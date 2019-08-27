@@ -10,7 +10,7 @@ PackageManager for InterSystems IRIS
 1. Download the  [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
 2. Import the zpm.xml into IRIS and compile via any desired way (Managemenet Portal, Studio or Terminal)
  
- After you can use PackageManager to install modules from [community repository](pm.community.intersystems.com) in any namespace.
+ After that you can use PackageManager to install modules from [community repository](pm.community.intersystems.com) in any namespace.
  
 # How to Install a Module:
 
