@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="TSL.SqlCompute.ClassB">
+<Super>TSL.SqlCompute.ParentClass</Super>
+<TimeCreated>64243,55921.232275</TimeCreated>
+
+<Property name="Computed">
+<Type>%String</Type>
+<Calculated>1</Calculated>
+<SqlComputeCode>Set {Computed} = {Name}_" of ClassB"</SqlComputeCode>
+<SqlComputed>1</SqlComputed>
+</Property>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+</Storage>
+</Class>
+</Export>

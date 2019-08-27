@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="Test.ModuleA.AbstractClass">
+<Abstract>1</Abstract>
+<TimeCreated>64509,41396.297647</TimeCreated>
+
+<Property name="Foo">
+<Type>%String</Type>
+</Property>
+</Class>
+</Export>

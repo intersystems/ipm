@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="Test.ModuleB.PersistentClass">
+<Super>%Persistent,Test.ModuleA.AbstractClass</Super>
+<TimeCreated>64509,41621.22</TimeCreated>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+<DataLocation>^Test.ModuleB.PersistentClassD</DataLocation>
+<DefaultData>PersistentClassDefaultData</DefaultData>
+<IdLocation>^Test.ModuleB.PersistentClassD</IdLocation>
+<IndexLocation>^Test.ModuleB.PersistentClassI</IndexLocation>
+<StreamLocation>^Test.ModuleB.PersistentClassS</StreamLocation>
+<Data name="PersistentClassDefaultData">
+<Value name="1">
+<Value>%%CLASSNAME</Value>
+</Value>
+<Value name="2">
+<Value>Foo</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+</Export>

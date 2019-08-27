@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="TSL.SqlCompute.ParentClass">
+<Abstract>1</Abstract>
+<Super>%Persistent</Super>
+<TimeCreated>64243,55924.404081</TimeCreated>
+
+<Property name="Name">
+<Type>%String</Type>
+</Property>
+
+<Property name="Computed">
+<Type>%String</Type>
+<Calculated>1</Calculated>
+<SqlComputeCode>Set {Computed} = {Name}_", instance of abstract class???"</SqlComputeCode>
+<SqlComputed>1</SqlComputed>
+</Property>
+
+<Method name="Run">
+<ClassMethod>1</ClassMethod>
+<Implementation><![CDATA[
+	Do ..%KillExtent()
+	
+	Set tObjA = ##class(TSL.SqlCompute.ClassA).%New()
+	Set tObjA.Name = "Object 1"
+	Do tObjA.%Save()
+	
+	Set tObjB = ##class(TSL.SqlCompute.ClassB).%New()
+	Set tObjB.Name = "Object 2"
+	Do tObjB.%Save()
+	
+	Do ##class(%SQL.Statement).%ExecDirect(,"select * from TSL_SqlCompute.ParentClass").%Display()
+]]></Implementation>
+</Method>
+
+<Storage name="Default">
+<Type>%Library.CacheStorage</Type>
+<DataLocation>^TSL.SqlCompute.ParentClassD</DataLocation>
+<DefaultData>ParentClassDefaultData</DefaultData>
+<IdLocation>^TSL.SqlCompute.ParentClassD</IdLocation>
+<IndexLocation>^TSL.SqlCompute.ParentClassI</IndexLocation>
+<StreamLocation>^TSL.SqlCompute.ParentClassS</StreamLocation>
+<Data name="ParentClassDefaultData">
+<Value name="1">
+<Value>%%CLASSNAME</Value>
+</Value>
+<Value name="2">
+<Value>Name</Value>
+</Value>
+<Value name="3">
+<Value>Computed</Value>
+</Value>
+</Data>
+</Storage>
+</Class>
+</Export>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Document name="SimpleApp.MODULE"><Module>
+  <Name>SimpleApp</Name>
+  <Version>0.0.1+snapshot</Version>
+  <Packaging>application</Packaging>
+  <Resources>
+    <Resource Name="TSL.SimpleAppInclude.INC" Preload="true">
+    </Resource>
+    <Resource Name="TSL.TestInstaller.CLS" Deploy="true">
+    </Resource>
+    <Resource Name="TSL.Lifecycle.CLS" Deploy="false">
+    </Resource>
+    <Resource Name="SimpleApp.Routine.MAC" Deploy="true">
+    </Resource>
+    <Resource Name="TSL.SqlCompute.PKG">
+    </Resource>
+    <Resource Name="/cls/" ProcessorClass="FileCopy">
+      <Attribute Name="InstallDirectory">{$mgrdir}/{$namespace}/source</Attribute>
+      <Attribute Name="Overlay">0</Attribute>
+    </Resource>
+    <Resource Name="/rtn/" ProcessorClass="TSL.DebugResourceProcessor">
+    </Resource>
+    <Resource Name="TSL.DebugResourceProcessor.CLS" Preload="true">
+    </Resource>
+  </Resources>
+  <LifecycleClass>DeployedApplication</LifecycleClass>
+  <InstallerClass>TSL.TestInstaller</InstallerClass>
+</Module>
+</Document></Export>

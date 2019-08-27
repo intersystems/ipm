@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Document name="Test.ModuleB.MODULE"><Module>
+  <Name>Test.ModuleB</Name>
+  <Version>0.0.1+snapshot</Version>
+  <Packaging>module</Packaging>
+  <Dependencies>
+    <ModuleReference>
+      <Name>Test.ModuleA</Name>
+      <Version>0.0.x</Version>
+    </ModuleReference>
+  </Dependencies>
+  <Resources>
+    <Resource Name="Test.ModuleB.PKG">
+    </Resource>
+  </Resources>
+  <LifecycleClass>Module</LifecycleClass>
+</Module>
+</Document></Export>

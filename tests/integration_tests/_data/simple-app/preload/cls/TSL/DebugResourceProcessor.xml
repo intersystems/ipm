@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="TSL.DebugResourceProcessor">
+<IncludeCode>TSL.SimpleAppInclude</IncludeCode>
+<Super>%ZPM.PackageManager.Developer.Processor.Abstract</Super>
+<TimeCreated>64366,52180.605442</TimeCreated>
+
+<Method name="OnBeforePhase">
+<FormalSpec><![CDATA[pPhase:%String,&pParams]]></FormalSpec>
+<ReturnType>%Status</ReturnType>
+<Implementation><![CDATA[
+	Write !,"CSP dir: ",..%Evaluate($$$CSPDIR)
+	Write !,"MGR dir: ",..%Evaluate("{$mgrdir}")
+	Write !,"Namespace: ",..%Evaluate("{$namespace}")
+	Quit ##super(pPhase,.pParams)
+]]></Implementation>
+</Method>
+</Class>
+</Export>

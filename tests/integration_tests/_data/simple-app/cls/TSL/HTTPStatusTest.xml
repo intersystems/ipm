@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Class name="TSL.HTTPStatusTest">
+<Super>HS.Test.TestCase</Super>
+<TimeCreated>64281,32917.116106</TimeCreated>
+
+<Method name="TestAllStatuses">
+<Implementation><![CDATA[
+	For i=200:1:206,300:1:308,400:1:418,422,428,429,431,451,500:1:505,511,520,522,524 {
+		Set req = ##class(%Net.HttpRequest).%New()
+		Set req.Server = "httpstat.us"
+		Set sc = req.Get(i)
+		Do $$$AssertStatusOK(sc,"GET "_req.Server_"/"_i_" succeeded.")
+		Do $$$AssertEquals(req.HttpResponse.StatusCode,i,"Got correct status code from GET "_req.Server_"/"_i)
+	}
+]]></Implementation>
+</Method>
+</Class>
+</Export>
