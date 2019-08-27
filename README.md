@@ -8,19 +8,16 @@ PackageManager for InterSystems IRIS
 # Install PackageManager:
 
 1. Download the  [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
-2. Load with compile to IRIS in any available way (Managemenet Portal, Studio or Terminal)
+2. Import the zpm.xml into IRIS and compile via any desired way (Managemenet Portal, Studio or Terminal)
  
- Now you can use PackageManager to install modules from global repository.
+ After you can use PackageManager to install modules from [community repository](pm.community.intersystems.com) in any namespace.
  
-# Install a Module:
+# How to Install a Module:
 
-1. In the terminal, call this command to inter zpm shell:
+1. Call this command to open zpm shell:
 > USER> zpm  
 
-2. Now you can load any module that resides in any of the defined repos into IRIS:
-> zpm: USER> install webterminal  
-
-3. To see all available modules which you can install:
+2. See the list of available modules:
 > zpm: USER>repo -list-modules -n registry
 >  
 > deepseebuttons 0.1.7
@@ -34,6 +31,9 @@ PackageManager for InterSystems IRIS
 > thirdpartychartportlets 0.0.1
 > webterminal 4.8.3
 > zpm 0.0.6
+
+3. You can load any module that resides in any of the defined repos into IRIS. E.g. here is the way to install webterminal:
+> zpm: USER> install webterminal  
 
 # To uninstall a module:
 > USER> zpm  
