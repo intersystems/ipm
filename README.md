@@ -1,11 +1,11 @@
-# Package Manager
+# Package Manager Client
 
 [![Gitter](https://img.shields.io/badge/chat-on%20telegram-blue.svg)](https://t.me/joinchat/FoZ4Mw58zQJwtbLzQrty3Q)
 
 
-PackageManager for InterSystems IRIS
+Package Manager Client for InterSystems IRIS
 
-# Install Package Manager:
+# Install Package Manager Client:
 
 1. Download the  [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
 2. Import the zpm.xml into IRIS and compile via any desired way (Managemenet Portal, Studio or Terminal)
