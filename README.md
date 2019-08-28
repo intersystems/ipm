@@ -39,3 +39,7 @@ Package Manager Client for InterSystems IRIS
 > USER> zpm  
 >
 > zpm: USER> uninstall webterminal
+
+# Support and Collaboration
+ZPM Package Manager client for ObjectScript is community supported and open to collaboration with Pull Requests.
+Issues and feature requests are very welcome
