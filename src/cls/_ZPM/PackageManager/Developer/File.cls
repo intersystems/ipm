@@ -17,7 +17,7 @@ ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
 		} ElseIf $$$isWINDOWS {
 			// Handle long directories
 			// Based on https://superuser.com/a/620474/227743
-			Set tEmptyDir = ##class(%File).NormalizeDirectory(##class(%File).TempFilename())
+			Set tEmptyDir = ##class(%File).NormalizeDirectory(##class(%File).TempFilename()_"dir")
 			If '##class(%File).CreateDirectory(tEmptyDir,.tReturn) {
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tEmptyDir,$zu(209,tReturn)))
 				Quit
