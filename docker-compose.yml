@@ -1,0 +1,13 @@
+version: '3.6'
+services:
+  iris:
+    build: 
+      context: .
+      
+    restart: always
+    ports: 
+      - 52774:52773
+    volumes:
+      - ~/iris.key:/usr/irissys/mgr/iris.key
+      - ./:/irisdev/app
+      - ./src/csp:/usr/irissys/mgr/csp/irisapp

@@ -1,18 +1,21 @@
-# Package Manager Client
+# ObjectScript Package Manager Client - ZPM
 
 [![Gitter](https://img.shields.io/badge/chat-on%20telegram-blue.svg)](https://t.me/joinchat/FoZ4Mw58zQJwtbLzQrty3Q)
 
+Helps to install ObjectScript, CSP and Frontend packages into InterSystems IRIS published on [ZPM Registry](https://pm.community.intersystems.com/packages/-/all)
 
-Package Manager Client for InterSystems IRIS
-
-# Install Package Manager Client:
+# Installing ObjectScript Package Manager Client:
 
 1. Download the  [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
 2. Import the zpm.xml into IRIS and compile via any desired way (Managemenet Portal, Studio or Terminal)
  
  After that you can use PackageManager to install modules from [community repository](pm.community.intersystems.com) in any namespace.
+
+3. Check if you call a zpm in command line and get the following:
+USER>zpm
+zpm: USER>
  
-# How to Install a Module:
+# How to Install a ZPM Module:
 
 1. Call this command to open zpm shell:
 > USER> zpm  
@@ -30,7 +33,7 @@ Package Manager Client for InterSystems IRIS
 > restforms 1.6.1
 > thirdpartychartportlets 0.0.1
 > webterminal 4.8.3
-> zpm 0.0.6
+> zpm 0.0.7
 
 3. You can load any module that resides in any of the defined repos into IRIS. E.g. here is the way to install webterminal:
 > zpm: USER> install webterminal  
@@ -41,5 +44,5 @@ Package Manager Client for InterSystems IRIS
 > zpm: USER> uninstall webterminal
 
 # Support and Collaboration
-ZPM Package Manager client for ObjectScript is community supported and open to collaboration with Pull Requests.
-Issues and feature requests are very welcome
+ObjectScript Package Manager is a community supported project and thus open to collaboration via Pull Requests.
+Issues and feature requests [are very welcome](https://github.com/intersystems-community/zpm/issues)
