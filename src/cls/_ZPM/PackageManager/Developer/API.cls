@@ -99,7 +99,7 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.PackageManager.Develop
 		
 		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
 		
-		Set tDocName = pSourceModule.Name_".MODULE"
+		Set tDocName = pSourceModule.Name_".ZPM"
 		
 		Set tSC = ##class(%Studio.SourceControl.Interface).GetStatus(tDocName,,.tIsEditable)
 		If $$$ISERR(tSC) {
@@ -381,7 +381,7 @@ ClassMethod GetModuleProperties(pModuleName As %String, Output pObject As %ZEN.p
 		Set tSC = $$$OK
 		Set pObject = ##class(%ZEN.proxyObject).%New()
 		Set pObject.error = ""
-		Set tModuleName = $Piece(pModuleName,".MODULE",1)
+		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName = "" {
 			Set tModuleObj = ##class(%ZPM.PackageManager.Developer.Module).%New()
 		} Else {
@@ -522,7 +522,7 @@ ClassMethod GetDependencySQL(pModuleName As %String, Output pSQL As %String) As 
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
-		Set tModuleName = $Piece(pModuleName,".MODULE",1)
+		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
 			Set tWhere = "where ""Module""->Name="_##class(%ZEN.Auxiliary.QueryInfo).QuoteSQL(tModuleName)
 			Set pSQL = "select Dependencies_Name as ModuleName, Dependencies_VersionString as Version, Dependencies_Scope as Scope from %ZPM_PackageManager_Developer.Module_Dependencies "_tWhere
@@ -539,7 +539,7 @@ ClassMethod GetResourceSQL(pModuleName As %String, Output pSQL As %String) As %S
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
-		Set tModuleName = $Piece(pModuleName,".MODULE",1)
+		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
 			Set tWhere = "where ""Module""->Name="_##class(%ZEN.Auxiliary.QueryInfo).QuoteSQL(tModuleName)
 			Set pSQL = "select Name,Preload,Scope,Deploy, "_
@@ -560,7 +560,7 @@ ClassMethod GetResourceAttributeSQL(pModuleName As %String, Output pSQL As %Stri
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
-		Set tModuleName = $Piece(pModuleName,".MODULE",1)
+		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
 			Set tWhere = "where ResourceReference->""Module""->Name="_##class(%ZEN.Auxiliary.QueryInfo).QuoteSQL(tModuleName)
 			Set pSQL = "select ResourceReference->Name ResourceReference,element_key Name,Attributes Value from %ZPM_PackageManager_Developer.ResourceReference_Attributes " _ tWhere
@@ -576,7 +576,7 @@ ClassMethod GetAPISQL(pModuleName As %String, Output pSQL As %String) As %Status
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
-		Set tModuleName = $Piece(pModuleName,".MODULE",1)
+		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
 			Set tWhere = "where ""Module""->Name="_##class(%ZEN.Auxiliary.QueryInfo).QuoteSQL(tModuleName)
 			Set pSQL = "select API_Name,API_Type,API_SubType,API_Public from %ZPM_PackageManager_Developer.Module_API " _ tWhere

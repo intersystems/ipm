@@ -3,9 +3,9 @@ Include (%ZPM.PackageManager.Common, %occErrors)
 Class %ZPM.PackageManager.Developer.Document.Module Extends %ZPM.PackageManager.Developer.Document.AbstractDocument
 {
 
-Projection RegisterExtension As %Projection.StudioDocument(DocumentDescription = "Application Module", DocumentExtension = "MODULE", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/PackageManager");
+Projection RegisterExtension As %Projection.StudioDocument(DocumentDescription = "Application Module", DocumentExtension = "ZPM", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/PackageManager");
 
-Parameter EXTENSION = ".MODULE";
+Parameter EXTENSION = ".ZPM";
 
 Parameter INFOGLOBAL = "^ZPM.Dev.Doc.Module";
 

@@ -355,7 +355,7 @@ Method %Reload(ByRef pParams) As %Status
 			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.")
 			Quit
 		}
-		If ($Piece(first,".",*) '= "module") {
+		If ($Piece(first,".",*) '= "zpm") {
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
 		}
@@ -697,7 +697,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				
 				Set tExt = $Piece(tFullResourceName,".",*)
 				Set tName = $Piece(tFullResourceName,".",1,*-1)
-				If ($$$ucase(tExt) = "MODULE") {
+				If ($$$ucase(tExt) = "ZPM") {
 					If (tName '= ..Module.Name) {
 						Set pDependencyGraph(tName,"Location") = ".modules/"_tName_"/"
 					}
@@ -725,7 +725,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Set tRelativePath = "preload/"_tRelativePath
 			}
 			
-			If (tExt = "MODULE") && (tName '= ..Module.Name) {
+			If (tExt = "ZPM") && (tName '= ..Module.Name) {
 				Set tRelativePath = pDependencyGraph(tName,"Location")_tRelativePath
 			} ElseIf (tSrcModule '= "") && (tSrcModule '= ..Module.Name) {
 				Set tRelativePath = pDependencyGraph(tSrcModule,"Location")_tRelativePath
@@ -1005,7 +1005,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 
 	// Intentionally does not support PKG - classes must be exported individually.
 	Set tDirectory = $Case(tExtension,
-		"MODULE":"",
+		"ZPM":"",
 		"LOC":"localize/",
 		"INC":"inc/",
 		"MAC":"mac/",
@@ -1015,7 +1015,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		)
 		
 	Set tFile = $Case(tExtension,
-		"MODULE":"module.xml",
+		"ZPM":"module.xml",
 		"LOC":$tr(tName,".%","/")_".xml",
 		"INC":$tr(tName,".%","/_")_".inc",
 		"MAC":$tr(tName,".%","/_")_".mac",

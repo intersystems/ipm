@@ -92,7 +92,7 @@ ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName A
 		
 		Do tReader.Correlate("Module","%ZPM.PackageManager.Developer.Module")
 		Do tReader.Next(.tModule,.tSC)
-		Set tName = tModule.Name_".MODULE"
+		Set tName = tModule.Name_".ZPM"
 		Do tXData.Data.Rewind()
 		
 		Set $Namespace = tInitNS

@@ -134,7 +134,7 @@ Method %Package(ByRef pParams) As %Status
 		}
 		
 		// Export module manifest
-		Set tSC = $System.OBJ.Export(..Module.Name_".MODULE",tWorkingDirectory_"module.xml", "/diffexport")
+		Set tSC = $System.OBJ.Export(..Module.Name_".ZPM",tWorkingDirectory_"module.xml", "/diffexport")
 		If $$$ISERR(tSC) {
 			Quit
 		}
