@@ -289,6 +289,20 @@ Method %Configure(ByRef pParams) As %Status
 			// Call OnConfigureComponent
 			Set tSC = $ClassMethod(..Module.InstallerClass,"OnConfigureComponent",$Namespace,tVerbose,.tVars)
 		}
+
+		// Call Invoke Methods
+		
+		Set key = ""
+		For {
+			Set invoke = ..Module.Invokes.GetNext(.key)
+			Quit:(key = "")
+			Set args = invoke.Arg.Count()
+			For i=1:1:invoke.Arg.Count() {
+				Set args(i) = invoke.Arg.GetAt(i)
+			}
+			Do $ClassMethod(invoke.Class,invoke.Method,args...)
+		}
+
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
