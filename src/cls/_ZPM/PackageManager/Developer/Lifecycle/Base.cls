@@ -269,8 +269,9 @@ Method %Configure(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
+		Set tVerbose = $Get(pParams("Verbose"),0)
 		If (..Module.InstallerClass '= "") {
-			Set tVerbose = $Get(pParams("Verbose"),0)
+			
 			Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
 			Set tDatabaseName = $Get(pParams("Configure","DatabaseName"))
 			Set tIsUpgrade = $Get(pParams("Configure","IsUpgrade"),0)
@@ -300,7 +301,13 @@ Method %Configure(ByRef pParams) As %Status
 			For i=1:1:invoke.Arg.Count() {
 				Set args(i) = invoke.Arg.GetAt(i)
 			}
-			Do $ClassMethod(invoke.Class,invoke.Method,args...)
+			If (tVerbose) { 
+				Write !, $$$FormatText("Invoking ClassMethod %1 from Class %2 ... ",invoke.Method,invoke.Class) 
+				Set result = $ClassMethod(invoke.Class,invoke.Method,args...)
+				Write $$$FormatText("Result: %1 ",result)
+			} else {
+				Do $ClassMethod(invoke.Class,invoke.Method,args...)
+			}
 		}
 
 	} Catch e {
