@@ -297,10 +297,8 @@ Method %Configure(ByRef pParams) As %Status
 		For {
 			Set invoke = ..Module.Invokes.GetNext(.key)
 			Quit:(key = "")
-			Set args = invoke.Arg.Count()
-			For i=1:1:invoke.Arg.Count() {
-				Set args(i) = invoke.Arg.GetAt(i)
-			}
+			Set args = 0
+			Do invoke.GetArgsArray(.args)
 			If (tVerbose) { 
 				Write !, $$$FormatText("Invoking ClassMethod %1 from Class %2 ... ",invoke.Method,invoke.Class) 
 				Set result = $ClassMethod(invoke.Class,invoke.Method,args...)
@@ -309,7 +307,6 @@ Method %Configure(ByRef pParams) As %Status
 				Do $ClassMethod(invoke.Class,invoke.Method,args...)
 			}
 		}
-
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

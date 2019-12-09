@@ -6,6 +6,14 @@ Class %ZPM.PackageManager.Developer.InvokeReference Extends (%Persistent,%ZPM.Pa
     
     Relationship Module As %ZPM.PackageManager.Developer.Module(XMLPROJECTION = "NONE")  [ Cardinality = parent, Inverse = Invokes ];
 
+	Method GetArgsArray(args) as %Status {
+		Set args = ..Arg.Count()
+		For i=1:1:..Arg.Count() {
+			Set args(i) = ..Arg.GetAt(i)
+			If (args(i)=$c(0)) { Set args(i) = "" }
+		}
+	}
+
 Storage Default
 {
 <Data name="InvokeReferenceDefaultData">
