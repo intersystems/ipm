@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@master
     - name: build docker image
-      run: docker build -t intersystemsdc/iris-community:2019.4.0.383.0-zpm
+      run: docker build -t intersystemsdc/iris-community:2019.4.0.383.0-zpm .
     - name: push to docker hub
       run: |
         docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
