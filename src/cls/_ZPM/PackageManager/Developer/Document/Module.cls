@@ -88,6 +88,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 			Do pModule.Defaults.Clear()
 			Do pModule.Mappings.Clear()
 			Do pModule.API.Clear()
+			Do pModule.Invokes.Clear()
 			
 			If (pModule.%Id() '= "") {
 				// Save to prevent unique index violations on re-insert of things that weren't actually removed.
