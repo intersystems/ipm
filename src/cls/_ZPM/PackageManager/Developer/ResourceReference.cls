@@ -104,27 +104,27 @@ Method ResolveChildren(ByRef pResourceArray) As %Status
 				Set tResourceCache(tCacheResult.%Get("UniqueName")) = ""
 			}
 			
-			Set tClassResult = ##class(%SQL.Statement).%ExecDirect(,
-				"select Name from %Dictionary.ClassDefinition where Name %STARTSWITH ? and Deployed = 0 and GeneratedBy IS NULL",
-				tPackage)
-			If (tClassResult.%SQLCODE < 0) {
-				Set tSC = $$$ERROR($$$SQLCode,tClassResult.%SQLCODE,tClassResult.%Message)
+			Set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
+        "select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
+				tPackage_"*")
+			If (tFilesResult.%SQLCODE < 0) {
+				Set tSC = $$$ERROR($$$SQLCode,tFilesResult.%SQLCODE,tFilesResult.%Message)
 				Quit
 			}
-			While tClassResult.%Next(.tSC) {
+			While tFilesResult.%Next(.tSC) {
 				If $$$ISERR(tSC) {
 					Quit
 				}
 				
-				Set tClassName = tClassResult.%Get("Name")_".CLS"
+				Set tFileName = tFilesResult.%Get("Name")
 				
 				// Skip resources owned by other modules (using cache).
-				If $Data(tResourceCache(tClassName)) {
+				If $Data(tResourceCache(tFileName)) {
 					Continue
 				}
 				Set tFoundInPackage = 0
-				For i=$Length(tClassName,".")-2:-1:1 {
-					If $Data(tResourceCache($Piece(tClassName,".",1,i)_".PKG")) {
+				For i=$Length(tFileName,".")-2:-1:1 {
+					If $Data(tResourceCache($Piece(tFileName,".",1,i)_".PKG")) {
 						Set tFoundInPackage = 1
 						Quit
 					}
@@ -133,12 +133,12 @@ Method ResolveChildren(ByRef pResourceArray) As %Status
 					Continue
 				}
 				
-				Set tResourceArray(tClassName) = ..Module.Name
-				Set tResourceArray(tClassName,"Processor") = ..Processor
-				Set tResourceArray(tClassName,"Generated") = ..Generated
-				Set tResourceArray(tClassName,"Preload") = ..Preload
-				Set tResourceArray(tClassName,"Scope") = ..Scope
-				Set tResourceArray(tClassName,"Deploy") = ..Deploy
+				Set tResourceArray(tFileName) = ..Module.Name
+				Set tResourceArray(tFileName,"Processor") = ..Processor
+				Set tResourceArray(tFileName,"Generated") = ..Generated
+				Set tResourceArray(tFileName,"Preload") = ..Preload
+				Set tResourceArray(tFileName,"Scope") = ..Scope
+				Set tResourceArray(tFileName,"Deploy") = ..Deploy
 			}
 			If $$$ISERR(tSC) {
 				Quit

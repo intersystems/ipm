@@ -58,7 +58,15 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			
 			If '..ResourceReference.Generated {
 				Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
-				Set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory_..Directory_"/")
+        Set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory)
+        If ('##class(%File).DirectoryExists(tResourceDirectory)) {
+          Quit 
+        }
+        
+        Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_..Directory_"/")
+        if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
+          Set tResourceDirectory = tResourceCatDirectory
+        }
 				
 				If '..ResourceReference.Preload {
 					Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
