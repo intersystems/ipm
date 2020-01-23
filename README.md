@@ -43,6 +43,13 @@ zpm: USER>
 >
 > zpm: USER> uninstall webterminal
 
+# How to submit modules
+This is described int the [following set of aticles](https://community.intersystems.com/tags/objectscript-package-manager)
+
+The simplest and template repository [could be found here](https://openexchange.intersystems.com/package/objectscript-package-example).
+Here is the [alternative supported folder structure.](https://openexchange.intersystems.com/package/objectscript-package-template)
+
+
 # Support and Collaboration
 ObjectScript Package Manager is a community supported project and thus open to collaboration via Pull Requests.
 Issues and feature requests [are very welcome](https://github.com/intersystems-community/zpm/issues)
