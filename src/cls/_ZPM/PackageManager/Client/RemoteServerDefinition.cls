@@ -17,7 +17,7 @@ Property Username As %String(MAXLEN = "");
 
 Property Password As %String(MAXLEN = "");
 
-Property DeploymentEnabled As %Integer(MAXVAL = 1, MINVAL = 0) [ InitialExpression = 1 ];
+Property DeploymentEnabled As %Integer(MAXVAL = 1, MINVAL = 0) [ InitialExpression = 0 ];
 
 Index DeploymentServer On DeploymentEnabled [ Unique ];
 

@@ -45,7 +45,7 @@ ClassMethod setup(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.I
 ClassMethod ZPMInit(pRegistry As %String = "")
 {
   if (pRegistry'="") {
-    do ##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry)
+    do ##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry_" -deployment")
   }
 }
 
