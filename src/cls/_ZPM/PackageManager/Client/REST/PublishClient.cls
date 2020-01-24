@@ -21,7 +21,7 @@ Method Publish(pModule As %ZPM.PackageManager.Core.VersionedBase) As %Boolean
   Set tRequest.ContentType = "application/json"
 
   $$$ThrowOnError(pModule.%JSONExportToStream(tRequest.EntityBody))
-  $$$ThrowOnError(tRequest.Post("/packages"))
+  $$$ThrowOnError(tRequest.Post(tRequest.Location_"packages"))
   
   If (tRequest.HttpResponse.StatusCode '= 200) {
     If tRequest.HttpResponse.StatusCode = 401 {

@@ -17,7 +17,7 @@ Property Username As %String(MAXLEN = "");
 
 Property Password As %String(MAXLEN = "");
 
-Property DeploymentEnabled As %Boolean [ InitialExpression = 1 ];
+Property DeploymentEnabled As %Integer(MAXVAL = 1, MINVAL = 0) [ InitialExpression = 1 ];
 
 Index DeploymentServer On DeploymentEnabled [ Unique ];
 
@@ -70,7 +70,8 @@ Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService
 /// Subclasses may override to show additional information.
 Method Display()
 {
-	Do ##super()
+	Do ##super() 
+	Write !,$c(9),"DeploymentEnabled?",$c(9),$$$YesNo(..DeploymentEnabled)
 	If (..Username '= "") {
 		Write !,$c(9),"Username: ",$c(9),..Username
 	}
@@ -103,10 +104,25 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 		If $Data(pModifiers("url"),tURL) {
 			Set pInstance.URL = tURL
 		}
+		If $Data(pModifiers("deployment"),tDeployment){
+			do ..RemoveDeploymentEnable()
+			Set pInstance.DeploymentEnabled = 1
+		} 
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
+}
+
+/// remove DeploymentEnable Flag from all REPO
+ClassMethod RemoveDeploymentEnable() As %Status
+{
+	Set tSC = $$$OK
+	Set tRes = ##class(%SQL.Statement).%ExecDirect(,"UPDATE %ZPM_PackageManager_Client.RemoteServerDefinition set DeploymentEnabled = NULL")
+	If (tRes.%SQLCODE < 0) {
+		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	}
+	Return tSC
 }
 
 Method GetSortOrder() As %Integer [ Private ]

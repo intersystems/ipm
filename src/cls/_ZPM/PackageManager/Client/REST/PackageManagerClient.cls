@@ -18,10 +18,10 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
   $$$ThrowOnError(tSC)
 
   If name = "" {
-    Set tSC = tRequest.Get($$$URLENCODE("packages/-/all"))
+    Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/-/all"))
   }
   Else {
-    Set tSC = tRequest.Get($$$URLENCODE("packages/" _ name))
+    Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/" _ name))
   }
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
     Set tRes = {}.%FromJSON(tRequest.HttpResponse.Data)
@@ -56,7 +56,7 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
   Set name = pModuleReference.Name
   Set version = pModuleReference.VersionString
 
-  Set tSC = tRequest.Get($$$URLENCODE("packages/" _ name _ "/" _ version))
+  Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/" _ name _ "/" _ version))
   Set tPackageUrl = ""
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
     Set tRes = {}.%FromJSON(tRequest.HttpResponse.Data)
@@ -64,8 +64,14 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
     Set tPackageUrl = tRes.url
     Set tHash = tRes.hash
 
-    Set tRequest = ..GetHttpRequest(tPackageUrl)
-    Set tSC = tRequest.Get()
+    Do ##class(%Net.URLParser).Parse(tPackageUrl,.tComponents)
+    If ($Data(tComponents("path"))#2) {
+      If ($Extract(tComponents("path"),1,1)="/") {
+          Set path = $Extract(tComponents("path"),2,*)	
+      }
+    }
+    Set tRequest = ..GetHttpRequest()
+    Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_path))
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
       Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz")
@@ -92,7 +98,7 @@ Method GetModuleManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedMo
   Set name = pModuleReference.Name
   Set version = pModuleReference.VersionString
 
-  Set tSC = tRequest.Get($$$URLENCODE("packages/" _ name _ "/"_version_"/manifest"))
+  Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/" _ name _ "/"_version_"/manifest"))
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
     Return tRequest.HttpResponse.Data
   }
@@ -107,7 +113,7 @@ Method IsAvailable() As %Boolean
   Set tRequest = ..GetHttpRequest()
   
   Set tRequest.Timeout = 1
-  Set tSC = tRequest.Get("_ping")
+  Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"_ping"))
   set status =tRequest.HttpResponse.StatusCode
   If $$$ISOK(tSC) && (tRequest.HttpResponse.StatusCode = 200) {
     Set tAvailable = 1
@@ -138,11 +144,16 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
 		If ($$$lcase(tComponents("scheme")) = "https") {
 			Set tRequest.Https = 1
     }
+    If ($Get(tComponents("path"))'="") {
+			Set path = tComponents("path")
+			If ($Extract(path,1,1)="/") {
+				Set path = $Extract(path,2,*)	
+			}
+			Set tRequest.Location = path
+		}
     #; in case of redirection
     Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
     
-		Set tLocation = $Get(tComponents("path"))
-    Set tRequest.Location = tLocation
 		If (..Username '= "") && (..Password '= "") {
       Set tRequest.Username = ..Username
       Set tRequest.Password = ..Password

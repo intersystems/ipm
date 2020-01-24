@@ -28,7 +28,7 @@ Relationship Resources As %ZPM.PackageManager.Developer.ResourceReference(XMLITE
 
 Relationship Mappings As %ZPM.PackageManager.Developer.MappingReference(XMLITEMNAME = "Mapping", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
-Relationship Invokes As %ZPM.PackageManager.Developer.InvokeReference(XMLITEMNAME = "Invoke", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE")  [ Cardinality = children, Inverse = Module ];
+Relationship Invokes As %ZPM.PackageManager.Developer.InvokeReference(XMLITEMNAME = "Invoke", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
 Property LifecycleClass As %Dictionary.CacheClassname;
 

@@ -96,6 +96,7 @@ repo -n AppModules -list-modules
 <modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
 <modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
+<modifier name="deployment" aliases="deploy" description="For remote repositories, specifies if this repo in DeploymentEnabled." />
 
 <!-- Modifiers specific to -enable -->
 <modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
