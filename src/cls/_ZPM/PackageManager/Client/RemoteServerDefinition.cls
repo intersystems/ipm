@@ -70,7 +70,7 @@ Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService
 /// Subclasses may override to show additional information.
 Method Display()
 {
-	Do ##super() 
+	Do ##super()
 	If (..Username '= "") {
 		Write !,$c(9),"Username: ",$c(9),..Username
 	}
@@ -110,17 +110,6 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
-}
-
-/// remove DeploymentEnable Flag from all REPO
-ClassMethod RemoveDeploymentEnable() As %Status
-{
-	Set tSC = $$$OK
-	Set tRes = ##class(%SQL.Statement).%ExecDirect(,"UPDATE %ZPM_PackageManager_Client.RemoteServerDefinition set DeploymentEnabled = NULL")
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-	}
-	Return tSC
 }
 
 Method GetSortOrder() As %Integer [ Private ]
