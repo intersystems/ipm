@@ -96,7 +96,6 @@ repo -n AppModules -list-modules
 <modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
 <modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
-<modifier name="deployment" aliases="deploy" description="For remote repositories, specifies if this repo in DeploymentEnabled." />
 
 <!-- Modifiers specific to -enable -->
 <modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
@@ -371,7 +370,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			Do ..ShowModulesForRepository(tName)
 		} Else {
 			Write !
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name from %ZPM_PackageManager_Client.ServerDefinition")
+			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
 			If (tRes.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 			}
@@ -380,7 +379,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 				If ($I(tCount) > 1) {
 					Write !!
 				}
-				Write tRes.%Get("Name"),":"
+				Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
 				Do ..ShowModulesForRepository(tRes.%Get("Name"))
 			}
 			$$$ThrowOnError(tSC)

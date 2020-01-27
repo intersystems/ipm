@@ -17,7 +17,7 @@ Property Username As %String(MAXLEN = "");
 
 Property Password As %String(MAXLEN = "");
 
-Property DeploymentEnabled As %Integer(MAXVAL = 1, MINVAL = 0) [ InitialExpression = 0 ];
+Property DeploymentEnabled As %Boolean [ InitialExpression = 1 ];
 
 Index DeploymentServer On DeploymentEnabled [ Unique ];
 
@@ -71,7 +71,6 @@ Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService
 Method Display()
 {
 	Do ##super() 
-	Write !,$c(9),"DeploymentEnabled?",$c(9),$$$YesNo(..DeploymentEnabled)
 	If (..Username '= "") {
 		Write !,$c(9),"Username: ",$c(9),..Username
 	}
@@ -104,10 +103,9 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 		If $Data(pModifiers("url"),tURL) {
 			Set pInstance.URL = tURL
 		}
-		If $Data(pModifiers("deployment"),tDeployment){
-			do ..RemoveDeploymentEnable()
-			Set pInstance.DeploymentEnabled = 1
-		} 
+		If ((pInstance.%Id()="")&&..DeploymentServerExists(1)) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server."_$$$NL_" Use ""repo -r -n registry -url <new url>"" to switch to another server"_$$$NL))
+		}
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
