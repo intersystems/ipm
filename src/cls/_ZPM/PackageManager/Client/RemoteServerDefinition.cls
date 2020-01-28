@@ -103,6 +103,9 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 		If $Data(pModifiers("url"),tURL) {
 			Set pInstance.URL = tURL
 		}
+		If ((pInstance.%Id()="")&&..DeploymentServerExists(1)) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server."_$$$NL_" Use ""repo -r -n registry -url <new url>"" to switch to another server"_$$$NL))
+		}
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
