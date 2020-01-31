@@ -36,14 +36,13 @@ Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceRefere
 	If (..Format = "") {
 		Set ..Format = $Case($$$lcase(..FilenameExtension),"cls":"UDL",:"XML")
 	}
-  Set ..Directory = ""
 	Quit tSC
 }
 
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
-  Set tVerbose = $Get(pParams("Verbose"))
+	Set tVerbose = $Get(pParams("Verbose"))
 	If ..Format = "XML" {
 		Set tSC = $System.OBJ.Export(pItemName,pFullExportPath,"-d")
 	} ElseIf (..Format = "UDL") {
