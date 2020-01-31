@@ -5,10 +5,13 @@ Class %ZPM.PackageManager.Developer.Processor.UnitTest Extends %ZPM.PackageManag
 Parameter DESCRIPTION As STRING = "Loads unit tests (extending %UnitTest.TestCase) from the specified directory and runs them during (Phase). For modules in development mode, the unit tests are always loaded and are not deleted after they are run.";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Phase,Package";
+Parameter ATTRIBUTES As STRING = "Phase,Package,ManagerClass";
 
-/// Phase in which the unit tests run - "test" (dev namespace) or "verify" (separate, clean namespace)
-Property Phase As %String(VALUELIST = ",test,verify") [ InitialExpression = "test", Required ];
+/// Class extending %UnitTest.Manager to use to run unit tests
+Property ManagerClass As %Dictionary.CacheClassname [ InitialExpression = "%ZPM.PackageManager.Developer.UnitTest.Manager" ];
+
+/// Phase in which the unit tests run - "test" (dev namespace), "verify" (separate, clean namespace), or "test,verify" (to run in both cases).
+Property Phase As %ZPM.PackageManager.Core.ListOfOptions(VALUELIST = ",test,verify") [ InitialExpression = {$ListBuild("test")}, Required ];
 
 /// Package containing unit tests - this will be mapped properly on development systems, and unit tests won't be deleted in the "test" phase if any classes in it exist.
 Property Package As %String(MAXLEN = 255) [ Required ];
@@ -32,12 +35,30 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 	Quit tSC
 }
 
+Method TestsShouldRun(pPhase As %String, ByRef pParams) As %Boolean
+{
+	Set tPathMatch = 1
+	Set tTestPath = ""
+	If $Data(pParams("UnitTest","Suite"),tTestSuite)#2 {
+		Set tTestPath = $Translate(tTestSuite,"/\","..")
+	} ElseIf $Data(pParams("UnitTest","Case"),tTestCase)#2 {
+		Set tTestPath = tTestCase
+	}
+	If (tTestPath '= "") && (..Package '= "") {
+		If $Length(tTestPath) > $Length(..Package) {
+			Set tPathMatch = ($Extract(tTestPath,1,$Length(..Package)) = ..Package)
+		} Else {
+			Set tPathMatch = ($Extract(..Package,1,$Length(tTestPath)) = tTestPath)
+		}
+	}
+	Quit tPathMatch && ($ListFind(..Phase,$ZConvert(pPhase,"L")) > 0)
+}
+
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
-		If ($ZConvert(pPhase,"L") = ..Phase) {
+		If ..TestsShouldRun(pPhase,.pParams) {
 			// In test/verify phase, run unit tests.
 			Set tVerbose = $Get(pParams("Verbose"))
 			Set tFlags = $Select(tVerbose:"/display=all",1:"/display=none")
@@ -52,25 +73,57 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 				}
 			}
 			
+			Set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
+			Set tUnitTestSubDir = ##class(%File).NormalizeDirectory(tUnitTestDir_$Replace(..Package,".","/"))
 			Set tTestSpec = ""
-			If $Data(pParams("UnitTest","Case"),tTestCase) {
+			If $Data(pParams("UnitTest","Suite"),tTestSuite) {
+				Set tTestSubDir = $Replace(tTestSuite,".","\")
+				Set tUnitTestDir = ##class(%File).NormalizeDirectory(tUnitTestDir_tTestSubDir)
+			} ElseIf $Data(pParams("UnitTest","Case"),tTestCase) {
 				Set tTestSpec = ":"_tTestCase
+				// Target the directory that contains this specific test case.
+				Set tTestSubDir = $Replace($Piece(tTestCase,".",1,*-1),".","/")
+				// Avoid nested directories
+				Set tFlags = tFlags_"/norecursive"
+				Set tUnitTestDir = ##class(%File).NormalizeDirectory(tUnitTestDir_tTestSubDir)
 				If $Data(pParams("UnitTest","Method"),tTestMethod) {
 					Set tTestSpec = tTestSpec_":"_tTestMethod
 				}
 			}
+
+			If ##class(%File).DirectoryExists(tUnitTestSubDir) && (tUnitTestSubDir [ tUnitTestDir) {
+				Set tUnitTestDir = tUnitTestSubDir
+			} ElseIf (tUnitTestSubDir '[ tUnitTestDir) {
+				// Case of multiple unit test resources
+				Quit
+			}
 			
 			Set tFlags = tFlags_$Get(pParams("UnitTest","Flags"))
 			
+			Set tManagerClass = $Get(pParams("UnitTest","ManagerClass"),..ManagerClass)
+			If (tManagerClass = "") {
+				Set tManagerClass = "%ZPM.PackageManager.Developer.UnitTest.Manager"
+			}
+			Merge tUserParams = pParams("UnitTest","UserParam")
+			
 			If $Data(^UnitTestRoot,tOldUnitTestRoot) // Stash ^UnitTestRoot
 			Set ^UnitTestRoot = tUnitTestDir
-			Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).RunTest(tTestSpec,tFlags)
+			Set tSC = $ClassMethod(tManagerClass,"RunTest",tTestSpec,tFlags,.tUserParams)
 			ZKill ^UnitTestRoot
 			$$$ThrowOnError(tSC)
 			
-			// TODO: Detect and report unit test failures as an error from this phase?
-			Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).GetLastStatus()
-			$$$ThrowOnError(tSC)
+			If $Data(pParams("UnitTest","JUnitOutput"),tJUnitFile) {
+				Set tPostfix = "-"_$ZConvert(pPhase,"L")_"-"_$Replace(..Package,".","-")
+				Set $Piece(tJUnitFile,".",*-1,*) = $Piece(tJUnitFile,".",1,*-1)_tPostfix_".xml"
+				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.JUnitOutput).ToFile(tJUnitFile)
+				$$$ThrowOnError(tSC)
+			}
+			
+			// By default, detect and report unit test failures as an error from this phase
+			If $Get(pParams("UnitTest","FailuresAreFatal"),1) {
+				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).GetLastStatus()
+				$$$ThrowOnError(tSC)
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
