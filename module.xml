@@ -3,7 +3,7 @@
 <Document name="ZPM.ZPM"><Module>
   <Name>ZPM</Name>
   <GlobalScope>true</GlobalScope>
-  <Version>0.1.3</Version>
+  <Version>0.1.4</Version>
   <ExternalName>Package Management System</ExternalName>
   <Description>Provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
   <Keywords>Package Manager</Keywords>
