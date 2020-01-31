@@ -148,7 +148,7 @@ Method BuildCache(pPurge As %Boolean = 1, pVerbose As %Integer = 0, pAutoDetectD
 			}
 			
 			Set tExt = $ZConvert($Piece($Get(tLoadedList),".",*),"U")
-			If (tExt '= "MODULE") {
+			If (tExt '= "ZPM") {
 				Continue
 			}
 			
@@ -196,7 +196,7 @@ ClassMethod GetModuleStreamFromFile(pFilename As %String, Output pStream As %Str
 		/*
 			<?xml version="1.0" encoding="UTF-8"?>
 			<Export generator="Cache" version="25">
-			<Document name="%ZPM.MODULE"><Module>
+			<Document name="%ZPM.ZPM"><Module>
 			...
 			</Module>
 			</Document></Export>
@@ -214,7 +214,7 @@ ClassMethod GetModuleStreamFromFile(pFilename As %String, Output pStream As %Str
 		Set pStream = ##class(%Stream.GlobalCharacter).%New()
 		Do pStream.WriteLine(tSourceStream.ReadLine($$$MaxStringLength)) //<?xml version="1.0" encoding="UTF-8"?>
 		Do tSourceStream.ReadLine($$$MaxStringLength) //<Export generator="Cache" version="25">
-		Set tFirstLine = tSourceStream.ReadLine($$$MaxStringLength) //<Document name="%ZPM.MODULE"><Module>
+		Set tFirstLine = tSourceStream.ReadLine($$$MaxStringLength) //<Document name="%ZPM.ZPM"><Module>
 		Do pStream.WriteLine("<Module>")
 		While 'tSourceStream.AtEnd {
 			Set tLine = tSourceStream.ReadLine($$$MaxStringLength)

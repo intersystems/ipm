@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-<Document name="Test.ModuleA.MODULE"><Module>
+<Document name="Test.ModuleA.ZPM"><Module>
   <Name>Test.ModuleA</Name>
   <Version>0.0.2+snapshot</Version>
   <Packaging>module</Packaging>

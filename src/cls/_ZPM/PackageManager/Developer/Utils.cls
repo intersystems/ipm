@@ -582,7 +582,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
 		set first = $$$lcase($o(tLoadedList("")))
 		if first=""                   set tSC = $$$ERROR($$$GeneralError,"No module definition found.") quit
 		if $o(tLoadedList(first))'="" set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.") quit
-		if $p(first,".",*)'="module"  set tSC = $$$ERROR($$$GeneralError,"No module definition found.") quit
+		if $p(first,".",*)'="zpm"  set tSC = $$$ERROR($$$GeneralError,"No module definition found.") quit
 		;
 		set name = $p(first,".",1,*-1)
 		;

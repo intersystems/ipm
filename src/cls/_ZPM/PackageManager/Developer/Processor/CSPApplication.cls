@@ -22,10 +22,10 @@ Parameter ATTRIBUTES = {""_
 	##class(%ZPM.PackageManager.Developer.Utils).GetInstallerProperties("CSPApplication", "Grant")};
 
 /// Overridden to avoid issues in %Installer generation
-Parameter XMLNAME = "PackageManagerCSPApplication";
+Parameter XMLNAME = "ZPMCSPApplication";
 
 /// Overridden to avoid issues in %Installer generation
-Parameter XMLTYPE = "PackageManagerCSPApplication";
+Parameter XMLTYPE = "ZPMCSPApplication";
 
 /// Enabled
 Property Enabled As %Boolean [ InitialExpression = 1 ];

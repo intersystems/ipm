@@ -370,7 +370,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			Do ..ShowModulesForRepository(tName)
 		} Else {
 			Write !
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name from %ZPM_PackageManager_Client.ServerDefinition")
+			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
 			If (tRes.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 			}
@@ -379,7 +379,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 				If ($I(tCount) > 1) {
 					Write !!
 				}
-				Write tRes.%Get("Name"),":"
+				Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
 				Do ..ShowModulesForRepository(tRes.%Get("Name"))
 			}
 			$$$ThrowOnError(tSC)

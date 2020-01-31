@@ -28,6 +28,8 @@ Relationship Resources As %ZPM.PackageManager.Developer.ResourceReference(XMLITE
 
 Relationship Mappings As %ZPM.PackageManager.Developer.MappingReference(XMLITEMNAME = "Mapping", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
+Relationship Invokes As %ZPM.PackageManager.Developer.InvokeReference(XMLITEMNAME = "Invoke", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
+
 Property LifecycleClass As %Dictionary.CacheClassname;
 
 Property InstallerClass As %Dictionary.CacheClassname;
@@ -489,7 +491,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 			}
 		}
 		
-		Set pReferenceArray(..Name_".MODULE") = ""
+		Set pReferenceArray(..Name_".ZPM") = ""
 		
 		Set tKey = ""
 		For {
@@ -521,7 +523,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 				}
 				
 				// Don't pass along the phase
-				Set pReferenceArray(tModName_".MODULE") = ..Name
+				Set pReferenceArray(tModName_".ZPM") = ..Name
 				Set tSC = tModule.GetResolvedReferences(.pReferenceArray, pLockedDependencies, ,pSkipDependencies)
 				If $$$ISERR(tSC) {
 					Quit
@@ -684,7 +686,7 @@ Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 			New %SourceControl
 			Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
 		}
-		Set tExternalName = ##class(%Studio.SourceControl.Interface).ExternalName(..Name_".MODULE")
+		Set tExternalName = ##class(%Studio.SourceControl.Interface).ExternalName(..Name_".ZPM")
 		If (tExternalName '= "") {
 			Set ..Root = ##class(%File).GetDirectory(tExternalName,1)
 		}

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-<Document name="ResourceTest.MODULE"><Module>
+<Document name="ResourceTest.ZPM"><Module>
   <Name>ResourceTest</Name>
   <Version>0.0.1+snapshot</Version>
   <Packaging>module</Packaging>

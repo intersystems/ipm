@@ -60,7 +60,8 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 		}
 		
 		Set tClassName = $TRANSLATE(tClassName, "%", "_")
-		Set pResourceArray(tClassKey,"RelativePath") = tSourceRoot_..Directory_"/"_$tr(tClassName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_"."_..FilenameExtension
+    Set tFilenameExtension = $Piece(tClassKey, ".", *)    
+		Set pResourceArray(tClassKey,"RelativePath") = tSourceRoot_$tr(tClassName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_"."_tFilenameExtension
 	}
 	Quit $$$OK
 }
@@ -90,7 +91,7 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, Output pHandle
 	// This works for either UDL or XML.
 	Set pHandled = 1
 	Set tFlags = $Select(pVerbose:"/display",1:"/nodisplay")_"/nocompile"
-	Set tSC = $System.OBJ.LoadDir(pFullResourcePath,tFlags,.tErrors,1)
+	Set tSC = $System.OBJ.ImportDir(pFullResourcePath,,tFlags,.tErrors,1)
 	For i=1:1:$Get(tErrors) {
 		Write !,$Get(tErrors(i))
 		Set pHandled = 0

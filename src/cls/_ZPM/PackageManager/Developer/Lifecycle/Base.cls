@@ -269,8 +269,9 @@ Method %Configure(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
+		Set tVerbose = $Get(pParams("Verbose"),0)
 		If (..Module.InstallerClass '= "") {
-			Set tVerbose = $Get(pParams("Verbose"),0)
+			
 			Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
 			Set tDatabaseName = $Get(pParams("Configure","DatabaseName"))
 			Set tIsUpgrade = $Get(pParams("Configure","IsUpgrade"),0)
@@ -288,6 +289,23 @@ Method %Configure(ByRef pParams) As %Status
 			
 			// Call OnConfigureComponent
 			Set tSC = $ClassMethod(..Module.InstallerClass,"OnConfigureComponent",$Namespace,tVerbose,.tVars)
+		}
+
+		// Call Invoke Methods
+		
+		Set key = ""
+		For {
+			Set invoke = ..Module.Invokes.GetNext(.key)
+			Quit:(key = "")
+			Set args = 0
+			Do invoke.GetArgsArray(.args)
+			If (tVerbose) { 
+				Write !, $$$FormatText("Invoking ClassMethod %1 from Class %2 ... ",invoke.Method,invoke.Class) 
+				Set result = $ClassMethod(invoke.Class,invoke.Method,args...)
+				Write $$$FormatText("Result: %1 ",result)
+			} else {
+				Do $ClassMethod(invoke.Class,invoke.Method,args...)
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -355,7 +373,7 @@ Method %Reload(ByRef pParams) As %Status
 			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.")
 			Quit
 		}
-		If ($Piece(first,".",*) '= "module") {
+		If ($Piece(first,".",*) '= "zpm") {
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
 		}
@@ -697,7 +715,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				
 				Set tExt = $Piece(tFullResourceName,".",*)
 				Set tName = $Piece(tFullResourceName,".",1,*-1)
-				If ($$$ucase(tExt) = "MODULE") {
+				If ($$$ucase(tExt) = "ZPM") {
 					If (tName '= ..Module.Name) {
 						Set pDependencyGraph(tName,"Location") = ".modules/"_tName_"/"
 					}
@@ -725,7 +743,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Set tRelativePath = "preload/"_tRelativePath
 			}
 			
-			If (tExt = "MODULE") && (tName '= ..Module.Name) {
+			If (tExt = "ZPM") && (tName '= ..Module.Name) {
 				Set tRelativePath = pDependencyGraph(tName,"Location")_tRelativePath
 			} ElseIf (tSrcModule '= "") && (tSrcModule '= ..Module.Name) {
 				Set tRelativePath = pDependencyGraph(tSrcModule,"Location")_tRelativePath
@@ -1005,7 +1023,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 
 	// Intentionally does not support PKG - classes must be exported individually.
 	Set tDirectory = $Case(tExtension,
-		"MODULE":"",
+		"ZPM":"",
 		"LOC":"localize/",
 		"INC":"inc/",
 		"MAC":"mac/",
@@ -1015,7 +1033,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		)
 		
 	Set tFile = $Case(tExtension,
-		"MODULE":"module.xml",
+		"ZPM":"module.xml",
 		"LOC":$tr(tName,".%","/")_".xml",
 		"INC":$tr(tName,".%","/_")_".inc",
 		"MAC":$tr(tName,".%","/_")_".mac",
