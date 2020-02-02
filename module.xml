@@ -13,12 +13,12 @@
   </Author>
   <Packaging>module</Packaging>
   <SourcesRoot>src</SourcesRoot>
-  <Resource Name="%ZPM.PackageManager.Common.INC"/>
-  <Resource Name="%ZPM.Utils.PKG"/>
-  <Resource Name="%ZPM.JSON.PKG"/>
-  <Resource Name="%ZPM.AbstractInstaller.CLS"/>
-  <Resource Name="%ZPM.PackageManager.PKG"/>
-  <Resource Name="%ZPM.PackageManager.CLS"/>
+  <Resource Name="%ZPM.PackageManager.Common.INC" Directory="inc"/>
+  <Resource Name="%ZPM.Utils.PKG" Directory="cls"/>
+  <Resource Name="%ZPM.JSON.PKG" Directory="cls"/>
+  <Resource Name="%ZPM.AbstractInstaller.CLS" Directory="cls"/>
+  <Resource Name="%ZPM.PackageManager.PKG" Directory="cls"/>
+  <Resource Name="%ZPM.PackageManager.CLS" Directory="cls"/>
   <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test"/>
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
   <Resource Name="%ZLANGC00.MAC" Generated="true"/>

@@ -61,7 +61,7 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 		
 		Set tClassName = $TRANSLATE(tClassName, "%", "_")
     Set tFilenameExtension = $Piece(tClassKey, ".", *)    
-		Set pResourceArray(tClassKey,"RelativePath") = tSourceRoot_$tr(tClassName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_"."_tFilenameExtension
+		Set pResourceArray(tClassKey,"RelativePath") = tSourceRoot_..Directory_"/"_$tr(tClassName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_"."_tFilenameExtension
 	}
 	Quit $$$OK
 }

@@ -19,7 +19,7 @@ XData PM [ XMLNamespace = INSTALLER ]
 
 <Namespace Name="%SYS">
   <Import File="${SRCDIR}inc/_ZPM/PackageManager/Common.inc" />
-  <Import File="${SRCDIR}" Recurse="1" />
+  <Import File="${SRCDIR}cls" Recurse="1" />
   
   <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" />
   <Invoke Class="%ZPM.Installer" Method="ZPMInit">
