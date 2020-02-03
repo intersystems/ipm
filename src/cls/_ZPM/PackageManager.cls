@@ -620,12 +620,12 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 		Set tPrefix = ""
 		If (tModuleName '= "") {
 			If (tVersion '= "") {
-				Write !,tModuleName_" "_tVersion_" not found in any repository."
+        $$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
 			} Else {
-				Write !,"'",tModuleName_"' not found in any repository."
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "'"_tModuleName_"' not found in any repository."))
 			}
 		} ElseIf (tKeywords '= "") {
-			Write !,"No modules found matching keywords: '",tKeywords,"'"
+      $$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
 		} Else {
 			
 		}

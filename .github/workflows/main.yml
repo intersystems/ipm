@@ -4,14 +4,33 @@ on: [push]
 
 jobs:
   build:
-
+    strategy:
+      matrix:
+        image: [
+          "store/intersystems/iris-community:2019.4.0.383.0",
+          "store/intersystems/irishealth-community:2019.4.0.383.0",
+          "store/intersystems/iris-community:2020.1.0.197.0",
+          "store/intersystems/irishealth-community:2020.1.0.197.0"
+        ]
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@master
-    - name: build docker image
-      run: docker build -t intersystemsdc/iris-community:2019.4.0.383.0-zpm .
-    - name: push to docker hub
-      run: |
-        docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-        docker push intersystemsdc/iris-community:2019.4.0.383.0-zpm
+      - uses: actions/checkout@master
+      - name: Build
+        run: docker build --rm --build-arg BASE=${{ matrix.image }} -t zpm .
+      - name: Test
+        timeout-minutes: 15
+        run: |
+            CONTAINER=`docker run -d --rm --init zpm`
+            docker ps
+            docker logs $CONTAINER
+            while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+            /bin/echo -e '' \
+              'zpm "list":1\n' \
+              'zpm "zpm test":1\n' \
+              'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
+              'zpm "repo -list":1\n' \
+              'zpm "install dsw":1\n' \
+              'zpm "list":1\n' \
+              'halt\n' \
+            | docker exec -i $CONTAINER iris session iris -U%SYS
+            docker stop $CONTAINER
