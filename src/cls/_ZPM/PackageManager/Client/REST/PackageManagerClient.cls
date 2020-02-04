@@ -71,7 +71,7 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
       }
     }
     Set tRequest = ..GetHttpRequest()
-    Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_path))
+    Set tSC = tRequest.Get(tRequest.Location_path)
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
       Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz")
