@@ -393,7 +393,11 @@ XData InternalXSL
     <xsl:for-each select="@*">
       <xsl:element name="Attribute">
         <xsl:attribute name="Name">
-          <xsl:value-of select="name()" />
+        <xsl:choose>
+		  <xsl:when test="name()='SourcePath'">Path</xsl:when>
+		  <xsl:when test="name()='DeployPath'">Directory</xsl:when>
+		  <xsl:otherwise><xsl:value-of select="name()" /></xsl:otherwise>
+		</xsl:choose>
         </xsl:attribute>
         <xsl:value-of select="." />
       </xsl:element>
@@ -429,6 +433,12 @@ XData InternalXSL
       <xsl:with-param name="name" select="'Path'" />
     </xsl:call-template>
   </xsl:template>
+  <xsl:template match="Module/*[@SourcePath]">
+    <xsl:call-template name="resource">
+      <xsl:with-param name="name" select="'SourcePath'" />
+    </xsl:call-template>
+  </xsl:template>
+
   <xsl:template match="Module/Resource">
     <xsl:call-template name="resource">
       <xsl:with-param name="name" select="'Name'" />

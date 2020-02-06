@@ -151,9 +151,11 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 <modifier name="namespace" aliases="ns" value="true" description="Namespace to start the manager in" />
 </command>
 
-<command name="list-installed" aliases="list">
-<description>Lists modules installed in the current namespace</description>
-<example description="Shows all installed modules in tree format.">list-installed -tree</example>
+<command name="list">
+<description>Lists modules installed in the current namespace or available in an active registry</description>
+<example description="Shows all installed modules in tree format.">list -installed -tree</example>
+<modifier name="available" aliases="a" description="Show available modules in an active registry" />
+<modifier name="installed" aliases="i" description="Lists modules installed in the current namespace" />
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules" />
 </command>
 
@@ -222,8 +224,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Uninstall(.tCommandInfo)
 			} ElseIf (tCommandInfo = "manage") {
 				Do ..Manage(.tCommandInfo)
-			} ElseIf (tCommandInfo = "list-installed") {
-				Do ..ListInstalled(.tCommandInfo)
+			} ElseIf (tCommandInfo = "list") {
+				Do ..List(.tCommandInfo)
 			} ElseIf (tCommandInfo = "list-dependents") {
 				Do ..ListDependents(.tCommandInfo)
 			} ElseIf (tCommandInfo = "orphans") {
@@ -332,6 +334,30 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
+ClassMethod ShowRepoModules(ByRef pCommandInfo) As %Status
+{
+	Kill tArgs
+	Set tName = $$$GetModifier(pCommandInfo,"name")
+	If (tName '= "") {
+		Do ..ShowModulesForRepository(tName)
+	} Else {
+		Write !
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
+		If (tRes.%SQLCODE < 0) {
+			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+		}
+		While tRes.%Next(.tSC) {
+			$$$ThrowOnError(tSC)
+			If ($I(tCount) > 1) {
+				Write !!
+			}
+			Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
+			Do ..ShowModulesForRepository(tRes.%Get("Name"))
+		}
+		$$$ThrowOnError(tSC)
+	}
+}
+
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
 	Set tFileSystem = $$$HasModifier(pCommandInfo,"filesystem")
@@ -364,26 +390,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	} ElseIf $$$HasModifier(pCommandInfo,"disable") {
 	} ElseIf $$$HasModifier(pCommandInfo,"info") {
 	} ElseIf $$$HasModifier(pCommandInfo,"list-modules") {
-		Kill tArgs
-		Set tName = $$$GetModifier(pCommandInfo,"name")
-		If (tName '= "") {
-			Do ..ShowModulesForRepository(tName)
-		} Else {
-			Write !
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
-			If (tRes.%SQLCODE < 0) {
-				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-			}
-			While tRes.%Next(.tSC) {
-				$$$ThrowOnError(tSC)
-				If ($I(tCount) > 1) {
-					Write !!
-				}
-				Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
-				Do ..ShowModulesForRepository(tRes.%Get("Name"))
-			}
-			$$$ThrowOnError(tSC)
-		}
+		Do ..ShowRepoModules(.pCommandInfo)
 		Quit
 	} ElseIf $$$HasModifier(pCommandInfo,"delete-all") {
 		Set tDeleteFS = tFileSystem || 'tRemote
@@ -731,53 +738,58 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
+ClassMethod List(ByRef pCommandInfo) [ Private ]
 {
-	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-		"select Name,VersionString from %ZPM_PackageManager_Developer.""MODULE""")
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-	}
-	While tRes.%Next(.tSC) {
-		$$$ThrowOnError(tSC)
-		Set tModMap(tRes.%Get("Name")) = tRes.%Get("VersionString")
-	}
-	$$$ThrowOnError(tSC)
-	
-	Set tTree = ''$Data(pCommandInfo("modifiers","tree"))
-	
-	If (tTree) {
-		// Show tree of dependencies as well.
-		// Modules that are dependencies for no other are shown at the top level.
-		// TODO: deal with cyclic dependencies?
-		
-		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
-			"select ""Module""->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
-			"from %ZPM_PackageManager_Developer.Module_Dependencies")
-		If (tDepRes.%SQLCODE < 0) {
+	If ($$$HasModifier(pCommandInfo,"available")) {
+		Do ..ShowRepoModules(.pCommandInfo)
+		Quit 
+	} Else {
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+			"select Name,VersionString from %ZPM_PackageManager_Developer.""MODULE""")
+		If (tRes.%SQLCODE < 0) {
 			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 		}
-		While tDepRes.%Next(.tSC) {
+		While tRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			Set tModMap(tDepRes.%Get("ModName"),tDepRes.%Get("DepName")) = tDepRes.%Get("DepVer")
-			Set tVisitedMap(tDepRes.%Get("DepName")) = 1
+			Set tModMap(tRes.%Get("Name")) = tRes.%Get("VersionString")
 		}
 		$$$ThrowOnError(tSC)
 		
-		Set tMod = ""
-		For {
-			Set tMod = $Order(tModMap(tMod),1,tVersion)
-			Quit:(tMod="")
-			Do:'$Data(tVisitedMap(tMod)) ..AccumulateTreeRecursive(tMod,.tModMap,.tOrderedTree)
-		}
+		Set tTree = ''$Data(pCommandInfo("modifiers","tree"))
 		
-		Do ..PrintTree(.tOrderedTree)
-	} Else {
-		Set tMod = ""
-		For {
-			Set tMod = $Order(tModMap(tMod),1,tVersion)
-			Quit:(tMod="")
-			Write tMod," ",tVersion,!
+		If (tTree) {
+			// Show tree of dependencies as well.
+			// Modules that are dependencies for no other are shown at the top level.
+			// TODO: deal with cyclic dependencies?
+			
+			Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
+				"select ""Module""->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
+				"from %ZPM_PackageManager_Developer.Module_Dependencies")
+			If (tDepRes.%SQLCODE < 0) {
+				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+			}
+			While tDepRes.%Next(.tSC) {
+				$$$ThrowOnError(tSC)
+				Set tModMap(tDepRes.%Get("ModName"),tDepRes.%Get("DepName")) = tDepRes.%Get("DepVer")
+				Set tVisitedMap(tDepRes.%Get("DepName")) = 1
+			}
+			$$$ThrowOnError(tSC)
+			
+			Set tMod = ""
+			For {
+				Set tMod = $Order(tModMap(tMod),1,tVersion)
+				Quit:(tMod="")
+				Do:'$Data(tVisitedMap(tMod)) ..AccumulateTreeRecursive(tMod,.tModMap,.tOrderedTree)
+			}
+			
+			Do ..PrintTree(.tOrderedTree)
+		} Else {
+			Set tMod = ""
+			For {
+				Set tMod = $Order(tModMap(tMod),1,tVersion)
+				Quit:(tMod="")
+				Write tMod," ",tVersion,!
+			}
 		}
 	}
 }

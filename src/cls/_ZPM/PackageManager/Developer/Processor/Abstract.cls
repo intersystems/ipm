@@ -211,12 +211,16 @@ Method OnGetUniqueName(Output pUniqueName)
 Method %Evaluate(pAttrValue) As %String [ Internal ]
 {
 	Set tAttrValue = ..%RegExReplace(pAttrValue,"(?i)\{\$namespace\}",$Namespace)
+	Set tAttrValue = ..%RegExReplace(pAttrValue,"(?i)\$\{namespace\}",$Namespace)
 	Set tMgrDir = ##class(%File).ManagerDirectory()
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$mgrdir\}",tMgrDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{mgrdir\}",tMgrDir)
 	Set tCSPDir = ##class(%File).NormalizeDirectory(##class(%File).ParentDirectoryName(tMgrDir)_"/csp")
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$cspdir\}",tCSPDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{cspdir\}",tCSPDir)
 	Set tRoot = $Case(..ResourceReference.Module.Root,"":"",:##class(%File).NormalizeDirectory(..ResourceReference.Module.Root))
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$root\}",tRoot)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{root\}",tRoot)
 	Quit tAttrValue
 }
 
