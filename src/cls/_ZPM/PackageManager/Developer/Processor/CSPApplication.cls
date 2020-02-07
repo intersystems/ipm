@@ -216,7 +216,7 @@ Method OnPhaseInternal(pTime As %String, pPhase As %String, ByRef pParams) As %S
 	Quit tSC
 }
 
-Method RepalceMatchRoles(matchRoles As %String, dbDir As %String) As %String
+Method ReplaceMatchRoles(matchRoles As %String, dbDir As %String) As %String
 {
 	Set templates = $Listbuild("{$dbrole}", "${dbrole}")
 	For i=1:1:$Listlength(templates) {
@@ -288,7 +288,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 		}
 		
 		Set matchRoles = ..MatchRoles
-		Set matchRoles = ..RepalceMatchRoles(matchRoles, dbDir)
+		Set matchRoles = ..ReplaceMatchRoles(matchRoles, dbDir)
     Set pos = 0
     For {
       Set pos = $Find(matchRoles, ":", pos)
