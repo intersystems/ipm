@@ -42,7 +42,11 @@ ClassMethod GetLastStatus(Output pFailureCount As %Integer) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		If $Data(^||%UnitTest.Manager.LastResult,tLogIndex) {
+		If '$Data(^||%UnitTest.Manager.LastResult,tLogIndex)#2 {
+			Set tLogIndex = $Order(^UnitTest.Result(""),-1)
+		}
+		Kill ^||%UnitTest.Manager.LastResult // Clean up
+		If tLogIndex {
 			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
 				"from %UnitTest_Result.TestAssert where Status = 0 "_
 				"and TestMethod->TestCase->TestSuite->TestInstance->InstanceIndex = ?",tLogIndex)
