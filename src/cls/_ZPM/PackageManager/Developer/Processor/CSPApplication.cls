@@ -216,6 +216,23 @@ Method OnPhaseInternal(pTime As %String, pPhase As %String, ByRef pParams) As %S
 	Quit tSC
 }
 
+Method ReplaceMatchRoles(matchRoles As %String, dbDir As %String) As %String
+{
+	Set templates = $Listbuild("{$dbrole}", "${dbrole}")
+	For i=1:1:$Listlength(templates) {
+		Set template = $Listget(templates, i)
+		If matchRoles[template {
+			Set dbRole = "%DB_DEFAULT"
+			Set db = ##class(SYS.Database).%OpenId(dbDir)
+			If $Isobject(db) {
+				Set dbRole = db.ResourceName
+			}
+			Set matchRoles = $Replace(matchRoles, template, dbRole)
+		}
+	}
+	Return matchRoles
+}
+
 Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 {
 	// TODO: Make mirror-safe.
@@ -271,14 +288,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 		}
 		
 		Set matchRoles = ..MatchRoles
-		If matchRoles["{$dbrole}" {
-			Set dbRole = "%DB_DEFAULT"
-			Set db = ##class(SYS.Database).%OpenId(dbDir)
-			If $Isobject(db) {
-				set dbRole = db.ResourceName
-			}
-			Set matchRoles = $Replace(matchRoles, "{$dbrole}", dbRole)
-		}
+		Set matchRoles = ..ReplaceMatchRoles(matchRoles, dbDir)
     Set pos = 0
     For {
       Set pos = $Find(matchRoles, ":", pos)

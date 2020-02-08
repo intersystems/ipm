@@ -50,6 +50,11 @@ The standard lifecycle phases are:
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
+<command name="search" aliases="find">
+<description>Shows all modules in current registry</description>
+<example description="Shows all modules in current registry">search</example>
+</command>
+
 <command name="repo" aliases="repository" dataPrefix="D">
 <description>Configures the current namespace to search for modules on a remote server or on the local filesystem.</description>
 <example description="List all repositories">
@@ -212,6 +217,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..%Help(.tCommandInfo)
 			} ElseIf (tCommandInfo = "init") {
 				Do ..Init(.tCommandInfo)
+			} ElseIf (tCommandInfo = "search") {
+				Do ..Search(.tCommandInfo)
 			} ElseIf (tCommandInfo = "repo") {
 				Do ..Repository(.tCommandInfo)
 			} ElseIf (tCommandInfo = "load") {
@@ -332,6 +339,29 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
+ClassMethod Search(ByRef pCommandInfo) [ Internal ]
+{
+	Set tName = $$$GetModifier(pCommandInfo,"name")
+	If (tName '= "") {
+		Do ..ShowModulesForRepository(tName)
+	} Else {
+		Write !
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
+		If (tRes.%SQLCODE < 0) {
+			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+		}
+		While tRes.%Next(.tSC) {
+			$$$ThrowOnError(tSC)
+			If ($I(tCount) > 1) {
+				Write !!
+			}
+			Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
+			Do ..ShowModulesForRepository(tRes.%Get("Name"))
+		}
+		$$$ThrowOnError(tSC)
+	}
+}
+
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
 	Set tFileSystem = $$$HasModifier(pCommandInfo,"filesystem")
@@ -364,26 +394,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	} ElseIf $$$HasModifier(pCommandInfo,"disable") {
 	} ElseIf $$$HasModifier(pCommandInfo,"info") {
 	} ElseIf $$$HasModifier(pCommandInfo,"list-modules") {
-		Kill tArgs
-		Set tName = $$$GetModifier(pCommandInfo,"name")
-		If (tName '= "") {
-			Do ..ShowModulesForRepository(tName)
-		} Else {
-			Write !
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
-			If (tRes.%SQLCODE < 0) {
-				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-			}
-			While tRes.%Next(.tSC) {
-				$$$ThrowOnError(tSC)
-				If ($I(tCount) > 1) {
-					Write !!
-				}
-				Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
-				Do ..ShowModulesForRepository(tRes.%Get("Name"))
-			}
-			$$$ThrowOnError(tSC)
-		}
+		Do ..Search(.pCommandInfo)
 		Quit
 	} ElseIf $$$HasModifier(pCommandInfo,"delete-all") {
 		Set tDeleteFS = tFileSystem || 'tRemote
