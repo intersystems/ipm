@@ -90,7 +90,10 @@ ClassMethod RetrieveBuiltDatabase(Output pStream As %Stream.TmpBinary, pVerbose 
 			Do pStream.Rewind()
 			
 			// Remount database
-			$$$ThrowOnError(##class(SYS.Database).MountDatabase(tDB.Directory))
+      Set tSysDB = ##class(SYS.Database).%OpenId(tPath)
+      If ('SystDB.Mounted) {
+        $$$ThrowOnError(##class(SYS.Database).MountDatabase(tDB.Directory))      
+      }
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -190,7 +193,10 @@ ClassMethod CreateDatabase(pDBName As %String, pInitFile As %String = "", pOverw
 			}
 			Set pCreated = 1
 		}
-		$$$ThrowOnError(##class(SYS.Database).MountDatabase(tPath))
+    Set tDB = ##class(SYS.Database).%OpenId(tPath)
+    If ('tDB.Mounted) {
+		  $$$ThrowOnError(##class(SYS.Database).MountDatabase(tPath))      
+    }    
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
