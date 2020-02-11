@@ -111,6 +111,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			Set tSC = $ClassMethod(tManagerClass,"RunTest",tTestSpec,tFlags,.tUserParams)
 			ZKill ^UnitTestRoot
 			$$$ThrowOnError(tSC)
+
+			// Allow the manager class to change its own UserParam array for later use in separate test runs
+			Merge pParams("UnitTest","UserParam") = tUserParams
 			
 			If $Data(pParams("UnitTest","JUnitOutput"),tJUnitFile) {
 				Set tPostfix = "-"_$ZConvert(pPhase,"L")_"-"_$Replace(..Package,".","-")
