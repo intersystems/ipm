@@ -59,12 +59,12 @@ ClassMethod Extract(pArchiveFileName As %String, pTargetDirectory As %String, Ou
 			Do tStream.CopyFromAndSave(pArchiveFileName)
 			Set tStream2 = ##class(%Stream.FileBinaryGzip).%New()
 			Set tStream2.Filename = tStream.Filename
-			Set extracted = ##class(%ZPM.Utils.FileBinaryTar).ExtractStream(tStream2)
+			Set extracted = ##class(%ZPM.Utils.FileBinaryTar).ExtractStream(tStream2, pTargetDirectory)
 		} Else {
-			Set extracted = ##class(%ZPM.Utils.FileBinaryTar).ExtractFile(pArchiveFileName, 1)			
+			Set extracted = ##class(%ZPM.Utils.FileBinaryTar).ExtractFile(pArchiveFileName, 1, pTargetDirectory)			
 		}
 		
-		set tSC = extracted.ExtractTo(pTargetDirectory)
+		//set tSC = extracted.ExtractTo(pTargetDirectory)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
