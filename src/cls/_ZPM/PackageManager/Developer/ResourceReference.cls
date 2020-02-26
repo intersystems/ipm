@@ -106,7 +106,7 @@ Method ResolveChildren(ByRef pResourceArray) As %Status
 			
 			Set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
         "select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
-				tPackage_"*")
+				tPackage_"*.cls,"_tPackage_"*.mac,"_tPackage_"*.int,"_tPackage_"*.inc")
 			If (tFilesResult.%SQLCODE < 0) {
 				Set tSC = $$$ERROR($$$SQLCode,tFilesResult.%SQLCODE,tFilesResult.%Message)
 				Quit
