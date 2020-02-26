@@ -128,7 +128,7 @@ Method FindPath(pPath As %String = "", Output found As FileBinaryTar) As %Status
   Return $$$OK
 }
 
-ClassMethod ExtractFile(aFileName As %String = "", Gzip As %Boolean = 1) As FileBinaryTar
+ClassMethod ExtractFile(aFileName As %String = "", Gzip As %Boolean = 1, pTargetDirectory As %String) As FileBinaryTar
 {
   if aFileName = "" {
     Return $$$ERROR($$$GeneralError, "Filename not specified")
@@ -139,7 +139,7 @@ ClassMethod ExtractFile(aFileName As %String = "", Gzip As %Boolean = 1) As File
     set fileStream=##class(%Stream.FileBinary).%New()
   }
   set fileStream.Filename=aFileName
-  Return ..ExtractStream(fileStream)
+  Return ..ExtractStream(fileStream, pTargetDirectory)
 }
 
 Method ExtractTo(pDest As %String) As %Status
@@ -159,15 +159,9 @@ Method ExtractTo(pDest As %String) As %Status
       do fs.%Close()
     }
   }
-
-  set key = ""
-  while ..GetNext(.key) {
-    do ..GetAt(key).ExtractTo(pDest)
-  }
-  Return $$$OK
 }
 
-ClassMethod ExtractStream(aFileStream As %Stream.Object) As FileBinaryTar
+ClassMethod ExtractStream(aFileStream As %Stream.Object, pTargetDirectory As %String) As FileBinaryTar
 {
   #dim tFile As FileBinaryTar
   set blockSize = ..#BLOCKSIZE
@@ -212,9 +206,12 @@ ClassMethod ExtractStream(aFileStream As %Stream.Object) As FileBinaryTar
     } while repeat
     set fileName=tFile.name
     quit:fileName=""
-    if tFile.typeflag'="g" {
-      do ..AddToArray(tFile, result)
+    if ( (tFile.typeflag'="g") && (tFile.typeflag=5) ) { 
+      // save directory
+      do tFile.ExtractTo(pTargetDirectory)
+      //      do ..AddToArray(tFile, result)
     }
+    
     continue:fileSize=0
     set readBlocks=fileSize \ blockSize
     set:fileSize#blockSize>0 readBlocks=readBlocks + 1
@@ -223,6 +220,10 @@ ClassMethod ExtractStream(aFileStream As %Stream.Object) As FileBinaryTar
       set tData=aFileStream.Read(blockSize)
       set:tPos=readBlocks tData=$extract(tData, 1, fileSize#blockSize)
       do tFile.fileData.Write(tData)
+    }
+    if tFile.typeflag'="g" { 
+      // save file
+      do tFile.ExtractTo(pTargetDirectory)
     }
   }
   Return result
