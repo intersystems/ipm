@@ -16,6 +16,7 @@ XData PM [ XMLNamespace = INSTALLER ]
 <Default Name="MODDIR" Dir="${MGRDIR}zpm" />
 <Default Name="SRCDIR" Dir="${MODDIR}src" />
 <Default Name="REGISTRY" Value="https://pm.community.intersystems.com" />
+<Default Name="TRACKINGID" Value="UA-3758147-1" />
 
 <Namespace Name="%SYS">
   <Import File="${SRCDIR}inc/_ZPM/PackageManager/Common.inc" />
@@ -23,7 +24,8 @@ XData PM [ XMLNamespace = INSTALLER ]
   
   <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" />
   <Invoke Class="%ZPM.Installer" Method="ZPMInit">
-    <Arg Value="${REGISTRY}"/>
+    <Arg Value="${REGISTRY}"/> 
+    <Arg Value="${TRACKINGID}"/>
   </Invoke>
   <Invoke Class="%ZPM.Installer" Method="ZPMLoad">
     <Arg Value="${MODDIR}"/>
@@ -42,11 +44,14 @@ ClassMethod setup(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.I
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "PM")
 }
 
-ClassMethod ZPMInit(pRegistry As %String = "")
+ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
-  if (pRegistry'="") {
-    do ##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry)
-  }
+    If (pRegistry'="") {
+        Do ##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry)
+    }
+    Do ##class(%ZPM.PackageManager.Settings).SetVersion($Parameter($CLASSNAME(),"VERSION"))
+    Do ##class(%ZPM.PackageManager.Settings).SetAnalyticsAvailable(1)
+    Do ##class(%ZPM.PackageManager.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID)
 }
 
 ClassMethod ZPMLoad(pDirectoryName)
