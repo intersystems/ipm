@@ -55,6 +55,14 @@ The standard lifecycle phases are:
 <example description="Shows all modules in current registry">search</example>
 </command>
 
+<command name="settings">
+<description>Update ZPM settings</description>
+<example description="Disable collecting analytics data">settings -analytics stop</example>
+<example description="Enable collecting analytics data">settings -analytics start</example>
+<modifier name="analytics" value="true" description="Enable/Disable collecting analytics data" />
+</command>
+
+
 <command name="repo" aliases="repository" dataPrefix="D">
 <description>Configures the current namespace to search for modules on a remote server or on the local filesystem.</description>
 <example description="List all repositories">
@@ -71,6 +79,10 @@ repo -n LocalFiles -delete
 </example>
 <example description="Lists all modules (and versions) available from the repository named &quot;AppModules&quot;">
 repo -n AppModules -list-modules
+</example>
+
+<example description="Lists all modules (and versions) available from the repository named &quot;AppModules&quot;">
+repo -r -n registry -reset-defaults
 </example>
 
 <!-- Universal Actions -->
@@ -101,6 +113,8 @@ repo -n AppModules -list-modules
 <modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
 <modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
+<modifier name="reset-defaults" value="false" description="Reset to default repository" />
+
 
 <!-- Modifiers specific to -enable -->
 <modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
@@ -235,6 +249,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..ListDependents(.tCommandInfo)
 			} ElseIf (tCommandInfo = "orphans") {
 				Do ..ListOrphans(.tCommandInfo)
+			} ElseIf (tCommandInfo = "settings") {
+				Do ..Settings(.tCommandInfo)
 			} ElseIf (tCommandInfo = "module-action") {
 				Do ..ModuleAction(.tCommandInfo)
 			}
@@ -362,6 +378,22 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
+ClassMethod Settings(ByRef pCommandInfo) [ Internal ]
+{
+    Set tAnalytics = $$$GetModifier(pCommandInfo,"analytics")
+    If ("start"=$ZConvert(tAnalytics,"L")) {
+        Set tSC = ##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1)
+    } ElseIf ("stop"=$ZConvert(tAnalytics,"L")) {
+        Set tSC = ##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(0)
+    } Else {
+        Write "Invalid value ""_tAnalytics_"", start or stop expected"
+        Quit
+    }
+    If $$$ISOK(tSC) {
+        Write "Configuration updated successfuly"
+    }
+}
+
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
 	Set tFileSystem = $$$HasModifier(pCommandInfo,"filesystem")
@@ -408,7 +440,22 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	} ElseIf $$$HasModifier(pCommandInfo,"delete") {
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyDelete($$$GetModifier(pCommandInfo,"name")))
 		Quit
-	} Else {
+	} Elseif $$$HasModifier(pCommandInfo,"reset-defaults") {
+        Set tName = $$$GetModifier(pCommandInfo,"name")
+        If ((tRemote'=1)||(tName="")) {
+            Write "Specify type (-remote) and repository name (-name registry)"
+            Quit
+        }
+        Merge tModifiers = pCommandInfo("modifiers")
+        Set tModifiers("url") = ##class(%ZPM.PackageManager.Client.Settings).GetDefaultRegistry()
+        If (tModifiers("url")="") {
+            Write "Error retrieving default registry URL"
+            Quit
+        }
+        Set tModifiers("username") = "", tModifiers("password") = ""
+    	Set tType = "%ZPM.PackageManager.Client.RemoteServerDefinition"
+        $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
+    } Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
 		Set tType = $$$GetModifier(pCommandInfo,"type")
 		

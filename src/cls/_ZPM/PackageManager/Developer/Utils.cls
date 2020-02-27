@@ -166,16 +166,14 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				// Old format (TODO: officially deprecate): try loading a .xml file
 				Set tSC = $System.OBJ.Load(tTmpStream.Filename,.qstruct)
 			}
-			If (##class(%ZPM.PackageManager.Client.Utils).IsAnalyticsAvailable()) {
-				Set errorMsg = "", success = 0
-				If $$$ISOK(tSC) {
-					Set success = 1
-				} Else {
-					Set success = 0
-					Set errorMsg = $System.Status.GetErrorText(tSC)
-				}
-				do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
-			}
+            Set errorMsg = "", success = 0
+            If $$$ISOK(tSC) {
+                Set success = 1
+            } Else {
+                Set success = 0
+                Set errorMsg = $System.Status.GetErrorText(tSC)
+            }
+            do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
 		}
 		If $$$ISERR(tSC) {
 			Quit

@@ -110,59 +110,57 @@ Method GetModuleManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedMo
   $$$ThrowStatus($$$ERROR($$$GeneralError,"Download package manifest, something went wrong."))
 }
 
-Method CollectAnalytics(action, name As %String, version As %String, success As %Boolean = 1, msg As %String = "") As %Status
+Method SendAnalyticsToRegistry(action As %String, data As %DynamicObject)
 {
+    Set tRequest = ..GetHttpRequest()
+    Set tRequest.ContentType = "application/json"
+    Do tRequest.SetHeader("INSTALLTOKEN", $Get(^IRIS.TempZPMRInst(data.name,data.version))) 
+    Kill ^IRIS.TempZPMRInst(data.name,data.version)
+    Do data.%ToJSON(tRequest.EntityBody) 
+    Set tSC = tRequest.Post($$$URLENCODE(tRequest.Location_"collect/" _ action))
+    If ($$$ISERR(tSC) || (tRequest.HttpResponse.StatusCode'=200)) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Error Sending Analytics Data"))
+    }
+}
 
-    w
+Method SendAnalyticsToGoogle(action As %String, data As %DynamicObject)
+{
+    set req = ##class(%Net.HttpRequest).%New()
+    set req.Server = "www.google-analytics.com"
+    set requestString = "v=1&tid="_##class(%ZPM.PackageManager.Settings).GetAnalyticsTrackingId()
+        _"&cid="_##class(%SYS.System).InstanceGUID()
+        _"&ds=web&an="_data.name_"&av="_data.version
+        _"&t=event&aiid="_$ZCONVERT(data."system_version", "O", "URL")_"&ec="_$ZCONVERT(action, "O", "URL")_"&ea="
+        _$case($$$ISOK(data.success), 1: "Success", : "Failure")_"&el="
+        _$ZCONVERT(data."error_msg", "O", "URL")
+    do req.EntityBody.Write(requestString)
+    return req.Post("/collect")
+}
 
+Method CollectAnalytics(action As %String, name As %String, version As %String, success As %Boolean = 1, msg As %String = "") As %Status
+{
+    if ('##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsAvailable()) {
+        Return $$$OK
+    }
     Set jo = {}
     Set jo.name = name
     Set jo.version = version
     Set jo.guid = ##class(%SYS.System).InstanceGUID()
     Set jo."system_version" = $ZVersion
-
-    Set ns = $Namespace
-    Zn "%SYS"
     Set module = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
-    If ($IsObject(module)) {
-        Set jo."zpmclient_version" = module.VersionString
+    Set zpmVersion = ##class(%ZPM.PackageManager.Client.Utils).GetZMPVersion()
+    If (zpmVersion'="") {
+        Set jo."zpmclient_version" = zpmVersion
     } 
-    Zn ns
     Do jo.%Set("success",success,"boolean")
     Set jo."error_msg" = msg
-
-    Set tRequest = ..GetHttpRequest()
-    Set tRequest.ContentType = "application/json"
-
-    Do tRequest.SetHeader("INSTALLTOKEN", $Get(^IRIS.TempZPMRInst(name,version))) 
-
-    Do jo.%ToJSON(tRequest.EntityBody) 
-
-    Set tSC = tRequest.Post($$$URLENCODE(tRequest.Location_"collect/" _ action))
- /*
-     If '($$$ISOK(tSC) && tRequest.HttpResponse.StatusCode=200) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"Error Sending Analytics Data"))
-    }
- */
-    // google
-    set req = ##class(%Net.HttpRequest).%New()
-    set req.Server = "www.google-analytics.com"
-
-    set requestString = "v=1&tid="_##class(%ZPM.PackageManager.Settings).GetAnalyticsTrackingId()
-        _"&cid="_##class(%SYS.System).InstanceGUID()
-        _"&ds=web&an="_name_" "_version_"&av="_##class(%ZPM.PackageManager.Settings).GetVersion()
-        _"&t=event&aiid="_$ZCONVERT($zv, "O", "URL")_"&ec="_$ZCONVERT(action, "O", "URL")_"&ea="
-        _$case($$$ISOK(success), 1: "Success", : "Failure")_"&el="
-        _$ZCONVERT(msg, "O", "URL")
-    write requestString
-    do req.EntityBody.Write(requestString)
     try {
-        return req.Post("/collect")
+        Do ..SendAnalyticsToRegistry(action, jo)
+        Do ..SendAnalyticsToGoogle(action, jo)
     } catch e {
-        do e.Log()
-        write !,"Unable to send analytics to " _ req.Server _ ", skipping analytics collection.",!
-        return $$$OK
+        write !,"Unable to send analytics, skipping analytics collection.",!
     }
+    return $$$OK
 }
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.

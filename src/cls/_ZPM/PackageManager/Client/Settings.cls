@@ -2,13 +2,13 @@
 /// Use this class to set or get settings
 /// 
 /// Available settings
-/// version (string) - zpm client version 
+/// default_registry (string) - default registry url 
 /// analytics_tracking_id
 /// analytics_available (boolean) - if 1 - send usage statistics
-Class %ZPM.PackageManager.Settings
+Class %ZPM.PackageManager.Client.Settings
 {
 
-Parameter VERSION = "version";
+Parameter REGISTRY = "default_registry";
 
 Parameter TRACKINGID = "analytics_tracking_id";
 
@@ -16,32 +16,29 @@ Parameter ANALYTICS = "analytics_available";
 
 ClassMethod GetValue(key As %String = "") As %String
 {
+    New $Namespace
     Return:(key="") ""
-    Set ns = $Namespace
     Set $Namespace = "%SYS"
-    Set val = $Get(^zpm.settings(key))
-    Set $Namespace = ns
-    Return val
+    Return $Get(^zpm.settings(key))
 }
 
 ClassMethod SetValue(key As %String = "", val As %String = "") As %Status
 {
     Return:(key="") ""
-    Set ns = $Namespace
+    New $Namespace   
     Set $Namespace = "%SYS"
     Set ^zpm.settings(key) = val
-    Set $Namespace = ns
     Return $$$OK
 }
 
-ClassMethod GetVersion() As %String
+ClassMethod GetDefaultRegistry() As %String
 {
-    Return ..GetValue(..#VERSION)
+    Return ..GetValue(..#REGISTRY)
 }
 
-ClassMethod SetVersion(val As %String) As %String
+ClassMethod SetDefaultRegistry(val As %String) As %String
 {
-    Return ..SetValue(..#VERSION, val)
+    Return ..SetValue(..#REGISTRY, val)
 }
 
 ClassMethod GetAnalyticsTrackingId() As %String
