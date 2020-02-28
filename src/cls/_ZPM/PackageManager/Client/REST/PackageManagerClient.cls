@@ -125,21 +125,23 @@ Method SendAnalyticsToRegistry(action As %String, data As %DynamicObject)
 
 Method SendAnalyticsToGoogle(action As %String, data As %DynamicObject)
 {
-    set req = ##class(%Net.HttpRequest).%New()
-    set req.Server = "www.google-analytics.com"
-    set requestString = "v=1&tid="_##class(%ZPM.PackageManager.Settings).GetAnalyticsTrackingId()
+    Set TrackingID = ##class(%ZPM.PackageManager.Settings).GetAnalyticsTrackingId()
+    Quit:(TrackingID = "") 0
+    Set req = ##class(%Net.HttpRequest).%New()
+    Set req.Server = "www.google-analytics.com"
+    Set requestString = "v=1&tid="_TrackingID
         _"&cid="_##class(%SYS.System).InstanceGUID()
         _"&ds=web&an="_data.name_"&av="_data.version
         _"&t=event&aiid="_$ZCONVERT(data."system_version", "O", "URL")_"&ec="_$ZCONVERT(action, "O", "URL")_"&ea="
         _$case($$$ISOK(data.success), 1: "Success", : "Failure")_"&el="
         _$ZCONVERT(data."error_msg", "O", "URL")
-    do req.EntityBody.Write(requestString)
-    return req.Post("/collect")
+    Do req.EntityBody.Write(requestString)
+    Return req.Post("/collect")
 }
 
 Method CollectAnalytics(action As %String, name As %String, version As %String, success As %Boolean = 1, msg As %String = "") As %Status
 {
-    if ('##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsAvailable()) {
+    If ('##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsAvailable()) {
         Return $$$OK
     }
     Set jo = {}
@@ -147,20 +149,19 @@ Method CollectAnalytics(action As %String, name As %String, version As %String, 
     Set jo.version = version
     Set jo.guid = ##class(%SYS.System).InstanceGUID()
     Set jo."system_version" = $ZVersion
-    Set module = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
     Set zpmVersion = ##class(%ZPM.PackageManager.Client.Utils).GetZMPVersion()
     If (zpmVersion'="") {
         Set jo."zpmclient_version" = zpmVersion
     } 
     Do jo.%Set("success",success,"boolean")
     Set jo."error_msg" = msg
-    try {
+    Try {
         Do ..SendAnalyticsToRegistry(action, jo)
         Do ..SendAnalyticsToGoogle(action, jo)
-    } catch e {
-        write !,"Unable to send analytics, skipping analytics collection.",!
+    } Catch e {
+        Write !,"Unable to send analytics, skipping analytics collection.",!
     }
-    return $$$OK
+    Return $$$OK
 }
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.
