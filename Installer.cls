@@ -16,7 +16,7 @@ XData PM [ XMLNamespace = INSTALLER ]
 <Default Name="MODDIR" Dir="${MGRDIR}zpm" />
 <Default Name="SRCDIR" Dir="${MODDIR}src" />
 <Default Name="REGISTRY" Value="https://pm.community.intersystems.com" />
-<Default Name="TRACKINGID" Value="UA-3758147-1" />
+<Default Name="TRACKINGID" Value="UA-126752118-1" />
 
 <Namespace Name="%SYS">
   <Import File="${SRCDIR}inc/_ZPM/PackageManager/Common.inc" />
