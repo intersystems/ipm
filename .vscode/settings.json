@@ -2,10 +2,9 @@
   "objectscript.conn": {
     "active": true,
     "port": 52774,
-    "host" : "localhost",
-    "username": "_system",
+    "username": "admin",
     "password": "SYS",
-    "ns": "%SYS",
+    "ns": "USER",
   }
 
 }
