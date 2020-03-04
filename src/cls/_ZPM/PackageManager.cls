@@ -176,12 +176,18 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 }
 
 /// @PublicAPI
-ClassMethod Shell(pCommand As %String) As %Status
+ClassMethod Shell(pCommand As %String, pTerminateOnError As %Boolean = 0, pHaltOnComplete As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Do ..ShellInternal(.pCommand,.tException)
 	If $IsObject(tException) {
+		If pTerminateOnError {
+			Do $System.Process.Terminate($Job,1)
+		}
 		Set tSC = tException.AsStatus()
+	}
+	If pHaltOnComplete {
+		Halt
 	}
 	Quit tSC
 }
