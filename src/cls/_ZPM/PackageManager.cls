@@ -55,11 +55,14 @@ The standard lifecycle phases are:
 <example description="Shows all modules in current registry">search</example>
 </command>
 
-<command name="settings">
+<command name="config">
 <description>Update ZPM settings</description>
-<example description="Disable collecting analytics data">settings -analytics stop</example>
-<example description="Enable collecting analytics data">settings -analytics start</example>
-<modifier name="analytics" value="true" description="Enable/Disable collecting analytics data" />
+<parameter name="action" required="true" description="Name of module on which to perform lifecycle actions" />
+<parameter name="key" required="false" description="Name of module on which to perform lifecycle actions" />
+<parameter name="value" required="false" description="Name of module on which to perform lifecycle actions" />
+
+
+
 </command>
 
 
@@ -249,8 +252,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..ListDependents(.tCommandInfo)
 			} ElseIf (tCommandInfo = "orphans") {
 				Do ..ListOrphans(.tCommandInfo)
-			} ElseIf (tCommandInfo = "settings") {
-				Do ..Settings(.tCommandInfo)
+			} ElseIf (tCommandInfo = "config") {
+				Do ..Config(.tCommandInfo)
 			} ElseIf (tCommandInfo = "module-action") {
 				Do ..ModuleAction(.tCommandInfo)
 			}
@@ -378,20 +381,36 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod Settings(ByRef pCommandInfo) [ Internal ]
+ClassMethod Config(ByRef pCommandInfo) [ Internal ]
 {
-    Set tAnalytics = $$$GetModifier(pCommandInfo,"analytics")
-    If ("start"=$ZConvert(tAnalytics,"L")) {
-        Set tSC = ##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1)
-    } ElseIf ("stop"=$ZConvert(tAnalytics,"L")) {
-        Set tSC = ##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(0)
-    } Else {
-        Write "Invalid value ""_tAnalytics_"", start or stop expected"
-        Quit
-    }
-    If $$$ISOK(tSC) {
-        Write "Configuration updated successfuly"
-    }
+	Set action = $Get(pCommandInfo("parameters","action"))
+	Set key = $Get(pCommandInfo("parameters","key"))
+	Set value = $Get(pCommandInfo("parameters","value"))
+
+	If (action="") { 
+		Set action = "list"	
+	}
+	If (action="list") {
+		Do ##class(%ZPM.PackageManager.Client.Settings).PrintList()
+	} ElseIf (action="set") {
+		If ( (key = "") || (value="") ) {
+			Write "Key and Value required. Use config set <key> <value>",!
+			Quit
+		} 
+		Do ##class(%ZPM.PackageManager.Client.Settings).UpdateOne(key,value)
+	} ElseIf (action="get") {
+		If (key = "") {
+			Do ##class(%ZPM.PackageManager.Client.Settings).PrintList()
+		} Else {
+			Do ##class(%ZPM.PackageManager.Client.Settings).PrintOne(key)
+		}
+	} ElseIf (action="delete") {
+		If (key = "") {
+			Write "Key required. Use config delete <key>",!
+			Quit
+		}
+		Do ##class(%ZPM.PackageManager.Client.Settings).ResetToDefault(key)
+	}
 }
 
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]

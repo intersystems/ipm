@@ -401,7 +401,7 @@ ClassMethod UninstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Instal
 	Quit tSC
 }
 
-ClassMethod GetZMPVersion()
+ClassMethod GetZPMVersion()
 {
     New $Namespace
     Set $Namespace = "%SYS"

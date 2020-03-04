@@ -149,7 +149,7 @@ Method CollectAnalytics(action As %String, name As %String, version As %String, 
     Set jo.version = version
     Set jo.guid = ##class(%SYS.System).InstanceGUID()
     Set jo."system_version" = $ZVersion
-    Set zpmVersion = ##class(%ZPM.PackageManager.Client.Utils).GetZMPVersion()
+    Set zpmVersion = ##class(%ZPM.PackageManager.Client.Utils).GetZPMVersion()
     If (zpmVersion'="") {
         Set jo."zpmclient_version" = zpmVersion
     } 
@@ -158,8 +158,8 @@ Method CollectAnalytics(action As %String, name As %String, version As %String, 
     Try {
         Do ..SendAnalyticsToRegistry(action, jo)
         Do ..SendAnalyticsToGoogle(action, jo)
-    } Catch e {
-        Write !,"Unable to send analytics, skipping analytics collection.",!
+    } Catch ex {
+        Return ex.AsStatus()
     }
     Return $$$OK
 }
