@@ -56,16 +56,15 @@ The standard lifecycle phases are:
 </command>
 
 <command name="config">
-<description>Update ZPM settings</description>
+<description>Update ZPM settings. Setting is a key-value pair.</description>
 <example description="Disable collecting analytics data">config set analytics 0</example>
 <example description="Enable collecting analytics data">config set analytics 1</example>
 <example description="list all settings">config list</example>
-<example description="get a value">config get &lt;key&gt;</example>
-<example description="set new value">config set &lt;key&gt; &lt;value&gt;</example>
-<example description="reset to default value">config delete &lt;key&gt;</example>
-<parameter name="action" required="true" description="Name of module on which to perform lifecycle actions" />
-<parameter name="key" required="false" description="Name of module on which to perform lifecycle actions" />
-<parameter name="value" required="false" description="Name of module on which to perform lifecycle actions" />
+<example description="get value for analytics key">config get analytics</example>
+<example description="reset to default value for analytics key">config delete analytics</example>
+<parameter name="action" required="true" description="One of settings actions: list, get, set, delete" />
+<parameter name="key" required="false" description="Setting key" />
+<parameter name="value" required="false" description="Setting value" />
 </command>
 
 
@@ -230,7 +229,6 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			
 			Kill tCommandInfo
       $$$ThrowOnError(..%ParseCommandInput(tCommand,.tCommandInfo))
-			zw tCommandInfo
 			If (tCommandInfo = "quit") {
 				Return
 			} ElseIf (tCommandInfo = "help") {
