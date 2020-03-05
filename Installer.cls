@@ -49,14 +49,6 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     If (pRegistry'="") {
         Do ##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry)
     }
-    Set param = ##class(%Dictionary.ParameterDefinition).%OpenId("%ZPM.PackageManager.Client.Settings||trackingIdDefault")
-    Set param.Default = pAnalyticsTrackingID
-    Do param.%Save()
-    Set param = ##class(%Dictionary.ParameterDefinition).%OpenId("%ZPM.PackageManager.Client.Settings||analyticsDefault")
-    Set param.Default = 1
-    Do param.%Save()
-    Do $System.OBJ.Compile("%ZPM.PackageManager.Client.Settings")
-
     Do ##class(%ZPM.PackageManager.Client.Settings).SetDefaultRegistry(pRegistry)
     Do ##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1)
     Do ##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID)

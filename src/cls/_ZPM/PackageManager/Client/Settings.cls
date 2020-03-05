@@ -12,11 +12,7 @@ Parameter registry = "default_registry";
 
 Parameter trackingId = "analytics_tracking_id";
 
-Parameter trackingIdDefault;
-
 Parameter analytics = "analytics_available";
-
-Parameter analyticsDefault;
 
 Parameter CONFIGURABLE = "trackingId,analytics";
 
@@ -59,7 +55,7 @@ ClassMethod ResetToDefault(key As %String) As %Status
         Write "Config key = """_key_""" not found",!
         Quit
     }
-    Set sc = ..SetValue($Parameter(..%ClassName(1),key), $Parameter(..%ClassName(1),key_"Default"))
+    Set sc = ..SetValue($Parameter(..%ClassName(1),key), ..GetDefaultValue($Parameter(..%ClassName(1),key)))
     If $$$ISOK(sc) {
         Write "Value for """_key_""" succesfully reset to default",!
     } Else {
@@ -94,12 +90,23 @@ ClassMethod GetValue(indx As %String = "") As %String
     Return $Get(^zpm.settings(indx))
 }
 
+ClassMethod GetDefaultValue(indx As %String = "") As %String
+{
+    New $Namespace
+    Return:(indx="") ""
+    Set $Namespace = "%SYS"
+    Return $Get(^zpm.settings(indx,"default"))
+}
+
 ClassMethod SetValue(indx As %String = "", val As %String = "") As %Status
 {
     Return:(indx="") ""
     New $Namespace   
     Set $Namespace = "%SYS"
     Set ^zpm.settings(indx) = val
+    If ($Data(^zpm.settings(indx,"default"))=0) {
+        Set ^zpm.settings(indx,"default") = val
+    }
     Return $$$OK
 }
 
