@@ -82,6 +82,10 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
           $$$ThrowStatus($$$ERROR($$$GeneralError, "Download module, hash mismatch."))
         }
       }
+      Set token = tRequest.HttpResponse.GetHeader("INSTALLTOKEN")
+      If (token'="") {
+        Set ^IRIS.TempZPMRInst(name,version) = token
+      }
     }
   }
   If tFileBinStream="" {
@@ -104,6 +108,61 @@ Method GetModuleManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedMo
   }
 
   $$$ThrowStatus($$$ERROR($$$GeneralError,"Download package manifest, something went wrong."))
+}
+
+Method SendAnalyticsToRegistry(action As %String, data As %DynamicObject)
+{
+    Set tRequest = ..GetHttpRequest()
+    Set tRequest.ContentType = "application/json"
+    Do tRequest.SetHeader("INSTALLTOKEN", $Get(^IRIS.TempZPMRInst(data.name,data.version))) 
+    Kill ^IRIS.TempZPMRInst(data.name,data.version)
+    Do data.%ToJSON(tRequest.EntityBody) 
+    Set tSC = tRequest.Post($$$URLENCODE(tRequest.Location_"collect/" _ action))
+    If ($$$ISERR(tSC) || (tRequest.HttpResponse.StatusCode'=200)) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Error Sending Analytics Data"))
+    }
+}
+
+Method SendAnalyticsToGoogle(action As %String, data As %DynamicObject)
+{
+    Set TrackingID = ##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsTrackingId()
+    Quit:(TrackingID = "") 0
+    Set tRequest = ##class(%Net.HttpRequest).%New()
+    Set tRequest.Server = "www.google-analytics.com"
+    Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
+    Set requestString = "v=1&tid="_TrackingID
+        _"&cid="_##class(%SYS.System).InstanceGUID()
+        _"&ds=web&an="_data.name_"&av="_data.version
+        _"&t=event&aiid="_$ZCONVERT(data."system_version", "O", "URL")_"&ec="_$ZCONVERT(action, "O", "URL")_"&ea="
+        _$case($$$ISOK(data.success), 1: "Success", : "Failure")_"&el="
+        _$ZCONVERT(data."error_msg", "O", "URL")
+    Do tRequest.EntityBody.Write(requestString)
+    Return tRequest.Post("/collect")
+}
+
+Method CollectAnalytics(action As %String, name As %String, version As %String, success As %Boolean = 1, msg As %String = "") As %Status
+{
+    If ('##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsAvailable()) {
+        Return $$$OK
+    }
+    Set jo = {}
+    Set jo.name = name
+    Set jo.version = version
+    Set jo.guid = ##class(%SYS.System).InstanceGUID()
+    Set jo."system_version" = $ZVersion
+    Set zpmVersion = ##class(%ZPM.PackageManager.Client.Utils).GetZPMVersion()
+    If (zpmVersion'="") {
+        Set jo."zpmclient_version" = zpmVersion
+    } 
+    Do jo.%Set("success",success,"boolean")
+    Set jo."error_msg" = msg
+    Try {
+        Do ..SendAnalyticsToRegistry(action, jo)
+        Do ..SendAnalyticsToGoogle(action, jo)
+    } Catch ex {
+        Return ex.AsStatus()
+    }
+    Return $$$OK
 }
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.

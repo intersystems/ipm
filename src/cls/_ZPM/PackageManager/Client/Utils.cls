@@ -401,4 +401,15 @@ ClassMethod UninstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Instal
 	Quit tSC
 }
 
+ClassMethod GetZPMVersion()
+{
+    New $Namespace
+    Set $Namespace = "%SYS"
+    Set module = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
+    If ($IsObject(module)) {
+        Return module.VersionString
+    }
+    Return ""
+}
+
 }

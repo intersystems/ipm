@@ -55,6 +55,19 @@ The standard lifecycle phases are:
 <example description="Shows all modules in current registry">search</example>
 </command>
 
+<command name="config">
+<description>Update ZPM settings. Setting is a key-value pair.</description>
+<example description="Disable collecting analytics data">config set analytics 0</example>
+<example description="Enable collecting analytics data">config set analytics 1</example>
+<example description="list all settings">config list</example>
+<example description="get value for analytics key">config get analytics</example>
+<example description="reset to default value for analytics key">config delete analytics</example>
+<parameter name="action" required="true" description="One of settings actions: list, get, set, delete" />
+<parameter name="key" required="false" description="Setting key" />
+<parameter name="value" required="false" description="Setting value" />
+</command>
+
+
 <command name="repo" aliases="repository" dataPrefix="D">
 <description>Configures the current namespace to search for modules on a remote server or on the local filesystem.</description>
 <example description="List all repositories">
@@ -71,6 +84,10 @@ repo -n LocalFiles -delete
 </example>
 <example description="Lists all modules (and versions) available from the repository named &quot;AppModules&quot;">
 repo -n AppModules -list-modules
+</example>
+
+<example description="Lists all modules (and versions) available from the repository named &quot;AppModules&quot;">
+repo -r -n registry -reset-defaults
 </example>
 
 <!-- Universal Actions -->
@@ -101,6 +118,8 @@ repo -n AppModules -list-modules
 <modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
 <modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
+<modifier name="reset-defaults" value="false" description="Reset to default repository" />
+
 
 <!-- Modifiers specific to -enable -->
 <modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
@@ -216,7 +235,6 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			
 			Kill tCommandInfo
       $$$ThrowOnError(..%ParseCommandInput(tCommand,.tCommandInfo))
-			
 			If (tCommandInfo = "quit") {
 				Return
 			} ElseIf (tCommandInfo = "help") {
@@ -241,6 +259,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..ListDependents(.tCommandInfo)
 			} ElseIf (tCommandInfo = "orphans") {
 				Do ..ListOrphans(.tCommandInfo)
+			} ElseIf (tCommandInfo = "config") {
+				Do ..Config(.tCommandInfo)
 			} ElseIf (tCommandInfo = "module-action") {
 				Do ..ModuleAction(.tCommandInfo)
 			}
@@ -368,6 +388,38 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
+ClassMethod Config(ByRef pCommandInfo) [ Internal ]
+{
+	Set action = $Get(pCommandInfo("parameters","action"))
+	Set key = $Get(pCommandInfo("parameters","key"))
+	Set value = $Get(pCommandInfo("parameters","value"))
+
+	If (action="") { 
+		Set action = "list"	
+	}
+	If (action="list") {
+		Do ##class(%ZPM.PackageManager.Client.Settings).PrintList()
+	} ElseIf (action="set") {
+		If ( (key = "") || (value="") ) {
+			Write "Key and Value required. Use config set <key> <value>",!
+			Quit
+		} 
+		Do ##class(%ZPM.PackageManager.Client.Settings).UpdateOne(key,value)
+	} ElseIf (action="get") {
+		If (key = "") {
+			Do ##class(%ZPM.PackageManager.Client.Settings).PrintList()
+		} Else {
+			Do ##class(%ZPM.PackageManager.Client.Settings).PrintOne(key)
+		}
+	} ElseIf (action="delete") {
+		If (key = "") {
+			Write "Key required. Use config delete <key>",!
+			Quit
+		}
+		Do ##class(%ZPM.PackageManager.Client.Settings).ResetToDefault(key)
+	}
+}
+
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
 	Set tFileSystem = $$$HasModifier(pCommandInfo,"filesystem")
@@ -414,7 +466,22 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	} ElseIf $$$HasModifier(pCommandInfo,"delete") {
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyDelete($$$GetModifier(pCommandInfo,"name")))
 		Quit
-	} Else {
+	} Elseif $$$HasModifier(pCommandInfo,"reset-defaults") {
+        Set tName = $$$GetModifier(pCommandInfo,"name")
+        If ((tRemote'=1)||(tName="")) {
+            Write "Specify type (-remote) and repository name (-name registry)"
+            Quit
+        }
+        Merge tModifiers = pCommandInfo("modifiers")
+        Set tModifiers("url") = ##class(%ZPM.PackageManager.Client.Settings).GetDefaultRegistry()
+        If (tModifiers("url")="") {
+            Write "Error retrieving default registry URL"
+            Quit
+        }
+        Set tModifiers("username") = "", tModifiers("password") = ""
+    	Set tType = "%ZPM.PackageManager.Client.RemoteServerDefinition"
+        $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
+    } Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
 		Set tType = $$$GetModifier(pCommandInfo,"type")
 		
