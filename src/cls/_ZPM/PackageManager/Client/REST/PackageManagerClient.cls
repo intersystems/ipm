@@ -125,18 +125,19 @@ Method SendAnalyticsToRegistry(action As %String, data As %DynamicObject)
 
 Method SendAnalyticsToGoogle(action As %String, data As %DynamicObject)
 {
-    Set TrackingID = ##class(%ZPM.PackageManager.Settings).GetAnalyticsTrackingId()
+    Set TrackingID = ##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsTrackingId()
     Quit:(TrackingID = "") 0
-    Set req = ##class(%Net.HttpRequest).%New()
-    Set req.Server = "www.google-analytics.com"
+    Set tRequest = ##class(%Net.HttpRequest).%New()
+    Set tRequest.Server = "www.google-analytics.com"
+    Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
     Set requestString = "v=1&tid="_TrackingID
         _"&cid="_##class(%SYS.System).InstanceGUID()
         _"&ds=web&an="_data.name_"&av="_data.version
         _"&t=event&aiid="_$ZCONVERT(data."system_version", "O", "URL")_"&ec="_$ZCONVERT(action, "O", "URL")_"&ea="
         _$case($$$ISOK(data.success), 1: "Success", : "Failure")_"&el="
         _$ZCONVERT(data."error_msg", "O", "URL")
-    Do req.EntityBody.Write(requestString)
-    Return req.Post("/collect")
+    Do tRequest.EntityBody.Write(requestString)
+    Return tRequest.Post("/collect")
 }
 
 Method CollectAnalytics(action As %String, name As %String, version As %String, success As %Boolean = 1, msg As %String = "") As %Status
