@@ -13,6 +13,8 @@ Property Version As %ZPM.PackageManager.Core.SemanticVersion(%JSONINCLUDE = "NON
 
 Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLNAME = "Version") [ Required ];
 
+Property Repo As %String(%JSONINCLUDE = "NONE", XMLPROJECTION = "NONE");
+
 Method VersionStringSet(tValue) As %Status
 {
 	Set i%VersionString = tValue
