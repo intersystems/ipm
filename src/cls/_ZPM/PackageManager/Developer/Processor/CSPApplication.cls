@@ -356,7 +356,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 				For {
 					Set tKey = $Order(tProperties(tKey),1,tValue)
 					Quit:tKey=""
-					Write !,tKey,": ",tValue
+					Write !,?4,tKey,": ",tValue
 				}
 			}
 			$$$ThrowOnError(tSC)
