@@ -74,10 +74,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			}
 			
 			Set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
-			Set tUnitTestSubDir = ##class(%File).NormalizeDirectory(tUnitTestDir_$Replace(..Package,".","/"))
+			Set tUnitTestRoot = ##class(%File).NormalizeDirectory(tUnitTestDir_$Replace(..Package,".","/"))
 			Set tTestSpec = ""
 			If $Data(pParams("UnitTest","Suite"),tTestSuite) {
-				Set tTestSubDir = $Replace(tTestSuite,".","\")
+				Set tTestSubDir = $Replace(tTestSuite,".","/")
 				Set tUnitTestDir = ##class(%File).NormalizeDirectory(tUnitTestDir_tTestSubDir)
 			} ElseIf $Data(pParams("UnitTest","Case"),tTestCase) {
 				Set tTestSpec = ":"_tTestCase
@@ -89,11 +89,11 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 				If $Data(pParams("UnitTest","Method"),tTestMethod) {
 					Set tTestSpec = tTestSpec_":"_tTestMethod
 				}
+			} Else {
+				Set tUnitTestDir = tUnitTestRoot
 			}
 
-			If ##class(%File).DirectoryExists(tUnitTestSubDir) && (tUnitTestSubDir [ tUnitTestDir) {
-				Set tUnitTestDir = tUnitTestSubDir
-			} ElseIf (tUnitTestSubDir '[ tUnitTestDir) {
+			If (tUnitTestDir '[ tUnitTestRoot) {
 				// Case of multiple unit test resources
 				Quit
 			}
