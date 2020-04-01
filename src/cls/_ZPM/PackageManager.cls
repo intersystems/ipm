@@ -546,9 +546,9 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Write !,tRes.%Get("Name")," ",tRes.%Get("Version")
+		Write !,tRes.%Get("Name"),?35," ",tRes.%Get("Version")
 		If (pShowRepo) {
-			Write ?40," ",tRes.%Get("Repo")
+			Write ?45," ",tRes.%Get("Repo")
 		}
 	}
 }
