@@ -132,19 +132,20 @@ Method SendAnalyticsToGoogle(action As %String, data As %DynamicObject)
     Set tRequest.Server = "www.google-analytics.com"
     Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
 
-    Set moduleName = data.name
     Set status = $case($$$ISOK(data.success), 1: "Success", : "Failure")
     Set version = data.version
     Set irisPlatform = $system.Version.GetPlatform()
     Set irisVersion = $system.Version.GetNumber()
     Set irisProduct = $system.Version.GetProduct()
-    Set requestString = "v=1&tid="_TrackingID
-        _"&cid="_##class(%SYS.System).InstanceGUID()
-        _"&ds=web"
-        _"&t=event"
-        _"&ec="_$ZCONVERT(moduleName, "O", "URL")_"&ea="_$ZCONVERT(status, "O", "URL")
-        _"&el="_$ZCONVERT(version_", "_irisProduct_", "_irisPlatform_", "_irisVersion, "O", "URL")
-    Do tRequest.EntityBody.Write(requestString)
+
+    Do tRequest.SetParam("v","1")
+    Do tRequest.SetParam("tid",TrackingID)
+    Do tRequest.SetParam("cid",##class(%SYS.System).InstanceGUID())
+    Do tRequest.SetParam("ds","web")
+    Do tRequest.SetParam("t","event")
+    Do tRequest.SetParam("ec",data.name)
+    Do tRequest.SetParam("ea",status)
+    Do tRequest.SetParam("el",version_", "_irisProduct_", "_irisPlatform_", "_irisVersion)
     Return tRequest.Post("/collect")
 }
 
