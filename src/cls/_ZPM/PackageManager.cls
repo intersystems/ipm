@@ -53,6 +53,7 @@ The standard lifecycle phases are:
 <command name="search" aliases="find">
 <description>Shows all modules in current registry</description>
 <example description="Shows all modules in current registry">search</example>
+<modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository for each module." />
 </command>
 
 <command name="config">
@@ -367,9 +368,10 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 {
+	Set tRepo = $Get(pCommandInfo("data","Repo"),0)
 	Set tName = $$$GetModifier(pCommandInfo,"name")
 	If (tName '= "") {
-		Do ..ShowModulesForRepository(tName)
+		Do ..ShowModulesForRepository(tName,tRepo)
 	} Else {
 		Write !
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
@@ -382,7 +384,7 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 				Write !!
 			}
 			Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
-			Do ..ShowModulesForRepository(tRes.%Get("Name"))
+			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo)
 		}
 		$$$ThrowOnError(tSC)
 	}
@@ -535,16 +537,19 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ShowModulesForRepository(pRepoName As %String) [ Private ]
+ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0) [ Private ]
 {
-	Set tQuery = "select Name,Version from %ZPM_PackageManager_Developer.Utils_GetModuleList(?)"
+	Set tQuery = "select Name,Version,Repo from %ZPM_PackageManager_Developer.Utils_GetModuleList(?)"
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName)
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Write !,tRes.%Get("Name")," ",tRes.%Get("Version")
+		Write !,tRes.%Get("Name"),?35," ",tRes.%Get("Version")
+		If (pShowRepo) {
+			Write ?45," ",tRes.%Get("Repo")
+		}
 	}
 }
 
