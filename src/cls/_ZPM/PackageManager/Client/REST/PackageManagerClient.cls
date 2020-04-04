@@ -128,15 +128,24 @@ Method SendAnalyticsToGoogle(action As %String, data As %DynamicObject)
     Set TrackingID = ##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsTrackingId()
     Quit:(TrackingID = "") 0
     Set tRequest = ##class(%Net.HttpRequest).%New()
+    Set tRequest.FollowRedirect = 1
     Set tRequest.Server = "www.google-analytics.com"
     Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
-    Set requestString = "v=1&tid="_TrackingID
-        _"&cid="_##class(%SYS.System).InstanceGUID()
-        _"&ds=web&an="_data.name_"&av="_data.version
-        _"&t=event&aiid="_$ZCONVERT(data."system_version", "O", "URL")_"&ec="_$ZCONVERT(action, "O", "URL")_"&ea="
-        _$case($$$ISOK(data.success), 1: "Success", : "Failure")_"&el="
-        _$ZCONVERT(data."error_msg", "O", "URL")
-    Do tRequest.EntityBody.Write(requestString)
+
+    Set status = $case($$$ISOK(data.success), 1: "Success", : "Failure")
+    Set version = data.version
+    Set irisPlatform = $system.Version.GetPlatform()
+    Set irisVersion = $system.Version.GetNumber()
+    Set irisProduct = $system.Version.GetProduct()
+
+    Do tRequest.SetParam("v","1")
+    Do tRequest.SetParam("tid",TrackingID)
+    Do tRequest.SetParam("cid",##class(%SYS.System).InstanceGUID())
+    Do tRequest.SetParam("ds","web")
+    Do tRequest.SetParam("t","event")
+    Do tRequest.SetParam("ec",data.name)
+    Do tRequest.SetParam("ea",status)
+    Do tRequest.SetParam("el",version_", "_irisProduct_", "_irisPlatform_", "_irisVersion)
     Return tRequest.Post("/collect")
 }
 
