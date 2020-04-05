@@ -233,6 +233,12 @@ Method ApplyCustomParameters(pAttributes As %Library.ArrayOfDataTypes, ByRef pPa
 		Set attribute = pAttributes.GetNext(.key)
 		Quit:(key="")
 		Do pAttributes.SetAt(##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(attribute,.customParams),key)
+		// try to set a Property
+		try {
+			set $Property($this,key) = pAttributes.GetAt(key)
+		} catch ex {
+			// do nothing if the property doesn't exist 
+		}
 	}
 	Return $$$OK
 }
