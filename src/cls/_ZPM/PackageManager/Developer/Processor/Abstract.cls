@@ -235,7 +235,7 @@ Method ApplyCustomParameters(pAttributes As %Library.ArrayOfDataTypes, ByRef pPa
 		Do pAttributes.SetAt(##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(attribute,.customParams),key)
 		// try to set a Property
 		try {
-			set $Property($this,key) = pAttributes.GetAt(key)
+			set $Property($this,key) = ..%Evaluate(pAttributes.GetAt(key))
 		} catch ex {
 			// do nothing if the property doesn't exist 
 		}
