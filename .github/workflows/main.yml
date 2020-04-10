@@ -11,6 +11,7 @@ on:
       - created
 jobs:
   build:
+    timeout-minutes: 20
     strategy:
       matrix:
         image: [
@@ -35,6 +36,7 @@ jobs:
       - name: Build
         run: docker build --rm --build-arg BASE=${{ matrix.image }} -t zpm .
       - name: Run temporary registry
+        timeout-minutes: 15
         run: |
             echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
             docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
@@ -71,6 +73,7 @@ jobs:
             | docker exec -i $CONTAINER iris session iris -U%SYS
             docker stop $CONTAINER
       - name: Clean install current version and test new one
+        timeout-minutes: 15
         run: |
             wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
             docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ matrix.image }}
@@ -88,6 +91,7 @@ jobs:
             | docker exec -i $CONTAINER iris session iris -U%SYS
             docker stop $CONTAINER
       - name: Clean install and test 
+        timeout-minutes: 15
         run: |
             wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
             docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ matrix.image }}
