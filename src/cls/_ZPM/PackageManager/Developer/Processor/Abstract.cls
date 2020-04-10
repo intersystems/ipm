@@ -152,6 +152,7 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 	// Default implementation: call %ValidateObject to validate attributes
 	Set tSC = $$$OK
 	Try {
+		Do ..ApplyCustomParameters(..ResourceReference.Attributes, .pParams)
 		If (pPhase = "Validate") {
 			Set tSC = ..%ValidateObject(1)
 			If $$$ISERR(tSC) {
@@ -222,6 +223,26 @@ Method %Evaluate(pAttrValue) As %String [ Internal ]
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$root\}",tRoot)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{root\}",tRoot)
 	Quit tAttrValue
+}
+
+Method ApplyCustomParameters(pAttributes As %Library.ArrayOfDataTypes, ByRef pParams) As %Status
+{
+	Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .pParams)
+	Set key = ""
+	For {
+		Set attribute = pAttributes.GetNext(.key)
+		Quit:(key="")
+		Do pAttributes.SetAt(##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(attribute,.customParams),key)
+		// try to set a Property
+		Try {
+			Set val = $Property($this,key)
+			Continue:($IsObject(val)||$Listvalid(val))
+			Set $Property($this,key) = ..%Evaluate(pAttributes.GetAt(key))
+		} Catch ex {
+			// do nothing if the property doesn't exist 
+		}
+	}
+	Return $$$OK
 }
 
 ClassMethod %RegExReplace(pString, pRegEx, pValue) As %String [ Private ]
