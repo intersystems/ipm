@@ -22,15 +22,15 @@ XData PM [ XMLNamespace = INSTALLER ]
   <Import File="${SRCDIR}inc/_ZPM/PackageManager/Common.inc" />
   <Import File="${SRCDIR}cls" Recurse="1" />
   
-  <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" />
-  <Invoke Class="%ZPM.Installer" Method="ZPMInit">
+  <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" CheckStatus="true" />
+  <Invoke Class="%ZPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/> 
     <Arg Value="${TRACKINGID}"/>
   </Invoke>
-  <Invoke Class="%ZPM.Installer" Method="ZPMLoad">
+  <Invoke Class="%ZPM.Installer" Method="ZPMLoad" CheckStatus="true">
     <Arg Value="${MODDIR}"/>
   </Invoke>
-  <Invoke Class="%ZPM.Installer" Method="ZPMCompile" />
+  <Invoke Class="%ZPM.Installer" Method="ZPMCompile" CheckStatus="true" />
 </Namespace>
 
 </Manifest>
@@ -47,21 +47,23 @@ ClassMethod setup(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.I
 ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
     If (pRegistry'="") {
-        Do ##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry)
+      $$$QuitOnError(##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry))
     }
-    Do ##class(%ZPM.PackageManager.Client.Settings).SetDefaultRegistry(pRegistry)
-    Do ##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1)
-    Do ##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID)
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetDefaultRegistry(pRegistry))
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1))
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
+
+    Quit $$$OK
 }
 
 ClassMethod ZPMLoad(pDirectoryName)
 {
-  do ##class(%ZPM.PackageManager).Shell("load -dev "_pDirectoryName)
+  Quit ##class(%ZPM.PackageManager).Shell("load -dev "_pDirectoryName)
 }
 
 ClassMethod ZPMCompile()
 {
-  do ##class(%ZPM.PackageManager).Shell("ZPM compile")
+  Quit ##class(%ZPM.PackageManager).Shell("ZPM compile")
 }
 
 ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, modified As %String, qstruct) As %Status
