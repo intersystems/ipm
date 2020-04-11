@@ -270,10 +270,6 @@ Method %Configure(ByRef pParams) As %Status
 	Set tSC = $$$OK
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"),0)
-
-		// getting custom parameters from command line or <Default> element
-		Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..Module, .pParams)
-
 		If (..Module.InstallerClass '= "") {
 			
 			Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
@@ -303,9 +299,6 @@ Method %Configure(ByRef pParams) As %Status
 			Quit:(key = "")
 			Set args = 0
 			Do invoke.GetArgsArray(.args)
-
-			Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateArgs(.args, .customParams)
-
 			If (tVerbose) { 
 				Write !, $$$FormatText("Invoking ClassMethod %1 from Class %2 ... ",invoke.Method,invoke.Class) 
 				Set result = $ClassMethod(invoke.Class,invoke.Method,args...)
