@@ -14,7 +14,7 @@ ClassMethod InitializeNamespace(pPostfix As %String, pVerbose As %Boolean = 1, O
 	Set tSC = $$$OK
 	Set pNewNamespace = ""
 	Try {
-		Set tInitNS = $Namespace
+		Set tInitNS = $Select($Namespace="%SYS": "USER", 1: $Namespace)
 		Set pNewNamespace = tInitNS_"-"_pPostfix
 		Set tBuildDBName = pNewNamespace_"-CODE"
 		Set tDataDBName = pNewNamespace_"-DATA"
@@ -39,7 +39,7 @@ ClassMethod SwitchToBuildNamespace() As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set tInitNS = $Namespace
+		Set tInitNS = $Select($Namespace="%SYS": "USER", 1: $Namespace)
 		Set $Namespace = tInitNS_"-BUILD"
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -52,7 +52,7 @@ ClassMethod SwitchToNamespace(pPostfix As %String) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set tInitNS = $Namespace
+		Set tInitNS = $Select($Namespace="%SYS": "USER", 1: $Namespace)
 		Set $Namespace = tInitNS_"-"_pPostfix
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -68,7 +68,7 @@ ClassMethod RetrieveBuiltDatabase(Output pStream As %Stream.TmpBinary, pVerbose 
 	Set tSC = $$$OK
 	Set pStream = ##class(%Stream.TmpBinary).%New()
 	Try {
-		Set tInitNS = $Namespace
+		Set tInitNS = $Select($Namespace="%SYS": "USER", 1: $Namespace)
 		Set tCodeDBName = tInitNS_"-CODE"
 		
 		Set $Namespace = "%SYS"
