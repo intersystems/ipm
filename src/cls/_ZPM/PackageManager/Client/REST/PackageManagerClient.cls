@@ -242,4 +242,18 @@ ClassMethod GetSSLConfiguration(host) As %String
   QUIT host
 }
 
+/// Used for unittests, reset's external temporary registry from any packages.
+Method ResetRegistry() As %Status
+{
+  Set debugKey = $system.Util.GetEnviron("TEST_REGISTRY_DEBUG")
+  if (debugKey="") {
+    Quit $$$OK
+  }
+
+  Set tRequest = ..GetHttpRequest()
+  Do tRequest.SetHeader("REGISTRY_DEBUG", debugKey)
+  
+  Quit tRequest.Get(tRequest.Location_"_reset")
+}
+
 }

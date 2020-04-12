@@ -66,14 +66,28 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
         Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_..Directory_"/")
         if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
           Set tResourceDirectory = tResourceCatDirectory
+        } 
+        ElseIf (..Directory="mac") {
+          Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_"rtn/")
+          if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
+            Set tResourceDirectory = tResourceCatDirectory
+          }
         }
 				
 				If '..ResourceReference.Preload {
 					Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
 					Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory_$tr(tName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator))_tFileExtension
 					If ($$$lcase(tFileExtension)=".xml")&&('##class(%File).Exists(tResourcePath)) {
-						Set $PIECE(tResourcePath, ".", *) = "cls"
-						Set ..Format = "UDL"
+            Set $PIECE(tResourcePath, ".", *) = "cls"
+            Set ..Format = "UDL"
+          } 
+          ElseIf ($$$lcase(tFileExtension)=".cls")&&('##class(%File).Exists(tResourcePath)) {
+            Set $PIECE(tResourcePath, ".", *) = "xml"
+            Set ..Format = "XML"            
+          }
+          
+					If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
+						Set $PIECE(tResourcePath, ".", *) = "rtn"
 					}
 
 					Set tResourceParentPath = ##class(%File).ParentDirectoryName(tResourcePath)

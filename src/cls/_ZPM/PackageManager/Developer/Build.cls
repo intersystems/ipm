@@ -90,8 +90,8 @@ ClassMethod RetrieveBuiltDatabase(Output pStream As %Stream.TmpBinary, pVerbose 
 			Do pStream.Rewind()
 			
 			// Remount database
-      Set tSysDB = ##class(SYS.Database).%OpenId(tPath)
-      If ('SystDB.Mounted) {
+      Set tSysDB = ##class(SYS.Database).%OpenId(tDB.Directory)
+      If ('tSysDB.Mounted) {
         $$$ThrowOnError(##class(SYS.Database).MountDatabase(tDB.Directory))      
       }
 		}

@@ -847,12 +847,12 @@ Method %Register(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		QUIT 
 
 		Set tVerbose = $Get(pParams("Verbose"))
 		// "Register" just means "Publish to the local repository"
-		Set tServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonOpen(1,,.tSC)
-		$$$ThrowOnError(tSC)
+		Set tServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonOpen(1)
+    #; Don't care, no local cache, do not register there
+    Quit:'$IsObject(tServer)
 
 		Set tIsApplication = ..%IsA("%ZPM.PackageManager.Developer.Lifecycle.Application")
 		

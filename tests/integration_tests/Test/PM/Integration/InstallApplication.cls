@@ -36,7 +36,7 @@ Method TestSimpleApp()
     
     // Finally: Given a qualified module reference, install it.
     Set tSC = ##class(%ZPM.PackageManager.Client.Utils).InstallApplication(tInstallInfo)
-    If '$$$AssertStatusOK(tSC,"Successfully installed SimpleApp application.") { Quit }
+    Quit:'$$$AssertStatusOK(tSC,"Successfully installed SimpleApp application.")
   } Catch e {
     Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
   }
