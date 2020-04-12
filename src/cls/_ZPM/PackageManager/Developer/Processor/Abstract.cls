@@ -215,14 +215,14 @@ Method OnGetUniqueName(Output pUniqueName)
 /// These special expressions are case-insensitive.
 Method %Evaluate(pAttrValue) As %String [ Internal ]
 {
-	Set tAttribute = pAttrValue
+	Set tAttrValue = pAttrValue
 	If $Data(..Params) {
 		Merge tParams = ..Params
 		Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
-		Set tAttribute = ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(tAttribute,.customParams)
+		Set tAttrValue = ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	}
-	Set tAttrValue = ..%RegExReplace(tAttribute,"(?i)\{\$namespace\}",$Namespace)
-	Set tAttrValue = ..%RegExReplace(tAttribute,"(?i)\$\{namespace\}",$Namespace)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$namespace\}",$Namespace)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{namespace\}",$Namespace)
 	Set tMgrDir = ##class(%File).ManagerDirectory()
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$mgrdir\}",tMgrDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{mgrdir\}",tMgrDir)
