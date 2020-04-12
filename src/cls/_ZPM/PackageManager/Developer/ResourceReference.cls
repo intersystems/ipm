@@ -41,7 +41,12 @@ Property UniqueName As %String(MAXLEN = 255, XMLPROJECTION = "NONE") [ Calculate
 /// Overridden unique identifier for this resource; provided by resource processor classes.
 Property OverrideName As %String(MAXLEN = 255, XMLPROJECTION = "NONE");
 
-Method ProcessorGet() As %ZPM.PackageManager.Developer.Processor.Abstract
+Method CreateProcessor(ByRef pParams) As %ZPM.PackageManager.Developer.Processor.Abstract
+{
+	Return ..ProcessorGet(.pParams)
+}
+
+Method ProcessorGet(ByRef pParams) As %ZPM.PackageManager.Developer.Processor.Abstract
 {
 	// Similar to LifecycleGet in Module.
 	If $IsObject(r%Processor) {
@@ -58,7 +63,7 @@ Method ProcessorGet() As %ZPM.PackageManager.Developer.Processor.Abstract
 	If (tProcessorClass = "") || '$$$comClassDefined(tProcessorClass) {
 		Quit $$$NULLOREF
 	}
-	Set r%Processor = $ClassMethod(tProcessorClass,"%New",$this)
+	Set r%Processor = $ClassMethod(tProcessorClass,"%New",$this, .pParams)
 	Quit r%Processor
 }
 

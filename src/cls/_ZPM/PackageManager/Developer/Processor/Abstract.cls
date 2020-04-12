@@ -14,9 +14,14 @@ Parameter ATTRIBUTES As STRING;
 
 Property ResourceReference As %ZPM.PackageManager.Developer.ResourceReference(XMLPROJECTION = "NONE") [ Private ];
 
-Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
+Property Params [ MultiDimensional ];
+
+Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference, ByRef pParams) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..ResourceReference = pResourceReference
+	if ($Data(pParams)) {
+		Merge ..Params = pParams
+	}
 	Do ..CopyAttributes()
 	Do ..ApplyDefaults()
 	Quit $$$OK
@@ -152,7 +157,6 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 	// Default implementation: call %ValidateObject to validate attributes
 	Set tSC = $$$OK
 	Try {
-		Do ..ApplyCustomParameters(..ResourceReference.Attributes, .pParams)
 		If (pPhase = "Validate") {
 			Set tSC = ..%ValidateObject(1)
 			If $$$ISERR(tSC) {
@@ -211,8 +215,14 @@ Method OnGetUniqueName(Output pUniqueName)
 /// These special expressions are case-insensitive.
 Method %Evaluate(pAttrValue) As %String [ Internal ]
 {
-	Set tAttrValue = ..%RegExReplace(pAttrValue,"(?i)\{\$namespace\}",$Namespace)
-	Set tAttrValue = ..%RegExReplace(pAttrValue,"(?i)\$\{namespace\}",$Namespace)
+	Set tAttribute = pAttrValue
+	If $Data(..Params) {
+		Merge tParams = ..Params
+		Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
+		Set tAttribute = ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(tAttribute,.customParams)
+	}
+	Set tAttrValue = ..%RegExReplace(tAttribute,"(?i)\{\$namespace\}",$Namespace)
+	Set tAttrValue = ..%RegExReplace(tAttribute,"(?i)\$\{namespace\}",$Namespace)
 	Set tMgrDir = ##class(%File).ManagerDirectory()
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$mgrdir\}",tMgrDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{mgrdir\}",tMgrDir)
@@ -223,26 +233,6 @@ Method %Evaluate(pAttrValue) As %String [ Internal ]
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$root\}",tRoot)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{root\}",tRoot)
 	Quit tAttrValue
-}
-
-Method ApplyCustomParameters(pAttributes As %Library.ArrayOfDataTypes, ByRef pParams) As %Status
-{
-	Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .pParams)
-	Set key = ""
-	For {
-		Set attribute = pAttributes.GetNext(.key)
-		Quit:(key="")
-		Do pAttributes.SetAt(##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(attribute,.customParams),key)
-		// try to set a Property
-		Try {
-			Set val = $Property($this,key)
-			Continue:($IsObject(val)||$Listvalid(val))
-			Set $Property($this,key) = ..%Evaluate(pAttributes.GetAt(key))
-		} Catch ex {
-			// do nothing if the property doesn't exist 
-		}
-	}
-	Return $$$OK
 }
 
 ClassMethod %RegExReplace(pString, pRegEx, pValue) As %String [ Private ]

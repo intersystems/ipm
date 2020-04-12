@@ -206,11 +206,11 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, Output pHandle
 	Quit $$$OK
 }
 
-Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference, ByRef pParams) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..Name = $Piece(pResourceReference.Name,".",1,*-1)
 	Set ..Extension = $Case(..#EXTENSION,"":$Piece(pResourceReference.Name,".",*),:..#EXTENSION)
-	Set tSC = ##super(pResourceReference)
+	Set tSC = ##super(pResourceReference, .pParams)
 	If (..Directory = "") {
 		Set ..Directory = $ZConvert(..Extension,"L")
 	}

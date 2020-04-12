@@ -121,6 +121,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				set tKey="" for {
 					#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
 					set tResource = tModule.Resources.GetNext(.tKey) quit:(tKey="")
+
+					do tResource.CreateProcessor(.pParams)
+
 					if $IsObject(tResource.Processor) {
 						set tSC = $method(tResource.Processor,"OnBeforePhase",tOnePhase,.pParams) quit:$$$ISERR(tSC)
 					}
@@ -916,6 +919,9 @@ Storage Default
 </Value>
 <Value name="17">
 <Value>SourcesRoot</Value>
+</Value>
+<Value name="18">
+<Value>Repo</Value>
 </Value>
 </Data>
 <DataLocation>^ZPM.Dev.ModuleD</DataLocation>
