@@ -241,8 +241,6 @@ ClassMethod GetStatus(InternalName As %String, Output pReferenced As %Boolean, O
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
-	//w "OnBeforeSave"
-
 	// Ensure OverrideName is set (if needed).
 	Set ..OverrideName = ..OverrideNameGet()
 	
