@@ -122,9 +122,8 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 					#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
 					set tResource = tModule.Resources.GetNext(.tKey) quit:(tKey="")
 
-					do tResource.CreateProcessor(.pParams)
-
 					if $IsObject(tResource.Processor) {
+						Do tResource.Processor.SetParams(.pParams)
 						set tSC = $method(tResource.Processor,"OnBeforePhase",tOnePhase,.pParams) quit:$$$ISERR(tSC)
 					}
 				}
@@ -140,6 +139,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				set tKey="" for {
 					set tResource = tModule.Resources.GetNext(.tKey) quit:(tKey="")			
 					if $IsObject(tResource.Processor) {
+						Do tResource.Processor.SetParams(.pParams)
 						Set tSC = $method(tResource.Processor,"OnAfterPhase",tOnePhase,.pParams) quit:$$$ISERR(tSC)
 					}
 				}

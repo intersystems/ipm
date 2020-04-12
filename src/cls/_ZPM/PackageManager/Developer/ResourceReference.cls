@@ -41,12 +41,7 @@ Property UniqueName As %String(MAXLEN = 255, XMLPROJECTION = "NONE") [ Calculate
 /// Overridden unique identifier for this resource; provided by resource processor classes.
 Property OverrideName As %String(MAXLEN = 255, XMLPROJECTION = "NONE");
 
-Method CreateProcessor(ByRef pParams) As %ZPM.PackageManager.Developer.Processor.Abstract
-{
-	Return ..ProcessorGet(.pParams)
-}
-
-Method ProcessorGet(ByRef pParams) As %ZPM.PackageManager.Developer.Processor.Abstract
+Method ProcessorGet() As %ZPM.PackageManager.Developer.Processor.Abstract
 {
 	// Similar to LifecycleGet in Module.
 	If $IsObject(r%Processor) {
@@ -63,7 +58,7 @@ Method ProcessorGet(ByRef pParams) As %ZPM.PackageManager.Developer.Processor.Ab
 	If (tProcessorClass = "") || '$$$comClassDefined(tProcessorClass) {
 		Quit $$$NULLOREF
 	}
-	Set r%Processor = $ClassMethod(tProcessorClass,"%New",$this, .pParams)
+	Set r%Processor = $ClassMethod(tProcessorClass,"%New",$this)
 	Quit r%Processor
 }
 
@@ -246,6 +241,8 @@ ClassMethod GetStatus(InternalName As %String, Output pReferenced As %Boolean, O
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
+	//w "OnBeforeSave"
+
 	// Ensure OverrideName is set (if needed).
 	Set ..OverrideName = ..OverrideNameGet()
 	

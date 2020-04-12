@@ -16,15 +16,22 @@ Property ResourceReference As %ZPM.PackageManager.Developer.ResourceReference(XM
 
 Property Params [ MultiDimensional ];
 
-Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference, ByRef pParams) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..ResourceReference = pResourceReference
-	if ($Data(pParams)) {
-		Merge ..Params = pParams
-	}
 	Do ..CopyAttributes()
 	Do ..ApplyDefaults()
 	Quit $$$OK
+}
+
+Method SetParams(ByRef pParams) As %Status
+{
+	if ($Data(pParams)) {
+		Merge ..Params = pParams
+		Do ..CopyAttributes()
+		Do ..ApplyDefaults()
+	}
+	Return $$$OK
 }
 
 Method CopyAttributes() [ CodeMode = objectgenerator, Private ]

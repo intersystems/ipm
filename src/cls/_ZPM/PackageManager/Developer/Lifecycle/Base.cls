@@ -450,7 +450,7 @@ Method %Reload(ByRef pParams) As %Status
 		For {
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:tKey=""
-			
+
 			If $IsObject(tResource.Processor) {
 				Set tSC = tResource.Processor.OnPhase("Reload",.pParams)
 			}
@@ -522,7 +522,7 @@ Method %Compile(ByRef pParams) As %Status
 		For {
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:tKey=""
-			
+
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
 				If tResource.Processor.%IsA("%ZPM.PackageManager.Developer.Processor.AbstractCompilable") {
 					Kill tOneResourceList

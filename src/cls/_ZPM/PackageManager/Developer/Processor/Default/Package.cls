@@ -36,9 +36,9 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 	Quit tSC
 }
 
-Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference, ByRef pParams) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tSC = ##super(pResourceReference,.pParams)
+	Set tSC = ##super(pResourceReference)
 	If (..Format = "") {
 		Set ..Format = $Case(..FilenameExtension,"cls":"UDL",:"XML")
 	}
