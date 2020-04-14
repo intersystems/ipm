@@ -173,7 +173,9 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
                 Set success = 0
                 Set errorMsg = $System.Status.GetErrorText(tSC)
             }
-            do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
+            if ($System.CLS.IsMthd(tClient, "CollectAnalytics")) {
+              do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
+            }
 		}
 		If $$$ISERR(tSC) {
 			Quit

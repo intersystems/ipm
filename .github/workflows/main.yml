@@ -54,6 +54,23 @@ jobs:
               -p /home/irisowner/registry/password.txt
             REGISTRY=`docker ps -lq`
             while [ "`docker container inspect -f {{.State.Health.Status}} $REGISTRY`" != "healthy" ]; do echo Waiting container; sleep 1; done
+      - name: Test and Verify 
+        timeout-minutes: 15
+        run: |
+            docker run --network zpm -d --rm --init \
+              -e TEST_REGISTRY=http://registry:52773/registry/ \
+              -e TEST_REGISTRY_USER=admin \
+              -e TEST_REGISTRY_PASSWORD=securepassword \
+              zpm
+            CONTAINER=`docker ps -lq`
+            while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+            /bin/echo -e '' \
+              'zpm "list":1\n' \
+              'zpm "zpm test":1\n' \
+              'zpm "zpm verify":1' \
+              'halt\n' \
+            | docker exec -i $CONTAINER iris session iris -U%SYS
+            docker stop $CONTAINER
       - name: Test and publish to temporary registry
         timeout-minutes: 15
         run: |
@@ -61,8 +78,6 @@ jobs:
             CONTAINER=`docker ps -lq`
             while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
             /bin/echo -e '' \
-              'zpm "list":1\n' \
-              'zpm "zpm test":1\n' \
               'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
               'zpm "repo -list":1\n' \
               'zpm "install dsw":1\n' \
@@ -76,7 +91,7 @@ jobs:
         timeout-minutes: 15
         run: |
             wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
-            docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ matrix.image }}
+            docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ matrix.image }}
             CONTAINER=`docker ps -lq`
             while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
             /bin/echo -e '' \
@@ -94,7 +109,7 @@ jobs:
         timeout-minutes: 15
         run: |
             wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
-            docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ matrix.image }}
+            docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ matrix.image }}
             CONTAINER=`docker ps -lq`
             while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
             /bin/echo -e '' \

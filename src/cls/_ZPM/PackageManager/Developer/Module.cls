@@ -382,7 +382,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					}
 					
 					Set tDepth = $Select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
-			
+
 					If (pPass = $$$EXACT) {	
 						Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth,tQualifiedReference.ServerName,tModule.VersionString)
 						Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
@@ -916,6 +916,9 @@ Storage Default
 </Value>
 <Value name="17">
 <Value>SourcesRoot</Value>
+</Value>
+<Value name="18">
+<Value>Repo</Value>
 </Value>
 </Data>
 <DataLocation>^ZPM.Dev.ModuleD</DataLocation>

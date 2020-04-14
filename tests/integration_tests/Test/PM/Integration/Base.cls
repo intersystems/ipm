@@ -18,6 +18,7 @@ Method Setup() As %Status
 		New $Namespace
 		do $$$AssertStatusOK(##class(%ZPM.PackageManager.Client.FilesystemServerDefinition).%DeleteExtent())
 		do $$$AssertStatusOK(##class(%ZPM.PackageManager.Client.RemoteServerDefinition).%DeleteExtent())
+		do $$$AssertStatusOK(##class(%ZPM.PackageManager.Client.LocalServerDefinition).%DeleteExtent())
 		
 		If '$$$AssertStatusOK(##class(%ZPM.PackageManager.Developer.UnitTest.Utils).CreateNamespace(..#CLIENTNS)) {
 			Quit
@@ -48,6 +49,9 @@ Method Setup() As %Status
 			Do $$$AssertStatusOK(tServerDefn.%Save(),"Remote server definition saved.")
 	
 			Set ..RegistryAdded = 1
+
+      /// Clear any packages on remote registry for debug purposes
+      Do tServerDefn.GetPackageService().ResetRegistry()
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()

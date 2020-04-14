@@ -45,9 +45,38 @@ ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.PackageManager.C
 			Set tClientCriteria.IncludeSnapshots = tServer.Snapshots
 			Set tServerResults = tClient.ListModules(tClientCriteria)
 			For i=1:1:tServerResults.Count() {
-				Do pResults.Insert(##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New(tServer.Name,tServerResults.GetAt(i)))
+        Set item = tServerResults.GetAt(i)
+        #; Sorting versions
+        Set versions(tServer.Name, +item.Version.Major, +item.Version.Minor, +item.Version.Patch, " "_item.Version.Patch_"_"_item.Version.Prerelease) = item
 			}
 		}
+    Set name = ""
+    For {
+      Set name = $Order(versions(name))
+      Quit:name=""
+      Set major = ""
+      For {
+        Set major = $Order(versions(name, major), -1)
+        Quit:major=""
+        Set minor = ""
+        For  {
+          Set minor = $Order(versions(name, major, minor), -1)
+          Quit:minor=""
+          Set patch = ""
+          For  {
+            Set patch = $Order(versions(name, major, minor, patch), -1)
+            Quit:patch=""
+            Set sub = ""
+            For  {
+              Set sub = $Order(versions(name, major, minor, patch, sub), 1, item)
+              Quit:sub=""
+              Do pResults.Insert(##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New(name, item))
+            }
+          }
+        }
+      }
+    }
+    
 		If $$$ISERR(tSC) {
 			Quit
 		}
