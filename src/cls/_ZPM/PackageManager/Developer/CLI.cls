@@ -454,7 +454,7 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Set tAccum = ""
 				} ElseIf (tState = $$$MODIFIERVALUE) {
 					If ($Get(tDataName) '= "") {
-						Do ..SetData(.pCommandInfo,tDataName,tAccum)
+						Do ..SetData(.pCommandInfo,tDataName,tAccum,1)
 						Set tDataName = ""
 					} Else {
 						Set pCommandInfo("modifiers",tModifier) = tAccum
@@ -516,7 +516,7 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Continue
 				} ElseIf (tState = $$$MODIFIERVALUEQUOTED) {
 					If ($Get(tDataName) '= "") {
-						Do ..SetData(.pCommandInfo,tDataName,tAccum)
+						Do ..SetData(.pCommandInfo,tDataName,tAccum,1)
 					} Else {
 						Set pCommandInfo("modifiers",tModifier) = tAccum
 					}
@@ -746,8 +746,11 @@ ClassMethod %GetCommandStructure(Output pCommandStructure) As %Status [ CodeMode
 }
 
 /// Utility method for setting multiple subscripts based on .-delimited <var>pDataName</var>
-ClassMethod SetData(pTargetArray, pDataName, pDataValue) [ Private ]
+ClassMethod SetData(pTargetArray, pDataName, pDataValue, pCustomParam = 0) [ Private ]
 {
+	If (pCustomParam && (pDataName'[".")) {
+		Set pDataName = "zpm."_pDataName
+	}
 	Set tPieces = $ListFromString(pDataName,".")
 	Set tValue = pDataValue
 	For i=$ListLength(tPieces):-1:1 {
