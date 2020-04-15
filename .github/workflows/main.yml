@@ -18,7 +18,9 @@ jobs:
           "store/intersystems/iris-community:2019.4.0.383.0",
           "store/intersystems/irishealth-community:2019.4.0.383.0",
           "store/intersystems/iris-community:2020.1.0.215.0",
-          "store/intersystems/irishealth-community:2020.1.0.215.0"
+          "store/intersystems/irishealth-community:2020.1.0.215.0",
+          "store/intersystems/iris-community:2020.2.0.196.0",
+          "store/intersystems/irishealth-community:2020.2.0.196.0"
         ]
     runs-on: ubuntu-latest
     steps:
