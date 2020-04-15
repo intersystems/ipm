@@ -44,6 +44,16 @@ ClassMethod setup(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.I
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "PM")
 }
 
+ClassMethod AsyncSetup(Args...)
+{
+  Try {
+    Set tSC = ..setup(Args...)
+  } Catch ex {
+    Set tSC = ex.AsStatus()
+  }  
+  Do $System.Event.Signal($ZParent, tSC)
+}
+
 ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
     If (pRegistry'="") {
@@ -78,19 +88,25 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
   if '..NeedInstall() QUIT $$$OK
 
   Write !,"Extract package"
-  Do ..ExtractPackage(.tModDir)
+  $$$QuitOnError(..ExtractPackage(.tModDir))
   
   Write !,"Install ZPM"
 
   set ts = $ZHOROLOG
   set logFile=##class(%File).TempFilename()
-  JOB ..setup(tModDir, 3):(:::logFile):0
+  JOB ..AsyncSetup(tModDir, 3):(:::logFile):0
   if '$test {
-    quit $$$OK
+    quit $$$ERROR($$$GeneralError, "Job did not start")
   }
+
   #; Wait setup
   set child=$zchild
-  do { hang 0.1 } while $data(^$JOB(child)) 
+  Set tSC = $$$OK
+  do { 
+    hang 1
+    Set $Listbuild(res, tSC) = $System.Event.WaitMsg("", 10)
+    Quit:res=1
+  } while $data(^$JOB(child))
 
   set fs=##class(%Stream.FileCharacter).%New()
   set fs.Filename=logFile
@@ -101,7 +117,7 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
 
   Write !,"Time spent ",$ZHOROLOG - ts
 
-  QUIT $$$OK
+  QUIT tSC
 }
 
 /// Check currently installed version, if any
