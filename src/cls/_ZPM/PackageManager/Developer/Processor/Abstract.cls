@@ -14,12 +14,24 @@ Parameter ATTRIBUTES As STRING;
 
 Property ResourceReference As %ZPM.PackageManager.Developer.ResourceReference(XMLPROJECTION = "NONE") [ Private ];
 
+Property Params [ MultiDimensional ];
+
 Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..ResourceReference = pResourceReference
 	Do ..CopyAttributes()
 	Do ..ApplyDefaults()
 	Quit $$$OK
+}
+
+Method SetParams(ByRef pParams) As %Status
+{
+	if ($Data(pParams)) {
+		Merge ..Params = pParams
+		Do ..CopyAttributes()
+		Do ..ApplyDefaults()
+	}
+	Return $$$OK
 }
 
 Method CopyAttributes() [ CodeMode = objectgenerator, Private ]
@@ -210,8 +222,14 @@ Method OnGetUniqueName(Output pUniqueName)
 /// These special expressions are case-insensitive.
 Method %Evaluate(pAttrValue) As %String [ Internal ]
 {
-	Set tAttrValue = ..%RegExReplace(pAttrValue,"(?i)\{\$namespace\}",$Namespace)
-	Set tAttrValue = ..%RegExReplace(pAttrValue,"(?i)\$\{namespace\}",$Namespace)
+	Set tAttrValue = pAttrValue
+	If $Data(..Params) {
+		Merge tParams = ..Params
+		Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
+		Set tAttrValue = ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
+	}
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$namespace\}",$Namespace)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{namespace\}",$Namespace)
 	Set tMgrDir = ##class(%File).ManagerDirectory()
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$mgrdir\}",tMgrDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{mgrdir\}",tMgrDir)
