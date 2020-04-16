@@ -121,7 +121,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				set tKey="" for {
 					#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
 					set tResource = tModule.Resources.GetNext(.tKey) quit:(tKey="")
+
 					if $IsObject(tResource.Processor) {
+						Do tResource.Processor.SetParams(.pParams)
 						set tSC = $method(tResource.Processor,"OnBeforePhase",tOnePhase,.pParams) quit:$$$ISERR(tSC)
 					}
 				}
@@ -137,6 +139,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				set tKey="" for {
 					set tResource = tModule.Resources.GetNext(.tKey) quit:(tKey="")			
 					if $IsObject(tResource.Processor) {
+						Do tResource.Processor.SetParams(.pParams)
 						Set tSC = $method(tResource.Processor,"OnAfterPhase",tOnePhase,.pParams) quit:$$$ISERR(tSC)
 					}
 				}
@@ -382,7 +385,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					}
 					
 					Set tDepth = $Select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
-
+			
 					If (pPass = $$$EXACT) {	
 						Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth,tQualifiedReference.ServerName,tModule.VersionString)
 						Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
