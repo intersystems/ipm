@@ -218,8 +218,13 @@ ClassMethod ExtractStream(aFileStream As %Stream.Object, pTargetDirectory As %St
     set tFile.fileData=##class(%Stream.FileBinary).%New()
     for tPos=1:1:readBlocks {
       set tData=aFileStream.Read(blockSize)
-      set:tPos=readBlocks tData=$extract(tData, 1, fileSize#blockSize)
+      if (tPos=readBlocks)&&(fileSize#blockSize>0) {
+        set tData=$extract(tData, 1, fileSize#blockSize)
+      }
       do tFile.fileData.Write(tData)
+    }
+    if (fileSize'=tFile.fileData.Size) {
+      throw ##class(%Exception.General).%New("File size mismatch: "_fileSize_":"_tFile.fileData.Size)
     }
     if tFile.typeflag'="g" { 
       // save file
