@@ -594,8 +594,8 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 		Set tResult = ""
 		#dim tResult As %ZPM.PackageManager.Core.QualifiedModuleReference
 		If (tKeywords = "") {
-			#; Install latest version by default
-			Set tResult = tResults.GetAt(tResults.Size)
+			// Install latest version by default
+			Set tResult = tResults.GetAt(1) // latest version is in the first list item 
 		} ElseIf (tResults.Count() > 0) {
 			For i=1:1:tResults.Count() {
 				Set tResultInfo = tResults.GetAt(i)
