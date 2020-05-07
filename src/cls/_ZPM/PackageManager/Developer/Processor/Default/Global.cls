@@ -4,6 +4,13 @@ Class %ZPM.PackageManager.Developer.Processor.Default.Global Extends %ZPM.Packag
 /// Description of resource processor class (shown in UI)
 Parameter DESCRIPTION As STRING = "Standard resource processor for global exports.";
 
+/// Comma-separated list of resource attribute names that this processor uses
+Parameter ATTRIBUTES As STRING = "Directory";
+
+/// Directory relative to module root containing the exported resource.
+/// Defaults to the resource's extension (lower-case) if unspecified.
+Property Directory As %String(MAXLEN = "") [ InitialExpression = "gbl/" ];
+
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
@@ -35,8 +42,22 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			
 			If '..ResourceReference.Generated {
 				Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
-				Set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory_"gbl/")
+				Set tResourceDirectory = tRoot_"/"_tSubDirectory
+
+				Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+				If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
+					Set tSourceRoot = tSourceRoot _ "/"
+				}
+
+				Set tDirectory = ..Directory
+				If tDirectory'="","\/"'[$EXTRACT(tDirectory, *) {
+					Set tDirectory = tDirectory _ "/"
+				} Else {
+					Set tDirectory = "gbl/"
+				}
 				
+				Set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
+
 				If '..ResourceReference.Preload {
 					Set tResourcePath = tResourceDirectory_$tr(tName,"%,("")","___")_".xml"
 					Set tSC = $System.OBJ.Load(tResourcePath,$Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile")
@@ -51,6 +72,27 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
+}
+
+Method OnResolveChildren(ByRef pResourceArray) As %Status
+{
+	If ('$Data(pResourceArray(..ResourceReference.Name))) {
+		Quit $$$OK
+	}
+	// Add the relative path for purposes of lifecycle %Export method
+	Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
+	Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+	If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
+		Set tSourceRoot = tSourceRoot _ "/"
+	}
+	Set tDirectory = ..Directory
+	If tDirectory'="","\/"'[$EXTRACT(tDirectory, *) {
+		Set tDirectory = tDirectory _ "/"
+	} Else {
+		Set tDirectory = "gbl/"
+	}
+	Set pResourceArray(..ResourceReference.Name,"RelativePath") = tSourceRoot_tDirectory_$tr(tName,"%,("")","___")_".xml"
+	Quit $$$OK
 }
 
 }
