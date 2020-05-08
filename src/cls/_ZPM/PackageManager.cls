@@ -192,6 +192,17 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 <parameter name="module" required="true" description="Name of module for which dependent modules will be found" />
 <parameter name="version" description="Version of the module for which dependent modules will be found (in all configured repositories)" />
 </command>
+
+<command name="version" aliases="ver">
+<description>Shows version client and registry</description>
+<example description="Shows version client and registry">
+version
+</example>
+<modifier name="list" aliases="l" description="List versions all modules in all namespaces" />
+<example description="List versions all packets in all namespaces">
+ver -list
+</example>
+</command>
 </commands>
 }
 
@@ -224,7 +235,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	For {
 		Try {
 			If (tCommand = "") {
-				Write "zpm: >>",$Namespace,">"
+				Write "zpm: ",$Namespace,">"
 				Read tCommand
 				Write !
 			}
@@ -264,6 +275,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Config(.tCommandInfo)
 			} ElseIf (tCommandInfo = "module-action") {
 				Do ..ModuleAction(.tCommandInfo)
+			}ElseIf (tCommandInfo = "version") {
+				Do ..Version(.tCommandInfo)
 			}
 		} Catch pException {
 			#dim e As %Exception.AbstractException
@@ -279,7 +292,95 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Write !
 	}
 }
+/// d ##class(%ZPM.PackageManager).GetListModules("zpm",.list)
+ClassMethod GetListModules(mask, ByRef pList) [ Internal ]
+{
+	Set tQuery = "select Name,VersionString,Description,ExternalName from %ZPM_PackageManager_Developer.""MODULE"""
+	if mask'="" {Set tQuery = tQuery _ " where name like ?"
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,mask)
+	} else {
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
+	}
+	If (tRes.%SQLCODE < 0) {
+		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	}
+	While tRes.%Next(.tSC) {
+		$$$ThrowOnError(tSC)
+		set pList(tRes.%Get("Name"))=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("ExternalName"))
+	}
+}
+/// Version client and registry
+ClassMethod Version(ByRef pCommandInfo) [ Internal ]
+{
+	new $Namespace
+	set $Namespace="%SYS"
+	/// ##class(%SYS.Namespace).Exists(tNamespace)
+	//select Nsp,Nsp from %SYS.Namespace_List(0,0) where Status = 1
+	set tRS = ##class(%ResultSet).%New("Config.Namespaces:List")
+	if '$isobject(tRS) q ""
+	set tSC = tRS.Execute()
+	While tRS.Next() {	
+		s name=tRS.GetData(1) 
+		continue:name="%ALL"
+		s namespace(name)=""
+	}
+	d tRS.Close()
+	
+	Set tList = $$$HasModifier(pCommandInfo,"list")
+	if tList {
+		set ns=""
+		for { set ns=$order(namespace(ns)) q:ns=""
+			write !,"  "_ns_">",!
+			set $Namespace=ns
+			do ..Shell("list")
+		}
+	} else {
+		set $Namespace="%SYS"
+		do ..GetListModules("zpm%",.list)
+		if $DATA(list("zpm")) {
+				write !,"%SYS>zpm "_$LG(list("zpm"),1)
+		}
+		set ns=""
+		for { set ns=$order(namespace(ns)) q:ns=""
+			kill list
+			set $namespace=ns
+			do ..GetListModules("zpm%",.list)
+			if $DATA(list("zpm-registry")) {
+				write !,name_">zpm-registry "_$LG(list("zpm-registry"),1)
+				set Found=name
+			}
+		}
+		set $namespace="%SYS"
+		if '$d(Found) write !," Registry Packet manager not found" 
+		//do ..Shell("repo -list")
+		//get url repo http://192.168.20.151:52223/registry/
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+			"select Name "_
+			"from %ZPM_PackageManager_Client.ServerDefinition "_
+			"order by %ZPM_PackageManager_Client.ServerDefinition_SortOrder(ID) desc")
+		If (tRes.%SQLCODE < 0) {
+			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+		}
+		While tRes.%Next(.tSC) {
+			$$$ThrowOnError(tSC)
+			
+			#dim tDefn As %ZPM.PackageManager.Client.ServerDefinition
+			Set tRepository = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+			$$$ThrowOnError(tSC)
+			set repo($i(repo))=$lb(tRepository.Name,tRepository.Details)
+		}
+		$$$ThrowOnError(tSC)
+		set repo=""
+		for { set repo=$order(repo(repo)) q:repo=""
+			set url=$lg(repo(repo),2)
+			if $GET(url)'="" {
+				w !,url
 
+			}
+		}
+	}
+	q $$$OK
+}
 ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 {
 	// In quiet mode, no prompts should be shown.
