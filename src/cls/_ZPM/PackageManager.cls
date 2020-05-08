@@ -224,7 +224,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	For {
 		Try {
 			If (tCommand = "") {
-				Write "zpm: -!-",$Namespace,">"
+				Write "zpm: >>",$Namespace,">"
 				Read tCommand
 				Write !
 			}
