@@ -5,6 +5,8 @@ Class %ZPM.PackageManager Extends %ZPM.PackageManager.Developer.CLI
 
 Parameter DOMAIN = "ZPM";
 
+Parameter STANDARDPHASES = {$Listbuild("reload","compile","test","package","verify","publish")};
+
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
 {
@@ -49,6 +51,73 @@ The standard lifecycle phases are:
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
+
+<command name="reload">
+<description>
+This command is an alias for `module-action module-name reload`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform reload action" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (reload), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="compile">
+<description>
+This command is an alias for `module-action module-name compile`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform compile action" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (compile), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="test">
+<description>
+This command is an alias for `module-action module-name test`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform test action" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (reload), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="package">
+<description>
+This command is an alias for `module-action module-name package`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform package actions" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (package), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="verify">
+<description>
+This command is an alias for `module-action module-name verify`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform verify action" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (verify), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="publish">
+<description>
+This command is an alias for `module-action module-name publish`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform publish actions" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (publish), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 
 <command name="search" aliases="find">
 <description>Shows all modules in current registry</description>
@@ -262,7 +331,9 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..ListOrphans(.tCommandInfo)
 			} ElseIf (tCommandInfo = "config") {
 				Do ..Config(.tCommandInfo)
-			} ElseIf (tCommandInfo = "module-action") {
+			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
+				Do ..RunOnePhase(.tCommandInfo)
+			}ElseIf (tCommandInfo = "module-action") {
 				Do ..ModuleAction(.tCommandInfo)
 			}
 		} Catch pException {
@@ -639,6 +710,15 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 	Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
+}
+
+ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
+{
+	Set tModName = $Get(pCommandInfo("parameters","module"))
+	Set tPhases = $Listbuild($zcvt(pCommandInfo, "w"))
+	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
+	Merge tParams = pCommandInfo("data")
+	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
 
 ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
