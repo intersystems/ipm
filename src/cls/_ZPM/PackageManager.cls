@@ -337,7 +337,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		set $Namespace="%SYS"
 		do ..GetListModules("zpm",.list)
 		if $DATA(list("zpm")) {
-				write !,"%SYS>zpm "_$LG(list("zpm"),1)
+				write !," zpm "_$LG(list("zpm"),1)
 		}
 		set ns=""
 		for { set ns=$order(namespace(ns)) q:ns=""
@@ -373,9 +373,9 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		for { set repo=$order(repo(repo)) q:repo=""
 			set url=$lg(repo(repo),2)
 			if $GET(url)'="" {
-				w !,url
+				w !," ",url
 				// Get version registry
-				set tSC= ..GetJsonURL(url,.o)) 
+				set tSC= ..GetJsonURL(url,.o)
 				$$$ThrowOnError(tSC)
 				w " "_o.version
 			}
@@ -384,11 +384,18 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 	q $$$OK
 }
 
-/// write $System.Status.GetErrorText(##class(App.net).GetJsonURL("https://pm.community.intersystems.com/",.o))
+/// write $System.Status.GetErrorText(##class(%ZPM.PackageManager).GetJsonURL("https://pm.community.intersystems.com/",.o))
 ClassMethod GetJsonURL(url As %String, ByRef obj) As %Status
 {
 	New $Namespace
- 	Set req=##class(%Net.HttpRequest).%New()
+ 	#dim req As %Net.HttpRequest
+	 Set req=##class(%Net.HttpRequest).%New()
+	set server=$p(url,"/",3)
+
+	if server[":" {
+		Set port=$p(server,":",2)
+		set server=$p(server,":")
+	}
 	
 	if $zconvert(url,"L")["https:" {
 	 	Set SSLConfig = "ZPM"
@@ -396,14 +403,11 @@ ClassMethod GetJsonURL(url As %String, ByRef obj) As %Status
 	 	Do:'##class(Security.SSLConfigs).Exists(SSLConfig) ##class(Security.SSLConfigs).Create(SSLConfig)
 	 	Set req.Https=1
 		Set req.SSLConfiguration=SSLConfig
+		set:$g(port)="" port=443
 	}
-	set server=$p(url,"/",3)
-	if server[":" {
-		set server=$p(server,":")
-		Set req.Port=$p(server,":",2)
-	}
-
+	set:$g(port)="" port=80
 	Set req.Server=server
+	set req.Port=port
 	set location=$p(url,"/",4,*)
 
 	Set req.Location =location
