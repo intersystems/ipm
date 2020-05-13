@@ -375,11 +375,50 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 			if $GET(url)'="" {
 				w !,url
 				// Get version registry
-				
+				set tSC= ..GetJsonURL(url,.o)) 
+				$$$ThrowOnError(tSC)
+				w " "_o.version
 			}
 		}
 	}
 	q $$$OK
+}
+
+/// write $System.Status.GetErrorText(##class(App.net).GetJsonURL("https://pm.community.intersystems.com/",.o))
+ClassMethod GetJsonURL(url As %String, ByRef obj) As %Status
+{
+	New $Namespace
+ 	Set req=##class(%Net.HttpRequest).%New()
+	
+	if $zconvert(url,"L")["https:" {
+	 	Set SSLConfig = "ZPM"
+	 	Zn "%SYS"
+	 	Do:'##class(Security.SSLConfigs).Exists(SSLConfig) ##class(Security.SSLConfigs).Create(SSLConfig)
+	 	Set req.Https=1
+		Set req.SSLConfiguration=SSLConfig
+	}
+	set server=$p(url,"/",3)
+	if server[":" {
+		set server=$p(server,":")
+		Set req.Port=$p(server,":",2)
+	}
+
+	Set req.Server=server
+	set location=$p(url,"/",4,*)
+
+	Set req.Location =location
+
+	Set st = req.Get()
+	Return:$$$ISERR(st) st
+	Return:(req.HttpResponse.StatusCode = 404) $$$ERROR($$$GeneralError,"Repository doesn't exist OR you don't have access")
+	Return:((req.HttpResponse.StatusCode = 403) && (req.HttpResponse.GetHeader("X-RATELIMIT-REMAINING")=0)) $$$ERROR($$$GeneralError,"API rate limit exceeded. Try logging in.")
+ 	Return:(req.HttpResponse.StatusCode '= 200) $$$ERROR($$$GeneralError,"Received " _ req.HttpResponse.StatusCode _ " status, expected 200")
+
+ 	#dim obj As %ZEN.proxyObject
+	Set st = ##class(%ZEN.Auxiliary.jsonProvider).%ConvertJSONToObject(req.HttpResponse.Data,,.obj,1)
+	Return:$$$ISERR(st) st
+
+ 	Return $$$OK
 }
 
 ClassMethod Init(ByRef pCommandInfo) [ Internal ]
