@@ -292,15 +292,13 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Write !
 	}
 }
+
 /// d ##class(%ZPM.PackageManager).GetListModules("zpm",.list)
-ClassMethod GetListModules(mask, ByRef pList) [ Internal ]
+ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
 {
-	Set tQuery = "select Name,VersionString,Description,ExternalName from %ZPM_PackageManager_Developer.""MODULE"""
-	if mask'="" {Set tQuery = tQuery _ " where name like ?"
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,mask)
-	} else {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
-	}
+	Set tQuery = "select Name,VersionString,Description,ExternalName from %ZPM_PackageManager_Developer.""MODULE"" where name %StartsWith ?"
+	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,StartsWith)
+	
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
@@ -309,24 +307,25 @@ ClassMethod GetListModules(mask, ByRef pList) [ Internal ]
 		set pList(tRes.%Get("Name"))=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("ExternalName"))
 	}
 }
+
 /// Version client and registry
 ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
 	new $Namespace
 	set $Namespace="%SYS"
-	/// ##class(%SYS.Namespace).Exists(tNamespace)
-	//select Nsp,Nsp from %SYS.Namespace_List(0,0) where Status = 1
-	set tRS = ##class(%ResultSet).%New("Config.Namespaces:List")
-	if '$isobject(tRS) q ""
-	set tSC = tRS.Execute()
-	While tRS.Next() {	
-		s name=tRS.GetData(1) 
-		continue:name="%ALL"
-		s namespace(name)=""
-	}
-	d tRS.Close()
 	
-	Set tList = $$$HasModifier(pCommandInfo,"list")
+	Set tQuery = "select Nsp from %SYS.Namespace_List(0,0) where Status = 1"
+	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
+	
+	If (tRes.%SQLCODE < 0) {
+		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	}
+	While tRes.%Next(.tSC) {
+		$$$ThrowOnError(tSC)
+		set namespace(tRes.%Get("Nsp"))=""
+	}
+  
+  	Set tList = $$$HasModifier(pCommandInfo,"list")
 	if tList {
 		set ns=""
 		for { set ns=$order(namespace(ns)) q:ns=""
@@ -336,7 +335,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		}
 	} else {
 		set $Namespace="%SYS"
-		do ..GetListModules("zpm%",.list)
+		do ..GetListModules("zpm",.list)
 		if $DATA(list("zpm")) {
 				write !,"%SYS>zpm "_$LG(list("zpm"),1)
 		}
@@ -344,16 +343,16 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		for { set ns=$order(namespace(ns)) q:ns=""
 			kill list
 			set $namespace=ns
-			do ..GetListModules("zpm%",.list)
+			do ..GetListModules("zpm",.list)
 			if $DATA(list("zpm-registry")) {
 				write !,name_">zpm-registry "_$LG(list("zpm-registry"),1)
 				set Found=name
 			}
 		}
 		set $namespace="%SYS"
-		if '$d(Found) write !," Registry Packet manager not found" 
-		//do ..Shell("repo -list")
-		//get url repo http://192.168.20.151:52223/registry/
+		if '$d(Found) write !," zpm-registry not found" 
+		
+		// Get URL current registry
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,
 			"select Name "_
 			"from %ZPM_PackageManager_Client.ServerDefinition "_
@@ -375,12 +374,14 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 			set url=$lg(repo(repo),2)
 			if $GET(url)'="" {
 				w !,url
-
+				// Get version registry
+				
 			}
 		}
 	}
 	q $$$OK
 }
+
 ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 {
 	// In quiet mode, no prompts should be shown.
