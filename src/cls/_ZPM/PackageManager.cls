@@ -198,10 +198,6 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 <example description="Shows version client and registry">
 version
 </example>
-<modifier name="list" aliases="l" description="List versions all modules in all namespaces" />
-<example description="List versions all packets in all namespaces">
-ver -list
-</example>
 </command>
 </commands>
 }
