@@ -325,104 +325,54 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		set namespace(tRes.%Get("Nsp"))=""
 	}
   
-  	Set tList = $$$HasModifier(pCommandInfo,"list")
-	if tList {
-		set ns=""
-		for { set ns=$order(namespace(ns)) q:ns=""
-			write !,"  "_ns_">",!
-			set $Namespace=ns
-			do ..Shell("list")
-		}
-	} else {
-		set $Namespace="%SYS"
+	set $Namespace="%SYS"
+	do ..GetListModules("zpm",.list)
+	if $DATA(list("zpm")) {
+			write !," zpm "_$LG(list("zpm"),1)
+	}
+	set ns=""
+	for { set ns=$order(namespace(ns)) q:ns=""
+		kill list
+		set $namespace=ns
 		do ..GetListModules("zpm",.list)
-		if $DATA(list("zpm")) {
-				write !," zpm "_$LG(list("zpm"),1)
+		if $DATA(list("zpm-registry")) {
+			write !,ns_">zpm-registry "_$LG(list("zpm-registry"),1)
+			set Found=name
 		}
-		set ns=""
-		for { set ns=$order(namespace(ns)) q:ns=""
-			kill list
-			set $namespace=ns
-			do ..GetListModules("zpm",.list)
-			if $DATA(list("zpm-registry")) {
-				write !,name_">zpm-registry "_$LG(list("zpm-registry"),1)
-				set Found=name
-			}
-		}
-		set $namespace="%SYS"
-		if '$d(Found) write !," zpm-registry not found" 
-		
-		// Get URL current registry
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-			"select Name "_
-			"from %ZPM_PackageManager_Client.ServerDefinition "_
-			"order by %ZPM_PackageManager_Client.ServerDefinition_SortOrder(ID) desc")
-		If (tRes.%SQLCODE < 0) {
-			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-		}
-		While tRes.%Next(.tSC) {
-			$$$ThrowOnError(tSC)
-			
-			#dim tDefn As %ZPM.PackageManager.Client.ServerDefinition
-			Set tRepository = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
-			$$$ThrowOnError(tSC)
-			set repo($i(repo))=$lb(tRepository.Name,tRepository.Details)
-		}
+	}
+	set $namespace="%SYS"
+	if '$d(Found) write !," Locally installed zpm-registry not found" 
+	
+	// Get URL current registry
+	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+		"select Name "_
+		"from %ZPM_PackageManager_Client.ServerDefinition "_
+		"order by %ZPM_PackageManager_Client.ServerDefinition_SortOrder(ID) desc")
+	If (tRes.%SQLCODE < 0) {
+		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	}
+	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		set repo=""
-		for { set repo=$order(repo(repo)) q:repo=""
-			set url=$lg(repo(repo),2)
-			if $GET(url)'="" {
-				w !," ",url
-				// Get version registry
-				set tSC= ..GetJsonURL(url,.o)
-				$$$ThrowOnError(tSC)
-				w " "_o.version
-			}
+		
+		#dim tDefn As %ZPM.PackageManager.Client.ServerDefinition
+		Set tRepository = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+		$$$ThrowOnError(tSC)
+		set repo($i(repo))=$lb(tRepository.Name,tRepository.Details)
+	}
+	$$$ThrowOnError(tSC)
+	set repo=""
+	for { set repo=$order(repo(repo)) q:repo=""
+		set url=$lg(repo(repo),2)
+		if $GET(url)'="" {
+			w !," ",url
+			// Get version registry
+			Set tClient = ##class(%ZPM.PackageManager.Client.REST.PackageManagerClient).%New()
+			set tSC= tClient.GetJsonURL(url,.o)
+			$$$ThrowOnError(tSC)
+			w " "_o.version
 		}
 	}
 	q $$$OK
-}
-
-/// write $System.Status.GetErrorText(##class(%ZPM.PackageManager).GetJsonURL("https://pm.community.intersystems.com/",.o))
-ClassMethod GetJsonURL(url As %String, ByRef obj) As %Status
-{
-	New $Namespace
- 	#dim req As %Net.HttpRequest
-	 Set req=##class(%Net.HttpRequest).%New()
-	set server=$p(url,"/",3)
-
-	if server[":" {
-		Set port=$p(server,":",2)
-		set server=$p(server,":")
-	}
-	
-	if $zconvert(url,"L")["https:" {
-	 	Set SSLConfig = "ZPM"
-	 	Zn "%SYS"
-	 	Do:'##class(Security.SSLConfigs).Exists(SSLConfig) ##class(Security.SSLConfigs).Create(SSLConfig)
-	 	Set req.Https=1
-		Set req.SSLConfiguration=SSLConfig
-		set:$g(port)="" port=443
-	}
-	set:$g(port)="" port=80
-	Set req.Server=server
-	set req.Port=port
-	set location=$p(url,"/",4,*)
-
-	Set req.Location =location
-
-	Set st = req.Get()
-	Return:$$$ISERR(st) st
-	Return:(req.HttpResponse.StatusCode = 404) $$$ERROR($$$GeneralError,"Repository doesn't exist OR you don't have access")
-	Return:((req.HttpResponse.StatusCode = 403) && (req.HttpResponse.GetHeader("X-RATELIMIT-REMAINING")=0)) $$$ERROR($$$GeneralError,"API rate limit exceeded. Try logging in.")
- 	Return:(req.HttpResponse.StatusCode '= 200) $$$ERROR($$$GeneralError,"Received " _ req.HttpResponse.StatusCode _ " status, expected 200")
-
- 	#dim obj As %ZEN.proxyObject
-	Set st = ##class(%ZEN.Auxiliary.jsonProvider).%ConvertJSONToObject(req.HttpResponse.Data,,.obj,1)
-	Return:$$$ISERR(st) st
-
- 	Return $$$OK
 }
 
 ClassMethod Init(ByRef pCommandInfo) [ Internal ]

@@ -7,6 +7,45 @@ Property Username As %String;
 
 Property Password As %String;
 
+Method GetJsonURL(url As %String, ByRef obj) As %Status
+{
+
+ 	#dim req As %Net.HttpRequest
+  Set req=##class(%Net.HttpRequest).%New()
+	
+  Do ##class(%Net.URLParser).Parse(url,.tComponents)
+  
+  set server=tComponents("host")
+	Set port=$GET(tComponents("port"))
+	
+	if tComponents("scheme")["https" {
+	 	Set req.Https=1
+		Set req.SSLConfiguration=..GetSSLConfiguration(server)
+ 	}
+	Set req.Server=server
+	set:port req.Port=port
+
+  If ($Get(tComponents("path"))'="") {
+    Set path = tComponents("path")
+    If ($Extract(path,1,1)="/") {
+      Set path = $Extract(path,2,*)	
+    }
+    Set req.Location = path
+  }
+ 
+	Set st = req.Get()
+	Return:$$$ISERR(st) st
+	Return:(req.HttpResponse.StatusCode = 404) $$$ERROR($$$GeneralError,"Repository doesn't exist OR you don't have access")
+	Return:((req.HttpResponse.StatusCode = 403) && (req.HttpResponse.GetHeader("X-RATELIMIT-REMAINING")=0)) $$$ERROR($$$GeneralError,"API rate limit exceeded. Try logging in.")
+ 	Return:(req.HttpResponse.StatusCode '= 200) $$$ERROR($$$GeneralError,"Received " _ req.HttpResponse.StatusCode _ " status, expected 200")
+
+ 	#dim obj As %ZEN.proxyObject
+	Set st = ##class(%ZEN.Auxiliary.jsonProvider).%ConvertJSONToObject(req.HttpResponse.Data,,.obj,1)
+	Return:$$$ISERR(st) st
+
+ 	Return $$$OK
+}
+
 Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference")
 {
   Set tList = ##class(%Library.ListOfObjects).%New()
