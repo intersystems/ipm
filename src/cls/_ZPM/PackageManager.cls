@@ -333,7 +333,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		do ..GetListModules("zpm",.list)
 		if $DATA(list("zpm-registry")) {
 			write !,ns_">zpm-registry "_$LG(list("zpm-registry"),1)
-			set Found=name
+			set Found=ns
 		}
 	}
 	set $namespace="%SYS"
