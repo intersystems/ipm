@@ -340,33 +340,16 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 	if '$d(Found) write !," Locally installed zpm-registry not found" 
 	
 	// Get URL current registry
-	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-		"select Name "_
-		"from %ZPM_PackageManager_Client.ServerDefinition "_
-		"order by %ZPM_PackageManager_Client.ServerDefinition_SortOrder(ID) desc")
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-	}
+	Set tRes = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).ExtentFunc()
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		
-		#dim tDefn As %ZPM.PackageManager.Client.ServerDefinition
-		Set tRepository = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+
+		#dim tRepository As %ZPM.PackageManager.Client.RemoteServerDefinition
+		Set tRepository = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).%OpenId(tRes.ID,,.tSC)
 		$$$ThrowOnError(tSC)
-		set repo($i(repo))=$lb(tRepository.Name,tRepository.Details)
-	}
-	$$$ThrowOnError(tSC)
-	set repo=""
-	for { set repo=$order(repo(repo)) q:repo=""
-		set url=$lg(repo(repo),2)
-		if $GET(url)'="" {
-			w !," ",url
-			// Get version registry
-			Set tClient = ##class(%ZPM.PackageManager.Client.REST.PackageManagerClient).%New()
-			set tSC= tClient.GetJsonURL(url,.o)
-			$$$ThrowOnError(tSC)
-			w " "_o.version
-		}
+		Set tService = tRepository.GetPackageService()
+		Set tInfo = tService.GetInfo()
+		Write !,tRepository.URL," - ",tInfo.version
 	}
 	q $$$OK
 }
