@@ -261,6 +261,13 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 <parameter name="module" required="true" description="Name of module for which dependent modules will be found" />
 <parameter name="version" description="Version of the module for which dependent modules will be found (in all configured repositories)" />
 </command>
+
+<command name="version" aliases="ver">
+<description>Shows version client and registry</description>
+<example description="Shows version client and registry">
+version
+</example>
+</command>
 </commands>
 }
 
@@ -335,6 +342,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..RunOnePhase(.tCommandInfo)
 			}ElseIf (tCommandInfo = "module-action") {
 				Do ..ModuleAction(.tCommandInfo)
+			}ElseIf (tCommandInfo = "version") {
+				Do ..Version(.tCommandInfo)
 			}
 		} Catch pException {
 			#dim e As %Exception.AbstractException
@@ -349,6 +358,71 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Quit:tOneCommand
 		Write !
 	}
+}
+
+/// d ##class(%ZPM.PackageManager).GetListModules("zpm",.list)
+ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
+{
+	Set tQuery = "select Name,VersionString,Description,ExternalName from %ZPM_PackageManager_Developer.""MODULE"" where name %StartsWith ?"
+	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,StartsWith)
+	
+	If (tRes.%SQLCODE < 0) {
+		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	}
+	While tRes.%Next(.tSC) {
+		$$$ThrowOnError(tSC)
+		set pList(tRes.%Get("Name"))=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("ExternalName"))
+	}
+}
+
+/// Version client and registry
+ClassMethod Version(ByRef pCommandInfo) [ Internal ]
+{
+	new $Namespace
+	set $Namespace="%SYS"
+	
+	Set tQuery = "select Nsp from %SYS.Namespace_List(0,0) where Status = 1"
+	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
+	
+	If (tRes.%SQLCODE < 0) {
+		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	}
+	While tRes.%Next(.tSC) {
+		$$$ThrowOnError(tSC)
+		set namespace(tRes.%Get("Nsp"))=""
+	}
+  
+	set $Namespace="%SYS"
+	do ..GetListModules("zpm",.list)
+	if $DATA(list("zpm")) {
+			write !," zpm "_$LG(list("zpm"),1)
+	}
+	set ns=""
+	for { set ns=$order(namespace(ns)) q:ns=""
+		kill list
+		set $namespace=ns
+		do ..GetListModules("zpm",.list)
+		if $DATA(list("zpm-registry")) {
+			write !,ns_">zpm-registry "_$LG(list("zpm-registry"),1)
+			set Found=ns
+		}
+	}
+	set $namespace="%SYS"
+	if '$d(Found) write !," Locally installed zpm-registry not found" 
+	
+	// Get URL current registry
+	Set tRes = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).ExtentFunc()
+	While tRes.%Next(.tSC) {
+		$$$ThrowOnError(tSC)
+
+		#dim tRepository As %ZPM.PackageManager.Client.RemoteServerDefinition
+		Set tRepository = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).%OpenId(tRes.ID,,.tSC)
+		$$$ThrowOnError(tSC)
+		Set tService = tRepository.GetPackageService()
+		Set tInfo = tService.GetInfo()
+		Write !,tRepository.URL," - ",tInfo.version
+	}
+	q $$$OK
 }
 
 ClassMethod Init(ByRef pCommandInfo) [ Internal ]

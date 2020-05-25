@@ -7,6 +7,19 @@ Property Username As %String;
 
 Property Password As %String;
 
+Method GetInfo(url As %String) As %DynamicObject
+{
+ 	Set tRequest = ..GetHttpRequest()
+ 	Set tSC = tRequest.Get()
+
+  If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
+    Set tRes = {}.%FromJSON(tRequest.HttpResponse.Data)
+    Return tRes
+  }
+
+	$$$ThrowStatus($$$ERROR($$$GeneralError,"Registry server not available."))
+}
+
 Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference")
 {
   Set tList = ##class(%Library.ListOfObjects).%New()
