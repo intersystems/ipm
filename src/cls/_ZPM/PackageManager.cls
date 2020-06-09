@@ -268,6 +268,16 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 version
 </example>
 </command>
+
+<command name="generate" aliases="gen"> 
+<description>Generates module.xml</description>
+<example description="Generates module.xml for your module in interactive mode ">generate</example>
+<example description="Generates template in the specified folder /my/path">generate -t /my/path</example>
+<modifier name="template" aliases="t" description="Generates module.xml template in the specified folder" />
+<modifier name="author" aliases="a" description="Request information about the author" />
+<parameter name="path" description="Directory on the local filesystem, containing a file named module.xml" />
+</command>
+
 </commands>
 }
 
@@ -340,9 +350,11 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Config(.tCommandInfo)
 			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
 				Do ..RunOnePhase(.tCommandInfo)
-			}ElseIf (tCommandInfo = "module-action") {
+			} ElseIf (tCommandInfo = "generate") {
+				Do ..GenerateModuleXML(.tCommandInfo)
+			} ElseIf (tCommandInfo = "module-action") {
 				Do ..ModuleAction(.tCommandInfo)
-			}ElseIf (tCommandInfo = "version") {
+			} ElseIf (tCommandInfo = "version") {
 				Do ..Version(.tCommandInfo)
 			}
 		} Catch pException {
@@ -373,6 +385,102 @@ ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
 		$$$ThrowOnError(tSC)
 		set pList(tRes.%Get("Name"))=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("ExternalName"))
 	}
+}
+
+/// generates module.xml
+ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
+{
+	Set tPath = $Get(pCommandInfo("parameters","path"))
+	If (tPath="") {
+		Set tHelp(1) = "Enter path to the module folder (where module.xml will be generated)"
+		Set tHelp(2) = "Enter "" null string to quit"
+		Do ##class(%Library.Prompt).GetString("Enter module folder:", .tPath, , ,.tHelp)
+		Return:(tPath="") $$$OK
+	}
+	Set tPath = ##class(%File).NormalizeDirectory(tPath)
+
+	If ($$$HasModifier(pCommandInfo,"template")) {
+		Return ##class(%ZPM.PackageManager.Developer.ModuleTemplate).GenerateTemplate(tPath)
+	} 
+	
+	While (1) {
+		Set tHelp(1) = "Enter module name"
+		Set tHelp(2) = "Enter "" null string to quit"
+		Do ##class(%Library.Prompt).GetString("Enter module name:", .tName, , ,.tHelp)
+		Return:(tName="") $$$OK
+		If ('##class(%ZPM.PackageManager.Developer.ModuleTemplate).NameIsValid(tName)) {
+			Write !,"Module name """_tName_""" is invalid" 
+			Set tName=""
+			Continue 
+		}
+		Quit 
+	}
+
+	While (1) {
+		Set tVersion = "1.0.0"
+		Do ##class(%Library.Prompt).GetString("Enter module version:", .tVersion)
+		Return:(tVersion="") $$$OK
+		If ('##class(%ZPM.PackageManager.Core.SemanticVersion).IsValid(tVersion)) {
+			Write !,"Module version """_tVersion_""" is invalid" 
+			Set tVersion=""
+			Continue 
+		}
+		Quit
+	}
+
+	Do ##class(%Library.Prompt).GetString("Enter module description:", .tDescription)
+
+	Do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)	
+
+	Set tTemplate = ##class(%ZPM.PackageManager.Developer.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
+	Return:'$IsObject(tTemplate) 
+
+	If ($$$HasModifier(pCommandInfo,"author")) {
+		Write !,"Author:"
+		Do ##class(%Library.Prompt).GetString("    Enter Author name:", .tAuthorPerson)	
+		Do ##class(%Library.Prompt).GetString("    Enter Organization name:", .tAuthorOrg)
+		Do ##class(%Library.Prompt).GetString("    Enter License:", .tAuthorLicense)
+		Do ##class(%Library.Prompt).GetString("    Enter Copyright Date:", .tAuthorCopy)
+		Do ##class(%Library.Prompt).GetString("    Enter Notes:", .tAuthorNotes)
+		Do tTemplate.SetAuthorProps(tAuthorPerson, tAuthorOrg, tAuthorLicense, tAuthorCopy, tAuthorNotes)
+		Write !
+	}
+	
+	Set tSrc = "src"
+	Do ##class(%Library.Prompt).GetString("Enter module source folder:", .tSrc)	
+	Do tTemplate.ReadResorces(tSrc)
+
+	// web applications
+	Do ##class(%ZPM.PackageManager.Developer.ModuleTemplate).GetCSPApplications(.apps)
+	If ($Listlength(apps)>0 ) {
+		Write !!,"Existing Web Applications:"
+		For i=1:1:$Listlength(apps) {
+			Write !,"    "_$Listget(apps,i)
+		}
+		Do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applictaions or * for all:", .tWebAppList)
+
+		Do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps) 
+		For i=1:1:$Listlength(tCSPapps) {
+			Set tCSPPath = ""
+			Do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$Listget(tCSPapps,i)_": ", .tCSPPath)
+			If (tCSPPath'="") {
+				Do tTemplate.SetSourcePathForCSPApp($Listget(tCSPapps,i),tCSPPath)
+			}
+		}
+	}
+
+	// dependencies
+	Write !,"Dependencies:"
+	While 1 {
+		Set tDependant = ""
+		Set tResponse = ##class(%Library.Prompt).GetString("    Enter module:version or empty string to continue:", .tDependant)
+		Set tDependant = $ZStrip(tDependant,"<>W")
+		Quit:(tDependant="")
+		Do tTemplate.AddDependant(tDependant)
+	}
+
+	Do tTemplate.ProcessResources()
+	Return tTemplate.SaveFile(tPath)
 }
 
 /// Version client and registry
