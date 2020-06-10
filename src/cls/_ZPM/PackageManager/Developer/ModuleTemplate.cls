@@ -186,6 +186,7 @@ ClassMethod NewTemplate(pPath, pName, pVersion, pDescription = "", pKeywords = "
     Set tTemplate.VersionString = pVersion
     Set tTemplate.Description = pDescription
     Set tTemplate.Keywords = pKeywords
+    Set tTemplate.Packaging = "module"
     Return tTemplate
 }
 
@@ -303,6 +304,14 @@ Method SetTemplateProps() As %Status
 	Set ..Author.CopyrightDate = $Piece($ZDate($Now(),3),"-")
 	Set ..Author.License = "MIT"
 	Set ..Author.Notes = "notes"
+
+    Set tModule = ##class(%ZPM.PackageManager.Core.ModuleReference).%New()
+    Set tModule.Name = "module"
+    Do tModule.VersionStringSet("1.*")
+    Do ..Dependencies.Insert(tModule)
+
+    Set ..Packaging = "module"
+    Set ..SourcesRoot = "src"
 
 	Set ..TemplateResources("inc") = "MyPackage.First.INC"
 	Set ..TemplateResources("inc","Directory")="inc"
