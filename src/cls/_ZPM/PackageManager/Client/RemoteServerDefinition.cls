@@ -92,14 +92,10 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 				$$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
 			}
 		}
-		Set pInstance.URL = tUrl
 		
-		If $Data(pModifiers("username"),tUsername) {
-			Set pInstance.Username = tUsername
-		}
-		If $Data(pModifiers("password"),tPassword) {
-			Set pInstance.Password = tPassword
-		}
+		Set pInstance.Username = $Get(pModifiers("username"),"")
+		Set pInstance.Password = $Get(pModifiers("password"),"")	
+	
 		If $Data(pModifiers("url"),tURL) {
 			Set pInstance.URL = tURL
 		}
