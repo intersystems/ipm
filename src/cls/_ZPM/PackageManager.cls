@@ -457,7 +457,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 		For i=1:1:$Listlength(apps) {
 			Write !,"    "_$Listget(apps,i)
 		}
-		Do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applictaions or * for all:", .tWebAppList)
+		Do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
 
 		Do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps) 
 		For i=1:1:$Listlength(tCSPapps) {
