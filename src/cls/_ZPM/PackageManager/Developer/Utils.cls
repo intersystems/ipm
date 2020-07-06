@@ -577,9 +577,20 @@ ClassMethod GetModuleListClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter
 	Quit $$$OK
 }
 
+ClassMethod GetModuleNameFromXML(pDirectory As %String, Output name As %String) As %Status
+{
+	Set tSC = ##class(%XML.XPATH.Document).CreateFromFile(pDirectory_"module.xml", .tDocument)
+	Return:$$$ISERR(tSC) tSC 	
+	Set tSC = tDocument.EvaluateExpression("/Export/Document/Module/Name", "text()", .tRes)
+    If $$$ISERR(tSC) Return tSC
+	Set name = $$$lcase(tRes.GetAt(1).Value)
+	Return $$$OK
+}
+
 ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
 {
 	set tSC = $$$OK
+	Set tPrevModule = ""
 	try {
 		set tVerbose = $Get(pParams("Verbose"))
 		If '$Data(pParams("qstruct")) {
@@ -587,6 +598,15 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
 		}
 		set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
 		
+		// get modulename from xml
+		$$$ThrowOnError(..GetModuleNameFromXML(pDirectory, .moduleName))
+		// try opening module object 
+		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(moduleName,,.tSC)
+		If $IsObject(tModule) {
+			Set tPrevModule = tModule.%ConstructClone()
+			Kill tModule
+		}
+
 		set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),.error,.tLoadedList) quit:$$$ISERR(tSC)
 		;
 		set first = $$$lcase($o(tLoadedList("")))
@@ -607,6 +627,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
 			new $$$ZPMHandledModules
 			set $$$ZPMHandledModules($Namespace) = "" //Initialize.
 		}
+		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).CheckSystemRequirements(name))
 		set tSC = tModule.LoadDependencies("",.pParams) quit:$$$ISERR(tSC)
 		;
 		set path = pDirectory_"preload"
@@ -633,11 +654,16 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
 		set tSC = ##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(name,$lb("Activate"),1,.pParams) quit:$$$ISERR(tSC)
 		;
 	} catch e {
+		If ('$IsObject(tPrevModule)) {
+			// delete module object if it's new one
+			Do ##class(%ZPM.PackageManager.Developer.Module).NameDelete(name)
+		} Else {
+			// save previous vresion of the object
+			Do ##class(%ZPM.PackageManager.Developer.Module).NameDelete(name)
+			Do tPrevModule.%Save()
+		}
 		set tSC = e.AsStatus()
 	}
-	;
-	if $$$ISERR(tSC) do $system.OBJ.DisplayError(tSC)
-	;
 	quit tSC
 }
 
