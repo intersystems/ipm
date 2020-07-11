@@ -590,7 +590,7 @@ ClassMethod GetModuleNameFromXML(pDirectory As %String, Output name As %String) 
 ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
 {
 	set tSC = $$$OK
-	Set tPrevModule = ""
+	Set (tPrevModule, name) = ""
 	try {
 		set tVerbose = $Get(pParams("Verbose"))
 		If '$Data(pParams("qstruct")) {
@@ -660,7 +660,9 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
 		} Else {
 			// save previous vresion of the object
 			Do ##class(%ZPM.PackageManager.Developer.Module).NameDelete(name)
-			Do tPrevModule.%Save()
+			If $IsObject(tPrevModule) {
+				Do tPrevModule.%Save()
+			}
 		}
 		set tSC = e.AsStatus()
 	}
