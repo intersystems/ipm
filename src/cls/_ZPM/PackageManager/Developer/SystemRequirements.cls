@@ -15,8 +15,6 @@ Method VersionStringSet(tValue) As %Status
 	Quit tSC
 }
 
-Property Product As %String(XMLPROJECTION = "ATTRIBUTE");
-
 Property Interoperability As %String(VALUELIST = ",enabled,disabled", XMLPROJECTION = "ATTRIBUTE");
 
 Method CheckRequirements() As %Status
@@ -31,20 +29,17 @@ Method CheckVersion() As %Status
 	Set tSystemMajor = $System.Version.GetMajor()
 	Set tSystemMinor = $System.Version.GetMinor()
 	If (..VersionString = "") { Return $$$OK } 
-	try {
-		Set tOperator = ..Version.Options.GetAt(1).Comparators.GetAt(1).Operator
-		Set tModuleMajor = ..Version.Options.GetAt(1).Comparators.GetAt(1).Major
-		Set tModuleMinor = ..Version.Options.GetAt(1).Comparators.GetAt(1).Minor
-		Set tVersionMatch = 0
-		Set tCommand = "(tSystemMajor,tModuleMajor,tSystemMinor,tModuleMinor,tVersionMatch) If ((tSystemMajor "_tOperator_" tModuleMajor) && (tSystemMinor "_tOperator_" tModuleMinor)) { Set tVersionMatch = 1 }"
-
-		Xecute (tCommand, tSystemMajor,tModuleMajor,tSystemMinor,tModuleMinor,.tVersionMatch)
-		If (tVersionMatch'=1) {
+	Try {
+		Set tComparator = ..Version.Options.GetAt(1).Comparators.GetAt(1)
+		Set CurrentSystemVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString($System.Version.GetNumber())
+		If CurrentSystemVersion.Patch = "" { 
+			Set CurrentSystemVersion.Patch = 0
+		}
+		If ('tComparator.Evaluate(CurrentSystemVersion)) {
 			Return $$$ERROR($$$GeneralError,"The module cannot be installed on the current version ("_tSystemMajor_"."_tSystemMinor_") of the system, version """_..VersionString_""" is required")
 		}
 		Return $$$OK
 	} Catch ex {
-		w ex.DisplayString()
 		Return $$$ERROR($$$GeneralError, "Unable to check reqired system version")
 	}
 }
