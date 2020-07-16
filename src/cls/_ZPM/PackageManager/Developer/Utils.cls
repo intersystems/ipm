@@ -579,7 +579,10 @@ ClassMethod GetModuleListClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter
 
 ClassMethod GetModuleNameFromXML(pDirectory As %String, Output name As %String) As %Status
 {
-	Set tSC = ##class(%XML.XPATH.Document).CreateFromFile(pDirectory_"module.xml", .tDocument)
+	Set stream=##class(%Stream.FileBinary).%New()
+	Set tSC = stream.LinkToFile(pDirectory_"module.xml")
+	Return:$$$ISERR(tSC) tSC 
+	Set tSC = ##class(%XML.XPATH.Document).CreateFromStream(stream, .tDocument)
 	Return:$$$ISERR(tSC) tSC 	
 	Set tSC = tDocument.EvaluateExpression("/Export/Document/Module/Name", "text()", .tRes)
     If $$$ISERR(tSC) Return tSC
