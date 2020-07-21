@@ -612,9 +612,10 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
 
 		set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),.error,.tLoadedList) quit:$$$ISERR(tSC)
 		;
-		set first = $$$lcase($o(tLoadedList("")))
+		set first = $Order(tLoadedList(""))
 		if first=""                   set tSC = $$$ERROR($$$GeneralError,"No module definition found.") quit
-		if $o(tLoadedList(first))'="" set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.") quit
+		if $Order(tLoadedList(first))'="" set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.") quit
+		set first = $$$lcase(first)
 		if $p(first,".",*)'="zpm"  set tSC = $$$ERROR($$$GeneralError,"No module definition found.") quit
 		;
 		set name = $p(first,".",1,*-1)

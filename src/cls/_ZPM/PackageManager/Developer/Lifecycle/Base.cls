@@ -371,7 +371,7 @@ Method %Reload(ByRef pParams) As %Status
 		Set tSC = $system.OBJ.Load(tRoot_"module.xml","/nodisplay",.error,.tLoadedList) quit:$$$ISERR(tSC)
 		
 		// Validate loaded module
-		Set first = $$$lcase($o(tLoadedList("")))
+		Set first = $Order(tLoadedList(""))
 		If (first = "") {
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
@@ -380,6 +380,7 @@ Method %Reload(ByRef pParams) As %Status
 			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.")
 			Quit
 		}
+		set first = $$$lcase(first)
 		If ($Piece(first,".",*) '= "zpm") {
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
