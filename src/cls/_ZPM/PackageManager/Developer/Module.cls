@@ -48,6 +48,8 @@ Property Root As %String(MAXLEN = "", XMLPROJECTION = "NONE");
 /// Sources root, where placed any source code
 Property SourcesRoot As %String(MAXLEN = 20);
 
+Property SystemRequirements As %ZPM.PackageManager.Developer.SystemRequirements;
+
 /// Default settings - there may be serveral types of these (subclasses of ModuleSetting).
 Property Defaults As list Of %ZPM.PackageManager.Developer.ModuleSetting(CLASSNAME = 1, STORAGEDEFAULT = "array", XMLNAME = "Defaults", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE", XMLTYPECONSTRAINT = "SUBSTITUTIONGROUP");
 
@@ -55,6 +57,26 @@ Method NameSet(val As %RawString) As %Status
 {
 	Set i%Name = $$$lcase(val)
 	Return $$$OK
+}
+
+ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
+{
+	Set tSC = $$$OK
+	Try {
+		Set pModuleName = $$$lcase(pModuleName)
+		Set tModule = ..NameOpen(pModuleName,,.tSC)
+		If '$isobject(tModule) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Module '"_pModuleName_"' not found."))
+		}
+		$$$ThrowOnError(tSC)
+
+		If ($IsObject(tModule.SystemRequirements)) {
+			$$$ThrowOnError(tModule.SystemRequirements.CheckRequirements())
+		}
+	} Catch ex {
+		Set tSC = ex.AsStatus()
+	}
+	Return tSC
 }
 
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
@@ -922,6 +944,9 @@ Storage Default
 </Value>
 <Value name="18">
 <Value>Repo</Value>
+</Value>
+<Value name="19">
+<Value>SystemRequirements</Value>
 </Value>
 </Data>
 <DataLocation>^ZPM.Dev.ModuleD</DataLocation>
