@@ -6,13 +6,38 @@ Parameter EXTENSION = ".DFI";
 Parameter ATTRIBUTES As STRING = "Directory,Keywords";
 
 /// Export format
-Property Format As %String [ InitialExpression = "UDL" ];
+Property Format As %String;
 
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "dfi" ];
 
 Property FilenameExtension As %String [ InitialExpression = "xml" ];
 
 Property Keywords As %String;
+
+Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
+{
+	Set tSC = ##super(pResourceReference)
+	If (..Format = "") {
+		Set ..Format = $Case($$$lcase(..FilenameExtension),"dfi":"UDL",:"XML")
+	}
+	Quit tSC
+}
+
+Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+{
+	Set tSC = $$$OK
+	Set tVerbose = $Get(pParams("Verbose"))
+	If ..Format = "XML" {
+		Set tSC = $System.OBJ.Export(pItemName,pFullExportPath,"-d")
+	} ElseIf (..Format = "UDL") {
+		Set tSC = $System.OBJ.ExportUDL(pItemName,pFullExportPath,"-d")
+	}
+	Set pItemHandled = 1
+	If $$$ISOK(tSC),tVerbose {
+		WRITE !,"Exported '",pItemName,"' to ",pFullExportPath
+	}
+	Quit tSC
+}
 
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
 {
