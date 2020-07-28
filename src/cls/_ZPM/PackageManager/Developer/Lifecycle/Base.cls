@@ -820,7 +820,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 					}
 					Write:tVerbose !,tSourcePath," -> ",tExportPath
 				}
-			} ElseIf (tExt = "CLS") || (tExt = "PRJ") || ($ZConvert($Extract(tFullPath,$length(tFullPath)-2,*),"l")="xml") || (##class(%RoutineMgr).UserType(tFullResourceName)) {
+			} ElseIf (tExt = "CLS") || (tExt = "DFI") ||(tExt = "PRJ") || ($ZConvert($Extract(tFullPath,$length(tFullPath)-2,*),"l")="xml") || (##class(%RoutineMgr).UserType(tFullResourceName)) {
 				If '$$$FileExists(tFullPath) {
 					Do ##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath))
 				}
