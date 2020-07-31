@@ -277,6 +277,19 @@ version
 <modifier name="author" aliases="a" description="Request information about the author" />
 <parameter name="path" description="Directory on the local filesystem, containing a file named module.xml" />
 </command>
+<command name="description" aliases="desc"> 
+<description>Description module</description>
+<example description="Displaying a description of all modules in the name of which there is a context tools">desc *tools*</example>
+<example description="Displays a description of all modules installed in the current namespace">desc * -locale</example>
+<example description="Displaying the description of all modules from the current register">desc * -reristry</example>
+<example description="Displaying the description of all module of Roberts Cemper">desc * -a rcemper</example>
+<parameter name="module" description="Name of module to show description" />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output description." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output description.(Default)" />
+<modifier name="author" aliases="a" dataAlias="Author" value="true" description="Find authors" />
+<modifier name="registry" aliases="r" dataAlias="Registry" dataValue="1" description="Output registry only" />
+<modifier name="locale" aliases="l" dataAlias="Locale" dataValue="1" description="Output locale only" />
+</command>
 
 </commands>
 }
@@ -356,6 +369,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..ModuleAction(.tCommandInfo)
 			} ElseIf (tCommandInfo = "version") {
 				Do ..Version(.tCommandInfo)
+			} ElseIf (tCommandInfo = "description") {
+				Do ..Description(.tCommandInfo)
 			}
 		} Catch pException {
 			#dim e As %Exception.AbstractException
@@ -370,6 +385,166 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Quit:tOneCommand
 		Write !
 	}
+}
+
+/// Get description module
+ClassMethod Description(ByRef pCommandInfo) [ Internal ]
+{
+	;zw pCommandInfo	;q
+	#define gn "^||tmpDesc"
+	KILL @$$$gn
+	Set tRegistry = ""
+	Set tModuleName = $Get(pCommandInfo("parameters","module"))
+	
+	If (tModuleName["/") {
+		set $lb(tRegistry, tModuleName) = $lfs(tModuleName, "/")
+	}
+	set where=""
+		,maxlenname=0
+		,Module=""
+	if tModuleName="?"||(tModuleName="help") {  do ..Shell("help desc") 
+		quit
+	}
+	elseif tModuleName["*" {
+		set where="where name like ?"
+		set Module=$replace(tModuleName,"*","%")
+	} elseif tModuleName'="" { 
+		set Module=tModuleName
+		set where="where name = ?"
+	}
+	if $get(pCommandInfo("data","zpm","Author"))'="" set RepoOwner=$zconvert($get(pCommandInfo("data","zpm","Author")),"L") write !,"Search by repository "_RepoOwner
+	if where="" write !,"Search the entire repository"
+	if $get(pCommandInfo("data","Locale")) write !,"Search only in Locale"
+	if $get(pCommandInfo("data","Registry")) write !,"Search only in Registry"
+	//Load the list info registry modules
+	if '$get(pCommandInfo("data","Locale")) {
+		set sql="select Name, Version, Repo from %ZPM_PackageManager_Developer.Utils_GetModuleList('registry') "_where
+			,rs=##class(%ResultSet).%New()
+			,sc=rs.Prepare(sql)
+		set:sc sc=rs.Execute(Module)
+		if sc {
+			for i=1:1 {
+				quit:'rs.%Next()  
+				set name=rs.Get("Name")
+				set:$l(name)>maxlenname maxlenname=$l(name)
+				if '$data(@$$$gn@(name,"Registry","Description")) {
+					set (repo,url)=rs.Get("Repo")
+					if $zconvert($p(url,"/",4),"L")'[$g(RepoOwner) continue
+					set @$$$gn@(name,"Registry")=$lb(rs.Get("Version"),rs.Get("Repo"))
+					set url="https://raw.githubusercontent.com"_$p(url,"/github.com",2) //TODO GitLab
+					if url="" {
+						set repo="not repository"
+					}
+					else {
+						set:$e(url,*)'="/" url=url_"/"
+						set url=url_"master/module.xml"
+						if ##class(%ZPM.PackageManager).GetDataURL(url,.modxml) {
+							set desc=$p($p($g(modxml),"Description>",2),"</")
+							;Author
+							if desc="", ##class(%ZPM.PackageManager).GetDataURL($replace(url,"module.xml","README.md"),.readme) {
+								set desc="from readme: "_$tr($e(readme,1,300),$c(13,10),"  ")_"..."
+							}
+						}
+					}
+					set @$$$gn@(name,"Registry","Description")=$get(desc,"no description")
+				}
+			 }
+			}
+		else { 
+			;write !,"Not found "_tModuleName_" in current registry"
+		}
+	}
+	//Load the list info locale modules
+	if '$get(pCommandInfo("data","Registry")), ($g(RepoOwner)="") {
+		set sql="select Name, Description, Keywords, Root, VersionString, Author_CopyrightDate, Author_License, Author_Notes, Author_Organization, Author_Person from %ZPM_PackageManager_Developer.""Module"" "_where
+			,rs=##class(%ResultSet).%New()
+			,sc=rs.Prepare(sql)
+		set:sc sc=rs.Execute(Module)
+		if sc {
+			for i=1:1 {
+				quit:'rs.%Next()  
+				set name=rs.Get("Name")
+				set:$l(name)>maxlenname maxlenname=$l(name)
+				if '$d(@$$$gn@(name,"Locale","Description")) {
+					set @$$$gn@(name,"Locale")=$lb(rs.Get("VersionString"),rs.Get("Root"))
+					set root=rs.Get("Root")
+					set desc=rs.Get("Description")
+					for a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
+						set @$$$gn@(name,"Locale","Description",a)=rs.Get(a)
+					}
+					if desc="" { //load from Root
+						set desc="no description"
+					}
+					set @$$$gn@(name,"Locale","Description")=desc
+				}
+			 }
+			}
+		else { 
+			;write !,"Not found "_tModuleName_" in current registry"
+		}
+	}
+	set name=""
+	for { set name=$order(@$$$gn@(name)) quit:name=""
+		set reg="" for { set reg=$order(@$$$gn@(name,reg),1,data) quit:reg=""
+			write !,name
+			,?(maxlenname+1),$e(reg,1),?(maxlenname+3),$lg(data,1),?(maxlenname+9),$$DrawColumn("Description: "_@$$$gn@(name,reg,"Description"))
+			,!?(maxlenname+9),"Repo: ",$lg(data,2)
+			if $g(pCommandInfo("data","Verbose"))'=0, $data(@$$$gn@(name,reg,"Description"))>9 {
+				set au="" for { set au=$order(@$$$gn@(name,reg,"Description",au)) quit:au=""
+					write !,?(maxlenname+9),$$DrawColumn(au_": "_@$$$gn@(name,reg,"Description",au))
+				}
+			}
+		}
+		
+	}
+	quit $$$OK
+DrawColumn(desc) ;draw description, code from zpmshow.mac
+	set dx=$x
+	for d=1:1:$L(desc," ") {
+ 		set wd=$P(desc," ",d) 
+		if $x+$l(wd)>80 write !,?dx
+		write wd," " 
+	}
+ quit ""
+}
+
+/// write $System.Status.GetErrorText(##class(%ZPM.PackageManager).GetDataURL("https://pm.community.intersystems.com/",.o))
+/// write $System.Status.GetErrorText(##class(%ZPM.PackageManager).GetDataURL("https://raw.githubusercontent.com/intersystems-community/zpm/master/module.xml",.o)) w o
+ClassMethod GetDataURL(url As %String, ByRef data) As %Status
+{
+	New $Namespace
+	set data=""
+ 	#dim req As %Net.HttpRequest
+	 Set req=##class(%Net.HttpRequest).%New()
+	set server=$p(url,"/",3)
+
+	if server[":" {
+		Set port=$p(server,":",2)
+		set server=$p(server,":")
+	}
+	if $zconvert(url,"L")["https:" {
+	 	Set SSLConfig = "ZPM"
+	 	Zn "%SYS"
+	 	Do:'##class(Security.SSLConfigs).Exists(SSLConfig) ##class(Security.SSLConfigs).Create(SSLConfig)
+	 	Set req.Https=1
+		Set req.SSLConfiguration=SSLConfig
+		set:$g(port)="" port=443
+	}
+	set:$g(port)="" port=80
+	Set req.Server=server
+	set req.Port=port
+	set location=$p(url,"/",4,*)
+
+	Set req.Location =location
+
+	Set st = req.Get()
+	Return:$$$ISERR(st) st
+	Return:(req.HttpResponse.StatusCode = 404) $$$ERROR($$$GeneralError,"Repository doesn't exist OR you don't have access")
+	Return:((req.HttpResponse.StatusCode = 403) && (req.HttpResponse.GetHeader("X-RATELIMIT-REMAINING")=0)) $$$ERROR($$$GeneralError,"API rate limit exceeded. Try logging in.")
+ 	Return:(req.HttpResponse.StatusCode '= 200) $$$ERROR($$$GeneralError,"Received " _ req.HttpResponse.StatusCode _ " status, expected 200")
+
+	set data=req.HttpResponse.Data.Read()
+ 	Return $$$OK
 }
 
 /// d ##class(%ZPM.PackageManager).GetListModules("zpm",.list)
