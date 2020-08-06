@@ -9,7 +9,7 @@ Helps to install ObjectScript, CSP and Frontend packages into InterSystems IRIS 
 1. Download the  [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
 2. Import the zpm.xml into IRIS and compile via any desired way (Management Portal, Studio or Terminal)
  
- After that you can use PackageManager to install modules from [community repository](pm.community.intersystems.com) in any namespace.
+ After that you can use PackageManager to install modules from [community repository](https://pm.community.intersystems.com) in any namespace.
 
 3. Check if you call a zpm in command line and get the following:
 USER>zpm
