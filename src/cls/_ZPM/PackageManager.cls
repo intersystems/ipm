@@ -845,7 +845,7 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 	}
 	Set tName = $$$GetModifier(pCommandInfo,"name")
 	If (tName '= "") {
-		Do ..ShowModulesForRepository(tName,tRepo,1)
+		Do ..ShowModulesForRepository(tName,tRepo)
 	} Else {
 		Write !
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
@@ -858,7 +858,7 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 				Write !!
 			}
 			Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
-			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo,tDesc)
+			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo)
 		}
 		$$$ThrowOnError(tSC)
 	}
@@ -1011,7 +1011,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0) [ Private ]
+ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0) [ Private ]
 {
 	Set tQuery = "select Name,Version,Repo from %ZPM_PackageManager_Developer.Utils_GetModuleList(?)"
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName)
