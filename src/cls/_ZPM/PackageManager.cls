@@ -248,7 +248,9 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 <command name="list-installed" aliases="list">
 <description>Lists modules installed in the current namespace</description>
 <example description="Shows all installed modules in tree format.">list-installed -tree</example>
+<example description="Shows a description of all modules installed in the current namespace">list -zn sql*</example>
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules" />
+<modifier name="znamespace" aliases="zn" value="true" description="Find modules in namespaces and go to it." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -283,11 +285,9 @@ version
 <example description="Shows all modules in current registry">search -r</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
 <modifier name="description" aliases="d" value="true" description="Shows description for each module. If the description is empty, then we take from the file readme.md (For this reason, slow execution is possible.)" />
-<modifier name="znamespace" aliases="zn" value="true" description="Find modules in namespaces and go to it." />
 <modifier name="url-inclusions" aliases="u" dataAlias="UrlInclusion" value="true" description="Find all inclusions in url" />
-<example description="Show a description of all modules in the name of which there is a context">find -d *tools*</example>
-<example description="Show a description of all modules installed in the current namespace">find -zn sql*</example>
-<example description="Show all module descriptions including context by url repo">find -d * -u /rcemper/</example>
+<example description="Shows a description of all modules in the name of which there is a context">find -d *tools*</example>
+<example description="Shows all module descriptions including context by url repo">find -d * -u /rcemper/</example>
 </command>
 
 <command name="namespace" aliases="zn"> 
@@ -403,7 +403,7 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 		for { set ns=$order(namespace(ns)) quit:ns=""
 			set $Namespace=ns
 			KILL list
-			if ns[$zconvert($tr(name,"*"),"U") {
+			if ("@"_ns)[("@"_$zconvert($tr(name,"*"),"U")) {
 				set num=num+1
 					,num(num)=ns
 				d ..GetListModules("",.list)
@@ -411,15 +411,18 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 					set module="",write=0
 					for { set module=$ORDER(list(module)) q:module=""
 						write !
-						,$select('write:num,1:$j("",$L(num))),"."
-						,ns_">"_$j("",namespace-$l(ns_">"))
-						," "_module_$j("",list-$l(module))
+						,$select('write:num_".",1:$j("",$L(num)+1))
+						,$$$White(ns)_">"_$j("",namespace-$l(ns_">"))
+						," "_$$$Green(module)_$j("",list-$l(module))
 						," "_$LG(list(module),1)
 						;," "_$LG(list(module),2)
 						set write=1
 					}
 				} else {
-					write !,num,$j("",$L(num)),".",ns_">"
+					write !
+					,num_"."
+					,$$$Violet(ns)_">"_$j("",namespace-$l(ns_">"))
+					
 				}
 			}
 		}
@@ -498,17 +501,17 @@ ClassMethod Description(tModuleName, UrlInc = "")
 	set name=""
 	for { set name=$order(@$$$gn@(name)) quit:name=""
 		set reg="" for { set reg=$order(@$$$gn@(name,reg),1,data) quit:reg=""
-			write !,name
+			write !,$$$Green(name)
 			;,?(maxlenname+1),$e(reg,1)
 			,?(maxlenname+1),$lg(data,1)
-			,?(maxlenname+7),$$DrawColumn("Description: "_@$$$gn@(name,reg,"Description"))
-			,!?(maxlenname+7),"Repo: ",$lg(data,2)
+			,?(maxlenname+7),$$DrawColumn($$$Yellow("Description: ")_@$$$gn@(name,reg,"Description"))
+			,!?(maxlenname+7),$$$Blue("Repo: "_$lg(data,2))
 			if $g(pCommandInfo("data","Verbose"))'=0, $data(@$$$gn@(name,reg,"Description"))>9 {
 				set au="" for { 
 					set au=$order(@$$$gn@(name,reg,"Description",au),1,audata) quit:au=""
 					write:audata'="" !
 					,?(maxlenname+9)
-					,$$DrawColumn(au_": "_@$$$gn@(name,reg,"Description",au))
+					,$$DrawColumn($$$Violet(au_": ")_@$$$gn@(name,reg,"Description",au))
 				}
 			}
 		}
@@ -715,7 +718,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 	set $Namespace="%SYS"
 	do ..GetListModules("zpm",.list)
 	if $DATA(list("zpm")) {
-			write !," zpm "_$LG(list("zpm"),1)
+			write !,$$$White($namespace)_"> "_$$$Green("zpm ")_$LG(list("zpm"),1)
 	}
 	set ns=""
 	for { set ns=$order(namespace(ns)) q:ns=""
@@ -723,7 +726,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		set $namespace=ns
 		do ..GetListModules("zpm",.list)
 		if $DATA(list("zpm-registry")) {
-			write !,ns_">zpm-registry "_$LG(list("zpm-registry"),1)
+			write !,$$$White(ns)_"> "_$$$Green("zpm-registry ")_$LG(list("zpm-registry"),1)
 			set Found=ns
 		}
 	}
@@ -740,7 +743,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowOnError(tSC)
 		Set tService = tRepository.GetPackageService()
 		Set tInfo = tService.GetInfo()
-		Write !,tRepository.URL," - ",tInfo.version
+		Write !,$$$Blue(tRepository.URL)," - ",tInfo.version
 	}
 	q $$$OK
 }
@@ -837,12 +840,6 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 	Set tDesc = $$$GetModifier(pCommandInfo,"description")
 	set UrlInclusion=$g(pCommandInfo("data","zpm","UrlInclusion"))
 	if tDesc'="" do ..Description(tDesc, UrlInclusion) q $$$OK
-	Set tNS = $Get(pCommandInfo("modifiers","znamespace"))
-	if tNS'="" {
-		kill pCommandInfo 
-		set pCommandInfo("parameters","name")=tNS do ..Namespace(.pCommandInfo) 
-		q $$$OK
-	}
 	Set tName = $$$GetModifier(pCommandInfo,"name")
 	If (tName '= "") {
 		Do ..ShowModulesForRepository(tName,tRepo)
@@ -1020,9 +1017,9 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Write !,tRes.%Get("Name"),?35," ",tRes.%Get("Version")
+		Write !,$$$Green(tRes.%Get("Name")),?35," ",tRes.%Get("Version")
 		If (pShowRepo) {
-			Write ?45," ",tRes.%Get("Repo")
+			Write ?45," ",$$$Blue(tRes.%Get("Repo"))
 		}
 	}
 }
@@ -1305,6 +1302,12 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
+	Set tNS = $Get(pCommandInfo("modifiers","znamespace"))
+	if tNS'="" {
+		kill pCommandInfo 
+		set pCommandInfo("parameters","name")=tNS do ..Namespace(.pCommandInfo) 
+		q $$$OK
+	}
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
 		"select Name,VersionString from %ZPM_PackageManager_Developer.""MODULE""")
 	If (tRes.%SQLCODE < 0) {
@@ -1349,7 +1352,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		For {
 			Set tMod = $Order(tModMap(tMod),1,tVersion)
 			Quit:(tMod="")
-			Write tMod," ",tVersion,!
+			Write $$$Green(tMod)," ",tVersion,!
 		}
 	}
 }
@@ -1491,7 +1494,7 @@ ClassMethod PrintTree(ByRef pTree)
 			Set $Extract(tFrontPadding,*) = $c($zh("252CH"))
 		}
 		
-		Write tFrontPadding,tValue,!
+		Write tFrontPadding,$$$Green($p(tValue," ",1))," ",$p(tValue," ",2),!
 		
 		If (tNextSibling '= "") {
 			Set tPadding(tNextSibling) = $Get(tPadding(i))

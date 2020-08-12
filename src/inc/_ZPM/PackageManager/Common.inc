@@ -20,6 +20,14 @@ ROUTINE %ZPM.PackageManager.Common [Type=INC]
 #define GetModifierDef(%array,%x,%y) $Get(%array("modifiers",%x),%y)
 #define YesNo(%val) $Select(%val:$$$Text("Yes"),1:$$$Text("No"))
 
+#; Escape sequence for coloring the font
+#define Clear $c(27)_"[0m"
+#define Green(%t) $c(27)_"[1;32;40m"_%t_$$$Clear
+#define Blue(%t) $c(27)_"[1;36;40m"_%t_$$$Clear
+#define White(%t) $c(27)_"[1;37;40m"_%t_$$$Clear
+#define Yellow(%t) $c(27)_"[1;33;40m"_%t_$$$Clear
+#define Violet(%t) $c(27)_"[1;35;40m"_%t_$$$Clear
+
 #; Copied from HS.JSON.INC
 #include %occReference
 #if $$$comClassDefined("%Library.Object")
