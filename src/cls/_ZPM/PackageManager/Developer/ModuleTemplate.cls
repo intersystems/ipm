@@ -5,6 +5,138 @@ Property TemplateResources [ MultiDimensional ];
 
 Property ModuleFolder As %String(XMLPROJECTION = "NONE");
 
+/// ExportList="00000,apptools.,apptools.M^00000,apptools.,apptools.M"
+ClassMethod ExportRes(Path As %String = "", ExportList As %String = "") As %Status
+{
+	set st=$$$OK
+		for i=1:1:$L(ExportList,"^") { set item=$p(ExportList,"^",i)
+			continue:item=""
+			d ..export(Path,$P(item,",",1),$P(item,",",2),$P(item,",",3))	
+		}
+	Quit st
+}
+
+/// d ##class(%ZPM.PackageManager.Developer.ModuleTemplate).export("d:\_proj\app","00000","apptools.","apptools.M")
+/// '$e(flags,i) i=1 isGenerated
+/// '$e(flags,i) i=2 isSystem
+/// '$e(flags,i) i=3 isPercented
+/// '$e(flags,i) i=4 isMapped
+/// '$e(flags,i) i=5 isDFI
+ClassMethod export(workdir = "", flags, mask = "", ignoremask = "")
+{
+	///zu(12) namespace directory by default
+	if workdir="" set workdir=zu(12,"")
+	#define export(%code, %file) try {s sc = $system.OBJ.ExportUDL(%code, %file,"/diffexport")} catch e {s sc=$$$ERROR($$$GeneralError,"Old version")} ##continue
+								 w:sc "Ok" d:'sc $system.OBJ.DisplayError(sc)
+
+	#define isGenerated(%code) ##class(%RoutineMgr).IsGenerated( %code )
+	#define isPercented(%code) ("%" = $e(%code))
+	#define isMapped(%code) ##class(%RoutineMgr).IsMapped( %code )
+	#define log w !, code, " -> ", $piece(filename,workdir,2), " "
+	
+	#define mkdir(%filename) ##continue
+			s path = ##class(%File).GetDirectory( %filename ) ##continue
+			if '##class(%File).DirectoryExists( path ) { ##continue
+				s sc = ##class(%File).CreateDirectoryChain( path ) ##continue
+				w !, "mkdir ", path, " ", sc ##continue
+			}
+						
+	w "#; Exporting to ", workdir,!
+	#; classes
+	s rs = ##class(%ResultSet).%New("%Dictionary.ClassDefinition:Summary")
+	if rs.Execute() {
+
+		while rs.%Next(){
+
+			s code = rs.Name _ ".cls", isSystem = rs.System
+			;w !,code
+			if ( '$e(flags,2) && isSystem ) continue
+			if ( '$e(flags,1) && $$$isGenerated( code ) ) continue
+			if ( '$e(flags,3) && $$$isPercented( code ) ) continue
+			if ( '$e(flags,4) && $$$isMapped( code ) ) continue
+			if mask'="",(("@"_code)'[("@"_mask )) continue
+			if ignoremask'="",(("@"_code)[("@"_ignoremask )) continue
+			
+			s filename = ..expfilename( code,workdir )
+			$$$mkdir( filename )
+			$$$log
+			$$$export( code, filename )
+			s item(code)=""
+		} s rs=""
+	}
+
+	#; routines
+	s rs = ##class(%ResultSet).%New("%Routine:RoutineList")
+	if rs.Execute() {
+    	while rs.%Next() {
+	 		s code = rs.Name
+	 		if ( '$e(flags,1) && $$$isGenerated( code ) ) continue
+	 		if ( '$e(flags,3) && $$$isPercented( code ) ) continue
+			if ( '$e(flags,4) && $$$isMapped( code ) ) continue
+			if ( '$find( code, mask ) ) continue
+			
+			s filename = ..expfilename( code,workdir )
+			$$$mkdir( filename )
+			$$$log
+			$$$export( code, filename )
+			s item(code)=""
+	    } s rs=""
+	}
+	#; dfi
+	#define export(%code,%file) s sc = ##class(%DeepSee.UserLibrary.Utils).%Export( %code, %file, 0 ) 
+	if '$e(flags,5) {
+		s sql = "Select fullName as Name From %DeepSee_UserLibrary.FolderItem"
+	    s rs = ##class(%SQL.Statement).%ExecDirect( .stm, sql )
+	    while rs.%Next() {
+			s code = rs.Name, filename = ..expfilename( code_".dfi",workdir )
+			if ( '$find( code, mask ) ) continue
+			if ($L(code,"$TRASH")>1) continue
+			$$$mkdir( filename )
+			$$$log
+			$$$export(code,filename)
+			s item(code)=""
+		} s rs=""
+	}
+	w !!, "#; Exported to ", workdir
+    Q $$$OK
+}
+
+/// test.dfi -> /dfi/test.dfi
+/// test.cls -> /cls/test.cls
+/// testpkg.test.cls -> /cls/testpkg/test.cls
+ClassMethod expfilename(code, wd)
+{
+	#define log(%dir,%sc) w !, "mkdir ", %dir, " ", sc
+
+	if '##class(%File).DirectoryExists( wd ) {
+		s sc = ##class(%File).CreateDirectoryChain( wd )
+		$$$log(wd,sc)
+	}
+
+	s ext = $p( code, ".", * ), ext = $zcvt( ext, "l" )
+	#; for each type - different directory
+
+	s:ext'="" wd = ##class(%File).NormalizeDirectory( ext, wd )
+
+	#; directory must exist before any call (%File).NormalizeFilename( , wd)
+	if '##class(%File).DirectoryExists( wd ) {
+		s sc = ##class(%File).CreateDirectoryChain( wd )
+		$$$log(wd,sc)
+	}
+
+	s filename = ##class(%File).NormalizeFilename( code, wd )
+	#; lowercase file extension
+	s $p(filename,".",*)=ext
+	//B:code="DPRep.Rest.JSON.cls" "L"
+	#; for *.cls Package.Subpackage.ClassName.cls -> Folder/Subfolder/ClassName.cls
+	if ext ="cls" {
+		s dirs = $piece( code, ".",1, *-2 ), dirs = $translate( dirs, ".", "/" )
+		s relpath = dirs _ "/" _ $piece( code, ".", *-1, * ) ;
+		s filename = ##class(%File).NormalizeFilename( relpath, wd )
+	}
+	Q filename
+}
+
 /// returns list of non-system csp applications in the current namespace
 ClassMethod GetCSPApplications(Output pApplications As %List) As %Status
 {
@@ -450,3 +582,4 @@ Storage Default
 }
 
 }
+
