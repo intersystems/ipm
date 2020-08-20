@@ -62,7 +62,7 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetDefaultRegistry(pRegistry))
     $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1))
     $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
-
+    $$$QuitOnError(##class(%ZPM.PackageManager).Shell("config set BackgroundTerminalIsWhite "_$Select($zversion(1)=3:0,1:1)))
     Quit $$$OK
 }
 
