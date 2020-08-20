@@ -733,9 +733,9 @@ ClassMethod GetDefaultCommandRegistry()
 	Set Status=##Class(Config.Startup).Get(.Properties)
 	If Status {
 		Set ServerPort="http://"_$zu(110)_":"_$Get(Properties("WebServerPort"),52773)
-		Write !,"Default Command of Registry"
-		Write !,"View all packets in brousers:",!,"  ",ServerPort_"/registry/packages/-/all"
-		Write !,"Switch on registry:",!,"repo -r -n registry -url "_ServerPort_"/registry/packages/ -user ""_system"" -pass ""SYS""",!
+		Write !,"Default commands for the registry"
+		Write !,"View all packets in the browser:",!,"  ",ServerPort_"/registry/packages/-/all"
+		Write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
 		
 	}
 }
@@ -1052,7 +1052,6 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Write !,$$$escGreen(tRes.%Get("Name")),?35," ",tRes.%Get("Version")
-		;Do:tRes.%Get("Name")="zpm-registry" ..GetDefaultCommandRegistry()
 		If (pShowRepo) {
 			Write ?45," ",$$$escBlue(tRes.%Get("Repo"))
 		}
