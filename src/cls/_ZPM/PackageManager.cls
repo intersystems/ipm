@@ -1052,7 +1052,7 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Write !,$$$escGreen(tRes.%Get("Name")),?35," ",tRes.%Get("Version")
-		Do:tRes.%Get("Name")="zpm-registry" ..GetDefaultCommandRegistry()
+		;Do:tRes.%Get("Name")="zpm-registry" ..GetDefaultCommandRegistry()
 		If (pShowRepo) {
 			Write ?45," ",$$$escBlue(tRes.%Get("Repo"))
 		}
