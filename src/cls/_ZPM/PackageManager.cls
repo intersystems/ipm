@@ -405,54 +405,54 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 /// Show modules in Namespace and to go namespace
 ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 {
-	set currentns=$Namespace
-	Set name = $tr($Get(pCommandInfo("parameters","name")),$c(34))
-	set tDesc=$g(pCommandInfo("data","Desc"))
-	if name["*" {
-		do ..GetListNamespace(.namespace)
-		set ns="",num=0
-		for { set ns=$order(namespace(ns)) quit:ns=""
-			set $Namespace=ns
-			KILL list
-			if ("@"_ns)[("@"_$zconvert($tr(name,"*"),"U")) {
-				set num=num+1
+	Set currentns=$Namespace
+	Set name = $Translate($Get(pCommandInfo("parameters","name")),$c(34))
+	Set tDesc=$Get(pCommandInfo("data","Desc"))
+	If name["*" {
+		Do ..GetListNamespace(.namespace)
+		Set ns="",num=0
+		For { set ns=$Order(namespace(ns)) Quit:ns=""
+			Set $Namespace=ns
+			Kill list
+			If ("@"_ns)[("@"_$Zconvert($tr(name,"*"),"U")) {
+				Set num=num+1
 					,num(num)=ns
-				d ..GetListModules("",.list)
-				if $D(list) {
-					set module="",write=0
-					for { set module=$ORDER(list(module)) q:module=""
-						write !
-						,$select('write:num_".",1:$j("",$L(num)+1))
-						,$$$White(ns)_">"_$j("",namespace-$l(ns_">"))
-						," "_$$$Green(module)_$j("",list-$l(module))
+				Do ..GetListModules("",.list)
+				If $D(list) {
+					Set module="",write=0
+					For { set module=$Order(list(module)) Quit:module=""
+						Write !
+						,$Select('write:num_".",1:$j("",$L(num)+1))
+						,$$$escDefault(ns)_">"_$j("",namespace-$l(ns_">"))
+						," "_$$$escGreen(module)_$j("",list-$l(module))
 						," "_$LG(list(module),1)
-						if tDesc {
-							write !?(4+$L(ns_">"_$j("",namespace-$l(ns_">"))))
-							d ..DrawColumn($$$Yellow("Description: ")_" "_$LG(list(module),2))
+						If tDesc {
+							Write !?(4+$L(ns_">"_$Justify("",namespace-$Length(ns_">"))))
+							Do ..DrawColumn($$$escYellow("Description: ")_" "_$Listget(list(module),2))
 						}
-						set write=1
+						Set write=1
 					}
-				} else {
-					write !
+				} Else {
+					Write !
 					,num_"."
-					,$$$Violet(ns)_">"_$j("",namespace-$l(ns_">"))
+					,$$$escViolet(ns)_">"_$Justify("",namespace-$Length(ns_">"))
 					
 				}
 			}
 		}
-		set $Namespace=currentns
+		Set $Namespace=currentns
 		Do ##class(%Library.Prompt).GetString("Enter the namespace number where to go: ", .goto)	
-		if goto,$D(num(goto)) set $Namespace=num(goto)
-	} else {
-		set $Namespace=name
+		If goto,$D(num(goto)) Set $Namespace=num(goto)
+	} Else {
+		Set $Namespace=name
 	}
 }
 
 /// Get list Namespace, example do ##(%ZPM.PackageManager).GetListNamespace(.ns)
 ClassMethod GetListNamespace(ByRef namespace)
 {
-	new $Namespace
-	set $Namespace="%SYS"
+	New $Namespace
+	Set $Namespace="%SYS"
 	
 	Set tQuery = "select Nsp from %SYS.Namespace_List(0,0) where Status = 1"
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
@@ -462,17 +462,17 @@ ClassMethod GetListNamespace(ByRef namespace)
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		set namespace(tRes.%Get("Nsp"))=""
-		set:$G(maxlen)<$L(tRes.%Get("Nsp")) maxlen=$L(tRes.%Get("Nsp"))
+		Set namespace(tRes.%Get("Nsp"))=""
+		Set:$Get(maxlen)<$Length(tRes.%Get("Nsp")) maxlen=$Length(tRes.%Get("Nsp"))
 	}
-	set:$D(namespace) namespace=$G(maxlen)
+	Set:$Data(namespace) namespace=$G(maxlen)
 }
 
 /// Get description module
 ClassMethod Description(tModuleName, UrlInc = "", ModuleView = "")
 {
 	#define gn "^||tmpDesc"
-	KILL @$$$gn
+	Kill @$$$gn
 	Set tRegistry = ""
 	If (tModuleName["/") {
 		set $lb(tRegistry, tModuleName) = $lfs(tModuleName, "/")
@@ -480,118 +480,119 @@ ClassMethod Description(tModuleName, UrlInc = "", ModuleView = "")
 	set where=""
 		,maxlenname=0
 		,Module=""
-	if tModuleName["*" {
-		set where="where name like ?"
-		set Module=$replace(tModuleName,"*","%")
-	} elseif tModuleName'="" { 
-		set Module=tModuleName
-		set where="where name = ?"
+	If tModuleName["*" {
+		Set where="where name like ?"
+		Set Module=$Replace(tModuleName,"*","%")
+	} Elseif tModuleName'="" { 
+		Set Module=tModuleName
+		Set where="where name = ?"
 	}
-	if UrlInc'="" set RepoOwner=$zconvert(UrlInc,"L") write !,"Search by repository "_RepoOwner
-	if where="" write !,"Search the entire repository"
-	else  write !,"Search the repository context "_Module
+	If UrlInc'="" Set RepoOwner=$Zconvert(UrlInc,"L") Write !,"Search by repository "_RepoOwner
+	If where="" Write !,"Search the entire repository"
+	Else  Write !,"Search the repository context "_Module
 	//Load the list info registry modules
-	set sql="select Name, Version, Repo from %ZPM_PackageManager_Developer.Utils_GetModuleList('registry') "_where
+	Set sql="select Name, Version, Repo from %ZPM_PackageManager_Developer.Utils_GetModuleList('registry') "_where
 		,rs=##class(%ResultSet).%New()
 		,sc=rs.Prepare(sql)
-	set:sc sc=rs.Execute(Module)
-	if sc {
-		for i=1:1 {
-			quit:'rs.%Next()  
-			set name=rs.Get("Name")
-			set:$l(name)>maxlenname maxlenname=$l(name)
-			if '$data(@$$$gn@(name,"Registry","Description")) {
-				set (repo,url)=rs.Get("Repo")
-				if $zconvert(url,"L")'[$g(RepoOwner) continue
-				set @$$$gn@(name,"Registry")=$lb(rs.Get("Version"),rs.Get("Repo"))
-				do ..GetDescFromRepo(url,.desc,.repo,.modxml)
-				set:ModuleView @$$$gn@(name,"Registry","Module")=$get(modxml)
-				set @$$$gn@(name,"Registry","Description")=$get(desc,"no description")
+	Set:sc sc=rs.Execute(Module)
+	If sc {
+		For i=1:1 {
+			Quit:'rs.%Next()  
+			Set name=rs.Get("Name")
+			Set:$l(name)>maxlenname maxlenname=$Length(name)
+			If '$Data(@$$$gn@(name,"Registry","Description")) {
+				Set (repo,url)=rs.Get("Repo")
+				If $Zconvert(url,"L")'[$Get(RepoOwner) Continue
+				Set @$$$gn@(name,"Registry")=$Listbuild(rs.Get("Version"),rs.Get("Repo"))
+				Do ..GetDescFromRepo(url,.desc,.repo,.modxml)
+				Set:ModuleView @$$$gn@(name,"Registry","Module")=$Get(modxml)
+				Set @$$$gn@(name,"Registry","Description")=$Get(desc,"no description")
 			}
 		 }
 		}
-	else { 
-		write !,"Not found "_tModuleName_" in current registry"
+	Else { 
+		Write !,"Not found "_tModuleName_" in current registry"
 	}
-	set name=""
-	for { set name=$order(@$$$gn@(name)) quit:name=""
-		set reg="" for { set reg=$order(@$$$gn@(name,reg),1,data) quit:reg=""
-			write !,$$$Green(name)
+	Set name=""
+	For { set name=$Order(@$$$gn@(name)) Quit:name=""
+		Set reg="" For { set reg=$Order(@$$$gn@(name,reg),1,data) Quit:reg=""
+			Write !,$$$escGreen(name)
 			;,?(maxlenname+1),$e(reg,1)
 			,?(maxlenname+1),$lg(data,1)
-			,?(maxlenname+7),..DrawColumn($$$Yellow("Description: ")_@$$$gn@(name,reg,"Description"))
-			,!?(maxlenname+7),$$$Blue("Repo: "_$lg(data,2))
+			,?(maxlenname+7),..DrawColumn($$$escYellow("Description: ")_@$$$gn@(name,reg,"Description"))
+			,!?(maxlenname+7),$$$escBlue("Repo: "_$lg(data,2))
+			Do:name="zpm-registry" ..GetDefaultCommandRegistry()
 		}
 		
 	}
-	quit $$$OK
+	Quit $$$OK
 }
 
 /// draw description, code from zpmshow.mac
 ClassMethod DrawColumn(desc) As %String
 {
- set dx=$x
-	for d=1:1:$L(desc," ") {
- 		set wd=$P(desc," ",d) 
-		if $x+$l(wd)>80 write !,?dx
-		write wd," " 
+ Set dx=$x
+	For d=1:1:$Length(desc," ") {
+ 		Set wd=$Piece(desc," ",d) 
+		If $x+$l(wd)>80 Write !,?dx
+		Write wd," " 
 	}
- quit ""
+ Quit ""
 }
 
 /// TODO GitLab repo
 ClassMethod GetDescFromRepo(url As %String, ByRef desc, ByRef repo, ByRef modxml) As %Status
 {
-	set desc=""
-	set url="https://raw.githubusercontent.com"_$p(url,"/github.com",2)
-	if url="" {
-		set repo="not repository"
+	Set desc=""
+	Set url="https://raw.githubusercontent.com"_$Piece(url,"/github.com",2)
+	If url="" {
+		Set repo="not repository"
 	}
-	else {
-		set:$e(url,*)'="/" url=url_"/"
-		set url=url_"master/module.xml"
-		if ##class(%ZPM.PackageManager).GetDataURL(url,.modxml) {
-			set desc=$p($p($g(modxml),"Description>",2),"</")
-			if desc="", ##class(%ZPM.PackageManager).GetDataURL($replace(url,"module.xml","README.md"),.readme) {
-				set d=$tr($e(readme,1,300),$c(13,10),"  ")
-				if d["](" {
-					for  { q:d'["]("
-						set d=$tr($p(d,"](",1),"[()","   ")_$p($p(d,"](",2,*),")",$s($p(d,"](",2,*)[")":2,1:1),*)
+	Else {
+		Set:$Extract(url,*)'="/" url=url_"/"
+		Set url=url_"master/module.xml"
+		If ##class(%ZPM.PackageManager).GetDataURL(url,.modxml) {
+			Set desc=$Piece($Piece($Get(modxml),"Description>",2),"</")
+			If desc="", ##class(%ZPM.PackageManager).GetDataURL($replace(url,"module.xml","README.md"),.readme) {
+				Set d=$Translate($Extract(readme,1,300),$Char(13,10),"  ")
+				If d["](" {
+					For  { Quit:d'["]("
+						Set d=$Translate($Piece(d,"](",1),"[()","   ")_$Piece($Piece(d,"](",2,*),")",$Select($Piece(d,"](",2,*)[")":2,1:1),*)
 						
 					}
 				}
-				set desc="from readme: "_d_"..."
+				Set desc="from readme: "_d_"..."
 			}
 		}
 	}
-	q $$$OK
+	Quit $$$OK
 }
 
 /// write $System.Status.GetErrorText(##class(%ZPM.PackageManager).GetDataURL("https://raw.githubusercontent.com/intersystems-community/zpm/master/module.xml",.o)) w o
 ClassMethod GetDataURL(url As %String, ByRef data) As %Status
 {
 	New $Namespace
-	set data=""
+	Set data=""
  	#dim req As %Net.HttpRequest
-	 Set req=##class(%Net.HttpRequest).%New()
-	set server=$p(url,"/",3)
+	Set req=##class(%Net.HttpRequest).%New()
+	Set server=$p(url,"/",3)
 
-	if server[":" {
+	If server[":" {
 		Set port=$p(server,":",2)
-		set server=$p(server,":")
+		Set server=$p(server,":")
 	}
-	if $zconvert(url,"L")["https:" {
+	If $zconvert(url,"L")["https:" {
 	 	Set SSLConfig = "ZPM"
 	 	Zn "%SYS"
 	 	Do:'##class(Security.SSLConfigs).Exists(SSLConfig) ##class(Security.SSLConfigs).Create(SSLConfig)
 	 	Set req.Https=1
 		Set req.SSLConfiguration=SSLConfig
-		set:$g(port)="" port=443
+		Set:$g(port)="" port=443
 	}
-	set:$g(port)="" port=80
+	Set:$Get(port)="" port=80
 	Set req.Server=server
-	set req.Port=port
-	set location=$p(url,"/",4,*)
+	Set req.Port=port
+	Set location=$Piece(url,"/",4,*)
 
 	Set req.Location =location
 
@@ -601,7 +602,7 @@ ClassMethod GetDataURL(url As %String, ByRef data) As %Status
 	Return:((req.HttpResponse.StatusCode = 403) && (req.HttpResponse.GetHeader("X-RATELIMIT-REMAINING")=0)) $$$ERROR($$$GeneralError,"API rate limit exceeded. Try logging in.")
  	Return:(req.HttpResponse.StatusCode '= 200) $$$ERROR($$$GeneralError,"Received " _ req.HttpResponse.StatusCode _ " status, expected 200")
 
-	set data=req.HttpResponse.Data.Read()
+	Set data=req.HttpResponse.Data.Read()
 
  	Return $$$OK
 }
@@ -611,17 +612,17 @@ ClassMethod GetDataURL(url As %String, ByRef data) As %Status
 ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
 {
 	Set tQuery = "select Name,VersionString,Description,ExternalName from %ZPM_PackageManager_Developer.""MODULE"""
-	if StartsWith'="" { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery_ " where name %StartsWith ?",StartsWith) }
-	else { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)}
+	If StartsWith'="" { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery_ " where name %StartsWith ?",StartsWith) }
+	Else { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)}
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		set pList(tRes.%Get("Name"))=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("ExternalName"))
-		set:$G(maxlen)<$L(tRes.%Get("Name")) maxlen=$L(tRes.%Get("Name"))
+		Set pList(tRes.%Get("Name"))=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("ExternalName"))
+		Set:$G(maxlen)<$L(tRes.%Get("Name")) maxlen=$L(tRes.%Get("Name"))
 	}
-	set:$D(pList) pList=$G(maxlen)
+	Set:$D(pList) pList=$G(maxlen)
 }
 
 /// generates module.xml
@@ -637,8 +638,8 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 	Set tPath = ##class(%File).NormalizeDirectory(tPath)
 
 	Set tExp = $$$GetModifier(pCommandInfo,"export")
-	if tExp'="" {
-		Quit ##class(%ZPM.PackageManager.Developer.ModuleTemplate).ExportRes(tPath,tExp)
+	If tExp'="" {
+		Do ##class(%ZPM.PackageManager.Developer.ModuleTemplate).ExportResources(tPath,tExp)
 	}	
 	If ($$$HasModifier(pCommandInfo,"template")) {
 		Return ##class(%ZPM.PackageManager.Developer.ModuleTemplate).GenerateTemplate(tPath)
@@ -723,33 +724,47 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 	Return tTemplate.SaveFile(tPath)
 }
 
+/// Get Default Command of Registry
+/// example d ##class(%ZPM.PackageManager).GetDefaultCommandRegistry()
+ClassMethod GetDefaultCommandRegistry()
+{
+	New $Namespace
+	Set $Namespace="%SYS"
+	Set Status=##Class(Config.Startup).Get(.Properties)
+	If Status {
+		Set ServerPort="http://"_$zu(110)_":"_$Get(Properties("WebServerPort"),52773)
+		Write !,"Default Command of Registry"
+		Write !,"View all packets in brousers:",!,"  ",ServerPort_"/registry/packages/-/all"
+		Write !,"Switch on registry:",!,"repo -r -n registry -url "_ServerPort_"/registry/packages/ -user ""_system"" -pass ""SYS""",!
+		
+	}
+}
+
 /// Version client and registry
 ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
 	New $Namespace
-  	do ..GetListNamespace(.namespace)
+  	Do ..GetListNamespace(.namespace)
   
-	set $Namespace="%SYS"
-	set Status=##Class(Config.Startup).Get(.Properties)
-	if Status s ServerPort="http://"_$zu(110)_":"_$g(Properties("WebServerPort"),52773)
+	Set $Namespace="%SYS"
 
-	do ..GetListModules("zpm",.list)
-	if $DATA(list("zpm")) {
-			write !,$$$White($namespace)_"> "_$$$Green("zpm ")_$LG(list("zpm"),1)
+	Do ..GetListModules("zpm",.list)
+	If $Data(list("zpm")) {
+			Write !,$$$escDefault($namespace)_"> "_$$$escGreen("zpm ")_$ListGet(list("zpm"),1)
 	}
-	set ns=""
-	for { set ns=$order(namespace(ns)) q:ns=""
-		kill list
-		set $namespace=ns
-		do ..GetListModules("zpm",.list)
-		if $DATA(list("zpm-registry")) {
-			write !,$$$White(ns)_"> "_$$$Green("zpm-registry ")_$LG(list("zpm-registry"),1)
-			write ServerPort_"/registry/packages/-/all"
-			set Found=ns
+	Set ns=""
+	For { Set ns=$Order(namespace(ns)) Quit:ns=""
+		Kill list
+		Set $namespace=ns
+		Do ..GetListModules("zpm",.list)
+		If $Data(list("zpm-registry")) {
+			Write !,$$$escDefault(ns)_"> "_$$$escGreen("zpm-registry ")_$ListGet(list("zpm-registry"),1)
+			Set Found=ns
+			Do ..GetDefaultCommandRegistry()
 		}
 	}
-	set $namespace="%SYS"
-	if '$d(Found) write !," Locally installed zpm-registry not found" 
+	Set $namespace="%SYS"
+	If '$Data(Found) Write !," Locally installed zpm-registry not found" 
 	
 	// Get URL current registry
 	Set tRes = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).ExtentFunc()
@@ -761,7 +776,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowOnError(tSC)
 		Set tService = tRepository.GetPackageService()
 		Set tInfo = tService.GetInfo()
-		Write !,$$$Blue(tRepository.URL)," - ",tInfo.version
+		Write !,$$$escBlue(tRepository.URL)," - ",tInfo.version
 	}
 	q $$$OK
 }
@@ -1036,9 +1051,10 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Write !,$$$Green(tRes.%Get("Name")),?35," ",tRes.%Get("Version")
+		Write !,$$$escGreen(tRes.%Get("Name")),?35," ",tRes.%Get("Version")
+		Do:tRes.%Get("Name")="zpm-registry" ..GetDefaultCommandRegistry()
 		If (pShowRepo) {
-			Write ?45," ",$$$Blue(tRes.%Get("Repo"))
+			Write ?45," ",$$$escBlue(tRes.%Get("Repo"))
 		}
 	}
 }
@@ -1323,37 +1339,36 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
 	Set tNS = $Get(pCommandInfo("modifiers","znamespace"))
 	set tDesc=$g(pCommandInfo("data","Desc"))
-	if tNS'="" {
-		kill pCommandInfo 
-		set pCommandInfo("parameters","name")=tNS 
-		set pCommandInfo("data","Desc")=tDesc
-		do ..Namespace(.pCommandInfo) 
-		q $$$OK
+	If tNS'="" {
+		Kill pCommandInfo 
+		Set pCommandInfo("parameters","name")=tNS 
+		Set pCommandInfo("data","Desc")=tDesc
+		Do ..Namespace(.pCommandInfo) 
 	}
-	if tDesc {
-		set gn="^||tmpDesc"		
-		set sql="select Name, Description, Keywords, Root, VersionString, Author_CopyrightDate, Author_License, Author_Notes, Author_Organization, Author_Person from %ZPM_PackageManager_Developer.""Module"" "
+	If tDesc {
+		Set gn="^||tmpDesc"		
+		Set sql="select Name, Description, Keywords, Root, VersionString, Author_CopyrightDate, Author_License, Author_Notes, Author_Organization, Author_Person from %ZPM_PackageManager_Developer.""Module"" "
 			,rs=##class(%ResultSet).%New()
 			,sc=rs.Prepare(sql)
-		set:sc sc=rs.Execute()
-		if sc {
-			for i=1:1 {
-				quit:'rs.%Next()  
-				set name=rs.Get("Name")
-				set:$l(name)>$g(maxlenname) maxlenname=$l(name)
-				if '$d(@gn@(name,"Locale","Description")) {
-					set @gn@(name,"Locale")=$lb(rs.Get("VersionString"),rs.Get("Root"))
-					set root=rs.Get("Root")
-					set desc=rs.Get("Description")
-					for a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
-						set @gn@(name,"Locale","Description",a)=rs.Get(a)
+		Set:sc sc=rs.Execute()
+		If sc {
+			For i=1:1 {
+				Quit:'rs.%Next()  
+				Set name=rs.Get("Name")
+				Set:$Length(name)>$Get(maxlenname) maxlenname=$Length(name)
+				If '$Data(@gn@(name,"Locale","Description")) {
+					Set @gn@(name,"Locale")=$Listbuild(rs.Get("VersionString"),rs.Get("Root"))
+					Set root=rs.Get("Root")
+					Set desc=rs.Get("Description")
+					For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
+						Set @gn@(name,"Locale","Description",a)=rs.Get(a)
 					}
-					set @gn@(name,"Locale","Description")=desc
+					Set @gn@(name,"Locale","Description")=desc
 				}
 			 }
-			set @gn@(name,"Locale")=$g(maxlenname) 
+			Set @gn@(name,"Locale")=$Get(maxlenname) 
 			}
-		else { 
+		Else { 
 			;write !,"Not found "_tModuleName_" in current registry"
 		}
 	}
@@ -1402,16 +1417,16 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		For {
 			Set tMod = $Order(tModMap(tMod),1,tVersion)
 			Quit:(tMod="")
-			Write !,$$$Green(tMod)," ",tVersion_" "
-			if $D(gn),$DATA(@gn@(tMod,"Locale")) {
-				set maxlenname=$L(tMod_" "_tVersion_" ")
-				do ..DrawColumn($$$Yellow("Description: ")_$G(@gn@(tMod,"Locale","Description")))
-				if $data(@gn@(tMod,"Locale","Description"))>9 {
-					set au="" for { 
-						set au=$order(@gn@(tMod,"Locale","Description",au),1,audata) quit:au=""
-						write:audata'="" !
+			Write !,$$$escGreen(tMod)," ",tVersion_" "
+			If $Data(gn),$Data(@gn@(tMod,"Locale")) {
+				Set maxlenname=$L(tMod_" "_tVersion_" ")
+				Do ..DrawColumn($$$escYellow("Description: ")_$Get(@gn@(tMod,"Locale","Description")))
+				If $Data(@gn@(tMod,"Locale","Description"))>9 {
+					Set au="" For { 
+						Set au=$Order(@gn@(tMod,"Locale","Description",au),1,audata) Quit:au=""
+						Write:audata'="" !
 						,?(maxlenname)
-						,..DrawColumn($$$Violet(au_": ")_audata)
+						,..DrawColumn($$$escViolet(au_": ")_audata)
 					}
 				}
 			}
@@ -1556,7 +1571,7 @@ ClassMethod PrintTree(ByRef pTree)
 			Set $Extract(tFrontPadding,*) = $c($zh("252CH"))
 		}
 		
-		Write tFrontPadding,$$$Green($p(tValue," ",1))," ",$p(tValue," ",2),!
+		Write tFrontPadding,$$$escGreen($p(tValue," ",1))," ",$p(tValue," ",2),!
 		
 		If (tNextSibling '= "") {
 			Set tPadding(tNextSibling) = $Get(tPadding(i))

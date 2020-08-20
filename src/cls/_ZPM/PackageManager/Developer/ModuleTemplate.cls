@@ -5,136 +5,140 @@ Property TemplateResources [ MultiDimensional ];
 
 Property ModuleFolder As %String(XMLPROJECTION = "NONE");
 
-/// ExportList="00000,apptools.,apptools.M^00000,apptools.,apptools.M"
-ClassMethod ExportRes(Path As %String = "", ExportList As %String = "") As %Status
+/// Export Resources 
+/// Example: ExportList="00000,apptools.,apptools.M^00000,apptools.,apptools.M"
+ClassMethod ExportResources(Path As %String = "", ExportList As %String = "") As %Status
 {
-	set st=$$$OK
-		for i=1:1:$L(ExportList,"^") { set item=$p(ExportList,"^",i)
-			continue:item=""
-			d ..export(Path,$P(item,",",1),$P(item,",",2),$P(item,",",3))	
+	Set st=$$$OK
+		For i=1:1:$Length(ExportList,"^") { Set item=$Piece(ExportList,"^",i)
+			Continue:item=""
+			Do ..ExportOneResource(Path,$Piece(item,",",1),$Piece(item,",",2),$Piece(item,",",3))	
 		}
 	Quit st
 }
 
-/// d ##class(%ZPM.PackageManager.Developer.ModuleTemplate).export("d:\_proj\app","00000","apptools.","apptools.M")
-/// '$e(flags,i) i=1 isGenerated
-/// '$e(flags,i) i=2 isSystem
-/// '$e(flags,i) i=3 isPercented
-/// '$e(flags,i) i=4 isMapped
-/// '$e(flags,i) i=5 isDFI
-ClassMethod export(workdir = "", flags, mask = "", ignoremask = "")
+/// Export different types of modules in different subfolders in UDL (plain) format
+/// test.dfi -> /dfi/test.dfi
+/// testpkg.test.cls -> /cls/testpkg/test.cls
+/// Fork from https://github.com/intersystems-ru/cache-udl
+/// d ##class(%ZPM.PackageManager.Developer.ModuleTemplate).ExportOneResource("d:\_proj\app","00000","apptools.","apptools.M")
+/// byte=1 isGenerated
+/// byte=2 isSystem
+/// byte=3 isPercented
+/// byte=4 isMapped
+/// byte=5 isDFI
+ClassMethod ExportOneResource(workdir = "", flags, mask = "", ignoremask = "")
 {
 	///zu(12) namespace directory by default
-	if workdir="" set workdir=zu(12,"")
-	#define export(%code, %file) try {s sc = $system.OBJ.ExportUDL(%code, %file,"/diffexport")} catch e {s sc=$$$ERROR($$$GeneralError,"Old version")} ##continue
-								 w:sc "Ok" d:'sc $system.OBJ.DisplayError(sc)
+	If workdir="" Set workdir=zu(12,"")
+	#define export(%code, %file) Try {Set sc = $system.OBJ.ExportUDL(%code, %file,"/diffexport")} catch e {s sc=$$$ERROR($$$GeneralError,"Old version")} ##continue
+								 Write:sc "Ok" Do:'sc $system.OBJ.DisplayError(sc)
 
 	#define isGenerated(%code) ##class(%RoutineMgr).IsGenerated( %code )
-	#define isPercented(%code) ("%" = $e(%code))
+	#define isPercented(%code) ("%" = $Extract(%code))
 	#define isMapped(%code) ##class(%RoutineMgr).IsMapped( %code )
-	#define log w !, code, " -> ", $piece(filename,workdir,2), " "
+	#define log Write !, code, " -> ", $Piece(filename,workdir,2), " "
 	
 	#define mkdir(%filename) ##continue
-			s path = ##class(%File).GetDirectory( %filename ) ##continue
-			if '##class(%File).DirectoryExists( path ) { ##continue
-				s sc = ##class(%File).CreateDirectoryChain( path ) ##continue
-				w !, "mkdir ", path, " ", sc ##continue
+			Set path = ##class(%File).GetDirectory( %filename ) ##continue
+			If '##class(%File).DirectoryExists( path ) { ##continue
+				Set sc = ##class(%File).CreateDirectoryChain( path ) ##continue
+				Write !, "mkdir ", path, " ", sc ##continue
 			}
 						
 	w "#; Exporting to ", workdir,!
 	#; classes
-	s rs = ##class(%ResultSet).%New("%Dictionary.ClassDefinition:Summary")
-	if rs.Execute() {
+	Set rs = ##class(%ResultSet).%New("%Dictionary.ClassDefinition:Summary")
+	If rs.Execute() {
 
-		while rs.%Next(){
+		While rs.%Next(){
 
-			s code = rs.Name _ ".cls", isSystem = rs.System
-			;w !,code
-			if ( '$e(flags,2) && isSystem ) continue
-			if ( '$e(flags,1) && $$$isGenerated( code ) ) continue
-			if ( '$e(flags,3) && $$$isPercented( code ) ) continue
-			if ( '$e(flags,4) && $$$isMapped( code ) ) continue
-			if mask'="",(("@"_code)'[("@"_mask )) continue
-			if ignoremask'="",(("@"_code)[("@"_ignoremask )) continue
+			Set code = rs.Name _ ".cls", isSystem = rs.System
+			If ( '$Extract(flags,2) && isSystem ) Continue
+			If ( '$Extract(flags,1) && $$$isGenerated( code ) ) Continue
+			If ( '$Extract(flags,3) && $$$isPercented( code ) ) Continue
+			If ( '$Extract(flags,4) && $$$isMapped( code ) ) Continue
+			If mask'="",(("@"_code)'[("@"_mask )) Continue
+			If ignoremask'="",(("@"_code)[("@"_ignoremask )) Continue
 			
-			s filename = ..expfilename( code,workdir )
+			Set filename = ..Expfilename( code,workdir )
 			$$$mkdir( filename )
 			$$$log
 			$$$export( code, filename )
-			s item(code)=""
-		} s rs=""
+			Set item(code)=""
+		} Set rs=""
 	}
 
 	#; routines
-	s rs = ##class(%ResultSet).%New("%Routine:RoutineList")
-	if rs.Execute() {
-    	while rs.%Next() {
-	 		s code = rs.Name
-	 		if ( '$e(flags,1) && $$$isGenerated( code ) ) continue
-	 		if ( '$e(flags,3) && $$$isPercented( code ) ) continue
-			if ( '$e(flags,4) && $$$isMapped( code ) ) continue
-			if ( '$find( code, mask ) ) continue
+	Set rs = ##class(%ResultSet).%New("%Routine:RoutineList")
+	If rs.Execute() {
+    	While rs.%Next() {
+	 		Set code = rs.Name
+	 		If ( '$e(flags,1) && $$$isGenerated( code ) ) Continue
+	 		If ( '$e(flags,3) && $$$isPercented( code ) ) Continue
+			If ( '$e(flags,4) && $$$isMapped( code ) ) Continue
+			If ( '$find( code, mask ) ) Continue
 			
-			s filename = ..expfilename( code,workdir )
+			Set filename = ..Expfilename( code,workdir )
 			$$$mkdir( filename )
 			$$$log
 			$$$export( code, filename )
-			s item(code)=""
-	    } s rs=""
+			Set item(code)=""
+	    } Set rs=""
 	}
 	#; dfi
 	#define export(%code,%file) s sc = ##class(%DeepSee.UserLibrary.Utils).%Export( %code, %file, 0 ) 
-	if '$e(flags,5) {
-		s sql = "Select fullName as Name From %DeepSee_UserLibrary.FolderItem"
-	    s rs = ##class(%SQL.Statement).%ExecDirect( .stm, sql )
-	    while rs.%Next() {
-			s code = rs.Name, filename = ..expfilename( code_".dfi",workdir )
-			if ( '$find( code, mask ) ) continue
-			if ($L(code,"$TRASH")>1) continue
+	If '$Extract(flags,5) {
+		Set sql = "Select fullName as Name From %DeepSee_UserLibrary.FolderItem"
+	    Set rs = ##class(%SQL.Statement).%ExecDirect( .stm, sql )
+	    While rs.%Next() {
+			Set code = rs.Name, filename = ..Expfilename( code_".dfi",workdir )
+			If ( '$Find( code, mask ) ) Continue
+			If ($Length(code,"$TRASH")>1) Continue
 			$$$mkdir( filename )
 			$$$log
 			$$$export(code,filename)
-			s item(code)=""
-		} s rs=""
+			Set item(code)=""
+		} Set rs=""
 	}
-	w !!, "#; Exported to ", workdir
-    Q $$$OK
+	Write !!, "#; Exported to ", workdir
+    Quit $$$OK
 }
 
 /// test.dfi -> /dfi/test.dfi
 /// test.cls -> /cls/test.cls
 /// testpkg.test.cls -> /cls/testpkg/test.cls
-ClassMethod expfilename(code, wd)
+ClassMethod Expfilename(code, wd)
 {
-	#define log(%dir,%sc) w !, "mkdir ", %dir, " ", sc
+	#define log(%dir,%sc) Write !, "mkdir ", %dir, " ", sc
 
-	if '##class(%File).DirectoryExists( wd ) {
-		s sc = ##class(%File).CreateDirectoryChain( wd )
+	If '##class(%File).DirectoryExists( wd ) {
+		Set sc = ##class(%File).CreateDirectoryChain( wd )
 		$$$log(wd,sc)
 	}
 
-	s ext = $p( code, ".", * ), ext = $zcvt( ext, "l" )
+	Set ext = $Piece( code, ".", * ), ext = $Zconvert( ext, "l" )
 	#; for each type - different directory
 
-	s:ext'="" wd = ##class(%File).NormalizeDirectory( ext, wd )
+	Set:ext'="" wd = ##class(%File).NormalizeDirectory( ext, wd )
 
 	#; directory must exist before any call (%File).NormalizeFilename( , wd)
-	if '##class(%File).DirectoryExists( wd ) {
-		s sc = ##class(%File).CreateDirectoryChain( wd )
+	If '##class(%File).DirectoryExists( wd ) {
+		Set sc = ##class(%File).CreateDirectoryChain( wd )
 		$$$log(wd,sc)
 	}
 
-	s filename = ##class(%File).NormalizeFilename( code, wd )
+	Set filename = ##class(%File).NormalizeFilename( code, wd )
 	#; lowercase file extension
-	s $p(filename,".",*)=ext
+	Set $Piece(filename,".",*)=ext
 	//B:code="DPRep.Rest.JSON.cls" "L"
 	#; for *.cls Package.Subpackage.ClassName.cls -> Folder/Subfolder/ClassName.cls
-	if ext ="cls" {
-		s dirs = $piece( code, ".",1, *-2 ), dirs = $translate( dirs, ".", "/" )
-		s relpath = dirs _ "/" _ $piece( code, ".", *-1, * ) ;
-		s filename = ##class(%File).NormalizeFilename( relpath, wd )
+	If ext ="cls" {
+		Set dirs = $Piece( code, ".",1, *-2 ), dirs = $Translate( dirs, ".", "/" )
+		Set relpath = dirs _ "/" _ $Piece( code, ".", *-1, * ) ;
+		Set filename = ##class(%File).NormalizeFilename( relpath, wd )
 	}
-	Q filename
+	Quit filename
 }
 
 /// returns list of non-system csp applications in the current namespace
