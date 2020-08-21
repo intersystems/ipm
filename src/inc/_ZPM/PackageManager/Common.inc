@@ -22,13 +22,13 @@ ROUTINE %ZPM.PackageManager.Common [Type=INC]
 
 #; Escape sequence for coloring the font
 #define escClear $c(27)_"[0m"
-#define escBg $Select(##class(%ZPM.PackageManager.Client.Settings).GetValue("BackgroundTerminalIsWhite"):47,1:40)
-#define escGreen(%t) $c(27)_"[1;32;"_$$$escBg_"m"_%t_$$$escClear
-#define escBlue(%t) $c(27)_"[1;36;"_$$$escBg_"m"_%t_$$$escClear
-#define escDefault(%t) $c(27)_"[1;3"_$Select($$$escBg:0,1:7)_";"_$$$escBg_"m"_%t_$$$escClear
-#define escYellow(%t) $c(27)_"[1;33;"_$$$escBg_"m"_%t_$$$escClear
-#define escViolet(%t) $c(27)_"[1;35;"_$$$escBg_"m"_%t_$$$escClear
-#define escSeq(%e,%t) $c(27)_"["_%e_"m"_%t_$$$escClear
+#define escBg $Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("ColorScheme"),"white":47,"dark":40,:0)
+#define escGreen(%t) $Select($$$escBg=0:%t,1:$c(27)_"[1;32;"_$$$escBg_"m"_%t_$$$escClear)
+#define escBlue(%t) $Select($$$escBg=0:%t,1:$c(27)_"[1;36;"_$$$escBg_"m"_%t_$$$escClear)
+#define escDefault(%t) $Select($$$escBg=0:%t,1:$c(27)_"[1;3"_$Select($$$escBg:0,1:7)_";"_$$$escBg_"m"_%t_$$$escClear)
+#define escYellow(%t) $Select($$$escBg=0:%t,1:$c(27)_"[1;33;"_$$$escBg_"m"_%t_$$$escClear)
+#define escViolet(%t) $Select($$$escBg=0:%t,1:$c(27)_"[1;35;"_$$$escBg_"m"_%t_$$$escClear)
+#define escSeq(%e,%t) $Select($$$escBg=0:%t,1:$c(27)_"["_%e_"m"_%t_$$$escClear)
 
 #; Copied from HS.JSON.INC
 #include %occReference

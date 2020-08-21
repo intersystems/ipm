@@ -14,9 +14,9 @@ Parameter trackingId = "analytics_tracking_id";
 
 Parameter analytics = "analytics_available";
 
-Parameter BackgroundTerminalIsWhite = "BackgroundTerminalIsWhite";
+Parameter ColorScheme = "ColorScheme";
 
-Parameter CONFIGURABLE = "trackingId,analytics,BackgroundTerminalIsWhite";
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
