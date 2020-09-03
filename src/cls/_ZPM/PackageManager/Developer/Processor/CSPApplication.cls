@@ -288,6 +288,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 		}
 		
 		Set matchRoles = ..MatchRoles
+		Set matchRolesR = matchRoles
 		Set matchRoles = ..ReplaceMatchRoles(matchRoles, dbDir)
     Set pos = 0
     For {
@@ -301,6 +302,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
         Set pos = pos - 1
       }
 		}
+		If matchRoles=":" $$$ThrowOnError($$$ERROR($$$GeneralError,"Missing role "_matchRolesR))
 		Set tProperties("MatchRoles") = matchRoles
 
 		// If we have a "Serve Files Timeout" and Serve Files is set to "Always", change to "Always and Cached."
@@ -421,3 +423,4 @@ Method OnGetUniqueName(Output pUniqueName)
 }
 
 }
+
