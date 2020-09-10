@@ -82,6 +82,12 @@ Storage Default
 <Value name="9">
 <Value>Installer</Value>
 </Value>
+<Value name="10">
+<Value>Description</Value>
+</Value>
+<Value name="11">
+<Value>Repo</Value>
+</Value>
 </Data>
 <DataLocation>^ZPM.Server.ModuleD</DataLocation>
 <DefaultData>PackageDefaultData</DefaultData>

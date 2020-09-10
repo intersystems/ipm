@@ -294,10 +294,9 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <description>Shows all modules in current registry or namespaces</description>
 <example description="Shows all modules in current registry">search -r</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
-<modifier name="description" aliases="d" value="true" description="Shows description for each module. If the description is empty, then we take from the file readme.md (For this reason, slow execution is possible.)" />
-<modifier name="url-inclusions" aliases="u" dataAlias="UrlInclusion" value="true" description="Find all inclusions in url" />
+<modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
+<parameter name="searchString" description="Search string, * can be used" />
 <example description="Shows a description of all modules in the name of which there is a context">find -d *tools*</example>
-<example description="Shows all module descriptions including context by url repo">find -d * -u /rcemper/</example>
 </command>
 
 <command name="namespace" aliases="zn"> 
@@ -468,143 +467,16 @@ ClassMethod GetListNamespace(ByRef namespace)
 	Set:$Data(namespace) namespace=$G(maxlen)
 }
 
-/// Get description module
-ClassMethod Description(tModuleName, UrlInc = "", ModuleView = "")
-{
-	#define gn "^||tmpDesc"
-	Kill @$$$gn
-	Set tRegistry = ""
-	If (tModuleName["/") {
-		set $lb(tRegistry, tModuleName) = $lfs(tModuleName, "/")
-	}
-	set where=""
-		,maxlenname=0
-		,Module=""
-	If tModuleName["*" {
-		Set where="where name like ?"
-		Set Module=$Replace(tModuleName,"*","%")
-	} Elseif tModuleName'="" { 
-		Set Module=tModuleName
-		Set where="where name = ?"
-	}
-	If UrlInc'="" Set RepoOwner=$Zconvert(UrlInc,"L") Write !,"Search by repository "_RepoOwner
-	If where="" Write !,"Search the entire repository"
-	Else  Write !,"Search the repository context "_Module
-	//Load the list info registry modules
-	Set sql="select Name, Version, Repo from %ZPM_PackageManager_Developer.Utils_GetModuleList('registry') "_where
-		,rs=##class(%ResultSet).%New()
-		,sc=rs.Prepare(sql)
-	Set:sc sc=rs.Execute(Module)
-	If sc {
-		For i=1:1 {
-			Quit:'rs.%Next()  
-			Set name=rs.Get("Name")
-			Set:$l(name)>maxlenname maxlenname=$Length(name)
-			If '$Data(@$$$gn@(name,"Registry","Description")) {
-				Set (repo,url)=rs.Get("Repo")
-				If $Zconvert(url,"L")'[$Get(RepoOwner) Continue
-				Set @$$$gn@(name,"Registry")=$Listbuild(rs.Get("Version"),rs.Get("Repo"))
-				Do ..GetDescFromRepo(url,.desc,.repo,.modxml)
-				Set:ModuleView @$$$gn@(name,"Registry","Module")=$Get(modxml)
-				Set @$$$gn@(name,"Registry","Description")=$Get(desc,"no description")
-			}
-		 }
-		}
-	Else { 
-		Write !,"Not found "_tModuleName_" in current registry"
-	}
-	Set name=""
-	For { set name=$Order(@$$$gn@(name)) Quit:name=""
-		Set reg="" For { set reg=$Order(@$$$gn@(name,reg),1,data) Quit:reg=""
-			Write !,$$$escGreen(name)
-			;,?(maxlenname+1),$e(reg,1)
-			,?(maxlenname+1),$lg(data,1)
-			,?(maxlenname+7),..DrawColumn($$$escYellow("Description: ")_@$$$gn@(name,reg,"Description"))
-			,!?(maxlenname+7),$$$escBlue("Repo: "_$lg(data,2))
-			Do:name="zpm-registry" ..GetDefaultCommandRegistry()
-		}
-		
-	}
-	Quit $$$OK
-}
-
-/// draw description, code from zpmshow.mac
+/// draw description
 ClassMethod DrawColumn(desc) As %String
 {
- Set dx=$x
+	Set dx=$x
 	For d=1:1:$Length(desc," ") {
  		Set wd=$Piece(desc," ",d) 
 		If $x+$l(wd)>80 Write !,?dx
 		Write wd," " 
 	}
- Quit ""
-}
-
-/// TODO GitLab repo
-ClassMethod GetDescFromRepo(url As %String, ByRef desc, ByRef repo, ByRef modxml) As %Status
-{
-	Set desc=""
-	Set url="https://raw.githubusercontent.com"_$Piece(url,"/github.com",2)
-	If url="" {
-		Set repo="not repository"
-	}
-	Else {
-		Set:$Extract(url,*)'="/" url=url_"/"
-		Set url=url_"master/module.xml"
-		If ##class(%ZPM.PackageManager).GetDataURL(url,.modxml) {
-			Set desc=$Piece($Piece($Get(modxml),"Description>",2),"</")
-			If desc="", ##class(%ZPM.PackageManager).GetDataURL($replace(url,"module.xml","README.md"),.readme) {
-				Set d=$Translate($Extract(readme,1,300),$Char(13,10),"  ")
-				If d["](" {
-					For  { Quit:d'["]("
-						Set d=$Translate($Piece(d,"](",1),"[()","   ")_$Piece($Piece(d,"](",2,*),")",$Select($Piece(d,"](",2,*)[")":2,1:1),*)
-						
-					}
-				}
-				Set desc="from readme: "_d_"..."
-			}
-		}
-	}
-	Quit $$$OK
-}
-
-/// write $System.Status.GetErrorText(##class(%ZPM.PackageManager).GetDataURL("https://raw.githubusercontent.com/intersystems-community/zpm/master/module.xml",.o)) w o
-ClassMethod GetDataURL(url As %String, ByRef data) As %Status
-{
-	New $Namespace
-	Set data=""
- 	#dim req As %Net.HttpRequest
-	Set req=##class(%Net.HttpRequest).%New()
-	Set server=$p(url,"/",3)
-
-	If server[":" {
-		Set port=$p(server,":",2)
-		Set server=$p(server,":")
-	}
-	If $zconvert(url,"L")["https:" {
-	 	Set SSLConfig = "ZPM"
-	 	Zn "%SYS"
-	 	Do:'##class(Security.SSLConfigs).Exists(SSLConfig) ##class(Security.SSLConfigs).Create(SSLConfig)
-	 	Set req.Https=1
-		Set req.SSLConfiguration=SSLConfig
-		Set:$g(port)="" port=443
-	}
-	Set:$Get(port)="" port=80
-	Set req.Server=server
-	Set req.Port=port
-	Set location=$Piece(url,"/",4,*)
-
-	Set req.Location =location
-
-	Set st = req.Get()
-	Return:$$$ISERR(st) st
-	Return:(req.HttpResponse.StatusCode = 404) $$$ERROR($$$GeneralError,"Repository doesn't exist OR you don't have access")
-	Return:((req.HttpResponse.StatusCode = 403) && (req.HttpResponse.GetHeader("X-RATELIMIT-REMAINING")=0)) $$$ERROR($$$GeneralError,"API rate limit exceeded. Try logging in.")
- 	Return:(req.HttpResponse.StatusCode '= 200) $$$ERROR($$$GeneralError,"Received " _ req.HttpResponse.StatusCode _ " status, expected 200")
-
-	Set data=req.HttpResponse.Data.Read()
-
- 	Return $$$OK
+ 	Quit ""
 }
 
 /// Get List Modules
@@ -870,15 +742,12 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 {
 	Set tRepo = $Get(pCommandInfo("data","Repo"),0)
-	Set tModuleView = $Get(pCommandInfo("data","ModuleView"),0)
-	Set tDesc = $$$GetModifier(pCommandInfo,"description")
-	set UrlInclusion=$g(pCommandInfo("data","zpm","UrlInclusion"))
-	if tDesc'="" do ..Description(tDesc, UrlInclusion,tModuleView) q $$$OK
+	Set tDesc= $Get(pCommandInfo("data","Description"),0)
+	Set tSearchString = $Get(pCommandInfo("parameters","searchString"),"")
 	Set tName = $$$GetModifier(pCommandInfo,"name")
 	If (tName '= "") {
-		Do ..ShowModulesForRepository(tName,tRepo)
+		Do ..ShowModulesForRepository(tName, tRepo, tDesc, tSearchString)
 	} Else {
-		Write !
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
 		If (tRes.%SQLCODE < 0) {
 			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
@@ -889,7 +758,7 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 				Write !!
 			}
 			Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
-			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo)
+			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo, tDesc, tSearchString)
 		}
 		$$$ThrowOnError(tSC)
 	}
@@ -1042,19 +911,46 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0) [ Private ]
+ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "") [ Private ]
 {
-	Set tQuery = "select Name,Version,Repo from %ZPM_PackageManager_Developer.Utils_GetModuleList(?)"
-	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName)
+	#define gn "^||tmpDesc"
+	Kill @$$$gn
+	Set maxlenname = 0, where = ""
+	If pSearchString["*" {
+		Set where=" WHERE name like ?"
+	} Elseif pSearchString'="" { 
+		Set where=" WHERE name = ?"
+	}
+	Set tQuery = "SELECT Name,Version,Repo,Description FROM %ZPM_PackageManager_Developer.Utils_GetModuleList(?) "_where
+	If (pSearchString = "") {
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName)
+	} Else {
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName, $Replace(pSearchString,"*","%"))
+	}
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Write !,$$$escGreen(tRes.%Get("Name")),?35," ",tRes.%Get("Version")
-		If (pShowRepo) {
-			Write ?45," ",$$$escBlue(tRes.%Get("Repo"))
+		Set name = tRes.%Get("Name")
+		Set:($Length(name)>maxlenname) maxlenname = $Length(name)
+		Set @$$$gn@(name)=$Listbuild(tRes.%Get("Version"),tRes.%Get("Repo"),tRes.%Get("Description"))
+	}
+	Set name=""
+	For { 
+		Set name = $Order(@$$$gn@(name)) 
+		Quit:name=""
+		Write !,$$$escGreen(name)
+		Write ?(maxlenname+1), $Listget(@$$$gn@(name),1)
+		If ( ($Listget(@$$$gn@(name),3)'="") && (pShowDesc=1) ) {
+			Write ?(maxlenname+7),..DrawColumn($$$escYellow("Description: ")_$Listget(@$$$gn@(name),3))
 		}
+		If ( ($Listget(@$$$gn@(name),3)'="") && ($Listget(@$$$gn@(name),2)'="") && (pShowDesc=1) && (pShowRepo=1) ) {
+			Write !
+		}
+		If ( ($Listget(@$$$gn@(name),2)'="") && (pShowRepo=1) ) {
+			Write ?(maxlenname+7),$$$escBlue("Repo: "_$Listget(@$$$gn@(name),2))
+		}	
 	}
 }
 
@@ -1693,4 +1589,3 @@ $$$ENDTAG
 }
 
 }
-

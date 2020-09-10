@@ -525,7 +525,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 	Quit tSC
 }
 
-Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repo:%String") [ SqlProc ]
+Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repo:%String,Description:%String") [ SqlProc ]
 {
 }
 
@@ -550,7 +550,7 @@ ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String) A
 			Set tList = tClient.ListModules(tSearchCriteria)
 			For i=1:1:tList.Count() {
 				Set tMod = tList.GetAt(i)
-				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repo)
+				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repo,tMod.Description)
 			}
 		}
 		
