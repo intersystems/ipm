@@ -1365,7 +1365,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 					Set @gn@(name,"Locale","Description")=desc
 				}
 			 }
-			Set @gn@(name,"Locale")=$Get(maxlenname) 
+			Set:$GET(name)'="" @gn@(name,"Locale")=$Get(maxlenname) 
 			}
 		Else { 
 			;write !,"Not found "_tModuleName_" in current registry"
