@@ -553,15 +553,6 @@ ClassMethod GetDescFromRepo(url As %String, ByRef desc, ByRef repo, ByRef modxml
 		Set url=url_"master/module.xml"
 		If ##class(%ZPM.PackageManager).GetDataURL(url,.modxml) {
 			Set desc=$Piece($Piece($Get(modxml),"Description>",2),"</")
-			If desc="", ##class(%ZPM.PackageManager).GetDataURL($replace(url,"module.xml","README.md"),.readme) {
-				Set d=$Translate($Extract(readme,1,300),$Char(13,10),"  ")
-				If d["](" {
-					For  { Quit:d'["]("
-						Set d=$Translate($Piece(d,"](",1),"[()","   ")_$Piece($Piece(d,"](",2,*),")",$Select($Piece(d,"](",2,*)[")":2,1:1),*)
-						
-					}
-				}
-				Set desc="from readme: "_d_"..."
 			}
 		}
 	}
