@@ -9,6 +9,8 @@ Parameter XMLIGNOREINVALIDATTRIBUTE = 1;
 
 Property Name As %String(%JSONFIELDNAME = "name", MAXLEN = 255) [ Required ];
 
+Property Description As %String(%JSONFIELDNAME = "description", MAXLEN = 1000);
+
 Property Version As %ZPM.PackageManager.Core.SemanticVersion(%JSONINCLUDE = "NONE", XMLPROJECTION = "NONE") [ Required ];
 
 Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLNAME = "Version") [ Required ];

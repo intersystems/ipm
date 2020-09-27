@@ -53,6 +53,7 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
         Set tModRef.Name = item.name
         Set tModRef.Repo = item.repository
         Set tModRef.VersionString = version
+        Set tModRef.Description = item.description
         Do tList.Insert(tModRef)
       }      
     }
