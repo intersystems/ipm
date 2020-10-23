@@ -912,14 +912,16 @@ Method %Verify(ByRef pParams) As %Status
 		// Map ^UnitTest* from its home in the original namespace to the VERIFY namespace.
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Build).MapGlobalEquivalently("UnitTest*",tInitNS,tNewNamespace))
 		
-		// Install this module artifact in the VERIFY namespace.
-		Write:tVerbose !,"Installing ",..Module.Name," ",..Module.VersionString," in namespace ",tNewNamespace
-		Set $Namespace = tNewNamespace
-		Set tTmpStream = ##class(%Stream.FileBinary).%New()
-		Do tTmpStream.CopyFromAndSave(..Payload)
-		Merge tParams = pParams
-		Set tParams("Reload","ForceLocalScope") = 1
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadModuleFromArchive(..Module.Name,..Module.VersionString,tTmpStream,.tParams))
+    If (..Payload.Size) {
+      // Install this module artifact in the VERIFY namespace.
+      Write:tVerbose !,"Installing ",..Module.Name," ",..Module.VersionString," in namespace ",tNewNamespace
+      Set $Namespace = tNewNamespace
+      Set tTmpStream = ##class(%Stream.FileBinary).%New()
+      Do tTmpStream.CopyFromAndSave(..Payload)
+      Merge tParams = pParams
+      Set tParams("Reload","ForceLocalScope") = 1
+      $$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadModuleFromArchive(..Module.Name,..Module.VersionString,tTmpStream,.tParams))
+    }
 		
 		#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
 		For i=1:1:..Module.Resources.Count() {
@@ -1037,6 +1039,11 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		"MAC":"mac/",
 		"CLS":"cls/",
 		"GBL":"gbl/",
+		"X12":"i14y/",
+		"LUT":"i14y/",
+		"ESD":"i14y/",
+		"DTL":"cls/",
+		"BPL":"cls/",
 		: $$$lcase(tExtension)_"/"
 		)
 		
@@ -1046,6 +1053,8 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		"INC":$tr(tName,".%","/_")_".inc",
 		"MAC":$tr(tName,".%","/_")_".mac",
 		"CLS":$tr(tName,".%","/")_".cls",
+		"DTL":$tr(tName,".%","/")_".cls",
+		"BPL":$tr(tName,".%","/")_".cls",
 		"GBL":$tr(tName,"%,("")","___")_".xml",
 		"DFI":$tr(tName,"-","/")_".dfi",
 		: tName _ "." _$$$lcase(tExtension)

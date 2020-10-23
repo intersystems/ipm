@@ -9,15 +9,20 @@
       <Attribute Name="FilenameTranslateIdentifier"> -%</Attribute>
       <Attribute Name="FilenameTranslateAssociator">_/</Attribute>
     </Resource>
-    <!-- <Resource Name="Demo.HL7.MsgRouter.Schema.HL7">
+    <Resource Name="Test_HIPAA_5010.X12">
       <Attribute Name="Directory">misc</Attribute>
-    </Resource> -->
+    </Resource>
+    <Resource Name="hl7_2.5.LUT">
+      <Attribute Name="Directory">misc</Attribute>
+    </Resource>
     <Resource Name="ResourceTest.APackage.PKG">
       <Attribute Name="CompileAfter">ResourceTest.MAC</Attribute>
       <Attribute Name="Flags">ck /multi=0</Attribute>
     </Resource>
-    <Resource Name="ResourceTest.MyClass.CLS">
-    </Resource>
+    <Resource Name="ResourceTest.SomeClass.CLS"/>
+    <Resource Name="ResourceTest.MyClass.CLS"/>
+    <Resource Name="ResourceTest.TestDTL.dtl"/>
+    <Resource Name="ResourceTest.TestBPL.bpl"/>
     <Resource Name="ResourceTest.INC">
     </Resource>
     <Resource Name="ResourceTest.MAC">

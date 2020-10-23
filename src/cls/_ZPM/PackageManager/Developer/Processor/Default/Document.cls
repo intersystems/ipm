@@ -115,22 +115,24 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 										Set tDocName = $Piece(tDocName, "/", 1, *-1) _ "-" _ $Piece(tDocName, "/", *)
 									}
 								}
+                Set tFlags = $Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile"
+                set tSC = $System.OBJ.Load(tResourcePath, tFlags)
 
-								// Slimmed down version of %Api.Atelier.v1:PutDoc
-								If ##class(%Atelier.v1.Utils.General).ValidateDocName(tDocName,.tSC,.tCategory) {
-									Set tFileStream = ##class(%Stream.FileCharacter).%New()
-									$$$ThrowOnError(tFileStream.LinkToFile(tResourcePath))
-									Kill tDocArray
-									While 'tFileStream.AtEnd {
-										Set tDocArray($i(tDocArray(0))) = tFileStream.ReadLine($$$MaxLocalLength,.tSC)
-										$$$ThrowOnError(tSC)
-									}
-									Set tSC = ##class(%Atelier.v1.Utils.TextServices).SetTextFromArray(.tDocArray,,tDocName,tCategory)
-									$$$ThrowOnError(tSC)
-									If tVerbose {
-										Write !,"Loaded "_tDocName
-									}
-								}
+								#; // Slimmed down version of %Api.Atelier.v1:PutDoc
+								#; If ##class(%Atelier.v1.Utils.General).ValidateDocName(tDocName,.tSC,.tCategory) {
+								#; 	Set tFileStream = ##class(%Stream.FileCharacter).%New()
+								#; 	$$$ThrowOnError(tFileStream.LinkToFile(tResourcePath))
+								#; 	Kill tDocArray
+								#; 	While 'tFileStream.AtEnd {
+								#; 		Set tDocArray($i(tDocArray(0))) = tFileStream.ReadLine($$$MaxLocalLength,.tSC)
+								#; 		$$$ThrowOnError(tSC)
+								#; 	}
+								#; 	Set tSC = ##class(%Atelier.v1.Utils.TextServices).SetTextFromArray(.tDocArray,,tDocName,tCategory)
+								#; 	$$$ThrowOnError(tSC)
+								#; 	If tVerbose {
+								#; 		Write !,"Loaded "_tDocName
+								#; 	}
+								#; }
 							}
 						} Else {
 							Set tFlags = $Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile"

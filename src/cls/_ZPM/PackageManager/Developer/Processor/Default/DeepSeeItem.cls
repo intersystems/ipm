@@ -3,7 +3,7 @@ Class %ZPM.PackageManager.Developer.Processor.Default.DeepSeeItem Extends %ZPM.P
 
 Parameter EXTENSION = ".DFI";
 
-Parameter ATTRIBUTES As STRING = "Directory,Keywords";
+Parameter ATTRIBUTES As STRING = "Directory,Keywords,FilenameTranslateIdentifier,FilenameTranslateAssociator";
 
 /// Export format
 Property Format As %String;
@@ -13,6 +13,10 @@ Property Directory As %String(MAXLEN = "") [ InitialExpression = "dfi" ];
 Property FilenameExtension As %String [ InitialExpression = "xml" ];
 
 Property Keywords As %String;
+
+Property FilenameTranslateIdentifier As %String [ InitialExpression = "-%,("")" ];
+
+Property FilenameTranslateAssociator As %String [ InitialExpression = "/___" ];
 
 Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
@@ -69,7 +73,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 Set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
                 
                 If '..ResourceReference.Preload {
-                    Set tResourcePath = tResourceDirectory_$tr(tName,"-%,("")","/___")_".xml"
+                    Set tResourcePath = tResourceDirectory_$tr(tName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_".xml"
                     Set tSC = $System.OBJ.Load(tResourcePath,$Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile")
                     If $$$ISERR(tSC) {
                         Quit
