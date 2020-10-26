@@ -1,5 +1,5 @@
 name: CI
-on: 
+on:
   push:
     branches:
       - master
@@ -8,129 +8,182 @@ on:
       - master
   release:
     types:
-      - created
+      - released
+env:
+  PREVIOUS: 2019.4.0.383.0
+  CURRENT: 2020.1.0.215.0
+  LATEST: 2020.4.0.521.0
 jobs:
   build:
     timeout-minutes: 20
     strategy:
       matrix:
-        image: [
-          "store/intersystems/iris-community:2019.4.0.383.0",
-          "store/intersystems/irishealth-community:2019.4.0.383.0",
-          "store/intersystems/iris-community:2020.1.0.215.0",
-          "store/intersystems/irishealth-community:2020.1.0.215.0",
-          "store/intersystems/iris-community:2020.4.0.521.0",
-          "store/intersystems/irishealth-community:2020.4.0.521.0"
-        ]
+        version: [previous, current, latest]
+        platform: [common, health]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
+      - run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
       - name: Dump GitHub context
         env:
           GITHUB_CONTEXT: ${{ toJson(github) }}
         run: echo "$GITHUB_CONTEXT"
-      - name: Set release version
-        if: github.event_name == 'release'
+      - name: Set image
+        id: image
         run: |
-          VERSION=${{ github.event.release.tag_name }}
+          IMAGE=store/intersystems/iris-community
+          [ '${{ matrix.platform }}' == 'health' ] && IMAGE=store/intersystems/irishealth-community
+          VERSION=${{ env.CURRENT }}
+          [ '${{ matrix.version }}' == 'previous' ] && VERSION=${{ env.PREVIOUS }}
+          [ '${{ matrix.version }}' == 'latest' ] && VERSION=${{ env.LATEST }}
+          echo ::set-output name=name::${IMAGE}:${VERSION}
+      - name: Setup version
+        id: version
+        run: |
+          VERSION=`grep -oPm1 "(?<=<Version>)[^<]+" module.xml | cut -d- -f1`
+          git tag -l | cat
+          [ $GITHUB_EVENT_NAME == 'release' ] && VERSION=${{ github.event.release.tag_name }} && VERSION=${VERSION/v/}
+          [ $GITHUB_EVENT_NAME == 'push' ] && VERSION+=-beta && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f4)+1))
+          [ $GITHUB_EVENT_NAME == 'pull_request' ] && VERSION+=-dev.${{ github.event.pull_request.number }}
           sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION/v/}<\/Version>/" module.xml
           cat module.xml
+          echo ::set-output name=number::${VERSION}
       - name: Build
-        run: docker build --rm --build-arg BASE=${{ matrix.image }} -t zpm .
+        run: docker build --rm --build-arg BASE=${{ steps.image.outputs.name }} -t zpm .
       - name: Run temporary registry
         timeout-minutes: 15
         run: |
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
-            docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
-            docker network create zpm
-            mkdir -p /tmp/registry/
-            rm -rf /tmp/registry/password.*
-            echo securepassword > /tmp/registry/password.txt
-            docker run --init --rm -d \
-              --network zpm \
-              --name registry \
-              --network-alias registry \
-              -p 52773:52773 \
-              -v /tmp/registry:/home/irisowner/registry \
-              docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
-              -p /home/irisowner/registry/password.txt
-            REGISTRY=`docker ps -lq`
-            while [ "`docker container inspect -f {{.State.Health.Status}} $REGISTRY`" != "healthy" ]; do echo Waiting container; sleep 1; done
-      - name: Test and Verify 
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
+          docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
+          docker network create zpm
+          mkdir -p /tmp/registry/
+          rm -rf /tmp/registry/password.*
+          echo securepassword > /tmp/registry/password.txt
+          docker run --init --rm -d \
+            --network zpm \
+            --name registry \
+            --network-alias registry \
+            -p 52773:52773 \
+            -v /tmp/registry:/home/irisowner/registry \
+            docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
+            -p /home/irisowner/registry/password.txt
+          REGISTRY=`docker ps -lq`
+          while [ "`docker container inspect -f {{.State.Health.Status}} $REGISTRY`" != "healthy" ]; do echo Waiting container; sleep 1; done
+      - name: Test and Verify
         timeout-minutes: 15
         run: |
-            docker run --network zpm -d --rm --init \
-              -e TEST_REGISTRY=http://registry:52773/registry/ \
-              -e TEST_REGISTRY_USER=admin \
-              -e TEST_REGISTRY_PASSWORD=securepassword \
-              zpm
-            CONTAINER=`docker ps -lq`
-            while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
-            /bin/echo -e '' \
-              'zpm "list":1\n' \
-              'zpm "zpm test":1\n' \
-              'zpm "zpm verify":1' \
-              'halt\n' \
-            | docker exec -i $CONTAINER iris session iris -U%SYS
-            docker stop $CONTAINER
+          docker run --network zpm -d --rm --init \
+            -e TEST_REGISTRY=http://registry:52773/registry/ \
+            -e TEST_REGISTRY_USER=admin \
+            -e TEST_REGISTRY_PASSWORD=securepassword \
+            zpm
+          CONTAINER=`docker ps -lq`
+          while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          /bin/echo -e '' \
+            'zpm "list":1\n' \
+            'zpm "zpm test":1\n' \
+            'zpm "zpm verify":1' \
+            'halt\n' \
+          | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker stop $CONTAINER
       - name: Test and publish to temporary registry
         timeout-minutes: 15
         run: |
-            docker run --network zpm -d --rm --init zpm
-            CONTAINER=`docker ps -lq`
-            while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
-            /bin/echo -e '' \
-              'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
-              'zpm "repo -list":1\n' \
-              'zpm "install dsw":1\n' \
-              'zpm "list":1\n' \
-              'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password securepassword":1\n' \
-              'zpm "zpm publish -v":1' \
-              'halt\n' \
-            | docker exec -i $CONTAINER iris session iris -U%SYS
-            docker stop $CONTAINER
+          docker run --network zpm -d --rm --init zpm
+          CONTAINER=`docker ps -lq`
+          while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          /bin/echo -e '' \
+            'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
+            'zpm "repo -list":1\n' \
+            'zpm "install dsw":1\n' \
+            'zpm "list":1\n' \
+            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password securepassword":1\n' \
+            'zpm "zpm publish -v":1' \
+            'halt\n' \
+          | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker stop $CONTAINER
       - name: Clean install current version and test new one
         timeout-minutes: 15
         run: |
-            wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
-            docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ matrix.image }}
-            CONTAINER=`docker ps -lq`
-            while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
-            /bin/echo -e '' \
-              'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
-              'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
-              'zpm "list":1\n' \
-              'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/""":1\n' \
-              'zpm "install zpm":1\n' \
-              'zpm "install dsw":1\n' \
-              'zpm "list":1\n' \
-              'halt\n' \
-            | docker exec -i $CONTAINER iris session iris -U%SYS
-            docker stop $CONTAINER
-      - name: Clean install and test 
+          wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
+          docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }}
+          CONTAINER=`docker ps -lq`
+          while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          /bin/echo -e '' \
+            'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
+            'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
+            'zpm "list":1\n' \
+            'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/""":1\n' \
+            'zpm "install zpm":1\n' \
+            'zpm "install dsw":1\n' \
+            'zpm "list":1\n' \
+            'halt\n' \
+          | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker stop $CONTAINER
+      - name: Clean install and test
         timeout-minutes: 15
         run: |
-            wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
-            docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ matrix.image }}
-            CONTAINER=`docker ps -lq`
-            while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
-            /bin/echo -e '' \
-              'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
-              'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
-              'zpm "list":1\n' \
-              'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
-              'zpm "install dsw":1\n' \
-              'zpm "list":1\n' \
-              'halt\n' \
-            | docker exec -i $CONTAINER iris session iris -U%SYS
-            docker stop $CONTAINER
+          wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
+          docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }}
+          CONTAINER=`docker ps -lq`
+          while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          /bin/echo -e '' \
+            'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
+            'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
+            'zpm "list":1\n' \
+            'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
+            'zpm "install dsw":1\n' \
+            'zpm "list":1\n' \
+            'halt\n' \
+          | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker stop $CONTAINER
+      - name: Prepare XML Installer
+        timeout-minutes: 15
+        run: |
+          wget http://localhost:52773/registry/packages/zpm/latest/installer -O zpm-${{ steps.version.outputs.number }}.xml
       - name: Stop temporary registry
         run: |
-            docker stop registry
-            docker network rm zpm
+          docker stop registry
+          docker network rm zpm
+      - uses: actions/upload-artifact@v2
+        if: matrix.version == 'current' && matrix.platform == 'common'
+        with:
+          name: zpm-${{ steps.version.outputs.number }}
+          path: zpm-${{ steps.version.outputs.number }}.xml
+      - name: Create Beta Release
+        id: create_release
+        uses: actions/create-release@v1
+        if: github.event_name == 'push' && matrix.version == 'current' && matrix.platform == 'common'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.number }}
+          release_name: v${{ steps.version.outputs.number }}
+          prerelease: ${{ github.event_name != 'release' }}
+      - name: Upload Beta Release Asset
+        uses: actions/upload-release-asset@v1
+        if: github.event_name == 'push' && matrix.version == 'current' && matrix.platform == 'common'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: zpm-${{ steps.version.outputs.number }}.xml
+          asset_name: zpm-${{ steps.version.outputs.number }}.xml
+          asset_content_type: text/xml
+      - name: Upload Public Release Asset
+        uses: actions/upload-release-asset@v1
+        if: github.event_name == 'release' && matrix.version == 'current' && matrix.platform == 'common'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: zpm-${{ steps.version.outputs.number }}.xml
+          asset_name: zpm-${{ steps.version.outputs.number }}.xml
+          asset_content_type: text/xml
       - name: Publish release
-        if: github.event_name == 'release' && matrix.image == 'store/intersystems/iris-community:2020.1.0.215.0'
+        if: github.event_name == 'release' && matrix.version == 'current' && matrix.platform == 'common'
         run: |
+          [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
             docker run -d --rm --init zpm
             CONTAINER=`docker ps -lq`
             while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
@@ -141,4 +194,25 @@ jobs:
               'halt\n' \
             | docker exec -i $CONTAINER iris session iris -U%SYS
             docker stop $CONTAINER
-
+          ) || true
+  bump-release-version:
+    name: bump release version
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: build
+    steps:
+      - uses: actions/checkout@master
+        with:
+          ref: master
+      - run: |
+          VERSION=${{ github.event.release.tag_name }} && VERSION=${VERSION/v/}
+          NEXT_VERSION=`echo $VERSION | awk -F. '/[0-9]+\./{$NF++;print}' OFS=.`
+          [ $NEXT_VERSION != $VERSION ] && (
+            sed -i -E "s/<Version>(.*)<\/Version>/<Version>${NEXT_VERSION/v/}-SNAPSHOT<\/Version>/" module.xml
+            cat module.xml
+            git config --global user.name 'ProjectBot'
+            git config --global user.email 'bot@users.noreply.github.com'
+            git add module.xml
+            git commit -m 'auto bump version with release'
+            git push
+          )
