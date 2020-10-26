@@ -52,7 +52,15 @@ Method %Package(ByRef pParams) As %Status
 	Set tSC = $$$OK
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
-		
+		Set tExportDirectory = $Get(pParams("zpm", "Path"))
+		If (tExportDirectory'="") && ('##class(%File).DirectoryExists(tExportDirectory)) {
+      Set tExportDirectory = ##class(%File).NormalizeDirectory(tExportDirectory)
+			If '##class(%File).CreateDirectoryChain(tExportDirectory,.tReturn) {
+				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",tExportDirectory,tReturn))
+				Quit
+			}
+		}
+
 		Set tSC = ..%Export(.pParams,.tExportDirectory)
 		If $$$ISERR(tSC) {
 			Quit
@@ -63,7 +71,7 @@ Method %Package(ByRef pParams) As %Status
 			Quit
 		}
 		
-		Write !,"Module exported to:",!,$c(9),tExportDirectory,!
+		Write !,"Module exported to:",!,$Char(9),tExportDirectory,!
 		
 		Set tTgzFile = $Extract(tExportDirectory,1,*-1)_".tgz"
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Archive).Create(tExportDirectory,tTgzFile,.tOutput)
@@ -76,7 +84,7 @@ Method %Package(ByRef pParams) As %Status
 		}
 		
 		// Always show this message
-		Write !,"Module package generated:",!,$c(9),tTgzFile
+		Write !,"Module package generated:",!,$Char(9),tTgzFile
 		
 		Set tSrcFileStream = ##class(%Stream.FileBinary).%New()
 		Set tSC = tSrcFileStream.LinkToFile(tTgzFile)
