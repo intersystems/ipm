@@ -455,9 +455,9 @@ Method %Reload(ByRef pParams) As %Status
 			If $IsObject(tResource.Processor) {
 				Set tSC = tResource.Processor.OnPhase("Reload",.pParams)
 			}
-		}
-		If $$$ISERR(tSC) {
-			Quit
+      If $$$ISERR(tSC) {
+        Quit
+      }
 		}
 		
 	} Catch e {

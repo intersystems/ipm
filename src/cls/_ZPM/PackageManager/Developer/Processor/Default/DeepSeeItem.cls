@@ -14,9 +14,13 @@ Property FilenameExtension As %String [ InitialExpression = "xml" ];
 
 Property Keywords As %String;
 
-Property FilenameTranslateIdentifier As %String [ InitialExpression = "-%,("")" ];
+/// Characters in the filename to use as the identifier in $translate when determining the resource's filename on disk
+/// The default behavior is to replace "." with "/" and ignore "%"
+Property FilenameTranslateIdentifier As %String [ InitialExpression = "-% ,("")" ];
 
-Property FilenameTranslateAssociator As %String [ InitialExpression = "/___" ];
+/// Characters in the filename to use as the associator in $translate when determining the resource's filename on disk
+/// The default behavior is to replace "." with "/" and ignore "%"
+Property FilenameTranslateAssociator As %String [ InitialExpression = "/_____" ];
 
 Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
@@ -54,32 +58,43 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
         Set tRoot = ..ResourceReference.Module.Root
 
         If (pPhase = "Reload") {
-            If '..ResourceReference.Generated { 
+            If '..ResourceReference.Generated,'..ResourceReference.Preload { 
                 Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
                 Set tResourceDirectory = tRoot_"/"_tSubDirectory
                 
                 Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-                If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
+                If tSourceRoot'="","\/"'[$Extract(tSourceRoot, *) {
                     Set tSourceRoot = tSourceRoot _ "/"
                 }
 
                 Set tDirectory = ..Directory
-                If tDirectory'="","\/"'[$EXTRACT(tDirectory, *) {
+                If tDirectory'="","\/"'[$Extract(tDirectory, *) {
                     Set tDirectory = tDirectory _ "/"
                 } Else {
                     Set tDirectory = "dfi/"
                 }
 
                 Set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
-                
-                If '..ResourceReference.Preload {
-                    Set tResourcePath = tResourceDirectory_$tr(tName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_".xml"
-                    Set tSC = $System.OBJ.Load(tResourcePath,$Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile")
-                    If $$$ISERR(tSC) {
-                        Quit
-                    }
+
+                If (tName [ "*") {
+                  Set tName = $Translate(tName, "*"_..FilenameTranslateIdentifier, "*"_..FilenameTranslateAssociator)
+                  Set tWildcards = tName_".xml"
+                  If $$$isUNIX Set tWildcards = $$$ucase(tWildcards)_";"_$$$lcase(tWildcards)
+                  Do ##class(%ZPM.PackageManager.Developer.File).FindFiles(tResourceDirectory, tWildcards, .tList)
+                } Else {
+                  Set tName = $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator) _ ".xml"
+                  Set tList($Increment(tList)) = $ListBuild(tName, tResourceDirectory _ tName) 
                 }
-            }
+
+                For i=1:1:tList {
+  								Set $ListBuild(tDocName, tResourcePath) = tList(i)
+
+                  Set tSC = $System.OBJ.Load(tResourcePath,$Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile")
+                  If $$$ISERR(tSC) {
+                    Quit
+                  }
+                }
+              }
         }
 
     } Catch e {
@@ -99,16 +114,16 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
         Set tItemName = $Piece(tItem, "." , 1, *-1)
         Set tFullName = ##class(%DeepSee.UserLibrary.FolderItem).fullNameFromDocumentName(tItem)
         #dim tObj As %DeepSee.UserLibrary.FolderItem = ##class(%DeepSee.UserLibrary.Utils).%OpenFolderItem(tFullName, .tSC)
-        If ('$ISOBJECT(tObj)) {
+        If ('$IsObject(tObj)) {
             Kill pResourceArray(tItem)
             Continue
         }
         If (..Keywords'="") {
-            Set tKeywords = $LISTFROMSTRING(tObj.keywords)
-            Set tDesiredKeywords = $LISTFROMSTRING(..Keywords)
+            Set tKeywords = $ListFromString(tObj.keywords)
+            Set tDesiredKeywords = $ListFromString(..Keywords)
             Set tGood = 1
-            For i=1:1:$LISTLENGTH(tDesiredKeywords) {
-                If ('$LISTFIND(tKeywords, $LISTGET(tDesiredKeywords, i))) {
+            For i=1:1:$ListLength(tDesiredKeywords) {
+                If ('$ListFind(tKeywords, $ListGet(tDesiredKeywords, i))) {
                     Set tGood = 0
                     Quit
                 }
@@ -119,10 +134,10 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
             }
         }
         Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-        If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
+        If tSourceRoot'="","\/"'[$Extract(tSourceRoot, *) {
             Set tSourceRoot = tSourceRoot _ "/"
         }
-        Set tItemName = $TRANSLATE(tItemName, "-", "/")
+        Set tItemName = $Translate(tItemName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)
         Set pResourceArray(tItem,"RelativePath") = tSourceRoot_..Directory_"/"_tItemName_"."_..FilenameExtension
     }
     Quit $$$OK
