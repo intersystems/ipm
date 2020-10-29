@@ -62,6 +62,11 @@ ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary
 		"LOC":"LocalizedErrorMessages",
 		"GBL":"Global",
 		"DFI":"DeepSeeItem",
+		"LUT":"Interoperability",
+		"X12":"Interoperability",
+		"ESD":"Interoperability",
+		"DTL":"Class",
+		"BPL":"Class",
 		:"Document")
 	If (tShortName = "") {
 		Quit ""

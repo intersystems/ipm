@@ -9,6 +9,8 @@ Property Format As %String(VALUELIST = ",UDL,XML");
 
 Property FilenameExtension As %String [ InitialExpression = "cls" ];
 
+Property Directory As %String(MAXLEN = "") [ InitialExpression = "cls" ];
+
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
