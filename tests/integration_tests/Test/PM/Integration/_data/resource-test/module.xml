@@ -5,10 +5,7 @@
   <Version>0.0.1+snapshot</Version>
   <Packaging>module</Packaging>
   <Resources>
-    <Resource Name="Sample Operational Reports-Auditing Overview.dashboard.DFI">
-      <Attribute Name="FilenameTranslateIdentifier"> -%</Attribute>
-      <Attribute Name="FilenameTranslateAssociator">_/</Attribute>
-    </Resource>
+    <Resource Name="Sample Operational Reports-Auditing Overview.dashboard.DFI"/>
     <Resource Name="Test_HIPAA_5010.X12">
       <Attribute Name="Directory">misc</Attribute>
     </Resource>
