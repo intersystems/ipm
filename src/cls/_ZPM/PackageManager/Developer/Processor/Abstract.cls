@@ -26,7 +26,7 @@ Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceRefere
 
 Method SetParams(ByRef pParams) As %Status
 {
-	if ($Data(pParams)) {
+	If ($Data(pParams)) {
 		Merge ..Params = pParams
 		Do ..CopyAttributes()
 		Do ..ApplyDefaults()
@@ -46,13 +46,18 @@ Method CopyAttributes() [ CodeMode = objectgenerator, Private ]
 					Set tMsg = $$$FormatText("Invalid property in ATTRIBUTES list: '%1'",tAttribute)
 					$$$ThrowStatus($$$ERROR($$$GeneralError,tMsg))
 				}
-				Do %code.WriteLine(" Set tIsDefined = ..ResourceReference.Attributes.IsDefined("""_tAttribute_""")")
-				Do %code.WriteLine(" If tIsDefined {")
-				Do %code.Write("  Set .."_tAttribute_" = ")
-				Set tDataType = $$$comMemberKeyGet(%compiledclass.Name,$$$cCLASSproperty,tAttribute,$$$cPROPruntimetype)
-				Set tAttrValue = "..%Evaluate(..ResourceReference.Attributes.GetAt("""_tAttribute_"""))"
-				Do %code.WriteLine("$Select($$$comMemberDefined($classname(),$$$cCLASSmethod,"""_tAttribute_"XSDToLogical""):$classmethod($classname(),"""_tAttribute_"XSDToLogical"","_tAttrValue_"),1:"_tAttrValue_")")
-				Do %code.WriteLine(" }")
+        Set tProps = $ListFromString($$$defMemberKeyGet(%compiledclass.Name,$$$cCLASSproperty,tAttribute,$$$cPROPaliases))
+        Set tProps = tProps _ $lb(tAttribute)
+        set tPtr1 = 0
+        while $ListNext(tProps, tPtr1, tAttribute) {
+          Do %code.WriteLine(" Set tIsDefined = ..ResourceReference.Attributes.IsDefined("""_tAttribute_""")")
+          Do %code.WriteLine(" If tIsDefined {")
+          Do %code.Write("  Set .."_tAttribute_" = ")
+          Set tDataType = $$$comMemberKeyGet(%compiledclass.Name,$$$cCLASSproperty,tAttribute,$$$cPROPruntimetype)
+          Set tAttrValue = "..%Evaluate(..ResourceReference.Attributes.GetAt("""_tAttribute_"""))"
+          Do %code.WriteLine("$Select($$$comMemberDefined($classname(),$$$cCLASSmethod,"""_tAttribute_"XSDToLogical""):$classmethod($classname(),"""_tAttribute_"XSDToLogical"","_tAttrValue_"),1:"_tAttrValue_")")
+          Do %code.WriteLine(" }")
+        }
 			}
 		}
 		
@@ -71,7 +76,7 @@ Method ApplyDefaults()
 		Set tDefault = tDefaults.GetAt(tDefaultIndex)
 		If tDefault.%IsA("%ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault") {
 			#dim tDefault As %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault
-			Set tThisClass = $classname()
+			Set tThisClass = $ClassName()
 			Set tFullClass = $$$DefaultProcessorPackageDot_tDefault.Class
 			If (tThisClass = tDefault.Class) || (tThisClass = tFullClass) {
 				Set tSatisfiesConditions = 1
@@ -230,15 +235,22 @@ Method %Evaluate(pAttrValue) As %String [ Internal ]
 	}
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$namespace\}",$Namespace)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{namespace\}",$Namespace)
-	Set tMgrDir = ##class(%File).ManagerDirectory()
+  Set tInstallDir = $System.Util.InstallDirectory()
+	Set tMgrDir = $System.Util.ManagerDirectory()
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$mgrdir\}",tMgrDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{mgrdir\}",tMgrDir)
-	Set tCSPDir = ##class(%File).NormalizeDirectory(##class(%File).ParentDirectoryName(tMgrDir)_"/csp")
+	Set tCSPDir = ##class(%File).NormalizeDirectory("csp", tInstallDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$cspdir\}",tCSPDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{cspdir\}",tCSPDir)
 	Set tRoot = $Case(..ResourceReference.Module.Root,"":"",:##class(%File).NormalizeDirectory(..ResourceReference.Module.Root))
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$root\}",tRoot)
 	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{root\}",tRoot)
+  Set tBinDir = $System.Util.BinaryDirectory()
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$bindir\}",tBinDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{bindir\}",tBinDir)
+  Set tLibDir = ##class(%File).NormalizeDirectory("lib", tInstallDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$libdir\}",tLibDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{libdir\}",tLibDir)
 	Quit tAttrValue
 }
 
