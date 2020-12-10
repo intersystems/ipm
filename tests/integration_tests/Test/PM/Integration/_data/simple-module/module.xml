@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="simplemodule.ZPM">
+    <Module>
+      <Name>simplemodule</Name>
+      <Version>0.0.1+snapshot</Version>
+      <Packaging>application</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="Test.pkg"/>
+      <Invoke Class="%EnsembleMgr" Method="EnableNamespace" Phase="Compile" When="Before" CheckStatus="true">
+        <Arg>${namespace}</Arg>
+        <Arg>${verbose}</Arg>
+      </Invoke>
+    </Module>
+  </Document>
+</Export>

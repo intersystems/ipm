@@ -4,6 +4,10 @@
   <Name>SimpleApp</Name>
   <Version>0.0.1+snapshot</Version>
   <Packaging>application</Packaging>
+  <Invoke Class="%EnsembleMgr" Method="EnableNamespace" Phase="Compile" When="Before" CheckStatus="true">
+    <Arg>${namespace}</Arg>
+    <Arg>${verbose}</Arg>
+  </Invoke>
   <Resources>
     <Resource Name="TSL.SimpleAppInclude.INC" Preload="true">
     </Resource>
