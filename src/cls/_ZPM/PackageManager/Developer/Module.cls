@@ -149,14 +149,35 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 						set tSC = $method(tResource.Processor,"OnBeforePhase",tOnePhase,.pParams) quit:$$$ISERR(tSC)
 					}
 				}
-				quit:$$$ISERR(tSC)
+				Quit:$$$ISERR(tSC)
+
+        #; Call Invoke Methods		
+        Set tKey = ""
+        For {
+          Set tInvoke = tModule.Invokes.GetNext(.tKey)
+          Quit:(tKey = "")
+          Set tSC = tInvoke.OnBeforePhase(tOnePhase,.pParams)
+          Quit:$$$ISERR(tSC)
+        }
+        Quit:$$$ISERR(tSC)
+
 				; call OnBeforePhase for this class
 				set tSC = tLifecycle.OnBeforePhase(tOnePhase,.pParams) quit:$$$ISERR(tSC)
 				;
 				set tSC = $method(tLifecycle,"%"_tOnePhase,.pParams) quit:$$$ISERR(tSC)
 				;
 				; call OnAfterPhase for this class
-				set tSC = tLifecycle.OnAfterPhase(tOnePhase,.pParams) quit:$$$ISERR(tSC)
+
+        #; Call Invoke Methods After Phase	
+        Set tKey = ""
+        For {
+          Set tInvoke = tModule.Invokes.GetNext(.tKey)
+          Quit:(tKey = "")
+          Set tSC = tInvoke.OnAfterPhase(tOnePhase,.pParams)
+          Quit:$$$ISERR(tSC)
+        }
+        Quit:$$$ISERR(tSC)
+
 				; notify resource processors
 				set tKey="" for {
 					set tResource = tModule.Resources.GetNext(.tKey) quit:(tKey="")			
@@ -871,6 +892,44 @@ Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List
 	from %ZPM_PackageManager_Developer.Module_Dependencies
 	where Dependencies_Name = :pOfModuleName and
 		(:pExcludeModuleNames is null or "Module"->Name not %INLIST :pExcludeModuleNames)
+}
+
+ClassMethod %RegExReplace(pString, pName, pValue) As %String [ Private ]
+{
+  Set tRegEx = "(?i)\{\$" _ pName _ "\}"
+	Set value =  ##class(%Regex.Matcher).%New(tRegEx, pString).ReplaceAll($Replace(pValue,"\","\\"))
+  Set tRegEx = "(?i)\$\{" _ pName _ "\}"
+	Set value =  ##class(%Regex.Matcher).%New(tRegEx, pString).ReplaceAll($Replace(pValue,"\","\\"))
+  Quit value
+}
+
+/// Evaluates an expression in an attribute
+/// Current valid expressions:
+/// {$namespace} - the current namespace
+/// {$mgrdir} - the instance's mgr directory
+/// {$cspdir} - the instance's root CSP directory
+/// {$root} - the resource's module's root directory
+/// These special expressions are case-insensitive.
+Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
+{
+	Set tAttrValue = pAttrValue
+	Set tRoot = $Case(..Root,"":"",:##class(%File).NormalizeDirectory(..Root))
+  Set tInstallDir = $System.Util.InstallDirectory()
+	Set tMgrDir = $System.Util.ManagerDirectory()
+  Set tBinDir = $System.Util.BinaryDirectory()
+	Set tCSPDir = ##class(%File).NormalizeDirectory("csp", tInstallDir)
+  Set tLibDir = ##class(%File).NormalizeDirectory("lib", tInstallDir)
+  Set tVerbose = +$Get(pParams("Verbose"))
+
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "namespace", $Namespace)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "ns", $Namespace)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "mgrdir",    tMgrDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "cspdir",    tCSPDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "root",      tRoot)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "bindir",    tBinDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "libdir",    tLibDir)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "verbose",   tVerbose)
+	Quit tAttrValue
 }
 
 Storage Default

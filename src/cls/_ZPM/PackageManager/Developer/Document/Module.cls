@@ -393,11 +393,11 @@ XData InternalXSL
     <xsl:for-each select="@*">
       <xsl:element name="Attribute">
         <xsl:attribute name="Name">
-        <xsl:choose>
-		  <xsl:when test="name()='SourcePath'">Path</xsl:when>
-		  <xsl:when test="name()='DeployPath'">Directory</xsl:when>
-		  <xsl:otherwise><xsl:value-of select="name()" /></xsl:otherwise>
-		</xsl:choose>
+          <xsl:choose>
+            <xsl:when test="name()='SourcePath'">Path</xsl:when>
+            <xsl:when test="name()='DeployPath'">Directory</xsl:when>
+            <xsl:otherwise><xsl:value-of select="name()" /></xsl:otherwise>
+          </xsl:choose>
         </xsl:attribute>
         <xsl:value-of select="." />
       </xsl:element>
@@ -411,7 +411,7 @@ XData InternalXSL
 				<xsl:attribute name="ProcessorClass">
 					<xsl:value-of select="name()" />
 				</xsl:attribute>
-			</xsl:if>
+      </xsl:if>
       <xsl:attribute name="Name">
         <xsl:value-of select="@*[name()=$name]" />
       </xsl:attribute>
@@ -444,6 +444,11 @@ XData InternalXSL
     </xsl:call-template>
   </xsl:template>
 
+  <xsl:template match="Module/Invoke">
+    <xsl:element name="Invokes">
+      <xsl:copy-of select="." />
+    </xsl:element>
+  </xsl:template>
   <xsl:template match="Module/Resource">
     <xsl:call-template name="resource">
       <xsl:with-param name="name" select="'Name'" />
