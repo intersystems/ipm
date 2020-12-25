@@ -233,30 +233,8 @@ Method %Evaluate(pAttrValue) As %String [ Internal ]
 		Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
 		Set tAttrValue = ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	}
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$namespace\}",$Namespace)
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{namespace\}",$Namespace)
-  Set tInstallDir = $System.Util.InstallDirectory()
-	Set tMgrDir = $System.Util.ManagerDirectory()
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$mgrdir\}",tMgrDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{mgrdir\}",tMgrDir)
-	Set tCSPDir = ##class(%File).NormalizeDirectory("csp", tInstallDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$cspdir\}",tCSPDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{cspdir\}",tCSPDir)
-	Set tRoot = $Case(..ResourceReference.Module.Root,"":"",:##class(%File).NormalizeDirectory(..ResourceReference.Module.Root))
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$root\}",tRoot)
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{root\}",tRoot)
-  Set tBinDir = $System.Util.BinaryDirectory()
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$bindir\}",tBinDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{bindir\}",tBinDir)
-  Set tLibDir = ##class(%File).NormalizeDirectory("lib", tInstallDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\{\$libdir\}",tLibDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue,"(?i)\$\{libdir\}",tLibDir)
-	Quit tAttrValue
-}
 
-ClassMethod %RegExReplace(pString, pRegEx, pValue) As %String [ Private ]
-{
-	Quit ##class(%Regex.Matcher).%New(pRegEx,pString).ReplaceAll($Replace(pValue,"\","\\"))
+  Quit ..ResourceReference.Module.%Evaluate(tAttrValue)
 }
 
 ClassMethod GetDescription(pClassName As %String) As %String [ SqlProc ]

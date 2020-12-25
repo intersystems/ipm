@@ -294,26 +294,6 @@ Method %Configure(ByRef pParams) As %Status
 			// Call OnConfigureComponent
 			Set tSC = $ClassMethod(..Module.InstallerClass,"OnConfigureComponent",$Namespace,tVerbose,.tVars)
 		}
-
-		// Call Invoke Methods
-		
-		Set key = ""
-		For {
-			Set invoke = ..Module.Invokes.GetNext(.key)
-			Quit:(key = "")
-			Set args = 0
-			Do invoke.GetArgsArray(.args)
-
-			Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateArgs(.args, .customParams)
-
-			If (tVerbose) { 
-				Write !, $$$FormatText("Invoking ClassMethod %1 from Class %2 ... ",invoke.Method,invoke.Class) 
-				Set result = $ClassMethod(invoke.Class,invoke.Method,args...)
-				Write $$$FormatText("Result: %1 ",result)
-			} else {
-				Do $ClassMethod(invoke.Class,invoke.Method,args...)
-			}
-		}
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
