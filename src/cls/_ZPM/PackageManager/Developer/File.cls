@@ -89,6 +89,10 @@ ClassMethod MakeDirectoryWriteable(pDirectory As %String, Output pCmd, Output pO
 		}
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(pCmd,.pOutputLog,.pErrLog)
 		$$$ThrowOnError(tSC)
+    if ($get(pErrLog(1))'="") {
+      set error = pErrLog(1)
+      Throw ##class(%Exception.General).%New(error)
+    }
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

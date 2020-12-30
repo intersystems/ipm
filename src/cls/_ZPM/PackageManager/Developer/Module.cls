@@ -894,13 +894,14 @@ Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List
 		(:pExcludeModuleNames is null or "Module"->Name not %INLIST :pExcludeModuleNames)
 }
 
-ClassMethod %RegExReplace(pString, pName, pValue) As %String [ Private ]
+ClassMethod %RegExReplace(pString, pName, pValue) As %String
 {
+  set tString = pString
   Set tRegEx = "(?i)\{\$" _ pName _ "\}"
-	Set value =  ##class(%Regex.Matcher).%New(tRegEx, pString).ReplaceAll($Replace(pValue,"\","\\"))
+	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
   Set tRegEx = "(?i)\$\{" _ pName _ "\}"
-	Set value =  ##class(%Regex.Matcher).%New(tRegEx, pString).ReplaceAll($Replace(pValue,"\","\\"))
-  Quit value
+	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
+  Quit tString
 }
 
 /// Evaluates an expression in an attribute
