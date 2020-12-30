@@ -86,6 +86,7 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
       }
     }
     Set tRequest = ..GetHttpRequest()
+    Set tRequest.Timeout = 300
     Set tSC = tRequest.Get(tRequest.Location_path)
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
