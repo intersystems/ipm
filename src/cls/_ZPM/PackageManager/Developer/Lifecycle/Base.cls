@@ -136,6 +136,13 @@ Method %Clean(ByRef pParams) As %Status
 				#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
 				Set tResource = ..Module.Resources.GetNext(.tKey)
 				Quit:tKey=""
+
+        If $IsObject(tResource.Processor) {
+          Do tResource.Processor.OnPhase("Clean",.pParams,.tHandled)
+          If (tHandled) {
+            Continue
+          }
+        }
 				
 				Kill tResourceChildren
 				Do tResource.ResolveChildren(.tResourceChildren)
@@ -672,7 +679,8 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 	Set tSC = $$$OK
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
-		
+    Merge tParams = pParams
+    		
 		Kill pDependencyGraph
 		If ($Get(pTargetDirectory) = "") {
 			Set pTargetDirectory = $$$lcase(..Module.Name_"-"_..Module.VersionString)
@@ -688,6 +696,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Quit
 			}
 		}
+    Set tParams("ModuleExportPath") = pTargetDirectory
 		
 		Set tSC = ..Module.GetResolvedReferences(.tResourceArray,..#EXPORTDEPENDENCIES,..PhaseList,1,.pDependencyGraph)
 		If $$$ISERR(tSC) {
@@ -744,7 +753,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Kill tItemParams
 				Merge tItemParams = tResourceArray(tFullResourceName)
 				Set tItemHandled = 0
-				Set tSC = tProcessor.OnExportItem(tFullPath,tFullResourceName,.tItemParams,.pParams,.tItemHandled)
+				Set tSC = tProcessor.OnExportItem(tFullPath,tFullResourceName,.tItemParams,.tParams,.tItemHandled)
 				If $$$ISERR(tSC) {
 					Quit
 				}

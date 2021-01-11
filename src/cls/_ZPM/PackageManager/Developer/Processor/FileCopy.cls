@@ -15,6 +15,7 @@ Property Overlay As %Boolean;
 
 Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 {
+  Set tVerbose = $Get(pParams("Verbose"))
 	// Default implementation: call %ValidateObject to validate attributes
 	Set tSC = $$$OK
 	Try {
@@ -24,22 +25,11 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 		}
 
 		If (pPhase = "Activate") && (..InstallDirectory '= "") {
-			Set tSourceDir = ##class(%File).NormalizeFilename(..ResourceReference.Module.Root _ ..ResourceReference.Name)
-			Set tTargetDir = ##class(%File).NormalizeDirectory(..InstallDirectory)
-			Write !,"Copying ",tSourceDir," to ",tTargetDir
-      If '##class(%File).DirectoryExists(tTargetDir) {
-        If '##class(%File).CreateDirectoryChain(tTargetDir,.tReturn) {
-          Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tTargetDir,$ZUtil(209,tReturn)))
-          Quit
-        }
-      }
-      If ##class(%File).DirectoryExists(tSourceDir) {
-        Write " as directory "
-			  Set tSC = ##class(%ZPM.PackageManager.Developer.File).CopyDir(tSourceDir,tTargetDir,'..Overlay)
-      }
-      Else {
-        Write " as file "
-			  Set tSC = ##class(%File).CopyFile(tSourceDir, tTargetDir, '..Overlay)
+      Set tSource = ..ResourceReference.Module.Root _ ..ResourceReference.Name
+      Set tTarget = ..InstallDirectory
+      Set tSC = ..DoCopy(tSource, tTarget, .pParams)
+      If $$$ISERR(tSC) {
+        Quit
       }
 		}
 	} Catch e {
@@ -65,6 +55,92 @@ Method OnBeforeArtifact(pExportDirectory As %String, pWorkingDirectory As %Strin
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
+}
+
+Method NormalizeNames(ByRef pSource As %String, ByRef pTarget As %String, Output pTargetDir, Output pAsFile As %Boolean)
+{
+  Set pAsFile = 0
+  If ("\/"[$Extract(pSource, *))
+    ||(
+      (##class(%File).NormalizeDirectory(pSource)'="")
+      &&##class(%File).DirectoryExists(##class(%File).NormalizeDirectory(pSource))) {
+    Set pSource = ##class(%File).NormalizeDirectory(pSource)
+    Set pTarget = ##class(%File).NormalizeDirectory(pTarget)
+    Set pTargetDir = pTarget
+  } Else {
+    Set pAsFile = 1
+    Set pSource = ##class(%File).NormalizeFilename(pSource)
+    If ("\/"[$Extract(pTarget, *)) {
+      Set pTargetDir = ##class(%File).NormalizeDirectory(pTarget)
+      Set pTarget = ##class(%File).NormalizeFilename(##class(%File).GetFilename(pSource), pTargetDir)
+    } Else {
+      Set pTarget = ##class(%File).NormalizeFilename(pTarget)
+      Set pTargetDir = ##class(%File).ParentDirectoryName(pTarget)
+    }
+  }
+}
+
+Method DoCopy(tSource, tTarget, pParams)
+{
+  Set tVerbose = $Get(pParams("Verbose"))
+  Set tSC = $$$OK
+  Try {
+    Do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
+
+    If '##class(%File).DirectoryExists(tTargetDir) {
+      If '##class(%File).CreateDirectoryChain(tTargetDir,.tReturn) {
+        Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tTargetDir,$ZUtil(209,tReturn)))
+        Quit
+      }
+    }
+
+    Write:tVerbose !,"Copying ",tSource," to ",tTarget
+    If (copyAsFile) {
+      Write:tVerbose " as file "
+      If '##class(%File).CopyFile(tSource, tTarget,'..Overlay, .return) {
+        Set tSC = $Get(%objlasterror, return)
+      }
+    }
+    Else {
+      Write:tVerbose " as directory "
+      Set tSC = ##class(%ZPM.PackageManager.Developer.File).CopyDir(tSource,tTarget,'..Overlay)
+    }
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+
+  Quit tSC
+}
+
+Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+{
+  
+  Set tVerbose = $Get(pParams("Verbose"))
+  Set pItemHandled = 1
+  
+  Set tExportPath = $Get(pParams("ModuleExportPath"))
+  Set tSource = ..InstallDirectory
+  Set tTarget = tExportPath _ ..ResourceReference.Name
+
+	Quit ..DoCopy(tSource, tTarget, .pParams)
+}
+
+Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
+{
+  Set tVerbose = $Get(pParams("Verbose"))
+  If (pPhase = "Clean") {
+    Set pResourceHandled = 1
+    Set tSource = ..ResourceReference.Module.Root _ ..ResourceReference.Name
+    Set tTarget = ..InstallDirectory
+    Do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
+    Write:tVerbose !,"Deleting ",tTarget
+    If copyAsFile {
+      Do ##class(%File).Delete(tTarget)
+    } Else {
+      Do ##class(%File).RemoveDirectoryTree(tTarget)
+    }
+  }
+	Quit $$$OK
 }
 
 }
