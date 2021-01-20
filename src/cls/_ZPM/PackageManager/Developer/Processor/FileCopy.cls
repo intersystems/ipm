@@ -5,7 +5,9 @@ Class %ZPM.PackageManager.Developer.Processor.FileCopy Extends %ZPM.PackageManag
 Parameter DESCRIPTION As STRING = "Copies the specified directory (the resource name) to a specific target location (InstallDirectory) during the Activate phase.";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "InstallDirectory,Overlay";
+Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay";
+
+Property Name As %String(MAXLEN = "");
 
 Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest} ];
 
@@ -25,7 +27,7 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 		}
 
 		If (pPhase = "Activate") && (..InstallDirectory '= "") {
-      Set tSource = ..ResourceReference.Module.Root _ ..ResourceReference.Name
+      Set tSource = ..ResourceReference.Module.Root _ ..Name
       Set tTarget = ..InstallDirectory
       Set tSC = ..DoCopy(tSource, tTarget, .pParams)
       If $$$ISERR(tSC) {
@@ -97,8 +99,13 @@ Method DoCopy(tSource, tTarget, pParams)
     Write:tVerbose !,"Copying ",tSource," to ",tTarget
     If (copyAsFile) {
       Write:tVerbose " as file "
+      If '##class(%File).Exists(tSource) {
+        Set tSC = $$$ERROR($$$GeneralError, "Source file does not exists")
+        Quit
+      }
       If '##class(%File).CopyFile(tSource, tTarget,'..Overlay, .return) {
-        Set tSC = $Get(%objlasterror, return)
+        Set tSC = $$$ERROR($$$GeneralError, "File not copied: " _ return)
+        Quit
       }
     }
     Else {
