@@ -923,14 +923,32 @@ Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
   Set tVerbose = +$Get(pParams("Verbose"))
 
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "namespace", $Namespace)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "ns", $Namespace)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "ns",        $Namespace)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "mgrdir",    tMgrDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "cspdir",    tCSPDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "root",      tRoot)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "bindir",    tBinDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "libdir",    tLibDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "verbose",   tVerbose)
+
+  Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", tAttrValue)
+  While regex.Locate() {
+    Set expr = regex.Group(1)
+    Set value = ..%EvalueateExpression(expr)
+    Set $Extract(tAttrValue, regex.Start, regex.End - 1) = value
+    Set regex.Text = tAttrValue
+  }
+  
 	Quit tAttrValue
+}
+
+Method %EvalueateExpression(pExpr) As %String [ Internal ]
+{
+  Try {
+    return @pExpr
+  } Catch ex {
+  }
+  Return ""
 }
 
 Storage Default
