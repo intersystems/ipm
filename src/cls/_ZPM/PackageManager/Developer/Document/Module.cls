@@ -324,6 +324,7 @@ Method ImportFromXML(stream As %RegisteredObject, flags As %String) As %Status
 
 	Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(stream, tXSL, .tOutput)
 	If $$$ISERR(tSC) Quit tSC
+  #; do tOutput.OutputToDevice()
 	
 	Do ..Code.Clear()
 	#; Do ..Code.WriteLine("<?xml version=""1.0""?>") //add XML header
@@ -443,10 +444,16 @@ XData InternalXSL
       <xsl:with-param name="name" select="'Url'" />
     </xsl:call-template>
   </xsl:template>
-
   <xsl:template match="Module/Invoke">
     <xsl:element name="Invokes">
       <xsl:copy-of select="." />
+    </xsl:element>
+  </xsl:template>
+  <xsl:template match="Module/Default|Module/Parameter">
+    <xsl:element name="Defaults">
+      <xsl:element name="Default">
+        <xsl:copy-of select="./@*" />
+      </xsl:element>
     </xsl:element>
   </xsl:template>
   <xsl:template match="Module/Resource">
