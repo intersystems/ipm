@@ -978,6 +978,30 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
 	Merge tParams = pCommandInfo("data")
+	if $EXTRACT(tDirectoryName,1,4)="http" {
+		set slash=$s($zversion(1)=3:"/",1:"\")
+		//set TempDir = $$$FileTempDir
+		set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($zu(86))_"mgr"_slash_"Temp"_slash_$tr($zts,".,")_slash)
+		$$$ThrowOnError(##class(%File).CreateDirectoryChain(TempDir))
+
+		set RepoName=$p($p(tDirectoryName,"/",*),".git")
+		set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
+		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(tCmd,.tLog,.tErr))
+
+      	If ($Get(tParams("Verbose"))) {
+			write !,"Create tempory directory "_TempDir
+			write !,tCmd
+        	For i=1:1:$Get(tLog) {
+          		Write tLog(i),!
+        	}
+      	}
+       	For i=1:1:$Get(tErr) {
+       		Write tErr(i),!
+       	}
+		hang 2
+		set tDirectoryName = TempDir_slash_RepoName
+	}
+
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($PIECE(tDirectoryName, ".", *)) = "tgz" {
