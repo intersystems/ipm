@@ -331,8 +331,8 @@ ClassMethod TerminalPrompt() As %String
 {
 	set tp=##class(%SYSTEM.Process).TerminalPrompt()
 	set prompt="zpm:"
-	set del=$Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("TerminalPrompt"),"green":$$$escGreen(">"),"red":$$$escRed(">"),"violet":$$$escViolet(">"),"yellow":$$$escYellow(">"),"blue":$$$escBlue(">"),:">")
-	if del=">" set tp=2
+	set del=$Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("TerminalPrompt"),"green":$$$escGreen(">"),"red":$$$escRed(">"),"violet":$$$escViolet(">"),"yellow":$$$escYellow(">"),"blue":$$$escBlue(">"),"none":"",:">")
+	if del="" set tp=2,del=">"
 	for i=1:1:$l(tp,",") {
 		if $p(tp,",",i)=1 {	set prompt=prompt_$p($system,":")_del continue}
 		elseif $p(tp,",",i)=2 {	set prompt=prompt_$namespace_del continue}
