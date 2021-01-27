@@ -127,7 +127,7 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
   
   Set tExportPath = $Get(pParams("ModuleExportPath"))
   Set tSource = ..InstallDirectory
-  Set tTarget = tExportPath _ ..ResourceReference.Name
+  Set tTarget = tExportPath _ ..Name
 
 	Quit ..DoCopy(tSource, tTarget, .pParams)
 }
@@ -137,7 +137,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
   Set tVerbose = $Get(pParams("Verbose"))
   If (pPhase = "Clean") {
     Set pResourceHandled = 1
-    Set tSource = ..ResourceReference.Module.Root _ ..ResourceReference.Name
+    Set tSource = ..ResourceReference.Module.Root _ ..Name
     Set tTarget = ..InstallDirectory
     Do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
     Write:tVerbose !,"Deleting ",tTarget
