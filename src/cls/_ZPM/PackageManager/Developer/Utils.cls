@@ -93,10 +93,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		}
 		
 		Set tClient = tServer.GetPackageService()
-		If 'tClient.IsAvailable() {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",tServer.Name))
-			Quit
-		}
+
 		Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
@@ -139,6 +136,9 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		} Else {
 			Set tAsArchive = -1
 			Set tPayload = tClient.GetModule(tModRef, .tAsArchive)
+			If (tVerbose) {
+				Write !,"Module "_pModuleName_" was downloaded from "_tServer.Name_" "_tServer.URL
+			}
 			Set tFileName = ""
 			If ($ISOBJECT(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
 				Set tFileName = tPayload.Filename
