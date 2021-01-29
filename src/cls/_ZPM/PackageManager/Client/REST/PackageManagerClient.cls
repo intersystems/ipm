@@ -196,7 +196,7 @@ Method IsAvailable() As %Boolean
   Set tAvailable = 0
   Set tRequest = ..GetHttpRequest()
   
-  Set tRequest.Timeout = 1
+  Set tRequest.Timeout = 30
   Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"_ping"))
   set status =tRequest.HttpResponse.StatusCode
   If $$$ISOK(tSC) && (tRequest.HttpResponse.StatusCode = 200) {
