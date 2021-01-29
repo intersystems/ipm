@@ -45,9 +45,9 @@ ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.PackageManager.C
 			Set tClientCriteria.IncludeSnapshots = tServer.Snapshots
 			Set tServerResults = tClient.ListModules(tClientCriteria)
 			For i=1:1:tServerResults.Count() {
-        Set item = tServerResults.GetAt(i)
-        #; Sorting versions
-        Set versions(tServer.Name, +item.Version.Major, +item.Version.Minor, +item.Version.Patch, " "_item.Version.Patch_"_"_item.Version.Prerelease) = item
+				Set item = tServerResults.GetAt(i)
+        		#; Sorting versions
+        		Set versions(tServer.Name, +item.Version.Major, +item.Version.Minor, +item.Version.Patch, " "_item.Version.Patch_"_"_item.Version.Prerelease) = item
 			}
 		}
     Set name = ""
@@ -102,11 +102,7 @@ ClassMethod RetrieveModuleManifest(pQualifiedReference As %ZPM.PackageManager.Co
 		}
 		
 		Set tClient = tServer.GetPackageService()
-		If 'tClient.IsAvailable() {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",tServer.Name))
-			Quit
-		}
-		
+
 		Set pManifestStream = tClient.GetModuleManifest(pQualifiedReference)
 	} Catch e {
 		If (e.Name["ZSOAP") && $Data(%objlasterror) {
@@ -130,10 +126,6 @@ ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Cor
 		}
 		
 		Set tClient = tServer.GetPackageService()
-		If 'tClient.IsAvailable() {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",tServer.Name))
-			Quit
-		}
 		
 		Set pPackageStream = tClient.GetModule(pQualifiedReference)
 	} Catch e {
@@ -213,10 +205,6 @@ ClassMethod RetrieveApplicationManifest(pQualifiedReference As %ZPM.PackageManag
 		}
 		
 		Set tClient = tServer.GetPackageService()
-		If 'tClient.IsAvailable() {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",tServer.Name))
-			Quit
-		}
 		
 		Set pManifestStream = tClient.GetApplicationManifest(pQualifiedReference)
 	} Catch e {
@@ -241,10 +229,6 @@ ClassMethod RetrieveApplicationPackage(pQualifiedReference As %ZPM.PackageManage
 		}
 		
 		Set tClient = tServer.GetPackageService()
-		If 'tClient.IsAvailable() {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",tServer.Name))
-			Quit
-		}
 		
 		Set pPackageStream = tClient.GetApplication(pQualifiedReference)
 	} Catch e {
