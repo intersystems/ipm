@@ -66,6 +66,45 @@ Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService
 	Quit tClient
 }
 
+Method ShowUplinks() As %Status
+{
+	Write !,"Registry: ",..URL
+	Set tClient = ..GetPublishService()
+	Set tUpLinks = tClient.ListUplinks() // DynamicArray 
+	Set iter = tUpLinks.%GetIterator()
+	If (tUpLinks.%Size() = 0) {
+		Write !,$c(9),"No Uplinks defined in the remote registry",!
+		Return $$$OK
+	} 
+    While iter.%GetNext(.key , .value ) {
+    	Write !
+		Write value.url
+		Write !,$c(9),"packages whitelist: ", value."package_whitelist"
+		Write !,$c(9),"position: ", value."position"
+		Write !,$c(9),"Active: ", $Case(value."active",1:"Yes",:"No")
+		Write !
+    }
+	Return $$$OK
+}
+
+Method UpdateUplink(ByRef pCommandInfo) As %Status
+{
+	Set url = $Get(pCommandInfo("modifiers","uplink-url"))
+	Set active = $Get(pCommandInfo("modifiers","uplink-active"))
+	Set whitelist = $Get(pCommandInfo("modifiers","uplink-package-whitelist"))
+	Set position = $Get(pCommandInfo("modifiers","uplink-position"))
+	If ((active="")&&(whitelist="")&&(position="")) {
+		Return $$$ERROR(5001,"Nothing to update")
+	}
+	Set jo = {"url":(url)}
+	If (active'="") { Set jo.active = active }
+	If (whitelist'="") { Set jo."package_whitelist" = whitelist }
+	If (position'="") { Set jo.position = position}
+	
+	Set tClient = ..GetPublishService()
+	Return tClient.UpdateUplink(jo)
+}
+
 /// Outputs information about this server to the current device.
 /// Subclasses may override to show additional information.
 Method Display()

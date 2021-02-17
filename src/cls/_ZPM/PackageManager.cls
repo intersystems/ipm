@@ -119,6 +119,13 @@ This command is an alias for `module-action module-name publish`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
+<command name="unpublish">
+<description>Unpublish (delete) the module from the registry</description>
+<parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
+<parameter name="version" required="true" description="Version (or version expression) of module to unpublish" />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 <command name="config">
 <description>Update ZPM settings. Setting is a key-value pair.</description>
 <example description="Disable collecting analytics data">config set analytics 0</example>
@@ -191,6 +198,11 @@ repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass "
 <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
 <modifier name="reset-defaults" value="false" description="Reset to default repository" />
 
+<modifier name="uplink-list" value="false" description="Show existing uplinks" />
+<modifier name="uplink-url" value="true" description="Set URL for the uplink" />
+<modifier name="uplink-package-whitelist" value="true" description="Set comma separated list of permitted packages" />
+<modifier name="uplink-position" value="true" description="Uplink position" />
+<modifier name="uplink-active" value="true" description="Uplink status, use -1 to delete uplink" />
 
 <!-- Modifiers specific to -enable -->
 <modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
@@ -350,7 +362,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			}
 			
 			Kill tCommandInfo
-      $$$ThrowOnError(..%ParseCommandInput(tCommand,.tCommandInfo))
+      		$$$ThrowOnError(..%ParseCommandInput(tCommand,.tCommandInfo))
 			If (tCommandInfo = "quit") {
 				Return
 			} ElseIf (tCommandInfo = "help") {
@@ -379,6 +391,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Config(.tCommandInfo)
 			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
 				Do ..RunOnePhase(.tCommandInfo)
+			} ElseIf (tCommandInfo = "unpublish") {
+				Do ..Unpublish(.tCommandInfo)
 			} ElseIf (tCommandInfo = "generate") {
 				Do ..GenerateModuleXML(.tCommandInfo)
 			} ElseIf (tCommandInfo = "module-action") {
@@ -797,12 +811,33 @@ ClassMethod Config(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
+/// <modifier name="uplink-list" value="false" description="Show existing uplinks" />
+/// <modifier name="uplink-url" value="false" description="Set URL for the uplink" />
+/// <modifier name="uplink-package-whitelist" value="false" description="Set comma separated list of permitted packages" />
+/// <modifier name="uplink-position" value="false" description="Uplink position" />
+/// <modifier name="uplink-active" value="false" description="Uplink status, use -1 to delete uplink" />
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
 	Set tFileSystem = $$$HasModifier(pCommandInfo,"filesystem")
 	Set tRemote = $$$HasModifier(pCommandInfo,"remote")
 	Set tLocal = $$$HasModifier(pCommandInfo,"local")
 	
+	If $$$HasModifier(pCommandInfo,"uplink-list") {
+		Set tName = $$$GetModifier(pCommandInfo,"name")
+		Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1,,.tSC)
+		$$$ThrowOnError(tSC)
+		$$$ThrowOnError(tServer.ShowUplinks())
+		Quit
+	}
+
+	If $$$HasModifier(pCommandInfo,"uplink-url") {
+		Set tName = $$$GetModifier(pCommandInfo,"name")
+		Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1,,.tSC)
+		$$$ThrowOnError(tSC)
+		$$$ThrowOnError(tServer.UpdateUplink(.pCommandInfo))
+		Quit
+	}
+
 	If $$$HasModifier(pCommandInfo,"list") {
 		Write !
 		If (tFileSystem + tRemote + tLocal '= 1) {
@@ -1041,6 +1076,22 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 	Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
+}
+
+ClassMethod Unpublish(ByRef pCommandInfo)
+{
+	If ('$Data(pCommandInfo("parameters","module"))) {
+		$$$ThrowStatus($$$ERROR(5001,"Module name required"))
+	}
+	If ('$Data(pCommandInfo("parameters","version"))) {
+		$$$ThrowStatus($$$ERROR(5001,"Module version required"))
+	}
+	Set tModuleName = pCommandInfo("parameters","module")
+	Set tModuleVersion = pCommandInfo("parameters","version")
+
+	Merge tParams = pCommandInfo("data")
+
+	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).Unpublish(tModuleName, tModuleVersion, .tParams))
 }
 
 ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]

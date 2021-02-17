@@ -203,6 +203,22 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 	quit tSC
 }
 
+/// Unpublish
+ClassMethod Unpublish(pModuleName As %String, pModuleVersion As %String, ByRef pParams) As %Status
+{
+	Set tSC = $$$OK
+	Try {
+		Set tVerbose = $Get(pParams("Verbose"),0)
+		Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1,,.tSC)
+		$$$ThrowOnError(tSC)
+		Set tPublishService = tServer.GetPublishService()
+		$$$ThrowOnError(tPublishService.Unpublish(pModuleName, pModuleVersion, tVerbose))
+	} Catch ex {
+		Set tSC = ex.AsStatus()
+	}
+	Return tSC
+}
+
 /// Uninstalls a named module (<var>pModuleName</var>).
 /// May optionally force installation (uninstalling even if required by other modules) if <var>pForce</var> is 1.
 /// May optionally recurse to also uninstall dependencies that are not required by other modules if <var>pRecurse</var> is 1.

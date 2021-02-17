@@ -20,6 +20,19 @@ Method GetInfo(url As %String) As %DynamicObject
 	$$$ThrowStatus($$$ERROR($$$GeneralError,"Registry server not available."))
 }
 
+Method ListUplinks() As %DynamicArray
+{
+  Set tJOArr = []
+  Set tRequest = ..GetHttpRequest()
+  Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"uplinks"))
+  If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
+    Set tJOArr = [].%FromJSON(tRequest.HttpResponse.Data)
+  } Else {
+    $$$ThrowStatus($$$ERROR(5001, "Unable to read Uplinks"))
+  }
+  Return tJOArr
+}
+
 Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference")
 {
   Set tList = ##class(%Library.ListOfObjects).%New()
