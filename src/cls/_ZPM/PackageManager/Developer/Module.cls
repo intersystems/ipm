@@ -915,7 +915,7 @@ Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
 {
 	Set tAttrValue = pAttrValue
 	Set tRoot = $Case(..Root,"":"",:##class(%File).NormalizeDirectory(..Root))
-  Set tInstallDir = $System.Util.InstallDirectory()
+  Set tInstallDir = ##class(%File).NormalizeDirectory("",$Piece($zu(86),$Select($zversion(1)=3:"/",1:"\"),1,*-1)) 
 	Set tMgrDir = $System.Util.ManagerDirectory()
   Set tBinDir = $System.Util.BinaryDirectory()
 	Set tCSPDir = ##class(%File).NormalizeDirectory("csp", tInstallDir)
