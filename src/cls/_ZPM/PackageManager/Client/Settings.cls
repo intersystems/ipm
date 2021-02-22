@@ -14,9 +14,16 @@ Parameter trackingId = "analytics_tracking_id";
 
 Parameter analytics = "analytics_available";
 
+/// Possible values: dark, white, none
 Parameter ColorScheme = "ColorScheme";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme";
+/// Possible values: green, red, violet, blue, yellow, none
+Parameter TerminalPrompt = "TerminalPrompt";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt";
+
+/// Returns configArray, that includes all configurable settings
+ClassMethod GetAll(Output configArray) As %Status
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
