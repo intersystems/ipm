@@ -24,9 +24,6 @@ Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
-
-/// Returns configArray, that includes all configurable settings
-ClassMethod GetAll(Output configArray) As %Status
 {
     Set configArray = ""
     For i=1:1:$Length(..#CONFIGURABLE, ",") {
