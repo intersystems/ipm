@@ -362,8 +362,10 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "repo") {
 				Do ..Repository(.tCommandInfo)
 			} ElseIf (tCommandInfo = "load") {
+				TSTART  write !,"Opening a transaction",!
 				Do ..Load(.tCommandInfo)
 			} ElseIf (tCommandInfo = "install") {
+				TSTART  write !,"Opening a transaction",!
 				Do ..Install(.tCommandInfo)
 			} ElseIf (tCommandInfo = "uninstall") {
 				Do ..Uninstall(.tCommandInfo)
@@ -378,6 +380,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "config") {
 				Do ..Config(.tCommandInfo)
 			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
+				if (tCommandInfo="publish") TSTART  write !,"Opening a transaction",!
 				Do ..RunOnePhase(.tCommandInfo)
 			} ElseIf (tCommandInfo = "generate") {
 				Do ..GenerateModuleXML(.tCommandInfo)
@@ -388,14 +391,15 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "namespace") {
 				Do ..Namespace(.tCommandInfo)			}
 			} Catch pException {
-			#dim e As %Exception.AbstractException
-			If (pException.Code = $$$ERCTRLC) {
-				Set pException = $$$NULLOREF
-				Return
+				if $TLevel>0 TROLLBACK   write !,"Rollback a transaction",!
+				#dim e As %Exception.AbstractException
+				If (pException.Code = $$$ERCTRLC) {
+					Set pException = $$$NULLOREF
+					Return
+				}
+				Write !,pException.DisplayString()
 			}
-			Write !,pException.DisplayString()
-		}
-		
+		if $TLevel>0 TCOMMIT  write !,"Completing a transaction",!
 		Set tCommand = ""
 		Quit:tOneCommand
 		Write !
