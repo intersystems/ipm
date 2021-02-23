@@ -967,7 +967,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 	$$$ThrowOnError(##class(%File).CreateDirectoryChain(TempDir))
 	set RepoName=$p($p($p(tDirectoryName,"/",*),".git")," ")
 	set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
-	if tParams("zpm","Branch")'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
+	if $Get(tParams("zpm","Branch"))'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
 	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(tCmd,.tLog,.tErr))
       	set tDirectoryName = TempDir_slash_RepoName
       	If ($Get(tParams("Verbose"))) {
