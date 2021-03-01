@@ -200,7 +200,7 @@ repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass "
 
 <modifier name="uplink-list" value="false" description="Show existing uplinks" />
 <modifier name="uplink-url" value="true" description="Set URL for the uplink" />
-<modifier name="uplink-package-whitelist" value="true" description="Set comma separated list of permitted packages" />
+<modifier name="uplink-package-allowlist" value="true" description="Set comma separated list of permitted packages" />
 <modifier name="uplink-position" value="true" description="Uplink position" />
 <modifier name="uplink-active" value="true" description="Uplink status, use -1 to delete uplink" />
 
@@ -811,11 +811,6 @@ ClassMethod Config(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-/// <modifier name="uplink-list" value="false" description="Show existing uplinks" />
-/// <modifier name="uplink-url" value="false" description="Set URL for the uplink" />
-/// <modifier name="uplink-package-whitelist" value="false" description="Set comma separated list of permitted packages" />
-/// <modifier name="uplink-position" value="false" description="Uplink position" />
-/// <modifier name="uplink-active" value="false" description="Uplink status, use -1 to delete uplink" />
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
 	Set tFileSystem = $$$HasModifier(pCommandInfo,"filesystem")

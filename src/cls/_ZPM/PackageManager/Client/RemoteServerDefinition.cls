@@ -79,7 +79,7 @@ Method ShowUplinks() As %Status
     While iter.%GetNext(.key , .value ) {
     	Write !
 		Write value.url
-		Write !,$c(9),"packages whitelist: ", value."package_whitelist"
+		Write !,$c(9),"packages allowlist: ", value."package_allowlist"
 		Write !,$c(9),"position: ", value."position"
 		Write !,$c(9),"Active: ", $Case(value."active",1:"Yes",:"No")
 		Write !
@@ -91,14 +91,14 @@ Method UpdateUplink(ByRef pCommandInfo) As %Status
 {
 	Set url = $Get(pCommandInfo("modifiers","uplink-url"))
 	Set active = $Get(pCommandInfo("modifiers","uplink-active"))
-	Set whitelist = $Get(pCommandInfo("modifiers","uplink-package-whitelist"))
+	Set allowlist = $Get(pCommandInfo("modifiers","uplink-package-allowlist"))
 	Set position = $Get(pCommandInfo("modifiers","uplink-position"))
-	If ((active="")&&(whitelist="")&&(position="")) {
+	If ((active="")&&(allowlist="")&&(position="")) {
 		Return $$$ERROR(5001,"Nothing to update")
 	}
 	Set jo = {"url":(url)}
 	If (active'="") { Set jo.active = active }
-	If (whitelist'="") { Set jo."package_whitelist" = whitelist }
+	If (allowlist'="") { Set jo."package_allowlist" = allowlist }
 	If (position'="") { Set jo.position = position}
 	
 	Set tClient = ..GetPublishService()
