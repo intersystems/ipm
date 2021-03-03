@@ -172,6 +172,7 @@ Method AddWebApps(pApps As %String, Output cspapps As %List) As %Status
         Set tAppList = $Listfromstring(pApps,",")
     }
     Set cspapps = ""
+    Set curns=$Namespace
     New $Namespace
     Set $Namespace = "%SYS"
     For i=1:1:$Listlength(tAppList) {
@@ -179,7 +180,9 @@ Method AddWebApps(pApps As %String, Output cspapps As %List) As %Status
         Set tAppName = props("Name")
         Set ..TemplateResources(tAppName) = tAppName
         Set ..TemplateResources(tAppName, "Url") = tAppName
- 
+        if props("MatchRoles")["%DB_"_curns {
+	    Set props("MatchRoles") = $replace(props("MatchRoles"),"%DB_"_curns,"{$dbrole}")
+        } 
         If (props("DispatchClass")'="") {
             Set ..TemplateResources(tAppName,"DispatchClass") = props("DispatchClass") 
         } Else {
