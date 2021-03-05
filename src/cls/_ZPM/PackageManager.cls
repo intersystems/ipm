@@ -460,8 +460,8 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 			}
 		}
 		Set $Namespace=currentns
-		Do ##class(%Library.Prompt).GetString("Enter the namespace number where to go: ", .goto)	
-		If goto,$D(num(goto)) Set $Namespace=num(goto)
+		Do ##class(%Library.Prompt).GetString("Enter number or name where to go: ", .goto)	
+		If goto'="" try { Set $Namespace=$Select($D(num(goto)):num(goto),1:goto) } catch e {}
 	} Else {
 		Set $Namespace=name
 	}
