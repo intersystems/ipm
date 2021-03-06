@@ -249,10 +249,8 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 <command name="list-installed" aliases="list">
 <description>Lists modules installed in the current namespace</description>
 <example description="Shows all installed modules in tree format.">list-installed -tree</example>
-<example description="Shows a description of all modules installed in the namespaceы by context">list -zn sql*</example>
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules" />
-<modifier name="znamespace" aliases="zn" value="true" description="Find modules in namespaces and go to it." />
-<modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Shows description for each module." />
+<modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -1233,57 +1231,11 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
-	Set tNS = $Get(pCommandInfo("modifiers","znamespace"))
-	set tDesc=$g(pCommandInfo("data","Desc"))
-	If tNS'="" {
-		Kill pCommandInfo 
-		Set pCommandInfo("parameters","name")=tNS 
-		Set pCommandInfo("data","Desc")=tDesc
-		Do ..Namespace(.pCommandInfo) 
-	}
-	If tDesc {
-		Set gn="^||tmpDesc"		
-		Set sql="select Name, Description, Keywords, Root, VersionString, Author_CopyrightDate, Author_License, Author_Notes, Author_Organization, Author_Person from %ZPM_PackageManager_Developer.""Module"" "
-			,rs=##class(%ResultSet).%New()
-			,sc=rs.Prepare(sql)
-		Set:sc sc=rs.Execute()
-		If sc {
-			For i=1:1 {
-				Quit:'rs.%Next()  
-				Set name=rs.Get("Name")
-				Set:$Length(name)>$Get(maxlenname) maxlenname=$Length(name)
-				If '$Data(@gn@(name,"Locale","Description")) {
-					Set @gn@(name,"Locale")=$Listbuild(rs.Get("VersionString"),rs.Get("Root"))
-					Set root=rs.Get("Root")
-					Set desc=rs.Get("Description")
-					For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
-						Set @gn@(name,"Locale","Description",a)=rs.Get(a)
-					}
-					Set @gn@(name,"Locale","Description")=desc
-				}
-		 	}
-			Set:$Get(name)'="" @gn@(name,"Locale")=$Get(maxlenname) 
-		} 
-	}
-		
-	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-		"select Name,VersionString from %ZPM_PackageManager_Developer.""MODULE""")
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-	}
-	While tRes.%Next(.tSC) {
-		$$$ThrowOnError(tSC)
-		Set tModMap(tRes.%Get("Name")) = tRes.%Get("VersionString")
-	}
-	$$$ThrowOnError(tSC)
-	
-	Set tTree = ''$Data(pCommandInfo("modifiers","tree"))
-	
-	If (tTree) {
+	If (''$Data(pCommandInfo("modifiers","tree"))) {
 		// Show tree of dependencies as well.
 		// Modules that are dependencies for no other are shown at the top level.
 		// TODO: deal with cyclic dependencies?
-		
+		quit:'..GetListModule(,.tModMap)	
 		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
 			"select ""Module""->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
 			"from %ZPM_PackageManager_Developer.Module_Dependencies")
@@ -1303,28 +1255,75 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 			Quit:(tMod="")
 			Do:'$Data(tVisitedMap(tMod)) ..AccumulateTreeRecursive(tMod,.tModMap,.tOrderedTree)
 		}
-		
 		Do ..PrintTree(.tOrderedTree)
 	} Else {
+		quit:'..GetListModule(,.tModMap,0)
 		Set tMod = ""
-		For {
-			Set tMod = $Order(tModMap(tMod),1,tVersion)
+		For { Set tMod = $Order(tModMap(tMod),1,tVersion)
 			Quit:(tMod="")
 			Write !,$$$escGreen(tMod)," ",tVersion_" "
-			If $Data(gn),$Data(@gn@(tMod,"Locale")) {
+			If $Data(tModMap(tMod,"L"),Lock) {
 				Set maxlenname=$L(tMod_" "_tVersion_" ")
-				Do ..DrawColumn($$$escYellow("Description: ")_$Get(@gn@(tMod,"Locale","Description")))
-				If $Data(@gn@(tMod,"Locale","Description"))>9 {
-					Set au="" For { 
-						Set au=$Order(@gn@(tMod,"Locale","Description",au),1,audata) Quit:au=""
-						Write:audata'="" !
-						,?(maxlenname)
-						,..DrawColumn($$$escViolet(au_": ")_audata)
-					}
+				Do ..DrawColumn($$$escYellow("Description: ")_$ListGet(Lock,2))
+				Set au=3 
+				For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" { 
+					Set au=au+1
+					set audata=$ListGet(Lock,au)
+					Write:audata'="" !
+					,?(maxlenname)
+					,..DrawColumn($$$escViolet(a_": ")_audata)
+				}
+				if $g(pCommandInfo("data","Desc")) {
+					Write !
+					,?(maxlenname)
+					,..DrawColumn($$$escViolet("Root: ")_$ListGet(Lock,3))
+				}
+				if $Data(tModMap(tMod,"R"),Rem) {
+					write !,$ListGet(Rem,3)
 				}
 			}
 		}
 	}
+}
+
+/// Get module list in currently namespace
+ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
+{
+	new $namespace
+	set $namespace=ns
+	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+		"select * from %ZPM_PackageManager_Developer.""MODULE""")
+	If (tRes.%SQLCODE < 0) {
+		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	}
+	set in=""
+	While tRes.%Next(.tSC) {
+		$$$ThrowOnError(tSC)
+		Set name=tRes.%Get("Name")
+		set in=in_"'"_name_"',"
+		set list=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
+		For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
+			Set list=list_$lb(tRes.%Get(a))
+		}
+		Set Mod(name) = tRes.%Get("VersionString")
+		Set:'OnlyName Mod(name,"L") = list
+		
+	}
+	$$$ThrowOnError(tSC)
+	quit:in=""||(OnlyName) $$$OK
+	set in=$Extract(in,1,*-1)
+
+	Set tQuery = "select Name, Version, Repo, Description from %ZPM_PackageManager_Developer.Utils_GetModuleList('registry') WHERE name in ("_in_")"
+	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
+	
+	If (tRes.%SQLCODE < 0) {
+		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	}
+	While tRes.%Next(.tSC) {
+		$$$ThrowOnError(tSC)
+		Set Mod(tRes.%Get("Name"),"R")=$Listbuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repo"))
+	}
+	quit $$$OK
 }
 
 ClassMethod AccumulateTreeRecursive(pModName As %String, ByRef pModMap, ByRef pTree, pLevel As %Integer = 0) [ Private ]
