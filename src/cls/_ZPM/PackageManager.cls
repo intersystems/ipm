@@ -1257,12 +1257,13 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		}
 		Do ..PrintTree(.tOrderedTree)
 	} Else {
-		quit:'..GetListModule(,.tModMap,0)
+		set tDesc=+$g(pCommandInfo("data","Desc"))
+		quit:'..GetListModule(,.tModMap,'tDesc)
 		Set tMod = ""
 		For { Set tMod = $Order(tModMap(tMod),1,tVersion)
 			Quit:(tMod="")
 			Write !,$$$escGreen(tMod)," ",tVersion_" "
-			If $Data(tModMap(tMod,"L"),Lock) {
+			If tDesc,$Data(tModMap(tMod,"L"),Lock) {
 				Set maxlenname=$L(tMod_" "_tVersion_" ")
 				Do ..DrawColumn($$$escYellow("Description: ")_$ListGet(Lock,2))
 				Set au=3 
@@ -1273,11 +1274,9 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 					,?(maxlenname)
 					,..DrawColumn($$$escViolet(a_": ")_audata)
 				}
-				if $g(pCommandInfo("data","Desc")) {
-					Write !
+				Write !
 					,?(maxlenname)
 					,..DrawColumn($$$escViolet("Root: ")_$ListGet(Lock,3))
-				}
 				if $Data(tModMap(tMod,"R"),Rem) {
 					write !,$ListGet(Rem,3)
 				}
