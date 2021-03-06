@@ -325,6 +325,25 @@ ClassMethod Shell(pCommand As %String, pTerminateOnError As %Boolean = 0, pHaltO
 	Quit tSC
 }
 
+ClassMethod TerminalPrompt() As %String
+{
+	set tp=##class(%SYSTEM.Process).TerminalPrompt()
+	set prompt="zpm:"
+	set del=$Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("TerminalPrompt"),"green":$$$escGreen(">"),"red":$$$escRed(">"),"violet":$$$escViolet(">"),"yellow":$$$escYellow(">"),"blue":$$$escBlue(">"),"none":"",:">")
+	if del="" set tp=2,del=">"
+	for i=1:1:$l(tp,",") {
+		if $p(tp,",",i)=1 {	set prompt=prompt_$p($system,":")_del continue}
+		elseif $p(tp,",",i)=2 {	set prompt=prompt_$namespace_del continue}
+		elseif $p(tp,",",i)=3 {	set prompt=prompt_$p($system,":",2)_del continue}
+		elseif $p(tp,",",i)=4 {	set prompt=prompt_$zt(+$p($h,",",2),1)_del continue}
+		elseif $p(tp,",",i)=5 {	set prompt=prompt_$job_del continue}
+		elseif $p(tp,",",i)=6 {	set prompt=prompt_$username_del continue}
+		;i think for zapm shell 7 and 8 do not need to be implemented
+	}
+	quit prompt
+}
+
+
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
@@ -337,7 +356,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	For {
 		Try {
 			If (tCommand = "") {
-				Write "zpm: ",$Namespace,">"
+				Write ..TerminalPrompt()
 				Read tCommand
 				Write !
 			}
@@ -439,8 +458,8 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 			}
 		}
 		Set $Namespace=currentns
-		Do ##class(%Library.Prompt).GetString("Enter the namespace number where to go: ", .goto)	
-		If goto,$D(num(goto)) Set $Namespace=num(goto)
+		Do ##class(%Library.Prompt).GetString("Enter number or name where to go: ", .goto)	
+		If goto'="" try { Set $Namespace=$Select($D(num(goto)):num(goto),1:goto) } catch e {}
 	} Else {
 		Set $Namespace=name
 	}
