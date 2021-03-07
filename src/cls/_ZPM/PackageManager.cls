@@ -391,7 +391,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "namespace") {
 				Do ..Namespace(.tCommandInfo)			}
 			} Catch pException {
-				if $TLevel>$GET(tTLev) TROLLBACK 1  write !,"Rollback a transaction",!
+				if $TLevel>$GET(tTLev) TROLLBACK 1  write:$GET(tCommandInfo("data","Verbose")) !,"Rollback a transaction",!
 				#dim e As %Exception.AbstractException
 				If (pException.Code = $$$ERCTRLC) {
 					Set pException = $$$NULLOREF
@@ -399,7 +399,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				}
 				Write !,pException.DisplayString()
 			}
-		if $TLevel>$GET(tTLev) TCOMMIT  write !,"Completing a transaction",!
+		if $TLevel>$GET(tTLev) TCOMMIT  write:$GET(tCommandInfo("data","Verbose")) !,"Completing a transaction",!
 		Set tCommand = ""
 		Quit:tOneCommand
 		Write !
@@ -410,8 +410,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 ClassMethod InTranStart(ByRef pCommandInfo, ByRef tTLev) [ Internal ]
 {
 	Set name = $Get(pCommandInfo("parameters","module"))
-	;Set tVerbose = ''$Data(pCommandInfo("modifiers","verbose"))
-	if name'="",name'="zpm" set tTLev=$TLevel  TSTART  write !,"Opening a transaction",!
+	Set tVerbose = $GET(pCommandInfo("data","Verbose"))
+	if name'="",name'="zpm" set tTLev=$TLevel  TSTART  write:tVerbose !,"Opening a transaction",!
 	quit $$$OK
 }
 
