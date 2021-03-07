@@ -379,8 +379,10 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "repo") {
 				Do ..Repository(.tCommandInfo)
 			} ElseIf (tCommandInfo = "load") {
+				Do ..InTranStart(.tCommandInfo,.tTLev)
 				Do ..Load(.tCommandInfo)
 			} ElseIf (tCommandInfo = "install") {
+				Do ..InTranStart(.tCommandInfo,.tTLev)
 				Do ..Install(.tCommandInfo)
 			} ElseIf (tCommandInfo = "uninstall") {
 				Do ..Uninstall(.tCommandInfo)
@@ -395,6 +397,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "config") {
 				Do ..Config(.tCommandInfo)
 			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
+				if (tCommandInfo="publish") Do ..InTranStart(.tCommandInfo,.tTLev)
 				Do ..RunOnePhase(.tCommandInfo)
 			} ElseIf (tCommandInfo = "generate") {
 				Do ..GenerateModuleXML(.tCommandInfo)
@@ -405,18 +408,28 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "namespace") {
 				Do ..Namespace(.tCommandInfo)			}
 			} Catch pException {
-			#dim e As %Exception.AbstractException
-			If (pException.Code = $$$ERCTRLC) {
-				Set pException = $$$NULLOREF
-				Return
+				if $TLevel>$GET(tTLev) TROLLBACK 1  write:$GET(tCommandInfo("data","Verbose")) !,"Rollback a transaction",!
+				#dim e As %Exception.AbstractException
+				If (pException.Code = $$$ERCTRLC) {
+					Set pException = $$$NULLOREF
+					Return
+				}
+				Write !,pException.DisplayString()
 			}
-			Write !,pException.DisplayString()
-		}
-		
+		if $TLevel>$GET(tTLev) TCOMMIT  write:$GET(tCommandInfo("data","Verbose")) !,"Completing a transaction",!
 		Set tCommand = ""
 		Quit:tOneCommand
 		Write !
 	}
+}
+
+/// In Transaction 
+ClassMethod InTranStart(ByRef pCommandInfo, ByRef tTLev) [ Internal ]
+{
+	Set name = $Get(pCommandInfo("parameters","module"))
+	Set tVerbose = $GET(pCommandInfo("data","Verbose"))
+	if name'="",name'="zpm" set tTLev=$TLevel  TSTART  write:tVerbose !,"Opening a transaction",!
+	quit $$$OK
 }
 
 /// Show modules in Namespace and to go namespace
