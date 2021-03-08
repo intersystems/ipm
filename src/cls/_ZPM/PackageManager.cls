@@ -79,7 +79,7 @@ This command is an alias for `module-action module-name compile`
 This command is an alias for `module-action module-name test`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform test action" />
-<modifier name="only" aliases="o" description="Only runs the specified phase (reload), rather than also running predecessors." />
+<modifier name="only" aliases="o" description="Only runs the specified phase (test), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
