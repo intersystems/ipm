@@ -12,7 +12,7 @@ on:
 env:
   PREVIOUS: 2019.4.0.383.0
   CURRENT: 2020.1.0.215.0
-  LATEST: 2020.4.0.521.0
+  LATEST: 2020.4.0.524.0
 jobs:
   build:
     timeout-minutes: 20
@@ -68,7 +68,7 @@ jobs:
             docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
             -p /home/irisowner/registry/password.txt
           REGISTRY=`docker ps -lq`
-          while [ "`docker container inspect -f {{.State.Health.Status}} $REGISTRY`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
       - name: Test and Verify
         timeout-minutes: 15
         run: |
@@ -78,7 +78,7 @@ jobs:
             -e TEST_REGISTRY_PASSWORD=securepassword \
             zpm
           CONTAINER=`docker ps -lq`
-          while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'zpm "list":1\n' \
             'zpm "zpm test":1\n' \
@@ -91,7 +91,7 @@ jobs:
         run: |
           docker run --network zpm -d --rm --init zpm
           CONTAINER=`docker ps -lq`
-          while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
             'zpm "repo -list":1\n' \
@@ -108,7 +108,7 @@ jobs:
           wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
           docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }}
           CONTAINER=`docker ps -lq`
-          while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
             'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
@@ -126,7 +126,7 @@ jobs:
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
           docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }}
           CONTAINER=`docker ps -lq`
-          while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
             'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
@@ -186,7 +186,7 @@ jobs:
           [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
             docker run -d --rm --init zpm
             CONTAINER=`docker ps -lq`
-            while [ "`docker container inspect -f {{.State.Health.Status}} $CONTAINER`" != "healthy" ]; do echo Waiting container; sleep 1; done
+            sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
             /bin/echo -e '' \
               'zpm "list":1\n' \
               'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
