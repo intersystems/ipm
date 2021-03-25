@@ -19,7 +19,9 @@ Method Publish(pModule As %ZPM.PackageManager.Core.VersionedBase) As %Boolean
   
   Set tRequest = ..GetHttpRequest()
   Set tRequest.ContentType = "application/json"
-
+  Set publishTimeout =  ##class(%ZPM.PackageManager.Client.Settings).GetValue("publish_timeout")
+  Set:publishTimeout'="" tRequest.Timeout = publishTimeout
+  
   $$$ThrowOnError(pModule.%JSONExportToStream(tRequest.EntityBody))
   $$$ThrowOnError(tRequest.Post(tRequest.Location_"packages"))
   
