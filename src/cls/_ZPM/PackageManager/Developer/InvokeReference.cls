@@ -22,6 +22,20 @@ Method GetArgsArray(pParams, Output args) As %Status
     Set args(i) = ..Module.%Evaluate(..Arg.GetAt(i), .pParams)
     If (args(i)=$Char(0)) { Set args(i) = "" }
   }
+  
+  /// Add custom parameters support for Invoke args
+  Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..Module)
+  Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateArgs(.args,.customParams)
+  /// Perform a second pass to manage embeded vars, ex:
+  /// <Default Name="MyDir" Value="${mgrdir}MySubDir"></Default>
+  Set i = ""
+  For  {
+  	Set i = $Order(args(i),1,value)
+  	Quit:i=""
+  	Set args(i) = ..Module.%Evaluate(value, .pParams)
+  }
+  	
+  Quit $$$OK
 }
 
 Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
