@@ -20,7 +20,9 @@ Parameter ColorScheme = "ColorScheme";
 /// Possible values: green, red, violet, blue, yellow, none
 Parameter TerminalPrompt = "TerminalPrompt";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt";
+Parameter PublishTimeout = "publish_timeout";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
