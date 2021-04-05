@@ -206,6 +206,11 @@ load C:\module\root\path\module-0.0.1.tgz
 load -dev -verbose C:\module\root\path\
 load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 </example>
+<modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
+<example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
+load https://github.com/user/repository.git
+load https://github.com/user/repository.git -b branch-name
+</example>
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
@@ -985,10 +990,38 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	}
 }
 
+ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
+{
+	set slash=$s($zversion(1)=3:"/",1:"\")
+	set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($zu(86))_"mgr"_slash_"Temp"_slash_$tr($zts,".,")_slash)
+	$$$ThrowOnError(##class(%File).CreateDirectoryChain(TempDir))
+	set RepoName=$p($p($p(tDirectoryName,"/",*),".git")," ")
+	set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
+	if $Get(tParams("zpm","Branch"))'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
+	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(tCmd,.tLog,.tErr))
+      	set tDirectoryName = TempDir_slash_RepoName
+      	If ($Get(tParams("Verbose"))) {
+			write !,"Create tempory directory "_TempDir
+			write !,tCmd
+        	For i=1:1:$Get(tLog) {
+          		Write tLog(i),!
+        	}
+        	write !,tDirectoryName
+      	}
+       	For i=1:1:$Get(tErr) {
+       		Write tErr(i),!
+       	}
+		hang 2
+		quit tDirectoryName
+}
+
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
 	Merge tParams = pCommandInfo("data")
+	if $Extract(tDirectoryName,1,4)="http" {
+		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
+	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($PIECE(tDirectoryName, ".", *)) = "tgz" {
