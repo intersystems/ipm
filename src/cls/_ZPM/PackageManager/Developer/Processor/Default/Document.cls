@@ -54,7 +54,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		If (pPhase = "Reload") {
 			Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
 			
-			$$$ThrowOnError(..OnConfigureMappings(.pParams))
+			// Disabled mapping of resources. It creates more problems than solves. 
+			// Moreover, the removal of mapping during uninstallation is not implemented.
+			// $$$ThrowOnError(..OnConfigureMappings(.pParams))
 			
 			If '..ResourceReference.Generated {
 				Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
