@@ -663,12 +663,16 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 	Set ns=""
 	For { Set ns=$Order(namespace(ns)) Quit:ns=""
 		Kill list
-		Set $namespace=ns
-		Do ..GetListModules("zpm",.list)
-		If $Data(list("zpm-registry")) {
-			Write !,$$$escDefault(ns)_"> "_$$$escGreen("zpm-registry ")_$ListGet(list("zpm-registry"),1)
-			Set Found=ns
-			Do ..GetDefaultCommandRegistry()
+		try {
+			Set $namespace=ns
+			Do ..GetListModules("zpm",.list)
+			If $Data(list("zpm-registry")) {
+				Write !,$$$escDefault(ns)_"> "_$$$escGreen("zpm-registry ")_$ListGet(list("zpm-registry"),1)
+				Set Found=ns
+				Do ..GetDefaultCommandRegistry()
+			}
+		} catch {
+			// just ignore inaccessible namespaces
 		}
 	}
 	Set $namespace="%SYS"
