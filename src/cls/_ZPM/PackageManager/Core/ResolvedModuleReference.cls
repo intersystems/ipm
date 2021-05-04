@@ -1,3 +1,4 @@
+/// Just a Serial Object of ModuleInfo so that it can be persisted in other objects.
 Class %ZPM.PackageManager.Core.ResolvedModuleReference Extends (%SerialObject, %ZPM.PackageManager.Core.ModuleInfo) [ StorageStrategy = "" ]
 {
 
@@ -17,7 +18,7 @@ Storage Default
 <Value>Description</Value>
 </Value>
 <Value name="5">
-<Value>Repo</Value>
+<Value>Repository</Value>
 </Value>
 </Data>
 <State>ResolvedModuleReferenceState</State>

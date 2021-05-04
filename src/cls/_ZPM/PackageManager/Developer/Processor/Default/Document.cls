@@ -11,12 +11,16 @@ Parameter ATTRIBUTES As STRING = "Compile,CompileAfter,Flags,Directory,LoadAsDir
 /// The only expected use case at this point is class packages (.PKG, but Extension will be .CLS)
 Parameter EXTENSION;
 
+/// When a module is loaded in developer mode, this is appended to the resource name in ^Sources - e.g., ^Sources(..Extension, <resource name>_..#NAMEPOSTFIX)
+/// The only expected use case at this point is class packages (.PKG, but Extension will be .CLS)
+Parameter NAMEPOSTFIX;
+
 /// If true, the resource will be compiled during the compilation phase in the module lifecycle.
 Property Compile As %Boolean [ InitialExpression = 1 ];
 
 /// Directory relative to module root containing the exported resource.
 /// Defaults to the resource's extension (lower-case) if unspecified.
-Property Directory As %String(MAXLEN = "");
+Property Directory As %String(MAXLEN = "") [ InitialExpression = {$ZConvert(..#EXTENSION,"L")} ];
 
 /// If true (default is false), the resource is loaded as a directory.
 Property LoadAsDirectory As %Boolean [ InitialExpression = 0 ];
@@ -49,22 +53,26 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		Set tVerbose = $Get(pParams("Verbose"),0)
 		Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
 		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-		Set tName = $TRANSLATE(tName, "%", "_")
-		Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
-		If (pPhase = "Reload") {
-			Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
+    Set tName = $TRANSLATE(tName, "%", "_")
+    Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
+		Set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
+		If ((pPhase = "Reload") && tInScope) || tInCurrentPhase {
+			// Runs in Reload normally, and also in Test for test scope / Verify for verify scope
+			Set tSourcesPrefix = $c($parameter("%ZPM.PackageManager.Developer.Extension.SourceControl.ISC","NOPREFIXCHARCODE"))
 			
+			If '$Get(pParams("NoMapping"),0) {
 			// Disabled mapping of resources. It creates more problems than solves. 
 			// Moreover, the removal of mapping during uninstallation is not implemented.
 			// $$$ThrowOnError(..OnConfigureMappings(.pParams))
+			}
 			
 			If '..ResourceReference.Generated {
 				Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
-        Set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory)
+				Set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory)
         If ('##class(%File).DirectoryExists(tResourceDirectory)) {
           Quit 
         }
-        
+
         Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_..Directory_"/")
         if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
           Set tResourceDirectory = tResourceCatDirectory
@@ -75,6 +83,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             Set tResourceDirectory = tResourceCatDirectory
           }
         }
+				
+				If tDeveloperMode && (..Extension '= "") && (tName '= "") {
+					Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix_tResourceDirectory
+				}
 				
 				If '..ResourceReference.Preload {
 					Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
@@ -92,69 +104,21 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 						Set $PIECE(tResourcePath, ".", *) = "rtn"
 					}
 
-					Set tResourceParentPath = ##class(%File).ParentDirectoryName(tResourcePath)
-
-					$$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,.tHandled))
-					If 'tHandled {
-						If (..Format = "UDL") {
-							// This is tailored toward support of "Other" documents exported in UDL format.
-							// NOTE: Does not support LoadAsDirectory in the general implementation, although subclasses (e.g., Package) may.
-							Set tDocName = ..ResourceReference.Name
-							Set tList = ""
-							If (tDocName [ "*") {
-								set tWildcards = tDocName
-								if $$$isUNIX set tWildcards = $$$ucase(tWildcards)_";"_$$$lcase(tWildcards)
-								do ##class(%ZPM.PackageManager.Developer.File).FindFiles(tResourceParentPath, tWildcards, .tList)
-							} Else {
-								set tList($i(tList)) = $LISTBUILD(tDocName, tResourcePath) 
-							}
-
-							For i=1:1:tList {
-								set $LISTBUILD(tDocName, tResourcePath) = tList(i)
-								If ($$$ucase($Piece(tDocName, ".", *)) = "DFI") {
-									Set tDocName = $Translate($Piece(tResourcePath, tResourceParentPath, 2), "-\", "_/")
-									If (tDocName [ "/") {
-										Set tDocName = $Piece(tDocName, "/", 1, *-1) _ "-" _ $Piece(tDocName, "/", *)
-									}
-								}
-                Set tFlags = $Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile"
-                set tSC = $System.OBJ.Load(tResourcePath, tFlags)
-
-								#; // Slimmed down version of %Api.Atelier.v1:PutDoc
-								#; If ##class(%Atelier.v1.Utils.General).ValidateDocName(tDocName,.tSC,.tCategory) {
-								#; 	Set tFileStream = ##class(%Stream.FileCharacter).%New()
-								#; 	$$$ThrowOnError(tFileStream.LinkToFile(tResourcePath))
-								#; 	Kill tDocArray
-								#; 	While 'tFileStream.AtEnd {
-								#; 		Set tDocArray($i(tDocArray(0))) = tFileStream.ReadLine($$$MaxLocalLength,.tSC)
-								#; 		$$$ThrowOnError(tSC)
-								#; 	}
-								#; 	Set tSC = ##class(%Atelier.v1.Utils.TextServices).SetTextFromArray(.tDocArray,,tDocName,tCategory)
-								#; 	$$$ThrowOnError(tSC)
-								#; 	If tVerbose {
-								#; 		Write !,"Loaded "_tDocName
-								#; 	}
-								#; }
-							}
-						} Else {
-							Set tFlags = $Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile"
-							If ..LoadAsDirectory {
-								Set tSC = $System.OBJ.LoadDir(tResourcePath,tFlags,.tErrors,1)
-							} Else {
-								Set tSC = $System.OBJ.Load(tResourcePath,tFlags,.tErrors)
-							}
-							For i=1:1:$Get(tErrors) {
-								Write !,tErrors(i)
-							}
-							$$$ThrowOnError(tSC)
-						}
-					}
+					$$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList))
+					
+					Set tSC = ##class(%ZPM.PackageManager.Developer.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
+					$$$ThrowOnError(tSC)
 				}
 			}
 			Set pResourceHandled = 1
 		} ElseIf (pPhase = "Compile") {
-			// If Compile is false, indicate that the resource's compilation phase has already been handled and nothing special should happen.
-			Set pResourceHandled = '..Compile
+			If tInScope {
+				// If Compile is false, indicate that the resource's compilation phase has already been handled and nothing special should happen.
+				Set pResourceHandled = '..Compile
+			} Else {
+				// If out of scope, nothing should happen.
+				Set pResourceHandled = 1
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -166,45 +130,29 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 {
 	Set tSC = $$$OK
 	Try {
-		Set tVerbose = $Get(pParams("Verbose"))
-		#; if $$$lcase($p(pItemName,".",*))="dfi" write !,pItemName," -> ",pFullExportPath
 		If ..Format = "UDL" {
 			// This is tailored toward support of "Other" documents exported in UDL format.
-			// Slimmed down version of %Api.Atelier.v1:GetDoc
 			If ##class(%Atelier.v1.Utils.General).ValidateDocName(pItemName,.tSC,.tCategory) {
 				// Ensure directory containing file exists, and attempt to create it if not.
 				If $Extract(pFullExportPath) = """" {
 					// Avoid issues with the path being quoted. (These mess up GetDirectory().)
 					Set pFullExportPath = $Extract(pFullExportPath,2,*-1)
 				}
+				
 				Set tTargetDirectory = ##class(%Library.File).GetDirectory(pFullExportPath)
 				If '##class(%Library.File).DirectoryExists(tTargetDirectory) {
-					// TODO: Use cleaner/more robust method for this?
-					Set tGood = ##class(%Library.File).CreateDirectoryChain(tTargetDirectory,.tReturn)
-					If 'tGood {
-						Set tMsg = $$$FormatText("Could not create directory '%1': %2",tTargetDirectory,$zu(209,tReturn))
-						$$$ThrowStatus($$$ERROR($$$GeneralError,tMsg))
-					}
+					$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.File).CreateDirectoryChain(tTargetDirectory))
 				}
 				
-				If ($SYSTEM.Version.GetMajor()<2017) {
-					Set tFileStream = ##class(%Stream.FileCharacter).%New()
-					$$$ThrowOnError(tFileStream.LinkToFile(pFullExportPath))
-					Set tSC = ##class(%Atelier.v1.Utils.TextServices).GetTextAsArray(pItemName,,.tDocArray)
-					$$$ThrowOnError(tSC)
-					
-					For tLine=1:1:tDocArray(0) {
-						Do tFileStream.WriteLine(tDocArray(tLine))
-					}
-					$$$ThrowOnError(tFileStream.%Save())					
-				} Else {
-					$$$ThrowOnError($SYSTEM.OBJ.ExportUDL(pItemName, pFullExportPath, "-d"))
-				}
-				If tVerbose {
-					WRITE !,"Exported '",pItemName,"' to ",pFullExportPath
-				}
-				Set pItemHandled = 1
+				$$$ThrowOnError($System.OBJ.ExportUDL(pItemName,pFullExportPath,"-d /diffexport"))
 			}
+			Set pItemHandled = 1
+		} ElseIf (..Format = "XML") {
+			$$$ThrowOnError($System.OBJ.Export(pItemName,pFullExportPath,"-d /diffexport"))
+			Set pItemHandled = 1
+		} ElseIf (..Format = "%RO") {
+			Set tSC = $$Export^%apiRTN(pItemName,pFullExportPath,"Save for Source Control","WNSK\UTF8\","-d /diffexport")
+			Set pItemHandled = 1
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -218,19 +166,87 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 	Quit $$$OK
 }
 
-/// Subclasses may override to customize resource load behavior during the Reload phase.
-Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, Output pHandled As %Boolean = 0) As %Status
+/// Subclasses may override to customize resource load behavior during the Reload phase. <br />
+/// @Argument	pFullResourcePath			The absolute path to the resource present on the file system
+/// @Argument	pVerbose					1: display output from loading files, 0: do not display output
+/// @Argument	pCompile					1: compile files upon load, 0: do not compile files
+/// @Argument	pLoadedList					Output: comma delimited list of files that have been loaded
+Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %Boolean = 0, Output pLoadedList As %String) As %Status
 {
-	Quit $$$OK
+	Set pLoadedList = ""
+	Set tSC = $$$OK
+	Try {
+		// Workaround: need to clean up after other UDL import/export operations
+		Kill ^||%oddDEF
+    Set tFlags = $Select(pVerbose:"/display",1:"/nodisplay")_
+      $Select(pCompile:"/compile",1:"/nocompile")_
+      $Select($TLevel:"/multicompile=0",1:"")
+    If (..Format = "UDL") {
+      Set tResourceParentPath = ##class(%File).ParentDirectoryName(pFullResourcePath)
+      Set tDocName = ..ResourceReference.Name
+      Set tList = ""
+      If (tDocName [ "*") {
+        Set tWildcards = tDocName
+        If $$$isUNIX set tWildcards = $$$ucase(tWildcards)_";"_$$$lcase(tWildcards)
+        Do ##class(%ZPM.PackageManager.Developer.File).FindFiles(tResourceParentPath, tWildcards, .tList)
+      } Else {
+        Set tList($i(tList)) = $LISTBUILD(tDocName, pFullResourcePath) 
+      }
+
+      For i=1:1:tList {
+        Set $LISTBUILD(tDocName, tResourcePath) = tList(i)
+        Set tSC = $System.OBJ.Load(tResourcePath, tFlags,, .pLoadedList)
+      }
+    } Else {
+      If ..LoadAsDirectory {
+        Set tSC = $System.OBJ.LoadDir(pFullResourcePath, tFlags, , 1, .pLoadedList)
+        $$$ThrowOnError(tSC)
+      } ElseIf (..Format = "%RO") {
+        // This tolerates some unusual %RO header formats that $System.OBJ.Load does not respect.
+        Set pLoadedList = ""
+        Set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$Select(pVerbose:"d",1:"-d"))
+        Set tResourceKey = ""
+        For {
+          Set tResourceKey = $Order(tResult(tResourceKey))
+          If (tResourceKey = "") {
+            Quit
+          }
+          Set pLoadedList = pLoadedList_$ListBuild(tResourceKey)
+        }
+        Set pLoadedList = $ListToString(pLoadedList)
+      } Else {
+        Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
+        $$$ThrowOnError(tSC)
+      }
+    }
+		If $Data(pLoadedList)#2 {
+			Do ..ResourceReference.UpdateChildrenFromString(pLoadedList)
+		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
 }
 
 Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
-	Set ..Name = $Piece(pResourceReference.Name,".",1,*-1)
-	Set ..Extension = $Case(..#EXTENSION,"":$Piece(pResourceReference.Name,".",*),:..#EXTENSION)
-	Set tSC = ##super(pResourceReference)
-	If (..Directory = "") {
-		Set ..Directory = $ZConvert(..Extension,"L")
+	Set tResourceRefName = pResourceReference.Name
+	// Set LoadAsDirectory to 1 if resource reference name is a path. 
+	// Else, get name and extension from resource reference name
+	If $Extract(tResourceRefName) = "/" {
+		Set ..LoadAsDirectory = 1
+		Set ..Directory = tResourceRefName
+		Set tSC = ##super(pResourceReference)
+		If (..Extension = "") {
+			Set ..Extension = ..#EXTENSION
+		}
+	} Else {
+		Set ..Name = $Piece(tResourceRefName,".",1,*-1)
+		Set ..Extension = $Case(..#EXTENSION,"":$Piece(tResourceRefName,".",*),:..#EXTENSION)
+		Set tSC = ##super(pResourceReference)
+		If (..Directory = "") {
+			Set ..Directory = $ZConvert(..Extension,"L")
+		}
 	}
 	Quit tSC
 }
@@ -240,10 +256,6 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 	Set tSC = $$$OK
 	Try {
 		If (pPhase = "Validate") {
-			If ($Extract(..Name) = "/") {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid resource name '%1' - must be a Studio document type.",..Name))
-				Quit
-			}
 			If (..Extension = "") {
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid resource name '%1' - must have a file extension to identify the Studio document type.",..Name))
 				Quit
@@ -255,21 +267,60 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 	Quit tSC
 }
 
+/// Enumerate all documents contained in the resource being processed. <br />
+/// @Argument	pResourceArray			ByRef: array of the following format: pResourceArray(<Studio document name>) = <module that contains document>
+/// pResourceArray(<Studio document name>, <resource referenty property>) = value of resource reference property for given document
 Method OnResolveChildren(ByRef pResourceArray) As %Status
 {
-	If ('$Data(pResourceArray(..ResourceReference.Name))) {
-		Quit $$$OK
+	If ..LoadAsDirectory {
+		Kill pResourceArray(..ResourceReference.Name)
+		Set tKey = ""
+		While 1 {
+			Do ..ResourceReference.Children.GetNext(.tKey)
+			Quit:(tKey = "")
+			Set pResourceArray(tKey) = ..ResourceReference.Module.Name
+			Set pResourceArray(tKey,"Processor") = ..ResourceReference.Processor
+			Set pResourceArray(tKey,"Generated") = ..ResourceReference.Generated
+			Set pResourceArray(tKey,"Preload") = ..ResourceReference.Preload
+			Set pResourceArray(tKey,"Scope") = ..ResourceReference.Scope
+			Set pResourceArray(tKey,"Deploy") = ..ResourceReference.Deploy
+			Set pResourceArray(tKey,"RelativePath") = ..OnItemRelativePath(tKey)
+		}
+	} Else {
+		// Add the relative path for purposes of lifecycle %Export method
+		Set pResourceArray(..ResourceReference.Name,"RelativePath") = ..OnItemRelativePath(..ResourceReference.Name)
 	}
-	// Add the relative path for purposes of lifecycle %Export method
-	Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
-	Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-	If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
-		Set tSourceRoot = tSourceRoot _ "/"
-	}
-	set tClassName = ..Name
-	Set tClassName = $TRANSLATE(tClassName, "%", "_")
-	Set pResourceArray(..ResourceReference.Name,"RelativePath") = tSourceRoot_..Directory_"/"_$tr(tClassName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 	Quit $$$OK
+}
+
+/// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
+Method OnItemRelativePath(pItemName As %String) As %String
+{
+	Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
+	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_..Directory_"/"_$tr($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
+}
+
+Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo) As %Status
+{
+	Set pInfo = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo).%New()
+	Set pInfo.SourceControlAware = 1
+	Set pInfo.RelativePath = ..Directory
+	Set pInfo.ResourceType = ..Extension
+	Set pInfo.Prefix = ..Name_..#NAMEPOSTFIX
+	If (..ResourceReference.Preload) {
+		Set pInfo.RelativePath = "/preload/"_pInfo.RelativePath
+	}
+	Quit $$$OK
+}
+
+/// Returns a unique name for this resource.
+/// Default implementation, leaving <var>pUniqueName</var> undefined, reverts to default behavior.
+/// An empty string indicates guaranteed uniqueness (useful for folders relative to module root)
+Method OnGetUniqueName(Output pUniqueName)
+{
+	If ($Extract(..ResourceReference.Name) = "/") {
+		Set pUniqueName = ..ResourceReference.Module.Name_"@"_..ResourceReference.Name
+	}
 }
 
 }

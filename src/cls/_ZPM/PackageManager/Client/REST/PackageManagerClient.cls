@@ -51,7 +51,7 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
         CONTINUE:'tVersion.Satisfies(tVersionExpression)
         Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
         Set tModRef.Name = item.name
-        Set tModRef.Repo = item.repository
+        Set tModRef.Repository = item.repository
         Set tModRef.VersionString = version
         Set tModRef.Description = item.description
         Do tList.Insert(tModRef)

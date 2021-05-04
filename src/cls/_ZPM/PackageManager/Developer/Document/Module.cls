@@ -3,11 +3,13 @@ Include (%ZPM.PackageManager.Common, %occErrors)
 Class %ZPM.PackageManager.Developer.Document.Module Extends %ZPM.PackageManager.Developer.Document.AbstractDocument
 {
 
-Projection RegisterExtension As %Projection.StudioDocument(DocumentDescription = "Application Module", DocumentExtension = "ZPM", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/PackageManager");
+Projection RegisterExtension As %ZPM.PackageManager.Developer.Document.Projection(DocumentDescription = "Application Module", DocumentExtension = "ZPM", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/PackageManager");
 
 Parameter EXTENSION = ".ZPM";
 
 Parameter INFOGLOBAL = "^ZPM.Dev.Doc.Module";
+
+Parameter STREAMCLASS = "%ZPM.PackageManager.Developer.Document.ModuleStream";
 
 /// Load the module definition <property>Name</property> into the stream <property>Code</property>
 Method Load() As %Status
@@ -35,6 +37,8 @@ Method Load() As %Status
 			If $$$ISERR(tSC) {
 				Quit
 			}
+		} ElseIf $$$ISERR(tSC) {
+			Quit
 		} Else {
 			Set tSC = ..Code.CopyFrom(tModStream.Contents)
 		}
@@ -62,6 +66,8 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 	Set pModule = $$$NULLOREF
 	Try {
 		New $$$ZPMStudioDocumentModule
+		New $$$ZPMDeferModifyResources
+		Set $$$ZPMDeferModifyResources = 1
 		If ##class(%ZPM.PackageManager.Developer.Module).NameExists(pStream.Name) {
 			Set pModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pStream.Name,,.tSC)
 			If $$$ISERR(tSC) {
@@ -87,8 +93,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 			Do pModule.Resources.Clear()
 			Do pModule.Defaults.Clear()
 			Do pModule.Mappings.Clear()
-			Do pModule.API.Clear()
-			Do pModule.Invokes.Clear()
+      Do pModule.Invokes.Clear()
 			
 			If (pModule.%Id() '= "") {
 				// Save to prevent unique index violations on re-insert of things that weren't actually removed.
@@ -106,13 +111,18 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 				Quit
 			}
 			
-			If (pStream.Name '= pModule.Name) {
+			If ($$$lcase(pStream.Name) '= $$$lcase(pModule.Name)) {
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module document name '%1' and module name in manifest '%2' must be the same.",pStream.Name,tModule.Name))
 				Quit
 			}
 		}
 		
 		Set tSC = pModule.%Save()
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.Interface).%OnModifyResources(pModule)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -124,30 +134,34 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 
 Method OnCompileDocument(ByRef qstruct As %String) As %Status
 {
+	#dim tModule As %ZPM.PackageManager.Developer.Module
+	#dim tGeneralSettings As %ZPM.PackageManager.Developer.GeneralSettings
 	Set tSC = $$$OK
 	Try {
 		Set tNameNoExt = $Piece(..Name,".",1,*-1)
 		Set tModStream = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(tNameNoExt,,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		Do tModStream.Contents.Clear()
 		Set tSC = tModStream.Contents.CopyFrom(..Code)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
+		Set tSC = tModStream.%Save()
+		$$$ThrowOnError(tSC)
 		
 		Set tSC = ..UpdatePersistentFromStream(tModStream,.tModule)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		Set ..Name = tModule.Name_..#EXTENSION
 		
-		Set tSC = tModule.%Compile()
-		If $$$ISERR(tSC) {
-			Quit
+		// Determine whether to suppress compilation from settings
+		Set tGeneralSettings = ##class(%ZPM.PackageManager.Developer.GeneralSettings).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		Set tSuppressCompilation = tGeneralSettings.SuppressCompilation
+		If tSuppressCompilation {
+			Write !, "Module compilation suppressed due to user settings."
+		} Else {
+			Set tSC = tModule.%Compile(.qstruct)
+			$$$ThrowOnError(tSC)
 		}
 		
 		Set @..#INFOGLOBAL@("compile",tModStream.Name) = $zdt($zts,3)
@@ -213,14 +227,23 @@ ClassMethod ImportStream(pName As %String, pStream As %GlobalCharacterStream) As
 ClassMethod Delete(name As %String) As %Status
 {
 	Set tSC = $$$OK
+	Set tInitTLevel = $TLevel
 	Try {
 		Set tSC = ..%ValidateName(name)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameDelete($Piece(name,".",1,*-1))
+		$$$ThrowOnError(tSC)
+		
+		Set tModuleName = $Piece(name,".",1,*-1)
+		TSTART
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameDelete(tModuleName)
+		$$$ThrowOnError(tSC)
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).NameDelete(tModuleName)
+		$$$ThrowOnError(tSC)
+		TCOMMIT
 	} Catch e {
 		Set tSC = e.AsStatus()
+	}
+	While ($TLevel > tInitTLevel) {
+		TROLLBACK 1
 	}
 	Quit tSC
 }
@@ -275,27 +298,44 @@ Query ItemList() As %SQLQuery(ROWSPEC = "name:%String,modified:%TimeStamp") [ Sq
 		where Name not in (select Name from %ZPM_PackageManager_Developer_Document.ModuleStream)
 }
 
-/// Lock the current routine, default method just unlocks the ^ROUTINE global with the name of the routine.
-/// If it fails then return a status code of the error, otherise return $$$OK
-Method Lock(flags As %String) As %Status
+/// Returns a comma-separated list of *individual* resources listed in the module manifest.
+/// This does not include packages or CSP/filesystem resources.
+ClassMethod GetOther(Name As %String) As %String
 {
-	Set tSC = $$$OK
-	If ..Locked Set ..Locked=..Locked+1 Quit $$$OK
-	If ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameExists($Piece(..Name,".",1,*-1),.tID) {
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).%LockId(tID)
+	Set tOtherDocs = ""
+	Try {
+		Set tExt = $Piece(Name,".",*)
+		If (tExt = "ZPM") {
+			Set tModuleName = $Piece(Name,".",1,*-1)
+			Set tResources = ##class(%SQL.Statement).%ExecDirect(,
+				"select UniqueName from %ZPM_PackageManager_Developer.ResourceReference where ""Module""->Name = ?",
+				tModuleName)
+			If (tResources.%SQLCODE < 0) {
+				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResources.%SQLCODE,tResources.%Message)
+			}
+			While (tResources.%Next(.tSC)) {
+				$$$ThrowOnError(tSC)
+				Set tName = tResources.%Get("UniqueName")
+				If (tName = "") || ($Extract(tName) = "/") {
+					// Skip CSP/filesystem resources, and resources without a corresponding server document name.
+					Continue
+				}
+				Set tExt = $Piece(tName,".",*)
+				If (tExt = "PKG") {
+					// Cannot open packages directly.
+					// Perhaps we could call ResolveChildren or expand these if there's interest.
+					Continue
+				}
+				Set tOtherDocs = tOtherDocs _ $ListBuild(tName)
+			}
+			$$$ThrowOnError(tSC)
+		}
+	} Catch e {
+		Set tOtherDocs = ""
+		// No way to report exceptions, so just Log it.
+		Do e.Log()
 	}
-	Set ..Locked=1
-	Quit tSC
-}
-
-/// Unlock the current routine, default method just unlocks the ^ROUTINE global with the name of the routine
-Method Unlock(flags As %String) As %Status
-{
-	Set tSC = $$$OK
-	If ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameExists($Piece(..Name,".",1,*-1),.tID) {
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).%UnlockId(tID)
-	}
-	Quit tSC
+	Quit $ListToString(tOtherDocs)
 }
 
 /// Export this document to the current device in XML format

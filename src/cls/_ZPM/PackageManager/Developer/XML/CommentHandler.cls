@@ -3,23 +3,35 @@
 Class %ZPM.PackageManager.Developer.XML.CommentHandler Extends %XML.SAX.ContentHandler
 {
 
-/// ..Comments = <number of comments extracted from document>
-/// ..Comments(i) = <text of ith comment in XML document>
-Property Comments [ MultiDimensional, Private ];
+/// Content (comments/whitespace) that have been found but not yet mapped to their appropriate position in the document.
+Property UnmappedContent [ MultiDimensional, Private ];
 
-/// ..CommentMap(i) = <XPath expression for location of ..Comments(i)>
-Property CommentMap [ MultiDimensional, Private ];
+/// ..Content = <number of comment/whitespace items extracted from document>
+/// ..Content(i) = $lb((comment|characters),<text>)
+Property Content [ MultiDimensional, Private ];
+
+/// ..ContentMap(i) = <XPath expression for location of ..Content(i)>
+Property ContentMap [ MultiDimensional, Private ];
 
 /// ..Path = <depth of current path in document>
 /// ..Path(i) = $ListBuild(<containing element descriptor>,<previous element descriptor>,<previous padding characters>)
 Property Path [ MultiDimensional, Private ];
 
-Property Padding As %String(MAXLEN = "") [ Private ];
+/// Last node type (document, element, comment)
+Property LastNodeType As %String [ Private ];
 
-Method GetResults(Output pComments, Output pCommentMap) [ Internal ]
+/// If no attributes are available to identify an element, then occurrences of element paths are counted and used instead (stored here)
+/// ..PathCount($zcrc(<path>,7)) = <count>
+Property PathCounts [ MultiDimensional, Private ];
+
+/// In case a duplicate path is found later in processing, this is used to track what the replacement should be.
+/// ..ReplacePaths($zcrc(<original path>,7)) = <path to really use>
+Property ReplacePaths [ MultiDimensional, Private ];
+
+Method GetResults(Output pContent, Output pContentMap) [ Internal ]
 {
-	Merge pComments = i%Comments
-	Merge pCommentMap = i%CommentMap
+	Merge pContent = ..Content
+	Merge pContentMap = ..ContentMap
 }
 
 Method Reapply(ByRef pXMLStream As %Stream.Object, pIndent As %Boolean = 1) As %Status
@@ -27,43 +39,46 @@ Method Reapply(ByRef pXMLStream As %Stream.Object, pIndent As %Boolean = 1) As %
 	Set tSC = $$$OK
 	Try {
 		// Construct XSLT to add comments back in.
-		Do ..GetResults(.tComments, .tCommentMap)
-		If '$Data(tComments) {
+		Do ..GetResults(.tContent, .tContentMap)
+		If '$Data(tContent) {
 			// No-op.
 			Quit
 		}
 		
 		Set tXSL = ##class(%Stream.TmpBinary).%New()
 		Do tXSL.Write("<?xml version=""1.0"" encoding=""UTF-8""?>")
-		Do tXSL.Write("<xsl:stylesheet version=""1.0"" xmlns:xsl=""http://www.w3.org/1999/XSL/Transform"">")
-		Do tXSL.Write("<xsl:output method=""xml"" "_$Select(pIndent:"indent=""yes""",1:"")_"/>")
+		Do tXSL.Write("<xsl:stylesheet version=""1.0"" xmlns:xsl=""http://www.w3.org/1999/XSL/Transform"" xmlns:xslt=""http://xml.apache.org/xslt"">")
+		Do tXSL.Write("<xsl:output method=""xml"" "_$Select(pIndent:"indent=""yes"" xslt:indent-amount=""2""",1:"")_"/>")
+    	If ('pIndent) {
+	    	// Add leading and trailing newline
+	    	Set tNewline = "<xsl:text>"_$ZConvert($c(10),"O","XML")_"</xsl:text>"
+	    	Do tXSL.Write("<xsl:template match=""/"">")
+	    	Do tXSL.Write(tNewline)
+	    	Do tXSL.Write("<xsl:apply-templates select=""*""/>")
+	    	Do tXSL.Write(tNewline)
+	    	Do tXSL.Write("</xsl:template>")
+    	}
 		Do tXSL.Write("<xsl:template match=""node()|@*"">")
     	Do tXSL.Write("<xsl:copy>")
-        Do tXSL.Write("<xsl:text /><xsl:apply-templates select=""node()|@*""/><xsl:text />")     
+        Do tXSL.Write("<xsl:text /><xsl:apply-templates select=""node()|@*""/><xsl:text />")
     	Do tXSL.Write("</xsl:copy>")
 		Do tXSL.Write("</xsl:template>")
 		
 		// First pass: build map of comments to associated elements (with filters)
 		#define BEFORE 0
 		#define AFTER 1
-		For i=1:1:$Get(tComments) {
-			Set tComment = tComments(i)
-			Set tContainerElement = $ListGet(tCommentMap(i))
-			Set tPrevElement = $ListGet(tCommentMap(i),2)
-			Set tPadding = $ListGet(tCommentMap(i),3)
+		For tIndex=1:1:$Get(tContent) {
+			Set tItem = tContent(tIndex)
+			Set tPath = tContentMap(tIndex)
 			
-			If (tPrevElement = $lb("","")) {
-				Set tMatch = $ListGet(tContainerElement,2)
-				Set tPlace = $$$BEFORE
-			} Else {
-				Set tMatch = $ListGet(tPrevElement,2)
-				Set tPlace = $$$AFTER
+			// Hash to avoid <SUBSCRIPT> errors for very long paths
+			Set tHash = $zcrc($ListGet(tPath,2),7)
+			Set tLocationHashMap(tHash) = $ListGet(tPath,2)
+			Set tLocationHashMap(tHash,tIndex) = tItem
+			
+			If ($ListGet(tItem) = "comment") {
+				Set tHasComments(tHash) = ""
 			}
-			
-			// Hash to avoid <SUBSCRIPT> errors
-			Set tHash = $zcrc(tMatch,7)
-			Set tLocationHashMap(tHash) = tMatch
-			Set tLocationHashMap(tHash,tPlace,i) = $lb(tPadding,tComment)
 		}
 		
 		// Second pass: write XSLT to add comments
@@ -72,29 +87,40 @@ Method Reapply(ByRef pXMLStream As %Stream.Object, pIndent As %Boolean = 1) As %
 			Set tKey = $Order(tLocationHashMap(tKey),1,tMatchExpression)
 			Quit:tKey=""
 			
-			Do tXSL.Write("<xsl:template match="""_tMatchExpression_""">")
-			Do tXSL.Write("<xsl:copy><xsl:copy-of select=""@*""/>")
+			// Only do anything if we actually have a comment.
+			If '$Data(tHasComments(tKey)) {
+				Continue
+			}
 			
-			Set tBeforeKey = 0
+			If $Data(..ReplacePaths(tKey),tReplaceExpression) {
+				// After tMatchExpression was stored, the real expression to use was updated (to add a counter).
+				// Use that expression instead.
+				Set tMatchExpression = tReplaceExpression
+			}
+			
+			Do tXSL.Write("<xsl:template match="""_tMatchExpression_""">")
+			
+			Set tBeforeKey = ""
+			Set tLineNumber = 1
 			For {
-				Set tBeforeKey = $Order(tLocationHashMap(tKey,$$$BEFORE,tBeforeKey),1,tData)
+				Set tBeforeKey = $Order(tLocationHashMap(tKey,tBeforeKey),1,tData)
 				Quit:tBeforeKey=""
 				
-				Do:pIndent tXSL.Write("<xsl:text>"_$ZConvert($ListGet(tData,1),"O","XML")_"</xsl:text>")
-				Do tXSL.Write("<xsl:comment>"_$ZConvert($ListGet(tData,2),"O","XML")_"</xsl:comment>")
-			}
-			
-			Do tXSL.Write("<xsl:apply-templates select=""node()|@*"" /></xsl:copy>")
-			
-			Set tAfterKey = 0
-			For {
-				Set tAfterKey = $Order(tLocationHashMap(tKey,$$$AFTER,tAfterKey),1,tData)
-				Quit:tAfterKey=""
+				Set $ListBuild(tType,tText) = tData
 				
-				Do:pIndent tXSL.Write("<xsl:text>"_$ZConvert($ListGet(tData,1),"O","XML")_"</xsl:text>")
-				Do tXSL.Write("<xsl:comment>"_$ZConvert($ListGet(tData,2),"O","XML")_"</xsl:comment>")
+				If (pIndent && (tType = "characters")) {
+					If (tLineNumber = 1) && ($Extract(tText) = $c(10)) {
+						Set tText = $Piece(tText,$c(10),1,*-1)
+					}
+					Do tXSL.Write("<xsl:text>"_$ZConvert(tText,"O","XML")_"</xsl:text>")
+				} ElseIf (tType = "comment") {
+					Do tXSL.WriteLine("<xsl:comment>"_$ZConvert(tText,"O","XML")_"</xsl:comment>")
+				}
+				Set tLineNumber = tLineNumber + 1
 			}
-			Do tXSL.Write("</xsl:template>")
+			
+			Do tXSL.Write("<xsl:copy><xsl:copy-of select=""@*""/>")
+			Do tXSL.Write("<xsl:apply-templates select=""node()|@*"" /></xsl:copy></xsl:template>")
 		}
 		
 		Do tXSL.Write("</xsl:stylesheet>")
@@ -142,44 +168,50 @@ ClassMethod BuildAttributeFilter(pAttrList As %List) As %String [ Private ]
 /// wrapping another exception.</p>
 Method comment(chars As %String, length As %Integer)
 {
-	Set tPosition = ..GetPosition()
-	Set i%Comments($Increment(i%Comments)) = chars
-	Set i%CommentMap(i%Comments) = tPosition
-	Set i%Padding = ""
+	Set ..UnmappedContent($Increment(..UnmappedContent)) = $lb("comment",chars)
+	Set ..LastNodeType = "comment"
 	Quit
 }
 
-/// Returns current position in the XML document, as an XPath expression with information on the previous node.
+/// Returns current position in the XML document, as an XPath expression with information on the next non-comment node.
 Method GetPosition() As %String
 {
 	Set tPath = ""
-	Set tPrevious = ""
 	Set tType = ""
-	Set tPreviousType = ""
-	Set tPadding = ""
 	For i=1:1:$Get(..Path) {
 		Kill tVal1,tVal2
-		Set $ListBuild(tType,tVal1) = ..Path(i)
+		Set $ListBuild(tType,tVal1,tFilter) = ..Path(i)
 		If (i = ..Path) {
 			Set tNext = $Case(tType,
-				"element":"/"_tVal1,
+				"element":"/"_tVal1_tFilter,
 				"document":"/",
 				:"")
-			Set tPrevious = $Get(..Path(i+1))
 		} Else {
 			Set tNext = $Case(tType,
-				"element":"/"_tVal1,
+				"element":"/"_tVal1_tFilter,
 				:"")
 		}
 		Set tPath = tPath_tNext
-		If (tPrevious '= "") {
-			Set tPreviousType = $ListGet(tPrevious,1)
-			Set tPrevious = tPath_
-				$Case(tType,"document":"",:"/")_
-				$ListGet(tPrevious,2)
+		If $Data(tVal1) {
+			If ($Get(tFilter) = "") && $Data(..PathCounts(i-1,tVal1),tCount) {
+				// If there is no filter, always refer to the node by position.
+				Set tPath = tPath_"["_tCount_"]"
+			} ElseIf ($Get(tFilter) '= "") && (i = ..Path) {
+				Set tHash = $zcrc(tPath,7)
+				If $Data(..PathCounts(tHash),tCount) {
+					If (tCount = 1) {
+						// Flag that we have another occurrence of this path that needs to be updated to refer
+						// to the first occurrence.
+						Set ..ReplacePaths(tHash) = tPath_"[1]"
+					}
+					Set tPath = tPath_"["_$Increment(..PathCounts(tHash))_"]"
+				} Else {
+					Set ..PathCounts(tHash) = 1
+				}
+			}
 		}
 	}
-	Quit $ListBuild($ListBuild(tType,tPath),$ListBuild(tPreviousType,tPrevious),i%Padding)
+	Quit $ListBuild(tType,tPath)
 }
 
 /// Receive notification of the beginning of the document.
@@ -192,10 +224,13 @@ Method GetPosition() As %String
 /// <p>
 Method startDocument()
 {
-	Kill i%Comments
-	Kill i%CommentMap
-	Set i%Padding = ""
-	Set i%Path($i(i%Path)) = $lb("document")
+	Kill ..Content
+	Kill ..ContentMap
+	Kill ..UnmappedContent
+	Kill ..PathCounts
+	Kill ..ReplacePaths
+	Set ..Path($i(..Path)) = $lb("document")
+	Set ..LastNodeType = "document"
 }
 
 /// Receive notification of the start of an element.
@@ -242,15 +277,20 @@ Method startElement(uri As %Library.String, localname As %Library.String, qname 
 	
 	Set tFilter = ..BuildAttributeFilter(tModArgs)
 	
+	Set tPathCount = $Get(..PathCounts(..Path,localname_tFilter),0) + 1
+	Set ..PathCounts(..Path,localname_tFilter) = tPathCount
+	
 	// Update path info
-	Set i%Path($Increment(i%Path)) = $lb("element",localname_tFilter)
-	Set tNext = i%Path
+	Set ..Path($Increment(..Path)) = $lb("element",localname,tFilter)
+	Set tNext = ..Path
 	For {
-		Set tNext = $Order(i%Path(tNext))
+		Set tNext = $Order(..Path(tNext))
 		Quit:tNext=""
-		Kill i%Path(tNext)
+		Kill ..Path(tNext)
 	}
-	Set i%Padding = ""
+	
+	Do ..MapContent()
+	Set ..LastNodeType = "element"
 }
 
 /// Receive notification of the end of an element.
@@ -271,8 +311,26 @@ Method startElement(uri As %Library.String, localname As %Library.String, qname 
 /// </p>
 Method endElement(uri As %Library.String, localname As %Library.String, qname As %Library.String)
 {
-	Set i%Path = i%Path - 1
-	Set i%Padding = ""
+	Set ..LastNodeType = "element"
+	Kill ..PathCounts(..Path)
+	Kill ..UnmappedContent
+	Set ..Path = ..Path - 1
+}
+
+Method MapContent()
+{
+	If $Data(..UnmappedContent,tContentCount) {
+		Set tPosition = ..GetPosition()
+		Set tRemovedOneIndent = 0
+		For tIndex=1:1:tContentCount {
+			Set tContent = $Get(..UnmappedContent(tIndex))
+			If ($ListGet(tContent,2) '= "") {
+				Set ..Content($i(..Content)) = tContent
+				Set ..ContentMap(..Content) = tPosition
+			}
+		}
+		Kill ..UnmappedContent
+	}
 }
 
 /// Receive notification of character data inside an element.
@@ -291,7 +349,11 @@ Method endElement(uri As %Library.String, localname As %Library.String, qname As
 /// </ul>
 Method characters(chars As %Library.String, length As %Library.Integer)
 {
-	Set i%Padding = chars
+	// Strip trailing $c(10) and any number of spaces following it.
+	Set tExtraChars = chars
+	If (tExtraChars '= "") {
+		Set ..UnmappedContent($i(..UnmappedContent)) = $lb("characters",tExtraChars)
+	}
 }
 
 }

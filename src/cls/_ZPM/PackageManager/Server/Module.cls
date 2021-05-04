@@ -86,7 +86,7 @@ Storage Default
 <Value>Description</Value>
 </Value>
 <Value name="11">
-<Value>Repo</Value>
+<Value>Repository</Value>
 </Value>
 </Data>
 <DataLocation>^ZPM.Server.ModuleD</DataLocation>

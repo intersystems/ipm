@@ -1,9 +1,17 @@
-Include (%occSAX, %syGluedef)
+Include (%occSAX, %syGluedef, %ZPM.Formatting)
 
 IncludeGenerator %occSAX
 
 Class %ZPM.PackageManager.Developer.CLI
 {
+
+/// Name of include file that will contain accessor macros for modifiers
+/// and parameters referenced in the "Commands" XData block. <br />
+/// If provided, an include file will be generated and included in the sub-class
+/// during compilation. <br />
+/// @API.Parameter
+/// @API.Overrideable
+Parameter CommandsAccessorIncludeFilename As STRING;
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -145,9 +153,13 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 	
 	If (tCommand '= "") && '$Data(tCommandStruct(tCommand)) {
 		// See if it's an alias. (If not, we'll show help for everything.)
-		If $Data(tCommandStruct(1,tCommand),tCommand)
+		If '$Data(tCommandStruct(1,tCommand),tCommand) {
+			Write !, $$$FormattedLine($$$Red, "WARNING: Command "_$$$QUOTE(tCommand)_" does not exist so showing all available commands.")
+			Write !
+		}
 	}
 	
+	// Single command
 	If (tCommand '= "") && (tCommand '= +tCommand) && $Data(tCommandStruct(tCommand)) {
 		Kill tOneCommandStruct
 		Merge tOneCommandStruct = tCommandStruct(tCommand)
@@ -159,19 +171,30 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 			Set tCommand = ""
 			For {
 				Set tCommand = $Order(tCommandStruct(1,tCommand))
-				Quit:(tCommand="")
+				If (tCommand = "") {
+					Quit
+				}
 				
 				Set tCommandStruct(tCommand) = tCommandStruct(1,tCommand)
 			}
 		}
 		
 		// List commands
-		Write:'tMarkdown !,"Available commands: "
+		If 'tMarkdown {
+			Write !, $$$FormattedLine($$$Underlined, "Available commands:")
+			Write !, "NOTE: [] around a parameter indicates it is optional"
+			Write !
+		}
 		Set tCommand = ""
-		For {
+		While 1 {
 			Set tCommand = $Order(tCommandStruct(tCommand))
-			Quit:(tCommand="")
-			Continue:(tCommand=+tCommand) // Skip numbered subscripts.
+			If (tCommand = "") {
+				Quit
+			}
+			// Skip numbered subscripts.
+			If (tCommand = +tCommand) {
+				Continue
+			}
 			
 			Kill tOneCommandStruct
 			Merge tOneCommandStruct = tCommandStruct(tCommand)
@@ -180,63 +203,90 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 			Write !
 		}
 		
-		Write:'tVerbose !,"For more detail, run:",!?2,"help <command-name>",!,"or",!?2,"help -v"
+		If 'tVerbose {
+			Write !, "For more detail, run:", !?2, "help <command-name>", !, "or", !?2, "help -v"
+		}
 	}
+	Write !
 }
 
 ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDetailed As %Boolean = 0, pMarkdownFormat As %Boolean = 0)
 {
-	#define ESCAPE(%string) $Select(pMarkdownFormat:$Replace(%string,"[","\["),1:%string)
+	// Macro to escape if in markdown
+	#define Escape(%string) $Select(pMarkdownFormat:$Replace(%string,"[","\["),1:%string)
+	// Macro to format strings if printing to terminal and to escape if in markdown
+	#define EscapeOrFormat(%string, %format) $Case(pMarkdownFormat, 1:$Replace(%string, "[", "\["), :$$$FormattedLine(%format, %string))
+	// Bullet point if in Terminal
+	#define BulletPoint $Case(pMarkdownFormat, 1: "", :$Char(8729)_" ")
+	// Black square if in Terminal
+	#define BlackSquare $Case(pMarkdownFormat, 1: "", :$Char(9632)_" ")
+	
 	Set tIndent = 2
 	Set tIsAlias = $Data(pCommandStruct)<10
 	If pMarkdownFormat && tIsAlias {
-		Write !,"----",!,"h2. ",pCommandName
-		Write !,"_Alias for [",pCommandStruct,"|#",pCommandStruct,"]_"
+		Write !, "----", !, "h2. ", pCommandName
+		Write !, "_Alias for [", pCommandStruct, "|#", pCommandStruct, "]_"
 	}
 	
 	// Don't show full documentation for aliases 
-	Quit:tIsAlias
+	If tIsAlias {
+		Return
+	}
 	
-	Write !,$Select(pMarkdownFormat:"----",1:""),!
-	Write:pMarkdownFormat "h2. "
-	Write pCommandName
+	Write !, $Select(pMarkdownFormat:"----",1:""), !
+	If pMarkdownFormat {
+		Write "h2. "
+	}
+	Write $$$EscapeOrFormat(pCommandName, $$$Red)
 	
-	Write:pMarkdownFormat !,"Syntax: {{",pCommandName
+	If pMarkdownFormat {
+		Write !, "Syntax: {{", pCommandName
+	}
 	
 	If $Data(pCommandStruct("modifiers")) && '$Get(pCommandStruct("trailingModifiers"),0) {
-		Write $$$ESCAPE(" [flags]")
+		Write $$$EscapeOrFormat(" [flags]", $$$Red)
 	}
 	
 	If $Data(pCommandStruct("parameters")) {
 		Set tKey = ""
 		Set tEndingBrackets = 0
-		For {
+		While 1 {
 			Set tKey = $Order(pCommandStruct("parameters",tKey),1,tParamName)
-			Quit:(tKey="")
-			Quit:(tKey'=+tKey) //Only deal with ordered parameters, not named
+			// Only deal with ordered parameters, not named
+			If (tKey = "") || (tKey '= +tKey) {
+				Quit
+			}
 			
 			Write " "
-			If 'pCommandStruct("parameters",tParamName,"required") {
-				Write $$$ESCAPE("[")
+			// Non-required parameters are surrounded with [] brackets
+			If 'pCommandStruct("parameters", tParamName, "required") {
+				Write $$$EscapeOrFormat("[", $$$Red)
 				Set tEndingBrackets = tEndingBrackets + 1
 			}
-			Write "<",tParamName,">"
+			Write $$$EscapeOrFormat("<"_tParamName_">", $$$Red)
 		}
 		
 		For i=1:1:tEndingBrackets {
-			Write $$$ESCAPE("]")
+			Write $$$EscapeOrFormat("]", $$$Red)
 		}
 	}
 	
 	If $Data(pCommandStruct("modifiers")) && $Get(pCommandStruct("trailingModifiers"),0) {
-		Write $$$ESCAPE(" [flags]")
+		Write $$$EscapeOrFormat(" [flags]", $$$Red)
 	}
 	
-	Write:pMarkdownFormat "}}"
+	If pMarkdownFormat {
+		Write "}}"
+	}
 	
-	Write:$Data(pCommandStruct("aliases")) !,"Alias",$Case($Length(pCommandStruct("aliases"),","),1:"",:"es"),": ",$Replace(pCommandStruct("aliases"),",",", ")
+	If $Data(pCommandStruct("aliases"), tAliases) {
+		Write !, ?tIndent, $$$BlackSquare_"Alias"_$Case($Length(tAliases, ","), 1:"", :"es")_": "_$Replace(tAliases, ",", ", ")
+	}
 	
-	Write:$Data(pCommandStruct("description")) !,?tIndent,pCommandStruct("description")
+	If $Data(pCommandStruct("description"), tDescription) {
+		Write !, ?tIndent, $$$BlackSquare_"Description: "_tDescription
+	}
+	
 	If (pDetailed) {
 		// Modifiers
 		If $Data(pCommandStruct("modifiers")) {
@@ -246,14 +296,16 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 			} Else {
 				Write ?tIndent
 			}
-			Write "Flags"
+			Write $$$BlackSquare_"Flags:"
 			If pMarkdownFormat {
-				Write !,"||Flag||Description||Aliases||"
+				Write !, "||Flag||Description||Aliases||"
 			}
 			Set tKey = 1000
-			For {
+			While 1 {
 				Set tKey = $Order(pCommandStruct("modifiers",tKey))
-				Quit:(tKey="")
+				If (tKey = "") {
+					Quit
+				}
 				
 				Write !
 				If pMarkdownFormat {
@@ -261,9 +313,10 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 				} Else {
 					Write ?(tIndent*2)
 				}
-				Write "-",tKey
+				Write $$$BulletPoint_"-"_tKey
 				
-				Kill tModInfo Merge tModInfo = pCommandStruct("modifiers",tKey)
+				Kill tModInfo
+				Merge tModInfo = pCommandStruct("modifiers",tKey)
 				If $Get(tModInfo("value")) {
 					If $Data(tModInfo("valueList"),tValueList) {
 						Write " <",$Replace(tValueList,",","/"),">"
@@ -271,21 +324,24 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 						Write " <value>"
 					}
 				}
-				Write:pMarkdownFormat " |"
-				If ($Data(tModInfo("description"),tDesc)) {
-					If 'pMarkdownFormat {
-						Write !,?(tIndent*3)
-					}
-					Write tDesc
+				If pMarkdownFormat {
+					Write " |"
 				}
-				Write:pMarkdownFormat " |"
+				If ($Data(tModInfo("description"),tDescription)) {
+					Write " : "_tDescription
+				}
+				If pMarkdownFormat {
+					Write " |"
+				}
 				If ($Data(tModInfo("aliases"),tAliases)) {
 					If 'pMarkdownFormat {
-						Write !,?(tIndent*3),"alias(es): -"
+						Write !, ?(tIndent*3), "alias(es): -"
 					}
 					Write $Replace(tAliases,",",", -")
 				}
-				Write:pMarkdownFormat " |"
+				If pMarkdownFormat {
+					Write " |"
+				}
 			}
 		}
 		
@@ -297,7 +353,7 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 			} Else {
 				Write ?tIndent
 			}
-			Write "Arguments"
+			Write $$$BlackSquare_"Arguments"
 			If pMarkdownFormat {
 				Write !,"||Name||Description||"
 			}
@@ -313,17 +369,18 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 				} Else {
 					Write ?(tIndent*2)
 				}
-				Write tParamName
-				Write:pMarkdownFormat " |"
+				Write $$$BulletPoint_tParamName
+				If pMarkdownFormat {
+					Write " |"
+				}
 				
 				Kill tParamInfo Merge tParamInfo = pCommandStruct("parameters",tParamName)
-				If ($Data(tParamInfo("description"),tDesc)) {
-					If 'pMarkdownFormat {
-						Write !,?(tIndent*3)
-					}
-					Write tDesc
+				If ($Data(tParamInfo("description"), tDescription)) {
+					Write ": "_tDescription
 				}
-				Write:pMarkdownFormat " |"
+				If pMarkdownFormat {
+					Write " |"
+				}
 			}
 		}
 		
@@ -335,28 +392,42 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 			} Else {
 				Write ?tIndent
 			}
-			Write "Examples"
+			Write $$$BlackSquare_"Examples"
 			If pMarkdownFormat {
 				Write !,"||Command||Description||"
 			}
 			Set tKey = ""
 			For {
 				Set tKey = $Order(pCommandStruct("examples",tKey))
-				Quit:(tKey="")
-				
+				If (tKey = "") {
+					Quit
+				}
 				
 				Write !
-				Write:pMarkdownFormat "|{{"
-				Write pCommandStruct("examples",tKey)
-				Write:pMarkdownFormat "}}|"
-				Write:'pMarkdownFormat ?(tIndent*2)
+				If pMarkdownFormat {
+					Write "|{{"
+				} Else {
+					Write ?(tIndent*2)
+				}
+				Write $$$BulletPoint_pCommandStruct("examples",tKey)
+				If pMarkdownFormat {
+					Write "}}|"
+				} Else {
+					Write ?(tIndent*2)
+				}
 				If $Data(pCommandStruct("examples",tKey,"description"),tDesc) {
-					Write:'pMarkdownFormat !,?(tIndent*3)
+					If 'pMarkdownFormat {
+						Write !, ?(tIndent*3)
+					}
 					Write tDesc
 				} Else {
-					Write:'pMarkdownFormat ?(tIndent*2)
+					If 'pMarkdownFormat {
+						Write !, ?(tIndent*2)
+					}
 				}
-				Write:pMarkdownFormat " |"
+				If pMarkdownFormat {
+					Write " |"
+				}
 			}
 		}
 	}
@@ -370,7 +441,7 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) As %Status [ Final ]
 {
 	Set tSC = $$$OK
-  Kill pCommandInfo
+	Kill pCommandInfo
 	Try {
 		Do ..%GetCommandStructure(.tCommandStructure)
 		
@@ -407,6 +478,12 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 		For {
 			Set tChar = $Extract(pCommandString,tPos)
 			Set tPos = tPos + 1
+			
+			If (tState = $$$ESCAPECHAR) {
+				If (tChar '= """") && (tChar '= "\") {
+					Set tAccum = tAccum_"\"
+				}
+			}
 			
 			If (tChar = " ") || (tChar = "") {
 				If (tState = $$$COMMAND) && (tAccum'="") {
@@ -478,6 +555,9 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Continue
 				}
 			} ElseIf (tChar = "-") {
+        If (tState = $$$MODIFIERVALUE) {
+          $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Expected value for '%1', but the next modifier found", tModifier)))
+        }
 				If (tState = $$$PREARGUMENT) {
 					Set tState = $$$MODIFIERNAME
 					Set tModifier = ""
@@ -592,7 +672,112 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 	Quit tSC
 }
 
-ClassMethod %GetCommandStructure(Output pCommandStructure) As %Status [ CodeMode = objectgenerator, Private ]
+/// Read JSON and construct a command matching the schema in the Commands XData blocks
+/// that can be parsed using <method>%ParseCommandInput</method>. <br />
+/// JSON format: <br />
+/// {
+/// 	"command": "command name",
+/// 	"parameters": { ... },
+/// 	"modifiers": { ... },
+/// 	"custom_modifiers": { ... }
+/// }
+/// where each nested object contains key-value pairs.
+ClassMethod ParseJsonToCommand(pJson As %Library.DynamicObject)
+{
+	Do ..%GetCommandStructure(.allCommandsArray)
+	Set command = pJson.%Get("command")
+	If (command = "") {
+		$$$ThrowStatus($$$ERROR($$$GeneralError,"Missing 'command' property in JSON"))
+	}
+	Set quotedName = $$$QUOTE(command)
+	If '$Data(allCommandsArray(command)) {
+		$$$ThrowStatus($$$ERROR($$$GeneralError,"Command "_quotedName_" does not exist."))
+	}
+	Merge commandArray = allCommandsArray(command)
+	
+	/*
+	 * NOTE: The below code does have a lot of common pieces to it
+	 * that could be refactored to smaller helper methods but has
+	 * been left this way for easier readability and understanding
+	 */
+	
+	Set modList = ""
+	#dim modifiers As %Library.DynamicObject
+	Set modifiers = pJson.%Get("modifiers")
+	If $IsObject(modifiers) {
+		#dim modIter As %Iterator.Object
+		Set modIter = modifiers.%GetIterator()
+		While modIter.%GetNext(.key, .value) {
+			Set modName = key
+			// Check that modifier exists on command
+			If '$Data(commandArray("modifiers", key)) {
+				// Check if modifier is an alias. If so, set modName to actual modifier
+				If '$Data(commandArray("modifiers", 1, key), modName) {
+					$$$ThrowStatus($$$ERROR($$$GeneralError,"Invalid modifier: -"_modName_" does not exist for command "_quotedName))
+				}
+			}
+			Set modHasValue = $Get(commandArray("modifiers", modName, "value"), 0)
+			If modHasValue {
+				// Ensure value is not ""
+				If (value = "") {
+					$$$ThrowStatus($$$ERROR($$$GeneralError,"Non-empty value required for modifier "_modName_" for command "_quotedName))
+				}
+			}
+			// Validation passed so add to list
+			Set modList = modList_$ListBuild("-"_modName)
+			If modHasValue {
+				Set modList = modList_$ListBuild(value)
+			}
+		}
+	}
+	
+	Set paramList = ""
+	#dim parameters As %Library.DynamicObject
+	Set parameters = pJson.%Get("parameters")
+	If $IsObject(parameters) {
+		#dim paramIter As %Iterator.Object
+		Set paramIter = parameters.%GetIterator()
+		While paramIter.%GetNext(.key, .value) {
+			// Check that parameter exists for command
+			If '$Data(commandArray("parameters", key)) {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Invalid parameter: "_$$$QUOTE(key)_" does not exist for command "_quotedName))
+			}
+			If (value = "") {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Non-empty value required for parameter "_$$$QUOTE(key)_" for command "_quotedName))
+			}
+			// Validation passed so add to list
+			Set paramList = paramList_$ListBuild(value)
+		}
+	}
+	
+	Set customModList = ""
+	#dim customModifiers As %Library.DynamicObject
+	Set customModifiers = pJson.%Get("custom_modifiers")
+	If $IsObject(customModifiers) {
+		// Get data prefix
+		Set dataPrefix = $Get(commandArray("dataPrefix"))
+		If (dataPrefix = "") {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"Command "_quotedName_" does not support custom modifiers"))
+		}
+		#dim customModIter As %Iterator.Object
+		Set customModIter = customModifiers.%GetIterator()
+		While customModIter.%GetNext(.key, .value) {
+			// Ensure value is not ""
+			If (value = "") {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Non-empty value required for all custom modifiers but absent for "_$$$QUOTE(key)_" for command "_quotedName))
+			}
+			// Validation passed so add to list
+			Set customModList = customModList_$ListBuild("-"_dataPrefix_key_"="_value)
+		}
+	}
+	
+	// Construct command
+	Set hasTrailingModiifers = $Get(commandArray("trailingModifiers"),0)
+	Set commandList = $ListBuild(command) _ $Case(hasTrailingModiifers, 1: paramList_modList, : modList_paramList) _ customModList
+	Return $ListToString(commandList, " ")
+}
+
+ClassMethod %GetCommandStructure(Output pCommandStructure) [ CodeMode = objectgenerator ]
 {
 	Set tSC = $$$OK
 	Try {
@@ -760,6 +945,156 @@ ClassMethod SetData(pTargetArray, pDataName, pDataValue, pCustomParam = 0) [ Pri
 		Merge tValue = tData
 	}
 	Merge pTargetArray("data") = tValue
+}
+
+/// Draw a border around a list of strings. Optionally provide a text format for the strings. <br />
+/// @Argument	pLineList		List of strings to write. <br />
+/// @Argument	pTextFormat		Text format (e.g. $$$Red, $$$Bold, etc.). <br />
+ClassMethod DrawBorder(pLineList As %Library.List, pTextFormat As %Integer = {$$$Default})
+{
+	// Find longest line in list
+	Set ptr = 0
+	Set maxLength = 0
+	While $ListNext(pLineList, ptr, line) {
+		Set lineLength = $Length(line)
+		If (lineLength > maxLength) {
+			Set maxLength = lineLength
+		}
+	}
+	
+	Set verticalBorderCharacter = "||"
+	Set horizonatalBorderCharacter = "="
+	
+	Set horizontalBorder = ""
+	For i=1:1:(maxLength + 6) {
+		Set horizontalBorder = horizontalBorder _ horizonatalBorderCharacter
+	}
+	
+	Write !, horizontalBorder
+	Set ptr = 0
+	While $ListNext(pLineList, ptr, line) {
+		Write !, verticalBorderCharacter_" ", $$$FormattedLine(pTextFormat, line), ?(maxLength + 3), " "_verticalBorderCharacter
+	} 
+	Write !, horizontalBorder
+	Write !
+}
+
+/// INTENDED USE: <br />
+/// - Intended for developer use if there is a subclass of this class that implements the Commands XData block. <br />
+/// WHAT IT DOES: <br />
+/// - Generates an include file with name <parameter>CommandsAccessorIncludeFilename</parameter>. This contains macros
+/// to be used to obtain subscripts of the subscripted array generated by <method>GetCommandStructure</method> rather
+/// than directly accessing subscripts using strings. <br />
+/// HOW TO USE: <br />
+/// - Override <parameter>CommandsAccessorIncludeFilename</parameter>. <br />
+/// - Call this method on the subclass. <br />
+/// - Add the created include file to the top of the subclass. <br />
+/// - Add the include file to source control. <br />
+/// - Use macros from the include file to access subscripted values in the output
+/// of <method>%GetCommandStructure</method> by passing the array as the only argument
+/// to macros to obtain the value of a single subscript/check its existence. <br />
+ClassMethod GenerateCommandsIncludeFile() [ Internal ]
+{
+	Do ..%GetCommandStructure(.commandStructure)
+	
+	// Array of lines to write to include file
+	#dim lineArray As %String
+	#define WriteLine(%line) Set lineArray($Increment(lineArray)) = %line
+	
+	// Names of subscripts
+	Set modifierSubscript = "modifiers"
+	Set parameterSubscript = "parameters"
+	
+	// Indicate how this was generated
+	$$$WriteLine("#; Generated by: "_$Classname()_":GenerateCommandsIncludeFile")
+	$$$WriteLine("")
+	
+	Set commandName = ""
+	While 1 {
+		Set commandName = $Order(commandStructure(commandName))
+		If (commandName = "") {
+			Quit
+		}
+		// Skip aliases
+		If $IsValidNum(commandName) {
+			Continue
+		}
+		// Skip if no modifiers or parameters
+		If '($Data(commandStructure(commandName, modifierSubscript)) || $Data(commandStructure(commandName, parameterSubscript))) {
+			Continue
+		}
+		
+		Set formattedCommandName = ..FormatName(commandName)
+		$$$WriteLine("#; Command: "_commandName)
+		$$$WriteLine("")
+		// Modifiers
+		Set modifierName = ""
+		While 1 {
+			Set modifierName = $Order(commandStructure(commandName, modifierSubscript, modifierName))
+			If (modifierName = "") {
+				Quit
+			}
+			// Skip aliases
+			If $IsValidNum(modifierName) {
+				Continue
+			}
+			Set formattedModifierName = ..FormatName(modifierName)
+			$$$WriteLine("/// Check for Modifier: "_modifierName)
+			$$$WriteLine("#define HasMod"_formattedCommandName_formattedModifierName_"(%array) ''$Data(%array("_$$$QUOTE(modifierSubscript)_", "_$$$QUOTE(modifierName)_"))")
+			// Only get modifier if it has value = true
+			If +$Get(commandStructure(commandName, modifierSubscript, modifierName, "value")) {
+				$$$WriteLine("/// Get Modifier: "_modifierName)
+				$$$WriteLine("#define GetMod"_formattedCommandName_formattedModifierName_"(%array) $Get(%array("_$$$QUOTE(modifierSubscript)_", "_$$$QUOTE(modifierName)_"))")
+			}
+		}
+		
+		// Parameters
+		Set parameterName = ""
+		While 1 {
+			Set parameterName = $Order(commandStructure(commandName, parameterSubscript, parameterName))
+			If (parameterName = "") {
+				Quit
+			}
+			// Skip aliases
+			If $IsValidNum(parameterName) {
+				Continue
+			}
+			Set formattedParameterName = ..FormatName(parameterName)
+			$$$WriteLine("/// Check for Parameter: "_parameterName)
+			$$$WriteLine("#define HasParam"_formattedCommandName_formattedParameterName_"(%array) ''$Data(%array("_$$$QUOTE(parameterSubscript)_", "_$$$QUOTE(parameterName)_"))")
+			$$$WriteLine("/// Get Parameter: "_parameterName)
+			$$$WriteLine("#define GetParam"_formattedCommandName_formattedParameterName_"(%array) $Get(%array("_$$$QUOTE(parameterSubscript)_", "_$$$QUOTE(parameterName)_"))")
+		}
+		
+		// Blank line after all commands
+		$$$WriteLine("")
+	}
+	Set filename = ..#CommandsAccessorIncludeFilename
+	Do ##class(%ZPM.PackageManager.Developer.Utils).CreateOrUpdateIncludeFile(filename, .lineArray)
+}
+
+/// Format the given name such that all punctuation characters are remove and
+/// the name is in camelCase, with the first letter capitalized. <br />
+/// @Argument	pName		String to format. <br />
+ClassMethod FormatName(pName As %String) As %String
+{
+	Set resultString = ""
+	// First letter should always be capital
+	Set letterCapital = 1
+	For i=1:1:$Length(pName) {
+		Set letter = $Extract(pName, i)
+		// Special characters should be removed and next letter should be capitalized
+		If ($ZStrip(letter, "*P") = "") {
+			Set letterCapital = 1
+			Continue
+		}
+		If letterCapital {
+			Set letter = $$$ucase(letter)
+			Set letterCapital = 0
+		}
+		Set resultString = resultString _ letter
+	}
+	Return resultString
 }
 
 }

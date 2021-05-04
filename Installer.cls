@@ -19,7 +19,7 @@ XData PM [ XMLNamespace = INSTALLER ]
 <Default Name="TRACKINGID" Value="UA-126752118-1" />
 
 <Namespace Name="%SYS">
-  <Import File="${SRCDIR}inc/_ZPM/PackageManager/Common.inc" />
+  <Import File="${SRCDIR}inc" Recurse="1"/>
   <Import File="${SRCDIR}cls" Recurse="1" />
   
   <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" CheckStatus="true" />
