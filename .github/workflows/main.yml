@@ -98,7 +98,7 @@ jobs:
             'zpm "install dsw":1\n' \
             'zpm "list":1\n' \
             'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password securepassword":1\n' \
-            'zpm "zpm publish -v":1' \
+            'zpm "publish zpm -v":1' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER
@@ -190,7 +190,7 @@ jobs:
             /bin/echo -e '' \
               'zpm "list":1\n' \
               'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
-              'zpm "zpm publish -v":1' \
+              'zpm "publish zpm -v":1' \
               'halt\n' \
             | docker exec -i $CONTAINER iris session iris -U%SYS
             docker stop $CONTAINER

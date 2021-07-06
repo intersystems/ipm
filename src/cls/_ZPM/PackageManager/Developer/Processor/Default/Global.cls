@@ -13,6 +13,10 @@ Property Global As %ZPM.PackageManager.Core.GlobalReference;
 /// If set to 1, do not delete the global when the module is cleaned/uninstalled
 Property Preserve As %Boolean [ InitialExpression = 0 ];
 
+/// Directory relative to module root containing the exported resource.
+/// Defaults to the resource's extension (lower-case) if unspecified.
+Property Directory As %String(MAXLEN = "") [ InitialExpression = "gbl/" ];
+
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
@@ -45,8 +49,22 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			
 			If '..ResourceReference.Generated {
 				Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
-				Set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory_"gbl/")
+				Set tResourceDirectory = tRoot _ "/" _ tSubDirectory
 				
+        Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+				If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
+					Set tSourceRoot = tSourceRoot _ "/"
+				}
+
+				Set tDirectory = ..Directory
+				If tDirectory'="","\/"'[$EXTRACT(tDirectory, *) {
+					Set tDirectory = tDirectory _ "/"
+				} Else {
+					Set tDirectory = "gbl/"
+				}
+
+        Set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
+
 				If tDeveloperMode {
 					Set ^Sources("GBL",tName) = tSourcesPrefix_tResourceDirectory
 				}

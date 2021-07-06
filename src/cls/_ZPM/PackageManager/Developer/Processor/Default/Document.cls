@@ -83,14 +83,14 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             Set tResourceDirectory = tResourceCatDirectory
           }
         }
-				
+    
 				If tDeveloperMode && (..Extension '= "") && (tName '= "") {
 					Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix_tResourceDirectory
 				}
 				
 				If '..ResourceReference.Preload {
 					Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
-					Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory_$tr(tName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator))_tFileExtension
+					Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $tr(tName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator))_tFileExtension
 					If ($$$lcase(tFileExtension)=".xml")&&('##class(%File).Exists(tResourcePath)) {
             Set $PIECE(tResourcePath, ".", *) = "cls"
             Set ..Format = "UDL"
@@ -129,6 +129,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
+  Set tVerbose = $Get(pParams("Verbose"),0)
 	Try {
 		If ..Format = "UDL" {
 			// This is tailored toward support of "Other" documents exported in UDL format.
@@ -154,6 +155,7 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 			Set tSC = $$Export^%apiRTN(pItemName,pFullExportPath,"Save for Source Control","WNSK\UTF8\","-d /diffexport")
 			Set pItemHandled = 1
 		}
+    Write:tVerbose !,"Exporting '",pItemName,"' to '",pFullExportPath,"'"
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -238,14 +240,17 @@ Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceRefere
 		Set ..Directory = tResourceRefName
 		Set tSC = ##super(pResourceReference)
 		If (..Extension = "") {
-			Set ..Extension = ..#EXTENSION
+			Set ..Extension = $$$lcase(..#EXTENSION)
 		}
 	} Else {
 		Set ..Name = $Piece(tResourceRefName,".",1,*-1)
-		Set ..Extension = $Case(..#EXTENSION,"":$Piece(tResourceRefName,".",*),:..#EXTENSION)
+		Set ..Extension = $$$lcase($Case(..#EXTENSION,"":$Piece(tResourceRefName,".",*),:..#EXTENSION))
 		Set tSC = ##super(pResourceReference)
 		If (..Directory = "") {
 			Set ..Directory = $ZConvert(..Extension,"L")
+      if $lf($lb("dtl","bpl"),..Directory) {
+        set ..Directory = "cls"
+      }
 		}
 	}
 	Quit tSC
@@ -297,7 +302,11 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 Method OnItemRelativePath(pItemName As %String) As %String
 {
 	Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
-	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_..Directory_"/"_$tr($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
+  Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+	If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
+		Set tSourceRoot = tSourceRoot _ "/"
+	}  
+	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_tSourceRoot_..Directory_"/"_$tr($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 }
 
 Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo) As %Status

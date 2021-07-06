@@ -45,7 +45,7 @@ Relationship Mappings As %ZPM.PackageManager.Developer.MappingReference(XMLITEMN
 Relationship Invokes As %ZPM.PackageManager.Developer.InvokeReference(XMLITEMNAME = "Invoke", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
 /// Lifecycle class used by default for this module
-Property LifecycleClass As %Dictionary.Classname [ InitialExpression = "%ZPM.PackageManager.Developer.Lifecycle.Module" ];
+Property LifecycleClass As %Dictionary.Classname;
 
 /// Lifecycle class to use for a specific command (may be overridden from command line)
 Property OverrideLifecycleClass As %Dictionary.Classname [ Transient ];
@@ -202,7 +202,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		}
 		
 		Set tLifecycle = tModule.Lifecycle
-		
+  
 		If pIsComplete {
 			Set tPhases = tLifecycle.GetCompletePhases(pPhases)
 		} Else {
@@ -986,7 +986,7 @@ Method OverrideLifecycleClassSet(pValue As %Dictionary.Classname) As %Status
 Method %OnNew() As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..Version = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(i%VersionString)
-	Quit $$$OK
+  Quit $$$OK
 }
 
 /// This callback method is invoked by the <METHOD>%Open</METHOD> method to 
@@ -1043,6 +1043,8 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
 				Quit
 			}
+		} ElseIf (..LifecycleClass = "") && (..Packaging '= "") {
+      Set ..LifecycleClass = $Case(..Packaging,"application": "Application", : "Module")
 		} ElseIf (..Packaging = "") {
 			// Default to "module"
 			Set ..Packaging = "module"

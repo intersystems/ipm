@@ -67,7 +67,7 @@ Method sizeGet() As %Integer
 Method sizeSet(pSize As %Integer) As %Status
 {
   set i%size = ..Dec2Oct(pSize, 11)
-  if ($length(i%size)>11) {
+  if ($length(i%size)>12) {
     return $$$ERROR(5001, "Size too big")
   }
   return $$$OK

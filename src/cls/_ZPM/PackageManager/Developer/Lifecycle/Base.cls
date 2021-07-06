@@ -432,7 +432,7 @@ Method %Reload(ByRef pParams) As %Status
 		
 		Set tPreloadRoot = tRoot_"preload"
 		If ##class(%File).DirectoryExists(tPreloadRoot) {
-			Set tSC = $System.OBJ.LoadDir(tPreloadRoot, $Select(tVerbose:"d",1:"-d")_"/compile", , 1)
+			Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_"/compile", , 1)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -753,7 +753,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				}
 			}
 		}
-		
+  
 		Set tFullResourceName = ""
 		For {
 			Set tFullResourceName = $Order(tResourceArray(tFullResourceName),1,tSrcModule)
@@ -780,7 +780,8 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Set tRelativePath = pDependencyGraph(tSrcModule,"Location")_tRelativePath
 			}
 			
-			Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(pTargetDirectory_tRelativePath)
+			Set tFullPath = ##class(%File).NormalizeFilename(pTargetDirectory_tRelativePath)
+			Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
 			
 			#dim tProcessor As %ZPM.PackageManager.Developer.Processor.Abstract
 			If $Data(tResourceArray(tFullResourceName,"Processor"),tProcessor) && $IsObject(tProcessor) {
@@ -813,8 +814,10 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 					Quit
 				}
 				
-				Set tSourcePath = ##class(%File).NormalizeFilenameWithSpaces(tModule.Root_tFullResourceName)
-				Set tExportPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath_tFullResourceName)
+				Set tSourcePath = ##class(%File).NormalizeFilename(tModule.Root_tFullResourceName)
+				Set tSourcePath = ##class(%File).NormalizeFilenameWithSpaces(tSourcePath)
+				Set tExportPath = ##class(%File).NormalizeFilename(tFullPath_tFullResourceName)
+				Set tExportPath = ##class(%File).NormalizeFilenameWithSpaces(tExportPath)
 				Set tSC = $$$OK
 				Set tDirectory = ##class(%File).GetDirectory(tExportPath,1)
 				If '##class(%File).DirectoryExists(tDirectory) {
@@ -887,6 +890,8 @@ Method %Register(ByRef pParams) As %Status
 		// "Register" just means "Publish to the local repository"
 		Set tServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonOpen(1,,.tSC)
 		If $$$ISERR(tSC) {
+      #; No local cache, ignoring
+      Set tSC = $$$OK
 			Quit
 		}
 		

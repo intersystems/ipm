@@ -1332,6 +1332,21 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Repository "_$$$QUOTE(repoName)_" does not exist so cannot be deleted."))
 		}
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyDelete(repoName))
+  } Elseif $$$HasModifier(pCommandInfo,"reset-defaults") {
+    Set tName = $$$GetModifier(pCommandInfo,"name")
+    If ((tRemote'=1)||(tName="")) {
+        Write "Specify type (-remote) and repository name (-name registry)"
+        Quit
+    }
+    Merge tModifiers = pCommandInfo("modifiers")
+    Set tModifiers("url") = ##class(%ZPM.PackageManager.Client.Settings).GetDefaultRegistry()
+    If (tModifiers("url")="") {
+        Write "Error retrieving default registry URL"
+        Quit
+    }
+    Set tModifiers("username") = "", tModifiers("password") = ""
+    Set tType = "%ZPM.PackageManager.Client.RemoteServerDefinition"
+    $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
 	} Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
 		Set tType = $$$GetModifier(pCommandInfo,"type")

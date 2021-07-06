@@ -362,9 +362,11 @@ Method ImportFromXML(stream As %RegisteredObject, flags As %String) As %Status
 {
 	Set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
 
+  Set tOutput = ##class(%Stream.GlobalCharacter).%New()
+  Set tOutput.LineTerminator = $Char(10)
 	Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(stream, tXSL, .tOutput)
 	If $$$ISERR(tSC) Quit tSC
-  #; do tOutput.OutputToDevice()
+  #; while 'tOutput.AtEnd { Write !,tOutput.ReadLine() }
 	
 	Do ..Code.Clear()
 	#; Do ..Code.WriteLine("<?xml version=""1.0""?>") //add XML header

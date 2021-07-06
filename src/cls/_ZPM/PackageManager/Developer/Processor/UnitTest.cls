@@ -30,7 +30,7 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 		Set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
 		If (pPhase = "Reload") {
 			// Only load unit tests if we're in developer mode.
-			If $Get(pParams("DeveloperMode")) {
+			If $Get(pParams("DeveloperMode")),##class(%File).DirectoryExists(tUnitTestDir) {
 				// LoadTestDirectory rather than recursive $System.OBJ.LoadDir to omit _ directories.
 				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).LoadTestDirectory(tUnitTestDir,tVerbose,.tLoadedList,..Format)
 				$$$ThrowOnError(tSC)
@@ -148,6 +148,7 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 			Set tResourceInfo = tModuleName
 			Set tResourceInfo("Generated") = 0
 			Set tResourceInfo("Preload") = 0
+			Set tResourceInfo("UnitTest") = 1
 			Set tResourceInfo("Scope") = ..Phase
 			Set tResourceInfo("Deploy") = 0
 			Set tResourceInfo("Processor") = $This
@@ -193,7 +194,8 @@ Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceRefere
 
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
-	Quit ..EmbeddedProcessor.OnExportItem(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
+  Set pItemHandled = 1
+	Quit $$$OK
 }
 
 /// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
