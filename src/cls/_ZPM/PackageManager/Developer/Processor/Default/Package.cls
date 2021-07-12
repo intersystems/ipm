@@ -4,17 +4,20 @@ Class %ZPM.PackageManager.Developer.Processor.Default.Package Extends %ZPM.Packa
 /// Description of resource processor class (shown in UI)
 Parameter DESCRIPTION As STRING = "Standard resource processor for packages of classes included in a module.";
 
-Parameter EXTENSION = ".CLS";
+Parameter EXTENSION = "CLS";
+
+Parameter NAMEPOSTFIX = ".";
 
 /// Export format
 Property Format As %String(VALUELIST = ",UDL,XML");
 
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "cls" ];
 
-Property LoadAsDirectory As %Boolean [ InitialExpression = 1 ];
+Property FilenameTranslateIdentifier As %String [ InitialExpression = ".%" ];
 
-/// Extension for individual filename(s) that comprise this resource
-Property FilenameExtension As %String [ InitialExpression = "cls" ];
+Property FilenameTranslateAssociator As %String [ InitialExpression = "/_" ];
+
+Property LoadAsDirectory As %Boolean [ InitialExpression = 1 ];
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
@@ -36,67 +39,40 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 	Quit tSC
 }
 
-Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
-{
-	Set tSC = ##super(pResourceReference)
-	If (..Format = "") {
-		Set ..Format = $Case(..FilenameExtension,"cls":"UDL",:"XML")
-	}
-	Quit tSC
-}
-
 Method OnResolveChildren(ByRef pResourceArray) As %Status
 {
-	Set tClassKey = ""
+	Set tItemKey = ""
 	For {
-		Set tClassKey = $Order(pResourceArray(tClassKey))
-		If (tClassKey = "") {
+		Set tItemKey = $Order(pResourceArray(tItemKey))
+		If (tItemKey = "") {
 			Quit
 		}
-		Set tClassName = $Piece(tClassKey,".",1,*-1)
-		Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-		If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
-			Set tSourceRoot = tSourceRoot _ "/"
-		}
-		
-		Set tClassName = $TRANSLATE(tClassName, "%", "_")
-    Set tFilenameExtension = $Piece(tClassKey, ".", *)    
-		Set pResourceArray(tClassKey,"RelativePath") = tSourceRoot_..Directory_"/"_$tr(tClassName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_"."_tFilenameExtension
+		Set pResourceArray(tItemKey,"RelativePath") = ..OnItemRelativePath(tItemKey, $Get(pResourceArray(tItemKey, "UnitTest")))
 	}
 	Quit $$$OK
 }
 
-Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+/// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
+Method OnItemRelativePath(pItemName As %String, pIsUnitTest As %Boolean = 0) As %String
 {
-	Set tSC = $$$OK
-	If (pItemName="") {
-		Quit $$$ERROR($$$GeneralError, "Nothing to export")
-	}
-	Set tVerbose = $Get(pParams("Verbose"))
-	If ..Format = "XML" {
-		Set tSC = $System.OBJ.Export(pItemName,pFullExportPath,"-d")
-	} ElseIf (..Format = "UDL") {
-		Set tSC = $System.OBJ.ExportUDL(pItemName,pFullExportPath,"-d")
-	}
-	Set pItemHandled = 1
-	If $$$ISOK(tSC),tVerbose {
-		WRITE !,"Exported '",pItemName,"' to ",pFullExportPath
-	}
-	Quit tSC
+  if ('pIsUnitTest) {
+    Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+    If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
+      Set tSourceRoot = tSourceRoot _ "/"
+    }
+  } else {
+    Set tSourceRoot = ""
+  }
+  set fileNameExtension = $$$lcase($Piece(pItemName, ".", *))
+  set directory = fileNameExtension
+  set fileName = $tr($Piece(pItemName, ".", 1, *-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator) _ "." _ fileNameExtension
+	Quit $Select(..ResourceReference.Preload:"preload/",1:"") _ tSourceRoot _ directory _ "/" _ fileName
 }
 
-/// Subclasses may override to customize resource load behavior during the Reload phase.
-Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, Output pHandled As %Boolean = 0) As %Status
+Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
-	// This works for either UDL or XML.
-	Set pHandled = 1
-	Set tFlags = $Select(pVerbose:"/display",1:"/nodisplay")_"/nocompile"
-	Set tSC = $System.OBJ.ImportDir(pFullResourcePath,,tFlags,.tErrors,1)
-	For i=1:1:$Get(tErrors) {
-		Write !,$Get(tErrors(i))
-		Set pHandled = 0
-	}
-	Quit tSC
+  set ..Format = "UDL"
+	Quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
 }
 
 }

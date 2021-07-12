@@ -50,17 +50,12 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
 		// Create namespace
 		Set tNSProps("Globals") = pNSName
 		Set tNSProps("Routines") = pNSName
-		If $ZVERSION["IRIS" {
-			Set tNSProps("Library") = "IRISLIB"
-			Set tNSProps("SysGlobals") = "IRISSYS"
-			Set tNSProps("SysRoutines") = "IRISSYS"
-			Set tNSProps("TempGlobals") = "IRISTEMP"
-		} else {
-			Set tNSProps("Library") = "CACHELIB"
-			Set tNSProps("SysGlobals") = "CACHESYS"
-			Set tNSProps("SysRoutines") = "CACHESYS"
-			Set tNSProps("TempGlobals") = "CACHETEMP"
-		}
+		
+    Set tNSProps("Library") = "IRISLIB"
+    Set tNSProps("SysGlobals") = "IRISSYS"
+    Set tNSProps("SysRoutines") = "IRISSYS"
+    Set tNSProps("TempGlobals") = "IRISTEMP"
+
 		Set tSC = ##class(Config.Namespaces).Create(pNSName,.tNSProps)
 		If $$$ISERR(tSC) {
 			Quit

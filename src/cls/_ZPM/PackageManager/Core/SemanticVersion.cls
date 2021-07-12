@@ -87,13 +87,73 @@ Method IsBackwardCompatibleWith(pVersion As %ZPM.PackageManager.Core.SemanticVer
 (pVersion.Major = ..Major) && (pVersion.Minor <= ..Minor)
 }
 
-/// Returns 1 if this version is a later version than <var>pVersion</var>.
-/// TODO: Account for prerelease?
-Method Follows(pVersion As %ZPM.PackageManager.Core.SemanticVersion) As %Boolean [ CodeMode = expression ]
+/// Returns 1 if this version is a later version than <var>pVersion</var>. <br />
+/// From <a href="http://semver.org/spec/v2.0.0.html#spec-item-11">the SemVer 2.0.0 specification</a>: <br />
+/// 1.0.0-alpha &lt; 1.0.0-alpha.1 &lt; 1.0.0-alpha.beta &lt; 1.0.0-beta &lt; 1.0.0-beta.2 &lt; 1.0.0-beta.11 &lt; 1.0.0-rc.1 &lt; 1.0.0
+/// Also, two prerelease versions with mismatched major/minor/patch should *not* follow each other; see: <a href="https://github.com/npm/node-semver#prerelease-tags">node-semver</a>
+Method Follows(pVersion As %ZPM.PackageManager.Core.SemanticVersion) As %Boolean
 {
-(..Major > pVersion.Major) ||
-	((..Major = pVersion.Major) && (..Minor > pVersion.Minor)) ||
-	((..Major = pVersion.Major) && (..Minor = pVersion.Minor) && (..Patch > pVersion.Patch))
+	Set tFollows = (..Major > pVersion.Major) ||
+		((..Major = pVersion.Major) && (..Minor > pVersion.Minor)) ||
+		((..Major = pVersion.Major) && (..Minor = pVersion.Minor) && (..Patch > pVersion.Patch))
+	
+	// Handle prereleases - messy!!
+	Set tEquals = (..Major = pVersion.Major) && (..Minor = pVersion.Minor) && (..Patch = pVersion.Patch)
+	If (..Prerelease '= "") || (pVersion.Prerelease '= "") {
+		If 'tEquals {
+			If (..Prerelease '= "") && (pVersion.Prerelease '= "") {
+				Quit 0
+			} Else {
+				Quit tFollows
+			}
+		} ElseIf (..Prerelease = pVersion.Prerelease) {
+			// They are equal; neither comes before the other, unless pVersion is a snapshot version and this version is not
+			Quit (pVersion.IsSnapshot() && '..IsSnapshot())
+		} ElseIf (..Prerelease '= "") && (pVersion.Prerelease = "") {
+			// This version has a prerelease, so it is earlier than pVersion.
+			Quit 0
+		} ElseIf (..Prerelease = "") && (pVersion.Prerelease '= "") {
+			// We are comparing equal versions where the earlier has a prerelease.
+			Quit 1
+		} Else{
+			// Both have a prerelease, and they're different.
+			// Compare dot-separated parts of the prerelease.
+			Set tFollows = 1
+			Set tThisParts = $ListFromString(..Prerelease,".")
+			Set tOtherParts = $ListFromString(pVersion.Prerelease,".")
+			
+			Set tOtherHasData = 1
+			Set tThisPointer = 0
+			Set tOtherPointer = 0
+			While $ListNext(tThisParts,tThisPointer,tThisPart) {
+				Set tOtherHasData = $ListNext(tOtherParts,tOtherPointer,tOtherPart)
+				If 'tOtherHasData {
+					// The prerelease version has more parts for this one.
+					Return 1
+				}
+				If (tOtherPart = tThisPart) {
+					// Keep looking through dot-separated parts.
+					Continue
+				}
+				
+				// "Collates after" operator works nicely here.
+				// e.g., the following are true: "beta" ]] 11, 11 ]] 2, 2 ]] 1
+				If (tThisPart ]] tOtherPart) {
+					Return 1
+				} Else {
+					Return 0
+				}
+			}
+			If tFollows && tOtherHasData && $ListNext(tOtherParts,tOtherPointer,tOtherPart) {
+				// If there are still dot-separated parts left in the prerelease of the version we are comparing to,
+				// it has more than this version, and therefore this version does not follow it.
+				Quit 0
+			}
+		}
+	} ElseIf tEquals {
+		Quit (pVersion.IsSnapshot() && '..IsSnapshot())
+	}
+	Quit tFollows
 }
 
 Method Satisfies(pExpression As %ZPM.PackageManager.Core.SemanticVersionExpression) As %Boolean
