@@ -999,6 +999,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 	set slash=$s($zversion(1)=3:"/",1:"\")
 	set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($zu(86))_"mgr"_slash_"Temp"_slash_$tr($zts,".,")_slash)
 	$$$ThrowOnError(##class(%File).CreateDirectoryChain(TempDir))
+	set:$Extract(tDirectoryName,*)="/" tDirectoryName=$Extract(tDirectoryName,1,*-1)
 	set RepoName=$p($p($p(tDirectoryName,"/",*),".git")," ")
 	set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
 	if $Get(tParams("zpm","Branch"))'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
