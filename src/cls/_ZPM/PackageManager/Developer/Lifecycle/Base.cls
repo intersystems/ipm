@@ -718,7 +718,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 		Kill pDependencyGraph
 		If ($Get(pTargetDirectory) = "") {
 			Set pTargetDirectory = $$$lcase(..Module.Name_"-"_..Module.VersionString)
-			Set pTargetDirectory = ##class(%File).NormalizeDirectory(pTargetDirectory, $$$FileTempDir)
+			Set pTargetDirectory = ##class(%File).NormalizeDirectory(pTargetDirectory, $$$FileTempDirSys)
 		}
 				
 		If '##class(%File).DirectoryExists(pTargetDirectory) {

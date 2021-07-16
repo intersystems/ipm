@@ -1485,7 +1485,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($PIECE(tDirectoryName, ".", *)) = "tgz" {
-		Set tTargetDirectory = $$$FileTempDir
+		Set tTargetDirectory = $$$FileTempDirSys
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Archive).Extract(tDirectoryName, tTargetDirectory)
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadNewModule(tTargetDirectory, .tParams))
 	}

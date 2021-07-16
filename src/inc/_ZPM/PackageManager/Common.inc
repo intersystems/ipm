@@ -1,4 +1,7 @@
 ROUTINE %ZPM.PackageManager.Common [Type=INC]
+
+#define FileTempDirSys	$zu(140,17,##class(%SYS.System).TempDirectory())
+
 #; Helper for XML import of documents
 #define ZPMStudioDocumentModule %ZPMStudioDocumentModule
 
