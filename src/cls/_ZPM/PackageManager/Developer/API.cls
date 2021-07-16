@@ -15,6 +15,7 @@ ClassMethod CreateModule(pObject As %ZEN.proxyObject, Output pModule As %ZPM.Pac
 		$$$ThrowOnError(tSC)
 		$$$ThrowOnError(pModule.%ValidateObject())
 		TSTART
+		Do ..AddUDLDefaults(pModule)
 		Do ..CreateInstallerClass(pModule)
 		Do ..CreateLifecycleClass(pModule)
 		TCOMMIT
@@ -26,42 +27,7 @@ ClassMethod CreateModule(pObject As %ZEN.proxyObject, Output pModule As %ZPM.Pac
 }
 
 /// Converts <var>pObject</var> to a Module object and saves it.
-ClassMethod UpdateModule(pModuleName As %String, pObject As %ZEN.proxyObject) As %Status
-{
-	Set tSC = $$$OK
-	Set tInitTLevel = $TLevel
-	Try {
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pModuleName,,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set tOldInstaller = tModule.InstallerClass
-		Set tOldLifecycle = tModule.LifecycleClass
-		TSTART
-		Set tSC = ..ProxyToModule(pObject,tModule,1)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tSC = ..ExportDocumentForObject(tModule,.tOutput)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		// TODO: Something with tOutput
-		
-		Do ..CreateInstallerClass(tModule)
-		Do ..CreateLifecycleClass(tModule)
-		TCOMMIT
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	While ($TLevel > tInitTLevel) { TROLLBACK 1 }
-	Quit tSC
-}
-
-/// @PrivateAPI
-ClassMethod UpdateAPIDocumentation(pModuleName As %String) As %Status
+ClassMethod UpdateModule(pModuleName As %String, pObject As %ZEN.proxyObject, Output pSourceControlOutput) As %Status
 {
 	Set tSC = $$$OK
 	Set tInitTLevel = $TLevel
@@ -72,12 +38,15 @@ ClassMethod UpdateAPIDocumentation(pModuleName As %String) As %Status
 		}
 		
 		TSTART
-		Set tSC = tModule.UpdateAPIDocumentation()
+		Do ..CreateInstallerClass(pObject)
+		Do ..CreateLifecycleClass(pObject)
+		
+		Set tSC = ..ProxyToModule(pObject,tModule,1,.pSourceControlOutput)
 		If $$$ISERR(tSC) {
 			Quit
 		}
 		
-		Set tSC = ..ExportDocumentForObject(tModule,.tOutput)
+		Set tSC = ..ExportDocumentForObject(tModule,.pSourceControlOutput)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -85,13 +54,16 @@ ClassMethod UpdateAPIDocumentation(pModuleName As %String) As %Status
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
-	While ($TLevel > tInitTLevel) { TROLLBACK 1 }
+	While ($TLevel > tInitTLevel) {
+		TROLLBACK 1
+	}
 	Quit tSC
 }
 
 ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.PackageManager.Developer.Module, Output pSourceControlOutput) As %Status
 {
 	Set tSC = $$$OK
+	Set tCookie = ""
 	Try {
 		New %SourceControl
 		
@@ -101,14 +73,22 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.PackageManager.Develop
 		
 		Set tDocName = pSourceModule.Name_".ZPM"
 		
-		Set tSC = ##class(%Studio.SourceControl.Interface).GetStatus(tDocName,,.tIsEditable)
-		If $$$ISERR(tSC) {
-			Quit
+		Set tSC = ##class(%Studio.SourceControl.Interface).GetStatus(tDocName,.tIsInSourceControl,.tIsEditable)
+		$$$ThrowOnError(tSC)
+		
+		If tIsInSourceControl && 'tIsEditable {
+			// Try to make the document editable.
+			Set tSC = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.Interface).%OnMakeModuleEditable(pSourceModule)
+			$$$ThrowOnError(tSC)
 		}
 		
+		// Did we actually make the document editable?
+		Set tSC = ##class(%Studio.SourceControl.Interface).GetStatus(tDocName,,.tIsEditable)
+		$$$ThrowOnError(tSC)
+		
+		// If still not editable, error out.
 		If 'tIsEditable {
-			Set tSC = $$$ERROR($$$ItemNotCheckedOut,tDocName)
-			Quit
+			$$$ThrowStatus($$$ERROR($$$ItemNotCheckedOut,tDocName))
 		}
 		
 		Set tModuleStream = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(pSourceModule.Name,,.tSC)
@@ -173,6 +153,35 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.PackageManager.Develop
 	Quit tSC
 }
 
+/// Add defaults to a module such that all classes are exported in UDL format
+ClassMethod AddUDLDefaults(pSource As %ZPM.PackageManager.Developer.Module)
+{
+	// Value is 1 if filename extension is needed as an attribute. 0 otherwise
+	#dim processorNameArray As %String
+	Set processorNameArray("Default.Include") = 0
+	Set processorNameArray("Default.Class") = 1
+	Set processorNameArray("Default.Package") = 1
+	Set processorNameArray("UnitTest") = 0
+	
+	Set processorName = ""
+	While 1 {
+		Set processorName = $Order(processorNameArray(processorName), 1, hasFilenameExtension)
+		If (processorName = "") {
+			Quit
+		}
+		Set defaultObj = ##class(%ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault).%New()
+		Set defaultObj.Class = processorName
+		Set sc = defaultObj.Attributes.SetAt("UDL", "Format")
+		$$$ThrowOnError(sc)
+		If hasFilenameExtension {
+			Set sc = defaultObj.Attributes.SetAt("cls", "FilenameExtension")
+			$$$ThrowOnError(sc)
+		}
+		Set sc = pSource.Defaults.Insert(defaultObj)
+		$$$ThrowOnError(sc)
+	}
+}
+
 ClassMethod CreateInstallerClass(pSource As %ZPM.PackageManager.Developer.Module) [ Private ]
 {
 	If (pSource.InstallerClass '= "") && '$$$defClassDefined(pSource.InstallerClass) && '$$$comClassDefined(pSource.InstallerClass) {
@@ -205,10 +214,13 @@ ClassMethod CreateLifecycleClass(pSource As %ZPM.PackageManager.Developer.Module
 	}
 }
 
-ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageManager.Developer.Module, pSave As %Boolean = 0) As %Status [ Private ]
+ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageManager.Developer.Module, pSave As %Boolean = 0, Output pSourceControlOutput) As %Status [ Private ]
 {
 	Set tSC = $$$OK
+	Set tCookie = ""
 	Try {
+		Do ##class(%ZPM.PackageManager.Developer.Utils).BeginCaptureOutput(.tCookie)
+		
 		Set pModule.Name = pObject.ModuleName
 		For tModuleProp = "GlobalScope","VersionString","ExternalName","Description","LifecycleClass","InstallerClass","Packaging","Keywords" {
 			Set $Property(pModule,tModuleProp) = $Property(pObject,tModuleProp)
@@ -317,7 +329,7 @@ ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageMa
 			}
 			
 			// TODO: Generated (Not yet supported in UI.)
-			Set tRes.Preload = tSrc.Preload
+			Set tRes.Preload = $Case(tSrc.Preload,1:1,:"")
 			Set tRes.Scope = tSrc.Scope
 			Set tRes.ProcessorClass = tSrc.ProcessorClass
 			
@@ -346,6 +358,12 @@ ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageMa
 				}
 			}
 			
+			// Note: this can't go in %OnBeforeSave because the lifecycle class could be overridden in some cases
+			If $IsObject(tRes.Processor) && ($classname(tRes.Processor) = tRes.Module.Lifecycle.GetDefaultResourceProcessor(tRes.Name)) {
+				// Don't bother listing the processor class if it matches the lifecycle default.
+				Set tRes.ProcessorClass = ""
+			}
+			
 			// Just to be safe...
 			Set tResClone.Module = $$$NULLOREF
 			
@@ -372,6 +390,9 @@ ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageMa
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
+	
+	// Ensure I/O redirection ends.
+	Do ##class(%ZPM.PackageManager.Developer.Utils).EndCaptureOutput(tCookie,.pSourceControlOutput)
 	Quit tSC
 }
 
@@ -471,7 +492,7 @@ ClassMethod ListProcessorAttributesExecute(ByRef qHandle As %Binary, pProcessorC
 			Set pProcessorClass = $$$DefaultProcessorPackageDot_pProcessorClass
 		}
 		If '$ClassMethod(pProcessorClass,"%Extends",tSuper) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Class '%1' does not extend '%2'"),pProcessorClass,tSuper)
+			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Class '%1' does not extend '%2'",pProcessorClass,tSuper))
 			Quit
 		}
 		Set tSC = $ClassMethod(pProcessorClass,"GetAttributeMetadata",.tMetadata)
@@ -499,9 +520,17 @@ ClassMethod ListProcessorAttributesClose(ByRef qHandle As %Binary) As %Status [ 
 	Quit $$$OK
 }
 
-ClassMethod GetInstalledModuleListSQL(Output pSQL As %String) As %Status
+/// If <var>pSnapshots</var> is empty, lists all modules.
+/// If 1, only snapshots; if 0, only non-snapshots.
+ClassMethod GetInstalledModuleListSQL(Output pSQL As %String, pSnapshots As %Boolean = "") As %Status
 {
 	Set pSQL = "select Name from %ZPM_PackageManager_Developer.""Module"""
+	If (pSnapshots = 0) {
+		Set pSQL = pSQL_" where Version_Build <> 'snapshot'"
+	} ElseIf (pSnapshots = 1) {
+		Set pSQL = pSQL_" where Version_Build = 'snapshot'"
+	}
+	Set pSQL = pSQL_" order by Name"
 	Quit $$$OK
 }
 
@@ -517,16 +546,18 @@ ClassMethod GetModuleListSQL(Output pSQL As %String) As %Status
 	Quit tSC
 }
 
-ClassMethod GetDependencySQL(pModuleName As %String, Output pSQL As %String) As %Status
+ClassMethod GetDependencySQL(pModuleName As %String, Output pSQL As %String, Output pArgs) As %Status
 {
+	Kill pArgs
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
 		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
-			Set tWhere = "where ""Module""->Name="_##class(%ZEN.Auxiliary.QueryInfo).QuoteSQL(tModuleName)
-			Set pSQL = "select Dependencies_Name as ModuleName, Dependencies_VersionString as Version, Dependencies_Scope as Scope from %ZPM_PackageManager_Developer.Module_Dependencies "_tWhere
-			Quit
+			Set pSQL = "select Dependencies_Name as ModuleName, Dependencies_VersionString as Version, Dependencies_Scope as Scope "_
+				"from %ZPM_PackageManager_Developer.Module_Dependencies "_
+				"where ""Module""->Name=?"
+			Set pArgs($i(pArgs)) = tModuleName
 		}
 	} Catch ex {
 		Set tSC = ex.AsStatus()
@@ -534,20 +565,22 @@ ClassMethod GetDependencySQL(pModuleName As %String, Output pSQL As %String) As 
 	Quit tSC
 }
 
-ClassMethod GetResourceSQL(pModuleName As %String, Output pSQL As %String) As %Status
+ClassMethod GetResourceSQL(pModuleName As %String, Output pSQL As %String, Output pArgs) As %Status
 {
+	Kill pArgs
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
 		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
-			Set tWhere = "where ""Module""->Name="_##class(%ZEN.Auxiliary.QueryInfo).QuoteSQL(tModuleName)
+			Set tProcessorExpression = "NVL(ProcessorClass,%ZPM_PackageManager_Developer_Lifecycle.GET_DEFAULT_RESOURCE_PROCESSOR(""Module""->LifecycleClass,Name))"
 			Set pSQL = "select Name,Preload,Scope,Deploy, "_
-				"case when ProcessorClass %STARTSWITH '"_$$$DefaultProcessorPackageDot_"' "_
-				"then SUBSTRING(ProcessorClass,"_(1+$Length($$$DefaultProcessorPackageDot))_") "_
-				"else ProcessorClass end ProcessorClass "_
+				"case when "_tProcessorExpression_" %STARTSWITH '"_$$$DefaultProcessorPackageDot_"' "_
+				"then SUBSTRING("_tProcessorExpression_","_(1+$Length($$$DefaultProcessorPackageDot))_") "_
+				"else "_tProcessorExpression_" end ProcessorClass "_
 				"from %ZPM_PackageManager_Developer.ResourceReference "_
-				tWhere
+				"where ""Module""->Name=?"
+			Set pArgs($i(pArgs)) = tModuleName
 		}
 	} Catch ex {
 		Set tSC = ex.AsStatus()
@@ -555,31 +588,18 @@ ClassMethod GetResourceSQL(pModuleName As %String, Output pSQL As %String) As %S
 	Quit tSC
 }
 
-ClassMethod GetResourceAttributeSQL(pModuleName As %String, Output pSQL As %String) As %Status
+ClassMethod GetResourceAttributeSQL(pModuleName As %String, Output pSQL As %String, Output pArgs) As %Status
 {
+	Kill pArgs
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
 		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
-			Set tWhere = "where ResourceReference->""Module""->Name="_##class(%ZEN.Auxiliary.QueryInfo).QuoteSQL(tModuleName)
-			Set pSQL = "select ResourceReference->Name ResourceReference,element_key Name,Attributes Value from %ZPM_PackageManager_Developer.ResourceReference_Attributes " _ tWhere
-		}
-	} Catch ex {
-		Set tSC = ex.AsStatus()
-	}
-	Quit tSC
-}
-
-ClassMethod GetAPISQL(pModuleName As %String, Output pSQL As %String) As %Status
-{
-	Set pSQL = ""
-	Set tSC = $$$OK
-	Try {
-		Set tModuleName = $Piece(pModuleName,".ZPM",1)
-		If tModuleName '= "" {
-			Set tWhere = "where ""Module""->Name="_##class(%ZEN.Auxiliary.QueryInfo).QuoteSQL(tModuleName)
-			Set pSQL = "select API_Name,API_Type,API_SubType,API_Public from %ZPM_PackageManager_Developer.Module_API " _ tWhere
+			Set pSQL = "select ResourceReference->Name ResourceReference,element_key Name,Attributes Value "_
+				"from %ZPM_PackageManager_Developer.ResourceReference_Attributes "_
+				"where ResourceReference->""Module""->Name=?"
+			Set pArgs($i(pArgs)) = tModuleName
 		}
 	} Catch ex {
 		Set tSC = ex.AsStatus()
@@ -630,155 +650,6 @@ ClassMethod GetRepositorySQL(Output pSQL As %String) As %Status
 	Set tSC = $$$OK
 	Try {
 		Set pSQL = "select * from %ZPM_PackageManager_Client.ServerDefinition order by ID"
-	} Catch ex {
-		Set tSC = ex.AsStatus()
-	}
-	Quit tSC
-}
-
-/// This method should return JSON metadata for the installer
-ClassMethod GetInstallerMedaData(pParameter As %String, Output pObject) As %Status
-{
-	Try {
-		Set tSC = $$$OK
-		Set pObject = {
-		"products":[
-		{	"id":25425,
-			"family":"HealthShare",
-			"product":"Patient Index",
-			"majorVersion":19,
-			"minorVersion":0,
-			"patchVersion":0,
-			"date":"2016-06-11",
-			"notes":"This version of Patient Index features adiabatic tuning and fresnel searching!",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/patient-index.jpg"
-		},
-		{	"id":23423,
-			"family":"HealthShare",
-			"product":"Provider Directory",
-			"majorVersion":16,
-			"minorVersion":0,
-			"patchVersion":0,
-			"date":"2016-07-11",
-			"notes":"As featured on TV.",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/provider-directory.jpg"
-		},
-		{	"id":23403,
-			"family":"HealthShare",
-			"product":"Personal Community",
-			"majorVersion":15,
-			"minorVersion":0,
-			"patchVersion":0,
-			"date":"2015-04-11",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/personal-community.jpg"
-		},
-		{	"id":23423,
-			"family":"HealthShare",
-			"product":"Personal Community",
-			"majorVersion":16,
-			"minorVersion":0,
-			"patchVersion":0,
-			"date":"2016-04-11",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/personal-community.jpg"
-		},
-		{	"id":23423,
-			"family":"HealthShare",
-			"product":"Personal Community",
-			"majorVersion":17,
-			"minorVersion":0,
-			"patchVersion":0,
-			"label":"beta",
-			"date":"2016-08-17",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/personal-community.jpg"
-		},
-		{	"id":34987,
-			"family":"HealthShare",
-			"product":"Information Exchange",
-			"majorVersion":15,
-			"minorVersion":0,
-			"patchVersion":0,
-			"date":"2016-08-02",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/information-exchange.jpg"
-		},
-		{	"id":32287,
-			"family":"HealthShare",
-			"product":"Health Insight",
-			"majorVersion":15,
-			"minorVersion":0,
-			"patchVersion":0,
-			"date":"2016-08-02",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/health-insight.jpg"
-		},
-		{	"id":32247,
-			"family":"HealthShare",
-			"product":"App Server",
-			"majorVersion":11,
-			"minorVersion":0,
-			"patchVersion":0,
-			"date":"2016-08-02",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/app-server.jpg"
-		},
-		{	"id":26247,
-			"family":"HealthShare",
-			"product":"Health Connect",
-			"majorVersion":13,
-			"minorVersion":0,
-			"patchVersion":0,
-			"date":"2016-08-02",
-			"releaseNotes":"assets/release-notes.pdf",
-			"image":"packagemanager/images/health-connect.jpg"
-		}
-	],
-
-	"productFilters":[
-		{"text":"All Products", "value":""},
-		{"text":"App Server", "value":"App Server"},
-		{"text":"Health Connect", "value":"Health Connect"},
-		{"text":"Health Insight", "value":"Health Insight"},
-		{"text":"Information Exchange", "value":"Information Exchange"},
-		{"text":"Personal Community", "value":"Personal Community"},
-		{"text":"Patient Index", "value":"Patient Index"},
-		{"text":"Provider Directory", "value":"Provider Directory"}
-	],
-
-	"versionFilters":[
-		{"text":"All Versions", "value":""},
-		{"text":"Latest Release", "value":"latest"},
-		{"text":"Beta Releases", "value":"beta"}
-	],
-
-	"servers":[
-		{"name":"HSINSTANCE1",
-			"family":"InterSystems","product":"Platform","majorVersion":2016,"minorVersion":1,"patchVersion":3,
-			"namespaces":[
-				{"name":"", "isNew":true },
-				{"name":"HSHC12", "family":"HealthShare","product":"Health Connect","majorVersion":12,"minorVersion":3,"patchVersion":14 },
-				{"name":"HSPI19", "family":"HealthShare","product":"Patient Index","majorVersion":19,"minorVersion":1,"patchVersion":1 },
-				{"name":"HSHI12", "family":"HealthShare","product":"Health Insight","majorVersion":14,"minorVersion":1,"patchVersion":1,"label":"beta-3" },
-				{"name":"HSPD14", "family":"HealthShare","product":"Provider Directory","majorVersion":14,"minorVersion":9,"patchVersion":5 },
-				{"name":"HSPD16", "family":"HealthShare","product":"Provider Directory","majorVersion":16,"minorVersion":0,"patchVersion":1 },
-				{"name":"HSPD20", "family":"HealthShare","product":"Provider Directory","majorVersion":20,"minorVersion":1,"patchVersion":1 }
-			]
-		},
-		{"name":"HSPORTAL",
-			"family":"InterSystems","product":"Platform","majorVersion":2016,"minorVersion":2,"patchVersion":0,
-			"namespaces":[
-				{"name":"", "isNew":true },
-				{"name":"HSPC15", "family":"HealthShare","product":"Personal Community","majorVersion":15,"minorVersion":1,"patchVersion":2  },
-				{"name":"TEST" }
-			]
-		}
-	]
-	}
-	Set pObject = pObject.%ToJSON()
 	} Catch ex {
 		Set tSC = ex.AsStatus()
 	}

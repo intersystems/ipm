@@ -3,11 +3,13 @@
 RELEASE_FILE=`pwd`/$1
 VERSION=$2
 
-iris start $ISC_PACKAGE_INSTANCENAME EmergencyId=sys,sys 
-/bin/echo -e "sys\nsys\n" \
-        " Do ##class(%ZPM.Installer).Release(\"${RELEASE_FILE}\", \"${VERSION}\")\n" \
-        " halt" \
-| iris session $ISC_PACKAGE_INSTANCENAME
+rm -rf /opt/out/*
 
-/bin/echo -e "sys\nsys\n" \
-| iris stop $ISC_PACKAGE_INSTANCENAME quietly
+iris start $ISC_PACKAGE_INSTANCENAME
+/bin/echo -e \
+        " zpm \"package zpm -only -p \"\"/tmp/zpm-${VERSION}\"\" \":1\n" \
+        " set sc = ##class(%ZPM.Installer).MakeFile(\"/tmp/zpm-${VERSION}.tgz\", \"${RELEASE_FILE}\")\n" \
+        " halt" \
+| iris session $ISC_PACKAGE_INSTANCENAME -U%SYS
+
+iris stop $ISC_PACKAGE_INSTANCENAME quietly
