@@ -555,9 +555,6 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Continue
 				}
 			} ElseIf (tChar = "-") {
-        If (tState = $$$MODIFIERVALUE) {
-          $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Expected value for '%1', but the next modifier found", tModifier)))
-        }
 				If (tState = $$$PREARGUMENT) {
 					Set tState = $$$MODIFIERNAME
 					Set tModifier = ""
