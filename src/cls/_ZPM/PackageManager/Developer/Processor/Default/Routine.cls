@@ -13,13 +13,10 @@ Property FilenameTranslateAssociator As %String [ InitialExpression = "/_" ];
 
 /// Directory relative to module root containing the exported resource.
 /// Defaults to the resource's extension (lower-case) if unspecified.
-Property Directory As %String(MAXLEN = "") [ InitialExpression = "rtn" ];
+Property Directory As %String(MAXLEN = "") [ InitialExpression = "mac" ];
 
 /// Extension for individual filename(s) that comprise this resource
-Property FilenameExtension As %String [ InitialExpression = "rtn" ];
-
-/// Export format - list of acceptable values may differ by subclass.
-Property Format As %String(VALUELIST = ",%RO,UDL") [ InitialExpression = "%RO" ];
+Property FilenameExtension As %String [ InitialExpression = "mac" ];
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
@@ -45,7 +42,7 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 {
 	If (..Format = "") {
 		// Default handling
-		Set ..Format = "%RO"
+		Set ..Format = "UDL"
 	}
 	Quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
 }
