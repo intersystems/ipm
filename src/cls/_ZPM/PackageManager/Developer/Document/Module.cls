@@ -274,7 +274,7 @@ ClassMethod TimeStamp(name As %String) As %TimeStamp [ SqlProc ]
 /// Return 1 if the given document exists and 0 if it does not.
 ClassMethod Exists(name As %String) As %Boolean
 {
-  Set tExists = 0
+	Set tExists = 0
 	Try {
 		Set tSC = ..%ValidateName(name)
 		If $$$ISERR(tSC) {
@@ -282,7 +282,7 @@ ClassMethod Exists(name As %String) As %Boolean
 		}
 		Set tName = $Piece(name,".",1,*-1)
 		Set tExists = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameExists(tName) 
-            || ##class(%ZPM.PackageManager.Developer.Module).NameExists(tName)
+						|| ##class(%ZPM.PackageManager.Developer.Module).NameExists(tName)
 	} Catch e {
 		Set tExists = 0
 	}
