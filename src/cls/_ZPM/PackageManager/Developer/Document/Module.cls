@@ -274,15 +274,15 @@ ClassMethod TimeStamp(name As %String) As %TimeStamp [ SqlProc ]
 /// Return 1 if the given document exists and 0 if it does not.
 ClassMethod Exists(name As %String) As %Boolean
 {
-	Set tExists = 0
+  Set tExists = 0
 	Try {
 		Set tSC = ..%ValidateName(name)
 		If $$$ISERR(tSC) {
 			Quit
 		}
 		Set tName = $Piece(name,".",1,*-1)
-		Set tExists = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameExists(tName)
-			|| ##class(%ZPM.PackageManager.Developer.Module).NameExists(tName)
+		Set tExists = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameExists(tName) 
+            || ##class(%ZPM.PackageManager.Developer.Module).NameExists(tName)
 	} Catch e {
 		Set tExists = 0
 	}
@@ -341,6 +341,9 @@ ClassMethod GetOther(Name As %String) As %String
 /// Export this document to the current device in XML format
 Method ExportToXML(flags As %String) As %Status
 {
+  if ('..Code.Size) {
+    quit $$$OK
+  }
 	Set tXSL=##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||ExternalXSL").Data
 
 	Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(..Code, tXSL, .tOutput)
@@ -360,6 +363,9 @@ Method ExportToXML(flags As %String) As %Status
 /// Import from the stream in XML format
 Method ImportFromXML(stream As %RegisteredObject, flags As %String) As %Status
 {
+  if ('stream.Size) {
+    quit $$$OK
+  }
 	Set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
 
   Set tOutput = ##class(%Stream.GlobalCharacter).%New()
