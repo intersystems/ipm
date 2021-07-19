@@ -1,12 +1,14 @@
-/// @PublicAPI
-Class %ZPM.PackageManager.Core.ModuleReference Extends (%SerialObject, %XML.Adaptor) [ StorageStrategy = "" ]
+/// @API.Object.Instantiable
+/// @Modifier Availability InterSystems
+Class %ZPM.PackageManager.Core.ModuleReference Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor) [ StorageStrategy = "" ]
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 Property Name As %String(MAXLEN = 255) [ Required ];
 
-Property Version As %ZPM.PackageManager.Core.SemanticVersionExpression(XMLPROJECTION = "NONE") [ Required ];
+/// Does not need code generation for comparison because <property>VersionString</property> comparison is good enough
+Property Version As %ZPM.PackageManager.Core.SemanticVersionExpression(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ Required ];
 
 Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version") [ Required ];
 
@@ -46,7 +48,7 @@ Storage Default
 </Value>
 </Data>
 <State>ModuleReferenceState</State>
-<StreamLocation>^ZPM.PackageManager9CFF.ModuleReferB471S</StreamLocation>
+<StreamLocation>^%ZPM.PackageManager9CFF.ModuleReferB471S</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

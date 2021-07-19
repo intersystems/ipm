@@ -71,7 +71,7 @@ Method %OnNew(pClass As %String, pIndexName As %String, pBaseIndexGlobal As %Str
 Method ContainsItem(pItem As %String) As %Boolean
 {
 	// Sample value of tRef:
-	// ^ZPM.Client.FSCacheI("SemVer","ZPMMOD.VirusScanner.Common",0,1,0,1,"snapshot")
+	// ^ZPM.Client.FSCacheI("SemVer","HSMOD.VirusScanner.Common",0,1,0,1,"snapshot")
 	// NOTE: pItem is a row ID.
 	Set tRef = $ClassMethod(i%Class,i%IndexName_"GetStored",pItem)
 	If (tRef = "") { Quit 0 }
@@ -89,7 +89,7 @@ Method ContainsItem(pItem As %String) As %Boolean
 	}
 	
 	Set tIsSnapshot = ($ZConvert($QSubscript(tRef,tLength),"L") = "snapshot") &&
-		('tIsPrerelease || ($QSubscript(tRef,tLength-1) = $c(0)))
+		('tIsPrerelease || ($QSubscript(tRef,tLength-1) = -2))
 	
 	If ..IncludeSnapshot < tIsSnapshot {
 		Quit 0
@@ -113,7 +113,7 @@ Method NextItem(pItem As %String = "") As %String
 	}
 	For {
 		// Sample value of tNextRef:
-		// ^ZPM.Client.FSCacheI("SemVer","ZPMMOD.VirusScanner.Common",0,1,0,1,"snapshot")
+		// ^ZPM.Client.FSCacheI("SemVer","HSMOD.VirusScanner.Common",0,1,0,1,"snapshot")
 		If (tNextRef = "") {
 			Quit
 		}
@@ -154,7 +154,7 @@ Method PreviousItem(pItem As %String = "") As %String
 	}
 	For {
 		// Sample value of tPreviousRef:
-		// ^ZPM.Client.FSCacheI("SemVer","ZPMMOD.VirusScanner.Common",0,1,0,1,"snapshot")
+		// ^%ZPM.Client.FSCacheI("SemVer","HSMOD.VirusScanner.Common",0,1,0,1,"snapshot")
 		If (tPreviousRef = "") {
 			Quit
 		}

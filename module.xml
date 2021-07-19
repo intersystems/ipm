@@ -13,17 +13,11 @@
   </Author>
   <Packaging>module</Packaging>
   <SourcesRoot>src</SourcesRoot>
-  <Resource Name="%ZPM.PackageManager.Common.INC" Directory="inc"/>
-  <Resource Name="%ZPM.Utils.PKG" Directory="cls"/>
-  <Resource Name="%ZPM.JSON.PKG" Directory="cls"/>
-  <Resource Name="%ZPM.AbstractInstaller.CLS" Directory="cls"/>
-  <Resource Name="%ZPM.PackageManager.PKG" Directory="cls"/>
-  <Resource Name="%ZPM.PackageManager.CLS" Directory="cls"/>
+  <Resource Name="%ZPM.PKG"/>
   <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test"/>
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
   <Resource Name="%ZLANGC00.MAC" Generated="true"/>
   <Resource Name="/doc/README.txt"/>
-  <LifecycleClass>%ZPM.PackageManager.Developer.Lifecycle.Module</LifecycleClass>
   <API>
     <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Annotation.Utils:ExtractAnnotations" Public="true"></Item>
     <Item Type="class" Name="%ZPM.PackageManager.Core.ModuleReference" Public="true"></Item>

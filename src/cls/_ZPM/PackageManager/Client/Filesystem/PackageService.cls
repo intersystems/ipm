@@ -29,8 +29,9 @@ Method GetModuleManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedMo
 	Quit tModule.Manifest
 }
 
-Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.Object
+Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference, Output AsArchive As %Boolean = 1) As %Stream.Object
 {
+  Set AsArchive = 1
 	// ... and tgz it!
 	Set tTempFileName = ##class(%File).TempFilename("tgz")
 	Set tSrcPath = ..GetModuleDirectory(pModuleReference)

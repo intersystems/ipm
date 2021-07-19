@@ -1,3 +1,5 @@
+Include %occErrors
+
 Class %ZPM.PackageManager.Client.Filesystem.Cache Extends (%Persistent, %ZPM.PackageManager.Core.ModuleInfo)
 {
 
@@ -7,7 +9,7 @@ Property Root As %String(MAXLEN = 260) [ Required ];
 
 ForeignKey RootFK(Root) References %ZPM.PackageManager.Client.FilesystemServerDefinition(RootIndex) [ OnDelete = cascade ];
 
-Property SubDirectory As %String(MAXLEN = 260) [ Required ];
+Property SubDirectory As %String(MAXLEN = 260);
 
 Property LastModified As %TimeStamp [ Required ];
 
@@ -65,6 +67,38 @@ ClassMethod OrderedMatchesFetch(ByRef qHandle As %Binary, ByRef Row As %List, By
 	Quit tSC
 }
 
+Method HandleSaveError(pSC As %Status) As %Status
+{
+	Set tSC = pSC
+	Try {
+		If $System.Status.Equals(pSC,$$$ERRORCODE($$$KeyNotUnique)) {
+			$$$ThrowOnError($System.Status.DecomposeStatus(pSC,.tStatusInfo))
+			
+			// Which key?
+			Set tErrorParam = tStatusInfo(1,"param",1)
+			Set tClass = $Piece(tErrorParam,":",1)
+			Set tKey = $Piece(tErrorParam,":",2)
+			If (tClass = $classname()) && (tKey = "RootNameVersion") {
+				// Find the existing instance with matching RootNameVersion
+				Set tOtherInstance = ..RootNameVersionOpen(..Root,..Name,..VersionString,,.tSC)
+				$$$ThrowOnError(tSC)
+				
+				// Log a descriptive error message
+				Set tDupeDir = ..Root_..SubDirectory
+				Set tUseDir = tOtherInstance.Root_tOtherInstance.SubDirectory
+				Set tMessage = ..Name_" "_..VersionString_" previously found in "_tUseDir_"; also found in "_tDupeDir_". The version in "_tUseDir_" will be used."
+				Do ##class(%ZPM.PackageManager.Core.LogManager).Warning(tMessage,1)
+				
+				// Treat this as a non-error
+				Set tSC = $$$OK
+			}
+		}
+	} Catch e {
+		Set tSC = $$$ADDSC(pSC,e.AsStatus())
+	}
+	Quit tSC
+}
+
 Storage Default
 {
 <Data name="CacheDefaultData">
@@ -94,6 +128,12 @@ Storage Default
 </Value>
 <Value name="9">
 <Value>SemVer</Value>
+</Value>
+<Value name="10">
+<Value>Description</Value>
+</Value>
+<Value name="11">
+<Value>Repository</Value>
 </Value>
 </Data>
 <DataLocation>^ZPM.Client.FSCacheD</DataLocation>

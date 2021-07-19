@@ -1,6 +1,6 @@
 Include (%sySecurity, %occErrors)
 
-Class %ZPM.PackageManager.Developer.Processor.CSPApplication Extends (%ZPM.PackageManager.Developer.Processor.Abstract, %XML.Adaptor, %Installer.CSPApplication)
+Class %ZPM.PackageManager.Developer.Processor.CSPApplication Extends (%ZPM.PackageManager.Developer.Processor.Abstract, %XML.Adaptor, %Installer.CSPApplication) [ PropertyClass = %ZPM.PackageManager.Developer.Processor.PropertyParameters ]
 {
 
 /// Description of resource processor class (shown in UI)
@@ -8,7 +8,7 @@ Parameter DESCRIPTION As STRING = "Facilitates CSP application definition/config
 
 Parameter ATTRIBUTES = {""_
 	// Not in any version of %Installer.CSPApplication (and probably shouldn't be)
-	"PasswordAuthEnabled,UnauthenticatedEnabled,DelegatedAuthEnabled,KerberosAuthEnabled,"_
+	"PasswordAuthEnabled,UnauthenticatedEnabled,DelegatedAuthEnabled,KerberosAuthEnabled,LoginTokenEnabled,"_
 	
 	// Not in any version of %Installer.CSPApplication (but maybe should be)
 	"Enabled,DeepSeeEnabled,iKnowEnabled,"_
@@ -48,6 +48,9 @@ Property DelegatedAuthEnabled As %Boolean [ InitialExpression = 0 ];
 /// Kerberos authentication enabled
 Property KerberosAuthEnabled As %Boolean [ InitialExpression = 0 ];
 
+/// Login token authentication enabled
+Property LoginTokenEnabled As %Boolean [ InitialExpression = 0 ];
+
 /// If defined, this will dispatch all requests in this CSP application to this one class
 Property DispatchClass As %String(MAXLEN = 256);
 
@@ -57,24 +60,13 @@ Property MatchRoles As %String(MAXLEN = 32767);
 /// Cookie Path
 Property CookiePath As %String(MAXLEN = 256);
 
-/// Do not delete during uninstall
-Property Keep As %Boolean [ Internal ];
-
 /// Physical path for CSP files
 Property Directory As %String(ATTRIBUTEREQUIRED = 0, MAXLEN = 1024) [ Required ];
 
 Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
-  Set tSC = ##super(pResourceReference)
-  Set ..Url = $ZConvert(..Url,"L")
-  new $namespace
-  If ..Url = "" {
-    Set ..Keep = 1
-    Set ..Url = $system.CSP.GetDefaultApp($NAMESPACE)
-    Set $namespace = "%SYS"
-    Set tSC = ##class(Security.Applications).Get(..Url,.tProperties)
-    Set ..Directory = ##class(%File).NormalizeDirectory(..Directory, $Get(tProperties("Path")))
-  }
+	Set tSC = ##super(pResourceReference)
+	Set ..Url = $ZConvert(..Url,"L")
 	Quit tSC
 }
 
@@ -131,7 +123,7 @@ Method OnPhaseInternal(pTime As %String, pPhase As %String, ByRef pParams) As %S
 		}
 		
 		Set ..CookiePath = $ZConvert(..CookiePath,"L")
-
+		
 		If ..Directory = "<irrelevant>" {
 			Set ..Directory = ""
 		}
@@ -237,10 +229,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 {
 	// TODO: Make mirror-safe.
 	
-  Set tSC = $$$OK
-  If (..Keep) {
-    Return $$$OK
-  }
+	Set tSC = $$$OK
 	Try {
 		Set tOrigNS = $Namespace
 		Set dbDir = $$$defdir
@@ -273,7 +262,8 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 		Set tProperties("AutheEnabled") = (..PasswordAuthEnabled * $$$AutheCache) +
 			(..UnauthenticatedEnabled * $$$AutheUnauthenticated) +
 			(..DelegatedAuthEnabled * $$$AutheDelegated) +
-			(..KerberosAuthEnabled * $$$AutheK5API)
+			(..KerberosAuthEnabled * $$$AutheK5API) +
+			(..LoginTokenEnabled * $$$AutheLoginToken)
 		
 		If tProperties("AutheEnabled") = 0 {
 			kill tProperties("AutheEnabled")
@@ -375,10 +365,7 @@ Method DeleteCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 {
 	// TODO: Make mirror-safe.
 	
-  Set tSC = $$$OK
-  If ..Keep {
-    Quit tSC
-  }
+	Set tSC = $$$OK
 	Try {
 		// Only try to purge files if the directory exists.
 		Set tDirExists = (..Directory '= "") && ##class(%File).DirectoryExists(..Directory)
@@ -422,5 +409,23 @@ Method OnGetUniqueName(Output pUniqueName)
 	}
 }
 
+Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo) As %Status
+{
+	Set pInfo = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo).%New()
+	If (..Url '= "") {
+		Set pInfo.SourceControlAware = 1
+		Set pInfo.ResourceType = "/CSP/"
+		Set pInfo.Prefix = ..Url
+		Set pInfo.RelativePath = ..ResourceReference.Name
+		Set pInfo.IsDirectory = ($Piece(..ResourceReference.Name,"/",*) '[ ".")
+	}
+	Quit $$$OK
 }
 
+/// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
+Method OnItemRelativePath(pItemName As %String) As %String
+{
+	Quit ..ResourceReference.Name_$Piece(pItemName,..Url,2)
+}
+
+}
