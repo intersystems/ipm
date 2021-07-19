@@ -34,12 +34,34 @@ Method %Activate(ByRef pParams) As %Status
 	Set tSC = $$$OK
 	Try {
 		Set tSC = ##super(.pParams)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
+		
 		Set tSC = ..Configure(.pParams)
-		If $$$ISERR(tSC) {
-			Quit
+		$$$ThrowOnError(tSC)
+		
+		If '$ListFind(..PhaseList,"Package") {
+			// Code cannot be deployed if it is to be reexported and packaged.
+			Set tSC = ..MakeDeployed(.pParams)
+			$$$ThrowOnError(tSC)
+		}
+		
+		
+		// Create Studio project for package if it is loaded in developer mode and no explicit statement to not create it
+		Set tNoStudioProject = $Get(pParams("NoStudioProject"), 0)
+		If ..Module.DeveloperMode && 'tNoStudioProject {
+			#dim tProject As %Studio.Project
+			// Do not throw exceptions if failure to create because creating a Studio project should not block activation.
+			// Just write the exception if in verbose mode
+			Set tStudioProjectSC = ..Module.GetStudioProject(.tProject)
+			Set tVerbose = $Get(pParams("Verbose"))
+			If tVerbose {
+				If $$$ISOK(tStudioProjectSC) {
+					Write !, "Studio project created/updated: " _ tProject.Name _ ".PRJ"
+				} Else {
+					Write !, "Unable to create/update Studio project: " _ tProject.Name _ ".PRJ"
+					Write !, $System.Status.GetErrorText(tStudioProjectSC)
+				}
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -71,7 +93,7 @@ Method %Package(ByRef pParams) As %Status
 			Quit
 		}
 		
-		Write !,"Module exported to:",!,$Char(9),tExportDirectory,!
+		Write:tVerbose !,"Module exported to:",!,$c(9),tExportDirectory,!
 		
 		Set tTgzFile = $Extract(tExportDirectory,1,*-1)_".tgz"
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Archive).Create(tExportDirectory,tTgzFile,.tOutput)
@@ -84,7 +106,7 @@ Method %Package(ByRef pParams) As %Status
 		}
 		
 		// Always show this message
-		Write !,"Module package generated:",!,$Char(9),tTgzFile
+		Write:tVerbose !,"Module package generated:",!,$c(9),tTgzFile
 		
 		Set tSrcFileStream = ##class(%Stream.FileBinary).%New()
 		Set tSC = tSrcFileStream.LinkToFile(tTgzFile)
@@ -96,7 +118,7 @@ Method %Package(ByRef pParams) As %Status
 		If $$$ISERR(tSC) {
 			Quit
 		}
-		Set pParams("PackageFile") = tTgzFile
+    Set pParams("PackageFile") = tTgzFile
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

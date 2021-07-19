@@ -23,12 +23,18 @@ Property Snapshots As %Boolean [ InitialExpression = 0 ];
 
 Property Prereleases As %Boolean [ InitialExpression = 0 ];
 
+/// Boolean flag indicating that modules installed from this repository
+/// are ALWAYS installed in non-developer mode.
+Property ReadOnly As %Boolean [ InitialExpression = 0 ];
+
 /// Returns a client to interact with this server.
 Method GetPackageService() As %ZPM.PackageManager.Core.IPackageService [ Abstract ]
 {
 }
 
 /// Returns a client to publish modules/applications to this server.
+/// If publishing modules/applications is not supported, returns $$$NULLOREF.
+/// Errors are thrown as exceptions.
 Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService [ Abstract ]
 {
 }
@@ -49,13 +55,16 @@ Method Display()
 	Write !,$c(9),"Available?",$c(9),$$$YesNo(..GetPackageService().IsAvailable())
 	Write !,$c(9),"Use for Snapshots?",$c(9),$$$YesNo(..Snapshots)
 	Write !,$c(9),"Use for Prereleases?",$c(9),$$$YesNo(..Prereleases)
+	Write !,$c(9),"Is Read-Only?",$c(9),$$$YesNo(..ReadOnly)
 }
 
 /// Called from package manager shell to create or update an instance of this class.
 /// Acceptable values in <var>pModifiers</var> and <var>pData</var> may vary between classes, but
 /// some (such as "name", "enabled", "snapshots", and "prereleases") are common to all.
 /// For a full list of modifiers, see the Commands XDATA block in <class>%ZPM.PackageManager</class>.
-ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status [ Final ]
+/// If specified, <var>pExpectedType</var> will be compared against the full classname of the existing
+/// instance matched by <var>pModifiers("name")</var>; an error will be returned if they do not match.
+ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData, pExpectedType As %Dictionary.Classname = "") As %Status [ Final ]
 {
 	Set tSC = $$$OK
 	Try {
@@ -73,6 +82,12 @@ ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pDat
 		If ..ServerDefinitionKeyExists(tName) {
 			Set tInstance = ..ServerDefinitionKeyOpen(tName,,.tSC)
 			$$$ThrowOnError(tSC)
+			
+			If (pExpectedType '= "") && (pExpectedType '= $classname(tInstance)) {
+				Set tMessage = "Repository '%1' is configured as a different type. Use a different name, or delete it (repo -n %1 -delete) and run the previous command again."
+				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText(tMessage,tName))
+				$$$ThrowStatus(tSC)
+			}
 		}
 		
 		If '$IsObject(tInstance) {
@@ -96,6 +111,11 @@ ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pDat
 			Set tInstance.Prereleases = tPrereleases
 		} ElseIf (tIsNew) {
 			Set tInstance.Prereleases = 1
+		}
+		If $Data(pModifiers("read-only"),tReadOnly) {
+			Set tInstance.ReadOnly = tReadOnly
+		} ElseIf (tIsNew) {
+			Set tInstance.ReadOnly = 0
 		}
 		
 		$$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
@@ -176,6 +196,9 @@ Storage Default
 </Value>
 <Value name="11">
 <Value>Prereleases</Value>
+</Value>
+<Value name="12">
+<Value>ReadOnly</Value>
 </Value>
 </Data>
 <DataLocation>^%ZPM.Client.ServerDefD</DataLocation>

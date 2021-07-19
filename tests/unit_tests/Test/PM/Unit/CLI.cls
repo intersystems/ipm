@@ -63,6 +63,14 @@ Method TestParser()
 	Set tResults(tCommands,"parameters","module")="SomeModule"
 	Set tResults(tCommands,"parameters","version")="0.0.1-prerelease.42+snapshot"
 	
+	Set tCommands($i(tCommands)) = "repo -r -n registry -url http://iris-test:52774/registry/ -user ""user"" -pass ""pass"""
+	Set tResults(tCommands)="repo"
+	Set tResults(tCommands,"modifiers","name")="registry"
+	Set tResults(tCommands,"modifiers","remote")=""
+	Set tResults(tCommands,"modifiers","url")="http://iris-test:52774/registry/"
+	Set tResults(tCommands,"modifiers","username")="user"
+	Set tResults(tCommands,"modifiers","password")="pass"
+	
 	/*
 	Set tCommands($i(tCommands)) = 
 	Set tResults(tCommands)=
@@ -104,6 +112,8 @@ Method TestRepository()
 	// Cleanup (again)
 	Do ..RunCommand("repo -n UTFILE -delete")
 	Do ..RunCommand("repo -name UTSERVER -delete")
+
+	Do ..RunCommand("repo -r -name registry -reset-defaults")
 }
 
 Method RunCommand(pCommand As %String)

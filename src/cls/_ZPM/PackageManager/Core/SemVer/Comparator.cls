@@ -78,9 +78,17 @@ Method Evaluate(pVersion As %ZPM.PackageManager.Core.SemanticVersion) As %Boolea
 {
 	// Must prereleases match?
 	Set tEquals = (..Operator [ "=") && (pVersion.Major = ..Major) && (pVersion.Minor = ..Minor) && (pVersion.Patch = ..Patch) && (pVersion.Prerelease = ..Prerelease)
-	If (..Operator = "=") {
+	If tEquals || (..Operator = "=") {
 		Quit tEquals
 	}
+	
+	// For purposes of this comparison, remove build metadata.
+	// Normally, <released version>.Follows(<otherwise identical +snapshot version>) returns 1.
+	// However, in this case, it should not; a semantic version expression requiring earlier/later
+	// than 1.1.0, for example, should reject 1.1.0+snapshot
+	#dim tVersion As %ZPM.PackageManager.Core.SemanticVersion
+	Set tVersion = pVersion.%ConstructClone()
+	Set tVersion.Build = ""
 	
 	Set tCompVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).%New()
 	Set tCompVersion.Major = ..Major
@@ -89,9 +97,9 @@ Method Evaluate(pVersion As %ZPM.PackageManager.Core.SemanticVersion) As %Boolea
 	Set tCompVersion.Prerelease = ..Prerelease
 	
 	If (..Operator [ "<") {
-		Quit tCompVersion.Follows(pVersion) || tEquals
+		Quit tCompVersion.Follows(tVersion)
 	} Else {
-		Quit pVersion.Follows(tCompVersion) || tEquals
+		Quit tVersion.Follows(tCompVersion)
 	}
 	
 	Quit 1

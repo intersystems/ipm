@@ -3,7 +3,8 @@ Class %ZPM.PackageManager.Developer.API.ErrorMessages
 
 /// <var>pDocName</var> is the full document name (including the .LOC extension) <br />
 /// <var>pFileObject</var> is an instance of %ZPM.PackageManager.Developer.ErrorMessages.MsgFile corresponding to the document's content. <br />
-/// @PrivateAPI
+/// @API.Method
+/// @Modifier Availability InterSystems
 ClassMethod GetMessageFile(pDocName As %String, Output pFileObject As %ZPM.PackageManager.Developer.ErrorMessages.MsgFile) As %Status
 {
 	Set tSC = $$$OK
@@ -32,7 +33,8 @@ ClassMethod GetMessageFile(pDocName As %String, Output pFileObject As %ZPM.Packa
 /// <var>pFileObject</var> is an instance of %ZPM.PackageManager.Developer.ErrorMessages.MsgFile corresponding to the document's content. <br />
 /// If <var>pCompile</var> is set to 1 (by default, it is), then the file will be compiled after save. <br />
 /// <var>pConsoleOutput</var> is an integer-subscripted array of lines of output from everything that happened. <br />
-/// @PrivateAPI
+/// @API.Method
+/// @Modifier Availability InterSystems
 ClassMethod SaveMessageFile(pDocName As %String, pFileObject As %ZPM.PackageManager.Developer.ErrorMessages.MsgFile, pCompile As %Boolean = 1, Output pConsoleOutput) As %Status
 {
 	Set tSC = $$$OK
