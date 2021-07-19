@@ -4,7 +4,7 @@
     <Module>
       <Name>simplemodule</Name>
       <Version>0.0.1+snapshot</Version>
-      <Packaging>application</Packaging>
+      <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
       <Resource Name="Test.pkg"/>
       <Invoke Class="%EnsembleMgr" Method="EnableNamespace" Phase="Compile" When="Before" CheckStatus="true">

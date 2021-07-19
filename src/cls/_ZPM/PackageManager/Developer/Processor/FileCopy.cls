@@ -2,17 +2,18 @@ Class %ZPM.PackageManager.Developer.Processor.FileCopy Extends %ZPM.PackageManag
 {
 
 /// Description of resource processor class (shown in UI)
-Parameter DESCRIPTION As STRING = "Copies the specified directory (the resource name) to a specific target location (InstallDirectory) during the Activate phase.";
+Parameter DESCRIPTION As STRING = "Copies the specified directory or file  (the resource name) to a specific target location (InstallDirectory) during the Activate phase.";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay";
+Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay,CSPApplication,Defer";
 
-Property Name As %String(MAXLEN = "");
+Property Name As %String(MAXLEN = "") [ Aliases = {SourceDirectory} ];
 
-Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest} ];
+/// Path to which the directory or file (a full filename, in that case) should be copied upon installation; may contain expressions.
+Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest}, Required ];
 
-/// Directory to which the directory should be copied upon installation; may contain expressions.
 /// If true, the files should be added to the target location (rather than fully replacing it, causing other files there to be deleted)
+/// Relevant for directories only.
 Property Overlay As %Boolean;
 
 Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status

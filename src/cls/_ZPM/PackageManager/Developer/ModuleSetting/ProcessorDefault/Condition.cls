@@ -1,5 +1,5 @@
 /// Tested in the SatisfiesCondition method of <class>%ZPM.PackageManager.Developer.Processor.Abstract</class>
-Class %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault.Condition Extends (%SerialObject, %XML.Adaptor)
+Class %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault.Condition Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
@@ -8,7 +8,7 @@ Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 Property Attribute As %String(MAXLEN = 100, XMLPROJECTION = "attribute") [ Required ];
 
 /// Comparison operator; if empty, "eq" is assumed (although not the InitialExpression for sake of XML re-export).
-Property Operator As %String(VALUELIST = ",eq,neq,gt,lt,gte,lte", XMLPROJECTION = "attribute");
+Property Operator As %String(VALUELIST = ",eq,neq,gt,lt,gte,lte,contains", XMLPROJECTION = "attribute");
 
 /// Value to compare to - may be empty.
 Property Value As %String(MAXLEN = "", XMLPROJECTION = "attribute");

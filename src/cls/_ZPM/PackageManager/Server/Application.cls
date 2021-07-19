@@ -79,6 +79,15 @@ Storage Default
 <Value name="8">
 <Value>SemVer</Value>
 </Value>
+<Value name="9">
+<Value>Installer</Value>
+</Value>
+<Value name="10">
+<Value>Description</Value>
+</Value>
+<Value name="11">
+<Value>Repository</Value>
+</Value>
 </Data>
 <DataLocation>^%ZPM.Server.ApplicationD</DataLocation>
 <DefaultData>ApplicationDefaultData</DefaultData>
