@@ -17,9 +17,10 @@ Method SaveResult(duration)
 }
 
 /// Loads unit test classes from a directory without compiling or running them. (Other debug loading approaches would compile them.)
-ClassMethod LoadTestDirectory(pRootDirectory As %String, pVerbose As %Boolean = 0) As %Status
+ClassMethod LoadTestDirectory(pRootDirectory As %String, pVerbose As %Boolean = 0, Output pLoadedList As %String, pFormat As %String = "") As %Status
 {
 	Set tSC = $$$OK
+	Set pLoadedList = ""
 	Try {
 		$$$ThrowOnError(..GetSubDirectories(pRootDirectory,pRootDirectory,1,"",.tSubDirs))
 		
@@ -29,7 +30,8 @@ ClassMethod LoadTestDirectory(pRootDirectory As %String, pVerbose As %Boolean = 
 			If (tDirectory = "") {
 				Quit
 			}
-			$$$ThrowOnError($System.OBJ.LoadDir(tDirectory,"k" _ $Select(pVerbose:"/display",1:"/nodisplay")))
+			// If no format provided, load only XML to support backwards compatability
+			$$$ThrowOnError($System.OBJ.LoadDir(tDirectory, "k" _ $Select(pVerbose:"/display",1:"/nodisplay"),,,.pLoadedList))
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()

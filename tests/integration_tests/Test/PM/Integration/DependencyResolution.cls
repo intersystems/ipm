@@ -13,20 +13,20 @@ Method TestEverything()
     
     Do ..PublishModules()
   
-		// Get annotations for local module XDATA blocks; put into array by module (XDATA) name.
-		If '$$$AssertStatusOK(##class(%ZPM.PackageManager.Developer.Annotation.Utils).ExtractAnnotations($classname(),.tAnnotationList)) {
-			Quit
-    }
+		#; // Get annotations for local module XDATA blocks; put into array by module (XDATA) name.
+		#; If '$$$AssertStatusOK(##class(%ZPM.PackageManager.Developer.Annotation.Utils).ExtractAnnotations($classname(),.tAnnotationList)) {
+		#; 	Quit
+    #; }
     
 		Kill tAssertArray
 		
-		For i=1:1:tAnnotationList.Count() {
-			#dim tAnnotation As %ZPM.PackageManager.Developer.Annotation
-			Set tAnnotation = tAnnotationList.GetAt(i)
-			If (tAnnotation.MemberType = "XData") {
-				Set tAssertArray(tAnnotation.MemberName,$i(tAssertArray(tAnnotation.MemberName))) = $ListBuild(tAnnotation.Tag,$$$lcase(tAnnotation.Value))
-			}
-    }
+		#; For i=1:1:tAnnotationList.Count() {
+		#; 	#dim tAnnotation As %ZPM.PackageManager.Developer.Annotation
+		#; 	Set tAnnotation = tAnnotationList.GetAt(i)
+		#; 	If (tAnnotation.MemberType = "XData") {
+		#; 		Set tAssertArray(tAnnotation.MemberName,$i(tAssertArray(tAnnotation.MemberName))) = $ListBuild(tAnnotation.Tag,$$$lcase(tAnnotation.Value))
+		#; 	}
+    #; }
     
 		// In client namespace:
 		Write !,!,!

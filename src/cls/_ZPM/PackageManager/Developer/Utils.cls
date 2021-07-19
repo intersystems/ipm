@@ -1,47 +1,153 @@
-Include (%occInclude, %occErrors, %ZPM.PackageManager.Common)
+Include (%occInclude, %occErrors, %syConfig, %syPrompt, %ZPM.PackageManager.Common)
 
 Class %ZPM.PackageManager.Developer.Utils [ System = 3 ]
 {
 
-/// Format of <var>pDependencyGraph</var>:
-/// pDependencyGraph("module name") = $ListBuild(depth, "server name")
-ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams)
+/// SSL/TLS config to use for HTTPS requests made by package manager code.
+Parameter DefaultSSLConfigName As STRING [ Internal ] = "ZPMSSLConfig";
+
+/// Returns the name of the default SSL config after creating if it it does not already exist.
+ClassMethod CreateAndGetSSLConfig(ByRef pProperties) As %String
 {
+	Set name = ..#DefaultSSLConfigName
+	New $Namespace
+	Set $Namespace = "%SYS"
+	If '##class(Security.SSLConfigs).Exists(name) {
+		Set pProperties("Description") = "Default SSL Config to be used by HealthShare Package Manager"
+		Set sc = ##class(Security.SSLConfigs).Create(name, .pProperties)
+		$$$ThrowOnError(sc)
+	}
+	Return name
+}
+
+/// Format of <var>pDependencyGraph</var>:
+/// pDependencyGraph("module name") = $ListBuild(<depth>,<server name>,<version>)
+/// pDependencyGraph("module name","<dependent module> <dependent module version>") = <irrelevant>
+ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue As %ZPM.PackageManager.Core.WorkMgr)
+{
+	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
+	$$$SuspendErrorCount
 	Set tSC = $$$OK
+	Set tLocked = 0
+	Set tRestoreParams = 0
 	Try {
-		// Sort dependencies by depth.
-		Set tKey = ""
-		For {
-			Set tKey = $Order(pDependencyGraph(tKey),1,tData)
-			Quit:tKey=""
+		Set initWorkQueueManager = '$Data(pParams("Multicompile","CacheTempIndex"),tCacheTempIndex) || '$IsObject($Get(pWorkQueue))
+		If initWorkQueueManager {
+			If '$IsObject($Get(pWorkQueue)) {
+				// There may be one at a higher stack level.
+				// Deal with dependencies here, and ensure that previous CacheTempIndex can be restored at the end.
+				Merge tParamBackup = pParams
+				Set tRestoreParams = 1
+			}
 			
-			Set $ListBuild(tDepth,tServerName,tVersion) = tData
-			Set tDepthList(tDepth,$Increment(tDepthList(tDepth))) = $ListBuild(tServerName,tKey,tVersion)
+			If ($Get(pParams("Threads")) = 1) || ($TLevel > 0) {
+				Set tNumWorkers = -1 // Disable multithreading.
+			} Else {
+				Set tNumWorkers = $Get(pParams("Threads"),1) // Enable multicompile
+			}
+			
+			Set pWorkQueue = ##class(%ZPM.PackageManager.Core.WorkMgr).Initialize("/multicompile="_tNumWorkers,.tSC)
+			$$$ThrowOnError(tSC)
+			
+			Set tModuleName = ""
+			For {
+				Set tModuleName = $Order(pDependencyGraph(tModuleName),1,tData)
+				Quit:tModuleName=""
+				
+				// List modules to avoid duplicate loads.
+				Set pParams("Multicompile","ModuleContext",tModuleName) = $ListBuild("Activate")
+				
+				// Invert dependency graph, subscripts (<module>,<depends on>)
+				Set tInvertedDependencyGraph(tModuleName) = $List(tData,2,3)
+				
+				Set tDependentKey = ""
+				For {
+					Set tDependentKey = $Order(pDependencyGraph(tModuleName,tDependentKey))
+					Quit:tDependentKey=""
+					
+					Set tInvertedDependencyGraph($Piece(tDependentKey," "),tModuleName) = ""
+				}
+			}
+			
+			Set tCacheTempIndex = $Increment($$$ZPMTempLoadGraphRoot)
+			Set pParams("Multicompile","CacheTempIndex") = tCacheTempIndex
+			Kill $$$ZPMTempLoadGraph(tCacheTempIndex)
+			Merge $$$ZPMTempLoadGraph(tCacheTempIndex) = tInvertedDependencyGraph
+		} Else {
+			Lock +$$$ZPMTempLoadGraph(tCacheTempIndex):$$$LockTimeout
+			If $Test {
+				Set tLocked = 1
+			} Else {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to obtain lock on dependency graph."))
+			}
+			Merge tInvertedDependencyGraph = $$$ZPMTempLoadGraph(tCacheTempIndex)
 		}
 		
-		// Load and install dependencies in reverse order by depth.
-		Set tDepth = ""
+		// Queue load of modules without uninstalled dependencies.
+		Set tModuleName = ""
 		For {
-			Set tDepth = $Order(tDepthList(tDepth),-1,tCount)
-			Quit:tDepth=""
-			For i=1:1:tCount {
-				Set $ListBuild(tServerName,tModuleName,tVersion) = tDepthList(tDepth,i)
-				
-				// Missing server name indicates that it's already present locally.
-				If (tServerName '= "") {
-					Set tSC = ..LoadModuleReference(tServerName,tModuleName,tVersion,.pParams)
-					If $$$ISERR(tSC) {
+			Set tModuleName = $Order(tInvertedDependencyGraph(tModuleName),1,tData)
+			Quit:tModuleName=""
+			
+			// Check if ALL subnode modules have no server name in the top level node of those modules
+			// in the inverted dependency graph (which means they are already installed)
+			// ONLY want to check on the initial version of the graph because nodes are killed as modules are installed
+			If initWorkQueueManager {
+				Set tHasUninstalledDependency = 0
+				Set tSubnode = ""
+				While 1 {
+					Set tSubnode = $Order(tInvertedDependencyGraph(tModuleName, tSubnode))
+					If (tSubnode = "") {
+						Quit
+					}
+					// Check if subnode exists. If it doesn't, then its already been installed because subnodes are killed
+					Set tSubnodeServerName = $ListGet($Get(tInvertedDependencyGraph(tSubnode)), 1)
+					If (tSubnodeServerName '= "") {
+						Set tHasUninstalledDependency = 1
 						Quit
 					}
 				}
+			} Else {
+				Set tHasUninstalledDependency = ($Data(tInvertedDependencyGraph(tModuleName)) >= 10)
 			}
-			If $$$ISERR(tSC) {
-				Quit
+			// If no uninstalled dependencies remain...
+			If 'tHasUninstalledDependency {
+				Set $ListBuild(tServerName,tVersion) = tData
+				ZKill $$$ZPMTempLoadGraph(tCacheTempIndex,tModuleName)
+				
+				// Missing server name indicates that it's already present locally; nothing to do in that case.
+				If (tServerName '= "") {
+					If ($TLevel = 0) && ($Get(pParams("Multicompile","Verbose"),$Get(pParams("Verbose"),0))) {
+						Write !,"Queuing module load: ",tModuleName," ",tVersion," @ ",tServerName
+					}
+					Set tSC = pWorkQueue.QueueCallback(
+						"##class("_$classname()_").LoadModuleReference",
+						"##class("_$classname()_").LoadCompleted",
+						tServerName,tModuleName,tVersion,.pParams,.pDependencyGraph)
+					$$$ThrowOnError(tSC)
+				} Else {
+					// Remove this module from dependencies.
+					Set tDependentKey = ""
+					For {
+						Set tDependentKey = $Order($$$ZPMTempLoadGraph(tCacheTempIndex,tDependentKey))
+						Quit:tDependentKey=""
+						
+						Kill $$$ZPMTempLoadGraph(tCacheTempIndex,tDependentKey,tModuleName)
+					}
+				}
 			}
 		}
-		If $$$ISERR(tSC) {
-			Quit
+		If (tLocked) {
+			Lock -$$$ZPMTempLoadGraph(tCacheTempIndex)
+			Set tLocked = 0
+		} Else {
+			// Only call WaitForComplete once (!!!)
+			// Recursive calls will do repeat execution of previously-queued jobs.
+			Set tSC = pWorkQueue.WaitForComplete()
+			$$$ThrowOnError(tSC)
 		}
+		
+		Merge $$$ZPMHandledModules($Namespace) = pParams("Multicompile","ModuleContext")
 	} Catch e {
 		If (e.Name["ZSOAP") {
 			Set tSC = $Get(%objlasterror,e.AsStatus())
@@ -49,10 +155,57 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams)
 			Set tSC = e.AsStatus()
 		}
 	}
+	If tRestoreParams {
+		Kill pParams
+		Merge pParams = tParamBackup
+	}
+	If (tLocked) {
+		Lock -$$$ZPMTempLoadGraph(tCacheTempIndex)
+	}
 	Quit tSC
 }
 
-ClassMethod LoadQualifiedReference(pReference As %ZPM.PackageManager.Core.QualifiedModuleReference, ByRef pParams) As %Status
+/// Intended to be invoked only as a work queue callback (so %status and %workqueue will be defined)
+/// Signature must match <method>LoadModuleReference</method> per work queue manager conventions.
+ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
+{
+	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
+	$$$SuspendErrorCount
+	Set tSC = $$$OK
+	Set tLocked = 0
+	Try {
+		$$$ThrowOnError(%status)
+		If $$$ISOK(tSC) && $Data(pParams("Multicompile","CacheTempIndex"),tCacheTempIndex) {
+			// Remove loaded dependency from dependencies subscript.
+			Lock +$$$ZPMTempLoadGraph(tCacheTempIndex):$$$LockTimeout
+			If $Test {
+				Set tLocked = 1
+			} Else {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to obtain lock on dependency graph."))
+			}
+			Set tDependentKey = ""
+			For {
+				Set tDependentKey = $Order($$$ZPMTempLoadGraph(tCacheTempIndex,tDependentKey))
+				Quit:tDependentKey=""
+				
+				Kill $$$ZPMTempLoadGraph(tCacheTempIndex,tDependentKey,pModuleName)
+			}
+			Lock -$$$ZPMTempLoadGraph(tCacheTempIndex)
+			Set tLocked = 0
+			
+			// Schedule load of any other modules that may need to be scheduled.
+			Set tSC = ..LoadDependencies(.pDependencyGraph,.pParams,%workqueue)
+		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	If (tLocked) {
+		Lock -$$$ZPMTempLoadGraph(tCacheTempIndex)
+	}
+	Quit tSC
+}
+
+ClassMethod LoadQualifiedReference(pReference As %ZPM.PackageManager.Core.QualifiedModuleReference, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -61,16 +214,18 @@ ClassMethod LoadQualifiedReference(pReference As %ZPM.PackageManager.Core.Qualif
 		If (tReference.ServerName = "") && ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonExists(1,.tID) {
 			Set tServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).%OpenId(tID)
 			Set tReference.ServerName = tServer.Name
-    }
-		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, .pParams)
+		}
+		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, .pParams, .pDependencyGraph)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
 
-ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, ByRef pParams) As %Status
+ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
+	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
+	$$$SuspendErrorCount
 	#dim tExpression As %ZPM.PackageManager.Core.SemanticVersionExpression
 	Set tSC = $$$OK
 	Try {
@@ -87,13 +242,27 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			Merge qstruct = pParams("qstruct")
 		}
 		
-		Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pServerName,,.tSC)
-		If $$$ISERR(tSC) {
+		// Use % variables that intentionally leak in worker processes, to avoid duplicate work when they go out of scope.
+		#dim %installcontext As %ZPM.PackageManager.Core.InstallContext
+		#dim %manager As %ZPM.PackageManager.Client.Manager
+		If '$$$IsISCWorker {
+			New %installcontext
+			New %manager
+		}
+		Set %installcontext = ##class(%ZPM.PackageManager.Core.InstallContext).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		Do %installcontext.SetGraph(.pDependencyGraph)
+		Merge tIndex = pParams("Multicompile","CacheTempIndex")
+		Do %installcontext.SetCacheTempIndex(.tIndex)
+		
+		Set %manager = $Select($IsObject($Get(%manager)):%manager,1:##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC))
+		$$$ThrowOnError(tSC)
+		
+		Set tClient = %manager.CheckServiceCache(pServerName,.tAvailable)
+		If 'tAvailable {
+			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pServerName))
 			Quit
 		}
-		
-		Set tClient = tServer.GetPackageService()
-
 		Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
@@ -113,13 +282,16 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			}
 		}
 		
-		Set tSC = ..GetRequiredVersionExpression(pModuleName,"",.tExpression)
+		// Ensure requested versions match those required by other modules in the namespace, excluding versions currently being installed
+		// (the requirements of such modules are already known to be satisfied)
+		Set tSC = ..GetRequiredVersionExpression(pModuleName,%installcontext.GetPendingModuleList(),.tExpression,.tSourceList)
 		If $$$ISERR(tSC) {
 			Quit
 		}
 		
 		If 'tExpression.IsSatisfiedBy(tModRef.Version) {
-			Set tSC = $$$ERROR($$$GeneralError,"Requested version (%1) does not satisfy the requirements of other modules installed in the current namespace (%2).",pVersion,tExpression.ToString())
+			Set tSourceString = $ListToString(tSourceList,"; ")
+			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Requested version (%1 %2) does not satisfy the requirements of other modules installed in the current namespace (%3).",tModRef.Name,pVersion,tSourceString))
 			Quit
 		}
 		
@@ -132,12 +304,12 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				// This doesn't make sense if we're loading the dependency from a remote server.
 				Set tDeveloperMode = 1
 			}
-			Set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode)
+			Set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName)
 		} Else {
 			Set tAsArchive = -1
 			Set tPayload = tClient.GetModule(tModRef, .tAsArchive)
 			If (tVerbose) {
-				Write !,"Module "_pModuleName_" was downloaded from "_tServer.Name_" "_tServer.URL
+				Write !,"Module "_pModuleName_" was downloaded from " _ pServerName _ " " _ tClient.Location
 			}
 			Set tFileName = ""
 			If ($ISOBJECT(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
@@ -166,16 +338,16 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				// Old format (TODO: officially deprecate): try loading a .xml file
 				Set tSC = $System.OBJ.Load(tTmpStream.Filename,.qstruct)
 			}
-            Set errorMsg = "", success = 0
-            If $$$ISOK(tSC) {
-                Set success = 1
-            } Else {
-                Set success = 0
-                Set errorMsg = $System.Status.GetErrorText(tSC)
-            }
-            if ($System.CLS.IsMthd(tClient, "CollectAnalytics")) {
-              do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
-            }
+      Set errorMsg = "", success = 0
+      If $$$ISOK(tSC) {
+          Set success = 1
+      } Else {
+          Set success = 0
+          Set errorMsg = $System.Status.GetErrorText(tSC)
+      }
+      if ($System.CLS.IsMthd(tClient, "CollectAnalytics")) {
+        do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
+      }
 		}
 		If $$$ISERR(tSC) {
 			Quit
@@ -189,11 +361,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			}
 			
 			// Don't need to register if loading from the local server.
-			If (tLocalServer '= tServer) && $IsObject($Get(tPayload)) && '##class(%ZPM.PackageManager.Server.Module).NameVersionExists(pModuleName, pVersion) {
+			If (tLocalServer.Name '= pServerName) && $IsObject($Get(tPayload)) && '##class(%ZPM.PackageManager.Server.Module).NameVersionExists(pModuleName, pVersion) {
 				Set tCacheMod = ##class(%ZPM.PackageManager.Core.Module).%New()
 				Set tCacheMod.Name = pModuleName
 				Set tCacheMod.VersionString = pVersion
-				Set tCacheMod.Manifest = tServer.GetPackageService().GetModuleManifest(tModRef)
+				Set tCacheMod.Manifest = tClient.GetModuleManifest(tModRef)
 				Do tPayload.Rewind()
 				Do tCacheMod.Payload.CopyFrom(tPayload)
 				Do tLocalServer.GetPublishService().PublishModule(tCacheMod)
@@ -248,7 +420,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 	Quit tSC
 }
 
-ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverrideDeveloperMode As %Boolean = 0) As %Status
+ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverrideDeveloperMode As %Boolean = 0, pRepository As %String = "") As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -263,8 +435,18 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			// Only propagate selected settings that should apply to dependencies.
 			Set tParams("DeveloperMode") = $Get(pOverrideDeveloperMode,0)
 			Set tParams("Verbose") = tVerbose
+			Merge tParams("NoLock") = pParams("NoLock")
+			Merge tParams("NoMapping") = pParams("NoMapping")
+			Merge tParams("NoTransaction") = pParams("NoTransaction")
+			Merge tParams("NoJournal") = pParams("NoJournal")
+			Merge tParams("Multicompile") = pParams("Multicompile")
+			Merge tParams("Threads") = pParams("Threads")
+			Merge tParams("NoStudioProject") = pParams("NoStudioProject")
+			Merge tParams("AngularBuild") = pParams("AngularBuild")
+			Merge tParams("Artifactory") = pParams("Artifactory")
+			Merge tParams("AngularArtifact") = pParams("AngularArtifact")
 		}
-		Set tSC = ..LoadNewModule(pDirectory,.tParams)
+		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -274,13 +456,43 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 	Quit tSC
 }
 
+/// Given a path to a module.xml file (directory), tries to correlate it to an instance of <class>%ZPM.PackageManager.Developer.Module</class>.
+/// Throws errors.
+ClassMethod GetModuleObjectFromPath(pPath As %String, Output pFound As %Boolean) As %ZPM.PackageManager.Developer.Module
+{
+	Set pFound = 0
+	Set pPath = ##class(%Library.File).NormalizeDirectory(pPath)
+	Set modulePath = pPath_"module.xml"
+	If '##class(%Library.File).Exists(modulePath) {
+		$$$ThrowStatus($$$ERROR($$$GeneralError,"File not found to obtain module object: "_modulePath))
+	}
+	Set stream = ##class(%Stream.FileCharacter).%New()
+	$$$ThrowOnError(stream.LinkToFile(modulePath))
+	Return ..GetModuleObjectFromStream(stream,.pFound)
+}
+
+/// Given a stream, tries to correlate it to an instance of <class>%ZPM.PackageManager.Developer.Module</class>.
+/// Throws errors.
+ClassMethod GetModuleObjectFromStream(pStream As %Stream.Object, Output pFound As %Boolean) As %ZPM.PackageManager.Developer.Module
+{
+	Set pFound = 0
+	Set reader = ##class(%XML.Reader).%New()
+	Set sc = reader.OpenStream(pStream)
+	$$$ThrowOnError(sc)
+	Do reader.Correlate("Module","%ZPM.PackageManager.Developer.Module")
+	Set pFound = (reader.Next(.moduleObj, .sc) > 0)
+	$$$ThrowOnError(sc)
+	Return $Get(moduleObj)
+}
+
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules As %List = "", Output pExpression As %ZPM.PackageManager.Core.SemanticVersionExpression) As %Status
+ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules As %List = "", Output pExpression As %ZPM.PackageManager.Core.SemanticVersionExpression, Output pSourceList As %List) As %Status
 {
 	Set tSC = $$$OK
 	Try {
 		Set pExpression = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).%New()
+		Set pSourceList = ""
 		
 		Set tResult = ##class(%ZPM.PackageManager.Developer.Module).VersionRequirementsFunc(pModuleName,pExcludeModules)
 		If (tResult.%SQLCODE < 0) {
@@ -289,12 +501,15 @@ ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules
 		
 		While tResult.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(tResult.%Get("Version"),.tVersionExpr))
+			Set tVersion = tResult.%Get("Version")
+			$$$ThrowOnError(##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(tVersion,.tVersionExpr))
 			Set pExpression = pExpression.And(tVersionExpr)
+			Set pSourceList = pSourceList_$ListBuild($ListToString(tResult.%Get("Names"),", ")_": "_tVersion)
 		}
 		$$$ThrowOnError(tSC)
 	} Catch e {
 		Set pExpression = $$$NULLOREF
+		Set pSourceList = ""
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
@@ -302,7 +517,8 @@ ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules
 
 /// Returns a flat list of dependents for a given module name (and optional version) <br />
 /// <var>pRepoNames</var> is a $ListBuild list of repositories in which to search for dependents; if blank, only currently-installed modules (and any missing dependencies) are considered. <br />
-/// @PrivateAPI
+/// @API.Method
+/// @Modifier Availability InterSystems
 ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), Output pErrorList, pModuleName As %String, pModuleVersion As %String = "", pRepoNames As %List = "") As %Status
 {
 	Set tSC = $$$OK
@@ -339,7 +555,8 @@ ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE
 /// Returns a tree of dependents, with dependent modules at the root, for a given module name (and optional version) <br />
 /// <var>pRepoNames</var> is a $ListBuild list of repositories in which to search for dependents; if blank, only currently-installed modules (and any missing dependencies) are considered. <br />
 /// Tree subscripts are $lb(Name,VersionString,ServerName). <br />
-/// @PrivateAPI
+/// @API.Method
+/// @Modifier Availability InterSystems
 ClassMethod GetDependentsAsTree(Output pTree, Output pErrorList, pModuleName As %String, pModuleVersion As %String = "", pRepoNames As %List = "") As %Status
 {
 	New %DepTree
@@ -443,11 +660,6 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 					Continue
 				}
 				
-				If '$Data(tDependencyGraph) {
-					// No dependencies, don't bother recording anything.
-					Continue
-				}
-				
 				// Add dependency graph to pGraphs, subscripted by qualified module reference.
 				Set pGraphs($Increment(pGraphs)) = $ListBuild("",tModule.Name,tModule.VersionString)
 				Merge pGraphs(pGraphs) = tDependencyGraph
@@ -525,7 +737,100 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 	Quit tSC
 }
 
-Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repo:%String,Description:%String") [ SqlProc ]
+/// Uninstalls all modules from the current namespace
+ClassMethod UninstallAll(pForce As %Boolean, ByRef pParams) As %Status
+{
+	Set tSC = $$$OK
+	Try {
+		// Get all dependency graphs for the namespace.
+		Set tSC = ..BuildAllDependencyGraphs(,.tGraphs)
+		$$$ThrowOnError(tSC)
+		
+		// Build arrays mapping dependencies in both directions.
+		// Doesn't need to be recursive.
+		For tIndex=1:1:$Get(tGraphs) {
+			Set tModuleName = $ListGet(tGraphs(tIndex),2)
+			Set tModuleNames(tModuleName) = ""
+			Set tDependency = ""
+			For {
+				Set tDependency = $Order(tGraphs(tIndex,tDependency),1,tData)
+				If (tDependency = "") {
+					Quit
+				}
+				If ($ListGet(tData,2) '= "") {
+					// This is not actually installed locally.
+					Continue
+				}
+				Set tDependsOn(tModuleName,tDependency) = ""
+				Set tModuleNames(tDependency,tModuleName) = ""
+			}
+		}
+		
+		Set tProgressMade = 1
+		For {
+			If '$Data(tModuleNames) {
+				Quit
+			}
+			If 'tProgressMade {
+				Set tFirstSC = $$$ERROR($$$GeneralError,"Unable to uninstall all modules.")
+				Set tSC = $System.Status.AppendStatus(tFirstSC,tSC) // Append any previous errors (which may be causes or unrelated)
+				$$$ThrowStatus(tSC)
+			}
+			Set tProgressMade = 0
+			
+			// Loop over "dependents" array to delete each module that has nothing left that depends on it.
+			// If a module fails to uninstall, modules that it depends on will not be uninstalled, unless
+			// pForce is true.
+			Set tModuleName = ""
+			For {
+				Set tModuleName = $Order(tModuleNames(tModuleName))
+				If (tModuleName = "") {
+					Quit
+				}
+				
+				If ($Data(tModuleNames(tModuleName)) > 1) {
+					// If there are dependencies left that have not been uninstalled yet, skip this module.
+					Continue
+				}
+				
+				If $Data(tFailedModules(tModuleName)) {
+					// If we have already tried unsuccessfully to uninstall a given module, don't try again.
+					Continue
+				}
+				
+				Kill tParams
+				Merge tParams = pParams
+				Write !,"Uninstalling ",tModuleName
+				Set tOneSC = ##class(%ZPM.PackageManager.Developer.Module).Uninstall(tModuleName,pForce,,.tParams)
+				If $$$ISOK(tOneSC) || pForce {
+					// If we are forcing uninstallation of everything that can be uninstalled,
+					// treat the module in question as uninstalled even if something went fatally wrong.
+					Set tDependentModule = ""
+					For {
+						Set tDependentModule = $Order(tDependsOn(tModuleName,tDependentModule))
+						If (tDependentModule = "") {
+							Quit
+						}
+						Kill tModuleNames(tDependentModule,tModuleName)
+					}
+					Kill tDependsOn(tModuleName)
+					Kill tModuleNames(tModuleName)
+					Set tProgressMade = 1
+				}
+				If $$$ISERR(tOneSC) {
+					Write !,"Error uninstalling ",tModuleName,": ",$System.Status.GetErrorText(tOneSC)
+					Set tSC = $System.Status.AppendStatus(tSC,tOneSC)
+					Set tFailedModules(tModuleName) = ""
+				}
+			}
+		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String") [ SqlProc ]
 {
 }
 
@@ -550,7 +855,7 @@ ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String) A
 			Set tList = tClient.ListModules(tSearchCriteria)
 			For i=1:1:tList.Count() {
 				Set tMod = tList.GetAt(i)
-				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repo,tMod.Description)
+				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description)
 			}
 		}
 		
@@ -590,218 +895,347 @@ ClassMethod GetModuleNameFromXML(pDirectory As %String, Output name As %String) 
 	Return $$$OK
 }
 
-ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams) As %Status
+ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %String = "") As %Status
 {
-	set tSC = $$$OK
-	Set (tPrevModule, name) = ""
-	try {
-		set tVerbose = $Get(pParams("Verbose"))
+	Set tSC = $$$OK
+	Set tInitTLevel = $TLevel
+	Try {
+		Set tVerbose = $Get(pParams("Verbose"))
+		Set tUseTransactions = '($Get(pParams("NoTransaction"),0) || $Get(pParams("NoJournal"),0))
 		If '$Data(pParams("qstruct")) {
 			Set qstruct = "ck"_$Select(tVerbose:"d",1:"-d")
 		}
-		set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
 		
-		// get modulename from xml
-		$$$ThrowOnError(..GetModuleNameFromXML(pDirectory, .moduleName))
-		// try opening module object 
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(moduleName,,.tSC)
-		If $IsObject(tModule) {
-			Set tPrevModule = tModule.%ConstructClone()
-			Kill tModule
+		// Check for valid license key prior to top-level module load
+		// This may throw an exception.
+		If '$Data($$$ZPMHandledModules($Namespace)) {
+			Set tLicenseIsValid = ..CheckLicenseKey()
+			If 'tLicenseIsValid {
+				Write !,"WARNING: Continuing module load without a valid license."
+			}
 		}
-
-		set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),.error,.tLoadedList) quit:$$$ISERR(tSC)
-		;
-		set first = $Order(tLoadedList(""))
-		if first=""                   set tSC = $$$ERROR($$$GeneralError,"No module definition found.") quit
-		if $Order(tLoadedList(first))'="" set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.") quit
-		set first = $$$lcase(first)
-		if $p(first,".",*)'="zpm"  set tSC = $$$ERROR($$$GeneralError,"No module definition found.") quit
-		;
-		set name = $p(first,".",1,*-1)
-		;
-		set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(name,,.tSC) quit:$$$ISERR(tSC)
-		if '$Data($$$ZPMHandledModules($Namespace)) {
+		
+		// Create a singleton instance for logging of warnings/error messages
+		Set tLogManager = ##class(%ZPM.PackageManager.Core.LogManager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		
+		// Show INFO+ if verbose, WARNING+ if not.
+		Set tMinLogLevel = $Select(tVerbose:1,1:2)
+		If (tLogManager.Threshold > tMinLogLevel) {
+			Set tLogManager.Threshold = tMinLogLevel
+		}
+		
+		Set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
+		
+		If ($Get(pParams("NoJournal"),0) '= 0) {
+			// Disable journalling with process-level switch.
+			Set tJournalMgr = ##class(%ZPM.PackageManager.Core.JournalManager).%New(0)
+		} ElseIf tUseTransactions {
+			TSTART
+		}
+		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+		$$$ThrowOnError(tSC)
+		
+		Set tFirstLoaded = $$$lcase($Order(tLoadedList("")))
+    
+		If (tFirstLoaded = "") {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
+		}
+		If ($Order(tLoadedList(tFirstLoaded)) '= "") {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"module.xml contains multiple documents."))
+		}
+		If ($Piece(tFirstLoaded,".",*) '= "zpm") {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
+		}
+		
+		Set tModuleName = $Piece(tFirstLoaded,".",1,*-1)
+		
+		If (pRepository '= "") {
+			// Force developer mode to be 0 if repository is read only.
+			If ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyExists(pRepository, .tRepositoryId) {
+				If +##class(%ZPM.PackageManager.Client.ServerDefinition).ReadOnlyGetStored(tRepositoryId) {
+					// Set in pParams directly so that this value gets transmitted downstream
+					Set pParams("DeveloperMode") = 0
+					If tVerbose {
+						Write !, "Repository "_pRepository_" is Read-Only so "_tModuleName_" will be loaded in non-developer mode"
+					}
+				}
+			}
+		}
+		
+		// If we have specified developer mode, but do not have a source control extension enabled, then set up a reasonable default.
+		If $Get(pParams("DeveloperMode"),0) {
+			Set tCurrentSourceControl = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
+			If (tCurrentSourceControl = "") {
+				Set tCompositeSCClass = "%ZPM.PackageManager.Developer.Extension.Composite"
+				$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
+				Set tPrimaryExtension = "%ZPM.PackageManager.Developer.Extension.SourceControl.ISC"
+				Set tSecondaryExtensions = $ListBuild("%ZPM.PackageManager.Developer.Extension.PackageManager")
+				$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Extension.Composite).SetExtensionClasses(tPrimaryExtension,tSecondaryExtensions))
+			}
+		}
+		
+		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleName,,.tSC)
+		$$$ThrowOnError(tSC)
+		Set tModule.Repository = pRepository
+		
+		If $Data(pParams("DeveloperMode"),tDeveloperMode) {
+			Set tModule.DeveloperMode = tDeveloperMode
+			Set tModule.Root = pDirectory
+			Set tSC = tModule.%Save()
+			$$$ThrowOnError(tSC)
+		} Else {
+			Set tDeveloperMode = +tModule.DeveloperMode
+		}
+		
+		If (tDeveloperMode && tUseTransactions) {
+			// In developer mode, save the module manifest so we can fix it even if errors occur afterward.
+			TCOMMIT
+			
+			// Nested transactions in underlying calls to LoadNewModule during the dependency resolution process may be rolled back at the end of this method.
+			// To debug a dependency, that module itself should be loaded in "developer mode"
+			TSTART
+		}
+		
+		If '$Data($$$ZPMHandledModules($Namespace)) {
 			// The purpose of this NEW command is to make sure that the % variable $$$ZPMHandledModules refers to doesn't leak outside this scope.
 			// This only happens for the first module to be loaded in a set of dependencies (using zpm "load ..." or zpm "install ...")
 			// $$$ZPMHandledModules is also used in the ExecutePhases method of %ZPM.PackageManager.Developer.Module to
 			// cover cases where new dependencies are added and a module is compiled without reloading, and in the BuildDependencyGraph
 			// method to treat installed snapshot versions as installed rather than forcing reload if they have been reloaded
 			// as part of the same root module operation.
-			new $$$ZPMHandledModules
-			set $$$ZPMHandledModules($Namespace) = "" //Initialize.
+			New $$$ZPMHandledModules
+			Set $$$ZPMHandledModules($Namespace) = "" //Initialize.
 		}
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).CheckSystemRequirements(name))
-		set tSC = tModule.LoadDependencies("",.pParams) quit:$$$ISERR(tSC)
-		;
-		set path = pDirectory_"preload"
-		if ##class(%File).DirectoryExists(path) {
-			set tSC = $system.OBJ.ImportDir(path,"*.inc",$Select(tVerbose:"d",1:"-d")_"/compile",,1) quit:$$$ISERR(tSC)
-			set tSC = $system.OBJ.LoadDir(path,$Select(tVerbose:"d",1:"-d")_"/compile",,1) quit:$$$ISERR(tSC)
-		} else {
-			write:tVerbose !,"Skipping preload - directory does not exist."
+		Merge $$$ZPMHandledModules($Namespace) = pParams("Multicompile","ModuleContext")
+
+    $$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).CheckSystemRequirements(tModuleName))
+		
+		#dim tInstallContext As %ZPM.PackageManager.Core.InstallContext
+		Set tInstallContext = ##class(%ZPM.PackageManager.Core.InstallContext).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		If 'tInstallContext.ModuleIsDependency(tModuleName) {
+			Set tSC = tModule.LoadDependencies("",.pParams)
+			$$$ThrowOnError(tSC)
 		}
-		;
-		set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),.error,.tLoadedList) quit:$$$ISERR(tSC)
-		set tSC = tModule.%Reload() quit:$$$ISERR(tSC)
-		if $Get(pParams("DeveloperMode"),0) {
-			if tModule.GlobalScope {
-				set ^%SYS("ModuleRoot","*",name) = pDirectory
-				set ^%SYS("ModuleRoot","*",name,"DeveloperMode") = 1
-			} else {
-				set ^%SYS("ModuleRoot",$namespace,name) = pDirectory
-				set ^%SYS("ModuleRoot",$namespace,name,"DeveloperMode") = 1
-			}
-		}
-		;
-		set pParams("RootDirectory") = pDirectory
-		set tSC = ##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(name,$lb("Activate"),1,.pParams) quit:$$$ISERR(tSC)
-		;
-	} catch e {
-		If ('$IsObject(tPrevModule)) {
-			// delete module object if it's new one
-			Do ##class(%ZPM.PackageManager.Developer.Module).NameDelete(name)
+		
+		Set tPath = pDirectory_"preload"
+		If ##class(%File).DirectoryExists(tPath) {
+			New $Namespace
+			Set tInitNamespace = $Namespace
+			// Ensure we load "preload" resources into the correct code database (the namespace default one), since this is before mappings are set up.
+			Set $Namespace = "^^"_##class(%ZPM.PackageManager.Developer.Utils).GetRoutineDatabaseDir($Namespace)
+			Set tSC = $system.OBJ.LoadDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($TLevel:"/multicompile=0",1:""),,1)
+			$$$ThrowOnError(tSC)
+			Set $Namespace = tInitNamespace
 		} Else {
-			// save previous vresion of the object
-			Do ##class(%ZPM.PackageManager.Developer.Module).NameDelete(name)
-			If $IsObject(tPrevModule) {
-				Do tPrevModule.%Save()
-			}
+			Write:tVerbose !,"Skipping preload - directory does not exist."
 		}
-		set tSC = e.AsStatus()
+		
+		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+		$$$ThrowOnError(tSC)
+		Set tSC = tModule.%Reload()
+		$$$ThrowOnError(tSC)
+		
+		If (tDeveloperMode && tUseTransactions) {
+			// In developer mode, commit load of dependencies (if all went well) and don't wrap reload/compile of this module's code
+			// in a transaction; we want to be able to debug!
+			TCOMMIT
+		}
+		Set pParams("RootDirectory") = pDirectory
+		If tVerbose || $Get(pParams("Multicompile","Verbose"),0) {
+			Write !,"Loading "_tModuleName_" in process "_$Job
+		}
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModuleName,$lb("Activate"),1,.pParams)
+		If $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
+			TCOMMIT
+		}
+		$$$ThrowOnError(tSC)
+	} Catch e {
+		Set tSC = e.AsStatus()
 	}
-	quit tSC
+	While ($TLevel > tInitTLevel) {
+		TROLLBACK 1
+	}
+	Quit tSC
 }
 
-ClassMethod AddPackageMapping(pNamespace As %String, pMapping As %String, pFrom As %String) As %Status
+ClassMethod CheckLicenseKey() As %Boolean
 {
-	set tSC = $$$OK
-	try {
+	// Limit the number of attempts in case this somehow ends up running in a non-interactive process.
+	#define MaxTries 5
+	Set tValidLicense = ($System.License.GetKeyStatus() '= "Invalid")
+	While ('tValidLicense) && $$$InProgrammerMode && ('$$$IsISCWorker) && ($Increment(tTries) <= $$$MaxTries) {
+		Write !!,"Your system has no (valid) license key present"
+		Write !,"Copy a valid license key into "_$System.Util.InstallDirectory()_"mgr"
+		Write !,"and then enter 'y' to activate it. Enter 'n' to continue without a license key, "
+		Write !,"or 'q' to quit."
+		Set tValue = 1
+		Set tResponse = ##class(%Library.Prompt).GetYesNo("Action >",.tValue,,$$$DisableHelpCharMask + $$$DisableBackupCharMask + $$$EnableQuitCharMask)
+		If (tResponse '= $$$SuccessResponse) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"Installation cancelled due to lack of license key."))
+		}
+		If ('tValue) {
+			// The user wants to keep going anyway.
+			Quit
+		}
+		
+		// Try to activate the license.
+		Set tSC = $System.License.Upgrade()
+		If $$$ISERR(tSC) {
+			Write !!,"ERROR activating license: ",!,$System.Status.GetErrorText(tSC)
+		} Else {
+			Write !,"License activated."
+			Set tValidLicense = 1
+		}
+	}
+	Quit tValidLicense
+}
+
+ClassMethod AddPackageMapping(pNamespace As %String, pMapping As %String, pFrom As %String, pSkipActivation As %Boolean = 0) As %Status
+{
+	Set tSC = $$$OK
+	Try {
 		If $$$ucase(pNamespace) = "%ALL" {
 			Set tSC = ..CreateAllNamespace()
 			If $$$ISERR(tSC) {
 				Quit
 			}
 		}
-		new $namespace
-		set $namespace = "%SYS"
-		kill p set p("Database") = pFrom
-		if '##Class(Config.MapPackages).Exists(pNamespace,pMapping) {
-			set tSC = ##Class(Config.MapPackages).Create(pNamespace,pMapping,.p,,1) quit:$$$ISERR(tSC)
+		New $namespace
+		Set $namespace = "%SYS"
+		If '##class(Config.MapPackages).Exists(pNamespace,pMapping) {
+			Set tProps("Database") = pFrom
+			$$$ThrowOnError(##class(Config.MapPackages).Create(pNamespace,pMapping,.tProps,,$$$CPFSave))
+			If 'pSkipActivation {
+				$$$ThrowOnError(..ActivateMappings(pNamespace))
+			}
 		}
-		set tSC = ..ActivateMappings(pNamespace) quit:$$$ISERR(tSC)
-	} catch e {
-		set tSC = e.AsStatus()
+	} Catch e {
+		Set tSC = e.AsStatus()
 	}
-	quit tSC
+	Quit tSC
 }
 
-ClassMethod RemovePackageMapping(pNamespace As %String, pMapping As %String) As %Status
+ClassMethod RemovePackageMapping(pNamespace As %String, pMapping As %String, pSkipActivation As %Boolean = 0) As %Status
 {
-	set tSC = $$$OK
-	try {
-		new $namespace
-		set $namespace = "%SYS"
-		if ##Class(Config.MapPackages).Exists(pNamespace,pMapping) {
-			set tSC = ##Class(Config.MapPackages).Delete(pNamespace,pMapping) quit:$$$ISERR(tSC)
+	Set tSC = $$$OK
+	Try {
+		New $namespace
+		Set $namespace = "%SYS"
+		If ##class(Config.MapPackages).Exists(pNamespace,pMapping) {
+			$$$ThrowOnError(##class(Config.MapPackages).Delete(pNamespace,pMapping,,$$$CPFSave))
+			If 'pSkipActivation {
+				$$$ThrowOnError(..ActivateMappings(pNamespace))
+			}
 		}
-		set tSC = ..ActivateMappings(pNamespace) quit:$$$ISERR(tSC)
-	} catch e {
-		set tSC = e.AsStatus()
+	} Catch e {
+		Set tSC = e.AsStatus()
 	}
-	quit tSC
+	Quit tSC
 }
 
-ClassMethod AddRoutineMapping(pNamespace As %String, pMapping As %String, pType As %String = "ALL", pFrom As %String) As %Status
+ClassMethod AddRoutineMapping(pNamespace As %String, pMapping As %String, pType As %String = "ALL", pFrom As %String, pSkipActivation As %Boolean = 0) As %Status
 {
-	set tSC = $$$OK
-	try {
+	Set tSC = $$$OK
+	Try {
 		If $$$ucase(pNamespace) = "%ALL" {
 			Set tSC = ..CreateAllNamespace()
 			If $$$ISERR(tSC) {
 				Quit
 			}
 		}
-		new $namespace
-		set $namespace = "%SYS"
-		kill p set p("Database") = pFrom
-		set pMapping = pMapping_$S(pType="ALL":"",1:"_"_pType)
-		if '##Class(Config.MapRoutines).Exists(pNamespace,pMapping) {
-			set tSC = ##Class(Config.MapRoutines).Create(pNamespace,pMapping,.p,,1) quit:$$$ISERR(tSC)
+		New $namespace
+		Set $namespace = "%SYS"
+		Set pMapping = pMapping_$S(pType="ALL":"",1:"_"_pType)
+		If '##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
+			Set tProps("Database") = pFrom
+			$$$ThrowOnError(##class(Config.MapRoutines).Create(pNamespace,pMapping,.tProps,,$$$CPFSave))
+			If 'pSkipActivation {
+				$$$ThrowOnError(..ActivateMappings(pNamespace))
+			}
 		}
-		; work around bug that Config.MapRoutines doesn't map ^rINDEX for INC files
-		if pType="INC" {
-			set tSC = ..AddGlobalMapping(pNamespace,"rINDEX("""_$e(pMapping,1,*-4)_""",""INC"")",pFrom)
-			quit:$$$ISERR(tSC)
-		}
-		set tSC = ..ActivateMappings(pNamespace) quit:$$$ISERR(tSC)
-	} catch e {
-		set tSC = e.AsStatus()
+	} Catch e {
+		Set tSC = e.AsStatus()
 	}
-	quit tSC
+	Quit tSC
 }
 
-ClassMethod RemoveRoutineMapping(pNamespace As %String, pMapping As %String, pType As %String = "ALL") As %Status
+ClassMethod RemoveRoutineMapping(pNamespace As %String, pMapping As %String, pType As %String = "ALL", pSkipActivation As %Boolean = 0) As %Status
 {
-	set tSC = $$$OK
-	try {
-		new $namespace
-		set $namespace = "%SYS"
-		set pMapping = pMapping_$S(pType="ALL":"",1:"_"_pType)
-		if ##Class(Config.MapRoutines).Exists(pNamespace,pMapping) {
-			set tSC = ##Class(Config.MapRoutines).Delete(pNamespace,pMapping) quit:$$$ISERR(tSC)
+	Set tSC = $$$OK
+	Try {
+		New $namespace
+		Set $namespace = "%SYS"
+		Set pMapping = pMapping_$S(pType="ALL":"",1:"_"_pType)
+		If ##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
+			$$$ThrowOnError(##class(Config.MapRoutines).Delete(pNamespace,pMapping,,$$$CPFSave))
+			If 'pSkipActivation {
+				$$$ThrowOnError(..ActivateMappings(pNamespace))
+			}
 		}
-		; work around bug that Config.MapRoutines doesn't map ^rINDEX for INC files
-		if pType="INC" {
-			set tSC = ..RemoveGlobalMapping(pNamespace,"rINDEX("""_$e(pMapping,1,*-4)_""",""INC"")")
-			quit:$$$ISERR(tSC)
-		}
-		set tSC = ..ActivateMappings(pNamespace) quit:$$$ISERR(tSC)
-	} catch e {
-		set tSC = e.AsStatus()
+	} Catch e {
+		Set tSC = e.AsStatus()
 	}
-	quit tSC
+	Quit tSC
 }
 
-ClassMethod AddGlobalMapping(pNamespace As %String, pMapping As %String, pFrom As %String, pSetCollation As %Boolean = 0) As %Status
+ClassMethod AddGlobalMapping(pNamespace As %String, pMapping As %String, pFrom As %String, pSetCollation As %Boolean = 0, pSkipActivation As %Boolean = 0, ByRef pChanged As %Boolean = 0) As %Status
 {
-	set tSC = $$$OK
-	try {
-		If $$$ucase(pNamespace) = "%ALL" {
+	Set tSC = $$$OK
+	Try {
+				If $$$ucase(pNamespace) = "%ALL" {
 			Set tSC = ..CreateAllNamespace()
 			If $$$ISERR(tSC) {
 				Quit
 			}
 		}
-		new $namespace
-		set $namespace = "%SYS"
-		kill p set p("Database") = pFrom
-		If pSetCollation {
-			Set tDB=##class(SYS.Database).%OpenId($ZU(12)_pFrom)
-			Set:$IsObject(tDB) p("Collation") = tDB.NewGlobalCollation
+    New $namespace
+	 	Set $namespace = "%SYS"
+		If (pMapping [ ":(") {
+			// 2008 has glo:(subs), 2009 has glo(subs)
+			Set pMapping=$Piece(pMapping,":(")_"("_$Piece(pMapping,":(",2,*)
 		}
-		if pMapping[":(" set pMapping=$p(pMapping,":(")_"("_$p(pMapping,":(",2,999) // 2008 has glo:(subs), 2009 has glo(subs)
-		if '##Class(Config.MapGlobals).Exists(pNamespace,pMapping) {
-			set tSC=##Class(Config.MapGlobals).Create(pNamespace,pMapping,.p,,1) quit:$$$ISERR(tSC)
+		
+		If '##Class(Config.MapGlobals).Exists(pNamespace,pMapping) {
+			Set tProps("Database") = pFrom
+			If pSetCollation {
+				Set tDB=##class(SYS.Database).%OpenId($ZU(12)_pFrom)
+				If $IsObject(tDB) {
+					Set tProps("Collation") = tDB.NewGlobalCollation
+				}
+			}
+			$$$ThrowOnError(##class(Config.MapGlobals).Create(pNamespace,pMapping,.tProps,,$$$CPFSave))
+			If pSkipActivation {
+				Set pChanged = 1
+			} Else {
+				$$$ThrowOnError(..ActivateMappings(pNamespace))
+			}
 		}
-		set tSC = ..ActivateMappings(pNamespace) quit:$$$ISERR(tSC)
-	} catch e {
-		set tSC = e.AsStatus()
+	} Catch e {
+		Set tSC = e.AsStatus()
 	}
-	quit tSC
+	Quit tSC
 }
 
-ClassMethod RemoveGlobalMapping(pNamespace As %String, pMapping As %String = "") As %Status
+ClassMethod RemoveGlobalMapping(pNamespace As %String, pMapping As %String = "", pSkipActivation As %Boolean = 0, ByRef pChanged As %Boolean = 0) As %Status
 {
-	set tSC = $$$OK
-	try {
-		new $namespace
-		set $namespace = "%SYS"
-		if pMapping[":(" set pMapping=$p(pMapping,":(")_"("_$p(pMapping,":(",2,999) // 2008 has glo:(subs), 2009 has glo(subs)
-		if ##Class(Config.MapGlobals).Exists(pNamespace,pMapping) {
-			set tSC = ##Class(Config.MapGlobals).Delete(pNamespace,pMapping) quit:$$$ISERR(tSC)
+	Set tSC = $$$OK
+	Try {
+		New $namespace
+		Set $namespace = "%SYS"
+		If pMapping [ ":(" {
+			// 2008 has glo:(subs), 2009 has glo(subs)
+			Set pMapping=$Piece(pMapping,":(")_"("_$Piece(pMapping,":(",2,999) 
+		} 
+		If ##class(Config.MapGlobals).Exists(pNamespace,pMapping) {
+			$$$ThrowOnError(##class(Config.MapGlobals).Delete(pNamespace,pMapping,,$$$CPFSave))
+			If pSkipActivation {
+				Set pChanged = 1
+			} Else {
+				$$$ThrowOnError(..ActivateMappings(pNamespace))
+			}
 		}
-		set tSC = ..ActivateMappings(pNamespace) quit:$$$ISERR(tSC)
 	} catch e {
 		set tSC = e.AsStatus()
 	}
@@ -832,52 +1266,97 @@ ClassMethod CreateAllNamespace() As %Status
 
 ClassMethod GetRoutineDatabase(pNamespace As %String) As %String
 {
-	new $namespace
-	set $namespace="%SYS"
-	quit ##class(Config.Namespaces).Open(pNamespace).Routines
+	New $namespace
+	Set $namespace="%SYS"
+	Quit ##class(Config.Namespaces).Open(pNamespace).Routines
 }
 
 ClassMethod GetGlobalDatabase(pNamespace As %String) As %String
 {
-	new $namespace
-	set $namespace="%SYS"
-	quit ##class(Config.Namespaces).Open(pNamespace).Globals
+	New $namespace
+	Set $namespace="%SYS"
+	Quit ##class(Config.Namespaces).Open(pNamespace).Globals
 }
 
 ClassMethod GetRoutineDatabaseDir(pNamespace As %String) As %String
 {
-	new $namespace
-	set $namespace="%SYS"
-	quit ..GetDatabaseDirectory(..GetRoutineDatabase())
+	New $namespace
+	Set $namespace="%SYS"
+	Quit ..GetDatabaseDirectory(..GetRoutineDatabase(pNamespace))
 }
 
 ClassMethod GetGlobalDatabaseDir(pNamespace As %String) As %String
 {
-	new $namespace
-	set $namespace="%SYS"
-	quit ..GetDatabaseDirectory(..GetGlobalDatabase())
+	New $namespace
+	Set $namespace="%SYS"
+	Quit ..GetDatabaseDirectory(..GetGlobalDatabase(pNamespace))
 }
 
 ClassMethod GetDatabaseDirectory(pDatabase As %String) As %String
 {
-	new $namespace
-	set $namespace="%SYS"
-	quit ##class(Config.Databases).Open(pDatabase).Directory
+	New $namespace
+	Set $namespace="%SYS"
+	Quit ##class(Config.Databases).Open(pDatabase).Directory
 }
 
-ClassMethod ActivateMappings(pNamespace = {$namespace}) As %Status [ Internal ]
+ClassMethod ActivateMappings(pNamespace = {$Namespace}) As %Status [ Internal ]
 {
-	set tSC=$$$OK
-	try {
-		new $Namespace
-		set $Namespace = "%SYS"
-		set tSC = ##Class(Config.CPF).Write() Quit:$$$ISERR(tSC)
-		set tSC = ##Class(Config.Map).MoveToActive() Quit:$$$ISERR(tSC)
-		set tSC = ##Class(Config.Namespaces).Load(pNamespace) Quit:$$$ISERR(tSC)
+	Set tSC=$$$OK
+	Try {
+		Set tInterruptManager = ##class(%ZPM.PackageManager.Core.InterruptManager).%New()
+		Do tInterruptManager.DisableInterrupts()
+		New $Namespace
+		Set $Namespace = "%SYS"
+		$$$ThrowOnError(##class(Config.CPF).Write())
+		$$$ThrowOnError(##class(Config.Map).MoveToActive())
+		$$$ThrowOnError(##class(Config.Namespaces).Load(pNamespace))
 	} Catch ex {
-		set tSC = ex.AsStatus()
+		Set tSC = ex.AsStatus()
 	}
-	quit tSC
+	Quit tSC
+}
+
+/// Copy a package from one namespace to another. This works whether or not the contents of
+/// the package are deployed. <br />
+/// This copies classes and include files in the package. <br />
+ClassMethod CopyItemsInPackage(pPackage As %String, pFromNamespace As %String, pToNamespace As %String)
+{
+	#define CopyTempGlobal ^CacheTemp.CopyPercentItems
+	If $Extract(pPackage, "*") '= "." {
+		Set pPackage = pPackage_"."
+	}
+	
+	New $Namespace
+	Set $Namespace = pFromNamespace
+	
+	// Create Studio project
+	Set project = ##class(%Studio.Project).%New()
+	
+	// Add classes to project
+	Set sc = project.AddItem(pPackage_"PKG")
+	$$$ThrowOnError(sc)
+	
+	// Add include files to project
+	Set key = pPackage
+	While 1 {
+		Set key = $Order(^rINC(key))
+		If (key = "") || ($Extract(key, 1, $Length(pPackage)) '= pPackage) {
+			Quit
+		}
+		Set sc = project.AddItem(key_".INC")
+		$$$ThrowOnError(sc)
+	}
+	
+	// Deploy project to temp global
+	Kill $$$CopyTempGlobal
+	Set globalName = $Name($$$CopyTempGlobal)
+	Set sc = project.DeployToGbl(globalName)
+	$$$ThrowOnError(sc)
+
+	// Switch to pToNamespace and import project
+	Set $Namespace = pToNamespace
+	Set sc = ##class(%Studio.Project).InstallFromGbl(globalName)
+	$$$ThrowOnError(sc)
 }
 
 /// This method exports items (classes, routines, etc.) and reloads it into a different namespace
@@ -1078,6 +1557,169 @@ ClassMethod OrphanedResourcesClose(ByRef qHandle As %Binary) As %Status [ PlaceA
 	Quit $$$OK
 }
 
+/// Helper method to see if <var>pNamespace</var> has <var>pModule</var> (a module name) installed.
+/// Returns false if the module is not installed (which may be because the namespace does not exist).
+ClassMethod NamespaceHasModule(pNamespace As %String, pModuleName As %String) As %Boolean
+{
+	Set tModuleExists = 0
+	New $Namespace
+	Try {
+		Set $Namespace = pNamespace // This might fail.
+		Set tModuleExists = ##class(%ZPM.PackageManager.Developer.Module).NameExists(pModuleName)
+	} Catch e {
+		// Ignore - this means the namespace does not exist.
+	}
+	Quit tModuleExists
+}
+
+/// Short-term approach to lock a module's dependencies within the module manifest (rather than using a separate file).
+ClassMethod LockWithCurrentDependencies(pModuleName As %String) As %Status
+{
+	Set tSC = $$$OK
+	Set tInitTLevel = $TLevel
+	Try {
+		TSTART
+		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pModuleName,,.tSC)
+		$$$ThrowOnError(tSC)
+		
+		Set tSC = tModule.BuildDependencyGraph(.tGraph,,,,,,,,1)
+		$$$ThrowOnError(tSC)
+		
+		// Build map of dependency name to position in module's dependencies
+		Set tDepKey = ""
+		For {
+			Set tDependency = tModule.Dependencies.GetNext(.tDepKey)
+			If (tDepKey = "") {
+				Quit
+			}
+			Set tDepMap(tDependency.Name) = tDepKey
+		}
+		
+		// Add dependencies or update their versions as needed
+		Set tModuleName = ""
+		For {
+			Set tModuleName = $Order(tGraph(tModuleName),1,tData)
+			If (tModuleName = "") {
+				Quit
+			}
+			Set tVersion = $ListGet(tData,3)
+			If $Data(tDepMap(tModuleName),tDependencyKey) {
+				// Lock down version.
+				Write !,"Locking dependency: ",tModuleName," ",tVersion
+				Set tModule.Dependencies.GetAt(tDependencyKey).VersionString = tVersion
+			} Else {
+				// Add new dependency for unlisted transitive dependency.
+				Write !,"Adding dependency: ",tModuleName," ",tVersion
+				Set tNewDependency = ##class(%ZPM.PackageManager.Core.ModuleReference).%New()
+				Set tNewDependency.Name = tModuleName
+				// Copy the actual version string (a semantic version) into the module manifest dependency's version string (a semantic version expression)
+				// A semantic version is also a valid semantic version expression, but not vice versa.
+				Set tNewDependency.VersionString = tVersion
+				$$$ThrowOnError(tModule.Dependencies.Insert(tNewDependency))
+			}
+		}
+		
+		$$$ThrowOnError(tModule.%Save())
+		
+		// Use the API to update the module manifest on disk from the updated persistent object
+		Set tStatus = ##class(%ZPM.PackageManager.Developer.API).ExportDocumentForObject(tModule,.tSourceControlOutput)
+		
+		// Always show any output (before checking tStatus)
+		For tLine=1:1:$Get(tSourceControlOutput) {
+			Write !,$Get(tSourceControlOutput(tLine))
+		}
+		$$$ThrowOnError(tStatus)
+		TCOMMIT
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	While ($TLevel > tInitTLevel) {
+		TROLLBACK 1
+	}
+	Quit tSC
+}
+
+/// Creates (or updates) an include file with name <var>pName</var> and contents in an indexed
+/// subscripted array <var>pLineArray</var>. <br />
+/// @Argument	pName		Name of include file. <br />
+/// @Argument	pLineArray	Subscripted array whose keys are indices and values correspond to
+/// lines in the include file. The top level node should have the number of lines. <br />
+ClassMethod CreateOrUpdateIncludeFile(pName As %String, ByRef pLineArray As %String)
+{
+	// Create include file
+	Set routine = ##class(%Library.Routine).%New(pName_".INC")
+	// Write lines
+	For i = 1:1:$Get(pLineArray) {
+		$$$ThrowOnError(routine.WriteLine(pLineArray(i)))
+	}
+	// Save the routine
+	$$$ThrowOnError(routine.Save())
+}
+
+ClassMethod ConvertW3CToTimestampUTC(pDateTime As %String) As %TimeStamp
+{
+    Set date = $Piece(pDateTime, "T", 1)
+    Set time = $Piece(pDateTime, "T", 2)
+    
+    // Validation
+    Set containsPlus = ($Find(time, "+") > 0)
+    Set containsMinus = ($Find(time, "-") > 0)
+    Set containsZ = ($Find(time, "Z") > 0)
+    If ((containsPlus + containsZ + containsMinus) > 1) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid time format. Cannot contain multiple timezone offset formats"))
+    }
+    If ((containsPlus + containsZ + containsMinus) = 0) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid time format. Missing timezone offset"))
+    }
+    
+    Set parsedTime = ""
+    Set dateAdd = ""
+    
+    // Obtain UTC time
+    If containsZ {
+        Set parsedTime = $Extract(time, 1, *-1)
+    } Else {
+	    Set operator = $Case(containsPlus, 1: "+", : "-")
+	    
+        Set absTime = $Piece(time, operator, 1)
+        Set offset = $Piece(time, operator, 2)
+        Set $ListBuild(offsetHours, offsetMinutes) = $ListFromString(offset, ":")
+        Set offsetHours = "-"_operator_offsetHours
+        Set offsetMinutes = "-"_operator_offsetMinutes
+        Set $ListBuild(hours, minutes, seconds) = $ListFromString(absTime, ":")
+        
+        Set computedMinutes = minutes + offsetMinutes
+        Set netMinutes = computedMinutes#60
+        Set hoursAdd = $Case((computedMinutes < 0), 1: -1, : $Case((computedMinutes >= 60), 1: 1, : 0))
+        Set computedHours = (hours + offsetHours + hoursAdd)
+        Set netHours = computedHours#24
+        Set dateAdd = $Case((computedHours < 0), 1: -1, : $Case((computedHours >= 24), 1: 1, : 0))
+        
+        // Add padding of 0's if needed
+        If ($Length(netHours) = 1) {
+        	Set netHours = "0"_netHours
+        }
+        If ($Length(netMinutes) = 1) {
+        	Set netMinutes = "0"_netMinutes
+        }
+        
+        Set parsedTime = netHours_":"_netMinutes_":"_seconds
+    }
+    Set dateTime = date_" "_parsedTime
+    If (dateAdd '= "") {
+	    // Adjust date
+        Set dateTime = $System.SQL.DATEADD("day", dateAdd, dateTime)
+    }
+    Return dateTime
+}
+
+ClassMethod ConvertTimestampUTCToW3C(pDateTime As %TimeStamp) As %String
+{
+    Set date = $Piece(pDateTime, " ", 1)
+    Set time = $Piece(pDateTime, " ", 2)    
+    Return date_"T"_time_"Z"
+}
+
 ClassMethod GetInstallerProperties(pClass As %String = "", pExcept As %String = "") [ PublicList = (tExcept, tClass) ]
 {
 	Set tExcept = pExcept
@@ -1095,65 +1737,6 @@ ClassMethod GetInstallerProperties(pClass As %String = "", pExcept As %String = 
 }
 
 /// Copied from %Net.Remote.Utility:RunCommandViaCPIPE and modified slightly to fit these purposes:
-/// Run a command using a CPIPE device.
-/// The first unused CPIPE device is allocated and returned in pDevice.  Upon exit the device is open; 
-/// it is up to the caller to close that device when done with it. <br/>
-/// <var>pTimeout</var> indicates how long to wait for the initial OPEN and <var>pTimeoutRead</var> indicates how long to wait between reading the output chunks</var>. <br/>
-/// Note that CPIPE (and PIPE) devices are supported on Unix and Windows, but not on VMS.  If this method is invoked
-/// on an instance installed on VMS, execution flow will be diverted to method <method>RunCommandViaZF</method>
-/// which uses a different technique.
-ClassMethod RunCommandViaCPIPE(pCmd As %String, Output pOutput, pTimeout As %Integer = 10, pTimeoutRead As %Integer = 5) As %Status [ Private ]
-{
-	Kill pOutput
-	
-	If ($System.Version.GetBuildOS() = "VMS") {
-		Quit ..RunCommandViaZF($G(pCmd), .pOutput, pTimeout)
-	}
-
-	Set tSC = $$$OK
-	Set tIO = $IO
-	Set tZEOFMode = $ZU(68,40,1)
-	Set pDevice = "|CPIPE|"
-	
-	Try {
-		Set p = ##class(%SYS.ProcessQuery).Open($J)
-		Set od = ","_p.OpenDevices_","
-		For x = "",1:1:100 If od'[(",|CPIPE|"_x_",") Set pDevice = "|CPIPE|"_x Quit
-		Set p = ""
-	}
-	Catch {
-	}
-	
-	Try {
-		Open pDevice:(pCmd:"R"):pTimeout
-		If '$T Set tSC = $$$ERROR($$$CacheError, "Failed to open |CPIPE| device in read mode for command: '"_pCmd_"'") Quit
-		Use pDevice
-		For {
-			// Keep reading through end of input; save only first 32,000 characters
-			Set tLine = "" Read tLine:pTimeoutRead
-			If '$T && (tLine=$C(-1)) Quit  // Exit by timeout
-			If $Length(tLine)<32000 {
-				Set pOutput($i(pOutput)) = tLine
-			} Else {
-				Set pOutput($i(pOutput)) = $E(tLine,1,32000)_" (more...)"
-			}
-			If ($ZEOF=-1) Quit  // Exit by EOF
-		}
-	} Catch (ex) {
-		Set tSC = ex.AsStatus()
-	}
-	
-	Close pDevice
-	
-	If 'tZEOFMode {
-		Do $ZU(68,40,0) // Restore ZEOF mode
-	}
-	Use tIO
-	
-	Quit tSC
-}
-
-/// Copied from %Net.Remote.Utility:RunCommandViaCPIPE and modified slightly to fit these purposes:
 /// Run a command using $ZF(-1) and an external temporary file to store the command output. <br>
 /// If <var>pDeleteTempFile</var> is 0 (false), the temporary file is not deleted; in this case, it is up to the caller to delete it when done with it.
 ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutput, pTimeout As %Integer = 10, Output pRetCode As %String) As %Status
@@ -1165,9 +1748,9 @@ ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutpu
 
 	Try {
 		Set tFile = ##class(%File).TempFilename("txt")
-		If tFile="" Set tSC = $$$ERROR($$$CacheError, "Failed to obtain a temporary file name") Quit
+		If tFile="" Set tSC = $$$ERROR($$$ObjectScriptError, "Failed to obtain a temporary file name") Quit
 		Set tErrFile = ##class(%File).TempFilename("txt")
-		If tErrFile="" Set tSC = $$$ERROR($$$CacheError, "Failed to obtain a temporary file name") Quit
+		If tErrFile="" Set tSC = $$$ERROR($$$ObjectScriptError, "Failed to obtain a temporary file name") Quit
 		If $System.Version.GetBuildOS()="VMS" {
 			Set pRetCode = $ZF(-1,pCmd,tFile)
 		} Else {
@@ -1193,7 +1776,7 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 	Try {
 		Kill pOutput
 		Close pFileName Open pFileName:("RS"):5
-		If '$T Set tSC = $$$ERROR($$$CacheError, "Failed to open temporary file '"_pFileName_"'") Quit
+		If '$T Set tSC = $$$ERROR($$$ObjectScriptError, "Failed to open temporary file '"_pFileName_"'") Quit
 		Set TooMuch = 0
 		Use pFileName
 		For {
