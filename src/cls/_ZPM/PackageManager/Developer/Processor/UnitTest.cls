@@ -5,16 +5,22 @@ Class %ZPM.PackageManager.Developer.Processor.UnitTest Extends %ZPM.PackageManag
 Parameter DESCRIPTION As STRING = "Loads unit tests (extending %UnitTest.TestCase) from the specified directory and runs them during (Phase). For modules in development mode, the unit tests are always loaded and are not deleted after they are run.";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Phase,Package,ManagerClass";
+Parameter ATTRIBUTES As STRING = "Phase,Package,ManagerClass,Format";
 
 /// Class extending %UnitTest.Manager to use to run unit tests
-Property ManagerClass As %Dictionary.CacheClassname [ InitialExpression = "%ZPM.PackageManager.Developer.UnitTest.Manager" ];
+Property ManagerClass As %Dictionary.Classname [ InitialExpression = "%ZPM.PackageManager.Developer.UnitTest.Manager" ];
 
 /// Phase in which the unit tests run - "test" (dev namespace), "verify" (separate, clean namespace), or "test,verify" (to run in both cases).
 Property Phase As %ZPM.PackageManager.Core.ListOfOptions(VALUELIST = ",test,verify") [ InitialExpression = {$ListBuild("test")}, Required ];
 
 /// Package containing unit tests - this will be mapped properly on development systems, and unit tests won't be deleted in the "test" phase if any classes in it exist.
 Property Package As %String(MAXLEN = 255) [ Required ];
+
+/// Export format
+Property Format As %String(VALUELIST = ",UDL,XML");
+
+/// Embedded processor to handle unit test resources as a package.
+Property EmbeddedProcessor As %ZPM.PackageManager.Developer.Processor.Default.Package [ Private ];
 
 Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 {
@@ -24,9 +30,12 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 		Set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
 		If (pPhase = "Reload") {
 			// Only load unit tests if we're in developer mode.
-			If $Get(pParams("DeveloperMode")) {
+			If $Get(pParams("DeveloperMode")),##class(%File).DirectoryExists(tUnitTestDir) {
 				// LoadTestDirectory rather than recursive $System.OBJ.LoadDir to omit _ directories.
-				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).LoadTestDirectory(tUnitTestDir,tVerbose)
+				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).LoadTestDirectory(tUnitTestDir,tVerbose,.tLoadedList,..Format)
+				$$$ThrowOnError(tSC)
+				
+				Set tSC = ##class(%ZPM.PackageManager.Developer.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
 			}
 		}
 	} Catch e {
@@ -63,6 +72,13 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			Set tVerbose = $Get(pParams("Verbose"))
 			Set tFlags = $Select(tVerbose:"/display=all",1:"/display=none")
 			
+			// Ensure unit tests and related classes are loaded.
+			Set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
+			Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).LoadTestDirectory(tUnitTestDir,tVerbose, ,..Format)
+			$$$ThrowOnError(tSC)
+			
+			$$$ThrowOnError($System.OBJ.CompilePackage(..Package,"ck"_$Select(tVerbose:"d",1:"-d")))
+			
 			If (..Package '= "") {
 				// See if package contains any classes.
 				// If it does, we won't delete the classes after running the test.
@@ -73,11 +89,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 				}
 			}
 			
-			Set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
-			Set tUnitTestRoot = ##class(%File).NormalizeDirectory(tUnitTestDir_$Replace(..Package,".","/"))
 			Set tTestSpec = ""
 			If $Data(pParams("UnitTest","Suite"),tTestSuite) {
-				Set tTestSubDir = $Replace(tTestSuite,".","/")
+				Set tTestSubDir = $Replace(tTestSuite,".","\")
 				Set tUnitTestDir = ##class(%File).NormalizeDirectory(tUnitTestDir_tTestSubDir)
 			} ElseIf $Data(pParams("UnitTest","Case"),tTestCase) {
 				Set tTestSpec = ":"_tTestCase
@@ -89,13 +103,6 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 				If $Data(pParams("UnitTest","Method"),tTestMethod) {
 					Set tTestSpec = tTestSpec_":"_tTestMethod
 				}
-			} Else {
-				Set tUnitTestDir = tUnitTestRoot
-			}
-
-			If (tUnitTestDir '[ tUnitTestRoot) {
-				// Case of multiple unit test resources
-				Quit
 			}
 			
 			Set tFlags = tFlags_$Get(pParams("UnitTest","Flags"))
@@ -111,13 +118,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			Set tSC = $ClassMethod(tManagerClass,"RunTest",tTestSpec,tFlags,.tUserParams)
 			ZKill ^UnitTestRoot
 			$$$ThrowOnError(tSC)
-
-			// Allow the manager class to change its own UserParam array for later use in separate test runs
-			Merge pParams("UnitTest","UserParam") = tUserParams
 			
 			If $Data(pParams("UnitTest","JUnitOutput"),tJUnitFile) {
 				Set tPostfix = "-"_$ZConvert(pPhase,"L")_"-"_$Replace(..Package,".","-")
-				Set $Piece(tJUnitFile,".",*-1,*) = $Piece(tJUnitFile,".",1,*-1)_tPostfix_".xml"
+				Set tJUnitFile = $Piece(tJUnitFile,".",1,*-1)_tPostfix_".xml"
 				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.JUnitOutput).ToFile(tJUnitFile)
 				$$$ThrowOnError(tSC)
 			}
@@ -137,23 +141,20 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
 Method OnResolveChildren(ByRef pResourceArray) As %Status
 {
-	Set tSC = $$$OK	
-	QUIT tSC
-	#; Don't see any reasons why we need it, it still works other way
+	Set tSC = $$$OK
 	Try {
 		If (..Package '= "") {
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name from %Dictionary.ClassDefinition where Name %STARTSWITH ? And Deployed = 0",..Package_".")
-			If (tRes.%SQLCODE < 0) {
-				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-			}
-			While tRes.%Next(.tSC) {
-				Set tResource = tRes.%Get("Name")_".CLS"
-				Set pResourceArray(tResource) = ..ResourceReference.Module.Name
-				Set pResourceArray(tResource,"Generated") = 0
-				Set pResourceArray(tResource,"Preload") = 0
-				Set pResourceArray(tResource,"Scope") = ..Phase
-				Set pResourceArray(tResource,"Deploy") = 0
-			}
+			Set tModuleName = ..ResourceReference.Module.Name
+			Set tResourceInfo = tModuleName
+			Set tResourceInfo("Generated") = 0
+			Set tResourceInfo("Preload") = 0
+			Set tResourceInfo("UnitTest") = 1
+			Set tResourceInfo("Scope") = ..Phase
+			Set tResourceInfo("Deploy") = 0
+			Set tResourceInfo("Processor") = $This
+			Set tResourceInfo("IsAPI") = 0
+			$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.ResourceReference).GetChildren(..Package_".PKG",tModuleName,1,.tResourceInfo,.pResourceArray))
+			$$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.pResourceArray))
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -169,6 +170,38 @@ Method OnGetUniqueName(Output pUniqueName)
 	If (..Package '= "") {
 		Set pUniqueName = ..Package_".PKG"
 	}
+}
+
+Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo) As %Status
+{
+	Set pInfo = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo).%New()
+	If (..Package '= "") {
+		Set pInfo.SourceControlAware = 1
+		Set pInfo.Prefix = ..Package_"."
+		Set pInfo.RelativePath = ..ResourceReference.Name
+		Set pInfo.ResourceType = "CLS"
+	}
+	Quit $$$OK
+}
+
+Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
+{
+	Set tSC = ##super(pResourceReference)
+	Set ..EmbeddedProcessor = ##class(%ZPM.PackageManager.Developer.Processor.Default.Package).%New(pResourceReference)
+	Set ..EmbeddedProcessor.Directory = ..ResourceReference.Name
+	Quit tSC
+}
+
+Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+{
+  Set pItemHandled = 1
+	Quit $$$OK
+}
+
+/// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
+Method OnItemRelativePath(pItemName As %String) As %String
+{
+	Quit ..EmbeddedProcessor.OnItemRelativePath(pItemName)
 }
 
 }

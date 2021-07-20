@@ -16,12 +16,12 @@ ClassMethod SettingIsDefined(pName As %String) As %Boolean [ Abstract ]
 {
 }
 
-/// Clears vale of setting <var>pName</var>
+/// Clears value of setting <var>pName</var>
 ClassMethod GetSettingValue(pName As %String) As %String [ Abstract ]
 {
 }
 
-/// Clears vale of setting <var>pName</var>
+/// Clears value of setting <var>pName</var>
 ClassMethod ClearSettingValue(pName As %String) As %Status [ Abstract ]
 {
 }
@@ -31,7 +31,15 @@ ClassMethod SetSettingValue(pName As %String, pValue As %String) As %Status [ Ab
 {
 }
 
-Query ListSettings() As %Query(ROWSPEC = "Source:%String,SourceDescription:%String,Name:%String,Description:%String,Defined:%Boolean,Value:%String,IsFirstForSource:%Boolean") [ Final, SqlProc ]
+/// Returns the datatype of a setting, as one of:
+/// boolean, string
+/// The default implementation is to always return "string"
+ClassMethod GetSettingType(pName As %String) As %String
+{
+	Quit "string"
+}
+
+Query ListSettings() As %Query(ROWSPEC = "Source:%String,SourceDescription:%String,Name:%String,Description:%String,Defined:%Boolean,Value:%String,IsFirstForSource:%Boolean,DataType:%String") [ Final, SqlProc ]
 {
 }
 
@@ -106,7 +114,8 @@ ClassMethod ListSettingsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRe
 		Set tDesc = $Piece(tSetting,":",2,*)
 		Set tIsDefined = $ClassMethod(tCurrentClass,"SettingIsDefined",tName)
 		Set tSettingValue = $ClassMethod(tCurrentClass,"GetSettingValue",tName)
-		Set Row = $ListBuild(tCurrentClass,tClassDesc,tName,tDesc,tIsDefined,tSettingValue,tFirstForSource)
+		Set tType = $ClassMethod(tCurrentClass,"GetSettingType",tName)
+		Set Row = $ListBuild(tCurrentClass,tClassDesc,tName,tDesc,tIsDefined,tSettingValue,tFirstForSource,tType)
 	} Catch e {
 		Write ! zw e w !
 		Set tSC = e.AsStatus()
