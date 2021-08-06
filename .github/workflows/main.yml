@@ -81,8 +81,8 @@ jobs:
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'zpm "list":1\n' \
-            'zpm "zpm test":1\n' \
-            'zpm "zpm verify":1' \
+            'zpm "test zpm -v":1\n' \
+            'zpm "verify zpm -v":1' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER

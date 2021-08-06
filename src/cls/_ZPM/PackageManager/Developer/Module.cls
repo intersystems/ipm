@@ -1396,7 +1396,7 @@ Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
   Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", tAttrValue)
   While regex.Locate() {
     Set expr = regex.Group(1)
-    Set value = ..%EvalueateExpression(expr)
+    Set value = ..%EvaluateExpression(expr)
     Set $Extract(tAttrValue, regex.Start, regex.End - 1) = value
     Set regex.Text = tAttrValue
   }
@@ -1404,7 +1404,7 @@ Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
 	Quit tAttrValue
 }
 
-Method %EvalueateExpression(pExpr) As %String [ Internal ]
+Method %EvaluateExpression(pExpr) As %String [ Internal ]
 {
   Try {
     return @pExpr

@@ -248,6 +248,11 @@ Method %Evaluate(pAttrValue) As %String [ Internal ]
 		Set tAttrValue = ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	}
 
+	If $Locate(tAttrValue,"(?i)\{name\}") {
+		Set tName = ..ResourceReference.Name
+   	Set tAttrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", tAttrValue).ReplaceAll($Replace(tName, "\","\\"))
+	}
+
   Quit ..ResourceReference.Module.%Evaluate(tAttrValue)
 }
 

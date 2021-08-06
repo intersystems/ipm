@@ -61,7 +61,7 @@ Method OnItemRelativePath(pItemName As %String, pIsUnitTest As %Boolean = 0) As 
       Set tSourceRoot = tSourceRoot _ "/"
     }
   } else {
-    Set tSourceRoot = ""
+    Set tSourceRoot = ..Directory
   }
   set fileNameExtension = $$$lcase($Piece(pItemName, ".", *))
   set directory = fileNameExtension

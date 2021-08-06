@@ -5,7 +5,7 @@ Class %ZPM.PackageManager.Developer.Processor.Default.Document Extends %ZPM.Pack
 Parameter DESCRIPTION As STRING = "Default resource processor class for %Studio.AbstractDocument subclasses";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Compile,CompileAfter,Flags,Directory,LoadAsDirectory,FilenameExtension,FilenameTranslateIdentifier,FilenameTranslateAssociator,Format";
+Parameter ATTRIBUTES As STRING = "Compile,CompileAfter,Flags,ExportFlags,Directory,LoadAsDirectory,FilenameExtension,FilenameTranslateIdentifier,FilenameTranslateAssociator,Format";
 
 /// May be set to determine the value of <property>Extension</property> based on a static value rather than based on the resource name.
 /// The only expected use case at this point is class packages (.PKG, but Extension will be .CLS)
@@ -99,6 +99,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             Set $PIECE(tResourcePath, ".", *) = "xml"
             Set ..Format = "XML"            
           }
+
+          If ('##class(%File).Exists(tResourcePath) && ##class(%File).Exists($tr(tResourcePath,"_","%"))) {
+            Set tResourcePath = $tr(tResourcePath,"_","%")
+          }
           
 					If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
 						Set $PIECE(tResourcePath, ".", *) = "rtn"
@@ -129,6 +133,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
+  Set tExportFlags = "-d /diffexport"_..ExportFlags
   Set tVerbose = $Get(pParams("Verbose"),0)
 	Try {
 		If ..Format = "UDL" {
@@ -145,14 +150,14 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 					$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.File).CreateDirectoryChain(tTargetDirectory))
 				}
 				
-				$$$ThrowOnError($System.OBJ.ExportUDL(pItemName,pFullExportPath,"-d /diffexport"))
+				$$$ThrowOnError($System.OBJ.ExportUDL(pItemName,pFullExportPath,tExportFlags))
 			}
 			Set pItemHandled = 1
 		} ElseIf (..Format = "XML") {
-			$$$ThrowOnError($System.OBJ.Export(pItemName,pFullExportPath,"-d /diffexport"))
+			$$$ThrowOnError($System.OBJ.Export(pItemName,pFullExportPath,tExportFlags))
 			Set pItemHandled = 1
 		} ElseIf (..Format = "%RO") {
-			Set tSC = $$Export^%apiRTN(pItemName,pFullExportPath,"Save for Source Control","WNSK\UTF8\","-d /diffexport")
+			Set tSC = $$Export^%apiRTN(pItemName,pFullExportPath,"Save for Source Control","WNSK\UTF8\",tExportFlags)
 			Set pItemHandled = 1
 		}
     Write:tVerbose !,"Exporting '",pItemName,"' to '",pFullExportPath,"'"
@@ -183,44 +188,34 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
     Set tFlags = $Select(pVerbose:"/display",1:"/nodisplay")_
       $Select(pCompile:"/compile",1:"/nocompile")_
       $Select($TLevel:"/multicompile=0",1:"")
-    If (..Format = "UDL") {
-      Set tResourceParentPath = ##class(%File).ParentDirectoryName(pFullResourcePath)
-      Set tDocName = ..ResourceReference.Name
-      Set tList = ""
-      If (tDocName [ "*") {
-        Set tWildcards = tDocName
-        If $$$isUNIX set tWildcards = $$$ucase(tWildcards)_";"_$$$lcase(tWildcards)
-        Do ##class(%ZPM.PackageManager.Developer.File).FindFiles(tResourceParentPath, tWildcards, .tList)
-      } Else {
-        Set tList($i(tList)) = $LISTBUILD(tDocName, pFullResourcePath) 
-      }
 
-      For i=1:1:tList {
-        Set $LISTBUILD(tDocName, tResourcePath) = tList(i)
-        Set tSC = $System.OBJ.Load(tResourcePath, tFlags,, .pLoadedList)
-      }
-    } Else {
-      If ..LoadAsDirectory {
-        Set tSC = $System.OBJ.LoadDir(pFullResourcePath, tFlags, , 1, .pLoadedList)
-        $$$ThrowOnError(tSC)
-      } ElseIf (..Format = "%RO") {
-        // This tolerates some unusual %RO header formats that $System.OBJ.Load does not respect.
+    If ..LoadAsDirectory {
+      Set tSC = $System.OBJ.ImportDir(pFullResourcePath, "*", tFlags, , 1, .pLoadedList)
+      $$$ThrowOnError(tSC)
+      If $Data(pLoadedList)>1 {
+        Merge tResult = pLoadedList
         Set pLoadedList = ""
-        Set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$Select(pVerbose:"d",1:"-d"))
-        Set tResourceKey = ""
-        For {
-          Set tResourceKey = $Order(tResult(tResourceKey))
-          If (tResourceKey = "") {
-            Quit
-          }
-          Set pLoadedList = pLoadedList_$ListBuild(tResourceKey)
-        }
-        Set pLoadedList = $ListToString(pLoadedList)
-      } Else {
-        Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
-        $$$ThrowOnError(tSC)
       }
+    } ElseIf (..Format = "%RO") {
+      // This tolerates some unusual %RO header formats that $System.OBJ.Load does not respect.
+      Set pLoadedList = ""
+      Set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$Select(pVerbose:"d",1:"-d"))
+    } Else {
+      Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
+      $$$ThrowOnError(tSC)
     }
+    If $Data(tResourceKey)>1 {
+      Set tResourceKey = ""
+      For {
+        Set tResourceKey = $Order(tResult(tResourceKey))
+        If (tResourceKey = "") {
+          Quit
+        }
+        Set pLoadedList = pLoadedList_$ListBuild(tResourceKey)
+      }
+      Set pLoadedList = $ListToString(pLoadedList)
+    }
+
 		If $Data(pLoadedList)#2 {
 			Do ..ResourceReference.UpdateChildrenFromString(pLoadedList)
 		}

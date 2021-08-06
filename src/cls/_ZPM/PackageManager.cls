@@ -1494,7 +1494,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 {
 	Set tRegistry = ""
-	Set tModuleName = $Get(pCommandInfo("parameters","module"))
+	Set tModuleName = $ZConvert($Get(pCommandInfo("parameters","module")), "L")
 	If (tModuleName["/") {
 		set $lb(tRegistry, tModuleName) = $lfs(tModuleName, "/")
 	}

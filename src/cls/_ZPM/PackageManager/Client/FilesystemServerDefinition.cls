@@ -177,7 +177,7 @@ Method AddCacheItem(pModuleFileName As %String, pSubDirectory As %String, Output
 		}
 		
 		Set tExt = $ZConvert($Piece($Get(tLoadedList),".",*),"U")
-		If (tExt '= "MODULE") {
+		If (tExt '= "ZPM") {
 			Quit
 		}
 		
@@ -238,7 +238,7 @@ Method GetModuleStreamFromFile(pFilename As %String, Output pStream As %Stream.G
 		$$$ThrowOnError(tSC)
 		
 		Set tMetaStream.LineTerminator = $Select($$$isWINDOWS:$c(13,10),$$$isUNIX:$c(10))
-		Set pName = tMetaStream.ReadLine()
+		Set pName = $ZConvert(tMetaStream.ReadLine(), "L")
 		Set pVersion = tMetaStream.ReadLine()
 	} Catch e {
 		Set tOuterSC = $$$ERROR($$$GeneralError,$$$FormatText("Error loading module from file '%1'",pFilename))
