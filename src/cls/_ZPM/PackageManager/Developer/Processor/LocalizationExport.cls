@@ -35,21 +35,34 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 		}
 		
 		If (pPhase = "Activate") {
-			// This is only an error at this stage.
-			If (..Domains = "") {
-				Set tSC = $$$ERROR($$$PropertyRequired,"Domains")
+			Set tExportDir = ..ResourceReference.Module.Root
+			If (tExportDir = "") {
+				// No-op in this case.
+				Quit
 			}
 			
-			Set tExportDir = ..ResourceReference.Module.Root
+			// This is only an error at this stage.
+			If (..Domains = "") {
+				If tIsLoc {
+					// No-op
+					Quit
+				}
+				Set tSC = $$$ERROR($$$PropertyRequired,"Domains")
+				Quit
+			}
 			If (..Filename '= "") {
 				Set tExportFile = ##class(%File).NormalizeFilename(tExportDir_"/"_..Filename)
 			} ElseIf ($Extract(..ResourceReference.Name) = "/") {
 				Set tExportFile = ##class(%File).NormalizeFilename(tExportDir_..ResourceReference.Name)
 			} Else {
-				Set tSC = $$$ERROR($$$PropertyRequired,"Filename")
+				$$$ThrowStatus($$$ERROR($$$PropertyRequired,"Filename"))
 			}
 			If tVerbose {
 				Write !,"Exporting messages for '",..Domains,"' domain(s) to ",tExportFile
+			}
+			Set tDirectory = ##class(%Library.File).GetDirectory(tExportFile)
+			If '##class(%Library.File).DirectoryExists(tDirectory) {
+				$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.File).CreateDirectoryChain(tDirectory))
 			}
 			Set tSC=$$ExportDomainList^%occMessages(tExportFile,..Domains)
 		}

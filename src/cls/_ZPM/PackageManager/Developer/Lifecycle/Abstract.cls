@@ -1,6 +1,6 @@
 Include (%syGluedef, %ZPM.PackageManager.Common)
 
-/// @PublicAPI
+/// @API.Extensible
 Class %ZPM.PackageManager.Developer.Lifecycle.Abstract Extends %RegisteredObject [ Abstract ]
 {
 
@@ -28,6 +28,20 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 	Quit $$$OK
 }
 
+/// This method can be overrided to include any action that needs to be executed 
+/// before the process of module's lifecycle, and also before notifying resource processors
+Method OnBeforeResourceProcessing(pPhase As %String, ByRef pParams) As %Status
+{
+	Quit $$$OK
+}
+
+/// This method can be overrided to include any action that needs to be executed 
+/// after the process of module's lifecycle, and also after notifying resource processors
+Method OnAfterResourceProcessing(pPhase As %String, ByRef pParams) As %Status
+{
+	Quit $$$OK
+}
+
 /// This method defines what a complete phase means for a given list of phases
 ClassMethod GetCompletePhases(pOnePhase As %List) As %List
 {
@@ -48,9 +62,12 @@ ClassMethod GetDefaultParameters(ByRef pParams, pPhases As %List)
 }
 
 /// Returns the default resource processor class to use for a given resource name.
-ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary.CacheClassname
+ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary.Classname
 {
 	If ($Extract(pResourceName) = "/") {
+		If pResourceName [ "/internal/testing/" {
+			Quit $$$DefaultProcessorPackageDot_"UnitTest"
+		}
 		Quit ""
 	}
 	Set tExtension = $Piece(pResourceName,".",*)
@@ -72,6 +89,23 @@ ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary
 		Quit ""
 	}
 	Quit $$$DefaultProcessorPackageDot_"Default."_tShortName
+}
+
+ClassMethod GetDefaultResourceProcessorProc(pLifecycleClass As %Dictionary.Classname, pResourceName As %String) As %String [ SqlName = GET_DEFAULT_RESOURCE_PROCESSOR, SqlProc ]
+{
+	// Fail gracefully (just say there is no default) if pLifecycleClass is empty/invalid.
+	Set tLifecycleClass = pLifecycleClass
+	If (tLifecycleClass = "") {
+		Quit ""
+	}
+	If '$$$comClassDefined(tLifecycleClass) {
+		// Try default package.
+		Set tLifecycleClass = $$$DefaultLifecyclePackageDot_tLifecycleClass
+	}
+	If '$$$comClassDefined(tLifecycleClass) {
+		Quit ""
+	}
+	Quit $ClassMethod(tLifecycleClass,"GetDefaultResourceProcessor",pResourceName)
 }
 
 }

@@ -2,18 +2,30 @@ Class %ZPM.PackageManager.Developer.Processor.FileCopy Extends %ZPM.PackageManag
 {
 
 /// Description of resource processor class (shown in UI)
-Parameter DESCRIPTION As STRING = "Copies the specified directory (the resource name) to a specific target location (InstallDirectory) during the Activate phase.";
+Parameter DESCRIPTION As STRING = "Copies the specified directory or file  (the resource name) to a specific target location (InstallDirectory) during the Activate phase.";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay";
+Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay,CSPApplication,Defer";
 
-Property Name As %String(MAXLEN = "");
+Property Name As %String(MAXLEN = "") [ Aliases = {SourceDirectory} ];
 
-Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest} ];
+/// Path to which the directory or file (a full filename, in that case) should be copied upon installation; may contain expressions.
+Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest}, Required ];
 
-/// Directory to which the directory should be copied upon installation; may contain expressions.
 /// If true, the files should be added to the target location (rather than fully replacing it, causing other files there to be deleted)
+/// Relevant for directories only.
 Property Overlay As %Boolean;
+
+/// Optional hint to source control class: which CSP application path do these files map to?
+/// For use cases where the CSPApplication resource processor is too heavy-handed - e.g., /csp/xslt
+/// Of course, this is only relevant for files that need to be copied to a CSP application.
+/// Note that this may be a full CSP file path, not only the name of a CSP application.
+Property CSPApplication As %String(MAXLEN = "");
+
+/// If true, the files will be copied at the end of the Activate phase rather than at the beginning.
+/// The default is to copy the files at the beginning of the Activate phase.
+/// Use this for build artifacts.
+Property Defer As %Boolean [ InitialExpression = 0 ];
 
 Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 {
@@ -26,8 +38,34 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 			Quit
 		}
 
-		If (pPhase = "Activate") && (..InstallDirectory '= "") {
-      Set tSource = ..ResourceReference.Module.Root _ ..Name
+		If (pPhase = "Activate") && (..InstallDirectory '= "") && ('..Defer) {
+      Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
+      Set tTarget = ..InstallDirectory
+      Set tSC = ..DoCopy(tSource, tTarget, .pParams)
+      If $$$ISERR(tSC) {
+        Quit
+      }
+		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+{
+  Set tVerbose = $Get(pParams("Verbose"))
+	// Default implementation: call %ValidateObject to validate attributes
+	Set tSC = $$$OK
+	Try {
+    
+		Set tSC = ##super(pPhase,.pParams)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+
+		If (pPhase = "Activate") && (..InstallDirectory '= "") && (..Defer) {
+      Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
       Set tTarget = ..InstallDirectory
       Set tSC = ..DoCopy(tSource, tTarget, .pParams)
       If $$$ISERR(tSC) {
@@ -47,6 +85,7 @@ Method OnBeforeArtifact(pExportDirectory As %String, pWorkingDirectory As %Strin
 		If (pExportDirectory = pWorkingDirectory) {
 			Quit
 		}
+
 		Write !,"[OnBeforeArtifact] "_..ResourceReference.Name
 		If '..ResourceReference.Deploy {
 			Set tSC = ##class(%ZPM.PackageManager.Developer.File).CopyDir(
@@ -127,7 +166,7 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
   
   Set tExportPath = $Get(pParams("ModuleExportPath"))
   Set tSource = ..InstallDirectory
-  Set tTarget = tExportPath _ ..Name
+  Set tTarget = tExportPath _ ..ResourceReference.Name
 
 	Quit ..DoCopy(tSource, tTarget, .pParams)
 }

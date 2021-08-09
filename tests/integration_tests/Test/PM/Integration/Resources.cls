@@ -3,6 +3,10 @@ Class Test.PM.Integration.Resources Extends %UnitTest.TestCase
 
 Method TestResourceTypes()
 {
+  If ('##class(%EnsembleMgr).IsHealthShareInstalled()) {
+    Quit $$$OK
+  }
+
 	Set tSC = $$$OK
 	Try {
 		Set tTestRoot = $Get(^UnitTestRoot)
