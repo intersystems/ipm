@@ -1498,6 +1498,9 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	If (tModuleName["/") {
 		set $lb(tRegistry, tModuleName) = $lfs(tModuleName, "/")
 	}
+  if (tModuleName = "") {
+    Quit $$$OK
+  }
 	If tRegistry = "" {
 		Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1,,.tSC)
 		If $isobject(tServer) {
