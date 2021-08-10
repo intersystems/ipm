@@ -44,8 +44,8 @@ jobs:
           git tag -l | cat
           [ $GITHUB_EVENT_NAME == 'release' ] && VERSION=${{ github.event.release.tag_name }} && VERSION=${VERSION/v/}
           [ $GITHUB_EVENT_NAME == 'push' ] && VERSION+=-beta && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f4)+1))
-          [ $GITHUB_EVENT_NAME == 'pull_request' ] && VERSION+=-dev.${{ github.event.pull_request.number }}
-          sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION/v/}<\/Version>/" module.xml
+          [ $GITHUB_EVENT_NAME == 'pull_request' ] && VERSION+=-dev.${{ github.event.pull_request.number }} && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f5)+1))
+          sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION}<\/Version>/" module.xml
           cat module.xml
           echo ::set-output name=number::${VERSION}
       - name: Build
@@ -81,8 +81,8 @@ jobs:
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'zpm "list":1\n' \
-            'zpm "zpm test":1\n' \
-            'zpm "zpm verify":1' \
+            'zpm "test zpm -v":1\n' \
+            'zpm "verify zpm -v":1' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER
@@ -96,9 +96,11 @@ jobs:
             'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
             'zpm "repo -list":1\n' \
             'zpm "install dsw":1\n' \
+            'zpm "install sslclient":1\n' \
             'zpm "list":1\n' \
             'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password securepassword":1\n' \
-            'zpm "zpm publish -v":1' \
+            'zpm "publish zpm -v":1' \
+            'zpm "publish sslclient -v":1' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER
@@ -153,7 +155,7 @@ jobs:
       - name: Create Beta Release
         id: create_release
         uses: actions/create-release@v1
-        if: github.event_name == 'push' && matrix.version == 'current' && matrix.platform == 'common'
+        if: github.event_name != 'release' && matrix.version == 'current' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -162,7 +164,7 @@ jobs:
           prerelease: ${{ github.event_name != 'release' }}
       - name: Upload Beta Release Asset
         uses: actions/upload-release-asset@v1
-        if: github.event_name == 'push' && matrix.version == 'current' && matrix.platform == 'common'
+        if: github.event_name != 'release' && matrix.version == 'current' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -190,7 +192,7 @@ jobs:
             /bin/echo -e '' \
               'zpm "list":1\n' \
               'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
-              'zpm "zpm publish -v":1' \
+              'zpm "publish zpm -v":1' \
               'halt\n' \
             | docker exec -i $CONTAINER iris session iris -U%SYS
             docker stop $CONTAINER

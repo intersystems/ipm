@@ -115,6 +115,10 @@ ClassMethod Delete(pGlobal, pID, pName, pVersion)
 
 ClassMethod GetIndexGlobalNode(pGlobal, pName, pVersion) As %String
 {
+	// The purpose of this method is to translate a semantic version into a global name that has
+	// a proper semantic version sorting order (most notably, for snapshot and prerelease versions)
+	// when traversed with $Query. (Forward is ascending order from earliest to latest; reverse, which is
+	// more likely useful, is descending order from latest to earliest version.)
 	Set $ListBuild(tMajor,tMinor,tPatch,tPreRelease,tBuild) = pVersion
 	If (tBuild = "") && (tPreRelease = "") {
 		// No build or prerelease - this is simple.
@@ -123,16 +127,27 @@ ClassMethod GetIndexGlobalNode(pGlobal, pName, pVersion) As %String
 		// No prerelease, but has a build - also simple.
 		Set tGlobal = $Name(@pGlobal@(pName,tMajor,tMinor,tPatch,1+($ZConvert(tBuild,"L")'="snapshot"),tBuild))
 	} Else {
-		// Less simple...
-		Set tPreRelease = $Get(tPreRelease),tBuild = $Get(tBuild)
+		// Less simple. Split dot-separated pieces of the prerelease into individual subscripts.
+		Set tPreRelease = $Get(tPreRelease)
+		Set tBuild = $Get(tBuild)
 		Set tPreReleaseParts = $ListFromString(tPreRelease,".")
 		Set tPtr = 0
 		Set tGlobal = $Name(@pGlobal@(pName,tMajor,tMinor,tPatch,0))
 		While $ListNext(tPreReleaseParts,tPtr,tPart) {
 			Set tGlobal = $Name(@tGlobal@(tPart))
 		}
-		If (tBuild '= "") {
+		
+		// Mark the end of a prerelease version with something that will force collation earlier than 
+		// e.g., ^global(-2,build) (for a snapshot version) collates before ^global(-1) (no build metadata), which collates
+		// before ^global(-1,build) (for other build metadata), which collates before ^global("beta",3,-2,"snapshot")
+		// (for a "later" prerelease version with more dot-separated parts).
+		// A reverse $query should go from later to earlier versions.
+		If ($ZConvert(tBuild,"L") = "snapshot") {
+			Set tGlobal = $Name(@tGlobal@(-2,tBuild))
+		} ElseIf (tBuild '= "") {
 			Set tGlobal = $Name(@tGlobal@(-1,tBuild))
+		} Else {
+			Set tGlobal = $Name(@tGlobal@(-1))
 		}
 	}
 	Quit tGlobal

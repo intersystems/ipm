@@ -1,4 +1,4 @@
-ARG BASE=store/intersystems/iris-community:2020.1.0.215.0
+ARG BASE=store/intersystems/irishealth-community:2020.4.0.547.0
 FROM ${BASE}
 
 USER root

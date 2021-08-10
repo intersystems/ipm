@@ -1,9 +1,165 @@
-Class %ZPM.PackageManager.Developer.Document.AbstractDocument Extends %Studio.AbstractDocument [ Abstract, Owner = {%Developer} ]
+Class %ZPM.PackageManager.Developer.Document.AbstractDocument Extends %Studio.AbstractDocument [ Abstract, DependsOn = %ZPM.PackageManager.Developer.Document.AbstractStream, Owner = {%Developer} ]
 {
+
+/// The extension name, this can be a comma separated list of extensions if this class supports more than one.
+/// For details on the projection parameters see <class>%Projection.StudioDocument</class>.
+Projection RegisterExtension As %ZPM.PackageManager.Developer.Document.Projection(DocumentDescription = "", DocumentExtension = "", DocumentIcon = 0, DocumentNew = 0, DocumentType = "", XMLNamespace = "");
 
 Parameter EXTENSION [ Abstract ];
 
 Parameter INFOGLOBAL [ Abstract ];
+
+/// Optional subclass of %ZPM.PackageManager.Developer.Document.AbstractStream that stores code in a character stream.
+Parameter STREAMCLASS;
+
+/// Runs at compile time to ensure that ..#<parameter>STREAMCLASS</parameter> is valid.
+/// Does not actually generate any code.
+ClassMethod ValidateStreamClass() [ CodeMode = objectgenerator, Final, Internal, Private ]
+{
+	Set tSC = $$$OK
+	Set tClass = %class.Name
+	Try {
+		Set tStreamClass = $$$comMemberKeyGet(%class.Name,$$$cCLASSparameter,"STREAMCLASS",$$$cPARAMdefault)
+		If (tStreamClass '= "") {
+			If '$$$comClassDefined(tStreamClass) {
+				$$$ThrowStatus($$$ERROR($$$CompiledClassDoesNotExist,tStreamClass))
+			}
+			
+			Set tRequiredSuper = "%ZPM.PackageManager.Developer.Document.AbstractStream"
+			If '$ClassMethod(tStreamClass,"%Extends",tRequiredSuper) {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Class '%1' does not extend '%2'",tStreamClass,tRequiredSuper)))
+			}
+		}
+	} Catch e {
+		Set tSC = $System.Status.EmbedStatus(
+			$$$ERROR($$$GeneralError,$$$FormatText("Invalid STREAMCLASS parameter value: %1",tClass)),
+			e.AsStatus())
+	}
+	Quit tSC
+}
+
+/// Loads the instance of ..#<parameter>STREAMCLASS</parameter> identified by <property>Name</property> into the stream <property>Code</property>
+Method Load() As %Status
+{
+	Set tSC = $$$OK
+	Try {
+		Set tSC = ..%ValidateName(..Name)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		Set tDocStream = $ClassMethod(..#STREAMCLASS,"NameOpen",$Piece(..Name,".",1,*-1),,.tSC)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		Set tSC = ..Code.CopyFrom(tDocStream.Contents)
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+/// Saves the document in <var>pStream</var> to the database as an instance of ..#<parameter>STREAMCLASS</parameter>, with name <var>pName</var>
+ClassMethod ImportStream(pName As %String, pStream As %GlobalCharacterStream) As %Status
+{
+	Set tSC = $$$OK
+	Set tInitTLevel = $TLevel
+	Try {
+		Set tSC = ..%ValidateName(pName)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		
+		TSTART
+		Set tName = $Piece(pName,".",1,*-1)
+		If $ClassMethod(..#STREAMCLASS,"NameExists",tName) {
+			Set tDocStream = $ClassMethod(..#STREAMCLASS,"NameOpen",tName,.tSC)
+			If $$$ISERR(tSC) {
+				Quit
+			}
+		} Else {
+			Set tDocStream = $ClassMethod(..#STREAMCLASS,"%New")
+			Set tDocStream.Name = tName
+		}
+		
+		Set tSC = tDocStream.Contents.CopyFrom(pStream)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		
+		Set tSC = tDocStream.%Save()
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		TCOMMIT
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	While ($TLevel > tInitTLevel) { TROLLBACK 1 }
+	Quit tSC
+}
+
+/// Deletes the instance of ..#<parameter>STREAMCLASS</parameter> identified by <var>name</var>
+ClassMethod Delete(name As %String) As %Status
+{
+	Set tSC = $$$OK
+	Set tInitTLevel = $TLevel
+	Try {
+		Set tSC = ..%ValidateName(name)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		Set tName = $Piece(name,".",1,*-1) // Strip extension
+		TSTART
+		Set tSC = $ClassMethod(..#STREAMCLASS,"NameDelete",tName)
+		$$$ThrowOnError(tSC)
+		$$$ThrowOnError(..OnDelete(name))
+		TCOMMIT
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	While ($TLevel > tInitTLevel) { TROLLBACK 1 }
+	Quit tSC
+}
+
+/// Subclasses may override to take additional steps during deletion.
+/// The caller handles transactions.
+ClassMethod OnDelete(name As %String) As %Status
+{
+	Quit $$$OK
+}
+
+/// Return the timestamp of schema category 'name' in %TimeStamp format, i.e. $zdatetime($horolog,3).
+/// This is used to determine if the category has been updated on the server and so needs reloading into Studio.
+/// So the format should be $zdatetime($horolog,3), or "" if the category does not exist.
+ClassMethod TimeStamp(name As %String) As %TimeStamp [ SqlProc ]
+{
+	If '..%ValidateName(name) {
+		Quit ""
+	}
+	
+	Set tStamp = ""
+	Set tNameNoExt = $Piece(name,".",1,*-1)
+	If $classmethod(..#STREAMCLASS,"NameExists",tNameNoExt,.tStreamID) { 
+		Set tStamp = $classmethod(..#STREAMCLASS,"LastModifiedTimestampGetStored",tStreamID) 
+	}
+	Quit tStamp
+}
+
+/// Return 1 if the given document exists and 0 if it does not.
+ClassMethod Exists(name As %String) As %Boolean
+{
+	Set tExists = 0
+	Try {
+		Set tSC = ..%ValidateName(name)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		Set tExists = $ClassMethod(..#STREAMCLASS,"NameExists",$Piece(name,".",1,*-1))
+	} Catch e {
+		Set tExists = 0
+	}
+	Quit tExists
+}
 
 /// CompileDocument is called when the document is to be compiled
 /// It has already called the source control hooks at this point
@@ -98,20 +254,66 @@ Query List(Directory As %String, Flat As %Boolean, System As %Boolean) As %Query
 {
 }
 
+/// Lock the current routine, default method just unlocks the ^ROUTINE global with the name of the routine.
+/// If it fails then return a status code of the error, otherwise return $$$OK
+Method Lock(flags As %String) As %Status
+{
+	Set tSC = $$$OK
+	If ..Locked {
+		Set ..Locked = ..Locked + 1
+		Quit $$$OK
+	}
+	Set tShared = ($Get(flags)["S")
+	Set tSC = $classmethod(..#STREAMCLASS,"%LockName",..Name,tShared,0)
+	If $$$ISOK(tSC) {
+		Set ..Locked = 1
+	}
+	Quit tSC
+}
+
+/// Unlock the current routine, default method just unlocks the ^ROUTINE global with the name of the routine
+Method Unlock(flags As %String) As %Status
+{
+	Set tShared = ($Get(flags)["S")
+	Set tImmediate = ($Get(flags)["I")
+	If (..Locked > 1) {
+		Set ..Locked = ..Locked - 1
+		Quit $$$OK
+	}
+	Set tSC = $classmethod(..#STREAMCLASS,"%UnlockName",..Name,tShared,tImmediate)
+	If $$$ISOK(tSC) {
+		Set ..Locked = 0
+	}
+	Quit tSC
+}
+
+/// Called from %Library.RoutineMgr:LockItem to lock a document by name (including extension)
+ClassMethod LockName(name As %String) As %Status
+{
+	Quit $classmethod(..#STREAMCLASS,"%LockName",name,0,0)
+}
+
+/// Called from %Library.RoutineMgr:UnlockItem to unlock a document by name (including extension)
+ClassMethod UnlockName(name As %String) As %Status
+{
+	Quit $classmethod(..#STREAMCLASS,"%UnlockName",name,0,0)
+}
+
 ClassMethod ListExecute(ByRef qHandle As %Binary, Directory As %String, Flat As %Boolean, System As %Boolean) As %Status
 {
 	If (Directory '= "") Set qHandle = "" Quit $$$OK
 	Set tSC = $$$OK
-	Set tStmt = ##class(%SQL.Statement).%New()
-	Set tSC = tStmt.%PrepareClassQuery($classname(),"ItemList")
+	// Use %Library.ResultSet set to avoid complex SQL permissions issues
+	// that apply to users who have Studio access, but not the %Development role.
+	// Note that the qHandle object complies with key aspects of the newer
+	// %SQL.* result set interface
+	Set qHandle = ##class(%Library.ResultSet).%New($classname()_":ItemList")
+	Set tSC = qHandle.Execute()
 	If $$$ISERR(tSC) {
 		Quit tSC
 	}
-	Set qHandle = tStmt.%Execute()
 	If (qHandle.%SQLCODE < 0) {
 		Set tSC = $$$ERROR($$$SQLCode,qHandle.%SQLCODE,qHandle.%Message)
-	}
-	If $$$ISERR(tSC) {
 		Quit tSC
 	}
 	If 'qHandle.%Next(.tSC) {

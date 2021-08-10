@@ -4,88 +4,16 @@ Class %ZPM.PackageManager.Client.Utils
 {
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status [ PublicList = registry ]
+ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
-	Set pResults = ##class(%Library.ListOfObjects).%New()
+	Set pResults = $$$NULLOREF
 	Try {
-		set registry = pSearchCriteria.Registry
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select ID from %ZPM_PackageManager_Client.ServerDefinition where Enabled = 1 and (:registry is null or Name = :registry) order by %ZPM_PackageManager_Client.ServerDefinition_SortOrder(ID)")
-		If (tRes.%SQLCODE < 0) {
-			Set tSC = $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
-			Quit
-		}
-		While (tRes.%Next(.tSC)) {
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			
-			Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).%OpenId(tRes.%Get("ID"),,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			
-			If pForceRemoteRepo && tServer.%IsA("%ZPM.PackageManager.Client.LocalServerDefinition") {
-				Continue
-			}
-			
-			// Only remote repositories support keywords, for now.
-			If (pSearchCriteria.Keywords.Count() > 0) && tServer.%IsA("%ZPM.PackageManager.Client.FilesystemServerDefinition") {
-				Continue
-			}
-			
-			Set tClient = tServer.GetPackageService()
-			If 'tClient.IsAvailable() {
-				Continue
-			}
-			
-			#dim tClientCriteria as %ZPM.PackageManager.Core.SearchCriteria
-			Set tClientCriteria = pSearchCriteria.%ConstructClone(1)
-			Set tClientCriteria.IncludePrerelease = tServer.Prereleases
-			Set tClientCriteria.IncludeSnapshots = tServer.Snapshots
-			Set tServerResults = tClient.ListModules(tClientCriteria)
-			For i=1:1:tServerResults.Count() {
-				Set item = tServerResults.GetAt(i)
-        		#; Sorting versions
-        		Set versions(tServer.Name, +item.Version.Major, +item.Version.Minor, +item.Version.Patch, " "_item.Version.Patch_"_"_item.Version.Prerelease) = item
-			}
-		}
-    Set name = ""
-    For {
-      Set name = $Order(versions(name))
-      Quit:name=""
-      Set major = ""
-      For {
-        Set major = $Order(versions(name, major), -1)
-        Quit:major=""
-        Set minor = ""
-        For  {
-          Set minor = $Order(versions(name, major, minor), -1)
-          Quit:minor=""
-          Set patch = ""
-          For  {
-            Set patch = $Order(versions(name, major, minor, patch), -1)
-            Quit:patch=""
-            Set sub = ""
-            For  {
-              Set sub = $Order(versions(name, major, minor, patch, sub), 1, item)
-              Quit:sub=""
-              Do pResults.Insert(##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New(name, item))
-            }
-          }
-        }
-      }
-    }
-    
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		Set tSC = tManager.SearchRepositoriesForModule(pSearchCriteria,.pResults)
 	} Catch e {
-		If (e.Name["ZSOAP") && $Data(%objlasterror) {
-			Set tSC = %objlasterror
-		} Else {
-			Set tSC = e.AsStatus()
-		}
+		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
@@ -96,20 +24,11 @@ ClassMethod RetrieveModuleManifest(pQualifiedReference As %ZPM.PackageManager.Co
 	Set tSC = $$$OK
 	Set pManifestStream = $$$NULLOREF
 	Try {
-		Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pQualifiedReference.ServerName,,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tClient = tServer.GetPackageService()
-
-		Set pManifestStream = tClient.GetModuleManifest(pQualifiedReference)
+		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		Set tSC = tManager.RetrieveModuleManifest(pQualifiedReference,.pManifestStream)
 	} Catch e {
-		If (e.Name["ZSOAP") && $Data(%objlasterror) {
-			Set tSC = %objlasterror
-		} Else {
-			Set tSC = e.AsStatus()
-		}
+		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
@@ -120,20 +39,11 @@ ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Cor
 	Set tSC = $$$OK
 	Set pPackageStream = $$$NULLOREF
 	Try {
-		Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pQualifiedReference.ServerName,,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tClient = tServer.GetPackageService()
-		
-		Set pPackageStream = tClient.GetModule(pQualifiedReference)
+		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		Set tSC = tManager.RetrieveModulePackage(pQualifiedReference,.pPackageStream)
 	} Catch e {
-		If (e.Name["ZSOAP") && $Data(%objlasterror) {
-			Set tSC = %objlasterror
-		} Else {
-			Set tSC = e.AsStatus()
-		}
+		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
@@ -142,53 +52,13 @@ ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Cor
 ClassMethod SearchRepositoriesForApplication(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
-	Set pResults = ##class(%Library.ListOfObjects).%New()
+	Set pResults = $$$NULLOREF
 	Try {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select ID from %ZPM_PackageManager_Client.ServerDefinition where Enabled = 1 order by %ZPM_PackageManager_Client.ServerDefinition_SortOrder(ID)")
-		If (tRes.%SQLCODE < 0) {
-			Set tSC = $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
-			Quit
-		}
-		While (tRes.%Next(.tSC)) {
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			
-			Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).%OpenId(tRes.%Get("ID"),,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			
-			If pForceRemoteRepo && tServer.%IsA("%ZPM.PackageManager.Client.LocalServerDefinition") {
-				Continue
-			}
-			
-			Set tClient = tServer.GetPackageService()
-			If 'tClient.Supports("ListApplications") {
-				Continue
-			}
-			If 'tClient.IsAvailable() {
-				Continue
-			}
-			
-			#dim tClientCriteria as %ZPM.PackageManager.Core.SearchCriteria
-			Set tClientCriteria = pSearchCriteria.%ConstructClone()
-			Set tClientCriteria.IncludePrerelease = tServer.Prereleases
-			Set tClientCriteria.IncludeSnapshots = tServer.Snapshots
-			Set tServerResults = tClient.ListApplications(tClientCriteria)
-			For i=1:1:tServerResults.Count() {
-				Do pResults.Insert(##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New(tServer.Name,tServerResults.GetAt(i)))
-			}
-		}
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		Set tSC = tManager.SearchRepositoriesForApplication(pSearchCriteria,.pResults)
 	} Catch e {
-		If (e.Name["ZSOAP") && $Data(%objlasterror) {
-			Set tSC = %objlasterror
-		} Else {
-			Set tSC = e.AsStatus()
-		}
+		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
@@ -199,20 +69,11 @@ ClassMethod RetrieveApplicationManifest(pQualifiedReference As %ZPM.PackageManag
 	Set tSC = $$$OK
 	Set pManifestStream = $$$NULLOREF
 	Try {
-		Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pQualifiedReference.ServerName,,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tClient = tServer.GetPackageService()
-		
-		Set pManifestStream = tClient.GetApplicationManifest(pQualifiedReference)
+		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		Set tSC = tManager.RetrieveApplicationManifest(pQualifiedReference,.pManifestStream)
 	} Catch e {
-		If (e.Name["ZSOAP") && $Data(%objlasterror) {
-			Set tSC = %objlasterror
-		} Else {
-			Set tSC = e.AsStatus()
-		}
+		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
@@ -223,20 +84,11 @@ ClassMethod RetrieveApplicationPackage(pQualifiedReference As %ZPM.PackageManage
 	Set tSC = $$$OK
 	Set pPackageStream = $$$NULLOREF
 	Try {
-		Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pQualifiedReference.ServerName,,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tClient = tServer.GetPackageService()
-		
-		Set pPackageStream = tClient.GetApplication(pQualifiedReference)
+		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		Set tSC = tManager.RetrieveApplicationPackage(pQualifiedReference,.pPackageStream)
 	} Catch e {
-		If (e.Name["ZSOAP") && $Data(%objlasterror) {
-			Set tSC = %objlasterror
-		} Else {
-			Set tSC = e.AsStatus()
-		}
+		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
@@ -251,7 +103,6 @@ ClassMethod InitializeLocalCache(Output pCreated As %Boolean = 0) As %Status
 			Quit
 		}
 		If $IsObject(tLocalCache) {
-			Set pCreated = 1
 			Quit
 		}
 		Set tLocalCache = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).%New()
@@ -272,6 +123,7 @@ ClassMethod InitializeLocalCache(Output pCreated As %Boolean = 0) As %Status
 /// Does a fresh or upgrade installation
 ClassMethod InstallApplication(pInstallInfo As %ZPM.PackageManager.Core.InstallationInfo) As %Status
 {
+	#dim tModule As %ZPM.PackageManager.Developer.Module
 	New $Namespace
 	Set tSC = $$$OK
 	Try {
@@ -284,7 +136,11 @@ ClassMethod InstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Installa
 			Quit
 		}
 		
-		// TODO: Validate module manifest?
+		// Validate manifest against module reference
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).ValidateStream(tManifestStream,pInstallInfo.ModuleReference,.tModule)
+		If $$$ISERR(tSC) {
+			Quit
+		}
 		
 		// Download application package.
 		Set tSC = ..RetrieveApplicationPackage(pInstallInfo.ModuleReference,.tPackageStream)
@@ -325,20 +181,23 @@ ClassMethod InstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Installa
 			}
 			Set tOverwrite = (tDBName="CODE")
 			Set tName = pInstallInfo.Namespace_"-"_tDBName
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Build).CreateDatabase(tName,tSourceFile,tOverwrite,.tCreated)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			If (tCreated) {
+			Set tOneDBSC = ##class(%ZPM.PackageManager.Developer.Build).CreateDatabase(tName,tSourceFile,tOverwrite,.tCreated)
+			Set tSC = $System.Status.AppendStatus(tSC,tOneDBSC)
+			If $$$ISERR(tOneDBSC) {
+				Write !,"Error creating database ",tName,": ",$System.Status.GetErrorText(tOneDBSC)
+			} ElseIf (tCreated) {
 				Write !,"Database ",tName," created."
 			} ElseIf (tOverwrite) {
 				Write !,"Database ",tName," overwritten."
 			}
 		}
+		If $$$ISERR(tSC) {
+			Quit
+		}
 		
 		// Create new namespace.
 		// TODO: Mappings for LOCAL database?
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).CreateNamespace(pInstallInfo.Namespace,pInstallInfo.Namespace_"-CODE",pInstallInfo.Namespace_"-DATA")
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).CreateNamespace(pInstallInfo.Namespace,pInstallInfo.Namespace_"-CODE",pInstallInfo.Namespace_"-DATA",,tModule.GetNamespaceConfig())
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -389,9 +248,9 @@ ClassMethod UninstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Instal
 		
 		Kill tParams
 		Set tParams("Configure","DatabaseName") = pInstallInfo.Namespace_"-CODE"
-		Set tSC = tModule.Lifecycle.Unconfigure(.tParams)
+		Set tLogSC = tModule.Lifecycle.Unconfigure(.tParams)
 		
-		// Clean up at the Caché/Ensemble level.
+		// Clean up at the Database level.
 		Set $Namespace = "%SYS" //Protection from <NAMESPACE>/etc.
 		
 		// TODO: Make the following steps optional? (Particularly, the deletion of user data / local code?)
@@ -400,11 +259,14 @@ ClassMethod UninstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Instal
 		Set tLocalDBName = pInstallInfo.Namespace_"-LOCAL"
 		
 		// These can fail safely.
-		Do ##class(%Library.EnsembleMgr).DisableNamespace(pInstallInfo.Namespace)
-		Do ##class(%ZPM.PackageManager.Developer.Build).DeleteNamespace(pInstallInfo.Namespace)
-		Do ##class(%ZPM.PackageManager.Developer.Build).DeleteDatabase(tCodeDBName)
-		Do ##class(%ZPM.PackageManager.Developer.Build).DeleteDatabase(tDataDBName)
-		Do ##class(%ZPM.PackageManager.Developer.Build).DeleteDatabase(tLocalDBName)
+		Set tLogSC = $$$ADDSC(tLogSC,##class(%Library.EnsembleMgr).DisableNamespace(pInstallInfo.Namespace))
+		Set tLogSC = $$$ADDSC(tLogSC,##class(%ZPM.PackageManager.Developer.Build).DeleteNamespace(pInstallInfo.Namespace))
+		Set tLogSC = $$$ADDSC(tLogSC,##class(%ZPM.PackageManager.Developer.Build).DeleteDatabase(tCodeDBName))
+		Set tLogSC = $$$ADDSC(tLogSC,##class(%ZPM.PackageManager.Developer.Build).DeleteDatabase(tDataDBName))
+		Set tLogSC = $$$ADDSC(tLogSC,##class(%ZPM.PackageManager.Developer.Build).DeleteDatabase(tLocalDBName))
+		If $$$ISERR(tLogSC) {
+			Write !,"Error(s) uninstalling application from namespace ",pInstallInfo.Namespace,": ",$System.Status.GetErrorText(tLogSC)
+		}
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

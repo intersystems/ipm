@@ -1,6 +1,9 @@
+/// Just a Resolved Module reference with a bit more information about which repository
+/// the module is located in.
 Class %ZPM.PackageManager.Core.QualifiedModuleReference Extends %ZPM.PackageManager.Core.ResolvedModuleReference
 {
 
+/// The name of the repository the module is in (The Name property in <class>%ZPM.PackageManager.Client.ServerDefinition</class>. <br />
 Property ServerName As %String;
 
 Method %OnNew(pServerName As %String = "", pResolvedReference As %ZPM.PackageManager.Core.ResolvedModuleReference = "") As %Status [ Private, ServerOnly = 1 ]
@@ -29,6 +32,12 @@ Storage Default
 </Value>
 <Value name="4">
 <Value>ServerName</Value>
+</Value>
+<Value name="5">
+<Value>Repository</Value>
+</Value>
+<Value name="6">
+<Value>Description</Value>
 </Value>
 </Data>
 <Type>%Storage.Serial</Type>
