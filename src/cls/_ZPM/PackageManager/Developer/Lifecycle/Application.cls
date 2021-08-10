@@ -46,17 +46,13 @@ Method %Package(ByRef pParams) As %Status
 		
 		// Export module contents
 		Set tSC = ..%Export(.pParams, .tExportDirectory, .tDependencyGraph)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		// Initialize and switch to build namespace
 		Set tInitNS = $Namespace
 		New $Namespace
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).InitializeBuildNamespace()
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).InitializeBuildNamespace(,..Module.GetNamespaceConfig())
+		$$$ThrowOnError(tSC)
 		
 		// Ensure all resources that are part of the module are swizzled.
 		Set tKey = ""
@@ -67,19 +63,15 @@ Method %Package(ByRef pParams) As %Status
 		
 		// Actually switch to build namespace
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).SwitchToBuildNamespace()
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		Write:tVerbose !,"Building in namespace: ",$Namespace
 		
 		// In the build namespace, create a filesystem repository pointing to the export directory.
-		// First, remove all filesystem repository.
-		Write:tVerbose !,"Clearing FileSystems registry..."
-		Set tSC = ##class(%ZPM.PackageManager.Client.FilesystemServerDefinition).%DeleteExtent()
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		// First, remove all existing server definitions to force use of the one filesystem repository.
+		Write:tVerbose !,"Clearing repository registry..."
+		Set tSC = ##class(%ZPM.PackageManager.Client.ServerDefinition).%DeleteExtent()
+		$$$ThrowOnError(tSC)
 		
 		Set tFSDef = ##class(%ZPM.PackageManager.Client.FilesystemServerDefinition).%New()
 		Set tFSDef.Name = "Build Directory"
@@ -89,9 +81,7 @@ Method %Package(ByRef pParams) As %Status
 		Set tFSDef.Root = tExportDirectory_".modules/"
 		Set tFSDef.Depth = 1
 		Set tSC = tFSDef.%Save()
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		// Load the export directory for this module
 		// LoadNewModule will execute up through the Activate step. (Reload, Validate, Compile, Activate.)
@@ -99,69 +89,56 @@ Method %Package(ByRef pParams) As %Status
 		Set tParams("DeveloperMode") = 0
 		Set tParams("Verbose") = tVerbose
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).LoadNewModule(tExportDirectory,.tParams)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		// Retrieve built code database
-		Set tWorkingDirectory = ##class(%File).NormalizeDirectory($$$FileTempDir)
-		Set tWorkingFile = ##class(%File).NormalizeFilename(..Module.Name_".tgz", tWorkingDirectory)
-		If '##class(%File).DirectoryExists(tWorkingDirectory),'##class(%File).CreateDirectory(tWorkingDirectory,.tReturn) {
+		Set tWorkingFile = $Piece(##class(%File).TempFilename(),".",1,*-1)
+		Set tWorkingDirectory = ##class(%File).NormalizeDirectory(tWorkingFile)
+		Set tWorkingFile = tWorkingFile_".tgz"
+		If '##class(%File).CreateDirectory(tWorkingDirectory,.tReturn) {
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Could not create directory %1: %2",tWorkingDirectory,tReturn))
 			Quit
 		}
 		
 		Set tStream = ##class(%Stream.FileBinary).%New()
-		Set tDBDirectory = ##class(%File).NormalizeDirectory("db", tWorkingDirectory)
+		Set tDBDirectory = ##class(%File).NormalizeDirectory(tWorkingDirectory_"db\")
 		If '##class(%File).CreateDirectory(tDBDirectory,.tReturn) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Could not create directory %1: %2", tDBDirectory, tReturn))
+			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Could not create directory %1: %2",tWorkingDirectory,tReturn))
 			Quit
 		}
 		Set tSC = tStream.LinkToFile(##class(%File).NormalizeFilename(tDBDirectory_"CODE.DAT"))
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		Set tSC = ..OnBeforeCaptureDatabase(.pParams)
+		$$$ThrowOnError(tSC)
 		
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).RetrieveBuiltDatabase(.tTempStream)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		Set tSC = tStream.CopyFromAndSave(tTempStream)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		// Export module manifest
 		Set tSC = $System.OBJ.Export(..Module.Name_".ZPM",tWorkingDirectory_"module.xml", "/diffexport")
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		Set tSC = ..OnBeforeArtifact(tExportDirectory,tWorkingDirectory,.pParams)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		 
+		$$$ThrowOnError(tSC)
+		
 		// Package as .tgz
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Archive).Create(tWorkingDirectory,tWorkingFile,.tOutput)
+		$$$ThrowOnError(tSC)
 		For i=1:1:tOutput {
 			Write:tVerbose !,tOutput(i)
 		}
 		
-		Write !,"Application package generated:",!,$C(9),tWorkingFile
+		Write:tVerbose !,"Application package generated:",!,$C(9),tWorkingFile
 		
 		Set tSrcFileStream = ##class(%Stream.FileBinary).%New()
 		Set tSC = tSrcFileStream.LinkToFile(tWorkingFile)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		Set tSC = ..Payload.CopyFrom(tSrcFileStream)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -227,73 +204,12 @@ Method OnBeforeCaptureDatabase(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set tVerbose = $Get(pParams("Verbose"))
-		
-		// Default implementation: see which resources are expicitly flagged with Deploy = true.
-		// Build an array of those, then mark them as deployed.
-		Set tSC = ..Module.GetResolvedReferences(.tResourceArray,..#EXPORTDEPENDENCIES,..PhaseList,1,.pDependencyGraph)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tResourceKey = ""
-		For {
-			Set tResourceKey = $Order(tResourceArray(tResourceKey))
-			Quit:(tResourceKey="")
-			
-			// Skip file resources - these are handled separately;
-			// "deployment" is the responsibility of resource processor classes.
-			If ($Extract(tResourceKey) = "/") {
-				Continue
-			}
-			
-			Kill tResourceInfo
-			Merge tResourceInfo = tResourceArray(tResourceKey)
-			Set tSC = ..OnBeforeCaptureResource(.tResourceInfo,.tDeploy)
-			$$$ThrowOnError(tSC)
-			
-			If tDeploy {
-				Set tName = $Piece(tResourceKey,".",1,*-1)
-				Set tExt = $Piece(tResourceKey,".",*)
-				If (tExt = "CLS") {
-					Set tDeployClassArray($Piece(tResourceKey,".",1,*-1)) = ""
-				} ElseIf (tExt = "MAC") || (tExt = "INT") {
-					Set tDeployRtnArray(tResourceKey) = ""
-				} Else {
-					// TODO: Handle making other types deployed?
-				}
-			}
-		}
-		
-		If $Data(tDeployClassArray) {
-			If (tVerbose) {
-				Set tClass = ""
-				Write !,"Marking classes as deployed:"
-				For {
-					Set tClass = $Order(tDeployClassArray(tClass))
-					Quit:tClass=""
-					Write !,$c(9),tClass
-				}
-			}
-			$$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
-		} ElseIf tVerbose {
-			Write !,"No classes to mark as deployed."
-		}
-		If $Data(tDeployRtnArray) {
-			Set tRtn = ""
-			For {
-				Set tRtn = $Order(tDeployRtnArray(tRtn))
-				Quit:tRtn=""
-				Write:tVerbose !,"Deploying routine: ",tRtn
-				$$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
-			}
-		} ElseIf tVerbose {
-			Write !,"No routines to deploy."
-		}
+		Set tSC = ..%MakeDeployed(.pParams)
+		$$$ThrowOnError(tSC)
 		
 		// Ensure that no code is left over in the code database.
-		Set tCodeDeployed = $Data(tDeployClassArray) || $Data(tDeployRtnArray)
-		If (tCodeDeployed) {
+		If (..HasDeployedResources) {
+			Set tVerbose = $Get(pParams("Verbose"))
 			Set tCodeDatabase = $Piece(##class(%SYS.Namespace).GetRoutineDest(),"^",2)
 			Set tCopyDatabase = ##class(%File).NormalizeDirectory(tCodeDatabase_"/comp/")
 			
@@ -320,23 +236,6 @@ Method OnBeforeCaptureDatabase(ByRef pParams) As %Status
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
-}
-
-Method OnBeforeCaptureResource(ByRef pResourceInfo, Output pDeploy As %Boolean) As %Status
-{
-	Set tSC = $$$OK
-	Try {
-		// Only deploy things expicitly flagged for deployment.
-		Set pDeploy = $Case($Get(pResourceInfo("Deploy")),1:1,:0)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
-
-Method %Namespace(ByRef pParams) As %Status
-{
-	Quit $$$OK
 }
 
 }

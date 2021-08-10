@@ -135,6 +135,7 @@ Method SatisfiesCondition(pCondition As %ZPM.PackageManager.Developer.ModuleSett
 		"lt":(tValue < pCondition.Value),
 		"gte":(tValue >= pCondition.Value),
 		"lte":(tValue <= pCondition.Value),
+		"contains":(tValue [ pCondition.Value),
 		:(tValue = pCondition.Value))
 }
 
@@ -196,6 +197,12 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 	Quit $$$OK
 }
 
+/// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
+Method OnItemRelativePath(pItemName As %String) As %String
+{
+	Quit ""
+}
+
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
 	Quit $$$OK
@@ -206,7 +213,7 @@ Method OnBeforeArtifact(pExportDirectory As %String, pWorkingDirectory As %Strin
 	Quit $$$OK
 }
 
-Method OnResolveChildren(ByRef pResourceArray) As %Status
+Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean) As %Status
 {
 	Quit $$$OK
 }
@@ -218,12 +225,19 @@ Method OnGetUniqueName(Output pUniqueName)
 {
 }
 
+Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo) As %Status
+{
+	Set pInfo = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo).%New()
+	Quit $$$OK
+}
+
 /// Evaluates an expression in an attribute
 /// Current valid expressions:
 /// {$namespace} - the current namespace
 /// {$mgrdir} - the instance's mgr directory
 /// {$cspdir} - the instance's root CSP directory
 /// {$root} - the resource's module's root directory
+/// {name} - the name of the resource
 /// These special expressions are case-insensitive.
 Method %Evaluate(pAttrValue) As %String [ Internal ]
 {
@@ -232,6 +246,11 @@ Method %Evaluate(pAttrValue) As %String [ Internal ]
 		Merge tParams = ..Params
 		Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
 		Set tAttrValue = ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
+	}
+
+	If $Locate(tAttrValue,"(?i)\{name\}") {
+		Set tName = ..ResourceReference.Name
+   	Set tAttrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", tAttrValue).ReplaceAll($Replace(tName, "\","\\"))
 	}
 
   Quit ..ResourceReference.Module.%Evaluate(tAttrValue)

@@ -42,7 +42,9 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 				// no-op
 				Quit
 			}
-			$$$ThrowOnError(..ResourceReference.ResolveChildren(.tResourceArray))
+			// Call ResolveChildren with second arg 0 to ignore module ownership
+			// for classes/subpackages within .PKG resources.
+			$$$ThrowOnError(..ResourceReference.ResolveChildren(.tResourceArray, 0))
 			If '..Overwrite {
 				Set $Namespace = ..Target
 				Set tKey = ""
@@ -77,7 +79,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 	Quit $$$OK
 }
 
-Method OnResolveChildren(ByRef pResourceArray) As %Status
+Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean) As %Status
 {
 	// For each child detected, see if the individual class or any more granular package containing is part of any module. If so, clear it from the array of child resources.
 	// Otherwise, indicate that the resource is generated (meaning "do not attempt to load/export").

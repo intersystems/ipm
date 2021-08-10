@@ -13,4 +13,7 @@ Property CompileAfter As %String(MAXLEN = "");
 /// Flags/qualifiers to compile with (overriding any more general defaults); "verbose" added per lifecycle command.
 Property Flags As %String(MAXLEN = "") [ InitialExpression = "ck" ];
 
+/// Flags/qualifiers to export items with.
+Property ExportFlags As %String(MAXLEN = "");
+
 }

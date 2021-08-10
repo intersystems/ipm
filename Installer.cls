@@ -19,7 +19,7 @@ XData PM [ XMLNamespace = INSTALLER ]
 <Default Name="TRACKINGID" Value="UA-126752118-1" />
 
 <Namespace Name="%SYS">
-  <Import File="${SRCDIR}inc/_ZPM/PackageManager/Common.inc" />
+  <Import File="${SRCDIR}inc" Recurse="1"/>
   <Import File="${SRCDIR}cls" Recurse="1" />
   
   <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" CheckStatus="true" />
@@ -140,6 +140,17 @@ ClassMethod NeedInstall(Output version As %String)
   QUIT 1
 }
 
+ClassMethod MakeFile(pPackagePath As %String, pInstaller As %String)
+{
+  set tPackage = ##class(%Stream.FileBinary).%New()
+  set tInstaller = ##class(%Stream.FileCharacter).%New()
+  if tPackage.LinkToFile(pPackagePath),tInstaller.LinkToFile(pInstaller) {
+    $$$QuitOnError(..Make(tPackage, tInstaller))
+    Quit tInstaller.%Save()
+  }
+  Quit $$$OK
+}
+
 ClassMethod Make(pPackage As %Stream.Object, ByRef pStream As %Stream.TmpCharacter) As %Status
 {
   Set tSC = $$$OK
@@ -161,8 +172,7 @@ ClassMethod Make(pPackage As %Stream.Object, ByRef pStream As %Stream.TmpCharact
     Set param.Default = $Get(tList)
     Do param.%Save()
 
-    Set tSC = $SYSTEM.OBJ.ExportToStream($CLASSNAME()_".CLS", .pStream, "/diffexport/exportversion=2017.1")
-    #; Set tSC = $SYSTEM.OBJ.ExportToStream($CLASSNAME()_".CLS", , "/diffexport/exportversion=2017.1")
+    Set tSC = $SYSTEM.OBJ.ExportToStream($CLASSNAME()_".CLS", .pStream, "/diffexport/exportversion=iris2019.1")
   } Catch e {
     Set tSC = e.AsStatus()
   }
@@ -203,6 +213,7 @@ ClassMethod CompactPackage(ByRef pList) As %Status
     Set xdata = ##class(%Dictionary.XDataDefinition).%New()
     Set xdata.Name = "Data"_i
     Set xdata.Description = name
+    Set xdata.SequenceNumber = 100 + i
     Do xdata.parentSetObjectId($CLASSNAME())
     set chunkSize = 22800
     while 'gzip.AtEnd {

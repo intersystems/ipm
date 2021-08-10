@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.ModuleAuthorInfo Extends (%SerialObject, %XML.Adaptor)
+Class %ZPM.PackageManager.Developer.ModuleAuthorInfo Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";

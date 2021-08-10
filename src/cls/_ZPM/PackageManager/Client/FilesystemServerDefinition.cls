@@ -31,8 +31,8 @@ Method RootSet(%val) As %Status
 Method GetPackageService() As %ZPM.PackageManager.Core.IPackageService
 {
 	Set tService = ##class(%ZPM.PackageManager.Client.Filesystem.PackageService).%New(..Root)
-	If tService.IsAvailable() {
-		$$$ThrowOnError(..BuildCache(1))
+	If '$$$IsISCWorker && tService.IsAvailable() {
+		$$$ThrowOnError(..BuildCache())
 	}
 	Quit tService
 }
@@ -51,7 +51,7 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 			}
 			
 			If ##class(%ZPM.PackageManager.Client.FilesystemServerDefinition).RootIndexExists(tPath) {
-				$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Root '%1' is already configured for another repository."),tPath))
+				$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Root '%1' is already configured for another repository.",tPath)))
 			}
 		}
 		Set pInstance.Root = tPath
@@ -93,13 +93,22 @@ Trigger RootChanged [ Event = UPDATE, Foreach = row/object ]
 	}
 }
 
-Method BuildCache(pPurge As %Boolean = 1, pVerbose As %Integer = 0, pAutoDetectDepth As %Boolean = 0) As %Status
+Method BuildCache(pPurge As %Boolean = {'$$$IsISCWorker}, pVerbose As %Integer = 0, pAutoDetectDepth As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set tInitTLevel = $TLevel
 	Try {
+		Set tLogManager = ##class(%ZPM.PackageManager.Core.LogManager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		
+		// Instantiate at this level for the performance benefit
+		Set tXSLTProvider = ##class(%ZPM.PackageManager.Core.XSLTProvider).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		
 		TSTART
-		If (pPurge) {
+		If (pPurge) && (..%Id() '= "") {
+			Set tLockManager = ##class(%ZPM.PackageManager.Core.LockManager).%New()
+			$$$ThrowOnError(tLockManager.LockClassId($classname(),..%Id()))
 			#dim tResult As %SQL.StatementResult
 			Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_PackageManager_Client_Filesystem.Cache where Root = ?",..Root)
 			If (tResult.%SQLCODE < 0) {
@@ -129,55 +138,17 @@ Method BuildCache(pPurge As %Boolean = 1, pVerbose As %Integer = 0, pAutoDetectD
 		}
 		
 		// Ensure that we're looking at valid MODULE documents (as opposed to classes named Module, which the package manager has!)
+		Set tAggSC = $$$OK
 		Set tKey = ""
 		For {
 			Set tKey = $Order(tFilenameList(tKey),1,tFile)
 			Quit:(tKey="")
 			
-			// Get list of what's in module.xml
-			Set tSC = $System.OBJ.Load(tFile,"-d",,.tLoadedList,1)
-			If $$$ISERR(tSC) {
-				// Wasn't a valid file. We'll just continue.
-				Set tSC = $$$OK
-				Continue
-			}
-			
-			If ($Length(tLoadedList,",") > 1) {
-				// Contained multiple documents - tricky! We'll just continue.
-				Continue
-			}
-			
-			Set tExt = $ZConvert($Piece($Get(tLoadedList),".",*),"U")
-			If (tExt '= "ZPM") {
-				Continue
-			}
-			
-			Kill tStream,tName,tVersionString
-			Set tSC = ..GetModuleStreamFromFile(tFile,.tStream,.tName,.tVersionString)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		
-			// Create cache item.
 			Set tSubDirectory = tFilenameList(tKey,"sub")
-			If ##class(%ZPM.PackageManager.Client.Filesystem.Cache).CacheItemIndexExists(..Root,tSubDirectory) {
-				Set tCacheItem = ##class(%ZPM.PackageManager.Client.Filesystem.Cache).CacheItemIndexOpen(..Root,tSubDirectory)
-			} Else {
-				Set tCacheItem = ##class(%ZPM.PackageManager.Client.Filesystem.Cache).%New()
-				Set tCacheItem.Root = ..Root
-				Set tCacheItem.SubDirectory = tSubDirectory
-			}
-			Set tCacheItem.Name = tName
-			Set tCacheItem.VersionString = tVersionString
-			Do tCacheItem.Manifest.CopyFrom(tStream)
-			Set tCacheItem.LastModified = $zdt($zts,3)
-			Set tSC = tCacheItem.%Save()
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			
+			Set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,.tName,.tVersionString))
 			Write:pVerbose !,tName," ",tVersionString," @ ",##class(%File).NormalizeDirectory(..Root_tSubDirectory)
 		}
+		$$$ThrowOnError(tAggSC)
 		TCOMMIT
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -186,57 +157,124 @@ Method BuildCache(pPurge As %Boolean = 1, pVerbose As %Integer = 0, pAutoDetectD
 	Quit tSC
 }
 
-ClassMethod GetModuleStreamFromFile(pFilename As %String, Output pStream As %Stream.GlobalCharacter, Output pName As %String, Output pVersion As %String) As %Status
+Method AddCacheItem(pModuleFileName As %String, pSubDirectory As %String, Output pName As %String, Output pVersionString As %String) As %Status
+{
+	Set tSC = $$$OK
+	Set pName = ""
+	Set pVersionString = ""
+	Try {
+		// Get list of what's in module.xml
+		Set tSC = $System.OBJ.Load(pModuleFileName,"-d",,.tLoadedList,1)
+		If $$$ISERR(tSC) {
+			// Wasn't a valid file. We'll just continue.
+			Set tSC = $$$OK
+			Quit
+		}
+		
+		If ($Length(tLoadedList,",") > 1) {
+			// Contained multiple documents - tricky! We'll just continue.
+			Quit
+		}
+		
+		Set tExt = $ZConvert($Piece($Get(tLoadedList),".",*),"U")
+		If (tExt '= "ZPM") {
+			Quit
+		}
+		
+		Kill tStream,tName,tVersionString
+		Set tParseSC = ..GetModuleStreamFromFile(pModuleFileName,.tStream,.pName,.pVersionString)
+		If $$$ISERR(tParseSC) {
+			// Log as a warning, but keep going.
+			Do ##class(%ZPM.PackageManager.Core.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$System.Status.GetErrorText(tParseSC),1)
+			Quit
+		}
+	
+		// Create cache item.
+		If ##class(%ZPM.PackageManager.Client.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
+			Set tCacheItem = ##class(%ZPM.PackageManager.Client.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
+			$$$ThrowOnError(tSC)
+		} Else {
+			Set tCacheItem = ##class(%ZPM.PackageManager.Client.Filesystem.Cache).%New()
+			Set tCacheItem.Root = ..Root
+			Set tCacheItem.SubDirectory = pSubDirectory
+		}
+		Set tCacheItem.Name = pName
+		Set tCacheItem.VersionString = pVersionString
+		Do tCacheItem.Manifest.CopyFrom(tStream)
+		Set tCacheItem.LastModified = $zdt($zts,3)
+		Set tSaveSC = tCacheItem.%Save()
+		If $$$ISERR(tSaveSC) {
+			Set tSC = tCacheItem.HandleSaveError(tSaveSC)
+		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+Method GetModuleStreamFromFile(pFilename As %String, Output pStream As %Stream.GlobalCharacter, Output pName As %String, Output pVersion As %String) As %Status
 {
 	Set tSC = $$$OK
 	Set pName = ""
 	Set pVersion = ""
 	Try {
-		// These documents will always look like:
-		/*
-			<?xml version="1.0" encoding="UTF-8"?>
-			<Export generator="Cache" version="25">
-			<Document name="%ZPM.ZPM"><Module>
-			...
-			</Module>
-			</Document></Export>
-		*/
-		// We want the first line, and everything from <Module> to </Module>.
-		// Rather than doing full XML parsing, it's fastest to just selectively copy lines from the file to the target stream.
-		// Some information is also extracted from the XML using $Piece.
-		
+		// The source stream should contain a Studio document export of a module manifest.
 		Set tSourceStream = ##class(%Stream.FileCharacter).%New()
 		Set tSC = tSourceStream.LinkToFile(pFilename)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+		$$$ThrowOnError(tSC)
 		
 		Set pStream = ##class(%Stream.GlobalCharacter).%New()
-		Do pStream.WriteLine(tSourceStream.ReadLine($$$MaxStringLength)) //<?xml version="1.0" encoding="UTF-8"?>
-		Do tSourceStream.ReadLine($$$MaxStringLength) //<Export generator="Cache" version="25">
-		Set tFirstLine = tSourceStream.ReadLine($$$MaxStringLength) //<Document name="%ZPM.ZPM"><Module>
-		Do pStream.WriteLine("<Module>")
-		While 'tSourceStream.AtEnd {
-			Set tLine = tSourceStream.ReadLine($$$MaxStringLength)
-			If tLine = "</Document></Export>" {
-				Quit
-			}
-			
-			// This depends on the Name and Version tags coming early in the export. Our format enforces this.
-			If (tLine [ "<Version>") && (pVersion = "") {
-				Set pVersion = $Piece($Piece(tLine,"<Version>",2),"</Version>")
-			}
-			If (tLine [ "<Name>") && (pName = "") {
-				Set pName = $Piece($Piece(tLine,"<Name>",2),"</Name>")
-			}
-			Do pStream.WriteLine(tLine)
-		}
+		Set tMetaStream = ##class(%Stream.GlobalCharacter).%New()
 		
-		Do pStream.Rewind()
+		// Extract <Module> section of document
+		Set tCompiledTransform = ##class(%ZPM.PackageManager.Core.XSLTProvider).GetCompiledTransformForXData($classname(),"ModuleDocumentTransform")
+		Set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tSourceStream,tCompiledTransform,.pStream)
+		$$$ThrowOnError(tSC)
+		
+		// Extract Name and Version
+		Do tSourceStream.Rewind()
+		Set tCompiledTransform = ##class(%ZPM.PackageManager.Core.XSLTProvider).GetCompiledTransformForXData($classname(),"MetadataExtractionTransform")
+		Set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tSourceStream,tCompiledTransform,.tMetaStream)
+		$$$ThrowOnError(tSC)
+		
+		Set tMetaStream.LineTerminator = $Select($$$isWINDOWS:$c(13,10),$$$isUNIX:$c(10))
+		Set pName = $ZConvert(tMetaStream.ReadLine(), "L")
+		Set pVersion = tMetaStream.ReadLine()
 	} Catch e {
-		Set tSC = e.AsStatus()
+		Set tOuterSC = $$$ERROR($$$GeneralError,$$$FormatText("Error loading module from file '%1'",pFilename))
+		Set tSC = $System.Status.EmbedStatus(tOuterSC,e.AsStatus())
 	}
 	Quit tSC
+}
+
+/// Extracts entire <Module> section from a Studio document export
+XData ModuleDocumentTransform
+{
+<xsl:stylesheet version="1.0"
+ xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+ <xsl:output indent="yes"/>
+ <xsl:template match="/Export/Document/Module">
+ <Module>
+ <xsl:copy-of select="node()"/>
+ </Module>
+ </xsl:template>
+</xsl:stylesheet>
+}
+
+/// Extracts Name and Version from a Studio document export and prints them one per line.
+XData MetadataExtractionTransform
+{
+<xsl:stylesheet version="1.0"
+ xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+ <xsl:output method="text"/>
+ <xsl:strip-space elements="*"/>
+ <xsl:template match="/Export/Document/Module">
+  <xsl:value-of select="Name" />
+  <!-- this prints a newline. -->
+  <xsl:text>&#10;</xsl:text>
+  <xsl:value-of select="Version" />
+ </xsl:template>
+</xsl:stylesheet>
 }
 
 ClassMethod ScanDirectory(pRoot As %String, ByRef pFilenameList, pSub As %String = "", pDepth As %Integer = "", pVerbose As %Boolean = 0, Output pMaxDepth As %Integer = 0) As %Status [ Internal ]

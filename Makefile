@@ -1,15 +1,15 @@
 
-VERSION?=$(shell cat .version)
+VERSION?=$(shell sed -n 's|^ *<Version>\(.*\)</Version> *|\1|p' module.xml)
 NAME?=zpm
 FULLNAME=$(NAME)-$(VERSION)
 
 IMAGE?=$(NAME):$(VERSION)
-BASE?=intersystems/iris:2019.3.0.302.0
+BASE?=store/intersystems/iris-community:2020.4.0.547.0
 
-build:
+build: clean
 	docker build -t $(IMAGE) .
 
-release: clean build
+release: build
 	echo release $(FULLNAME)
 	echo image $(IMAGE)
 	docker run --rm -it -v `pwd`/scripts:/opt/scripts -v `pwd`/out:/opt/out -w /opt/out --entrypoint /opt/scripts/make-release.sh $(IMAGE) $(FULLNAME).xml $(VERSION)
