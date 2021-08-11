@@ -14,10 +14,10 @@ Parameter trackingId = "analytics_tracking_id";
 
 Parameter analytics = "analytics_available";
 
-/// Possible values: dark, white, none
+/// Possible values: yes, none
 Parameter ColorScheme = "ColorScheme";
 
-/// Possible values: green, red, violet, blue, yellow, none
+/// Possible values: green, red, magenta, blue, yellow, cyan, none
 Parameter TerminalPrompt = "TerminalPrompt";
 
 Parameter PublishTimeout = "publish_timeout";

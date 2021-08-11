@@ -1,8 +1,9 @@
 ROUTINE %ZPM.Formatting [Type=INC]
 #; Contains utility macros for formatting lines printed to Terminal
 
+#define ColorScheme $Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("ColorScheme"),"none":0,:1)
 /// Returns a line with given formatting, clearing the formatting at the end of the line
-#define FormattedLine(%formatCode, %line) $$$ControlSequence(%formatCode)_%line_$$$ControlSequence($$$ResetAll)
+#define FormattedLine(%formatCode, %line) $Select($$$ColorScheme:$$$ControlSequence(%formatCode)_%line_$$$ControlSequence($$$ResetAll),1:%line)
 
 /// Creates the control sequence for the formatting based on the code
 #define ControlSequence(%code) $Char(27)_"["_%code_"m"
