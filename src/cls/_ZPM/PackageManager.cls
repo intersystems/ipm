@@ -459,12 +459,17 @@ ClassMethod Shell(pCommand As %String, pTerminateOnError As %Boolean = 0, pHaltO
 	Quit tSC
 }
 
+ClassMethod TerminalPromptColor() As %String
+{
+	quit $Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("TerminalPrompt"),"green":$$$Green,"red":$$$Red,"magenta":$$$Magenta,"yellow":$$$Yellow,"blue":$$$Blue,"cyan":$$$Cyan,"none":$$$Default,:$$$Default)
+}
+
 ClassMethod TerminalPrompt() As %String
 {
 	set tp=##class(%SYSTEM.Process).TerminalPrompt()
 	set prompt="zpm:"
-	set del=$Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("TerminalPrompt"),"green":$$$FormattedLine($$$Green,">"),"red":$$$FormattedLine($$$Red,">"),"magenta":$$$FormattedLine($$$Magenta,">"),"yellow":$$$FormattedLine($$$Yellow,">"),"blue":$$$FormattedLine($$$Blue,">"),"cyan":$$$FormattedLine($$$Cyan,">"),"none":"",:">")
-	if del="" set tp=2,del=">"
+	set del=$$$FormattedLine(..TerminalPromptColor(),">")
+	if ..TerminalPromptColor()=$$$Default set tp=2
 	for i=1:1:$l(tp,",") {
 		if $p(tp,",",i)=1 {	set prompt=prompt_$p($system,":")_del continue}
 		elseif $p(tp,",",i)=2 {	set prompt=prompt_$namespace_del continue}
@@ -497,7 +502,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			// Have intro message just for first entrance to shell
 			// Ensure not displayed if its just one command
 			If 'tInShell && 'tOneCommand {
-				Do ..DrawBorder(introMessageList, $$$Red)
+				Do ..DrawBorder(introMessageList, ..TerminalPromptColor())
 				Set tInShell = 1
 			}
 			
