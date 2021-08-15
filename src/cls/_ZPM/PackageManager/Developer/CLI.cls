@@ -237,14 +237,14 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 	If pMarkdownFormat {
 		Write "h2. "
 	}
-	Write $$$EscapeOrFormat(pCommandName, $$$Red)
+	Write $$$EscapeOrFormat(pCommandName, ##class(%ZPM.PackageManager).TerminalPromptColor())
 	
 	If pMarkdownFormat {
 		Write !, "Syntax: {{", pCommandName
 	}
 	
 	If $Data(pCommandStruct("modifiers")) && '$Get(pCommandStruct("trailingModifiers"),0) {
-		Write $$$EscapeOrFormat(" [flags]", $$$Red)
+		Write $$$EscapeOrFormat(" [flags]", ##class(%ZPM.PackageManager).TerminalPromptColor())
 	}
 	
 	If $Data(pCommandStruct("parameters")) {
@@ -260,19 +260,19 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 			Write " "
 			// Non-required parameters are surrounded with [] brackets
 			If 'pCommandStruct("parameters", tParamName, "required") {
-				Write $$$EscapeOrFormat("[", $$$Red)
+				Write $$$EscapeOrFormat("[", ##class(%ZPM.PackageManager).TerminalPromptColor())
 				Set tEndingBrackets = tEndingBrackets + 1
 			}
-			Write $$$EscapeOrFormat("<"_tParamName_">", $$$Red)
+			Write $$$EscapeOrFormat("<"_tParamName_">", ##class(%ZPM.PackageManager).TerminalPromptColor())
 		}
 		
 		For i=1:1:tEndingBrackets {
-			Write $$$EscapeOrFormat("]", $$$Red)
+			Write $$$EscapeOrFormat("]", ##class(%ZPM.PackageManager).TerminalPromptColor())
 		}
 	}
 	
 	If $Data(pCommandStruct("modifiers")) && $Get(pCommandStruct("trailingModifiers"),0) {
-		Write $$$EscapeOrFormat(" [flags]", $$$Red)
+		Write $$$EscapeOrFormat(" [flags]", ##class(%ZPM.PackageManager).TerminalPromptColor())
 	}
 	
 	If pMarkdownFormat {
@@ -1095,3 +1095,4 @@ ClassMethod FormatName(pName As %String) As %String
 }
 
 }
+
