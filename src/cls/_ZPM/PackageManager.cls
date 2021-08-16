@@ -476,9 +476,9 @@ ClassMethod TerminalPrompt() As %String
 		elseif $p(tp,",",i)=3 {	set prompt=prompt_$p($system,":",2)_del continue}
 		elseif $p(tp,",",i)=4 {	set prompt=prompt_$zt(+$p($h,",",2),1)_del continue}
 		elseif $p(tp,",",i)=5 {	set prompt=prompt_$job_del continue}
-		elseif $p(tp,",",i)=6 {	set prompt=prompt_$username_del continue}
-		;i think for zapm shell 7 and 8 do not need to be implemented
-	}
+        elseif $p(tp,",",i)=8,$tl { set prompt=prompt_"TL"_$tl_del continue}
+        ;for zpm shell 7 do not need to be implemented	
+    }
 	quit prompt
 }
 
