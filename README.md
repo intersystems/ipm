@@ -2,7 +2,13 @@
 
 [![Gitter](https://img.shields.io/badge/chat-on%20telegram-blue.svg)](https://t.me/joinchat/FoZ4Mw58zQJwtbLzQrty3Q)
 
-Helps to install ObjectScript, CSP and Frontend packages into InterSystems IRIS published on [ZPM Registry](https://pm.community.intersystems.com/packages/-/all)
+Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and Frontend packages, and any files into InterSystems IRIS published on the official [ZPM Registry](https://pm.community.intersystems.com/packages/-/all) or private ZPM registry of your own.
+
+## Documentation
+[The official documenation in the wiki](https://github.com/intersystems-community/zpm/wiki/03.-Module.xml)
+[Articles on the InterSystems Developer Community](https://community.intersystems.com/tags/objectscript-package-manager-zpm)
+[Videos on YouTube](https://www.youtube.com/playlist?list=PLKb2cBVphNQRcmxt4LtYDyLJEPfF4X4-4)
+
 
 ## Installing ObjectScript Package Manager Client:
 
@@ -49,6 +55,7 @@ This is described in the [following set of articles](https://community.intersyst
 
 The simplest and template repository [can be found here](https://openexchange.intersystems.com/package/objectscript-package-example).
 Here is the [alternative supported folder structure.](https://openexchange.intersystems.com/package/objectscript-package-template)
+
 
 
 ## Support and Collaboration
