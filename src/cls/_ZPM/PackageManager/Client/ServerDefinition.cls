@@ -1,6 +1,6 @@
 Include (%syPrompt, %ZPM.PackageManager.Common)
 
-Class %ZPM.PackageManager.Client.ServerDefinition Extends (%Persistent, %ZEN.DataModel.Adaptor) [ Abstract ]
+Class %ZPM.PackageManager.Client.ServerDefinition Extends (%Persistent, %ZEN.DataModel.Adaptor, %ZPM.PackageManager.Developer.CLICommands) [ Abstract ]
 {
 
 Parameter DOMAIN = "ZPM";
@@ -10,6 +10,8 @@ Parameter DISPLAYNAME As STRING [ Abstract ];
 
 /// Short/logical name for this type of repository, used in the package manager shell as an alternative to the full class name.
 Parameter MONIKER As STRING [ Abstract ];
+
+Parameter MONIKERALIAS As STRING [ Abstract ];
 
 Index ServerDefinitionKey On Name [ Unique ];
 
@@ -22,6 +24,36 @@ Property Details As %String(MAXLEN = "") [ SqlComputeCode = {Set {*} = ""}, SqlC
 Property Snapshots As %Boolean [ InitialExpression = 0 ];
 
 Property Prereleases As %Boolean [ InitialExpression = 0 ];
+
+ClassMethod %GetCommandStructure(Output pCommandStructure)
+{
+  Kill pCommandStructure
+  Set tRes = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
+  While tRes.%Next(.tSC) {
+    Do $ClassMethod(tRes.Name, "%GetOneCommandStructure", .tCommandStructure)
+    Merge pCommandStructure("repo") = tCommandStructure("repo")
+  }
+}
+
+ClassMethod CollectServerTypes(Output types) As %Status
+{
+  Set rs = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
+
+  While rs.%Next() {
+    Set name = rs.Name
+    Set moniker = $Parameter(name, "MONIKER")
+    Continue:moniker=""
+    Set types(moniker) = name
+    
+    Set aliasList = $ListFromString($Parameter(name, "MONIKERALIAS"))
+    Set ptr = 0
+    While $ListNext(aliasList, ptr, alias) {
+      Merge types(alias) = types(moniker)
+    }
+  }
+  
+  Return $$$OK
+}
 
 /// Boolean flag indicating that modules installed from this repository
 /// are ALWAYS installed in non-developer mode.
@@ -168,6 +200,12 @@ ClassMethod CatalogFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtE
 ClassMethod CatalogClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = CatalogExecute ]
 {
 	Quit $$$OK
+}
+
+Query List() As %SQLQuery
+{
+SELECT Name FROM ServerDefinition
+ORDER BY ServerDefinition_SortOrder(ID) DESC
 }
 
 Storage Default

@@ -3,7 +3,9 @@ Class %ZPM.PackageManager.Client.FilesystemServerDefinition Extends %ZPM.Package
 
 Parameter DISPLAYNAME As STRING = "Filesystem";
 
-Parameter MONIKER As STRING = "file";
+Parameter MONIKER As STRING = "filesystem";
+
+Parameter MONIKERALIAS As STRING = "f,fs";
 
 Index RootIndex On Root [ Unique ];
 
@@ -17,6 +19,25 @@ Property Depth As %Integer [ InitialExpression = 0, Required ];
 
 /// Prompt to use for Root in interactive configuration of this repository type
 Parameter RootPromptString = {$$$Text("Root File Path:","ZPM")};
+
+XData Commands
+{
+<commands>
+<command name="repo">
+<group name="Filesystem repository">
+
+<modifier name="filesystem" aliases="f,fs" description="Create/update a filesystem repository" />
+<modifier name="depth" aliases="d" value="true" description="For filesystem repositories, specifies the depth (number of folders underneath the root) to search for files named module.xml" />
+<modifier name="path" aliases="p" value="true" description="For filesystem repositories, specifies the path to the root directory" />
+
+<example description="Create a repository pointing to the filesystem with name LocalFiles, accepting snapshots, looking for files named module.xml up to 2 directories deep in C:\MyWorkspace\RootModuleDir\">
+repo -name LocalFiles -snapshots 1 -fs -depth 2 -path C:\MyWorkspace\RootModuleDir\
+</example>
+
+</group>
+</command>
+</commands>
+}
 
 Method RootSet(%val) As %Status
 {
