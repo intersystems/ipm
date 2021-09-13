@@ -429,10 +429,12 @@ Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 		Set ..OverrideName = ..OverrideNameGet()
 		
 		// Normalize resource extension for server resources - should always be upper case.
-		If ($Extract(..Name) '= "/") {
-			Set tExt = $Piece(..Name,".",*)
-			Set ..Name = $Piece(..Name,".",1,*-1)_"."_$ZConvert($Piece(..Name,".",*),"U")
-		}
+    If (..ProcessorClass '= "FileCopy") { 
+      If ($Extract(..Name) '= "/") {
+        Set tExt = $Piece(..Name,".",*)
+        Set ..Name = $Piece(..Name,".",1,*-1)_"."_$ZConvert($Piece(..Name,".",*),"U")
+      }
+    }
 		
 		// See if resource already exists as part of a different module.
 		If ..NonNullResourceNameExists(..UniqueName,.tExistingID) && (tExistingID '= ..%Id()) {
