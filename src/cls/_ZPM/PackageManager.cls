@@ -150,12 +150,6 @@ repo -list
 <example description="Delete all repositories">
 repo -delete-all
 </example>
-<example description="Create a repository pointing to the filesystem with name LocalFiles, accepting snapshots, looking for files named module.xml up to 2 directories deep in C:\MyWorkspace\RootModuleDir\">
-repo -name LocalFiles -snapshots 1 -fs -depth 2 -path C:\MyWorkspace\RootModuleDir\
-</example>
-<example description="Create a repository pointing to the perforce depot with name AppModules, marking the repository as read-only, looking for files named module.xml at all levels under the depot path //healthshare/appmodules/">
-repo -name AppModules -read-only 1 -p4 -path //healthshare/appmodules/
-</example>
 <example description="Delete the repository named &quot;LocalFiles&quot;">
 repo -n LocalFiles -delete
 </example>
@@ -163,20 +157,9 @@ repo -n LocalFiles -delete
 repo -n AppModules -list-modules
 </example>
 
-<example description="Switch to test registery">
-repo -r -n registry -url https://test.pm.community.intersystems.com/registry/ -user "test" -pass "test"
-</example>
-
-<example description="Reset to default registry (pm.community.intersystems.com) and it is equivalent to a command">
-repo -r -n registry -reset-defaults
-</example>
-<example description=" ">
-repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass ""
-</example>
-
 <!-- Universal Actions -->
-<modifier name="delete-all" description="Deletes all repositories (possibly subject to a type filter: -f, -r, -l, -p4)" />
-<modifier name="list" description="Lists all repositories (possibly subject to a type filter: -f, -r, -l, -p4)" />
+<modifier name="delete-all" description="Deletes all repositories (possibly subject to a type filter: -f, -r, ...)" />
+<modifier name="list" description="Lists all repositories (possibly subject to a type filter: -f, -r, ...)" />
 <modifier name="list-modules" aliases="modules,listmodules" description="List modules available in the specified repository (-n\[ame]), or in all configured repositories if no repository was specified." />
 
 <!-- General/shared modifiers -->
@@ -189,33 +172,8 @@ repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass "
 <modifier name="prereleases" aliases="pre" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for prerelease software" />
 <modifier name="read-only" aliases="ro" value="true" valueList="0,1" description="For any repository, specifies that modules installed from it are ALWAYS installed in non-developer mode, effectively making them read only" />
 
-<!-- Repository types  -->
-<modifier name="filesystem" aliases="f,fs" description="Create/update a filesystem repository" />
-<modifier name="remote" aliases="r" description="Create/update a remote server repository" />
-<modifier name="local" aliases="l" description="Create/update the local namespace cache" />
-<modifier name="perforce" aliases="p4" description="Create/update a Perforce workspace repository" />
 <modifier name="type" value="true" aliases="t" description="Subclass of %ZPM.PackageManager.Client.ServerDefinition to create/modify/delete or implementation of %ZPM.PackageManager.Core.IPackageService or %ZPM.PackageManager.Core.IPublishService to enable/disable" />
 
-<!-- File repository modifiers -->
-<modifier name="depth" aliases="d" value="true" description="For filesystem repositories, specifies the depth (number of folders underneath the root) to search for files named module.xml" />
-<modifier name="path" aliases="p" value="true" description="For filesystem repositories, specifies the path to the root directory" />
-
-<!-- Perforce repository modifier -->
-<modifier name="spec" value="true" description="A Perforce file specification (e.g., @changelist or @label) at which modules will be discovered and at which files will be synced. Default is #head." />
-<modifier name="shelves" value="true" description="A comma-separated list of Perforce shelved changelists to unshelve into the workspace before building the repository." />
-<modifier name="force-update" aliases="force" description="For Perforce repositories, indicates that the repository should be updated even if no changes have been submitted since the last time it was updated." />
-<modifier name="recurse" value="true" description="Recurse in branches that contain modules (by default, this option is not selected)" />
-
-<!-- Remote repository modifiers -->
-<modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
-<modifier name="publish-url" value="true" description="For remote repositories, specifies the URL for package publishing web services."/>
-<modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
-<modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
-<modifier name="reset-defaults" value="false" description="Reset to default repository" />
-<modifier name="sslconfig" aliases="ssl" value="true" description="For remote repositories, specifies the SSL configuration name to use when connecting." />
-
-<!-- Modifiers specific to -enable -->
-<modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
 </command>
 
 <command name="load" dataPrefix="D">
@@ -440,6 +398,14 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <parameter name="name" description="Name namespace, * or context name*" />
 </command>
 </commands>
+}
+
+ClassMethod %GetCommandStructure(Output pCommandStructure)
+{
+  Do ..%GetOneCommandStructure(.pCommandStructure)
+
+  Do ##class(%ZPM.PackageManager.Client.ServerDefinition).%GetCommandStructure(.tCommandStructure)
+  Merge pCommandStructure("repo") = tCommandStructure("repo")
 }
 
 /// @API.Method
@@ -1257,51 +1223,40 @@ ClassMethod Config(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
-	Set tFileSystem = $$$HasModifier(pCommandInfo,"filesystem")
-	Set tRemote = $$$HasModifier(pCommandInfo,"remote")
-	Set tLocal = $$$HasModifier(pCommandInfo,"local")
-	Set tPerforce = $$$HasModifier(pCommandInfo,"perforce")
-	
+  Do ##class(%ZPM.PackageManager.Client.ServerDefinition).CollectServerTypes(.types)
+
+  Set tType = $$$GetModifier(pCommandInfo, "type")
+
+  Set serverClassList = ""
+  Set t = ""
+  For {
+    Set t = $order(types(t), 1, className)
+    Quit:(t = "")
+    If ('($$$HasModifier(pCommandInfo, t)) && (t '= tType)) {
+      Kill types(t)
+    } 
+    ElseIf '$Listfind(serverClassList, className) {
+      Set serverClassList = serverClassList _ $ListBuild(className)
+    }
+  }
+
 	If $$$HasModifier(pCommandInfo,"list") && '$$$HasModifier(pCommandInfo,"list-modules") {
-		Set tUseFilter = ((tFileSystem + tRemote + tLocal + tPerforce) > 0)
-		// Construct array of subclasses of %ZPM.PackageManager.Client.ServerDefinition to filter by
-		#dim tFilterArray
-		If tUseFilter {
-			If tPerforce {
-				Set tFilterArray("%ZPM.PackageManager.Client.P4Workspace") = ""
-			}
-			If tFileSystem {
-				Set tFilterArray("%ZPM.PackageManager.Client.FilesystemServerDefinition") = ""
-			}
-			If tRemote {
-				Set tFilterArray("%ZPM.PackageManager.Client.RemoteServerDefinition") = ""
-			}
-			If tLocal {
-				Set tFilterArray("%ZPM.PackageManager.Client.LocalServerDefinition") = ""
-			}
-		}
-		Set tableName = $$$comClassKeyGet("%ZPM.PackageManager.Client.ServerDefinition",$$$cCLASSsqlqualifiednameQ)
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-			"select Name "_
-			"from "_tableName_" "_
-			"order by "_tableName_"_SortOrder(ID) desc")
-		If (tRes.%SQLCODE < 0) {
-			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-		}
+		Set tUseFilter = $Data(types)\10
+    Set tRes = ##class(%ZPM.PackageManager.Client.ServerDefinition).ListFunc()
+    $$$ThrowSQLIfError(tRes.%SQLCODE,tRes.%Message)
 		Set tDisplayCount = 0
 		Write !
-		While tRes.%Next(.tSC) {
+    While tRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			
-			#dim tDefn As %ZPM.PackageManager.Client.ServerDefinition
+
 			Set tRepository = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
 			$$$ThrowOnError(tSC)
-			If 'tUseFilter || (tUseFilter && $Data(tFilterArray($Classname(tRepository)))#2) {
-				Do $Increment(tDisplayCount)
+			If serverClassList = "" || ($ListFind(serverClassList, $Classname(tRepository))) {
 				Do tRepository.Display()
 				Write !
+				Set tDisplayCount = tDisplayCount + 1 
 			}
-		}
+    }
 		$$$ThrowOnError(tSC)
 		If (tDisplayCount = 0) {
 			Write "No repositories found.", !
@@ -1311,23 +1266,15 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
     Do ..Search(.pCommandInfo)
 		Quit
 	} ElseIf $$$HasModifier(pCommandInfo,"delete-all") {
-		If ((tPerforce + tFileSystem + tLocal + tRemote) = 0) {
-			// If none provided, delete all
+    If (serverClassList = "") {
 			$$$ThrowOnError(##class(%ZPM.PackageManager.Client.ServerDefinition).%DeleteExtent())
-		} Else {
-			If tPerforce {
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Client.P4Workspace).%DeleteExtent())
-			}
-			If tFileSystem {
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Client.FilesystemServerDefinition).%DeleteExtent())
-			}
-			If tLocal {
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Client.LocalServerDefinition).%DeleteExtent())
-			}
-			If tRemote {
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Client.RemoteServerDefinition).%DeleteExtent())
-			}
-		}
+    }
+    Else {
+      Set ptr = 0
+      While $ListNext(serverClassList, ptr, className) {
+        $$$ThrowOnError($ClassMethod(className, "%DeleteExtent"))
+      }
+    }
 	} ElseIf $$$HasModifier(pCommandInfo,"delete") {
 		Set repoName = $$$GetModifier(pCommandInfo,"name")
 		If (repoName = "") {
@@ -1338,12 +1285,14 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		}
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyDelete(repoName))
   } Elseif $$$HasModifier(pCommandInfo,"reset-defaults") {
-    Set tName = $$$GetModifier(pCommandInfo,"name")
-    If ((tRemote'=1)||(tName="")) {
-        Write "Specify type (-remote) and repository name (-name registry)"
-        Quit
-    }
     Merge tModifiers = pCommandInfo("modifiers")
+    Set tName = $$$GetModifier(pCommandInfo,"name")
+    If (tName = "") {
+      Set tName = "registry"
+      Set tModifiers("name") = tName
+    }
+    Set tModifiers("remote") = ""
+
     Set tModifiers("url") = ##class(%ZPM.PackageManager.Client.Settings).GetDefaultRegistry()
     If (tModifiers("url")="") {
         Write "Error retrieving default registry URL"
@@ -1354,7 +1303,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
     $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
 	} Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
-		Set tType = $$$GetModifier(pCommandInfo,"type")
+		Set tType = $ListGet(serverClassList)
 		
 		#dim tRepoTypeResult As %SQL.StatementResult
 		Set tStatement = ##class(%SQL.Statement).%New()
@@ -1372,29 +1321,18 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		}
 		$$$ThrowOnError(tSC)
 	
-		If (tType = "") {
-			Set tType = $Select(
-				tFileSystem:"%ZPM.PackageManager.Client.FilesystemServerDefinition",
-				tRemote:"%ZPM.PackageManager.Client.RemoteServerDefinition",
-				tPerforce:"%ZPM.PackageManager.Client.P4Workspace",
-				tLocal:"%ZPM.PackageManager.Client.LocalServerDefinition",
-				1:"")
-			
-			If (tType = "") {
-				Set tResponse = ##class(%Library.Prompt).GetMenu("Which sort of repository do you wish to configure?",.tDescIndex,.tDescList,,$$$InitialDisplayMask)
-				If (tResponse '= $$$SuccessResponse) {
-					$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-				}
-			
-				If (tDescIndex = "") {
-					$$$ThrowStatus($$$ERROR($$$GeneralError,"A repository type must be specified."))
-				}
-				
-				Set tType = tClassList(tDescIndex)
-			}
-		} ElseIf $Data(tMonikers($ZConvert(tType,"L")),tClassName) {
-			Set tType = tClassName
-		}
+    If (tType = "") {
+      Set tResponse = ##class(%Library.Prompt).GetMenu("Which sort of repository do you wish to configure?",.tDescIndex,.tDescList,,$$$InitialDisplayMask)
+      If (tResponse '= $$$SuccessResponse) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+      }
+    
+      If (tDescIndex = "") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"A repository type must be specified."))
+      }
+      
+      Set tType = tClassList(tDescIndex)
+    }
 		
 		Set tBaseClass = "%ZPM.PackageManager.Client.ServerDefinition"
 		If '$ClassMethod(tType,"%Extends",tBaseClass) {
@@ -2387,4 +2325,3 @@ ClassMethod ShellScript(pCommand As %String, pOutputLogFile As %String = "", pAp
 }
 
 }
-
