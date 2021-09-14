@@ -463,7 +463,7 @@ ClassMethod TerminalPrompt() As %String
 {
 	set tp=##class(%SYSTEM.Process).TerminalPrompt()
 	set prompt="zpm:"
-	set del=$Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("TerminalPrompt"),"green":$$$escGreen(">"),"red":$$$escRed(">"),"violet":$$$escViolet(">"),"yellow":$$$escYellow(">"),"blue":$$$escBlue(">"),"none":"",:">")
+	set del=$Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("TerminalPrompt"),"green":$$$FormattedLine($$$Green,">"),"red":$$$FormattedLine($$$Red,">"),"violet":$$$FormattedLine($$$Magenta,">"),"yellow":$$$FormattedLine($$$Yellow,">"),"blue":$$$FormattedLine($$$Blue,">"),"none":"",:">")
 	if del="" set tp=2,del=">"
 	for i=1:1:$l(tp,",") {
 		if $p(tp,",",i)=1 {	set prompt=prompt_$p($system,":")_del continue}
@@ -631,19 +631,19 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 					For { set module=$Order(list(module)) Quit:module=""
 						Write !
 						,$Select('write:num_".",1:$j("",$L(num)+1))
-						,$$$escDefault(ns)_">"_$j("",namespace-$l(ns_">"))
-						," "_$$$escGreen(module)_$j("",list-$l(module))
+						,(ns)_">"_$j("",namespace-$l(ns_">"))
+						," "_$$$FormattedLine($$$Green,module)_$j("",list-$l(module))
 						," "_$LG(list(module),1)
 						If tDesc {
 							Write !?(4+$L(ns_">"_$Justify("",namespace-$Length(ns_">"))))
-							Do ..DrawColumn($$$escYellow("Description: ")_" "_$Listget(list(module),2))
+							Do ..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_" "_$Listget(list(module),2))
 						}
 						Set write=1
 					}
 				} Else {
 					Write !
 					,num_"."
-					,$$$escViolet(ns)_">"_$Justify("",namespace-$Length(ns_">"))
+					,$$$FormattedLine($$$Magenta,ns)_">"_$Justify("",namespace-$Length(ns_">"))
 					
 				}
 			}
@@ -832,7 +832,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 
 	Do ..GetListModules("zpm",.list)
 	If $Data(list("zpm")) {
-			Write !,$$$escDefault($namespace)_"> "_$$$escGreen("zpm ")_$ListGet(list("zpm"),1)
+			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,"zpm ")_$ListGet(list("zpm"),1)
 	}
 	Set ns=""
 	For { Set ns=$Order(namespace(ns)) Quit:ns=""
@@ -841,7 +841,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 			Set $namespace=ns
 			Do ..GetListModules("zpm",.list)
 			If $Data(list("zpm-registry")) {
-				Write !,$$$escDefault(ns)_"> "_$$$escGreen("zpm-registry ")_$ListGet(list("zpm-registry"),1)
+				Write !,(ns)_"> "_$$$FormattedLine($$$Green,"zpm-registry ")_$ListGet(list("zpm-registry"),1)
 				Set Found=ns
 				Do ..GetDefaultCommandRegistry()
 			}
@@ -862,7 +862,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowOnError(tSC)
 		Set tService = tRepository.GetPackageService()
 		Set tInfo = tService.GetInfo()
-		Write !,$$$escBlue(tRepository.URL)," - ",tInfo.version
+		Write !,$$$FormattedLine($$$Blue,tRepository.URL)," - ",tInfo.version
 	}
 	q $$$OK
 }
@@ -1431,16 +1431,16 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	For { 
 		Set name = $Order(@$$$gn@(name)) 
 		Quit:name=""
-		Write !,$$$escGreen(name)
+		Write !,$$$FormattedLine($$$Green,name)
 		Write ?(maxlenname+1), $Listget(@$$$gn@(name),1)
 		If ( ($Listget(@$$$gn@(name),3)'="") && (pShowDesc=1) ) {
-			Write ?(maxlenname+7),..DrawColumn($$$escYellow("Description: ")_$Listget(@$$$gn@(name),3))
+			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_$Listget(@$$$gn@(name),3))
 		}
 		If ( ($Listget(@$$$gn@(name),3)'="") && ($Listget(@$$$gn@(name),2)'="") && (pShowDesc=1) && (pShowRepo=1) ) {
 			Write !
 		}
 		If ( ($Listget(@$$$gn@(name),2)'="") && (pShowRepo=1) ) {
-			Write ?(maxlenname+7),$$$escBlue("Repository: "_$Listget(@$$$gn@(name),2))
+			Write ?(maxlenname+7),$$$FormattedLine($$$Blue,"Repository: "_$Listget(@$$$gn@(name),2))
 		}	
 	}
 }
@@ -1455,6 +1455,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 	set slash=$s($zversion(1)=3:"/",1:"\")
 	set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($zu(86))_"mgr"_slash_"Temp"_slash_$tr($zts,".,")_slash)
 	$$$ThrowOnError(##class(%File).CreateDirectoryChain(TempDir))
+	set:$Extract(tDirectoryName,*)="/" tDirectoryName=$Extract(tDirectoryName,1,*-1)
 	set RepoName=$p($p($p(tDirectoryName,"/",*),".git")," ")
 	set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
 	if $Get(tParams("zpm","Branch"))'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
@@ -1827,21 +1828,21 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		Set tMod = ""
 		For { Set tMod = $Order(tModMap(tMod),1,tVersion)
 			Quit:(tMod="")
-			Write !,$$$escGreen(tMod)," ",tVersion_" "
+			Write !,$$$FormattedLine($$$Green,tMod)," ",tVersion_" "
 			If tDesc,$Data(tModMap(tMod,"L"),Lock) {
 				Set maxlenname=$L(tMod_" "_tVersion_" ")
-				Do ..DrawColumn($$$escYellow("Description: ")_$ListGet(Lock,2))
+				Do ..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_$ListGet(Lock,2))
 				Set au=3 
 				For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" { 
 					Set au=au+1
 					set audata=$ListGet(Lock,au)
 					Write:audata'="" !
 					,?(maxlenname)
-					,..DrawColumn($$$escViolet(a_": ")_audata)
+					,..DrawColumn($$$FormattedLine($$$Magenta,a_": ")_audata)
 				}
 				Write !
 					,?(maxlenname)
-					,..DrawColumn($$$escViolet("Root: ")_$ListGet(Lock,3))
+					,..DrawColumn($$$FormattedLine($$$Magenta,"Root: ")_$ListGet(Lock,3))
 				if $Data(tModMap(tMod,"R"),Rem) {
 					write !,$ListGet(Rem,3)
 				}
@@ -2027,7 +2028,7 @@ ClassMethod PrintTree(ByRef pTree)
 			Set $Extract(tFrontPadding,*) = $c($zh("252CH"))
 		}
 		
-		Write tFrontPadding,$$$escGreen($p(tValue," ",1))," ",$p(tValue," ",2),!
+		Write tFrontPadding,$$$FormattedLine($$$Green,$p(tValue," ",1))," ",$p(tValue," ",2),!
 		
 		If (tNextSibling '= "") {
 			Set tPadding(tNextSibling) = $Get(tPadding(i))
@@ -2381,3 +2382,4 @@ ClassMethod ShellScript(pCommand As %String, pOutputLogFile As %String = "", pAp
 }
 
 }
+
