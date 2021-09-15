@@ -1748,9 +1748,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
 			"select ""Module""->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
 			"from %ZPM_PackageManager_Developer.Module_Dependencies")
-		If (tDepRes.%SQLCODE < 0) {
-			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-		}
+    $$$ThrowSQLIfError(tDepRes.%SQLCODE, tDepRes.%Message)
 		While tDepRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
 			Set tModMap(tDepRes.%Get("ModName"),tDepRes.%Get("DepName")) = tDepRes.%Get("DepVer")
