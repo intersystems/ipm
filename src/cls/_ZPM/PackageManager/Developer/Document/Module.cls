@@ -487,7 +487,7 @@ XData InternalXSL
       <xsl:with-param name="name" select="'SourcePath'" />
     </xsl:call-template>
   </xsl:template>
-  <xsl:template match="Module/*[@Url and not(@SourcePath) and not(@Path)] ">
+  <xsl:template match="Module/*[@Url and not(@SourcePath) and not(@Path) and not(@Name)]">
     <xsl:call-template name="resource">
       <xsl:with-param name="name" select="'Url'" />
     </xsl:call-template>
