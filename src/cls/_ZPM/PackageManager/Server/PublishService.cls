@@ -12,11 +12,8 @@ Parameter USECLASSNAMESPACES = 1;
 
 Method PublishModule(pModule As %ZPM.PackageManager.Core.Module) As %Boolean [ WebMethod ]
 {
-	If (pModule.Version.Build = "snapshot") {
-		// Allow update of snapshot versions with the same full version string.
-		Set tModule = ##class(%ZPM.PackageManager.Server.Module).NameVersionOpen(pModule.Name,pModule.VersionString)
-	}
-	If '$IsObject($Get(tModule)) {
+	Set tModule = ##class(%ZPM.PackageManager.Server.Module).NameVersionOpen(pModule.Name,pModule.VersionString)
+	If '$IsObject(tModule) {
 		Set tModule = ##class(%ZPM.PackageManager.Server.Module).%New()
 	}
 	Set tModule.Name = pModule.Name
@@ -30,11 +27,8 @@ Method PublishModule(pModule As %ZPM.PackageManager.Core.Module) As %Boolean [ W
 
 Method PublishApplication(pApplication As %ZPM.PackageManager.Core.Application) As %Boolean [ WebMethod ]
 {
-	If (pApplication.Version.Build = "snapshot") {
-		// Allow update of snapshot versions with the same full version string.
-		Set tApplication = ##class(%ZPM.PackageManager.Server.Application).NameVersionOpen(pApplication.Name,pApplication.VersionString)
-	}
-	If '$IsObject($Get(tApplication)) {
+	Set tApplication = ##class(%ZPM.PackageManager.Server.Application).NameVersionOpen(pApplication.Name,pApplication.VersionString)
+	If '$IsObject(tApplication) {
 		Set tApplication = ##class(%ZPM.PackageManager.Server.Application).%New()
 	}
 	Set tApplication.Name = pApplication.Name

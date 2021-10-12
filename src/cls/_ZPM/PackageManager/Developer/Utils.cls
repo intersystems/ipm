@@ -309,7 +309,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			Set tAsArchive = -1
 			Set tPayload = tClient.GetModule(tModRef, .tAsArchive)
 			If (tVerbose) {
-				Write !,"Module "_pModuleName_" was downloaded from " _ pServerName _ " " _ tClient.Location
+				Set serverDef = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pServerName)
+				Write !,"Module "_pModuleName_" was downloaded from " _ pServerName
+				If $IsObject(serverDef) {
+					Write " (",serverDef.Details,")"
+				}
 			}
 			Set tFileName = ""
 			If ($ISOBJECT(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
