@@ -72,6 +72,8 @@ Property DeveloperMode As %Boolean(ForceCodeGenerate = 0, XMLPROJECTION = "NONE"
 /// Default settings - there may be serveral types of these (subclasses of ModuleSetting).
 Property Defaults As list Of %ZPM.PackageManager.Developer.ModuleSetting(CLASSNAME = 1, STORAGEDEFAULT = "array", XMLNAME = "Defaults", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE", XMLTYPECONSTRAINT = "SUBSTITUTIONGROUP");
 
+Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
+
 Method NameSet(val As %RawString) As %Status
 {
 	Set i%Name = $$$lcase(val)
@@ -96,6 +98,13 @@ ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 		Set tSC = ex.AsStatus()
 	}
 	Return tSC
+}
+
+Method WriteAfterInstallMessage()
+{
+	If ..AfterInstallMessage '= "" {
+		Write !,..%Evaluate(..AfterInstallMessage),!
+	}
 }
 
 /// Calls <method>%CompareTo</method> on this object and also calls it on any relationships in the class
@@ -1383,6 +1392,7 @@ Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
 	Set tCSPDir = ##class(%File).NormalizeDirectory("csp", tInstallDir)
   Set tLibDir = ##class(%File).NormalizeDirectory("lib", tInstallDir)
   Set tVerbose = +$Get(pParams("Verbose"))
+  Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
 
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "namespace", $Namespace)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "ns",        $Namespace)
@@ -1392,6 +1402,7 @@ Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "bindir",    tBinDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "libdir",    tLibDir)
 	Set tAttrValue = ..%RegExReplace(tAttrValue, "verbose",   tVerbose)
+	Set tAttrValue = ..%RegExReplace(tAttrValue, "webroot",   urlRoot)
 
   Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", tAttrValue)
   While regex.Locate() {
@@ -1486,6 +1497,9 @@ Storage Default
 <Value name="20">
 <Value>DeveloperMode</Value>
 </Value>
+<Value name="21">
+<Value>AfterInstallMessage</Value>
+</Value>
 </Data>
 <DataLocation>^ZPM.Dev.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
@@ -1496,3 +1510,4 @@ Storage Default
 }
 
 }
+

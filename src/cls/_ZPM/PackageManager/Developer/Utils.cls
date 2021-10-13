@@ -1051,6 +1051,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			TCOMMIT
 		}
 		$$$ThrowOnError(tSC)
+		Do tModule.WriteAfterInstallMessage()
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -1798,3 +1799,4 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 }
 
 }
+
