@@ -12,13 +12,14 @@ on:
 env:
   PREVIOUS: 2019.4.0.383.0
   CURRENT: 2020.1.0.215.0
-  LATEST: 2020.4.0.524.0
+  LATEST: 2021.1.0.215.3
 jobs:
   build:
     timeout-minutes: 20
     strategy:
       matrix:
-        version: [previous, current, latest]
+        # version: [previous, current, latest]
+        version: [latest]
         platform: [common, health]
     runs-on: ubuntu-latest
     steps:
