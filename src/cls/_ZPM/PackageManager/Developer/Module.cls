@@ -557,7 +557,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 			
 			// Test whether dependency version is a valid semantic version. These are handled in the first pass only.
 			// Other cases are handled in the second pass only.
-			Set tIsExactVersion = +##class(%ZPM.PackageManager.Core.SemanticVersion).IsValid(tDep.VersionString)
+			Set tIsExactVersion = +##class(%ZPM.PackageManager.Core.SemanticVersion).IsValid(tDep.VersionString) kill %objlasterror
 			If ((pPass = $$$EXACT) && 'tIsExactVersion) || ((pPass = $$$FUZZY) && tIsExactVersion) {
 				Continue
 			}
