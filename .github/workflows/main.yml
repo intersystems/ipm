@@ -149,14 +149,14 @@ jobs:
           docker stop registry
           docker network rm zpm
       - uses: actions/upload-artifact@v2
-        if: matrix.version == 'current' && matrix.platform == 'common'
+        if: matrix.version == 'latest' && matrix.platform == 'common'
         with:
           name: zpm-${{ steps.version.outputs.number }}
           path: zpm-${{ steps.version.outputs.number }}.xml
       - name: Create Beta Release
         id: create_release
         uses: actions/create-release@v1
-        if: github.event_name != 'release' && matrix.version == 'current' && matrix.platform == 'common'
+        if: github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -165,7 +165,7 @@ jobs:
           prerelease: ${{ github.event_name != 'release' }}
       - name: Upload Beta Release Asset
         uses: actions/upload-release-asset@v1
-        if: github.event_name != 'release' && matrix.version == 'current' && matrix.platform == 'common'
+        if: github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -175,7 +175,7 @@ jobs:
           asset_content_type: text/xml
       - name: Upload Public Release Asset
         uses: actions/upload-release-asset@v1
-        if: github.event_name == 'release' && matrix.version == 'current' && matrix.platform == 'common'
+        if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -184,7 +184,7 @@ jobs:
           asset_name: zpm-${{ steps.version.outputs.number }}.xml
           asset_content_type: text/xml
       - name: Publish release
-        if: github.event_name == 'release' && matrix.version == 'current' && matrix.platform == 'common'
+        if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         run: |
           [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
             docker run -d --rm --init zpm
