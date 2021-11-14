@@ -2049,8 +2049,11 @@ ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 ClassMethod Import(ByRef pCommandInfo)
 {
 	Set tSC = $$$OK
+  Set tSource = $Get(pCommandInfo("parameters","source"))
+  If (tSource = "") {
+    $$$ThrowStatus($$$ERROR($$$GeneralError,"A source for import must be specified"))
+  } 
 	Try {
-		Set tSource = pCommandInfo("parameters","source")
 		Set tRecurse = '$$$HasModifier(pCommandInfo,"norecurse")
 		Set tCompile = '$$$HasModifier(pCommandInfo,"nocompile")
 		Set tVerbose = $$$HasModifier(pCommandInfo,"verbose")
@@ -2063,8 +2066,9 @@ ClassMethod Import(ByRef pCommandInfo)
 		
 		Set tSourceDir = ##class(%Library.File).NormalizeDirectory(tSource)
 		Set tSourceFile = ##class(%Library.File).NormalizeFilename(tSource)
-		Set tLoadFlags = $Select(tCompile:"c",1:"")_$Select(tVerbose:"d",1:"")_"k"
+		Set tLoadFlags = $Select(tCompile:"c",1:"")_$Select(tQuiet:"-d",tVerbose:"d",1:"")_"k"
 		For tListOnly = 1,0 {
+      Continue:tListOnly&&'$IsObject(%SourceControl)
 			Set tLoadedList = ""
 			// First pass, this lists the things that will be loaded.
 			// Second pass, it loads them.
@@ -2073,7 +2077,7 @@ ClassMethod Import(ByRef pCommandInfo)
 					If 'tQuiet {
 						Write !,"Loading "_tSourceDir
 					}
-					Set tSC = $System.OBJ.LoadDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly)
+					Set tSC = $System.OBJ.ImportDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly)
 					
 					// Build $ListBuild list of loaded items
 					Set tLoadedKey = ""
@@ -2096,6 +2100,8 @@ ClassMethod Import(ByRef pCommandInfo)
 				Set tSC = $$$ERROR($$$FileDoesNotExist,tSource)
 			}
 			$$$ThrowOnError(tSC)
+
+      Continue:'$IsObject(%SourceControl)
 			
 			If tListOnly {
 				// Trigger source control class's user action 6 (simulating a load into Studio)
@@ -2117,54 +2123,14 @@ ClassMethod Import(ByRef pCommandInfo)
 					// If a file has previously been exported to the Perforce workspace but not actually marked for add, GetStatus will report that the file is
 					// in source control. This case is handled later after revert is attempted and fails because the file is not known to Perforce.
 					Kill ^Sources(0,"FileTimeStamp",tLoadedItem)
-					Do %SourceControl.GetStatus(tLoadedItem,.tIsInSourceControl)
-					If tIsInSourceControl {
-						Set tSC = $$$ADDSC(tSC,%SourceControl.OnAfterSave(tLoadedItem))
-					} Else {
-						Set tSC = $$$ADDSC(tSC,%SourceControl.AddToSourceControl(tLoadedItem))
-					}
+					If $$$ISOK(##class(%Studio.SourceControl.Interface).GetStatus(tLoadedItem,.tIsInSourceControl)) {
+            If tIsInSourceControl {
+              Set tSC = $$$ADDSC(tSC,%SourceControl.OnAfterSave(tLoadedItem))
+            } Else {
+              Set tSC = $$$ADDSC(tSC,%SourceControl.AddToSourceControl(tLoadedItem))
+            }
+          }
 				}
-				
-				If 'tQuiet {
-					Write !,"Reverting unchanged files."
-				}
-				Set tPointer = 0
-				While $ListNext(tLoadedList,tPointer,tLoadedItem) {
-					// Revert unchanged files (silently)
-					Set tFileName = ##class(%Studio.SourceControl.Interface).ExternalName(tLoadedItem)
-					If (tFileName '= "") {
-						#define IsFilesNotOpenedError(%sc) $$$ISERR(%sc) && ($System.Status.GetErrorText(%sc) [ "file(s) not opened on this client")
-						Set tOneSC = ##class(%Studio.SourceControl.ISC).RunCmd("p4 revert -a "_tFileName,,tVerbose)
-						If $$$IsFilesNotOpenedError(tOneSC) {
-							// Try adding to source control (e.g., the file is not opened because it should have been marked for add)
-							Set tOneSC = %SourceControl.AddToSourceControl(tLoadedItem)
-						} ElseIf $$$ISOK(tOneSC) && ##class(%Library.File).Writeable(tFileName) {
-							// See if it's a really simple diff where only TimeCreated has changed.
-							// Sample:
-							/*
-								HSLIB>zw tOutput
-								tOutput=5
-								tOutput(1)="==== <perforce path info> ===="
-								tOutput(2)="8c8"
-								tOutput(3)="< <TimeCreated>64660,60017.014201</TimeCreated>"
-								tOutput(4)="---"
-								tOutput(5)="> <TimeCreated>64672,52154.482369</TimeCreated>
-							*/
-							Kill tOutput
-							Set tOneSC = ##class(%Studio.SourceControl.ISC).RunCmd("p4 diff "_tFileName,.tOutput,tVerbose)
-							If $$$ISOK(tOneSC) {
-								If ($Get(tOutput) = 5) && ($Extract(tOutput(3),4,14) = "TimeCreated") && ($Extract(tOutput(5),4,14) = "TimeCreated") {
-									Set tOneSC = ##class(%Studio.SourceControl.ISC).RunCmd("p4 revert "_tFileName,,tVerbose)
-								}
-							}
-							If $$$IsFilesNotOpenedError(tOneSC) {
-								Set tOneSC = $$$OK
-							}
-						}
-						Set tSC = $$$ADDSC(tSC,tOneSC)
-					}
-				}
-				$$$ThrowOnError(tSC)
 			}
 		}
 	} Catch e {
