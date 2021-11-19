@@ -29,7 +29,7 @@ Method Publish(pModule As %ZPM.PackageManager.Core.VersionedBase) As %Boolean
     If tRequest.HttpResponse.StatusCode = 401 {
       $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, authorization required."))
     } Else {
-	    set tMessage = "Publishing module, server responded with status code "_tRequest.HttpResponse.StatusCode_"."
+      set tMessage = "Publishing module, server responded with status code "_tRequest.HttpResponse.StatusCode_"."
       $$$ThrowStatus($$$ERROR($$$GeneralError, tMessage))
     }
   }
