@@ -741,7 +741,8 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 	If tExp'="" {
 		set tPathSrc=##class(%File).NormalizeDirectory(tPath_"\"_tSrc)
 		Do ##class(%ZPM.PackageManager.Developer.ModuleTemplate).ExportResources(tPathSrc,tExp)
-	}mplate.ReadResorces(tSrc)
+	}
+	Do tTemplate.ReadResorces(tSrc)
 
 	// web applications
 	Do ##class(%ZPM.PackageManager.Developer.ModuleTemplate).GetCSPApplications(.apps)
