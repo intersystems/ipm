@@ -458,7 +458,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Set tOneCommand = 1
 	}
 	Set introMessageList = $ListBuild(
-		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
+		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm","%SYS")),
 		"Enter q/quit to exit the shell. Enter ?/help to view available commands"
 	)
 	Set tInShell = 0
@@ -794,8 +794,10 @@ ClassMethod GetDefaultCommandRegistry()
 }
 
 /// Get Version Module
-ClassMethod GetVersionModule(name)
+ClassMethod GetVersionModule(name, namespace = {$namespace})
 {
+	New $Namespace
+	Set $Namespace=namespace
 	Do ..GetListModules(name,.list)
 	If $Data(list(name)) {
 			quit $ListGet(list(name),1)
