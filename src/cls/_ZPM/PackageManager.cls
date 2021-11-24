@@ -458,7 +458,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Set tOneCommand = 1
 	}
 	Set introMessageList = $ListBuild(
-		"Welcome to the Package Manager Shell (ZPM).",
+		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
 		"Enter q/quit to exit the shell. Enter ?/help to view available commands"
 	)
 	Set tInShell = 0
@@ -791,6 +791,16 @@ ClassMethod GetDefaultCommandRegistry()
 		Write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
 		
 	}
+}
+
+/// Get Version Module
+ClassMethod GetVersionModule(name)
+{
+	Do ..GetListModules(name,.list)
+	If $Data(list(name)) {
+			quit $ListGet(list(name),1)
+	}
+	quit ""
 }
 
 /// @API.Method
