@@ -1302,6 +1302,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
     Set tModifiers("username") = "", tModifiers("password") = ""
     Set tType = "%ZPM.PackageManager.Client.RemoteServerDefinition"
     $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
+	do ..Shell("repo -list")
 	} Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
 		Set tType = $ListGet(serverClassList)
@@ -1343,6 +1344,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		Merge tModifiers = pCommandInfo("modifiers")
 		Merge tData = pCommandInfo("data")
 		$$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData,tType))
+		do ..Shell("repo -list")
 	}
 }
 
