@@ -458,7 +458,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Set tOneCommand = 1
 	}
 	Set introMessageList = $ListBuild(
-		"Welcome to the Package Manager Shell (ZPM).",
+		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm","%SYS")),
 		"Enter q/quit to exit the shell. Enter ?/help to view available commands"
 	)
 	Set tInShell = 0
@@ -791,6 +791,18 @@ ClassMethod GetDefaultCommandRegistry()
 		Write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
 		
 	}
+}
+
+/// Get Version Module
+ClassMethod GetVersionModule(name, namespace = {$namespace})
+{
+	New $Namespace
+	Set $Namespace=namespace
+	Do ..GetListModules(name,.list)
+	If $Data(list(name)) {
+			quit $ListGet(list(name),1)
+	}
+	quit ""
 }
 
 /// @API.Method
@@ -1302,6 +1314,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
     Set tModifiers("username") = "", tModifiers("password") = ""
     Set tType = "%ZPM.PackageManager.Client.RemoteServerDefinition"
     $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
+	do ..Shell("repo -list")
 	} Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
 		Set tType = $ListGet(serverClassList)
@@ -1343,6 +1356,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		Merge tModifiers = pCommandInfo("modifiers")
 		Merge tData = pCommandInfo("data")
 		$$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData,tType))
+		do ..Shell("repo -list")
 	}
 }
 
