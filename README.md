@@ -3,7 +3,7 @@
 Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and Frontend packages, and any files into InterSystems IRIS published on the official [ZPM Registry](https://pm.community.intersystems.com/packages/-/all) or private ZPM registry of your own.
 
 ## Documentation
-* [The official documenation in the wiki](https://github.com/intersystems-community/zpm/wiki/03.-Module.xml)
+* [The official documenation in the wiki](https://github.com/intersystems-community/zpm/wiki/)
 * [Articles on the InterSystems Developer Community](https://community.intersystems.com/tags/objectscript-package-manager-zpm)
 * [Videos on YouTube](https://www.youtube.com/playlist?list=PLKb2cBVphNQRcmxt4LtYDyLJEPfF4X4-4)
 
