@@ -3,12 +3,12 @@ Class %ZPM.PackageManager.Developer.SystemRequirements Extends (%Persistent, %XM
 
 Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version", XMLPROJECTION = "ATTRIBUTE");
 
-Property Version As %ZPM.PackageManager.Core.SemanticVersionExpression(XMLPROJECTION = "NONE");
+Property Version As %ZPM.General.SemanticVersionExpression(XMLPROJECTION = "NONE");
 
 Method VersionStringSet(tValue) As %Status
 {
 	Set i%VersionString = tValue
-	Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(tValue,.tExpression)
+	Set tSC = ##class(%ZPM.General.SemanticVersionExpression).FromString(tValue,.tExpression)
 	If $$$ISOK(tSC) {
 		Set ..Version = tExpression
 	}
@@ -31,7 +31,7 @@ Method CheckVersion() As %Status
 	If (..VersionString = "") { Return $$$OK } 
 	Try {
 		Set tComparator = ..Version.Options.GetAt(1).Comparators.GetAt(1)
-		Set CurrentSystemVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString($System.Version.GetNumber())
+		Set CurrentSystemVersion = ##class(%ZPM.General.SemanticVersion).FromString($System.Version.GetNumber())
 		If CurrentSystemVersion.Patch = "" { 
 			Set CurrentSystemVersion.Patch = 0
 		}

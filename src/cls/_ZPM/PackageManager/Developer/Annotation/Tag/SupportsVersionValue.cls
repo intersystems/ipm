@@ -11,7 +11,7 @@ Method ValidateAndAssignVersion(pVersionValue As %String = "", pContextObject As
 {
 	if pVersionValue '= "" {
 		// it would be nice to use this as the actual property type but it doesn't work with our XML output plans
-		set tTestVal = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(pVersionValue)
+		set tTestVal = ##class(%ZPM.General.SemanticVersion).FromString(pVersionValue)
 		set tSC = tTestVal.%ValidateObject()
 		
 		if $$$ISERR(tSC) {

@@ -129,7 +129,7 @@ ClassMethod NeedInstall(Output version As %String)
       RETURN 1
     }
 
-    set version = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(..#VERSION)
+    set version = ##class(%ZPM.General.SemanticVersion).FromString(..#VERSION)
     if $isobject(version) {
       RETURN version.Follows(module.Version)
     }
@@ -158,7 +158,7 @@ ClassMethod Make(pPackage As %Stream.Object, ByRef pStream As %Stream.TmpCharact
 		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
 
     Set tmpDir = ##class(%File).NormalizeDirectory($$$FileTempDir)
-    $$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Archive).Extract(pPackage, tmpDir))
+    $$$ThrowOnError(##class(%ZPM.General.Archive).Extract(pPackage, tmpDir))
 
     Do ..CollectPackage(tmpDir, .tList, tmpDir)
 

@@ -1,6 +1,6 @@
 Include (%occErrors, %ZPM.PackageManager.Common)
 
-Class %ZPM.PackageManager.Developer.Module Extends (%Persistent, %ZPM.PackageManager.Core.ModuleInfo, %ZPM.PackageManager.Core.ComparisonAdaptor) [ StorageStrategy = "" ]
+Class %ZPM.PackageManager.Developer.Module Extends (%Persistent, %ZPM.General.ModuleInfo, %ZPM.PackageManager.Core.ComparisonAdaptor) [ StorageStrategy = "" ]
 {
 
 Parameter DOMAIN = "ZPM";
@@ -12,7 +12,7 @@ Property GlobalScope As %Boolean;
 Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version") [ InitialExpression = "0.0.1+snapshot", Required ];
 
 /// Does not need comparison method to be code generated because that comparing <property>VersionString</property> is good enough.
-Property Version As %ZPM.PackageManager.Core.SemanticVersion(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ Required ];
+Property Version As %ZPM.General.SemanticVersion(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ Required ];
 
 Property ExternalName As %String(MAXLEN = 255);
 
@@ -532,7 +532,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 		$$$ThrowOnError(tSC)
 		
 		// Disregard violation of dependencies of pending modules
-		Set tInstallContext = ##class(%ZPM.PackageManager.Core.InstallContext).%Get(.tSC)
+		Set tInstallContext = ##class(%ZPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		
 		// May want to pass phases to subsequent calls
@@ -557,13 +557,13 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 			
 			// Test whether dependency version is a valid semantic version. These are handled in the first pass only.
 			// Other cases are handled in the second pass only.
-			Set tIsExactVersion = +##class(%ZPM.PackageManager.Core.SemanticVersion).IsValid(tDep.VersionString) kill %objlasterror
+			Set tIsExactVersion = +##class(%ZPM.General.SemanticVersion).IsValid(tDep.VersionString) kill %objlasterror
 			If ((pPass = $$$EXACT) && 'tIsExactVersion) || ((pPass = $$$FUZZY) && tIsExactVersion) {
 				Continue
 			}
 			
 			// Build cumulative version requirement string
-			#dim tSearchExpr As %ZPM.PackageManager.Core.SemanticVersionExpression
+			#dim tSearchExpr As %ZPM.General.SemanticVersionExpression
 			Set tSearchExpr = tDep.Version.%ConstructClone(1)
 			Set tConstraintList = $ListBuild(..Name_": "_tDep.VersionString)
 			Set tSourcePath = ""
@@ -571,7 +571,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 				Set tSourcePath = $Order(pDependencyGraph(tDep.Name,tSourcePath),1,tOtherReq)
 				Quit:tSourcePath=""
 				
-				Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(tOtherReq,.tExpr)
+				Set tSC = ##class(%ZPM.General.SemanticVersionExpression).FromString(tOtherReq,.tExpr)
 				If $$$ISERR(tSC) {
 					Quit
 				}
@@ -647,7 +647,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 				If 'pPermitDowngrade {
 					// Add a minimum of the currently-installed version as a constraint.
 					Set tRangeString = ">="_tLocalObj.VersionString
-					Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(tRangeString,.tCurrentlyInstalledExpr)
+					Set tSC = ##class(%ZPM.General.SemanticVersionExpression).FromString(tRangeString,.tCurrentlyInstalledExpr)
 					$$$ThrowOnError(tSC)
 					Set tSearchExpr = tSearchExpr.And(tCurrentlyInstalledExpr)
 					Set tConstraintList = tConstraintList_$ListBuild(tLocalObj.Name_": "_tRangeString_" (currently installed, downgrade not permitted)")
@@ -994,7 +994,7 @@ Method OverrideLifecycleClassSet(pValue As %Dictionary.Classname) As %Status
 /// class then this oref will be the one returned to the caller of %New method.
 Method %OnNew() As %Status [ Private, ServerOnly = 1 ]
 {
-	Set ..Version = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(i%VersionString)
+	Set ..Version = ##class(%ZPM.General.SemanticVersion).FromString(i%VersionString)
   Quit $$$OK
 }
 
@@ -1040,7 +1040,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 		// Ensure packaging property is set to the correct value.
 		// This validation only runs if the lifecycle class exists.
 		If (..LifecycleClass '= "") && $$$comClassDefined(..LifecycleClass) {
-			Set tBaseClass = "%ZPM.PackageManager.Developer.Lifecycle.Base"
+			Set tBaseClass = "%ZPM.Lifecycle.Base"
 			If '$ClassMethod(..LifecycleClass,"%Extends",tBaseClass) {
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid lifecycle class '%1' - must extend %2",..LifecycleClass,tBaseClass))
 				Quit
@@ -1083,7 +1083,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 		
 		// Pre-check for uniqueness among resources (make sure there are no collisions and report descriptive errors if there are).
 		// This is simpler than trying to interpret a unique index violation later, and will work in all cases where we're updating modules.
-		Set tInstallContext = ##class(%ZPM.PackageManager.Core.InstallContext).%Get(.tSC)
+		Set tInstallContext = ##class(%ZPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		
 		Set tSC = $$$OK
@@ -1139,7 +1139,7 @@ Method %OnAddToSaveSet(depth As %Integer = 3, insert As %Integer = 0, callcount 
 	Try {
 		// Ensure Version serial object is up to date.
 		If (..VersionString '= ..Version.ToString()) {
-			Set ..Version = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(..VersionString)
+			Set ..Version = ##class(%ZPM.General.SemanticVersion).FromString(..VersionString)
 		}
 		Set tSC = ..XMLExportToStream(.tStream)
 		If $$$ISERR(tSC) {
@@ -1157,7 +1157,7 @@ Method %OnAddToSaveSet(depth As %Integer = 3, insert As %Integer = 0, callcount 
 		}
 		
 		// Deal with resources moving from a module dependent on the current module that hasn't been reloaded yet
-		Set tInstallContext = ##class(%ZPM.PackageManager.Core.InstallContext).%Get(.tSC)
+		Set tInstallContext = ##class(%ZPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		
 		Set tSC = $$$OK
@@ -1510,4 +1510,3 @@ Storage Default
 }
 
 }
-

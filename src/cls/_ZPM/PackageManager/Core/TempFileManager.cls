@@ -3,7 +3,7 @@
 /// @Modifier Availability InterSystems
 /// @API.Object.Instantiable
 /// @Modifier Availability Forbidden
-Class %ZPM.PackageManager.Core.TempFileManager Extends %ZPM.PackageManager.Core.Singleton
+Class %ZPM.PackageManager.Core.TempFileManager Extends %ZPM.General.Singleton
 {
 
 Property Files [ MultiDimensional, Private ];

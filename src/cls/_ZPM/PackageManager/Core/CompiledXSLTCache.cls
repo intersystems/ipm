@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Core.CompiledXSLTCache Extends %ZPM.PackageManager.Core.Singleton
+Class %ZPM.PackageManager.Core.CompiledXSLTCache Extends %ZPM.General.Singleton
 {
 
 Property Cache [ MultiDimensional, Private ];

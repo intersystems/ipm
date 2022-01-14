@@ -35,7 +35,7 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
 	// ... and tgz it!
 	Set tTempFileName = ##class(%File).TempFilename("tgz")
 	Set tSrcPath = ..GetModuleDirectory(pModuleReference)
-	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Archive).Create(tSrcPath,tTempFileName))
+	$$$ThrowOnError(##class(%ZPM.General.Archive).Create(tSrcPath,tTempFileName))
 	
 	Set tFileBinStream = ##class(%Stream.FileBinary).%New()
 	$$$ThrowOnError(tFileBinStream.LinkToFile(tTempFileName))

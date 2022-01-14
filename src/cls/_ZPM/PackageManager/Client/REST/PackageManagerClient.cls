@@ -27,7 +27,7 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
 
   Set name = $$$lcase(pSearchCriteria.Name)
   Set tVersionExpression = pSearchCriteria.VersionExpression
-  Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
+  Set tSC = ##class(%ZPM.General.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
   $$$ThrowOnError(tSC)
 
   If name = "" {
@@ -47,7 +47,7 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
     While tIter.%GetNext(.key, .item) {
       Set tIterVer = item.versions.%GetIterator()
       WHILE tIterVer.%GetNext(.verkey, .version) {
-        Set tVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(version)
+        Set tVersion = ##class(%ZPM.General.SemanticVersion).FromString(version)
         CONTINUE:'tVersion.Satisfies(tVersionExpression)
         Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
         Set tModRef.Name = item.name

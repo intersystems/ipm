@@ -119,7 +119,7 @@ Method BuildCache(pPurge As %Boolean = {'$$$IsISCWorker}, pVerbose As %Integer =
 	Set tSC = $$$OK
 	Set tInitTLevel = $TLevel
 	Try {
-		Set tLogManager = ##class(%ZPM.PackageManager.Core.LogManager).%Get(.tSC)
+		Set tLogManager = ##class(%ZPM.General.LogManager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		
 		// Instantiate at this level for the performance benefit
@@ -206,7 +206,7 @@ Method AddCacheItem(pModuleFileName As %String, pSubDirectory As %String, Output
 		Set tParseSC = ..GetModuleStreamFromFile(pModuleFileName,.tStream,.pName,.pVersionString)
 		If $$$ISERR(tParseSC) {
 			// Log as a warning, but keep going.
-			Do ##class(%ZPM.PackageManager.Core.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$System.Status.GetErrorText(tParseSC),1)
+			Do ##class(%ZPM.General.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$System.Status.GetErrorText(tParseSC),1)
 			Quit
 		}
 	

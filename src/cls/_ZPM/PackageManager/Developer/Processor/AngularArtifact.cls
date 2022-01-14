@@ -35,8 +35,8 @@ Property ArtifactoryRepo As %String(MAXLEN = "");
 
 Method VersionSet(pValue As %String) As %Library.Status
 {
-	#dim versionObj As %ZPM.PackageManager.Core.SemanticVersion
-	Set sc = ##class(%ZPM.PackageManager.Core.SemanticVersion).IsValid(pValue)
+	#dim versionObj As %ZPM.General.SemanticVersion
+	Set sc = ##class(%ZPM.General.SemanticVersion).IsValid(pValue)
 	Set i%Version = pValue
 	Return sc
 }

@@ -1,5 +1,5 @@
 /// Just a Serial Object of ModuleInfo so that it can be persisted in other objects.
-Class %ZPM.PackageManager.Core.ResolvedModuleReference Extends (%SerialObject, %ZPM.PackageManager.Core.ModuleInfo) [ StorageStrategy = "" ]
+Class %ZPM.PackageManager.Core.ResolvedModuleReference Extends (%SerialObject, %ZPM.General.ModuleInfo) [ StorageStrategy = "" ]
 {
 
 Storage Default

@@ -16,7 +16,7 @@ Property Name As %String [ Private, ReadOnly ];
 
 Property Parameters As %String [ Private, ReadOnly ];
 
-Property VersionExpression As %ZPM.PackageManager.Core.SemanticVersionExpression [ Private ];
+Property VersionExpression As %ZPM.General.SemanticVersionExpression [ Private ];
 
 Property IncludePrerelease As %Boolean [ InitialExpression = 0, Private ];
 
@@ -54,7 +54,7 @@ Method %OnNew(pClass As %String, pIndexName As %String, pBaseIndexGlobal As %Str
 		If (pVersionExpression = "") {
 			Set pVersionExpression = "*"
 		}
-		Set pSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(pVersionExpression,.tExpression)
+		Set pSC = ##class(%ZPM.General.SemanticVersionExpression).FromString(pVersionExpression,.tExpression)
 		Set ..VersionExpression = tExpression
 		If $$$ISERR(pSC) {
 			Quit
@@ -96,7 +96,7 @@ Method ContainsItem(pItem As %String) As %Boolean
 	}
 	
 	// The data of the index will be the semantic version.
-	Set tVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromListBuild($Get(@tRef@(pItem)))
+	Set tVersion = ##class(%ZPM.General.SemanticVersion).FromListBuild($Get(@tRef@(pItem)))
 	Quit tVersion.Satisfies(..VersionExpression)
 }
 

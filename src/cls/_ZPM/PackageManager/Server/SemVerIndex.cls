@@ -4,7 +4,7 @@
 /// <li>Simplify ordering based on latest semantic version, properly handling major/minor/patch version numbers and prerelease designations.</li>
 /// </ol>
 /// </p>
-/// <p>To use this index in a class, define an index on a string property (the module name) and a property of type <class>%ZPM.PackageManager.Core.SemanticVersion</class>.
+/// <p>To use this index in a class, define an index on a string property (the module name) and a property of type <class>%ZPM.General.SemanticVersion</class>.
 /// <code>
 /// Index SemVer On (Name, Version) As %ZPM.PackageManager.Server.SemVerIndex;
 /// </code>

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.UIFW Extends (%ZPM.PackageManager.Developer.Processor.Abstract, %ZPM.PackageManager.Developer.IConfigurable)
+Class %ZPM.PackageManager.Developer.Processor.UIFW Extends (%ZPM.PackageManager.Developer.Processor.Abstract, %ZPM.General.IConfigurable)
 {
 
 /// Comma-separated list of resource attribute names that this processor uses

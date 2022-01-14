@@ -243,13 +243,13 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		}
 		
 		// Use % variables that intentionally leak in worker processes, to avoid duplicate work when they go out of scope.
-		#dim %installcontext As %ZPM.PackageManager.Core.InstallContext
+		#dim %installcontext As %ZPM.General.InstallContext
 		#dim %manager As %ZPM.PackageManager.Client.Manager
 		If '$$$IsISCWorker {
 			New %installcontext
 			New %manager
 		}
-		Set %installcontext = ##class(%ZPM.PackageManager.Core.InstallContext).%Get(.tSC)
+		Set %installcontext = ##class(%ZPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		Do %installcontext.SetGraph(.pDependencyGraph)
 		Merge tIndex = pParams("Multicompile","CacheTempIndex")
@@ -406,7 +406,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 			Quit
 		}
 		Set tTargetDirectory = ##class(%File).NormalizeFilenameWithSpaces(tTargetDirectory)
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Archive).Extract(pArchiveStream.Filename,tTargetDirectory,.tOutput)
+		Set tSC = ##class(%ZPM.General.Archive).Extract(pArchiveStream.Filename,tTargetDirectory,.tOutput)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -920,7 +920,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		}
 		
 		// Create a singleton instance for logging of warnings/error messages
-		Set tLogManager = ##class(%ZPM.PackageManager.Core.LogManager).%Get(.tSC)
+		Set tLogManager = ##class(%ZPM.General.LogManager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		
 		// Show INFO+ if verbose, WARNING+ if not.
@@ -1015,8 +1015,8 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 
     $$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).CheckSystemRequirements(tModuleName))
 		
-		#dim tInstallContext As %ZPM.PackageManager.Core.InstallContext
-		Set tInstallContext = ##class(%ZPM.PackageManager.Core.InstallContext).%Get(.tSC)
+		#dim tInstallContext As %ZPM.General.InstallContext
+		Set tInstallContext = ##class(%ZPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		If 'tInstallContext.ModuleIsDependency(tModuleName) {
 			Set tSC = tModule.LoadDependencies("",.pParams)
@@ -1803,4 +1803,3 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 }
 
 }
-

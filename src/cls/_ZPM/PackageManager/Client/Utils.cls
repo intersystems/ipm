@@ -160,7 +160,7 @@ ClassMethod InstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Installa
 			Quit
 		}
 		Set tExtractDir = ##class(%File).NormalizeDirectory($Piece(tTmpFileName,".tgz"))
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Archive).Extract(tTmpFileName,tExtractDir,.tOutput)
+		Set tSC = ##class(%ZPM.General.Archive).Extract(tTmpFileName,tExtractDir,.tOutput)
 		For i=1:1:$Get(tOutput) {
 			Write !,tOutput(i)
 		}

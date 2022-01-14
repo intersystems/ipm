@@ -8,7 +8,7 @@ Parameter DESCRIPTION As STRING = "Loads unit tests (extending %UnitTest.TestCas
 Parameter ATTRIBUTES As STRING = "Phase,Package,Class,ManagerClass,Format,ExportFlags";
 
 /// Phase in which the unit tests run - "test" (dev namespace), "verify" (separate, clean namespace), or "test,verify" (to run in both cases).
-Property Phase As %ZPM.PackageManager.Core.ListOfOptions(VALUELIST = ",test,verify") [ InitialExpression = {$ListBuild("test")}, Required ];
+Property Phase As %ZPM.DataType.ListOfOptions(VALUELIST = ",test,verify") [ InitialExpression = {$ListBuild("test")}, Required ];
 
 // NOTE: Either Package or Class MUST be defined.
 

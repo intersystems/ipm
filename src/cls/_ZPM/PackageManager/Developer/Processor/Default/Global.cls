@@ -8,7 +8,7 @@ Parameter DESCRIPTION As STRING = "Standard resource processor for global export
 Parameter ATTRIBUTES As STRING = "Global,Preserve";
 
 /// Optional name of global within the file
-Property Global As %ZPM.PackageManager.Core.GlobalReference;
+Property Global As %ZPM.DataType.GlobalReference;
 
 /// If set to 1, do not delete the global when the module is cleaned/uninstalled
 Property Preserve As %Boolean [ InitialExpression = 0 ];

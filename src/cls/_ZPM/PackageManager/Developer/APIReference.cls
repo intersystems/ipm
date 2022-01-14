@@ -4,7 +4,7 @@ Class %ZPM.PackageManager.Developer.APIReference Extends (%SerialObject, %XML.Ad
 {
 
 /// The name of the resource that should be scanned for API annotations, with extension; e.g., MyModule.API.PKG
-Property Resource As %ZPM.PackageManager.Developer.ResourceName(XMLPROJECTION = "attribute");
+Property Resource As %ZPM.DataType.ResourceName(XMLPROJECTION = "attribute");
 
 Storage Default
 {

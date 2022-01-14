@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Core.VersionedBase Extends %ZPM.PackageManager.Core.ModuleInfo [ Abstract ]
+Class %ZPM.PackageManager.Core.VersionedBase Extends %ZPM.General.ModuleInfo [ Abstract ]
 {
 
 Property Manifest As %Stream.GlobalCharacterSearchable(%JSONFIELDNAME = "manifest", SIMILARITYINDEX = "ManifestSearchIndex");

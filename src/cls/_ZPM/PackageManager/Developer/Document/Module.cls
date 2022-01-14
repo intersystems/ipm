@@ -135,7 +135,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 Method OnCompileDocument(ByRef qstruct As %String) As %Status
 {
 	#dim tModule As %ZPM.PackageManager.Developer.Module
-	#dim tGeneralSettings As %ZPM.PackageManager.Developer.GeneralSettings
+	#dim tGeneralSettings As %ZPM.General.Settings
 	Set tSC = $$$OK
 	Try {
 		Set tNameNoExt = $Piece(..Name,".",1,*-1)
@@ -154,7 +154,7 @@ Method OnCompileDocument(ByRef qstruct As %String) As %Status
 		Set ..Name = tModule.Name_..#EXTENSION
 		
 		// Determine whether to suppress compilation from settings
-		Set tGeneralSettings = ##class(%ZPM.PackageManager.Developer.GeneralSettings).%Get(.tSC)
+		Set tGeneralSettings = ##class(%ZPM.General.Settings).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		Set tSuppressCompilation = tGeneralSettings.SuppressCompilation
 		If tSuppressCompilation {

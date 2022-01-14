@@ -203,7 +203,7 @@ ClassMethod CreateLifecycleClass(pSource As %ZPM.PackageManager.Developer.Module
 	If (pSource.LifecycleClass '= "") && '$$$defClassDefined(pSource.LifecycleClass) && '$$$comClassDefined(pSource.LifecycleClass) && '$$$comClassDefined($$$DefaultLifecyclePackageDot_pSource.LifecycleClass) {
 		Set tDef = ##class(%Dictionary.ClassDefinition).%New()
 		Set tDef.Name = pSource.LifecycleClass
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Lifecycle.Base).GetBaseClassForPackaging(pSource.Packaging,.tBaseClass))
+		$$$ThrowOnError(##class(%ZPM.Lifecycle.Base).GetBaseClassForPackaging(pSource.Packaging,.tBaseClass))
 		Set tDef.Super = tBaseClass
 		Set tDef.ProcedureBlock = 1
 		Do tDef.ProcedureBlockReset()
@@ -436,7 +436,7 @@ ClassMethod GetModuleProperties(pModuleName As %String, Output pObject As %ZEN.p
 
 ClassMethod GetPackagingListSQL(Output pSQL As %String) As %Status
 {
-	Set pSQL = "select Packaging,BaseClass from %ZPM_PackageManager_Developer_Lifecycle.Base_Packaging()"
+	Set pSQL = "select Packaging,BaseClass from %ZPM_Lifecycle.Base_Packaging()"
 	Quit $$$OK
 }
 

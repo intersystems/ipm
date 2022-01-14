@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Lifecycle.Application Extends %ZPM.PackageManager.Developer.Lifecycle.Base
+Class %ZPM.PackageManager.Developer.Lifecycle.Application Extends %ZPM.Lifecycle.Base
 {
 
 Parameter EXPORTDEPENDENCIES As BOOLEAN = 1;
@@ -125,7 +125,7 @@ Method %Package(ByRef pParams) As %Status
 		$$$ThrowOnError(tSC)
 		
 		// Package as .tgz
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Archive).Create(tWorkingDirectory,tWorkingFile,.tOutput)
+		Set tSC = ##class(%ZPM.General.Archive).Create(tWorkingDirectory,tWorkingFile,.tOutput)
 		$$$ThrowOnError(tSC)
 		For i=1:1:tOutput {
 			Write:tVerbose !,tOutput(i)

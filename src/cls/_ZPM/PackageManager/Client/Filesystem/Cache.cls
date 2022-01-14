@@ -1,6 +1,6 @@
 Include %occErrors
 
-Class %ZPM.PackageManager.Client.Filesystem.Cache Extends (%Persistent, %ZPM.PackageManager.Core.ModuleInfo)
+Class %ZPM.PackageManager.Client.Filesystem.Cache Extends (%Persistent, %ZPM.General.ModuleInfo)
 {
 
 Index CacheItemIndex On (Root, SubDirectory) [ Data = LastModified, Unique ];
@@ -87,7 +87,7 @@ Method HandleSaveError(pSC As %Status) As %Status
 				Set tDupeDir = ..Root_..SubDirectory
 				Set tUseDir = tOtherInstance.Root_tOtherInstance.SubDirectory
 				Set tMessage = ..Name_" "_..VersionString_" previously found in "_tUseDir_"; also found in "_tDupeDir_". The version in "_tUseDir_" will be used."
-				Do ##class(%ZPM.PackageManager.Core.LogManager).Warning(tMessage,1)
+				Do ##class(%ZPM.General.LogManager).Warning(tMessage,1)
 				
 				// Treat this as a non-error
 				Set tSC = $$$OK

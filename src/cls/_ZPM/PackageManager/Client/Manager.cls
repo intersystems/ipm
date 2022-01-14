@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Client.Manager Extends %ZPM.PackageManager.Core.Singleton
+Class %ZPM.PackageManager.Client.Manager Extends %ZPM.General.Singleton
 {
 
 /// If set to 1, calls to %Get must return an instance of this class created in the current namespace; a new instance will be created if none exists.
@@ -283,7 +283,7 @@ Method RetrieveApplicationPackage(pQualifiedReference As %ZPM.PackageManager.Cor
 }
 
 /// Tracks the OREF of this instance in a PPG for later reference.
-/// Subclasses of %ZPM.PackageManager.Core.Singleton that override this method *MUST* call ##super().
+/// Subclasses of %ZPM.General.Singleton that override this method *MUST* call ##super().
 Method %OnNew() As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..XSLTProvider = ##class(%ZPM.PackageManager.Core.XSLTProvider).%Get(.tSC)

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Core.XSLTProvider Extends %ZPM.PackageManager.Core.Singleton
+Class %ZPM.PackageManager.Core.XSLTProvider Extends %ZPM.General.Singleton
 {
 
 /// If set to 1, calls to %Get must return an instance of this class created in the current namespace; a new instance will be created if none exists.

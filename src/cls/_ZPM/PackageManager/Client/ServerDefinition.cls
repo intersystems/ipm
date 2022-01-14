@@ -1,6 +1,6 @@
 Include (%syPrompt, %ZPM.PackageManager.Common)
 
-Class %ZPM.PackageManager.Client.ServerDefinition Extends (%Persistent, %ZEN.DataModel.Adaptor, %ZPM.PackageManager.Developer.CLICommands) [ Abstract ]
+Class %ZPM.PackageManager.Client.ServerDefinition Extends (%Persistent, %ZEN.DataModel.Adaptor, %ZPM.CLI.Commands) [ Abstract ]
 {
 
 Parameter DOMAIN = "ZPM";
