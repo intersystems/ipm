@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Core.XDataArchive.FileCharacter Extends %ZPM.PackageManager.Core.XDataArchive.IFile
+Class %ZPM.Lifecycle.StudioProject.XDataArchive.FileCharacter Extends %ZPM.Lifecycle.StudioProject.XDataArchive.IFile
 {
 
 Parameter STREAMCLASS As STRING = "%Stream.FileCharacter";

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Client.REST.PackageManagerClient Extends (%RegisteredObject, %ZPM.PackageManager.Core.IPackageService)
+Class %ZPM.Repo.Remote.PackageService Extends (%RegisteredObject, %ZPM.Repo.IPackageService)
 {
 
 Property Location As %String;
@@ -20,7 +20,7 @@ Method GetInfo(url As %String) As %DynamicObject
 	$$$ThrowStatus($$$ERROR($$$GeneralError,"Registry server not available."))
 }
 
-Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference")
+Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference")
 {
   Set tList = ##class(%Library.ListOfObjects).%New()
   Set tRequest = ..GetHttpRequest()
@@ -141,7 +141,7 @@ Method SendAnalyticsToRegistry(action As %String, data As %DynamicObject)
 
 Method SendAnalyticsToGoogle(action As %String, data As %DynamicObject)
 {
-    Set TrackingID = ##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsTrackingId()
+    Set TrackingID = ##class(%ZPM.Repo.UniversalSettings).GetAnalyticsTrackingId()
     Quit:(TrackingID = "") 0
     Set tRequest = ##class(%Net.HttpRequest).%New()
     Set tRequest.FollowRedirect = 1
@@ -167,7 +167,7 @@ Method SendAnalyticsToGoogle(action As %String, data As %DynamicObject)
 
 Method CollectAnalytics(action As %String, name As %String, version As %String, success As %Boolean = 1, msg As %String = "") As %Status
 {
-    If ('##class(%ZPM.PackageManager.Client.Settings).GetAnalyticsAvailable()) {
+    If ('##class(%ZPM.Repo.UniversalSettings).GetAnalyticsAvailable()) {
         Return $$$OK
     }
     Set jo = {}
@@ -175,7 +175,7 @@ Method CollectAnalytics(action As %String, name As %String, version As %String, 
     Set jo.version = version
     Set jo.guid = ##class(%SYS.System).InstanceGUID()
     Set jo."system_version" = $ZVersion
-    Set zpmVersion = ##class(%ZPM.PackageManager.Client.Utils).GetZPMVersion()
+    Set zpmVersion = ##class(%ZPM.Repo.Utils).GetZPMVersion()
     If (zpmVersion'="") {
         Set jo."zpmclient_version" = zpmVersion
     } 

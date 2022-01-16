@@ -5,7 +5,7 @@
 /// default_registry (string) - default registry url 
 /// analytics_tracking_id
 /// analytics_available (boolean) - if 1 - send usage statistics
-Class %ZPM.PackageManager.Client.Settings Extends %RegisteredObject
+Class %ZPM.Repo.UniversalSettings Extends %RegisteredObject
 {
 
 Parameter registry = "default_registry";
@@ -149,4 +149,3 @@ ClassMethod SetAnalyticsAvailable(val As %String) As %Boolean
 }
 
 }
-

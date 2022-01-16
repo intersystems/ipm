@@ -11,7 +11,7 @@ Method TestResourceTypes()
 	Try {
 		Set tTestRoot = $Get(^UnitTestRoot)
 		
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).InitializeLocalCache(.tCreated))
+		$$$ThrowOnError(##class(%ZPM.Repo.Utils).InitializeLocalCache(.tCreated))
 		If (tCreated) {
 			Do $$$LogMessage("Initialized local cache.")
 		} Else {

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Client.FilesystemServerDefinition Extends %ZPM.PackageManager.Client.ServerDefinition
+Class %ZPM.Repo.Filesystem.Definition Extends %ZPM.Repo.Definition
 {
 
 Parameter DISPLAYNAME As STRING = "Filesystem";
@@ -49,9 +49,9 @@ Method RootSet(%val) As %Status
 }
 
 /// Returns a client to interact with this server.
-Method GetPackageService() As %ZPM.PackageManager.Core.IPackageService
+Method GetPackageService() As %ZPM.Repo.IPackageService
 {
-	Set tService = ##class(%ZPM.PackageManager.Client.Filesystem.PackageService).%New(..Root)
+	Set tService = ##class(%ZPM.Repo.Filesystem.PackageService).%New(..Root)
 	If '$$$IsISCWorker && tService.IsAvailable() {
 		$$$ThrowOnError(..BuildCache())
 	}
@@ -59,7 +59,7 @@ Method GetPackageService() As %ZPM.PackageManager.Core.IPackageService
 }
 
 /// Handles modifiers/data attributes provided from the package manager shell.
-ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status
+ClassMethod OnConfigure(pInstance As %ZPM.Repo.Definition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -71,7 +71,7 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
 			
-			If ##class(%ZPM.PackageManager.Client.FilesystemServerDefinition).RootIndexExists(tPath) {
+			If ##class(%ZPM.Repo.Filesystem.Definition).RootIndexExists(tPath) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Root '%1' is already configured for another repository.",tPath)))
 			}
 		}
@@ -90,7 +90,7 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 }
 
 /// Returns a client to publish modules/applications to this server.
-Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService
+Method GetPublishService() As %ZPM.Repo.IPublishService
 {
 	// TODO: Implement? (Does it make sense to allow publishing to the local filesystem? What does that even mean?)
 	Quit $$$NULLOREF
@@ -107,7 +107,7 @@ Trigger RootChanged [ Event = UPDATE, Foreach = row/object ]
 	New tOldRoot
 	If ({Root*C}) {
 		Set tOldRoot = {Root*O}
-		&sql(delete from %ZPM_PackageManager_Client_Filesystem.Cache where Root = :tOldRoot)
+		&sql(delete from %ZPM_REPO_Filesystem.Cache where Root = :tOldRoot)
 		If (SQLCODE < 0) {
 			Set %ok = 0
 		}
@@ -123,7 +123,7 @@ Method BuildCache(pPurge As %Boolean = {'$$$IsISCWorker}, pVerbose As %Integer =
 		$$$ThrowOnError(tSC)
 		
 		// Instantiate at this level for the performance benefit
-		Set tXSLTProvider = ##class(%ZPM.PackageManager.Core.XSLTProvider).%Get(.tSC)
+		Set tXSLTProvider = ##class(%ZPM.Repo.XSLTProvider).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		
 		TSTART
@@ -131,7 +131,7 @@ Method BuildCache(pPurge As %Boolean = {'$$$IsISCWorker}, pVerbose As %Integer =
 			Set tLockManager = ##class(%ZPM.PackageManager.Core.LockManager).%New()
 			$$$ThrowOnError(tLockManager.LockClassId($classname(),..%Id()))
 			#dim tResult As %SQL.StatementResult
-			Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_PackageManager_Client_Filesystem.Cache where Root = ?",..Root)
+			Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_Repo_Filesystem.Cache where Root = ?",..Root)
 			If (tResult.%SQLCODE < 0) {
 				Set tSC = $$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message)
 				Quit
@@ -211,11 +211,11 @@ Method AddCacheItem(pModuleFileName As %String, pSubDirectory As %String, Output
 		}
 	
 		// Create cache item.
-		If ##class(%ZPM.PackageManager.Client.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
-			Set tCacheItem = ##class(%ZPM.PackageManager.Client.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
+		If ##class(%ZPM.Repo.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
+			Set tCacheItem = ##class(%ZPM.Repo.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
 			$$$ThrowOnError(tSC)
 		} Else {
-			Set tCacheItem = ##class(%ZPM.PackageManager.Client.Filesystem.Cache).%New()
+			Set tCacheItem = ##class(%ZPM.Repo.Filesystem.Cache).%New()
 			Set tCacheItem.Root = ..Root
 			Set tCacheItem.SubDirectory = pSubDirectory
 		}
@@ -248,13 +248,13 @@ Method GetModuleStreamFromFile(pFilename As %String, Output pStream As %Stream.G
 		Set tMetaStream = ##class(%Stream.GlobalCharacter).%New()
 		
 		// Extract <Module> section of document
-		Set tCompiledTransform = ##class(%ZPM.PackageManager.Core.XSLTProvider).GetCompiledTransformForXData($classname(),"ModuleDocumentTransform")
+		Set tCompiledTransform = ##class(%ZPM.Repo.XSLTProvider).GetCompiledTransformForXData($classname(),"ModuleDocumentTransform")
 		Set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tSourceStream,tCompiledTransform,.pStream)
 		$$$ThrowOnError(tSC)
 		
 		// Extract Name and Version
 		Do tSourceStream.Rewind()
-		Set tCompiledTransform = ##class(%ZPM.PackageManager.Core.XSLTProvider).GetCompiledTransformForXData($classname(),"MetadataExtractionTransform")
+		Set tCompiledTransform = ##class(%ZPM.Repo.XSLTProvider).GetCompiledTransformForXData($classname(),"MetadataExtractionTransform")
 		Set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tSourceStream,tCompiledTransform,.tMetaStream)
 		$$$ThrowOnError(tSC)
 		
@@ -342,8 +342,8 @@ ClassMethod ScanDirectory(pRoot As %String, ByRef pFilenameList, pSub As %String
 
 Storage Default
 {
-<Data name="FilesystemServerDefinitionDefaultData">
-<Subscript>"FilesystemServerDefinition"</Subscript>
+<Data name="DefinitionDefaultData1">
+<Subscript>"Definition"</Subscript>
 <Value name="1">
 <Value>Root</Value>
 </Value>
@@ -351,7 +351,7 @@ Storage Default
 <Value>Depth</Value>
 </Value>
 </Data>
-<DefaultData>FilesystemServerDefinitionDefaultData</DefaultData>
+<DefaultData>DefinitionDefaultData1</DefaultData>
 <Type>%Storage.Persistent</Type>
 }
 

@@ -612,7 +612,7 @@ ClassMethod GetServerListSQL(Output pSQL As %String) As %Status
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
-		Set pSQL = "select Name from %ZPM_PackageManager_Client.ServerDefinition"
+		Set pSQL = "select Name from %ZPM_Repo.Definition"
 	} Catch ex {
 		Set tSC = ex.AsStatus()
 	}
@@ -628,7 +628,7 @@ ClassMethod GetServerDefinitionList(Output pObject As %ZEN.proxyObject) As %Stat
 		Set tRS = ##class(%ResultSet).%New()
 		Set tRS.ClassName = "%Dictionary.ClassDefinition"
 		Set tRS.QueryName = "SubclassOf"
-		Set tSC = tRS.Execute("%ZPM.PackageManager.Client.ServerDefinition")
+		Set tSC = tRS.Execute("%ZPM.Repo.Definition")
      	If $$$ISERR(tSC) {
 	     	Quit	
      	}
@@ -649,7 +649,7 @@ ClassMethod GetRepositorySQL(Output pSQL As %String) As %Status
 	Set pSQL = ""
 	Set tSC = $$$OK
 	Try {
-		Set pSQL = "select * from %ZPM_PackageManager_Client.ServerDefinition order by ID"
+		Set pSQL = "select * from %ZPM_Repo.Definition order by ID"
 	} Catch ex {
 		Set tSC = ex.AsStatus()
 	}
@@ -664,8 +664,8 @@ ClassMethod GetAvailableModuleNamesExecute(ByRef qHandle As %Binary) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
-		Set tSC = ##class(%ZPM.PackageManager.Client.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults)
+		Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
+		Set tSC = ##class(%ZPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -706,9 +706,9 @@ ClassMethod GetAvailableModuleVersionsExecute(ByRef qHandle As %Binary, pName As
 	Try {
 		If ($Get(pName) '= "") {
 		
-			Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
+			Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
 			Set tSearchCriteria.Name = pName
-			Set tSC = ##class(%ZPM.PackageManager.Client.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults)
+			Set tSC = ##class(%ZPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults)
 			If $$$ISERR(tSC) {
 				Quit
 			}

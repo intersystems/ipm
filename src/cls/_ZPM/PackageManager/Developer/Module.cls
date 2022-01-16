@@ -528,7 +528,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 		// Create an instance of the repository manager singleton (or get the existing one)
 		// This makes it available at lower stack levels, which helps
 		// to avoid significant duplicate work in dependency resolution.
-		Set tRepositoryManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		Set tRepositoryManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		
 		// Disregard violation of dependencies of pending modules
@@ -654,7 +654,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 				}
 			}
 			
-			Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
+			Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
 			Set tSearchCriteria.Name = tDep.Name
 			Set tSearchCriteria.VersionExpression = tSearchExpr.ToString()
 			Set tSC = tRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)

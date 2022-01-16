@@ -1,7 +1,7 @@
-Class %ZPM.PackageManager.Core.IPublishService [ Abstract ]
+Class %ZPM.Repo.IPublishService [ Abstract ]
 {
 
-Method PublishModule(pModule As %ZPM.PackageManager.Core.Module) As %Boolean [ Abstract ]
+Method PublishModule(pModule As %ZPM.Repo.Remote.ModuleInfo) As %Boolean [ Abstract ]
 {
 }
 

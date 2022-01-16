@@ -1,5 +1,5 @@
 /// This class helps with packaging a directory (containing files) in a format that is easy to import on a different instance.
-Class %ZPM.PackageManager.Core.XDataArchive Extends %RegisteredObject
+Class %ZPM.Lifecycle.StudioProject.XDataArchive Extends %RegisteredObject
 {
 
 Property SourceDirectory As %String(MAXLEN = "") [ Private ];
@@ -108,7 +108,7 @@ Method Populate(pVerbose As %Boolean = 1) As %Status
 			If pVerbose {
 				Write !,"Converting file: ",tFile
 			}
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Core.XDataArchive.IFile).IngestToStream(..SourceDirectory_tFile,tXData.Data))
+			$$$ThrowOnError(##class(%ZPM.Lifecycle.StudioProject.XDataArchive.IFile).IngestToStream(..SourceDirectory_tFile,tXData.Data))
 			Do tClass.XDatas.Insert(tXData)
 			$$$ThrowOnError(tClass.%Save())
 		}
@@ -187,7 +187,7 @@ ClassMethod Extract(pTargetDirectory As %String) As %Status
 				If (tXDataKey = "") {
 					Quit
 				}
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Core.XDataArchive.IFile).Extract(pTargetDirectory,tXData))
+				$$$ThrowOnError(##class(%ZPM.Lifecycle.StudioProject.XDataArchive.IFile).Extract(pTargetDirectory,tXData))
 			}
 		}
 	} Catch e {

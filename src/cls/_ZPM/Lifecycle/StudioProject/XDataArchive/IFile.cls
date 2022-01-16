@@ -1,6 +1,6 @@
 /// Abstract representation of a file included in an XData archive.
 /// Subclasses may customize the stream type.
-Class %ZPM.PackageManager.Core.XDataArchive.IFile Extends (%RegisteredObject, %XML.Adaptor) [ Abstract ]
+Class %ZPM.Lifecycle.StudioProject.XDataArchive.IFile Extends (%RegisteredObject, %XML.Adaptor) [ Abstract ]
 {
 
 Parameter STREAMCLASS As STRING [ Abstract ];
@@ -12,9 +12,9 @@ ClassMethod IngestToStream(pFile As %String, pStream As %Stream.Object) As %Stat
 	}
 	Set tExtension = $Piece(pFile,".",*)
 	If (tExtension '= "") && $Data(tTextTypes(tExtension)) {
-		Quit ##class(%ZPM.PackageManager.Core.XDataArchive.FileCharacter).WriteToStream(pFile,pStream)
+		Quit ##class(%ZPM.Lifecycle.StudioProject.XDataArchive.FileCharacter).WriteToStream(pFile,pStream)
 	}
-	Quit ##class(%ZPM.PackageManager.Core.XDataArchive.FileBinary).WriteToStream(pFile,pStream)
+	Quit ##class(%ZPM.Lifecycle.StudioProject.XDataArchive.FileBinary).WriteToStream(pFile,pStream)
 }
 
 ClassMethod Extract(pDirectory As %String, pXData As %Dictionary.XDataDefinition) As %Status [ Final ]
@@ -22,8 +22,8 @@ ClassMethod Extract(pDirectory As %String, pXData As %Dictionary.XDataDefinition
 	Set tSC = $$$OK
 	Try {
 		Set tReader = ##class(%XML.Reader).%New()
-		Do tReader.Correlate("FileCharacter","%ZPM.PackageManager.Core.XDataArchive.FileCharacter")
-		Do tReader.Correlate("FileBinary","%ZPM.PackageManager.Core.XDataArchive.FileBinary")
+		Do tReader.Correlate("FileCharacter","%ZPM.Lifecycle.StudioProject.XDataArchive.FileCharacter")
+		Do tReader.Correlate("FileBinary","%ZPM.Lifecycle.StudioProject.XDataArchive.FileBinary")
 		$$$ThrowOnError(tReader.OpenStream(pXData.Data))
 		While tReader.Next(.tObject,.tSC) {
 			$$$ThrowOnError(tSC)
@@ -47,7 +47,7 @@ Method WriteToFile(pFile As %String) As %Status [ Private ]
 	Try {
 		Set tDirectory = ##class(%Library.File).GetDirectory(pFile)
 		If '##class(%Library.File).DirectoryExists(tDirectory) {
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Core.XDataArchive).CreateDirectoryChain(tDirectory))
+			$$$ThrowOnError(##class(%ZPM.Lifecycle.StudioProject.XDataArchive).CreateDirectoryChain(tDirectory))
 		}
 		Set tDestFileStream = $classmethod(..#STREAMCLASS,"%New")
 		$$$ThrowOnError(tDestFileStream.LinkToFile(pFile))

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Client.LocalServerDefinition Extends %ZPM.PackageManager.Client.ServerDefinition
+Class %ZPM.Repo.Local.Definition Extends %ZPM.Repo.Definition
 {
 
 Parameter DISPLAYNAME As STRING = "Local Cache";
@@ -12,19 +12,19 @@ Index Singleton On IsLocalCache [ Unique ];
 Property IsLocalCache As %Integer [ InitialExpression = 1, ReadOnly ];
 
 /// Returns a client to interact with this server.
-Method GetPackageService() As %ZPM.PackageManager.Core.IPackageService
+Method GetPackageService() As %ZPM.Repo.IPackageService
 {
 	Quit ##class(%ZPM.PackageManager.Server.PackageService).%New()
 }
 
 /// Returns a client to publish modules/applications to this server.
-Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService
+Method GetPublishService() As %ZPM.Repo.IPublishService
 {
 	Quit ##class(%ZPM.PackageManager.Server.PublishService).%New()
 }
 
 /// Handles modifiers/data attributes provided from the package manager shell.
-ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status
+ClassMethod OnConfigure(pInstance As %ZPM.Repo.Definition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status
 {
 	// Intentional no-op.
 	Quit $$$OK
@@ -33,11 +33,6 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 Method GetSortOrder() As %Integer [ Private ]
 {
 	Quit 1
-}
-
-Storage Default
-{
-<Type>%Storage.Persistent</Type>
 }
 
 }

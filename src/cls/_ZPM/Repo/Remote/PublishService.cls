@@ -1,7 +1,7 @@
-Class %ZPM.PackageManager.Client.REST.PublishClient Extends (%ZPM.PackageManager.Client.REST.PackageManagerClient, %ZPM.PackageManager.Core.IPublishService)
+Class %ZPM.Repo.Remote.PublishService Extends (%ZPM.Repo.Remote.PackageService, %ZPM.Repo.IPublishService)
 {
 
-Method PublishModule(pModule As %ZPM.PackageManager.Core.Module) As %Boolean
+Method PublishModule(pModule As %ZPM.Repo.Remote.ModuleInfo) As %Boolean
 {
   Quit ..Publish(pModule)
 }
@@ -19,7 +19,7 @@ Method Publish(pModule As %ZPM.PackageManager.Core.VersionedBase) As %Boolean
   
   Set tRequest = ..GetHttpRequest()
   Set tRequest.ContentType = "application/json"
-  Set publishTimeout =  ##class(%ZPM.PackageManager.Client.Settings).GetValue("publish_timeout")
+  Set publishTimeout =  ##class(%ZPM.Repo.UniversalSettings).GetValue("publish_timeout")
   Set:publishTimeout'="" tRequest.Timeout = publishTimeout
   
   $$$ThrowOnError(pModule.%JSONExportToStream(tRequest.EntityBody))
@@ -29,8 +29,7 @@ Method Publish(pModule As %ZPM.PackageManager.Core.VersionedBase) As %Boolean
     If tRequest.HttpResponse.StatusCode = 401 {
       $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, authorization required."))
     } Else {
-      set tMessage = "Publishing module, server responded with status code "_tRequest.HttpResponse.StatusCode_"."
-      $$$ThrowStatus($$$ERROR($$$GeneralError, tMessage))
+      $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, something went wrong."))
     }
   }
   Quit 1

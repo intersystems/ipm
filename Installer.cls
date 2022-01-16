@@ -59,10 +59,10 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     If (pRegistry'="") {
       $$$QuitOnError(##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry))
     }
-    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetDefaultRegistry(pRegistry))
-    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1))
-    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
-    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetValue("ColorScheme",""))
+    $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry))
+    $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetAnalyticsAvailable(1))
+    $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
+    $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetValue("ColorScheme",""))
     Quit $$$OK
 }
 

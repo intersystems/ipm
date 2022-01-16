@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Core.Module Extends (%RegisteredObject, %ZPM.PackageManager.Core.VersionedBase)
+Class %ZPM.Repo.Remote.ModuleInfo Extends (%RegisteredObject, %ZPM.PackageManager.Core.VersionedBase)
 {
 
 Parameter XMLTYPE = "CoreModule";

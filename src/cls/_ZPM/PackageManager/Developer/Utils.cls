@@ -211,8 +211,8 @@ ClassMethod LoadQualifiedReference(pReference As %ZPM.PackageManager.Core.Qualif
 	Try {
 		#dim tReference As %ZPM.PackageManager.Core.QualifiedModuleReference
 		Set tReference = pReference.%ConstructClone()
-		If (tReference.ServerName = "") && ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonExists(1,.tID) {
-			Set tServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).%OpenId(tID)
+		If (tReference.ServerName = "") && ##class(%ZPM.Repo.Local.Definition).SingletonExists(1,.tID) {
+			Set tServer = ##class(%ZPM.Repo.Local.Definition).%OpenId(tID)
 			Set tReference.ServerName = tServer.Name
 		}
 		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, .pParams, .pDependencyGraph)
@@ -226,7 +226,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 {
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
-	#dim tExpression As %ZPM.PackageManager.Core.SemanticVersionExpression
+	#dim tExpression As %ZPM.General.SemanticVersionExpression
 	Set tSC = $$$OK
 	Try {
 		// Backward-compatibility: if params isn't an array, use it as qstruct
@@ -244,7 +244,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		
 		// Use % variables that intentionally leak in worker processes, to avoid duplicate work when they go out of scope.
 		#dim %installcontext As %ZPM.General.InstallContext
-		#dim %manager As %ZPM.PackageManager.Client.Manager
+		#dim %manager As %ZPM.Repo.Manager
 		If '$$$IsISCWorker {
 			New %installcontext
 			New %manager
@@ -255,7 +255,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		Merge tIndex = pParams("Multicompile","CacheTempIndex")
 		Do %installcontext.SetCacheTempIndex(.tIndex)
 		
-		Set %manager = $Select($IsObject($Get(%manager)):%manager,1:##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC))
+		Set %manager = $Select($IsObject($Get(%manager)):%manager,1:##class(%ZPM.Repo.Manager).%Get(.tSC))
 		$$$ThrowOnError(tSC)
 		
 		Set tClient = %manager.CheckServiceCache(pServerName,.tAvailable)
@@ -309,7 +309,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			Set tAsArchive = -1
 			Set tPayload = tClient.GetModule(tModRef, .tAsArchive)
 			If (tVerbose) {
-				Set serverDef = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pServerName)
+				Set serverDef = ##class(%ZPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
 				Write !,"Module "_pModuleName_" was downloaded from " _ pServerName
 				If $IsObject(serverDef) {
 					Write " (",serverDef.Details,")"
@@ -358,15 +358,15 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		}
 		
 		// If remote load is successful, also register the module in the local cache.
-		If 'tModRef.Version.IsSnapshot() && ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonExists(1) {
-			Set tLocalServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonOpen(1,,.tSC)
+		If 'tModRef.Version.IsSnapshot() && ##class(%ZPM.Repo.Local.Definition).SingletonExists(1) {
+			Set tLocalServer = ##class(%ZPM.Repo.Local.Definition).SingletonOpen(1,,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
 			
 			// Don't need to register if loading from the local server.
 			If (tLocalServer.Name '= pServerName) && $IsObject($Get(tPayload)) && '##class(%ZPM.PackageManager.Server.Module).NameVersionExists(pModuleName, pVersion) {
-				Set tCacheMod = ##class(%ZPM.PackageManager.Core.Module).%New()
+				Set tCacheMod = ##class(%ZPM.Repo.Remote.ModuleInfo).%New()
 				Set tCacheMod.Name = pModuleName
 				Set tCacheMod.VersionString = pVersion
 				Set tCacheMod.Manifest = tClient.GetModuleManifest(tModRef)
@@ -491,11 +491,11 @@ ClassMethod GetModuleObjectFromStream(pStream As %Stream.Object, Output pFound A
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules As %List = "", Output pExpression As %ZPM.PackageManager.Core.SemanticVersionExpression, Output pSourceList As %List) As %Status
+ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules As %List = "", Output pExpression As %ZPM.General.SemanticVersionExpression, Output pSourceList As %List) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set pExpression = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).%New()
+		Set pExpression = ##class(%ZPM.General.SemanticVersionExpression).%New()
 		Set pSourceList = ""
 		
 		Set tResult = ##class(%ZPM.PackageManager.Developer.Module).VersionRequirementsFunc(pModuleName,pExcludeModules)
@@ -506,7 +506,7 @@ ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules
 		While tResult.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
 			Set tVersion = tResult.%Get("Version")
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(tVersion,.tVersionExpr))
+			$$$ThrowOnError(##class(%ZPM.General.SemanticVersionExpression).FromString(tVersion,.tVersionExpr))
 			Set pExpression = pExpression.And(tVersionExpr)
 			Set pSourceList = pSourceList_$ListBuild($ListToString(tResult.%Get("Names"),", ")_": "_tVersion)
 		}
@@ -674,7 +674,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 		} Else {
 			Set tPointer = 0
 			While $ListNext(pRepoNames,tPointer,tRepoName) {
-				Set tRepo = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tRepoName,,.tSC)
+				Set tRepo = ##class(%ZPM.Repo.Definition).ServerDefinitionKeyOpen(tRepoName,,.tSC)
 				If $$$ISERR(tSC) {
 					// Fatal error: repository name invalid
 					Quit
@@ -684,9 +684,9 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 					Continue
 				}
 				
-				#dim tPackageService As %ZPM.PackageManager.Core.IPackageService
+				#dim tPackageService As %ZPM.Repo.IPackageService
 				Set tPackageService = tRepo.GetPackageService()
-				Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
+				Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
 				Set tSearchCriteria.IncludePrerelease = tRepo.Prereleases
 				Set tSearchCriteria.IncludeSnapshots = tRepo.Snapshots
 				Set tList = tPackageService.ListModules(tSearchCriteria)
@@ -846,14 +846,14 @@ ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String) A
 	}
 	Set tSC = $$$OK
 	Try {
-		Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pServer,,.tSC)
+		Set tServer = ##class(%ZPM.Repo.Definition).ServerDefinitionKeyOpen(pServer,,.tSC)
 		If $$$ISERR(tSC) {
 			Quit
 		}
 		
 		Set tClient = tServer.GetPackageService()
 		If tClient.IsAvailable() {
-			Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
+			Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
 			Set tSearchCriteria.IncludePrerelease = tServer.Prereleases
 			Set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
 			Set tList = tClient.ListModules(tSearchCriteria)
@@ -956,8 +956,8 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		
 		If (pRepository '= "") {
 			// Force developer mode to be 0 if repository is read only.
-			If ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyExists(pRepository, .tRepositoryId) {
-				If +##class(%ZPM.PackageManager.Client.ServerDefinition).ReadOnlyGetStored(tRepositoryId) {
+			If ##class(%ZPM.Repo.Definition).ServerDefinitionKeyExists(pRepository, .tRepositoryId) {
+				If +##class(%ZPM.Repo.Definition).ReadOnlyGetStored(tRepositoryId) {
 					// Set in pParams directly so that this value gets transmitted downstream
 					Set pParams("DeveloperMode") = 0
 					If tVerbose {

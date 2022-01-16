@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Server.Module Extends (%Persistent, %ZPM.PackageManager.Core.Module) [ SqlTableName = _MODULE ]
+Class %ZPM.PackageManager.Server.Module Extends (%Persistent, %ZPM.Repo.Remote.ModuleInfo) [ SqlTableName = _MODULE ]
 {
 
 Parameter XMLTYPE = "ServerModule";

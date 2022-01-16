@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Client.RemoteServerDefinition Extends %ZPM.PackageManager.Client.ServerDefinition
+Class %ZPM.Repo.Remote.Definition Extends %ZPM.Repo.Definition
 {
 
 Parameter DISPLAYNAME As STRING = "Remote Repository";
@@ -79,9 +79,9 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 }
 
 /// Returns a REST client to interact with this server.
-Method GetPackageService() As %ZPM.PackageManager.Core.IPackageService
+Method GetPackageService() As %ZPM.Repo.IPackageService
 {
-	Set tClient = ##class(%ZPM.PackageManager.Client.REST.PackageManagerClient).%New()
+	Set tClient = ##class(%ZPM.Repo.Remote.PackageService).%New()
 	Set tClient.Location = ..URL
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
@@ -89,9 +89,9 @@ Method GetPackageService() As %ZPM.PackageManager.Core.IPackageService
 }
 
 /// Returns a REST client to publish modules/applications to this server.
-Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService
+Method GetPublishService() As %ZPM.Repo.IPublishService
 {
-	Set tClient = ##class(%ZPM.PackageManager.Client.REST.PublishClient).%New()
+	Set tClient = ##class(%ZPM.Repo.Remote.PublishService).%New()
 	Set tClient.Location = ..URL
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
@@ -112,7 +112,7 @@ Method Display()
 }
 
 /// Handles modifiers/data attributes provided from the package manager shell.
-ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status
+ClassMethod OnConfigure(pInstance As %ZPM.Repo.Definition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -147,27 +147,6 @@ Method GetSortOrder() As %Integer [ Private ]
 {
 	// TODO: Allow this to be changed dynamically.
 	Quit 2 + $Case(..%Id(),"":1,:..%Id())
-}
-
-Storage Default
-{
-<Data name="RemoteServerDefinitionDefaultData">
-<Subscript>"RemoteServerDefinition"</Subscript>
-<Value name="2">
-<Value>Username</Value>
-</Value>
-<Value name="3">
-<Value>Password</Value>
-</Value>
-<Value name="4">
-<Value>URL</Value>
-</Value>
-<Value name="5">
-<Value>DeploymentEnabled</Value>
-</Value>
-</Data>
-<DefaultData>RemoteServerDefinitionDefaultData</DefaultData>
-<Type>%Storage.Persistent</Type>
 }
 
 }

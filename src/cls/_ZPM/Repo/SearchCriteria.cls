@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Core.SearchCriteria Extends (%RegisteredObject, %XML.Adaptor)
+Class %ZPM.Repo.SearchCriteria Extends (%RegisteredObject, %XML.Adaptor)
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";

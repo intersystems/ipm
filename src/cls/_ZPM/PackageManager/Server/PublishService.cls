@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Server.PublishService Extends (%ZPM.PackageManager.Server.AbstractService, %ZPM.PackageManager.Core.IPublishService) [ ProcedureBlock ]
+Class %ZPM.PackageManager.Server.PublishService Extends (%ZPM.PackageManager.Server.AbstractService, %ZPM.Repo.IPublishService) [ ProcedureBlock ]
 {
 
 /// Name of the WebService.
@@ -10,7 +10,7 @@ Parameter NAMESPACE = "http://www.intersystems.com/PackageManager";
 /// Namespaces of referenced classes will be used in the WSDL.
 Parameter USECLASSNAMESPACES = 1;
 
-Method PublishModule(pModule As %ZPM.PackageManager.Core.Module) As %Boolean [ WebMethod ]
+Method PublishModule(pModule As %ZPM.Repo.Remote.ModuleInfo) As %Boolean [ WebMethod ]
 {
 	Set tModule = ##class(%ZPM.PackageManager.Server.Module).NameVersionOpen(pModule.Name,pModule.VersionString)
 	If '$IsObject(tModule) {

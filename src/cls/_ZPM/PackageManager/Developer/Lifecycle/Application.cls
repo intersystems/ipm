@@ -70,10 +70,10 @@ Method %Package(ByRef pParams) As %Status
 		// In the build namespace, create a filesystem repository pointing to the export directory.
 		// First, remove all existing server definitions to force use of the one filesystem repository.
 		Write:tVerbose !,"Clearing repository registry..."
-		Set tSC = ##class(%ZPM.PackageManager.Client.ServerDefinition).%DeleteExtent()
+		Set tSC = ##class(%ZPM.Repo.Definition).%DeleteExtent()
 		$$$ThrowOnError(tSC)
 		
-		Set tFSDef = ##class(%ZPM.PackageManager.Client.FilesystemServerDefinition).%New()
+		Set tFSDef = ##class(%ZPM.Repo.Filesystem.Definition).%New()
 		Set tFSDef.Name = "Build Directory"
 		Set tFSDef.Enabled = 1
 		Set tFSDef.Snapshots = 1

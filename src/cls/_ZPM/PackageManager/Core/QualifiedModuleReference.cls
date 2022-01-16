@@ -3,7 +3,7 @@
 Class %ZPM.PackageManager.Core.QualifiedModuleReference Extends %ZPM.PackageManager.Core.ResolvedModuleReference
 {
 
-/// The name of the repository the module is in (The Name property in <class>%ZPM.PackageManager.Client.ServerDefinition</class>. <br />
+/// The name of the repository the module is in (The Name property in <class>%ZPM.Repo.Definition</class>. <br />
 Property ServerName As %String;
 
 Method %OnNew(pServerName As %String = "", pResolvedReference As %ZPM.PackageManager.Core.ResolvedModuleReference = "") As %Status [ Private, ServerOnly = 1 ]

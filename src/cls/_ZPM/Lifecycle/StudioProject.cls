@@ -175,7 +175,7 @@ Method PackageOneModule(pModule As %ZPM.PackageManager.Developer.Module, pTarget
 			}
 		}
 	}
-	Set tArchive = ##class(%ZPM.PackageManager.Core.XDataArchive).%New(tWorkingDirectory)
+	Set tArchive = ##class(%ZPM.Lifecycle.StudioProject.XDataArchive).%New(tWorkingDirectory)
 	$$$ThrowOnError(tArchive.AddToProject(tSourceProject,tVerbose))
 	
 	Set tInstallerClass = ""

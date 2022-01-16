@@ -1,6 +1,6 @@
 Include (%syPrompt, %ZPM.PackageManager.Common)
 
-Class %ZPM.PackageManager.Client.ServerDefinition Extends (%Persistent, %ZEN.DataModel.Adaptor, %ZPM.CLI.Commands) [ Abstract ]
+Class %ZPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %ZPM.CLI.Commands) [ Abstract ]
 {
 
 Parameter DOMAIN = "ZPM";
@@ -60,14 +60,14 @@ ClassMethod CollectServerTypes(Output types) As %Status
 Property ReadOnly As %Boolean [ InitialExpression = 0 ];
 
 /// Returns a client to interact with this server.
-Method GetPackageService() As %ZPM.PackageManager.Core.IPackageService [ Abstract ]
+Method GetPackageService() As %ZPM.Repo.IPackageService [ Abstract ]
 {
 }
 
 /// Returns a client to publish modules/applications to this server.
 /// If publishing modules/applications is not supported, returns $$$NULLOREF.
 /// Errors are thrown as exceptions.
-Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService [ Abstract ]
+Method GetPublishService() As %ZPM.Repo.IPublishService [ Abstract ]
 {
 }
 
@@ -160,7 +160,7 @@ ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pDat
 }
 
 /// Subclasses must override. Allows handling of any custom modifiers/data attributes provided from the package manager shell.
-ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status [ Abstract ]
+ClassMethod OnConfigure(pInstance As %ZPM.Repo.Definition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status [ Abstract ]
 {
 }
 
@@ -204,46 +204,40 @@ ClassMethod CatalogClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = Cat
 
 Query List() As %SQLQuery
 {
-SELECT Name FROM ServerDefinition
-ORDER BY ServerDefinition_SortOrder(ID) DESC
+SELECT Name FROM %ZPM_Repo.Definition
+ORDER BY %ZPM_Repo.Definition_SortOrder(ID) DESC
 }
 
 Storage Default
 {
-<Data name="ServerDefinitionDefaultData">
+<Data name="DefinitionDefaultData">
 <Value name="1">
 <Value>%%CLASSNAME</Value>
 </Value>
 <Value name="2">
 <Value>Name</Value>
 </Value>
-<Value name="5">
-<Value>Credentials</Value>
-</Value>
-<Value name="7">
+<Value name="3">
 <Value>Enabled</Value>
 </Value>
-<Value name="8">
-<Value>IsLocalCache</Value>
-</Value>
-<Value name="9">
+<Value name="4">
 <Value>Details</Value>
 </Value>
-<Value name="10">
+<Value name="5">
 <Value>Snapshots</Value>
 </Value>
-<Value name="11">
+<Value name="6">
 <Value>Prereleases</Value>
 </Value>
-<Value name="12">
+<Value name="7">
 <Value>ReadOnly</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.Client.ServerDefD</DataLocation>
-<DefaultData>ServerDefinitionDefaultData</DefaultData>
-<IdLocation>^%ZPM.Client.ServerDefD</IdLocation>
-<IndexLocation>^%ZPM.Client.ServerDefI</IndexLocation>
-<StreamLocation>^%ZPM.Client.ServerDefS</StreamLocation>
+<DataLocation>^%ZPM.Repo.DefinitionD</DataLocation>
+<DefaultData>DefinitionDefaultData</DefaultData>
+<IdLocation>^%ZPM.Repo.DefinitionD</IdLocation>
+<IndexLocation>^%ZPM.Repo.DefinitionI</IndexLocation>
+<StreamLocation>^%ZPM.Repo.DefinitionS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

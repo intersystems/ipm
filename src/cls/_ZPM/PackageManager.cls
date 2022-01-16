@@ -172,7 +172,7 @@ repo -n AppModules -list-modules
 <modifier name="prereleases" aliases="pre" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for prerelease software" />
 <modifier name="read-only" aliases="ro" value="true" valueList="0,1" description="For any repository, specifies that modules installed from it are ALWAYS installed in non-developer mode, effectively making them read only" />
 
-<modifier name="type" value="true" aliases="t" description="Subclass of %ZPM.PackageManager.Client.ServerDefinition to create/modify/delete or implementation of %ZPM.PackageManager.Core.IPackageService or %ZPM.PackageManager.Core.IPublishService to enable/disable" />
+<modifier name="type" value="true" aliases="t" description="Subclass of %ZPM.Repo.Definition to create/modify/delete or implementation of %ZPM.Repo.IPackageService or %ZPM.Repo.IPublishService to enable/disable" />
 
 </command>
 
@@ -404,7 +404,7 @@ ClassMethod %GetCommandStructure(Output pCommandStructure)
 {
   Do ..%GetOneCommandStructure(.pCommandStructure)
 
-  Do ##class(%ZPM.PackageManager.Client.ServerDefinition).%GetCommandStructure(.tCommandStructure)
+  Do ##class(%ZPM.Repo.Definition).%GetCommandStructure(.tCommandStructure)
   Merge pCommandStructure("repo") = tCommandStructure("repo")
 }
 
@@ -427,7 +427,7 @@ ClassMethod Shell(pCommand As %String, pTerminateOnError As %Boolean = 0, pHaltO
 
 ClassMethod TerminalPromptColor() As %String
 {
-	quit $Case(##class(%ZPM.PackageManager.Client.Settings).GetValue("TerminalPrompt"),"green":$$$Green,"red":$$$Red,"magenta":$$$Magenta,"yellow":$$$Yellow,"blue":$$$Blue,"cyan":$$$Cyan,"none":$$$Default,:$$$Default)
+	quit $Case(##class(%ZPM.Repo.UniversalSettings).GetValue("TerminalPrompt"),"green":$$$Green,"red":$$$Red,"magenta":$$$Magenta,"yellow":$$$Yellow,"blue":$$$Blue,"cyan":$$$Cyan,"none":$$$Default,:$$$Default)
 }
 
 ClassMethod TerminalPrompt() As %String
@@ -824,12 +824,12 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 	If '$Data(Found) Write !," Locally installed zpm-registry not found" 
 	
 	// Get URL current registry
-	Set tRes = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).ExtentFunc()
+	Set tRes = ##class(%ZPM.Repo.Remote.Definition).ExtentFunc()
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 
-		#dim tRepository As %ZPM.PackageManager.Client.RemoteServerDefinition
-		Set tRepository = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).%OpenId(tRes.ID,,.tSC)
+		#dim tRepository As %ZPM.Repo.Remote.Definition
+		Set tRepository = ##class(%ZPM.Repo.Remote.Definition).%OpenId(tRes.ID,,.tSC)
 		$$$ThrowOnError(tSC)
 		Set tService = tRepository.GetPackageService()
 		Set tInfo = tService.GetInfo()
@@ -916,7 +916,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	Set tQuiet = $$$HasModifier(pCommandInfo,"noprompt")
 	
 	// Local artifact cache
-	$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).InitializeLocalCache(.tCreated))
+	$$$ThrowOnError(##class(%ZPM.Repo.Utils).InitializeLocalCache(.tCreated))
 	If (tCreated) {
 		Write !,"Initialized local cache."
 	} Else {
@@ -924,7 +924,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	}
 	
 	// Reindex tables with semantic version indices
-	For tClass = "%ZPM.PackageManager.Server.Module","%ZPM.PackageManager.Server.Application","%ZPM.PackageManager.Client.Filesystem.Cache" {
+	For tClass = "%ZPM.PackageManager.Server.Module","%ZPM.PackageManager.Server.Application","%ZPM.Repo.Filesystem.Cache" {
 		Write !,"Reindexing ",tClass,"... "
 		$$$ThrowOnError($ClassMethod(tClass,"%BuildIndices",,1,1))
 		Write "done."
@@ -1173,7 +1173,7 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 	If (tName '= "") {
 		Do ..ShowModulesForRepository(tName, tRepo, tDesc, tSearchString)
 	} Else {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_Repo.Definition")
 		If (tRes.%SQLCODE < 0) {
 			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 		}
@@ -1199,31 +1199,31 @@ ClassMethod Config(ByRef pCommandInfo) [ Internal ]
 		Set action = "list"	
 	}
 	If (action="list") {
-		Do ##class(%ZPM.PackageManager.Client.Settings).PrintList()
+		Do ##class(%ZPM.Repo.UniversalSettings).PrintList()
 	} ElseIf (action="set") {
 		If ( (key = "") || (value="") ) {
 			Write "Key and Value required. Use config set <key> <value>",!
 			Quit
 		} 
-		Do ##class(%ZPM.PackageManager.Client.Settings).UpdateOne(key,value)
+		Do ##class(%ZPM.Repo.UniversalSettings).UpdateOne(key,value)
 	} ElseIf (action="get") {
 		If (key = "") {
-			Do ##class(%ZPM.PackageManager.Client.Settings).PrintList()
+			Do ##class(%ZPM.Repo.UniversalSettings).PrintList()
 		} Else {
-			Do ##class(%ZPM.PackageManager.Client.Settings).PrintOne(key)
+			Do ##class(%ZPM.Repo.UniversalSettings).PrintOne(key)
 		}
 	} ElseIf (action="delete") {
 		If (key = "") {
 			Write "Key required. Use config delete <key>",!
 			Quit
 		}
-		Do ##class(%ZPM.PackageManager.Client.Settings).ResetToDefault(key)
+		Do ##class(%ZPM.Repo.UniversalSettings).ResetToDefault(key)
 	}
 }
 
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
-  Do ##class(%ZPM.PackageManager.Client.ServerDefinition).CollectServerTypes(.types)
+  Do ##class(%ZPM.Repo.Definition).CollectServerTypes(.types)
 
   Set tType = $$$GetModifier(pCommandInfo, "type")
 
@@ -1242,14 +1242,14 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 
 	If $$$HasModifier(pCommandInfo,"list") && '$$$HasModifier(pCommandInfo,"list-modules") {
 		Set tUseFilter = $Data(types)\10
-    Set tRes = ##class(%ZPM.PackageManager.Client.ServerDefinition).ListFunc()
+    Set tRes = ##class(%ZPM.Repo.Definition).ListFunc()
     $$$ThrowSQLIfError(tRes.%SQLCODE,tRes.%Message)
 		Set tDisplayCount = 0
 		Write !
     While tRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
 
-			Set tRepository = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+			Set tRepository = ##class(%ZPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
 			$$$ThrowOnError(tSC)
 			If serverClassList = "" || ($ListFind(serverClassList, $Classname(tRepository))) {
 				Do tRepository.Display()
@@ -1267,7 +1267,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		Quit
 	} ElseIf $$$HasModifier(pCommandInfo,"delete-all") {
     If (serverClassList = "") {
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Client.ServerDefinition).%DeleteExtent())
+			$$$ThrowOnError(##class(%ZPM.Repo.Definition).%DeleteExtent())
     }
     Else {
       Set ptr = 0
@@ -1280,10 +1280,10 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		If (repoName = "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Missing -name modifier"))
 		}
-		If '##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyExists(repoName) {
+		If '##class(%ZPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Repository "_$$$QUOTE(repoName)_" does not exist so cannot be deleted."))
 		}
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyDelete(repoName))
+		$$$ThrowOnError(##class(%ZPM.Repo.Definition).ServerDefinitionKeyDelete(repoName))
   } Elseif $$$HasModifier(pCommandInfo,"reset-defaults") {
     Merge tModifiers = pCommandInfo("modifiers")
     Set tName = $$$GetModifier(pCommandInfo,"name")
@@ -1293,13 +1293,13 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
     }
     Set tModifiers("remote") = ""
 
-    Set tModifiers("url") = ##class(%ZPM.PackageManager.Client.Settings).GetDefaultRegistry()
+    Set tModifiers("url") = ##class(%ZPM.Repo.UniversalSettings).GetDefaultRegistry()
     If (tModifiers("url")="") {
         Write "Error retrieving default registry URL"
         Quit
     }
     Set tModifiers("username") = "", tModifiers("password") = ""
-    Set tType = "%ZPM.PackageManager.Client.RemoteServerDefinition"
+    Set tType = "%ZPM.Repo.Remote.Definition"
     $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
 	} Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
@@ -1307,7 +1307,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		
 		#dim tRepoTypeResult As %SQL.StatementResult
 		Set tStatement = ##class(%SQL.Statement).%New()
-		Set tSC = tStatement.%PrepareClassQuery("%ZPM.PackageManager.Client.ServerDefinition","Catalog")
+		Set tSC = tStatement.%PrepareClassQuery("%ZPM.Repo.Definition","Catalog")
 		$$$ThrowOnError(tSC)
 		Set tRepoTypeResult = tStatement.%Execute()
 		If tRepoTypeResult.%SQLCODE < 0 {
@@ -1334,7 +1334,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
       Set tType = tClassList(tDescIndex)
     }
 		
-		Set tBaseClass = "%ZPM.PackageManager.Client.ServerDefinition"
+		Set tBaseClass = "%ZPM.Repo.Definition"
 		If '$ClassMethod(tType,"%Extends",tBaseClass) {
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid type '%1' - must extend %2",tType,tBaseClass))
 		}
@@ -1446,7 +1446,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
     Quit $$$OK
   }
 	If tRegistry = "" {
-		Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1,,.tSC)
+		Set tServer = ##class(%ZPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.tSC)
 		If $isobject(tServer) {
 			Set tRegistry = tServer.Name
 		}
@@ -1455,12 +1455,12 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
 	
-	Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
+	Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
 	Set tSearchCriteria.Registry = tRegistry
 	Set tSearchCriteria.Name = tModuleName
 	Set tSearchCriteria.VersionExpression = tVersion
 	Set tSearchCriteria.Keywords = tKeywords
-	$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+	$$$ThrowOnError(##class(%ZPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
 	
 	If (tResults.Count() > 0) {
 		Set tResult = ""
@@ -1657,12 +1657,12 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
 			
-			Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
+			Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
 			Set tSearchCriteria.Name = tModName
 			Set tSearchCriteria.VersionExpression = tModVersion
 			Set tSearchCriteria.IncludeSnapshots = 1
 			Set tSearchCriteria.IncludePrerelease = 1
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).SearchRepositoriesForApplication(tSearchCriteria,.tResults))
+			$$$ThrowOnError(##class(%ZPM.Repo.Utils).SearchRepositoriesForApplication(tSearchCriteria,.tResults))
 			
 			If (tResults.Count() > 0) {
 				#dim tResult As %ZPM.PackageManager.Core.QualifiedModuleReference
@@ -1688,7 +1688,7 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 			
 			// TODO: Parameters
 			
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).InstallApplication(tInfo))
+			$$$ThrowOnError(##class(%ZPM.Repo.Utils).InstallApplication(tInfo))
 			
 			Set $Namespace = tNamespace
 		} ElseIf (tValue = 2) {
@@ -1729,7 +1729,7 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 			Set tInfo = ##class(%ZPM.PackageManager.Core.InstallationInfo).%New()
 			Set tInfo.Namespace = $Namespace
 			Set tInfo.ModuleReference.Name = tModuleList(tUninstallAppIdx)
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).UninstallApplication(tInfo))
+			$$$ThrowOnError(##class(%ZPM.Repo.Utils).UninstallApplication(tInfo))
 		} ElseIf (tValue = 4) {
 			Set tNamespace = ""
 		} ElseIf (tValue = 5) {

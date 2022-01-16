@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Server.PackageService Extends (%ZPM.PackageManager.Server.AbstractService, %ZPM.PackageManager.Core.IPackageService, %ZPM.PackageManager.Core.ModuleInfo.QueryUtils) [ ProcedureBlock ]
+Class %ZPM.PackageManager.Server.PackageService Extends (%ZPM.PackageManager.Server.AbstractService, %ZPM.Repo.IPackageService, %ZPM.PackageManager.Core.ModuleInfo.QueryUtils) [ ProcedureBlock ]
 {
 
 /// Name of the WebService.
@@ -10,7 +10,7 @@ Parameter NAMESPACE = "http://www.intersystems.com/PackageManager";
 /// Namespaces of referenced classes will be used in the WSDL.
 Parameter USECLASSNAMESPACES = 1;
 
-Method ListApplications(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ WebMethod ]
+Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ WebMethod ]
 {
 	Set tList = ##class(%Library.ListOfObjects).%New()
 	Set tQuery = "select m.Name,m.VersionString from %ZPM_PackageManager_Server.Application_OrderedMatches(?,?,?) m "_
@@ -18,7 +18,7 @@ Method ListApplications(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriter
 	Quit ..moduleSqlToList(tQuery,.pSearchCriteria)
 }
 
-Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ WebMethod ]
+Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ WebMethod ]
 {
 	Set tList = ##class(%Library.ListOfObjects).%New()
 	Set tQuery = "select m.Name,m.VersionString from %ZPM_PackageManager_Server.Module_OrderedMatches(?,?,?) m "_

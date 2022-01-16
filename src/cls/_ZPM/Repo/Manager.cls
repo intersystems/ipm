@@ -1,19 +1,19 @@
-Class %ZPM.PackageManager.Client.Manager Extends %ZPM.General.Singleton
+Class %ZPM.Repo.Manager Extends %ZPM.General.Singleton
 {
 
 /// If set to 1, calls to %Get must return an instance of this class created in the current namespace; a new instance will be created if none exists.
 Parameter NAMESPACESCOPE As BOOLEAN = 1;
 
 /// Avoids constantly reinstantiating the package service objects, which may be expensive.
-Property ServiceCache As array Of %ZPM.PackageManager.Core.IPackageService;
+Property ServiceCache As array Of %ZPM.Repo.IPackageService;
 
 /// Keeps track of which repositories are unavailable (by name - the keys are important, values don't matter)
 Property UnavailableNames As array Of %String;
 
 /// Performance optimization for XSLTs
-Property XSLTProvider As %ZPM.PackageManager.Core.XSLTProvider;
+Property XSLTProvider As %ZPM.Repo.XSLTProvider;
 
-Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boolean) As %ZPM.PackageManager.Core.IPackageService
+Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boolean) As %ZPM.Repo.IPackageService
 {
 	Set pAvailable = 0
 	If ..UnavailableNames.IsDefined(pRepositoryName) {
@@ -22,7 +22,7 @@ Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boole
 	
 	Set tClient = ..ServiceCache.GetAt(pRepositoryName)
 	If '$IsObject(tClient) {
-		Set tRepository = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(pRepositoryName,,.tSC)
+		Set tRepository = ##class(%ZPM.Repo.Definition).ServerDefinitionKeyOpen(pRepositoryName,,.tSC)
 		$$$ThrowOnError(tSC)
 		
 		If tRepository.Enabled {
@@ -45,13 +45,13 @@ Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boole
 }
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
+Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set pResults = ##class(%Library.ListOfObjects).%New()
 	Try {
     Set registry = pSearchCriteria.Registry
-    Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select ID from %ZPM_PackageManager_Client.ServerDefinition where Enabled = 1 and (:registry is null or Name = :registry) order by %ZPM_PackageManager_Client.ServerDefinition_SortOrder(ID)")
+    Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select ID from %ZPM_Repo.Definition where Enabled = 1 and (:registry is null or Name = :registry) order by %ZPM_Repo.Definition_SortOrder(ID)")
 		If (tRes.%SQLCODE < 0) {
 			Set tSC = $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
 			Quit
@@ -61,17 +61,17 @@ Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.PackageManager.Core.S
 				Quit
 			}
 			
-			Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).%OpenId(tRes.%Get("ID"),,.tSC)
+			Set tServer = ##class(%ZPM.Repo.Definition).%OpenId(tRes.%Get("ID"),,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
 			
-			If pForceRemoteRepo && tServer.%IsA("%ZPM.PackageManager.Client.LocalServerDefinition") {
+			If pForceRemoteRepo && tServer.%IsA("%ZPM.Repo.Local.Definition") {
 				Continue
 			}
 			
 			// Only remote repositories support keywords, for now.
-			If (pSearchCriteria.Keywords.Count() > 0) && tServer.%IsA("%ZPM.PackageManager.Client.FilesystemServerDefinition") {
+			If (pSearchCriteria.Keywords.Count() > 0) && tServer.%IsA("%ZPM.Repo.Filesystem.Definition") {
 				Continue
 			}
 			
@@ -80,7 +80,7 @@ Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.PackageManager.Core.S
 				Continue
 			}
 			
-			#dim tClientCriteria as %ZPM.PackageManager.Core.SearchCriteria
+			#dim tClientCriteria as %ZPM.Repo.SearchCriteria
 			Set tClientCriteria = pSearchCriteria.%ConstructClone(1)
 			Set tPrereleases = pSearchCriteria.IncludePrerelease
 			If (tPrereleases = "") {
@@ -182,12 +182,12 @@ Method RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Core.Qua
 }
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
+Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set pResults = ##class(%Library.ListOfObjects).%New()
 	Try {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select ID from %ZPM_PackageManager_Client.ServerDefinition where Enabled = 1 order by %ZPM_PackageManager_Client.ServerDefinition_SortOrder(ID)")
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select ID from %ZPM_Repo.Definition where Enabled = 1 order by %ZPM_Repo.Definition_SortOrder(ID)")
 		If (tRes.%SQLCODE < 0) {
 			Set tSC = $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
 			Quit
@@ -197,12 +197,12 @@ Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.PackageManager.C
 				Quit
 			}
 			
-			Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).%OpenId(tRes.%Get("ID"),,.tSC)
+			Set tServer = ##class(%ZPM.Repo.Definition).%OpenId(tRes.%Get("ID"),,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
 			
-			If pForceRemoteRepo && tServer.%IsA("%ZPM.PackageManager.Client.LocalServerDefinition") {
+			If pForceRemoteRepo && tServer.%IsA("%ZPM.Repo.Local.Definition") {
 				Continue
 			}
 			
@@ -214,7 +214,7 @@ Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.PackageManager.C
 				Continue
 			}
 			
-			#dim tClientCriteria as %ZPM.PackageManager.Core.SearchCriteria
+			#dim tClientCriteria as %ZPM.Repo.SearchCriteria
 			Set tClientCriteria = pSearchCriteria.%ConstructClone()
 			Set tClientCriteria.IncludePrerelease = tServer.Prereleases
 			Set tClientCriteria.IncludeSnapshots = tServer.Snapshots
@@ -286,7 +286,7 @@ Method RetrieveApplicationPackage(pQualifiedReference As %ZPM.PackageManager.Cor
 /// Subclasses of %ZPM.General.Singleton that override this method *MUST* call ##super().
 Method %OnNew() As %Status [ Private, ServerOnly = 1 ]
 {
-	Set ..XSLTProvider = ##class(%ZPM.PackageManager.Core.XSLTProvider).%Get(.tSC)
+	Set ..XSLTProvider = ##class(%ZPM.Repo.XSLTProvider).%Get(.tSC)
 	$$$ThrowOnError(tSC)
 	Set tSC = ##super()
 	$$$ThrowOnError(tSC)

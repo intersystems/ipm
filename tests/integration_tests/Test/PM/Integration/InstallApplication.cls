@@ -14,7 +14,7 @@ Method TestSimpleApp()
     #; Set tInstallInfo = ##class(%ZPM.PackageManager.Core.InstallationInfo).%New()
     #; Set tInstallInfo.Namespace = "INTTEST"
     #; #; Set tInstallInfo.ModuleReference = tQualRef //tResults.GetAt(1)
-    #; Set tSC = ##class(%ZPM.PackageManager.Client.Utils).UninstallApplication(tInstallInfo)
+    #; Set tSC = ##class(%ZPM.Repo.Utils).UninstallApplication(tInstallInfo)
     #; If $$$ISERR(tSC) {
     #;   Do $$$LogMessage("Encountered an error trying to clean up INTTEST namespace (which may not actually be an issue): "_$System.Status.GetErrorText(tSC))
     #; } Else {
@@ -22,7 +22,7 @@ Method TestSimpleApp()
     #; }
     
     #; // Finally: Given a qualified module reference, install it.
-    #; Set tSC = ##class(%ZPM.PackageManager.Client.Utils).InstallApplication(tInstallInfo)
+    #; Set tSC = ##class(%ZPM.Repo.Utils).InstallApplication(tInstallInfo)
     Quit:'$$$AssertStatusOK(tSC,"Successfully installed SimpleApp application.")
   } Catch e {
     Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")

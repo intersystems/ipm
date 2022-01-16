@@ -1,10 +1,10 @@
 Class %ZPM.PackageManager.Core.ModuleInfo.QueryUtils
 {
 
-ClassMethod moduleSqlToList(pQuery As %String, pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria, ByRef pArgs) As %Library.ListOfObjects
+ClassMethod moduleSqlToList(pQuery As %String, pSearchCriteria As %ZPM.Repo.SearchCriteria, ByRef pArgs) As %Library.ListOfObjects
 {
 	If '$IsObject($Get(pSearchCriteria)) {
-		 Set pSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
+		 Set pSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
 	}
 	Merge tArgs = pArgs
 	Set tKeywordList = ""

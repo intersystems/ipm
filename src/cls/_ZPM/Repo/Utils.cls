@@ -1,15 +1,15 @@
 Include %occErrors
 
-Class %ZPM.PackageManager.Client.Utils
+Class %ZPM.Repo.Utils
 {
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
+ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set pResults = $$$NULLOREF
 	Try {
-		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		Set tSC = tManager.SearchRepositoriesForModule(pSearchCriteria,.pResults)
 	} Catch e {
@@ -24,7 +24,7 @@ ClassMethod RetrieveModuleManifest(pQualifiedReference As %ZPM.PackageManager.Co
 	Set tSC = $$$OK
 	Set pManifestStream = $$$NULLOREF
 	Try {
-		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		Set tSC = tManager.RetrieveModuleManifest(pQualifiedReference,.pManifestStream)
 	} Catch e {
@@ -39,7 +39,7 @@ ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Cor
 	Set tSC = $$$OK
 	Set pPackageStream = $$$NULLOREF
 	Try {
-		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		Set tSC = tManager.RetrieveModulePackage(pQualifiedReference,.pPackageStream)
 	} Catch e {
@@ -49,12 +49,12 @@ ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Cor
 }
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-ClassMethod SearchRepositoriesForApplication(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
+ClassMethod SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set pResults = $$$NULLOREF
 	Try {
-		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		Set tSC = tManager.SearchRepositoriesForApplication(pSearchCriteria,.pResults)
 	} Catch e {
@@ -69,7 +69,7 @@ ClassMethod RetrieveApplicationManifest(pQualifiedReference As %ZPM.PackageManag
 	Set tSC = $$$OK
 	Set pManifestStream = $$$NULLOREF
 	Try {
-		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		Set tSC = tManager.RetrieveApplicationManifest(pQualifiedReference,.pManifestStream)
 	} Catch e {
@@ -84,7 +84,7 @@ ClassMethod RetrieveApplicationPackage(pQualifiedReference As %ZPM.PackageManage
 	Set tSC = $$$OK
 	Set pPackageStream = $$$NULLOREF
 	Try {
-		Set tManager = ##class(%ZPM.PackageManager.Client.Manager).%Get(.tSC)
+		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		Set tSC = tManager.RetrieveApplicationPackage(pQualifiedReference,.pPackageStream)
 	} Catch e {
@@ -98,14 +98,14 @@ ClassMethod InitializeLocalCache(Output pCreated As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set tLocalCache = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonOpen(1,,.tSC)
+		Set tLocalCache = ##class(%ZPM.Repo.Local.Definition).SingletonOpen(1,,.tSC)
 		If $$$ISERR(tSC) && ($System.Status.GetErrorCodes(tSC) '= $$$KeyValueNotFoundOpen) {
 			Quit
 		}
 		If $IsObject(tLocalCache) {
 			Quit
 		}
-		Set tLocalCache = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).%New()
+		Set tLocalCache = ##class(%ZPM.Repo.Local.Definition).%New()
 		Set tLocalCache.Name = "(Local Cache)"
 		Set tLocalCache.Prereleases = 1
 		Set tLocalCache.Snapshots = 1

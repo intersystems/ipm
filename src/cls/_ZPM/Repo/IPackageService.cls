@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Core.IPackageService [ Abstract ]
+Class %ZPM.Repo.IPackageService [ Abstract ]
 {
 
 Method GetApplication(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.Object [ Abstract ]
@@ -33,11 +33,11 @@ Method HasModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
 {
 }
 
-Method ListApplications(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ Abstract ]
+Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ Abstract ]
 {
 }
 
-Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ Abstract ]
+Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ Abstract ]
 {
 }
 
