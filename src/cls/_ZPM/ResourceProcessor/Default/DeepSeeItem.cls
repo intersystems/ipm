@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.Default.DeepSeeItem Extends %ZPM.PackageManager.Developer.Processor.Default.Document
+Class %ZPM.ResourceProcessor.Default.DeepSeeItem Extends %ZPM.ResourceProcessor.Default.Document
 {
 
 Parameter EXTENSION = ".DFI";
@@ -148,27 +148,6 @@ Method OnGetUniqueName(Output pUniqueName)
     If (..Keywords '= "") {
         Set pUniqueName = ..Keywords
     }
-}
-
-Storage Default
-{
-<Data name="DeepSeeItemDefaultData">
-<Value name="1">
-<Value>%%CLASSNAME</Value>
-</Value>
-<Value name="2">
-<Value>FilenameExtension</Value>
-</Value>
-<Value name="3">
-<Value>Format</Value>
-</Value>
-</Data>
-<DataLocation>^%ZPM.PackageMaE05F.DeepSeeItemD</DataLocation>
-<DefaultData>DeepSeeItemDefaultData</DefaultData>
-<IdLocation>^%ZPM.PackageMaE05F.DeepSeeItemD</IdLocation>
-<IndexLocation>^%ZPM.PackageMaE05F.DeepSeeItemI</IndexLocation>
-<StreamLocation>^%ZPM.PackageMaE05F.DeepSeeItemS</StreamLocation>
-<Type>%Storage.Persistent</Type>
 }
 
 }

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.Default.Routine Extends %ZPM.PackageManager.Developer.Processor.Default.Document
+Class %ZPM.ResourceProcessor.Default.Routine Extends %ZPM.ResourceProcessor.Default.Document
 {
 
 /// Description of resource processor class (shown in UI)

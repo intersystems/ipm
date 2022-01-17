@@ -466,13 +466,13 @@ ClassMethod GetInstallerClassListSQL(Output pSQL As %String) As %Status
 ClassMethod GetProcessorClassListSQL(Output pSQL As %String) As %Status
 {
 	Set pSQL = "select SUBSTRING(cd.Name,"_(1+$Length($$$DefaultProcessorPackageDot))_") Name, "_
-			"%ZPM_PackageManager_Developer_Processor.Abstract_GetDescription(cd.Name) Description from "_
-		"%Dictionary.ClassDefinition_SubclassOf('%ZPM.PackageManager.Developer.Processor.Abstract') subs "_
+			"%ZPM_ResourceProcessor.Abstract_GetDescription(cd.Name) Description from "_
+		"%Dictionary.ClassDefinition_SubclassOf('%ZPM.ResourceProcessor.Abstract') subs "_
 		"join %Dictionary.CompiledClass cd on subs.Name = cd.Name "_
 		"where cd.Abstract = 0 and cd.Name %STARTSWITH '"_$$$DefaultProcessorPackageDot_"' "_
 		"union "_
-		"select cd.Name,%ZPM_PackageManager_Developer_Processor.Abstract_GetDescription(cd.Name) Description from "_
-		"%Dictionary.ClassDefinition_SubclassOf('%ZPM.PackageManager.Developer.Processor.Abstract') subs "_
+		"select cd.Name,%ZPM_ResourceProcessor.Abstract_GetDescription(cd.Name) Description from "_
+		"%Dictionary.ClassDefinition_SubclassOf('%ZPM.ResourceProcessor.Abstract') subs "_
 		"join %Dictionary.CompiledClass cd on subs.Name = cd.Name "_
 		"where cd.Abstract = 0 and not cd.Name %STARTSWITH '"_$$$DefaultProcessorPackageDot_"'"
 	Quit $$$OK
@@ -487,7 +487,7 @@ ClassMethod ListProcessorAttributesExecute(ByRef qHandle As %Binary, pProcessorC
 	Set tSC = $$$OK
 	Try {
 		Set qHandle("pointer") = ""
-		Set tSuper = "%ZPM.PackageManager.Developer.Processor.Abstract"
+		Set tSuper = "%ZPM.ResourceProcessor.Abstract"
 		If '$$$comClassDefined(pProcessorClass) && $$$comClassDefined($$$DefaultProcessorPackageDot_pProcessorClass) {
 			Set pProcessorClass = $$$DefaultProcessorPackageDot_pProcessorClass
 		}

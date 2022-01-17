@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.PropertyParameters [ System = 3 ]
+Class %ZPM.ResourceProcessor.PropertyParameters [ System = 3 ]
 {
 
 /// Can set to true if the attribute should be listed as required in property list APIs (without requiring it at the Objects level).

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.UnitTest Extends %ZPM.PackageManager.Developer.Processor.Abstract
+Class %ZPM.ResourceProcessor.Test Extends %ZPM.ResourceProcessor.Abstract
 {
 
 /// Description of resource processor class (shown in UI)
@@ -36,7 +36,7 @@ Property Format As %String(VALUELIST = ",UDL,XML");
 Property ExportFlags As %String(MAXLEN = "");
 
 /// Embedded processor to handle unit test resources as a package.
-Property EmbeddedProcessor As %ZPM.PackageManager.Developer.Processor.Default.Document [ Private ];
+Property EmbeddedProcessor As %ZPM.ResourceProcessor.Default.Document [ Private ];
 
 Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 {
@@ -242,10 +242,10 @@ Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceRefere
 {
 	Set tSC = ##super(pResourceReference)
 	If (..Package '= "") {
-		Set ..EmbeddedProcessor = ##class(%ZPM.PackageManager.Developer.Processor.Default.Package).%New(pResourceReference)
+		Set ..EmbeddedProcessor = ##class(%ZPM.ResourceProcessor.Default.Package).%New(pResourceReference)
 		Set ..EmbeddedProcessor.Directory = ..ResourceReference.Name
 	} ElseIf (..Class '= "") {
-		Set ..EmbeddedProcessor = ##class(%ZPM.PackageManager.Developer.Processor.Default.Class).%New(pResourceReference)
+		Set ..EmbeddedProcessor = ##class(%ZPM.ResourceProcessor.Default.Class).%New(pResourceReference)
 	}
 	Set ..EmbeddedProcessor.ExportFlags = ..ExportFlags
 	Quit tSC

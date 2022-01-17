@@ -30,8 +30,8 @@
     <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Utils:GetDependentsList" Public="false"></Item>
     <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Utils:GetDependentsAsTree" Public="false"></Item>
     <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.API:UpdateAPIDocumentation" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.API.ErrorMessages:GetMessageFile" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.API.ErrorMessages:SaveMessageFile" Public="false"></Item>
+    <Item Type="class" SubType="Method" Name="%ZPM.ResourceProcessor.LocalizationExport:GetMessageFile" Public="false"></Item>
+    <Item Type="class" SubType="Method" Name="%ZPM.ResourceProcessor.LocalizationExport:SaveMessageFile" Public="false"></Item>
     <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Build:SwitchToNamespace" Public="false"></Item>
     <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Build:InitializeNamespace" Public="false"></Item>
   </API>

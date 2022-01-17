@@ -1,4 +1,4 @@
-/// Tested in the SatisfiesCondition method of <class>%ZPM.PackageManager.Developer.Processor.Abstract</class>
+/// Tested in the SatisfiesCondition method of <class>%ZPM.ResourceProcessor.Abstract</class>
 Class %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault.Condition Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
 {
 

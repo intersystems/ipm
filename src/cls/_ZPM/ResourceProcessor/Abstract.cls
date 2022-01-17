@@ -1,7 +1,7 @@
 Include %ZPM.PackageManager.Common
 
 /// Superclass for all classes used to process lifecycle events for resources
-Class %ZPM.PackageManager.Developer.Processor.Abstract Extends %RegisteredObject [ Abstract, PropertyClass = %ZPM.PackageManager.Developer.Processor.PropertyParameters ]
+Class %ZPM.ResourceProcessor.Abstract Extends %RegisteredObject [ Abstract, PropertyClass = %ZPM.ResourceProcessor.PropertyParameters ]
 {
 
 Parameter NAME = {$Piece(%classname, ".", *)};

@@ -1,5 +1,5 @@
 /// Registered object representation of a domain in a localized error message document
-Class %ZPM.PackageManager.Developer.ErrorMessages.MsgDomain Extends (%RegisteredObject, %XML.Adaptor)
+Class %ZPM.ResourceProcessor.LocalizationExport.MsgDomain Extends (%RegisteredObject, %XML.Adaptor)
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager/ErrorMessages";

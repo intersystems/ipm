@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.Default.Global Extends %ZPM.PackageManager.Developer.Processor.Abstract
+Class %ZPM.ResourceProcessor.Default.Global Extends %ZPM.ResourceProcessor.Abstract
 {
 
 /// Description of resource processor class (shown in UI)

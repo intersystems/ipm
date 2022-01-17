@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.Default.LocalizedErrorMessages Extends (%ZPM.PackageManager.Developer.Processor.Default.Document, %ZPM.PackageManager.Developer.Processor.LocalizationExport)
+Class %ZPM.ResourceProcessor.Default.LocalizedMessages Extends (%ZPM.ResourceProcessor.Default.Document, %ZPM.ResourceProcessor.LocalizationExport)
 {
 
 /// Description of resource processor class (shown in UI)
@@ -32,7 +32,7 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 		// Uses CompileList rather than Compile to support custom document type (.LOC)
 		Set tSC = $System.OBJ.CompileList(..ResourceReference.Name,$Select(tVerbose:"d",1:"-d")_..Flags)
 	}
-	Quit $$$ADDSC(tSC,##class(%ZPM.PackageManager.Developer.Processor.LocalizationExport)$This.OnBeforePhase(pPhase,.pParams))
+	Quit $$$ADDSC(tSC,##class(%ZPM.ResourceProcessor.LocalizationExport)$This.OnBeforePhase(pPhase,.pParams))
 }
 
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status

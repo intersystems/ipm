@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.AbstractCompilable Extends %ZPM.PackageManager.Developer.Processor.Abstract [ Abstract ]
+Class %ZPM.ResourceProcessor.AbstractCompilable Extends %ZPM.ResourceProcessor.Abstract [ Abstract ]
 {
 
 /// Description of resource processor class (shown in UI)

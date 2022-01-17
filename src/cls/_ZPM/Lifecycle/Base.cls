@@ -544,7 +544,7 @@ Method %Compile(ByRef pParams) As %Status
 			Quit:tKey=""
 			
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
-				If tResource.Processor.%IsA("%ZPM.PackageManager.Developer.Processor.AbstractCompilable") {
+				If tResource.Processor.%IsA("%ZPM.ResourceProcessor.AbstractCompilable") {
 					Kill tOneResourceList
 					Set tOneResourceList(tResource.Name) = ""
 					Set tSC = tResource.ResolveChildren(.tOneResourceList)
@@ -783,7 +783,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			Set tFullPath = ##class(%File).NormalizeFilename(pTargetDirectory_tRelativePath)
 			Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
 			
-			#dim tProcessor As %ZPM.PackageManager.Developer.Processor.Abstract
+			#dim tProcessor As %ZPM.ResourceProcessor.Abstract
 			If $Data(tResourceArray(tFullResourceName,"Processor"),tProcessor) && $IsObject(tProcessor) {
 				Kill tItemParams
 				Merge tItemParams = tResourceArray(tFullResourceName)

@@ -33,7 +33,7 @@ Property APIs As list Of %ZPM.PackageManager.Developer.APIReference(STORAGEDEFAU
 Property ProcessorClass As %Dictionary.Classname(XMLPROJECTION = "ATTRIBUTE");
 
 /// Transient instance of ProcessorClass
-Property Processor As %ZPM.PackageManager.Developer.Processor.Abstract(XMLPROJECTION = "NONE") [ Transient ];
+Property Processor As %ZPM.ResourceProcessor.Abstract(XMLPROJECTION = "NONE") [ Transient ];
 
 /// If set to true, this source code is not shipped in application packaging.
 /// (Of course, it must be included in module packaging.)
@@ -53,7 +53,7 @@ Property Children As array Of %String(MAXLEN = 1, XMLPROJECTION = "NONE");
 
 Index Children On Children(KEYS);
 
-Method ProcessorGet() As %ZPM.PackageManager.Developer.Processor.Abstract
+Method ProcessorGet() As %ZPM.ResourceProcessor.Abstract
 {
 	// Similar to LifecycleGet in Module.
 	If $IsObject(r%Processor) {

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Processor.Default.Interoperability Extends %ZPM.PackageManager.Developer.Processor.Default.Document
+Class %ZPM.ResourceProcessor.Default.Interoperability Extends %ZPM.ResourceProcessor.Default.Document
 {
 
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "i14y/" ];
