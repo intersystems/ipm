@@ -1,11 +1,11 @@
 Class %ZPM.StudioDocument.LocalizedMessages Extends %ZPM.StudioDocument.Abstract [ DependsOn = %ZPM.StudioDocument.LocalizedMessageStream ]
 {
 
-Projection RegisterExtension As %ZPM.StudioDocument.Projection(DocumentDescription = "Localizable Error Messages", DocumentExtension = "LOC", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/HealthShare/LocalizedMessages");
+Projection RegisterExtension As %ZPM.StudioDocument.Projection(DocumentDescription = "Localizable Error Messages", DocumentExtension = "LOC", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/HealthShare/ErrorMessages");
 
 Parameter EXTENSION = ".LOC";
 
-Parameter INFOGLOBAL = "^ZPM.StudioDoc.LocalizedMessages";
+Parameter INFOGLOBAL = "^ZPM.Dev.Doc.LocalizedMessages";
 
 Parameter STREAMCLASS = "%ZPM.StudioDocument.LocalizedMessageStream";
 

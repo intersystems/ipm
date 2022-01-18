@@ -7,7 +7,7 @@ Projection RegisterExtension As %ZPM.StudioDocument.Projection(DocumentDescripti
 
 Parameter EXTENSION = ".ZPM";
 
-Parameter INFOGLOBAL = "^ZPM.StudioDoc.Module";
+Parameter INFOGLOBAL = "^ZPM.Dev.Doc.Module";
 
 Parameter STREAMCLASS = "%ZPM.StudioDocument.ModuleStream";
 
