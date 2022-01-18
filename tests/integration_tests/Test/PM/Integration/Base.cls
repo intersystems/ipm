@@ -20,7 +20,7 @@ Method Setup() As %Status
 		do $$$AssertStatusOK(##class(%ZPM.Repo.Remote.Definition).%DeleteExtent())
 		do $$$AssertStatusOK(##class(%ZPM.Repo.Local.Definition).%DeleteExtent())
 		
-		If '$$$AssertStatusOK(##class(%ZPM.PackageManager.Developer.UnitTest.Utils).CreateNamespace(..#CLIENTNS)) {
+		If '$$$AssertStatusOK(##class(%ZPM.Test.Utils).CreateNamespace(..#CLIENTNS)) {
 			Quit
 		}
 		Set ..ClientNSCreated = 1
@@ -64,7 +64,7 @@ Method TearDown() As %Status
 	Set tSC = $$$OK
 	Try {
 		New $Namespace
-		Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Utils).DeleteNamespace(..#CLIENTNS)
+		Set tSC = ##class(%ZPM.Test.Utils).DeleteNamespace(..#CLIENTNS)
 		Do:..ClientNSCreated $$$AssertStatusOK(tSC,"Client namespace deleted.")
 		if ..RegistryAdded {
 			Do $$$AssertStatusOK(##class(%ZPM.Repo.Definition).ServerDefinitionKeyDelete(..#REGISTRYNAME))

@@ -11,7 +11,7 @@ Method PublishApplication(pApplication As %ZPM.PackageManager.Core.Application) 
   Quit ..Publish(pApplication)
 }
 
-Method Publish(pModule As %ZPM.PackageManager.Core.VersionedBase) As %Boolean
+Method Publish(pModule As %ZPM.Repo.Remote.ModuleInfo) As %Boolean
 {
   if (..Username="") || (..Password="") {
     $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, authorization required."))

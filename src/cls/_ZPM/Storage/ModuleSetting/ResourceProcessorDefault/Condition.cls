@@ -1,5 +1,5 @@
 /// Tested in the SatisfiesCondition method of <class>%ZPM.ResourceProcessor.Abstract</class>
-Class %ZPM.Storage.ModuleSetting.ResourceProcessorDefault.Condition Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
+Class %ZPM.Storage.ModuleSetting.ResourceProcessorDefault.Condition Extends (%SerialObject, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor)
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";

@@ -128,7 +128,7 @@ Method BuildCache(pPurge As %Boolean = {'$$$IsISCWorker}, pVerbose As %Integer =
 		
 		TSTART
 		If (pPurge) && (..%Id() '= "") {
-			Set tLockManager = ##class(%ZPM.PackageManager.Core.LockManager).%New()
+			Set tLockManager = ##class(%ZPM.Utils.LockManager).%New()
 			$$$ThrowOnError(tLockManager.LockClassId($classname(),..%Id()))
 			#dim tResult As %SQL.StatementResult
 			Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_Repo_Filesystem.Cache where Root = ?",..Root)

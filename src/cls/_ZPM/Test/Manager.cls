@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.UnitTest.Manager Extends %UnitTest.Manager
+Class %ZPM.Test.Manager Extends %UnitTest.Manager
 {
 
 /// Ensures the last run variable is cleared out, then just does the usual.

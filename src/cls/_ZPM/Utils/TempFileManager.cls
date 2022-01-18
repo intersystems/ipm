@@ -3,7 +3,7 @@
 /// @Modifier Availability InterSystems
 /// @API.Object.Instantiable
 /// @Modifier Availability Forbidden
-Class %ZPM.PackageManager.Core.TempFileManager Extends %ZPM.General.Singleton
+Class %ZPM.Utils.TempFileManager Extends %ZPM.General.Singleton
 {
 
 Property Files [ MultiDimensional, Private ];
@@ -31,7 +31,7 @@ Method GetTempFolderName() As %String
 		Set ..Files($Increment(..Files)) = tTempFileName
 	}
 	Set tTempFolderName = tTempFileName_"d/" // Append "d/" for uniqueness on IRIS.
-	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.File).CreateDirectoryChain(tTempFolderName))
+	$$$ThrowOnError(##class(%ZPM.Utils.File).CreateDirectoryChain(tTempFolderName))
 	Set ..Folders($Increment(..Folders)) = tTempFolderName
 	Quit tTempFolderName
 }
@@ -45,7 +45,7 @@ Method Cleanup() As %Status
 	Kill ..Files
 	
 	For tIndex=1:1:$Get(..Folders) {
-		Set tSC = $$$ADDSC(tSC,##class(%ZPM.PackageManager.Developer.File).RemoveDirectoryTree(..Folders(tIndex)))
+		Set tSC = $$$ADDSC(tSC,##class(%ZPM.Utils.File).RemoveDirectoryTree(..Folders(tIndex)))
 	}
 	Kill ..Folders
 	Quit tSC

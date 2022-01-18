@@ -1,5 +1,5 @@
 /// Handles setting of "break" to avoid Ctr-C breaking the instance when called during critical sections.
-Class %ZPM.PackageManager.Core.InterruptManager Extends %RegisteredObject
+Class %ZPM.Utils.InterruptManager Extends %RegisteredObject
 {
 
 /// Stores the value associated with the "break" command.

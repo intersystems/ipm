@@ -88,7 +88,7 @@ Method OnBeforeArtifact(pExportDirectory As %String, pWorkingDirectory As %Strin
 
 		Write !,"[OnBeforeArtifact] "_..ResourceReference.Name
 		If '..ResourceReference.Deploy {
-			Set tSC = ##class(%ZPM.PackageManager.Developer.File).CopyDir(
+			Set tSC = ##class(%ZPM.Utils.File).CopyDir(
 				pExportDirectory_..ResourceReference.Name,
 				pWorkingDirectory_..ResourceReference.Name)
 		}
@@ -149,7 +149,7 @@ Method DoCopy(tSource, tTarget, pParams)
     }
     Else {
       Write:tVerbose " as directory "
-      Set tSC = ##class(%ZPM.PackageManager.Developer.File).CopyDir(tSource,tTarget,'..Overlay)
+      Set tSC = ##class(%ZPM.Utils.File).CopyDir(tSource,tTarget,'..Overlay)
     }
 	} Catch e {
 		Set tSC = e.AsStatus()

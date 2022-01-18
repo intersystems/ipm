@@ -41,7 +41,7 @@ Method Populate(pVerbose As %Boolean = 1) As %Status
 	Set tSC = $$$OK
 	Try {
 		If (..SourceDirectory = "") {
-			$$$ThrowStatus($$$ERROR($$$GeneralError,"A directory must be specified in %ZPM.PackageManager.Core.XDataArchive:%OnNew."))
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"A directory must be specified in %ZPM.Lifecycle.StudioProject.XDataArchive:%OnNew."))
 		}
 		Set ..SourceDirectory = ##class(%Library.File).NormalizeDirectory(..SourceDirectory)
 		If '##class(%Library.File).DirectoryExists(..SourceDirectory) {
@@ -147,7 +147,7 @@ Method GetDirectoryContentsRecursive(pDirectory As %String, Output pItems) As %S
 	Quit tSC
 }
 
-/// Copied from %ZPM.PackageManager.Developer.File to support use in classes cloned from this one
+/// Copied from %ZPM.Utils.File to support use in classes cloned from this one
 ClassMethod CreateDirectoryChain(pName As %String) As %Status
 {
 	Set tSC = $$$OK

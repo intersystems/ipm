@@ -47,7 +47,7 @@ Method CalculatedMembersGet() As %Collection.AbstractListOfObj [ CodeMode = obje
 {
 	// use an array collection to get things in order 
 	set tCodeStream = %code
-	do ##class(%ZPM.PackageManager.Developer.GeneratorUtils).BuildRelationshipSorter(tCodeStream, "Members", "GetSortingKey()")
+	do ##class(%ZPM.Utils.CodeGeneration).BuildRelationshipSorter(tCodeStream, "Members", "GetSortingKey()")
 	
 	quit $$$OK
 }
@@ -56,7 +56,7 @@ Method CalculatedNonModuleSuperclassesGet() As %Collection.AbstractListOfObj [ C
 {
 	// use an array collection to get things in order 
 	set tCodeStream = %code
-	do ##class(%ZPM.PackageManager.Developer.GeneratorUtils).BuildRelationshipSorter(tCodeStream, "NonModuleSuperclasses", "ClassName")
+	do ##class(%ZPM.Utils.CodeGeneration).BuildRelationshipSorter(tCodeStream, "NonModuleSuperclasses", "ClassName")
 	
 	quit $$$OK
 }

@@ -62,7 +62,7 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 			}
 			Set tDirectory = ##class(%Library.File).GetDirectory(tExportFile)
 			If '##class(%Library.File).DirectoryExists(tDirectory) {
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.File).CreateDirectoryChain(tDirectory))
+				$$$ThrowOnError(##class(%ZPM.Utils.File).CreateDirectoryChain(tDirectory))
 			}
 			Set tSC=$$ExportDomainList^%occMessages(tExportFile,..Domains)
 		}

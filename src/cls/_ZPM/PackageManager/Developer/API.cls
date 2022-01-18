@@ -102,7 +102,7 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.Storage.Module, Output
 		
 		If $IsObject(tModuleStream) {
 			// Extract comments from existing document stream
-			Set tHandler = ##class(%ZPM.PackageManager.Developer.XML.CommentHandler).%New()
+			Set tHandler = ##class(%ZPM.Utils.XMLCommentHandler).%New()
 			Set tReader = ##class(%XML.SAX.Parser).%New()
 			Set tSC = ##Class(%XML.SAX.Parser).ParseStream(tModuleStream.Contents,tHandler)
 			$$$ThrowOnError(tSC)
@@ -192,7 +192,7 @@ ClassMethod CreateInstallerClass(pSource As %ZPM.Storage.Module) [ Private ]
 		Set tDef.ProcedureBlock = 1
 		Do tDef.ProcedureBlockReset()
 		$$$ThrowOnError(tDef.%Save())
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.ClassUtils).OverrideAbstractMembers(pSource.InstallerClass))
+		$$$ThrowOnError(##class(%ZPM.Utils.Class).OverrideAbstractMembers(pSource.InstallerClass))
 		
 		// TODO: Add class to module (if not already covered by a package that's part of the module)
 	}
@@ -208,7 +208,7 @@ ClassMethod CreateLifecycleClass(pSource As %ZPM.Storage.Module) [ Private ]
 		Set tDef.ProcedureBlock = 1
 		Do tDef.ProcedureBlockReset()
 		$$$ThrowOnError(tDef.%Save())
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.ClassUtils).OverrideAbstractMembers(pSource.LifecycleClass))
+		$$$ThrowOnError(##class(%ZPM.Utils.Class).OverrideAbstractMembers(pSource.LifecycleClass))
 		
 		// TODO: Add class to module as a "preload" resource
 	}
@@ -443,12 +443,12 @@ ClassMethod GetPackagingListSQL(Output pSQL As %String) As %Status
 ClassMethod GetLifecycleClassListSQL(Output pSQL As %String) As %Status
 {
 	Set pSQL = "select SUBSTRING(cd.Name,"_(1+$Length($$$DefaultLifecyclePackageDot))_") Name from "_
-		"%Dictionary.ClassDefinition_SubclassOf('%ZPM.PackageManager.Developer.Lifecycle.Abstract') subs "_
+		"%Dictionary.ClassDefinition_SubclassOf('%ZPM.Lifecycle.Base') subs "_
 		"join %Dictionary.CompiledClass cd on subs.Name = cd.Name "_
 		"where cd.Abstract = 0 and cd.Name %STARTSWITH '"_$$$DefaultLifecyclePackageDot_"' "_
 		"union "_
 		"select cd.Name from "_
-		"%Dictionary.ClassDefinition_SubclassOf('%ZPM.PackageManager.Developer.Lifecycle.Abstract') subs "_
+		"%Dictionary.ClassDefinition_SubclassOf('%ZPM.Lifecycle.Base') subs "_
 		"join %Dictionary.CompiledClass cd on subs.Name = cd.Name "_
 		"where cd.Abstract = 0 and not cd.Name %STARTSWITH '"_$$$DefaultLifecyclePackageDot_"'"
 	Quit $$$OK

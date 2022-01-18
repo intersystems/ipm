@@ -1,6 +1,6 @@
 /// @API.Object.Instantiable
 /// @Modifier Availability InterSystems
-Class %ZPM.Storage.ModuleReference Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor) [ StorageStrategy = "" ]
+Class %ZPM.Storage.ModuleReference Extends (%SerialObject, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor) [ StorageStrategy = "" ]
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";

@@ -80,7 +80,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   Set tName = $Translate(tName, "*"_..FilenameTranslateIdentifier, "*"_..FilenameTranslateAssociator)
                   Set tWildcards = tName_".xml"
                   If $$$isUNIX Set tWildcards = $$$ucase(tWildcards)_";"_$$$lcase(tWildcards)
-                  Do ##class(%ZPM.PackageManager.Developer.File).FindFiles(tResourceDirectory, tWildcards, .tList)
+                  Do ##class(%ZPM.Utils.File).FindFiles(tResourceDirectory, tWildcards, .tList)
                 } Else {
                   Set tName = $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator) _ ".xml"
                   Set tList($Increment(tList)) = $ListBuild(tName, tResourceDirectory _ tName) 

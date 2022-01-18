@@ -1,4 +1,4 @@
-Class %ZPM.Repo.Filesystem.PackageService Extends (%RegisteredObject, %ZPM.Repo.IPackageService, %ZPM.PackageManager.Core.ModuleInfo.QueryUtils)
+Class %ZPM.Repo.Filesystem.PackageService Extends (%RegisteredObject, %ZPM.Repo.IPackageService)
 {
 
 Property Root As %String [ Private, ReadOnly ];
@@ -14,7 +14,7 @@ Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObject
 	Set tList = ##class(%Library.ListOfObjects).%New()
 	Set tQuery = "select Name,VersionString from %ZPM_Repo_Filesystem.Cache_OrderedMatches(?,?,?,?) m"
 	Set tArgs($i(tArgs)) = ..Root
-	Quit ..moduleSqlToList(tQuery,.pSearchCriteria,.tArgs)
+	Quit ##class(%ZPM.Repo.Utils).moduleSqlToList(tQuery,.pSearchCriteria,.tArgs)
 }
 
 Method HasModule(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean

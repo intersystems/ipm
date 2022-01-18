@@ -5,7 +5,7 @@
 /// <li>Call the Lock() and (optionally) Unlock() methods.</li>
 /// <li>When the object goes out of scope, remaining locks are automatically released with the correct flags.</li>
 /// </ol>
-Class %ZPM.PackageManager.Core.LockManager Extends %RegisteredObject
+Class %ZPM.Utils.LockManager Extends %RegisteredObject
 {
 
 /// Map of (<global>,<flags>) to lock count
@@ -217,7 +217,7 @@ Method LockClassDefinition(pClass As %String, pShared As %Boolean = 0, pTimeout 
 	Quit tSC
 }
 
-Method MergeTo(pTargetLockManager As %ZPM.PackageManager.Core.LockManager)
+Method MergeTo(pTargetLockManager As %ZPM.Utils.LockManager)
 {
 	Set tGlobalName = ""
 	For {

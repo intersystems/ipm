@@ -1,6 +1,6 @@
 Include %sySecurity
 
-Class %ZPM.PackageManager.Developer.UnitTest.Utils
+Class %ZPM.Test.Utils
 {
 
 ClassMethod CreateNamespace(pNSName As %String) As %Status
@@ -138,12 +138,12 @@ ClassMethod DeleteNamespace(pNSName As %String) As %Status
 		Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
 
 		// Delete directories
-		Set tDirRemoved = ##class(%ZPM.PackageManager.Developer.File).RemoveDirectoryTree(tPath)
+		Set tDirRemoved = ##class(%ZPM.Utils.File).RemoveDirectoryTree(tPath)
 		If 'tDirRemoved {
 			Set tFinalStatus = $$$ADDSC(tFinalStatus,$$$ERROR($$$GeneralError,"Error removing directory '"_tPath_"'"))
 		}
 		
-		Set tDirRemoved = ##class(%ZPM.PackageManager.Developer.File).RemoveDirectoryTree(tWebPath)
+		Set tDirRemoved = ##class(%ZPM.Utils.File).RemoveDirectoryTree(tWebPath)
 		If 'tDirRemoved {
 			Set tFinalStatus = $$$ADDSC(tFinalStatus,$$$ERROR($$$GeneralError,"Error removing directory '"_tWebPath_"'"))
 		}

@@ -27,7 +27,7 @@ $Case(..Package '= "", 1: ".PKG", : ".CLS")
 }
 
 /// Class extending %UnitTest.Manager to use to run unit tests
-Property ManagerClass As %Dictionary.Classname [ InitialExpression = "%ZPM.PackageManager.Developer.UnitTest.Manager" ];
+Property ManagerClass As %Dictionary.Classname [ InitialExpression = "%ZPM.Test.Manager" ];
 
 /// Export format
 Property Format As %String(VALUELIST = ",UDL,XML");
@@ -48,7 +48,7 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 			// Only load unit tests if we're in developer mode.
 			If $Get(pParams("DeveloperMode")) {
 				// LoadTestDirectory rather than recursive $System.OBJ.LoadDir to omit _ directories.
-				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).LoadTestDirectory(tUnitTestDir,tVerbose,.tLoadedList,..Format)
+				Set tSC = ##class(%ZPM.Test.Manager).LoadTestDirectory(tUnitTestDir,tVerbose,.tLoadedList,..Format)
 				$$$ThrowOnError(tSC)
 				
 				Set tSC = ##class(%ZPM.Storage.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
@@ -97,7 +97,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			
 			// Ensure unit tests and related classes are loaded.
 			Set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
-			Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).LoadTestDirectory(tUnitTestDir,tVerbose, ,..Format)
+			Set tSC = ##class(%ZPM.Test.Manager).LoadTestDirectory(tUnitTestDir,tVerbose, ,..Format)
 			$$$ThrowOnError(tSC)
 			
 			Set tCompileFlags = "ck"_$Select(tVerbose:"d",1:"-d")
@@ -162,7 +162,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			
 			Set tManagerClass = $Get(pParams("UnitTest","ManagerClass"),..ManagerClass)
 			If (tManagerClass = "") {
-				Set tManagerClass = "%ZPM.PackageManager.Developer.UnitTest.Manager"
+				Set tManagerClass = "%ZPM.Test.Manager"
 			}
 			Merge tUserParams = pParams("UnitTest","UserParam")
 			
@@ -180,13 +180,13 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 					Set tPostfix = tPostfix_$Replace(..Class,".","-")_"-CLS"
 				}
 				Set tJUnitFile = $Piece(tJUnitFile,".",1,*-1)_tPostfix_".xml"
-				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.JUnitOutput).ToFile(tJUnitFile)
+				Set tSC = ##class(%ZPM.Test.JUnitOutput).ToFile(tJUnitFile)
 				$$$ThrowOnError(tSC)
 			}
 			
 			// By default, detect and report unit test failures as an error from this phase
 			If $Get(pParams("UnitTest","FailuresAreFatal"),1) {
-				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).GetLastStatus()
+				Set tSC = ##class(%ZPM.Test.Manager).GetLastStatus()
 				$$$ThrowOnError(tSC)
 			}
 			Write !

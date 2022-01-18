@@ -23,7 +23,7 @@ ClassMethod CreateAndGetSSLConfig(ByRef pProperties) As %String
 /// Format of <var>pDependencyGraph</var>:
 /// pDependencyGraph("module name") = $ListBuild(<depth>,<server name>,<version>)
 /// pDependencyGraph("module name","<dependent module> <dependent module version>") = <irrelevant>
-ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue As %ZPM.PackageManager.Core.WorkMgr)
+ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue As %SYSTEM.WorkMgr)
 {
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
@@ -46,7 +46,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 				Set tNumWorkers = $Get(pParams("Threads"),1) // Enable multicompile
 			}
 			
-			Set pWorkQueue = ##class(%ZPM.PackageManager.Core.WorkMgr).Initialize("/multicompile="_tNumWorkers,.tSC)
+			Set pWorkQueue = ##class(%SYSTEM.WorkMgr).Initialize("/multicompile="_tNumWorkers,.tSC)
 			$$$ThrowOnError(tSC)
 			
 			Set tModuleName = ""
@@ -395,7 +395,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 		Set tTargetDirectory = ##class(%File).NormalizeDirectory(tTargetDirectory)
 		If ##class(%File).DirectoryExists(tTargetDirectory) {
 			// Delete it.
-			Set tSC = ##class(%ZPM.PackageManager.Developer.File).RemoveDirectoryTree(tTargetDirectory)
+			Set tSC = ##class(%ZPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -933,7 +933,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		
 		If ($Get(pParams("NoJournal"),0) '= 0) {
 			// Disable journalling with process-level switch.
-			Set tJournalMgr = ##class(%ZPM.PackageManager.Core.JournalManager).%New(0)
+			Set tJournalMgr = ##class(%ZPM.Utils.JournalManager).%New(0)
 		} ElseIf tUseTransactions {
 			TSTART
 		}
@@ -1308,7 +1308,7 @@ ClassMethod ActivateMappings(pNamespace = {$Namespace}) As %Status [ Internal ]
 {
 	Set tSC=$$$OK
 	Try {
-		Set tInterruptManager = ##class(%ZPM.PackageManager.Core.InterruptManager).%New()
+		Set tInterruptManager = ##class(%ZPM.Utils.InterruptManager).%New()
 		Do tInterruptManager.DisableInterrupts()
 		New $Namespace
 		Set $Namespace = "%SYS"

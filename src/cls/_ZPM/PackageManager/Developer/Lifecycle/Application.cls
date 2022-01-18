@@ -51,7 +51,7 @@ Method %Package(ByRef pParams) As %Status
 		// Initialize and switch to build namespace
 		Set tInitNS = $Namespace
 		New $Namespace
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).InitializeBuildNamespace(,..Module.GetNamespaceConfig())
+		Set tSC = ##class(%ZPM.Utils.Build).InitializeBuildNamespace(,..Module.GetNamespaceConfig())
 		$$$ThrowOnError(tSC)
 		
 		// Ensure all resources that are part of the module are swizzled.
@@ -62,7 +62,7 @@ Method %Package(ByRef pParams) As %Status
 		}
 		
 		// Actually switch to build namespace
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).SwitchToBuildNamespace()
+		Set tSC = ##class(%ZPM.Utils.Build).SwitchToBuildNamespace()
 		$$$ThrowOnError(tSC)
 		
 		Write:tVerbose !,"Building in namespace: ",$Namespace
@@ -112,7 +112,7 @@ Method %Package(ByRef pParams) As %Status
 		Set tSC = ..OnBeforeCaptureDatabase(.pParams)
 		$$$ThrowOnError(tSC)
 		
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Build).RetrieveBuiltDatabase(.tTempStream)
+		Set tSC = ##class(%ZPM.Utils.Build).RetrieveBuiltDatabase(.tTempStream)
 		$$$ThrowOnError(tSC)
 		Set tSC = tStream.CopyFromAndSave(tTempStream)
 		$$$ThrowOnError(tSC)

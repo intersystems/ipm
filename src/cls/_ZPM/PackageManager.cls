@@ -1486,7 +1486,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 		}
 		
 		If (tResult '= "") {
-			Do ##class(%ZPM.PackageManager.Developer.Lifecycle.Abstract).GetDefaultParameters(.tParams)
+			Do ##class(%ZPM.Lifecycle.Base).GetDefaultParameters(.tParams)
 			Merge tParams = pCommandInfo("data")
 			Set tParams("Install") = 1
 			$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadModuleReference(tResult.ServerName,tResult.Name,tResult.VersionString,.tParams))

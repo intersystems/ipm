@@ -1,6 +1,6 @@
 Include (%occErrors, %occOptions, %syPrompt)
 
-Class %ZPM.PackageManager.Developer.Build
+Class %ZPM.Utils.Build
 {
 
 /// @API.Method
@@ -669,7 +669,7 @@ ClassMethod Backup() As %Status [ Internal ]
 		Set tSourceDir = ##class(%Library.File).GetDirectory()
 		Set tTargetDir = ##class(%Library.File).SubDirectoryName(tSourceDir,"backup",1)
 		Kill %objlasterror
-		Set tSC = ##class(%ZPM.PackageManager.Developer.File).CreateDirectoryChain(tTargetDir)
+		Set tSC = ##class(%ZPM.Utils.File).CreateDirectoryChain(tTargetDir)
 		$$$ThrowOnError(tSC)
 		Set $Namespace = "%SYS"
 		Write !,"Freezing writes..."

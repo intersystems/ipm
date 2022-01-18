@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.ClassUtils
+Class %ZPM.Utils.Class
 {
 
 /// Overrides all abstract methods, properties, of <var>pClassName</var>'s parents (removing the [ Abstract ] flag) and saves the class definition.

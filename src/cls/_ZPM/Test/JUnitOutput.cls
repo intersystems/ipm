@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.UnitTest.JUnitOutput
+Class %ZPM.Test.JUnitOutput
 {
 
 ClassMethod ToFile(pFileName As %String, pTestIndex As %Integer = {$Order(^UnitTest.Result(""),-1)}) As %Status

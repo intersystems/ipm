@@ -1,6 +1,6 @@
 /// Represents a resource within a <class>%ZPM.Storage.ResourceReference</class> - 
 /// typically, a class or subpackage within a .PKG resource - that should be scanned for API annotations.
-Class %ZPM.PackageManager.Developer.APIReference Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
+Class %ZPM.PackageManager.Developer.APIReference Extends (%SerialObject, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor)
 {
 
 /// The name of the resource that should be scanned for API annotations, with extension; e.g., MyModule.API.PKG

@@ -157,7 +157,7 @@ Method PackageOneModule(pModule As %ZPM.Storage.Module, pTargetGlobal As %String
 	$$$ThrowOnError(pModule.GetStudioProject(.tSourceProject,0,tDeployDefault,"source"))
 	
 	// Add in static files
-	Set tTempFileManager = ##class(%ZPM.PackageManager.Core.TempFileManager).%Get(.tSC)
+	Set tTempFileManager = ##class(%ZPM.Utils.TempFileManager).%Get(.tSC)
 	$$$ThrowOnError(tSC)
 	Set tWorkingDirectory = tTempFileManager.GetTempFolderName()
 	

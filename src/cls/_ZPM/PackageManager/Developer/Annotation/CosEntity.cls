@@ -99,7 +99,7 @@ Method CalculatedTagsGet() As %Collection.AbstractListOfObj [ CodeMode = objectg
 {
 	// use an array collection to get things in order 
 	set tCodeStream = %code
-	do ##class(%ZPM.PackageManager.Developer.GeneratorUtils).BuildRelationshipSorter(tCodeStream, "Tags", "ShortTagName()")
+	do ##class(%ZPM.Utils.CodeGeneration).BuildRelationshipSorter(tCodeStream, "Tags", "ShortTagName()")
 	
 	quit $$$OK
 }

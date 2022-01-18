@@ -17,7 +17,7 @@ Method CalculatedArgumentsGet() As %Collection.AbstractListOfObj [ CodeMode = ob
 {
 	// use an array collection to get things in order 
 	set tCodeStream = %code
-	do ##class(%ZPM.PackageManager.Developer.GeneratorUtils).BuildRelationshipSorter(tCodeStream, "Arguments", "Name")
+	do ##class(%ZPM.Utils.CodeGeneration).BuildRelationshipSorter(tCodeStream, "Arguments", "Name")
 	
 	quit $$$OK
 }

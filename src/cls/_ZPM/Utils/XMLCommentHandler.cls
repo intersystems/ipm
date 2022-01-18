@@ -1,6 +1,6 @@
 /// Use: Extracts XML comments from a document and allows them to be added back in later,
 /// assuming that the XPath paths to their previous locations are still valid.
-Class %ZPM.PackageManager.Developer.XML.CommentHandler Extends %XML.SAX.ContentHandler
+Class %ZPM.Utils.XMLCommentHandler Extends %XML.SAX.ContentHandler
 {
 
 /// Content (comments/whitespace) that have been found but not yet mapped to their appropriate position in the document.

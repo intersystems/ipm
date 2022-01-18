@@ -147,7 +147,7 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 				
 				Set tTargetDirectory = ##class(%Library.File).GetDirectory(pFullExportPath)
 				If '##class(%Library.File).DirectoryExists(tTargetDirectory) {
-					$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.File).CreateDirectoryChain(tTargetDirectory))
+					$$$ThrowOnError(##class(%ZPM.Utils.File).CreateDirectoryChain(tTargetDirectory))
 				}
 				
 				$$$ThrowOnError($System.OBJ.ExportUDL(pItemName,pFullExportPath,tExportFlags))

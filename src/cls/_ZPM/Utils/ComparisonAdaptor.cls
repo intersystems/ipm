@@ -1,6 +1,6 @@
 /// Handles code generation of a grab bag of useful functions to be code generated, such as the following:
 /// - Comparison functions that compare instances of a class by comparing their properties.
-Class %ZPM.PackageManager.Core.ComparisonAdaptor [ Abstract, PropertyClass = %ZPM.PackageManager.Core.ComparisonAdaptorPropParam, System = 4 ]
+Class %ZPM.Utils.ComparisonAdaptor [ Abstract, PropertyClass = %ZPM.Utils.ComparisonAdaptor.PropertyParams, System = 4 ]
 {
 
 /// Set to true to skip code generation in this class
@@ -44,14 +44,14 @@ ClassMethod CompareToSkipCondition(pCompiledProperty As %Dictionary.CompiledProp
 /// differed in the following format: <br />
 /// pDifferingPropertyArray("property name", "any nested property names or indices/keys for iterable properties")
 /// = $ListBuild("value in calling object", "value in pObj"). <br />
-Method %CompareTo(pObj As %ZPM.PackageManager.Core.ComparisonAdaptor, pIgnorePropertyList As %Library.List = "", Output pDifferingPropertyArray As %Library.List) As %Boolean [ CodeMode = objectgenerator, ForceGenerate ]
+Method %CompareTo(pObj As %ZPM.Utils.ComparisonAdaptor, pIgnorePropertyList As %Library.List = "", Output pDifferingPropertyArray As %Library.List) As %Boolean [ CodeMode = objectgenerator, ForceGenerate ]
 {
 	#define WriteLine(%line) Do %code.WriteLine($Char(9)_%line)
 	Set classname = %compiledclass.Name
 	Set methodName = %method.Name
 	Set skipCodeGeneration = +$Get(%parameter("SkipCodeGeneration"))
 	// Do not generate in this class
-	Set sourceClassname = "%ZPM.PackageManager.Core.ComparisonAdaptor"
+	Set sourceClassname = "%ZPM.Utils.ComparisonAdaptor"
 	If (classname = sourceClassname) || skipCodeGeneration {
 		Return $$$OK
 	}
@@ -147,8 +147,8 @@ ClassMethod GenerateCompareForSingleItem(pCode As %Stream.MethodGenerator, pClas
 	} ElseIf (classTypeOfPropertyType = $$$cCLASSCLASSTYPEPERSISTENT) || (classTypeOfPropertyType = $$$cCLASSCLASSTYPESERIAL) || (classTypeOfPropertyType = $$$cCLASSCLASSTYPENONE) {
 		// Check that the class extends this adaptor class
 		Set superClassList = ..FindAllSuperClasses(propertyType)
-		If '$ListFind(superClassList, "%ZPM.PackageManager.Core.ComparisonAdaptor") {
-			$$$CodeGenError("The class "_$$$QUOTE(propertyType)_" needs to extend %ZPM.PackageManager.Core.ComparisonAdaptor")
+		If '$ListFind(superClassList, "%ZPM.Utils.ComparisonAdaptor") {
+			$$$CodeGenError("The class "_$$$QUOTE(propertyType)_" needs to extend %ZPM.Utils.ComparisonAdaptor")
 		}
 		$$$WriteLine("Set isEqual = "_pItem1_"."_pMethodName_"("_pItem2_", , .diffInfo)")
 		$$$WriteLine("If 'isEqual {")

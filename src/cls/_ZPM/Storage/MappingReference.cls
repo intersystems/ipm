@@ -1,4 +1,4 @@
-Class %ZPM.Storage.MappingReference Extends (%Persistent, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
+Class %ZPM.Storage.MappingReference Extends (%Persistent, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor)
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Server.PackageService Extends (%ZPM.PackageManager.Server.AbstractService, %ZPM.Repo.IPackageService, %ZPM.PackageManager.Core.ModuleInfo.QueryUtils) [ ProcedureBlock ]
+Class %ZPM.PackageManager.Server.PackageService Extends (%ZPM.PackageManager.Server.AbstractService, %ZPM.Repo.IPackageService) [ ProcedureBlock ]
 {
 
 /// Name of the WebService.
@@ -15,7 +15,7 @@ Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library
 	Set tList = ##class(%Library.ListOfObjects).%New()
 	Set tQuery = "select m.Name,m.VersionString from %ZPM_PackageManager_Server.Application_OrderedMatches(?,?,?) m "_
 		"join %ZPM_PackageManager_Server.Application sm on sm.Name = m.Name and sm.VersionString = m.VersionString"
-	Quit ..moduleSqlToList(tQuery,.pSearchCriteria)
+	Quit ##class(%ZPM.Repo.Utils).moduleSqlToList(tQuery,.pSearchCriteria)
 }
 
 Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.ModuleInfo") [ WebMethod ]
@@ -23,7 +23,7 @@ Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.List
 	Set tList = ##class(%Library.ListOfObjects).%New()
 	Set tQuery = "select m.Name,m.VersionString from %ZPM_PackageManager_Server.Module_OrderedMatches(?,?,?) m "_
 		"join %ZPM_PackageManager_Server._Module sm on sm.Name = m.Name and sm.VersionString = m.VersionString"
-	Quit ..moduleSqlToList(tQuery,.pSearchCriteria)
+	Quit ##class(%ZPM.Repo.Utils).moduleSqlToList(tQuery,.pSearchCriteria)
 }
 
 Method HasApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean [ WebMethod ]

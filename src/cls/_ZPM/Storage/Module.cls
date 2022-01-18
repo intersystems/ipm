@@ -1,6 +1,6 @@
 Include (%occErrors, %ZPM.PackageManager.Common)
 
-Class %ZPM.Storage.Module Extends (%Persistent, %ZPM.General.ModuleInfo, %ZPM.PackageManager.Core.ComparisonAdaptor) [ StorageStrategy = "" ]
+Class %ZPM.Storage.Module Extends (%Persistent, %ZPM.General.ModuleInfo, %ZPM.Utils.ComparisonAdaptor) [ StorageStrategy = "" ]
 {
 
 Parameter DOMAIN = "ZPM";
@@ -36,7 +36,7 @@ Property CalculatedResources As list Of %ZPM.Storage.ResourceReference(XMLIO = "
 Method CalculatedResourcesGet() As %Collection.AbstractListOfObj [ CodeMode = objectgenerator ]
 {
  	Set tCodeStream = %code
- 	Do ##class(%ZPM.PackageManager.Developer.GeneratorUtils).BuildRelationshipSorter(tCodeStream, "Resources", "GetSortKey()")
+ 	Do ##class(%ZPM.Utils.CodeGeneration).BuildRelationshipSorter(tCodeStream, "Resources", "GetSortKey()")
  	Quit $$$OK
 }
 
@@ -52,7 +52,7 @@ Property OverrideLifecycleClass As %Dictionary.Classname [ Transient ];
 
 Property InstallerClass As %Dictionary.Classname;
 
-Property Lifecycle As %ZPM.PackageManager.Developer.Lifecycle.Abstract(XMLPROJECTION = "NONE") [ Transient ];
+Property Lifecycle As %ZPM.Lifecycle.Base(XMLPROJECTION = "NONE") [ Transient ];
 
 Property Hash As %Binary(ForceCodeGenerate = 0, XMLPROJECTION = "NONE");
 
@@ -949,7 +949,7 @@ Method UpdateAPIDocumentation(pDependencies As %List = "") As %Status
 	Quit tSC
 }
 
-Method LifecycleGet() As %ZPM.PackageManager.Developer.Lifecycle.Abstract
+Method LifecycleGet() As %ZPM.Lifecycle.Base
 {
 	If $IsObject(r%Lifecycle) {
 		Quit r%Lifecycle

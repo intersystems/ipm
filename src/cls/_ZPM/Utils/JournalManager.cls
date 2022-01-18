@@ -6,7 +6,7 @@
 /// <li>When the object goes out of scope, the flag is returned to its original value.</li>
 /// </ol>
 /// Under the hood, this does some messy stuff with View/$View that it's best to abstract.
-Class %ZPM.PackageManager.Core.JournalManager Extends %RegisteredObject [ Final, Hidden ]
+Class %ZPM.Utils.JournalManager Extends %RegisteredObject [ Final, Hidden ]
 {
 
 Parameter FLAG = 1024;

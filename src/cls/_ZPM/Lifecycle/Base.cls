@@ -1,8 +1,14 @@
-Include %occErrors
+Include (%occErrors, %syGluedef, %ZPM.PackageManager.Common)
 
-Class %ZPM.Lifecycle.Base Extends %ZPM.PackageManager.Developer.Lifecycle.Abstract [ Abstract ]
+Class %ZPM.Lifecycle.Base Extends %RegisteredObject [ Abstract ]
 {
 
+Property Module As %ZPM.Storage.Module [ Private ];
+
+Property PhaseList As %List;
+
+/// $ListBuild list of phases in this lifecycle. <br />
+/// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
 Parameter PHASES = {$ListBuild("Clean","Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify","Register","Publish","Configure","Unconfigure")};
 
 Property Payload As %Stream.Object [ Private ];
@@ -16,6 +22,96 @@ Parameter DEPLOYBYDEFAULT As BOOLEAN = 0;
 Parameter PACKAGING [ Abstract ];
 
 Property HasDeployedResources As %Boolean [ InitialExpression = 0 ];
+
+Method %OnNew(pModule As %ZPM.Storage.Module) As %Status [ Private, ServerOnly = 1 ]
+{
+	Set ..Module = pModule
+	Quit $$$OK
+}
+
+Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
+{
+	Quit $$$OK
+}
+
+Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+{
+	Quit $$$OK
+}
+
+/// This method can be overrided to include any action that needs to be executed 
+/// before the process of module's lifecycle, and also before notifying resource processors
+Method OnBeforeResourceProcessing(pPhase As %String, ByRef pParams) As %Status
+{
+	Quit $$$OK
+}
+
+/// This method can be overrided to include any action that needs to be executed 
+/// after the process of module's lifecycle, and also after notifying resource processors
+Method OnAfterResourceProcessing(pPhase As %String, ByRef pParams) As %Status
+{
+	Quit $$$OK
+}
+
+Method %DispatchMethod(pMethod As %String, ByRef pParams, Args...) [ ServerOnly = 1 ]
+{
+	if $listfind(..#PHASES,pMethod)=0 do $zu(96,3,$$$ERNOMETHOD,1,"","method "_pMethod_" of class "_$classname())
+	quit ..Module.ExecutePhases(..Module.Name,$lb(pMethod),1,.pParams)
+}
+
+/// Merges default parameters into pParams
+/// For now, just looks at ^SYS("PackageManager","DefaultParameters")
+ClassMethod GetDefaultParameters(ByRef pParams, pPhases As %List)
+{
+	Merge pParams = ^SYS("PackageManager","DefaultParameters")
+}
+
+/// Returns the default resource processor class to use for a given resource name.
+ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary.Classname
+{
+	If ($Extract(pResourceName) = "/") {
+		If pResourceName [ "/internal/testing/" {
+			Quit $$$DefaultProcessorPackageDot_"UnitTest"
+		}
+		Quit ""
+	}
+	Set tExtension = $Piece(pResourceName,".",*)
+	Set tShortName = $Case(tExtension,
+		"PKG":"Package",
+		"CLS":"Class",
+		"INC":"Include",
+		"MAC":"Routine",
+		"LOC":"LocalizedErrorMessages",
+		"GBL":"Global",
+		"DFI":"DeepSeeItem",
+		"LUT":"Interoperability",
+		"X12":"Interoperability",
+		"ESD":"Interoperability",
+		"DTL":"Class",
+		"BPL":"Class",
+		:"Document")
+	If (tShortName = "") {
+		Quit ""
+	}
+	Quit $$$DefaultProcessorPackageDot_"Default."_tShortName
+}
+
+ClassMethod GetDefaultResourceProcessorProc(pLifecycleClass As %Dictionary.Classname, pResourceName As %String) As %String [ SqlName = GET_DEFAULT_RESOURCE_PROCESSOR, SqlProc ]
+{
+	// Fail gracefully (just say there is no default) if pLifecycleClass is empty/invalid.
+	Set tLifecycleClass = pLifecycleClass
+	If (tLifecycleClass = "") {
+		Quit ""
+	}
+	If '$$$comClassDefined(tLifecycleClass) {
+		// Try default package.
+		Set tLifecycleClass = $$$DefaultLifecyclePackageDot_tLifecycleClass
+	}
+	If '$$$comClassDefined(tLifecycleClass) {
+		Quit ""
+	}
+	Quit $ClassMethod(tLifecycleClass,"GetDefaultResourceProcessor",pResourceName)
+}
 
 /// This method defines what a complete phase means for a given list of phases
 ClassMethod GetCompletePhases(pPhases As %List) As %List
@@ -629,7 +725,7 @@ Method %Compile(ByRef pParams) As %Status
 				Set tNoCompileLock = '$Get(pParams("NoLock"))
 				If $$$IsISCWorker && 'tNoCompileLock {
 					// Customized locking - takes out shared locks on dependencies to avoid conflicts between parallel module loads.
-					Set tSC = ##class(%ZPM.PackageManager.Core.LockManager).LockClassesRecursive(.tLockManager,.tCompileArray,.tLockedClasses)
+					Set tSC = ##class(%ZPM.Utils.LockManager).LockClassesRecursive(.tLockManager,.tCompileArray,.tLockedClasses)
 					$$$ThrowOnError(tSC)
 					Set tNoCompileLock = 1
 				}
@@ -833,7 +929,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 					// NOTE: Does not overlay directories.
 					Set tSourcePath = ##class(%File).GetDirectory(tSourcePath)
 					Set tExportPath = ##class(%File).GetDirectory(tExportPath)
-					Set tSC = ##class(%ZPM.PackageManager.Developer.File).CopyDir(tSourcePath,tExportPath)
+					Set tSC = ##class(%ZPM.Utils.File).CopyDir(tSourcePath,tExportPath)
 					If $$$ISERR(tSC) {
 						Quit
 					}
@@ -966,21 +1062,21 @@ Method %Verify(ByRef pParams) As %Status
 				Set tNSConfig = ..Module.GetNamespaceConfig()
 				
 				// Create namespace in which to run tests and switch to it.
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Build).InitializeNamespace("VERIFY",tVerbose,.tNewNamespace,tNSConfig))
+				$$$ThrowOnError(##class(%ZPM.Utils.Build).InitializeNamespace("VERIFY",tVerbose,.tNewNamespace,tNSConfig))
 				
 				// Map ^UnitTest* from its home in the original namespace to the VERIFY namespace.
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Build).MapGlobalEquivalently("UnitTest*",tInitNS,tNewNamespace))
+				$$$ThrowOnError(##class(%ZPM.Utils.Build).MapGlobalEquivalently("UnitTest*",tInitNS,tNewNamespace))
 				
 				// If the module being verified is not the package manager, map the package manager itself equivalently in the VERIFY namespace.
 				If (..Module.Name '= "ZHSLIB") {
-					$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Build).MapRoutineEquivalently("%ZPM*",tInitNS,,tNewNamespace))
-					$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Build).MapPackageEquivalently("%ZPM",tInitNS,tNewNamespace))
+					$$$ThrowOnError(##class(%ZPM.Utils.Build).MapRoutineEquivalently("%ZPM*",tInitNS,,tNewNamespace))
+					$$$ThrowOnError(##class(%ZPM.Utils.Build).MapPackageEquivalently("%ZPM",tInitNS,tNewNamespace))
 				}
 				
 				// Map globals for %ZPM.Repo.Definition and %ZPM.Repo.Filesystem.Cache
 				// from the original namespace to the VERIFY namespace
 				For tClass = "%ZPM.Repo.Definition","%ZPM.Repo.Filesystem.Cache" {
-					$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Build).MapClassDataEquivalently(tClass,tInitNS,tNewNamespace))
+					$$$ThrowOnError(##class(%ZPM.Utils.Build).MapClassDataEquivalently(tClass,tInitNS,tNewNamespace))
 				}
 				
 				// Install this module artifact in the VERIFY namespace.
@@ -1467,8 +1563,8 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 	join %Dictionary.CompiledParameter cp
 	on cp.Parent = cd.Name
 		and cp.Name = 'PACKAGING'
-	where cd.Name %STARTSWITH '%ZPM.PackageManager.Developer.Lifecycle' -- This is a critical assumption for performance reasons. Full ^oddCOM scans are expensive!
-		and cd.PrimarySuper [ '~%ZPM.PackageManager.Developer.Lifecycle.Abstract~'
+	where cd.Name %STARTSWITH '%ZPM.Lifecycle' -- This is a critical assumption for performance reasons. Full ^oddCOM scans are expensive!
+		and cd.PrimarySuper [ '~%ZPM.Lifecycle.Base~'
 		and cp.Final = 1
 		and cp.Origin = cd.Name
 		and (:pPackaging is null or cp._default = :pPackaging)

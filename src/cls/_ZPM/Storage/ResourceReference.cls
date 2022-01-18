@@ -1,6 +1,6 @@
 Include %ZPM.PackageManager.Common
 
-Class %ZPM.Storage.ResourceReference Extends (%Persistent, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
+Class %ZPM.Storage.ResourceReference Extends (%Persistent, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor)
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";

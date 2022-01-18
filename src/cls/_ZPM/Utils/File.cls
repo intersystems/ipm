@@ -1,5 +1,5 @@
 /// Wraps a set of more robust file operations
-Class %ZPM.PackageManager.Developer.File
+Class %ZPM.Utils.File
 {
 
 /// Create this directory and all the parent directories if they do not exist. This differs from

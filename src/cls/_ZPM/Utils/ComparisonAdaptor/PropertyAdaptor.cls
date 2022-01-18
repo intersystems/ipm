@@ -1,5 +1,5 @@
-/// Property parameter class for <class>%ZPM.PackageManager.Core.ComparisonAdaptor</class>
-Class %ZPM.PackageManager.Core.ComparisonAdaptorPropParam [ System = 2 ]
+/// Property parameter class for <class>%ZPM.Utils.ComparisonAdaptor</class>
+Class %ZPM.Utils.ComparisonAdaptor.PropertyParams [ System = 2 ]
 {
 
 /// Forces code generation for the given property. <br />
