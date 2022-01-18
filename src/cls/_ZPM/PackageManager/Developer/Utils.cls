@@ -205,11 +205,11 @@ ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersi
 	Quit tSC
 }
 
-ClassMethod LoadQualifiedReference(pReference As %ZPM.PackageManager.Core.QualifiedModuleReference, ByRef pParams, ByRef pDependencyGraph) As %Status
+ClassMethod LoadQualifiedReference(pReference As %ZPM.Storage.QualifiedModuleInfo, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		#dim tReference As %ZPM.PackageManager.Core.QualifiedModuleReference
+		#dim tReference As %ZPM.Storage.QualifiedModuleInfo
 		Set tReference = pReference.%ConstructClone()
 		If (tReference.ServerName = "") && ##class(%ZPM.Repo.Local.Definition).SingletonExists(1,.tID) {
 			Set tServer = ##class(%ZPM.Repo.Local.Definition).%OpenId(tID)
@@ -263,14 +263,14 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pServerName))
 			Quit
 		}
-		Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
+		Set tModRef = ##class(%ZPM.Storage.ModuleInfo).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
 		
 		// Make sure we're not downgrading.
 		If '$Get(pParams("PermitDowngrade")) {
-			If ##class(%ZPM.PackageManager.Developer.Module).NameExists(pModuleName) {
-				Set tInstModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pModuleName,,.tSC)
+			If ##class(%ZPM.Storage.Module).NameExists(pModuleName) {
+				Set tInstModule = ##class(%ZPM.Storage.Module).NameOpen(pModuleName,,.tSC)
 				If $$$ISERR(tSC) {
 					Quit
 				}
@@ -460,9 +460,9 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 	Quit tSC
 }
 
-/// Given a path to a module.xml file (directory), tries to correlate it to an instance of <class>%ZPM.PackageManager.Developer.Module</class>.
+/// Given a path to a module.xml file (directory), tries to correlate it to an instance of <class>%ZPM.Storage.Module</class>.
 /// Throws errors.
-ClassMethod GetModuleObjectFromPath(pPath As %String, Output pFound As %Boolean) As %ZPM.PackageManager.Developer.Module
+ClassMethod GetModuleObjectFromPath(pPath As %String, Output pFound As %Boolean) As %ZPM.Storage.Module
 {
 	Set pFound = 0
 	Set pPath = ##class(%Library.File).NormalizeDirectory(pPath)
@@ -475,15 +475,15 @@ ClassMethod GetModuleObjectFromPath(pPath As %String, Output pFound As %Boolean)
 	Return ..GetModuleObjectFromStream(stream,.pFound)
 }
 
-/// Given a stream, tries to correlate it to an instance of <class>%ZPM.PackageManager.Developer.Module</class>.
+/// Given a stream, tries to correlate it to an instance of <class>%ZPM.Storage.Module</class>.
 /// Throws errors.
-ClassMethod GetModuleObjectFromStream(pStream As %Stream.Object, Output pFound As %Boolean) As %ZPM.PackageManager.Developer.Module
+ClassMethod GetModuleObjectFromStream(pStream As %Stream.Object, Output pFound As %Boolean) As %ZPM.Storage.Module
 {
 	Set pFound = 0
 	Set reader = ##class(%XML.Reader).%New()
 	Set sc = reader.OpenStream(pStream)
 	$$$ThrowOnError(sc)
-	Do reader.Correlate("Module","%ZPM.PackageManager.Developer.Module")
+	Do reader.Correlate("Module","%ZPM.Storage.Module")
 	Set pFound = (reader.Next(.moduleObj, .sc) > 0)
 	$$$ThrowOnError(sc)
 	Return $Get(moduleObj)
@@ -498,7 +498,7 @@ ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules
 		Set pExpression = ##class(%ZPM.General.SemanticVersionExpression).%New()
 		Set pSourceList = ""
 		
-		Set tResult = ##class(%ZPM.PackageManager.Developer.Module).VersionRequirementsFunc(pModuleName,pExcludeModules)
+		Set tResult = ##class(%ZPM.Storage.Module).VersionRequirementsFunc(pModuleName,pExcludeModules)
 		If (tResult.%SQLCODE < 0) {
 			$$$ThrowStatus($$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message))
 		}
@@ -523,7 +523,7 @@ ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules
 /// <var>pRepoNames</var> is a $ListBuild list of repositories in which to search for dependents; if blank, only currently-installed modules (and any missing dependencies) are considered. <br />
 /// @API.Method
 /// @Modifier Availability InterSystems
-ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), Output pErrorList, pModuleName As %String, pModuleVersion As %String = "", pRepoNames As %List = "") As %Status
+ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.QualifiedModuleInfo"), Output pErrorList, pModuleName As %String, pModuleVersion As %String = "", pRepoNames As %List = "") As %Status
 {
 	Set tSC = $$$OK
 	Kill pErrorList
@@ -543,7 +543,7 @@ ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE
 					Continue
 				}
 				
-				Set tQualRef = ##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New()
+				Set tQualRef = ##class(%ZPM.Storage.QualifiedModuleInfo).%New()
 				Set tQualRef.ServerName = $ListGet(tGraphs(i),1)
 				Set tQualRef.Name = $ListGet(tGraphs(i),2)
 				Set tQualRef.VersionString = $ListGet(tGraphs(i),3)
@@ -633,13 +633,13 @@ ClassMethod InvertDependencies(pNodeName As %String, ByRef pGraph, Output pTree)
 
 ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, Output pErrorList) As %Status [ Internal ]
 {
-	#dim tModule As %ZPM.PackageManager.Developer.Module
+	#dim tModule As %ZPM.Storage.Module
 	Set tSC = $$$OK
 	Kill pGraphs
 	Kill pErrorList
 	Try {
 		If '$ListLength(pRepoNames) {
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name from %ZPM_PackageManager_Developer.""Module""")
+			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name from %ZPM_Storage.""Module""")
 			If (tRes.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 			}
@@ -648,7 +648,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 					Quit
 				}
 				
-				Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tRes.%Get("Name"),,.tSC)
+				Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tRes.%Get("Name"),,.tSC)
 				If $$$ISERR(tSC) {
 					Quit
 				}
@@ -691,7 +691,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 				Set tSearchCriteria.IncludeSnapshots = tRepo.Snapshots
 				Set tList = tPackageService.ListModules(tSearchCriteria)
 				For i=1:1:tList.Count() {
-					#dim tModRef As %ZPM.PackageManager.Core.ResolvedModuleReference
+					#dim tModRef As %ZPM.Storage.ModuleInfo
 					Set tModRef = tList.GetAt(i)
 					
 					// Retrieve module manifest
@@ -702,7 +702,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 					If $$$ISERR(tSC) {
 						Quit
 					}
-					Do tReader.Correlate("Module","%ZPM.PackageManager.Developer.Module")
+					Do tReader.Correlate("Module","%ZPM.Storage.Module")
 					Do tReader.Next(.tModule,.tCorrSC)
 					If $$$ISERR(tCorrSC) {
 						// Non-fatal error
@@ -805,7 +805,7 @@ ClassMethod UninstallAll(pForce As %Boolean, ByRef pParams) As %Status
 				Kill tParams
 				Merge tParams = pParams
 				Write !,"Uninstalling ",tModuleName
-				Set tOneSC = ##class(%ZPM.PackageManager.Developer.Module).Uninstall(tModuleName,pForce,,.tParams)
+				Set tOneSC = ##class(%ZPM.Storage.Module).Uninstall(tModuleName,pForce,,.tParams)
 				If $$$ISOK(tOneSC) || pForce {
 					// If we are forcing uninstallation of everything that can be uninstalled,
 					// treat the module in question as uninstalled even if something went fatally wrong.
@@ -979,7 +979,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			}
 		}
 		
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleName,,.tSC)
+		Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
 		
@@ -1004,7 +1004,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		If '$Data($$$ZPMHandledModules($Namespace)) {
 			// The purpose of this NEW command is to make sure that the % variable $$$ZPMHandledModules refers to doesn't leak outside this scope.
 			// This only happens for the first module to be loaded in a set of dependencies (using zpm "load ..." or zpm "install ...")
-			// $$$ZPMHandledModules is also used in the ExecutePhases method of %ZPM.PackageManager.Developer.Module to
+			// $$$ZPMHandledModules is also used in the ExecutePhases method of %ZPM.Storage.Module to
 			// cover cases where new dependencies are added and a module is compiled without reloading, and in the BuildDependencyGraph
 			// method to treat installed snapshot versions as installed rather than forcing reload if they have been reloaded
 			// as part of the same root module operation.
@@ -1013,7 +1013,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		}
 		Merge $$$ZPMHandledModules($Namespace) = pParams("Multicompile","ModuleContext")
 
-    $$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).CheckSystemRequirements(tModuleName))
+    $$$ThrowOnError(##class(%ZPM.Storage.Module).CheckSystemRequirements(tModuleName))
 		
 		#dim tInstallContext As %ZPM.General.InstallContext
 		Set tInstallContext = ##class(%ZPM.General.InstallContext).%Get(.tSC)
@@ -1050,7 +1050,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		If tVerbose || $Get(pParams("Multicompile","Verbose"),0) {
 			Write !,"Loading "_tModuleName_" in process "_$Job
 		}
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModuleName,$lb("Activate"),1,.pParams)
+		Set tSC = ##class(%ZPM.Storage.Module).ExecutePhases(tModuleName,$lb("Activate"),1,.pParams)
 		If $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
 			TCOMMIT
 		}
@@ -1570,7 +1570,7 @@ ClassMethod NamespaceHasModule(pNamespace As %String, pModuleName As %String) As
 	New $Namespace
 	Try {
 		Set $Namespace = pNamespace // This might fail.
-		Set tModuleExists = ##class(%ZPM.PackageManager.Developer.Module).NameExists(pModuleName)
+		Set tModuleExists = ##class(%ZPM.Storage.Module).NameExists(pModuleName)
 	} Catch e {
 		// Ignore - this means the namespace does not exist.
 	}
@@ -1584,7 +1584,7 @@ ClassMethod LockWithCurrentDependencies(pModuleName As %String) As %Status
 	Set tInitTLevel = $TLevel
 	Try {
 		TSTART
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pModuleName,,.tSC)
+		Set tModule = ##class(%ZPM.Storage.Module).NameOpen(pModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
 		
 		Set tSC = tModule.BuildDependencyGraph(.tGraph,,,,,,,,1)
@@ -1615,7 +1615,7 @@ ClassMethod LockWithCurrentDependencies(pModuleName As %String) As %Status
 			} Else {
 				// Add new dependency for unlisted transitive dependency.
 				Write !,"Adding dependency: ",tModuleName," ",tVersion
-				Set tNewDependency = ##class(%ZPM.PackageManager.Core.ModuleReference).%New()
+				Set tNewDependency = ##class(%ZPM.Storage.ModuleReference).%New()
 				Set tNewDependency.Name = tModuleName
 				// Copy the actual version string (a semantic version) into the module manifest dependency's version string (a semantic version expression)
 				// A semantic version is also a valid semantic version expression, but not vice versa.

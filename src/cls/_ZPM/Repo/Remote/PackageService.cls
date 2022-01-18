@@ -20,7 +20,7 @@ Method GetInfo(url As %String) As %DynamicObject
 	$$$ThrowStatus($$$ERROR($$$GeneralError,"Registry server not available."))
 }
 
-Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference")
+Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.Storage.ModuleInfo")
 {
   Set tList = ##class(%Library.ListOfObjects).%New()
   Set tRequest = ..GetHttpRequest()
@@ -49,7 +49,7 @@ Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObject
       WHILE tIterVer.%GetNext(.verkey, .version) {
         Set tVersion = ##class(%ZPM.General.SemanticVersion).FromString(version)
         CONTINUE:'tVersion.Satisfies(tVersionExpression)
-        Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
+        Set tModRef = ##class(%ZPM.Storage.ModuleInfo).%New()
         Set tModRef.Name = item.name
         Set tModRef.Repository = item.repository
         Set tModRef.VersionString = version
@@ -62,7 +62,7 @@ Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObject
   Return tList
 }
 
-Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference, Output AsArchive As %Boolean = 1) As %Stream.Object
+Method GetModule(pModuleReference As %ZPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 1) As %Stream.Object
 {
   Set tRequest = ..GetHttpRequest()
   Set tFileBinStream = ""
@@ -110,7 +110,7 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
   Quit tFileBinStream
 }
 
-Method GetModuleManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.Object
+Method GetModuleManifest(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.Object
 {
   Set tRequest = ..GetHttpRequest()
   Set tFileBinStream = ""

@@ -124,7 +124,7 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
 ClassMethod NeedInstall(Output version As %String)
 {
   try {
-    set module = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
+    set module = ##class(%ZPM.Storage.Module).NameOpen("zpm")
     if '$ISOBJECT(module) {
       RETURN 1
     }
@@ -155,7 +155,7 @@ ClassMethod Make(pPackage As %Stream.Object, ByRef pStream As %Stream.TmpCharact
 {
   Set tSC = $$$OK
   try {
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
+		Set tModule = ##class(%ZPM.Storage.Module).NameOpen("zpm")
 
     Set tmpDir = ##class(%File).NormalizeDirectory($$$FileTempDir)
     $$$ThrowOnError(##class(%ZPM.General.Archive).Extract(pPackage, tmpDir))

@@ -1,5 +1,7 @@
-Class %ZPM.PackageManager.Developer.InvokeReference Extends (%Persistent, %ZPM.PackageManager.Core.InvokeReference)
+Class %ZPM.Storage.InvokeReference Extends (%Persistent, %XML.Adaptor)
 {
+
+Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 Property Class As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ Required ];
 
@@ -13,7 +15,7 @@ Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpressio
 
 Property Arg As list Of %String(XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
 
-Relationship Module As %ZPM.PackageManager.Developer.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes ];
+Relationship Module As %ZPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes ];
 
 Method GetArgsArray(pParams, Output args) As %Status
 {
@@ -24,8 +26,8 @@ Method GetArgsArray(pParams, Output args) As %Status
   }
   
   /// Add custom parameters support for Invoke args
-  Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..Module,.pParams)
-  Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateArgs(.args,.customParams)
+  Do ##class(%ZPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..Module)
+  Do ##class(%ZPM.Storage.ModuleSetting.Default).EvaluateArgs(.args,.customParams)
   /// Perform a second pass to manage embeded vars, ex:
   /// <Default Name="MyDir" Value="${mgrdir}MySubDir"></Default>
   Set i = ""
@@ -87,23 +89,23 @@ Storage Default
 <Value>Method</Value>
 </Value>
 <Value name="4">
-<Value>Arg</Value>
+<Value>Phase</Value>
 </Value>
 <Value name="5">
-<Value>Phase</Value>
+<Value>When</Value>
 </Value>
 <Value name="6">
 <Value>CheckStatus</Value>
 </Value>
 <Value name="7">
-<Value>When</Value>
+<Value>Arg</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Invokes")</DataLocation>
 <DefaultData>InvokeReferenceDefaultData</DefaultData>
-<IdLocation>^%ZPM.PackageManager360D.ModuleC("Invokes")</IdLocation>
-<IndexLocation>^%ZPM.Packa360D.InvokeRefer378FI</IndexLocation>
-<StreamLocation>^%ZPM.Packa360D.InvokeRefer378FS</StreamLocation>
+<IdLocation>^%ZPM.Storage.ModuleC("Invokes")</IdLocation>
+<IndexLocation>^%ZPM.Storage.InvokeReferenceI</IndexLocation>
+<StreamLocation>^%ZPM.Storage.InvokeReferenceS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

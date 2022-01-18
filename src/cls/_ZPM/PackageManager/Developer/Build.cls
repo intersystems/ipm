@@ -5,14 +5,14 @@ Class %ZPM.PackageManager.Developer.Build
 
 /// @API.Method
 /// @Modifier Availability InterSystems
-ClassMethod InitializeBuildNamespace(pVerbose As %Boolean = 1, pNSConfig As %ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig) As %Status
+ClassMethod InitializeBuildNamespace(pVerbose As %Boolean = 1, pNSConfig As %ZPM.Storage.ModuleSetting.NamespaceConfig) As %Status
 {
 	Quit ..InitializeNamespace("BUILD", pVerbose,, pNSConfig)
 }
 
 /// @API.Method
 /// @Modifier Availability InterSystems
-ClassMethod InitializeNamespace(pPostfix As %String, pVerbose As %Boolean = 1, Output pNewNamespace, pNSConfig As %ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig) As %Status
+ClassMethod InitializeNamespace(pPostfix As %String, pVerbose As %Boolean = 1, Output pNewNamespace, pNSConfig As %ZPM.Storage.ModuleSetting.NamespaceConfig) As %Status
 {
 	// TODO: Support custom mappings and additional databases.
 	Set tSC = $$$OK
@@ -315,7 +315,7 @@ ClassMethod DeleteDatabase(pDBName As %String, pIsLibraryDatabase As %Boolean = 
 	Quit tFinalStatus
 }
 
-ClassMethod CreateNamespace(pNSName As %String, pCodeDBName As %String, pDataDBName As %String, pVerbose As %Boolean = 1, pNSConfig As %ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig) As %Status
+ClassMethod CreateNamespace(pNSName As %String, pCodeDBName As %String, pDataDBName As %String, pVerbose As %Boolean = 1, pNSConfig As %ZPM.Storage.ModuleSetting.NamespaceConfig) As %Status
 {
 	New $Namespace
 	Set tSC = $$$OK

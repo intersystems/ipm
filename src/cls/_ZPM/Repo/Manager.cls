@@ -45,7 +45,7 @@ Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boole
 }
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
+Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.QualifiedModuleInfo"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set pResults = ##class(%Library.ListOfObjects).%New()
@@ -119,7 +119,7 @@ Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, 
             For  {
               Set sub = $Order(versions(name, major, minor, patch, sub), 1, item)
               Quit:sub=""
-              Do pResults.Insert(##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New(name, item))
+              Do pResults.Insert(##class(%ZPM.Storage.QualifiedModuleInfo).%New(name, item))
             }
           }
         }
@@ -136,7 +136,7 @@ Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, 
 }
 
 /// Loads the module reference 
-Method RetrieveModuleManifest(pQualifiedReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pManifestStream As %Stream.Object) As %Status
+Method RetrieveModuleManifest(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pManifestStream As %Stream.Object) As %Status
 {
 	Set tSC = $$$OK
 	Set pManifestStream = $$$NULLOREF
@@ -159,7 +159,7 @@ Method RetrieveModuleManifest(pQualifiedReference As %ZPM.PackageManager.Core.Qu
 }
 
 /// Loads the module reference 
-Method RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pPackageStream As %Stream.Object) As %Status
+Method RetrieveModulePackage(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pPackageStream As %Stream.Object) As %Status
 {
 	Set tSC = $$$OK
 	Set pPackageStream = $$$NULLOREF
@@ -182,7 +182,7 @@ Method RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Core.Qua
 }
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
+Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.QualifiedModuleInfo"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set pResults = ##class(%Library.ListOfObjects).%New()
@@ -220,7 +220,7 @@ Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCrite
 			Set tClientCriteria.IncludeSnapshots = tServer.Snapshots
 			Set tServerResults = tClient.ListApplications(tClientCriteria)
 			For i=1:1:tServerResults.Count() {
-				Do pResults.Insert(##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New(tServer.Name,tServerResults.GetAt(i)))
+				Do pResults.Insert(##class(%ZPM.Storage.QualifiedModuleInfo).%New(tServer.Name,tServerResults.GetAt(i)))
 			}
 		}
 		If $$$ISERR(tSC) {
@@ -237,7 +237,7 @@ Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCrite
 }
 
 /// Loads the module reference 
-Method RetrieveApplicationManifest(pQualifiedReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pManifestStream As %Stream.Object) As %Status
+Method RetrieveApplicationManifest(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pManifestStream As %Stream.Object) As %Status
 {
 	Set tSC = $$$OK
 	Set pManifestStream = $$$NULLOREF
@@ -260,7 +260,7 @@ Method RetrieveApplicationManifest(pQualifiedReference As %ZPM.PackageManager.Co
 }
 
 /// Loads the application package 
-Method RetrieveApplicationPackage(pQualifiedReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pPackageStream As %Stream.Object) As %Status
+Method RetrieveApplicationPackage(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pPackageStream As %Stream.Object) As %Status
 {
 	Set tSC = $$$OK
 	Set pPackageStream = $$$NULLOREF

@@ -1,6 +1,6 @@
 Include (%occErrors, %ZPM.PackageManager.Common)
 
-Class %ZPM.PackageManager.Developer.Module Extends (%Persistent, %ZPM.General.ModuleInfo, %ZPM.PackageManager.Core.ComparisonAdaptor) [ StorageStrategy = "" ]
+Class %ZPM.Storage.Module Extends (%Persistent, %ZPM.General.ModuleInfo, %ZPM.PackageManager.Core.ComparisonAdaptor) [ StorageStrategy = "" ]
 {
 
 Parameter DOMAIN = "ZPM";
@@ -20,18 +20,18 @@ Property Description As %String(MAXLEN = "");
 
 Property Keywords As %String(MAXLEN = "");
 
-Property Author As %ZPM.PackageManager.Developer.ModuleAuthorInfo;
+Property Author As %ZPM.Storage.ModuleAuthorInfo;
 
 /// Typically "module" or "application", but intentionally not enforced with VALUELIST.
 Property Packaging As %String [ Required ];
 
-Property Dependencies As list Of %ZPM.PackageManager.Core.ModuleReference(STORAGEDEFAULT = "array");
+Property Dependencies As list Of %ZPM.Storage.ModuleReference(STORAGEDEFAULT = "array");
 
-Relationship Resources As %ZPM.PackageManager.Developer.ResourceReference(XMLIO = "IN", XMLITEMNAME = "Resource", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
+Relationship Resources As %ZPM.Storage.ResourceReference(XMLIO = "IN", XMLITEMNAME = "Resource", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
 /// Calculated property used for XML output of Resources relationship (in a reasonable order:
 /// packages, classes, includes, globals, routines, CSP resources, then in alphabetical order within those categories).
-Property CalculatedResources As list Of %ZPM.PackageManager.Developer.ResourceReference(XMLIO = "OUT", XMLITEMNAME = "Resource", XMLNAME = "Resources", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Calculated ];
+Property CalculatedResources As list Of %ZPM.Storage.ResourceReference(XMLIO = "OUT", XMLITEMNAME = "Resource", XMLNAME = "Resources", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Calculated ];
 
 Method CalculatedResourcesGet() As %Collection.AbstractListOfObj [ CodeMode = objectgenerator ]
 {
@@ -40,9 +40,9 @@ Method CalculatedResourcesGet() As %Collection.AbstractListOfObj [ CodeMode = ob
  	Quit $$$OK
 }
 
-Relationship Mappings As %ZPM.PackageManager.Developer.MappingReference(XMLITEMNAME = "Mapping", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
+Relationship Mappings As %ZPM.Storage.MappingReference(XMLITEMNAME = "Mapping", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
-Relationship Invokes As %ZPM.PackageManager.Developer.InvokeReference(XMLITEMNAME = "Invoke", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
+Relationship Invokes As %ZPM.Storage.InvokeReference(XMLITEMNAME = "Invoke", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
 /// Lifecycle class used by default for this module
 Property LifecycleClass As %Dictionary.Classname;
@@ -64,13 +64,13 @@ Property Root As %String(ForceCodeGenerate = 0, MAXLEN = "", XMLPROJECTION = "NO
 /// Sources root, where placed any source code
 Property SourcesRoot As %String(MAXLEN = 20);
 
-Property SystemRequirements As %ZPM.PackageManager.Developer.SystemRequirements(ForceCodeGenerate = 0);
+Property SystemRequirements As %ZPM.Storage.SystemRequirements(ForceCodeGenerate = 0);
 
 /// Set to 1 if this module is in development mode, 0 if it is not.
 Property DeveloperMode As %Boolean(ForceCodeGenerate = 0, XMLPROJECTION = "NONE");
 
 /// Default settings - there may be serveral types of these (subclasses of ModuleSetting).
-Property Defaults As list Of %ZPM.PackageManager.Developer.ModuleSetting(CLASSNAME = 1, STORAGEDEFAULT = "array", XMLNAME = "Defaults", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE", XMLTYPECONSTRAINT = "SUBSTITUTIONGROUP");
+Property Defaults As list Of %ZPM.Storage.ModuleSetting(CLASSNAME = 1, STORAGEDEFAULT = "array", XMLNAME = "Defaults", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE", XMLTYPECONSTRAINT = "SUBSTITUTIONGROUP");
 
 Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
@@ -109,7 +109,7 @@ Method WriteAfterInstallMessage()
 
 /// Calls <method>%CompareTo</method> on this object and also calls it on any relationships in the class
 /// specifically <property>Mappings</property> and <property>Resources</property>. <br />
-Method CompareWithRelationships(pModuleObj As %ZPM.PackageManager.Developer.Module, pIgnorePropertyList As %Library.List = "", Output pDifferingPropertyArray As %Library.List) As %Boolean
+Method CompareWithRelationships(pModuleObj As %ZPM.Storage.Module, pIgnorePropertyList As %Library.List = "", Output pDifferingPropertyArray As %Library.List) As %Boolean
 {
 	Kill pDifferingPropertyArray
 	Set isEqual = ..%CompareTo(pModuleObj, pIgnorePropertyList, .pDifferingPropertyArray)
@@ -280,7 +280,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				// Notify resource processors
 				Set tKey = ""
 				For {
-					#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+					#dim tResource As %ZPM.Storage.ResourceReference
 					Set tResource = tModule.Resources.GetNext(.tKey)
 					If (tKey = "") {
 						Quit
@@ -371,22 +371,22 @@ ClassMethod Uninstall(pModuleName As %String, pForce As %Boolean = 0, pRecurse A
 		Set tParams("Clean","Level") = 1 // Simulate clean of module as dependency.
 		Set tParams("Clean","Force") = pForce
 		Set tParams("Clean","Recurse") = pRecurse
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(pModuleName,$ListBuild("Clean"),,.tParams)
+		Set tSC = ##class(%ZPM.Storage.Module).ExecutePhases(pModuleName,$ListBuild("Clean"),,.tParams)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
 
-Method GetNamespaceConfig(ByRef pCheckedModules) As %ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig
+Method GetNamespaceConfig(ByRef pCheckedModules) As %ZPM.Storage.ModuleSetting.NamespaceConfig
 {
-	Set tNSConfig = ##class(%ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig).%New()
+	Set tNSConfig = ##class(%ZPM.Storage.ModuleSetting.NamespaceConfig).%New()
 	
 	// See if this module has any settings.
 	Set tCount = ..Defaults.Count()
 	For tDefaultIndex = 1:1:tCount {
 		Set tDefault = ..Defaults.GetAt(tDefaultIndex)
-		If (tDefault.%IsA("%ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig")) {
+		If (tDefault.%IsA("%ZPM.Storage.ModuleSetting.NamespaceConfig")) {
 			Set tNSConfig = tDefault
 			Quit
 		}
@@ -395,7 +395,7 @@ Method GetNamespaceConfig(ByRef pCheckedModules) As %ZPM.PackageManager.Develope
 	// Recursively merge in settings from installed dependencies.
 	Set tDependencyKey = ""
 	For {
-		#dim tDependency As %ZPM.PackageManager.Core.ModuleReference
+		#dim tDependency As %ZPM.Storage.ModuleReference
 		Set tDependency = ..Dependencies.GetNext(.tDependencyKey)
 		If (tDependencyKey = "") {
 			Quit
@@ -426,8 +426,8 @@ Method GetDefaultParameters(Output pParams)
 		If (tDefaultKey = "") {
 			Quit
 		}
-		If tDefault.%IsA("%ZPM.PackageManager.Developer.ModuleSetting.Parameter") {
-			#dim tDefault As %ZPM.PackageManager.Developer.ModuleSetting.Parameter
+		If tDefault.%IsA("%ZPM.Storage.ModuleSetting.Parameter") {
+			#dim tDefault As %ZPM.Storage.ModuleSetting.Parameter
 			
 			// Filter out defaults for other lifecycle classes
 			If (tDefault.LifecycleClass '= "") {
@@ -489,8 +489,8 @@ Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
 				
 				If (tOptimizeInstalled) && '$Data($$$ZPMHandledModules($Namespace,tModuleLoop)) {
 					// Optimize for exact version matches that are already installed.
-					If ##class(%ZPM.PackageManager.Developer.Module).NameExists(tModuleLoop) {
-						Set tMod = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleLoop,,.tSC)
+					If ##class(%ZPM.Storage.Module).NameExists(tModuleLoop) {
+						Set tMod = ##class(%ZPM.Storage.Module).NameOpen(tModuleLoop,,.tSC)
 						$$$ThrowOnError(tSC)
 						If (tMod.VersionString = $ListGet(tValue,3)) {
 							Set $List(tValue,2) = ""
@@ -538,7 +538,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 		// May want to pass phases to subsequent calls
 		Set tPhases = $Case(pCheckNestedScoped, 1: pPhases, : "")
 		For i=1:1:..Dependencies.Count() {
-			#dim tDep As %ZPM.PackageManager.Core.ModuleReference
+			#dim tDep As %ZPM.Storage.ModuleReference
 			Set tDep = ..Dependencies.GetAt(i)
 			
 			Set tModulePath = pModulePath
@@ -681,14 +681,14 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					Set tMsg = "Error reading module manifest for %1 %2 from repository %3"
 					Set tOuterSC = $$$ERROR($$$GeneralError,$$$FormatText(tMsg,tQualifiedReference.Name,tQualifiedReference.VersionString,tQualifiedReference.ServerName))
 					
-					#dim tModule As %ZPM.PackageManager.Developer.Module
+					#dim tModule As %ZPM.Storage.Module
 					Set tReader = ##class(%XML.Reader).%New()
 					Set tSC = tReader.OpenStream(tManifest)
 					If $$$ISERR(tSC) {
 						Set tSC = $System.Status.EmbedStatus(tOuterSC,tSC)
 						Quit
 					}
-					Do tReader.Correlate("Module","%ZPM.PackageManager.Developer.Module")
+					Do tReader.Correlate("Module","%ZPM.Storage.Module")
 					Do tReader.Next(.tModule,.tSC)
 					If $$$ISERR(tSC) {
 						Set tSC = $System.Status.EmbedStatus(tOuterSC,tSC)
@@ -806,7 +806,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 {
 	Set tStatement = ##class(%SQL.Statement).%New()
-	$$$ThrowOnError(tStatement.%Prepare("select Dependencies_Name as ModuleName from %ZPM_PackageManager_Developer.Module_Dependencies where ""Module""->Name = ?"))
+	$$$ThrowOnError(tStatement.%Prepare("select Dependencies_Name as ModuleName from %ZPM_Storage.Module_Dependencies where ""Module""->Name = ?"))
 	
 	Set tKnownDependencyList = ""
 	Set tSearchList = $ListBuild(pModuleName)
@@ -871,7 +871,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 		
 		Set tKey = ""
 		For {
-			#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+			#dim tResource As %ZPM.Storage.ResourceReference
 			Set tResource = ..Resources.GetNext(.tKey)
 			Quit:tKey=""
 			If '..HasScope(pPhases,tResource.Scope) {
@@ -893,7 +893,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 				Set tModName = $Order(pDependencyGraph(tModName))
 				Quit:tModName=""
 				
-				Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModName,,.tSC)
+				Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tModName,,.tSC)
 				If $$$ISERR(tSC) {
 					Quit
 				}
@@ -1072,7 +1072,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 		Set tDefaultCount = ..Defaults.Count()
 		For tDefaultIndex=1:1:tDefaultCount {
 			Set tDefault = ..Defaults.GetAt(tDefaultIndex)
-			If tDefault.%IsA("%ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig") {
+			If tDefault.%IsA("%ZPM.Storage.ModuleSetting.NamespaceConfig") {
 				Set tNSConfigCount = tNSConfigCount + 1
 			}
 		}
@@ -1095,8 +1095,8 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 			// If it hasn't been saved yet (to account for module renames)...
 			If (tResource.%Id() = "") && (tResource.UniqueName '= "") {
 				// ... see if some other resource exists with the same name.
-				If ##class(%ZPM.PackageManager.Developer.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
-					Set tOtherResource = ##class(%ZPM.PackageManager.Developer.ResourceReference).%OpenId(tResourceId,,.tSC)
+				If ##class(%ZPM.Storage.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
+					Set tOtherResource = ##class(%ZPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
 					If $$$ISERR(tSC) {
 						Quit
 					}
@@ -1169,13 +1169,13 @@ Method %OnAddToSaveSet(depth As %Integer = 3, insert As %Integer = 0, callcount 
 			// If it hasn't been saved yet (to account for module renames)...
 			If (tResource.%Id() = "") && (tResource.UniqueName '= "") {
 				// ... see if some other resource exists with the same name.
-				If ##class(%ZPM.PackageManager.Developer.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
-					Set tOtherResource = ##class(%ZPM.PackageManager.Developer.ResourceReference).%OpenId(tResourceId,,.tSC)
+				If ##class(%ZPM.Storage.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
+					Set tOtherResource = ##class(%ZPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
 					$$$ThrowOnError(tSC)
 					
 					If tInstallContext.ModuleIsPending(tOtherResource.Module.Name) {
 						// Delete the resource. If the pending module still contains it, there will be an error when that module is loaded.
-						Set tSC = ##class(%ZPM.PackageManager.Developer.ResourceReference).%DeleteId(tResourceId)
+						Set tSC = ##class(%ZPM.Storage.ResourceReference).%DeleteId(tResourceId)
 						$$$ThrowOnError(tSC)
 					}
 				}
@@ -1200,13 +1200,13 @@ Method %OnAddToSaveSet(depth As %Integer = 3, insert As %Integer = 0, callcount 
 ///         is "" when called from %XML.Reader for Correlate'd objects.<br>
 ClassMethod XMLNew(document As %XML.Document, node As %Integer, containerOref As %RegisteredObject = "") As %RegisteredObject [ ServerOnly = 1 ]
 {
-	// Coupled with %ZPM.PackageManager.Developer.Document.Module to allow editing of the current module rather than matching an existing one.
+	// Coupled with %ZPM.StudioDocument.Module to allow editing of the current module rather than matching an existing one.
 	Quit $Get($$$ZPMStudioDocumentModule,..%New())
 }
 
 /// Validates the module manifest in <var>pManifest</var> - both that it can be interpreted properly as XML, and also that the module it contains (returned in <var>pModule</var>) has
 /// a name and version matching the supplied <var>pModuleReference</var>.
-ClassMethod ValidateStream(pManifest As %Stream.Object, pModuleReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pModule As %ZPM.PackageManager.Developer.Module) As %Status
+ClassMethod ValidateStream(pManifest As %Stream.Object, pModuleReference As %ZPM.Storage.QualifiedModuleInfo, Output pModule As %ZPM.Storage.Module) As %Status
 {
 	Set pModule = $$$NULLOREF
 	Set tSC = $$$OK
@@ -1268,7 +1268,7 @@ Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Bo
 		
 		Set tResourceKey = ""
 		For {
-			#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+			#dim tResource As %ZPM.Storage.ResourceReference
 			Set tResource = ..Resources.GetNext(.tResourceKey)
 			If (tResourceKey = "") {
 				Quit
@@ -1359,7 +1359,7 @@ Method Lock() As %Status
 Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List = "") As %SQLQuery [ SqlProc ]
 {
 	select distinct %exact Dependencies_VersionString "Version",%DLIST("Module"->Name) "Names"
-	from %ZPM_PackageManager_Developer.Module_Dependencies
+	from %ZPM_Storage.Module_Dependencies
 	where Dependencies_Name = :pOfModuleName and
 		(:pExcludeModuleNames is null or "Module"->Name not %INLIST :pExcludeModuleNames)
 	group by Dependencies_VersionString
@@ -1441,71 +1441,68 @@ Storage Default
 <Value>%%CLASSNAME</Value>
 </Value>
 <Value name="2">
-<Value>Name</Value>
+<Value>GlobalScope</Value>
 </Value>
 <Value name="3">
-<Value>Namespace</Value>
+<Value>Name</Value>
 </Value>
 <Value name="4">
-<Value>VersionString</Value>
-</Value>
-<Value name="5">
 <Value>Version</Value>
 </Value>
-<Value name="6">
-<Value>LastModifiedTimestamp</Value>
-</Value>
-<Value name="7">
-<Value>LifecycleClass</Value>
-</Value>
-<Value name="8">
-<Value>Hash</Value>
-</Value>
-<Value name="9">
-<Value>Description</Value>
-</Value>
-<Value name="10">
+<Value name="5">
 <Value>ExternalName</Value>
 </Value>
-<Value name="11">
+<Value name="6">
+<Value>Description</Value>
+</Value>
+<Value name="7">
+<Value>Keywords</Value>
+</Value>
+<Value name="8">
 <Value>Author</Value>
 </Value>
-<Value name="12">
+<Value name="9">
+<Value>Packaging</Value>
+</Value>
+<Value name="10">
+<Value>LifecycleClass</Value>
+</Value>
+<Value name="11">
 <Value>InstallerClass</Value>
 </Value>
+<Value name="12">
+<Value>Hash</Value>
+</Value>
 <Value name="13">
-<Value>GlobalScope</Value>
+<Value>LastModifiedTimestamp</Value>
 </Value>
 <Value name="14">
 <Value>Root</Value>
 </Value>
 <Value name="15">
-<Value>Packaging</Value>
-</Value>
-<Value name="16">
-<Value>Keywords</Value>
-</Value>
-<Value name="17">
 <Value>SourcesRoot</Value>
 </Value>
-<Value name="18">
-<Value>Repository</Value>
-</Value>
-<Value name="19">
+<Value name="16">
 <Value>SystemRequirements</Value>
 </Value>
-<Value name="20">
+<Value name="17">
 <Value>DeveloperMode</Value>
 </Value>
-<Value name="21">
+<Value name="18">
 <Value>AfterInstallMessage</Value>
 </Value>
+<Value name="19">
+<Value>Repository</Value>
+</Value>
+<Value name="20">
+<Value>VersionString</Value>
+</Value>
 </Data>
-<DataLocation>^ZPM.Dev.ModuleD</DataLocation>
+<DataLocation>^%ZPM.Storage.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
-<IdLocation>^ZPM.Dev.ModuleD</IdLocation>
-<IndexLocation>^ZPM.Dev.ModuleI</IndexLocation>
-<StreamLocation>^ZPM.Dev.ModuleS</StreamLocation>
+<IdLocation>^%ZPM.Storage.ModuleD</IdLocation>
+<IndexLocation>^%ZPM.Storage.ModuleI</IndexLocation>
+<StreamLocation>^%ZPM.Storage.ModuleS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

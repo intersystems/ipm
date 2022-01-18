@@ -33,8 +33,8 @@ Method %Package(ByRef pParams) As %Status
 		
 		// Possibly, include package manager in package and install it if needed.
 		If tIncludePackageManager {
-			If ##class(%ZPM.PackageManager.Developer.Module).NameExists("ZHSLIB") {
-				Set tZPMModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("ZHSLIB",,.tSC)
+			If ##class(%ZPM.Storage.Module).NameExists("ZHSLIB") {
+				Set tZPMModule = ##class(%ZPM.Storage.Module).NameOpen("ZHSLIB",,.tSC)
 				$$$ThrowOnError(tSC)
 				Do ..PackageOneModule(tZPMModule,tTarget,.pParams,.tModuleLocations,.tRtn)
 			} Else {
@@ -51,7 +51,7 @@ Method %Package(ByRef pParams) As %Status
 				If (tModule = "") {
 					Quit
 				}
-				Set tDepthGraph($ListGet(tData),$Increment(tDepthGraph($ListGet(tData)))) = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModule,,.tSC)
+				Set tDepthGraph($ListGet(tData),$Increment(tDepthGraph($ListGet(tData)))) = ##class(%ZPM.Storage.Module).NameOpen(tModule,,.tSC)
 				$$$ThrowOnError(tSC)
 			}
 			
@@ -124,7 +124,7 @@ Method %Package(ByRef pParams) As %Status
 }
 
 /// Packages a single module as a subordinate Studio project, and configures the overall installation routine with instructions to install it.
-Method PackageOneModule(pModule As %ZPM.PackageManager.Developer.Module, pTargetGlobal As %String, ByRef pParams, ByRef pModuleLocations, ByRef pInstallerCode) [ Internal, Private ]
+Method PackageOneModule(pModule As %ZPM.Storage.Module, pTargetGlobal As %String, ByRef pParams, ByRef pModuleLocations, ByRef pInstallerCode) [ Internal, Private ]
 {
 	Set tVerbose = $Get(pParams("Verbose"),0)
 	Set tDeployDefault = $Get(pParams("Package","Deploy"),0)
@@ -164,7 +164,7 @@ Method PackageOneModule(pModule As %ZPM.PackageManager.Developer.Module, pTarget
 	// Notify resource processors for harvest of static files from module root
 	Set tKey = ""
 	For {
-		#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+		#dim tResource As %ZPM.Storage.ResourceReference
 		Set tResource = pModule.Resources.GetNext(.tKey)
 		Quit:(tKey="")
 		
@@ -219,7 +219,7 @@ Method PackageOneModule(pModule As %ZPM.PackageManager.Developer.Module, pTarget
 		// Just run the Activate lifecycle phase.
 		Set pInstallerCode($i(pInstallerCode)) = " Kill tParams"
 		Set pInstallerCode($i(pInstallerCode)) = " Set tParams(""RootDirectory"") = tExtractDirectory"
-		Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).ExecutePhases("_$$$QUOTE(pModule.Name)_",$ListBuild(""Activate""),,.tParams))"
+		Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(%ZPM.Storage.Module).ExecutePhases("_$$$QUOTE(pModule.Name)_",$ListBuild(""Activate""),,.tParams))"
 	} ElseIf (tInstallerClass '= "") {
 		If $$$defMemberDefined(tInstallerClass,$$$cCLASSmethod,"OnInstallComponent") {
 			Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class("_tInstallerClass_").OnInstallComponent(""""))"

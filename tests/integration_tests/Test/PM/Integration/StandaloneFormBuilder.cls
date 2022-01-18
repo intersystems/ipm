@@ -3,7 +3,7 @@ Class Test.PM.Integration.StandaloneFormBuilder Extends Test.PM.Integration.Base
 
 Method TestNewNamespaceInstall()
 {
-	#; #dim tModule As %ZPM.PackageManager.Developer.Module
+	#; #dim tModule As %ZPM.Storage.Module
 	
 	#; New $Namespace
 	#; Set tOrigNS = $Namespace
@@ -26,7 +26,7 @@ Method TestNewNamespaceInstall()
 	#; 		}
 	#; 	}
 		
-	#; 	Set tRef = ##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New()
+	#; 	Set tRef = ##class(%ZPM.Storage.QualifiedModuleInfo).%New()
 	#; 	Set tRef.ServerName = "Users"
 	#; 	Set tRef.Name = "HS.StandaloneFormBuilder"
 	#; 	Set tRef.VersionString = "0.0.1+snapshot"

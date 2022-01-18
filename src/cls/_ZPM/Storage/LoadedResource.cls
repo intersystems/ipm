@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.LoadedResource Extends %Persistent
+Class %ZPM.Storage.LoadedResource Extends %Persistent
 {
 
 Property Namespace As %String(MAXLEN = 64) [ Required ];
@@ -9,9 +9,9 @@ Property ResourceUniqueName As %String(MAXLEN = 255) [ Required ];
 
 Property LoadedResource As %String(MAXLEN = 255) [ Required ];
 
-ForeignKey ModuleNameFK(ModuleName) References %ZPM.PackageManager.Developer.Module(Name) [ OnDelete = cascade ];
+ForeignKey ModuleNameFK(ModuleName) References %ZPM.Storage.Module(Name) [ OnDelete = cascade ];
 
-ForeignKey ResourceUniqueNameFK(ResourceUniqueName) References %ZPM.PackageManager.Developer.ResourceReference(ResourceName) [ OnDelete = cascade ];
+ForeignKey ResourceUniqueNameFK(ResourceUniqueName) References %ZPM.Storage.ResourceReference(ResourceName) [ OnDelete = cascade ];
 
 Index NamespaceIndex On Namespace [ Type = bitmap ];
 
@@ -26,7 +26,7 @@ ClassMethod TrackResourceNames(pModuleName As %String, pResourceName As %String,
 	Set tSC = $$$OK
 	Set tRecordsCreated = 0
 	Try {
-		Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_PackageManager_Developer.LoadedResource "_
+		Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_Storage.LoadedResource "_
 			"where Namespace = ? and ModuleName = ? and ResourceUniqueName = ?",
 			pNamespace,pModuleName,pResourceName)
 		If (tResult.%SQLCODE < 0) {
@@ -49,7 +49,7 @@ ClassMethod TrackResourceNames(pModuleName As %String, pResourceName As %String,
 		
 		If tRecordsCreated {
 			// Since using IRISTEMP, need an alternative approach to remove any rows that have been created:
-			Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_PackageManager_Developer.LoadedResource "_
+			Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_Storage.LoadedResource "_
 				"where Namespace = ? and ModuleName = ? and ResourceUniqueName = ?",
 				pNamespace,pModuleName,pResourceName)
 			If (tResult.%SQLCODE < 0) {
@@ -72,7 +72,7 @@ ClassMethod Validate(pNamespace As %String = {$Namespace}, Output pErrorList) As
 		// Find any resources that were loaded twice.
 		Set tQuery = "select LoadedResource,Sources from ("_
 			"	select LoadedResource,count(distinct ModuleName) as Matches,LIST(ModuleName||':'||ResourceUniqueName) As Sources "_
-			"	from %ZPM_PackageManager_Developer.LoadedResource "_
+			"	from %ZPM_Storage.LoadedResource "_
 			"	where Namespace = ? "_
 			"	group by LoadedResource) duplicates "_
 			"where duplicates.Matches > 1"
@@ -83,7 +83,7 @@ ClassMethod Validate(pNamespace As %String = {$Namespace}, Output pErrorList) As
 		// Find any resources that were loaded as part of a different module than the one that says it contains them.
 		Set tQuery = "select LoadedResource,ModuleName,ActualModule from ( "_
 			"	select LoadedResource,ModuleName,%ZPM_PackageManager_Developer_Extension.Utils_GetHomeModuleName(LoadedResource) ActualModule "_
-			"	from %ZPM_PackageManager_Developer.LoadedResource "_
+			"	from %ZPM_Storage.LoadedResource "_
 			"	where Namespace = ?)"_
 			"	where ModuleName != ActualModule"
 		Set tResult = ##class(%SQL.Statement).%ExecDirect(,tQuery,pNamespace)
@@ -104,7 +104,7 @@ ClassMethod Clear(pNamespace As %String = {$Namespace}) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_PackageManager_Developer.LoadedResource "_
+		Set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %ZPM_Storage.LoadedResource "_
 			"where Namespace = ?",
 			pNamespace)
 		If (tResult.%SQLCODE < 0) {
@@ -150,11 +150,11 @@ Storage Default
 <Value>LoadedResource</Value>
 </Value>
 </Data>
-<DataLocation>^CacheTemp.ZPM.LoadedResourceD</DataLocation>
+<DataLocation>^%ZPM.Storage.LoadedResourceD</DataLocation>
 <DefaultData>LoadedResourceDefaultData</DefaultData>
-<IdLocation>^CacheTemp.ZPM.LoadedResourceD</IdLocation>
-<IndexLocation>^CacheTemp.ZPM.LoadedResourceI</IndexLocation>
-<StreamLocation>^CacheTemp.ZPM.LoadedResourceS</StreamLocation>
+<IdLocation>^%ZPM.Storage.LoadedResourceD</IdLocation>
+<IndexLocation>^%ZPM.Storage.LoadedResourceI</IndexLocation>
+<StreamLocation>^%ZPM.Storage.LoadedResourceS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

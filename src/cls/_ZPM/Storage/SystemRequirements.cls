@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.SystemRequirements Extends (%Persistent, %XML.Adaptor)
+Class %ZPM.Storage.SystemRequirements Extends (%Persistent, %XML.Adaptor)
 {
 
 Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version", XMLPROJECTION = "ATTRIBUTE");
@@ -63,20 +63,17 @@ Storage Default
 <Value>VersionString</Value>
 </Value>
 <Value name="3">
-<Value>Product</Value>
+<Value>Version</Value>
 </Value>
 <Value name="4">
 <Value>Interoperability</Value>
 </Value>
-<Value name="5">
-<Value>Version</Value>
-</Value>
 </Data>
-<DataLocation>^%ZPM.Packa360D.SystemRequi5D02D</DataLocation>
+<DataLocation>^%ZPM.Storage.SystemRequi5D02D</DataLocation>
 <DefaultData>SystemRequirementsDefaultData</DefaultData>
-<IdLocation>^%ZPM.Packa360D.SystemRequi5D02D</IdLocation>
-<IndexLocation>^%ZPM.Packa360D.SystemRequi5D02I</IndexLocation>
-<StreamLocation>^%ZPM.Packa360D.SystemRequi5D02S</StreamLocation>
+<IdLocation>^%ZPM.Storage.SystemRequi5D02D</IdLocation>
+<IndexLocation>^%ZPM.Storage.SystemRequi5D02I</IndexLocation>
+<StreamLocation>^%ZPM.Storage.SystemRequi5D02S</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

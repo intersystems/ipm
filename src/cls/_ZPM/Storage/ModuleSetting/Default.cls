@@ -1,14 +1,14 @@
 /// Custom defaults for module
 /// Each <Default Name="" Value="" /> element defines one parameter, that can be specified
 /// during module installation
-Class %ZPM.PackageManager.Developer.ModuleSetting.Default Extends %ZPM.PackageManager.Developer.ModuleSetting
+Class %ZPM.Storage.ModuleSetting.Default Extends %ZPM.Storage.ModuleSetting
 {
 
 Property Name As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE");
 
 Property Value As %String(MAXLEN = 1000, XMLPROJECTION = "ATTRIBUTE");
 
-ClassMethod GetCustomParameters(Output customParams, module As %ZPM.PackageManager.Developer.Module, ByRef pParams) As %Status
+ClassMethod GetCustomParameters(Output customParams, module As %ZPM.Storage.Module, ByRef pParams) As %Status
 {
     Kill customParams
     Set customParams = ""
@@ -16,7 +16,7 @@ ClassMethod GetCustomParameters(Output customParams, module As %ZPM.PackageManag
     For {
         Set default = module.Defaults.GetNext(.key)
         Quit:(key="")
-        If (default.%ClassName(1)="%ZPM.PackageManager.Developer.ModuleSetting.Default") {
+        If (default.%ClassName(1)="%ZPM.Storage.ModuleSetting.Default") {
             Set customParams(default.Name) = default.Value
             If ($Data(pParams("zpm",default.Name))) {
                 Set customParams(default.Name) = $Get(pParams("zpm",default.Name))

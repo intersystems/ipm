@@ -4,7 +4,7 @@ Class %ZPM.General.SASchema Extends %Studio.SASchemaClass
 /// This is a comma-separated list of the classes whose xml elements
 /// can be used as the root level element of a document separated with a ':' and the
 /// XML tag name to correlate this with e.g. "User.Person:person,User.Company:company".
-Parameter ROOTCLASSES As STRING = "%ZPM.PackageManager.Developer.Module:Module";
+Parameter ROOTCLASSES As STRING = "%ZPM.Storage.Module:Module";
 
 /// This is the namespace value used to identify this SA schema.
 /// This corresponds to the XMLNamespace keyword of a Studio XData block.

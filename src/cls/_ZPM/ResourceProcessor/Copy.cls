@@ -125,7 +125,7 @@ Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean
 			}
 			
 			// Then check persistent records for all modules
-			If ##class(%ZPM.PackageManager.Developer.ResourceReference).ResourceNameExists(tKey) {
+			If ##class(%ZPM.Storage.ResourceReference).ResourceNameExists(tKey) {
 				// Resource exists as part of some module.
 				// Don't include it in the copy.
 				Kill pResourceArray(tKey)
@@ -139,7 +139,7 @@ Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean
 					If (tPackageKey = ..ResourceReference.Name) {
 						Quit
 					}
-					If ##class(%ZPM.PackageManager.Developer.ResourceReference).ResourceNameExists(tPackageKey) {
+					If ##class(%ZPM.Storage.ResourceReference).ResourceNameExists(tPackageKey) {
 						Kill pResourceArray(tKey)
 						Set ..TargetResourceCache(tPackageKey) = ""
 						Quit

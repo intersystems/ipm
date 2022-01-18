@@ -51,7 +51,7 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 				Set tSC = ##class(%ZPM.PackageManager.Developer.UnitTest.Manager).LoadTestDirectory(tUnitTestDir,tVerbose,.tLoadedList,..Format)
 				$$$ThrowOnError(tSC)
 				
-				Set tSC = ##class(%ZPM.PackageManager.Developer.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
+				Set tSC = ##class(%ZPM.Storage.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
 			}
 		}
 	} Catch e {
@@ -212,7 +212,7 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 		Set tResourceInfo("IsAPI") = 0
 		Set tResourceInfo("UnitTest") = 1
 		Set tResource = $Case(..Package '= "", 1: ..Package, : ..Class)_..Extension
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.pResourceArray))
+		$$$ThrowOnError(##class(%ZPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.pResourceArray))
 		$$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.pResourceArray))
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -238,7 +238,7 @@ Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extens
 	Quit $$$OK
 }
 
-Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pResourceReference As %ZPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set tSC = ##super(pResourceReference)
 	If (..Package '= "") {

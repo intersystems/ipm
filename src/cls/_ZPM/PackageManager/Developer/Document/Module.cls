@@ -27,7 +27,7 @@ Method Load() As %Status
 			Set tSC = $$$OK
 			
 			// Fall back to direct rendering of XML from persistent object
-			Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tName,,.tSC)
+			Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tName,,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -60,7 +60,7 @@ Method Save() As %Status
 	Quit ..Load()
 }
 
-ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.Document.ModuleStream, Output pModule As %ZPM.PackageManager.Developer.Module) As %Status
+ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.Document.ModuleStream, Output pModule As %ZPM.Storage.Module) As %Status
 {
 	Set tSC = $$$OK
 	Set pModule = $$$NULLOREF
@@ -68,13 +68,13 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 		New $$$ZPMStudioDocumentModule
 		New $$$ZPMDeferModifyResources
 		Set $$$ZPMDeferModifyResources = 1
-		If ##class(%ZPM.PackageManager.Developer.Module).NameExists(pStream.Name) {
-			Set pModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pStream.Name,,.tSC)
+		If ##class(%ZPM.Storage.Module).NameExists(pStream.Name) {
+			Set pModule = ##class(%ZPM.Storage.Module).NameOpen(pStream.Name,,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
 		} Else {
-			Set pModule = ##class(%ZPM.PackageManager.Developer.Module).%New()
+			Set pModule = ##class(%ZPM.Storage.Module).%New()
 		}
 		
 		If (pStream.Contents.Size = 0) {
@@ -104,8 +104,8 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 				}
 			}
 			
-			Set $$$ZPMStudioDocumentModule = pModule //Stash for use in %ZPM.PackageManager.Developer.Module:XMLNew
-			Do tReader.Correlate("Module","%ZPM.PackageManager.Developer.Module")
+			Set $$$ZPMStudioDocumentModule = pModule //Stash for use in %ZPM.Storage.Module:XMLNew
+			Do tReader.Correlate("Module","%ZPM.Storage.Module")
 			Do tReader.Next(.tModule,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
@@ -134,7 +134,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.
 
 Method OnCompileDocument(ByRef qstruct As %String) As %Status
 {
-	#dim tModule As %ZPM.PackageManager.Developer.Module
+	#dim tModule As %ZPM.Storage.Module
 	#dim tGeneralSettings As %ZPM.General.Settings
 	Set tSC = $$$OK
 	Try {
@@ -236,7 +236,7 @@ ClassMethod Delete(name As %String) As %Status
 		TSTART
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameDelete(tModuleName)
 		$$$ThrowOnError(tSC)
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).NameDelete(tModuleName)
+		Set tSC = ##class(%ZPM.Storage.Module).NameDelete(tModuleName)
 		$$$ThrowOnError(tSC)
 		TCOMMIT
 	} Catch e {
@@ -263,7 +263,7 @@ ClassMethod TimeStamp(name As %String) As %TimeStamp [ SqlProc ]
 	If $IsObject(tModStream) {
 		Set tStamp = tModStream.LastModifiedTimestamp
 	} Else {
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tNameNoExt)
+		Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tNameNoExt)
 		If $IsObject(tModule) {
 			Set tStamp = tModule.LastModifiedTimestamp
 		}
@@ -282,7 +282,7 @@ ClassMethod Exists(name As %String) As %Boolean
 		}
 		Set tName = $Piece(name,".",1,*-1)
 		Set tExists = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameExists(tName) 
-						|| ##class(%ZPM.PackageManager.Developer.Module).NameExists(tName)
+						|| ##class(%ZPM.Storage.Module).NameExists(tName)
 	} Catch e {
 		Set tExists = 0
 	}
@@ -294,7 +294,7 @@ Query ItemList() As %SQLQuery(ROWSPEC = "name:%String,modified:%TimeStamp") [ Sq
 {
 	select Name, LastModifiedTimestamp from %ZPM_PackageManager_Developer_Document.ModuleStream
 	union
-	select Name, LastModifiedTimestamp from %ZPM_PackageManager_Developer."Module"
+	select Name, LastModifiedTimestamp from %ZPM_Storage."Module"
 		where Name not in (select Name from %ZPM_PackageManager_Developer_Document.ModuleStream)
 }
 
@@ -308,7 +308,7 @@ ClassMethod GetOther(Name As %String) As %String
 		If (tExt = "ZPM") {
 			Set tModuleName = $Piece(Name,".",1,*-1)
 			Set tResources = ##class(%SQL.Statement).%ExecDirect(,
-				"select UniqueName from %ZPM_PackageManager_Developer.ResourceReference where ""Module""->Name = ?",
+				"select UniqueName from %ZPM_Storage.ResourceReference where ""Module""->Name = ?",
 				tModuleName)
 			If (tResources.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResources.%SQLCODE,tResources.%Message)

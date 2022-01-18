@@ -76,7 +76,7 @@ ClassMethod moduleSqlToList(pQuery As %String, pSearchCriteria As %ZPM.Repo.Sear
 			Quit
 		}
 		
-		Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
+		Set tModRef = ##class(%ZPM.Storage.ModuleInfo).%New()
 		Set tModRef.Name = tRes.%Get("Name")
 		Set tModRef.VersionString = tRes.%Get("VersionString")
 		Do tList.Insert(tModRef)

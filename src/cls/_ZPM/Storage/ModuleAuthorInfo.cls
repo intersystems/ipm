@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.ModuleAuthorInfo Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
+Class %ZPM.Storage.ModuleAuthorInfo Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
 {
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
@@ -37,7 +37,7 @@ Storage Default
 </Value>
 </Data>
 <State>ModuleAuthorInfoState</State>
-<StreamLocation>^ZPM.PackageManager.ModuleAutho4EB8S</StreamLocation>
+<StreamLocation>^%ZPM.Storage.ModuleAuthorInfoS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

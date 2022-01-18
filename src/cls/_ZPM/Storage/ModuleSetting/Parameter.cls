@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.ModuleSetting.Parameter Extends %ZPM.PackageManager.Developer.ModuleSetting
+Class %ZPM.Storage.ModuleSetting.Parameter Extends %ZPM.Storage.ModuleSetting
 {
 
 /// Name of the parameter (may contain "." to indicate a subscript in the array passed to lifecycle phases)

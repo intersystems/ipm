@@ -10,7 +10,7 @@ Parameter NAMESPACE = "http://www.intersystems.com/PackageManager";
 /// Namespaces of referenced classes will be used in the WSDL.
 Parameter USECLASSNAMESPACES = 1;
 
-Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ WebMethod ]
+Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.ModuleInfo") [ WebMethod ]
 {
 	Set tList = ##class(%Library.ListOfObjects).%New()
 	Set tQuery = "select m.Name,m.VersionString from %ZPM_PackageManager_Server.Application_OrderedMatches(?,?,?) m "_
@@ -18,7 +18,7 @@ Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library
 	Quit ..moduleSqlToList(tQuery,.pSearchCriteria)
 }
 
-Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference") [ WebMethod ]
+Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.ModuleInfo") [ WebMethod ]
 {
 	Set tList = ##class(%Library.ListOfObjects).%New()
 	Set tQuery = "select m.Name,m.VersionString from %ZPM_PackageManager_Server.Module_OrderedMatches(?,?,?) m "_
@@ -26,21 +26,21 @@ Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %Library.List
 	Quit ..moduleSqlToList(tQuery,.pSearchCriteria)
 }
 
-Method HasApplication(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Boolean [ WebMethod ]
+Method HasApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean [ WebMethod ]
 {
 	Set tName = pModuleReference.Name
 	Set tVersion = pModuleReference.VersionString
 	Quit ##class(%ZPM.PackageManager.Server.Application).NameVersionExists(tName,tVersion)
 }
 
-Method HasModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Boolean [ WebMethod ]
+Method HasModule(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean [ WebMethod ]
 {
 	Set tName = pModuleReference.Name
 	Set tVersion = pModuleReference.VersionString
 	Quit ##class(%ZPM.PackageManager.Server.Module).NameVersionExists(tName,tVersion)
 }
 
-Method GetApplicationManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.GlobalCharacter [ WebMethod ]
+Method GetApplicationManifest(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.GlobalCharacter [ WebMethod ]
 {
 	Set tName = pModuleReference.Name
 	Set tVersion = pModuleReference.VersionString
@@ -49,7 +49,7 @@ Method GetApplicationManifest(pModuleReference As %ZPM.PackageManager.Core.Resol
 	Quit tApplication.Manifest
 }
 
-Method GetModuleManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.GlobalCharacter [ WebMethod ]
+Method GetModuleManifest(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.GlobalCharacter [ WebMethod ]
 {
 	Set tName = pModuleReference.Name
 	Set tVersion = pModuleReference.VersionString
@@ -58,7 +58,7 @@ Method GetModuleManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedMo
 	Quit tPackage.Manifest
 }
 
-Method GetApplication(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.GlobalBinary [ WebMethod ]
+Method GetApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.GlobalBinary [ WebMethod ]
 {
 	Set tName = pModuleReference.Name
 	Set tVersion = pModuleReference.VersionString
@@ -67,7 +67,7 @@ Method GetApplication(pModuleReference As %ZPM.PackageManager.Core.ResolvedModul
 	Quit tApplication.Payload
 }
 
-Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.GlobalBinary [ WebMethod ]
+Method GetModule(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.GlobalBinary [ WebMethod ]
 {
 	Set tName = pModuleReference.Name
 	Set tVersion = pModuleReference.VersionString

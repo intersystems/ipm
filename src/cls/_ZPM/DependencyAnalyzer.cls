@@ -11,7 +11,7 @@ ClassMethod RunForAllModules() As %Status
 	Set tOneSC = $$$OK
 	Try {
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-			"select Name from %ZPM_PackageManager_Developer.""MODULE""")
+			"select Name from %ZPM_Storage.""MODULE""")
 		If (tRes.%SQLCODE < 0) {
 			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 		}
@@ -40,7 +40,7 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 		Set tRun = ##class(%ZPM.DependencyAnalyzer.ModuleResults).%New()
 		Set tRun.TargetModule = pModuleName
 		
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pModuleName,,.tSC)
+		Set tModule = ##class(%ZPM.Storage.Module).NameOpen(pModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
 		
 		If $IsObject(pProgressListener) {
@@ -77,7 +77,7 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 		
 		Set tResourceKey = ""
 		For {
-			#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+			#dim tResource As %ZPM.Storage.ResourceReference
 			Set tResource = tModule.Resources.GetNext(.tResourceKey)
 			If (tResourceKey = "") {
 				Quit

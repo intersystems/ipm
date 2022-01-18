@@ -5,12 +5,12 @@ Class %ZPM.PackageManager.Developer.API
 
 /// Converts <var>pObject</var> to a Module object and returns it by reference.
 /// (The caller may then export it to XML, for example.)
-ClassMethod CreateModule(pObject As %ZEN.proxyObject, Output pModule As %ZPM.PackageManager.Developer.Module) As %Status
+ClassMethod CreateModule(pObject As %ZEN.proxyObject, Output pModule As %ZPM.Storage.Module) As %Status
 {
 	Set tSC = $$$OK
 	Set tInitTLevel = $TLevel
 	Try {
-		Set pModule = ##class(%ZPM.PackageManager.Developer.Module).%New()
+		Set pModule = ##class(%ZPM.Storage.Module).%New()
 		Set tSC = ..ProxyToModule(pObject,pModule)
 		$$$ThrowOnError(tSC)
 		$$$ThrowOnError(pModule.%ValidateObject())
@@ -32,7 +32,7 @@ ClassMethod UpdateModule(pModuleName As %String, pObject As %ZEN.proxyObject, Ou
 	Set tSC = $$$OK
 	Set tInitTLevel = $TLevel
 	Try {
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pModuleName,,.tSC)
+		Set tModule = ##class(%ZPM.Storage.Module).NameOpen(pModuleName,,.tSC)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -60,7 +60,7 @@ ClassMethod UpdateModule(pModuleName As %String, pObject As %ZEN.proxyObject, Ou
 	Quit tSC
 }
 
-ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.PackageManager.Developer.Module, Output pSourceControlOutput) As %Status
+ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.Storage.Module, Output pSourceControlOutput) As %Status
 {
 	Set tSC = $$$OK
 	Set tCookie = ""
@@ -128,7 +128,7 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.PackageManager.Develop
 			Quit
 		}
 		
-		// NOTE: tRtn.Code is a %ZPM.PackageManager.Developer.Document.Module
+		// NOTE: tRtn.Code is a %ZPM.StudioDocument.Module
 		Do tRtn.Code.Code.Clear()
 		Set tHeader = tExportStream.ReadLine()
 		If ($Extract(tHeader,1,2) '= "<?") {
@@ -154,7 +154,7 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.PackageManager.Develop
 }
 
 /// Add defaults to a module such that all classes are exported in UDL format
-ClassMethod AddUDLDefaults(pSource As %ZPM.PackageManager.Developer.Module)
+ClassMethod AddUDLDefaults(pSource As %ZPM.Storage.Module)
 {
 	// Value is 1 if filename extension is needed as an attribute. 0 otherwise
 	#dim processorNameArray As %String
@@ -169,7 +169,7 @@ ClassMethod AddUDLDefaults(pSource As %ZPM.PackageManager.Developer.Module)
 		If (processorName = "") {
 			Quit
 		}
-		Set defaultObj = ##class(%ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault).%New()
+		Set defaultObj = ##class(%ZPM.Storage.ModuleSetting.ResourceProcessorDefault).%New()
 		Set defaultObj.Class = processorName
 		Set sc = defaultObj.Attributes.SetAt("UDL", "Format")
 		$$$ThrowOnError(sc)
@@ -182,7 +182,7 @@ ClassMethod AddUDLDefaults(pSource As %ZPM.PackageManager.Developer.Module)
 	}
 }
 
-ClassMethod CreateInstallerClass(pSource As %ZPM.PackageManager.Developer.Module) [ Private ]
+ClassMethod CreateInstallerClass(pSource As %ZPM.Storage.Module) [ Private ]
 {
 	If (pSource.InstallerClass '= "") && '$$$defClassDefined(pSource.InstallerClass) && '$$$comClassDefined(pSource.InstallerClass) {
 		// Create stub class
@@ -198,7 +198,7 @@ ClassMethod CreateInstallerClass(pSource As %ZPM.PackageManager.Developer.Module
 	}
 }
 
-ClassMethod CreateLifecycleClass(pSource As %ZPM.PackageManager.Developer.Module) [ Private ]
+ClassMethod CreateLifecycleClass(pSource As %ZPM.Storage.Module) [ Private ]
 {
 	If (pSource.LifecycleClass '= "") && '$$$defClassDefined(pSource.LifecycleClass) && '$$$comClassDefined(pSource.LifecycleClass) && '$$$comClassDefined($$$DefaultLifecyclePackageDot_pSource.LifecycleClass) {
 		Set tDef = ##class(%Dictionary.ClassDefinition).%New()
@@ -214,7 +214,7 @@ ClassMethod CreateLifecycleClass(pSource As %ZPM.PackageManager.Developer.Module
 	}
 }
 
-ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageManager.Developer.Module, pSave As %Boolean = 0, Output pSourceControlOutput) As %Status [ Private ]
+ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.Storage.Module, pSave As %Boolean = 0, Output pSourceControlOutput) As %Status [ Private ]
 {
 	Set tSC = $$$OK
 	Set tCookie = ""
@@ -268,7 +268,7 @@ ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageMa
 					Kill tDestMap(1,tNameKey,tScopeKey)
 				} Else {
 					// Create
-					Set tDep = ##class(%ZPM.PackageManager.Core.ModuleReference).%New()
+					Set tDep = ##class(%ZPM.Storage.ModuleReference).%New()
 					Set tDep.Name = tNameKey
 					Do pModule.Dependencies.Insert(tDep)
 				}
@@ -323,7 +323,7 @@ ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageMa
 				Kill tDestMap(1,tNameKey)
 			} Else {
 				// Create
-				Set tRes = ##class(%ZPM.PackageManager.Developer.ResourceReference).%New()
+				Set tRes = ##class(%ZPM.Storage.ResourceReference).%New()
 				Set tRes.Name = tNameKey
 				Do pModule.Resources.Insert(tRes)
 			}
@@ -334,7 +334,7 @@ ClassMethod ProxyToModule(pObject As %ZEN.proxyObject, pModule As %ZPM.PackageMa
 			Set tRes.ProcessorClass = tSrc.ProcessorClass
 			
 			// Clone of the resource for comparison to default values.
-			Set tResClone = ##class(%ZPM.PackageManager.Developer.ResourceReference).%New()
+			Set tResClone = ##class(%ZPM.Storage.ResourceReference).%New()
 			Set tResClone.Name = tRes.Name
 			Set tResClone.Scope = tRes.Scope
 			Set tResClone.Preload = tRes.Preload
@@ -404,9 +404,9 @@ ClassMethod GetModuleProperties(pModuleName As %String, Output pObject As %ZEN.p
 		Set pObject.error = ""
 		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName = "" {
-			Set tModuleObj = ##class(%ZPM.PackageManager.Developer.Module).%New()
+			Set tModuleObj = ##class(%ZPM.Storage.Module).%New()
 		} Else {
-			Set tModuleObj = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleName,,.tSC)
+			Set tModuleObj = ##class(%ZPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 			$$$ThrowOnError(tSC)
 		}
 		Set pObject.Name = tModuleObj.Name
@@ -524,7 +524,7 @@ ClassMethod ListProcessorAttributesClose(ByRef qHandle As %Binary) As %Status [ 
 /// If 1, only snapshots; if 0, only non-snapshots.
 ClassMethod GetInstalledModuleListSQL(Output pSQL As %String, pSnapshots As %Boolean = "") As %Status
 {
-	Set pSQL = "select Name from %ZPM_PackageManager_Developer.""Module"""
+	Set pSQL = "select Name from %ZPM_Storage.""Module"""
 	If (pSnapshots = 0) {
 		Set pSQL = pSQL_" where Version_Build <> 'snapshot'"
 	} ElseIf (pSnapshots = 1) {
@@ -555,7 +555,7 @@ ClassMethod GetDependencySQL(pModuleName As %String, Output pSQL As %String, Out
 		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
 			Set pSQL = "select Dependencies_Name as ModuleName, Dependencies_VersionString as Version, Dependencies_Scope as Scope "_
-				"from %ZPM_PackageManager_Developer.Module_Dependencies "_
+				"from %ZPM_Storage.Module_Dependencies "_
 				"where ""Module""->Name=?"
 			Set pArgs($i(pArgs)) = tModuleName
 		}
@@ -578,7 +578,7 @@ ClassMethod GetResourceSQL(pModuleName As %String, Output pSQL As %String, Outpu
 				"case when "_tProcessorExpression_" %STARTSWITH '"_$$$DefaultProcessorPackageDot_"' "_
 				"then SUBSTRING("_tProcessorExpression_","_(1+$Length($$$DefaultProcessorPackageDot))_") "_
 				"else "_tProcessorExpression_" end ProcessorClass "_
-				"from %ZPM_PackageManager_Developer.ResourceReference "_
+				"from %ZPM_Storage.ResourceReference "_
 				"where ""Module""->Name=?"
 			Set pArgs($i(pArgs)) = tModuleName
 		}
@@ -597,7 +597,7 @@ ClassMethod GetResourceAttributeSQL(pModuleName As %String, Output pSQL As %Stri
 		Set tModuleName = $Piece(pModuleName,".ZPM",1)
 		If tModuleName '= "" {
 			Set pSQL = "select ResourceReference->Name ResourceReference,element_key Name,Attributes Value "_
-				"from %ZPM_PackageManager_Developer.ResourceReference_Attributes "_
+				"from %ZPM_Storage.ResourceReference_Attributes "_
 				"where ResourceReference->""Module""->Name=?"
 			Set pArgs($i(pArgs)) = tModuleName
 		}
@@ -671,7 +671,7 @@ ClassMethod GetAvailableModuleNamesExecute(ByRef qHandle As %Binary) As %Status
 		}
 		
 		For i=1:1:tResults.Count() {
-			#dim tRef As %ZPM.PackageManager.Core.QualifiedModuleReference = tResults.GetAt(i)
+			#dim tRef As %ZPM.Storage.QualifiedModuleInfo = tResults.GetAt(i)
 			Set qHandle(tRef.Name) = ""
 		}
 	} Catch e {
@@ -714,7 +714,7 @@ ClassMethod GetAvailableModuleVersionsExecute(ByRef qHandle As %Binary, pName As
 			}
 			
 			For i=1:1:tResults.Count() {
-				#dim tRef As %ZPM.PackageManager.Core.QualifiedModuleReference = tResults.GetAt(i)
+				#dim tRef As %ZPM.Storage.QualifiedModuleInfo = tResults.GetAt(i)
 				Set qHandle(i) = $ListBuild(tRef.VersionString,tRef.ServerName)
 			}
 		}

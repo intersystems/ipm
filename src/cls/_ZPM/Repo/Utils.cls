@@ -4,7 +4,7 @@ Class %ZPM.Repo.Utils
 {
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
+ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.QualifiedModuleInfo"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set pResults = $$$NULLOREF
@@ -19,7 +19,7 @@ ClassMethod SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCrite
 }
 
 /// Loads the module reference 
-ClassMethod RetrieveModuleManifest(pQualifiedReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pManifestStream As %Stream.Object) As %Status
+ClassMethod RetrieveModuleManifest(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pManifestStream As %Stream.Object) As %Status
 {
 	Set tSC = $$$OK
 	Set pManifestStream = $$$NULLOREF
@@ -34,7 +34,7 @@ ClassMethod RetrieveModuleManifest(pQualifiedReference As %ZPM.PackageManager.Co
 }
 
 /// Loads the module reference 
-ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pPackageStream As %Stream.Object) As %Status
+ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pPackageStream As %Stream.Object) As %Status
 {
 	Set tSC = $$$OK
 	Set pPackageStream = $$$NULLOREF
@@ -49,7 +49,7 @@ ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.PackageManager.Cor
 }
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
-ClassMethod SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.QualifiedModuleReference"), pForceRemoteRepo As %Boolean = 0) As %Status
+ClassMethod SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.QualifiedModuleInfo"), pForceRemoteRepo As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set pResults = $$$NULLOREF
@@ -64,7 +64,7 @@ ClassMethod SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.Search
 }
 
 /// Loads the module reference 
-ClassMethod RetrieveApplicationManifest(pQualifiedReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pManifestStream As %Stream.Object) As %Status
+ClassMethod RetrieveApplicationManifest(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pManifestStream As %Stream.Object) As %Status
 {
 	Set tSC = $$$OK
 	Set pManifestStream = $$$NULLOREF
@@ -79,7 +79,7 @@ ClassMethod RetrieveApplicationManifest(pQualifiedReference As %ZPM.PackageManag
 }
 
 /// Loads the application package 
-ClassMethod RetrieveApplicationPackage(pQualifiedReference As %ZPM.PackageManager.Core.QualifiedModuleReference, Output pPackageStream As %Stream.Object) As %Status
+ClassMethod RetrieveApplicationPackage(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pPackageStream As %Stream.Object) As %Status
 {
 	Set tSC = $$$OK
 	Set pPackageStream = $$$NULLOREF
@@ -123,7 +123,7 @@ ClassMethod InitializeLocalCache(Output pCreated As %Boolean = 0) As %Status
 /// Does a fresh or upgrade installation
 ClassMethod InstallApplication(pInstallInfo As %ZPM.PackageManager.Core.InstallationInfo) As %Status
 {
-	#dim tModule As %ZPM.PackageManager.Developer.Module
+	#dim tModule As %ZPM.Storage.Module
 	New $Namespace
 	Set tSC = $$$OK
 	Try {
@@ -137,7 +137,7 @@ ClassMethod InstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Installa
 		}
 		
 		// Validate manifest against module reference
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).ValidateStream(tManifestStream,pInstallInfo.ModuleReference,.tModule)
+		Set tSC = ##class(%ZPM.Storage.Module).ValidateStream(tManifestStream,pInstallInfo.ModuleReference,.tModule)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -211,7 +211,7 @@ ClassMethod InstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Installa
 		
 		// Run application "Configure" phase (should not compile/activate, or need to compile).
 		Set tModName = $Piece(tLoaded,".ZPM")
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModName,,.tSC)
+		Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tModName,,.tSC)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -241,7 +241,7 @@ ClassMethod UninstallApplication(pInstallInfo As %ZPM.PackageManager.Core.Instal
 	Set tSC = $$$OK
 	Try {
 		// Unconfigure application
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pInstallInfo.ModuleReference.Name,,.tSC)
+		Set tModule = ##class(%ZPM.Storage.Module).NameOpen(pInstallInfo.ModuleReference.Name,,.tSC)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -280,7 +280,7 @@ ClassMethod GetZPMVersion()
 {
     New $Namespace
     Set $Namespace = "%SYS"
-    Set module = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
+    Set module = ##class(%ZPM.Storage.Module).NameOpen("zpm")
     If ($IsObject(module)) {
         Return module.VersionString
     }

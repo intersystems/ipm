@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault Extends %ZPM.PackageManager.Developer.ModuleSetting
+Class %ZPM.Storage.ModuleSetting.ResourceProcessorDefault Extends %ZPM.Storage.ModuleSetting
 {
 
 /// Resource processor class to which this default setting applies
@@ -8,12 +8,12 @@ Property Class As %Dictionary.Classname(XMLPROJECTION = "ATTRIBUTE") [ Required 
 Property Attributes As array Of %String(MAXLEN = "", XMLKEYNAME = "Name", XMLNAME = "Attribute", XMLPROJECTION = "ELEMENT");
 
 /// Conditions under which the default settings apply
-Property Conditions As list Of %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault.Condition(XMLNAME = "Condition", XMLPROJECTION = "ELEMENT");
+Property Conditions As list Of %ZPM.Storage.ModuleSetting.ResourceProcessorDefault.Condition(XMLNAME = "Condition", XMLPROJECTION = "ELEMENT");
 
 Storage Default
 {
-<Data name="ProcessorDefaultState">
-<Subscript>"ProcessorDefault"</Subscript>
+<Data name="ResourceProcessorDefaultState">
+<Subscript>"ResourceProcessorDefault"</Subscript>
 <Value name="1">
 <Value>Class</Value>
 </Value>
@@ -24,7 +24,7 @@ Storage Default
 <Value>Conditions</Value>
 </Value>
 </Data>
-<State>ProcessorDefaultState</State>
+<State>ResourceProcessorDefaultState</State>
 <Type>%Storage.Serial</Type>
 }
 

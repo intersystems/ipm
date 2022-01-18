@@ -663,7 +663,7 @@ ClassMethod DrawColumn(desc) As %String
 /// example d ##class(%ZPM.PackageManager).GetListModules("zpm",.list)
 ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
 {
-	Set tQuery = "select Name,VersionString,Description,ExternalName from %ZPM_PackageManager_Developer.""MODULE"""
+	Set tQuery = "select Name,VersionString,Description,ExternalName from %ZPM_Storage.""MODULE"""
 	If StartsWith'="" { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery_ " where name %StartsWith ?",StartsWith) }
 	Else { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)}
 	If (tRes.%SQLCODE < 0) {
@@ -691,17 +691,17 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 
 	Set tExp = $$$GetModifier(pCommandInfo,"export")
 	If tExp'="" {
-		Do ##class(%ZPM.PackageManager.Developer.ModuleTemplate).ExportResources(tPath,tExp)
+		Do ##class(%ZPM.Storage.ModuleTemplate).ExportResources(tPath,tExp)
 	}	
 	If ($$$HasModifier(pCommandInfo,"template")) {
-		Return ##class(%ZPM.PackageManager.Developer.ModuleTemplate).GenerateTemplate(tPath)
+		Return ##class(%ZPM.Storage.ModuleTemplate).GenerateTemplate(tPath)
 	} 
 	While (1) {
 		Set tHelp(1) = "Enter module name"
 		Set tHelp(2) = "Enter "" null string to quit"
 		Do ##class(%Library.Prompt).GetString("Enter module name:", .tName, , ,.tHelp)
 		Return:(tName="") $$$OK
-		If ('##class(%ZPM.PackageManager.Developer.ModuleTemplate).NameIsValid(tName)) {
+		If ('##class(%ZPM.Storage.ModuleTemplate).NameIsValid(tName)) {
 			Write !,"Module name """_tName_""" is invalid" 
 			Set tName=""
 			Continue 
@@ -725,7 +725,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 
 	Do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)	
 
-	Set tTemplate = ##class(%ZPM.PackageManager.Developer.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
+	Set tTemplate = ##class(%ZPM.Storage.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
 	Return:'$IsObject(tTemplate) 
 
 	If ($$$HasModifier(pCommandInfo,"author")) {
@@ -744,7 +744,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 	Do tTemplate.ReadResorces(tSrc)
 
 	// web applications
-	Do ##class(%ZPM.PackageManager.Developer.ModuleTemplate).GetCSPApplications(.apps)
+	Do ##class(%ZPM.Storage.ModuleTemplate).GetCSPApplications(.apps)
 	If ($Listlength(apps)>0 ) {
 		Write !!,"Existing Web Applications:"
 		For i=1:1:$Listlength(apps) {
@@ -1464,7 +1464,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	
 	If (tResults.Count() > 0) {
 		Set tResult = ""
-		#dim tResult As %ZPM.PackageManager.Core.QualifiedModuleReference
+		#dim tResult As %ZPM.Storage.QualifiedModuleInfo
 		// Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
 		If ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
 			Set tResult = tResults.GetAt(1)
@@ -1519,7 +1519,7 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 	
 	// Find  the currently-installed version of the module
 	Set tModuleName = $Get(pCommandInfo("parameters","module"))
-	Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleName,,.tSC)
+	Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 	If $System.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module '%1' is not currently installed.",tModuleName)))
 	}
@@ -1546,7 +1546,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 	} Else {
 		Set tModuleName = pCommandInfo("parameters","module")
 		Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
+		$$$ThrowOnError(##class(%ZPM.Storage.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
 	}
 }
 
@@ -1556,7 +1556,7 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	Set tPhases = $Listbuild($zcvt(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
 	Merge tParams = pCommandInfo("data")
-	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
+	$$$ThrowOnError(##class(%ZPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
 
 ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
@@ -1572,9 +1572,9 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 			Set tActualPhases = tActualPhases_$ListBuild($zcvt(tPhase, "w"))
 		}
 		Merge tParams = pCommandInfo("data")
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModName,tActualPhases,tIsComplete,.tParams))
+		$$$ThrowOnError(##class(%ZPM.Storage.Module).ExecutePhases(tModName,tActualPhases,tIsComplete,.tParams))
 	} Else {
-		If (tModName '= "") && ##class(%ZPM.PackageManager.Developer.Module).NameExists(tModName) {
+		If (tModName '= "") && ##class(%ZPM.Storage.Module).NameExists(tModName) {
 			// TODO: list phases if a valid module name was specified.
 		} Else {
 			Do ..%Help()
@@ -1665,7 +1665,7 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 			$$$ThrowOnError(##class(%ZPM.Repo.Utils).SearchRepositoriesForApplication(tSearchCriteria,.tResults))
 			
 			If (tResults.Count() > 0) {
-				#dim tResult As %ZPM.PackageManager.Core.QualifiedModuleReference
+				#dim tResult As %ZPM.Storage.QualifiedModuleInfo
 				If (tResults.Count() = 1) {
 					Set tInfo.ModuleReference = tResults.GetAt(1)
 				} ElseIf (tResults.Count() > 1) {
@@ -1701,7 +1701,7 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 			Set tModuleList = 0
 			
 			#dim tRes As %SQL.StatementResult
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name,LifecycleClass from %ZPM_PackageManager_Developer.""Module""")
+			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name,LifecycleClass from %ZPM_Storage.""Module""")
 			If (tRes.%SQLCODE < 0) {
 				$$$ThrowStatus($$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message))
 			}
@@ -1747,7 +1747,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		quit:'..GetListModule(,.tModMap)	
 		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
 			"select ""Module""->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
-			"from %ZPM_PackageManager_Developer.Module_Dependencies")
+			"from %ZPM_Storage.Module_Dependencies")
     $$$ThrowSQLIfError(tDepRes.%SQLCODE, tDepRes.%Message)
 		While tDepRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
@@ -1798,7 +1798,7 @@ ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
 	new $namespace
 	set $namespace=ns
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-		"select * from %ZPM_PackageManager_Developer.""MODULE""")
+		"select * from %ZPM_Storage.""MODULE""")
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
@@ -1938,7 +1938,7 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
 		Do ..PrintTree(.tDependentTree)
 	} Else {
 		For i=1:1:tList.Count() {
-			#dim tItem As %ZPM.PackageManager.Core.QualifiedModuleReference
+			#dim tItem As %ZPM.Storage.QualifiedModuleInfo
 			Set tItem = tList.GetAt(i)
 			Set tServer = $Case(tItem.ServerName,"":" (installed)",:" @ "_tItem.ServerName)
 			Write !,tItem.Name," ",tItem.VersionString,tServer
@@ -2009,7 +2009,7 @@ ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 	Try {
 		If (tAll) {
 			Set tResult = ##class(%SQL.Statement).%ExecDirect(,
-				"select Name from %ZPM_PackageManager_Developer.""Module"" where DeveloperMode = 1")
+				"select Name from %ZPM_Storage.""Module"" where DeveloperMode = 1")
 			If (tResult.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE,tResult.%Message)
 			}
@@ -2024,7 +2024,7 @@ ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 				Set tModuleName = tResult.%Get("Name")
 			}
 			
-			Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleName,,.tSC)
+			Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 			$$$ThrowOnError(tSC)
 			Set tSC = ##class(%ZPM.PackageManager.Developer.API).ExportDocumentForObject(tModule,.tSourceControlOutput)
 			$$$ThrowOnError(tSC)

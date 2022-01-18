@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.ModuleTemplate Extends %ZPM.PackageManager.Developer.Module
+Class %ZPM.Storage.ModuleTemplate Extends %ZPM.Storage.Module
 {
 
 Property TemplateResources [ MultiDimensional ];
@@ -21,7 +21,7 @@ ClassMethod ExportResources(Path As %String = "", ExportList As %String = "") As
 /// test.dfi -> /dfi/test.dfi
 /// testpkg.test.cls -> /cls/testpkg/test.cls
 /// Fork from https://github.com/intersystems-ru/cache-udl
-/// d ##class(%ZPM.PackageManager.Developer.ModuleTemplate).ExportOneResource("d:\_proj\app","00000","apptools.","apptools.M")
+/// d ##class(%ZPM.Storage.ModuleTemplate).ExportOneResource("d:\_proj\app","00000","apptools.","apptools.M")
 /// byte=1 isGenerated
 /// byte=2 isSystem
 /// byte=3 isPercented
@@ -142,10 +142,10 @@ ClassMethod Expfilename(code, wd)
 }
 
 /// returns list of non-system csp applications in the current namespace
-ClassMethod GetCSPApplications(Output pApplications As %List, currentNamespace = {$Namespace}) As %Status
+ClassMethod GetCSPApplications(Output pApplications As %List) As %Status
 {
     Set pApplications = ""
-    
+    Set currentNamespace = $Namespace
     New $Namespace
     Set $Namespace = "%SYS"
     Set statement = ##class(%SQL.Statement).%New()
@@ -162,7 +162,7 @@ ClassMethod GetCSPApplications(Output pApplications As %List, currentNamespace =
 }
 
 /// adds a web application to the temporary array of module resources
-Method AddWebApps(pApps As %String, Output cspapps As %List, curns = {$Namespace}) As %Status
+Method AddWebApps(pApps As %String, Output cspapps As %List) As %Status
 {
     Set tAppList = ""
     Set pApps = $ZSTRIP(pApps,"<>W")
@@ -172,7 +172,7 @@ Method AddWebApps(pApps As %String, Output cspapps As %List, curns = {$Namespace
         Set tAppList = $Listfromstring(pApps,",")
     }
     Set cspapps = ""
-    
+    Set curns=$Namespace
     New $Namespace
     Set $Namespace = "%SYS"
     For i=1:1:$Listlength(tAppList) {
@@ -290,7 +290,7 @@ Method AddDependant(pDependant As %String) As %Status
     Set tName = $Piece(pDependant,":",1)
     Set tVersion = $Piece(pDependant,":",2)
     If (tName="")||(tVersion="") { Return $$$OK }
-    Set tModule = ##class(%ZPM.PackageManager.Core.ModuleReference).%New()
+    Set tModule = ##class(%ZPM.Storage.ModuleReference).%New()
     Set tModule.Name = tName
     Do tModule.VersionStringSet(tVersion)
     Return ..Dependencies.Insert(tModule)
@@ -307,7 +307,7 @@ ClassMethod GenerateTemplate(pPath As %String = "") As %Status
 
 Method SetAuthorProps(pPerson As %String = "", pOrg As %String = "", pCopy As %String = "", pLicense As %String = "", pNotes As %String = "") As %Status
 {
-    Set tAuthor = ##class(%ZPM.PackageManager.Developer.ModuleAuthorInfo).%New()
+    Set tAuthor = ##class(%ZPM.Storage.ModuleAuthorInfo).%New()
     Set tAuthor.Person = pPerson
     Set tAuthor.Organization = pOrg
     Set tAuthor.CopyrightDate = pCopy
@@ -399,7 +399,7 @@ Method ProcessResources()
 	For {
 		Set key = $Order(resources(key))
 		Quit:(key="")
-		Set resource = ##class(%ZPM.PackageManager.Developer.ResourceReference).%New()
+		Set resource = ##class(%ZPM.Storage.ResourceReference).%New()
 		Set resource.Name = $Get(resources(key),"resourceName")
 		Set att = ""
 		For {
@@ -437,14 +437,14 @@ Method SetTemplateProps() As %Status
     Set ..VersionString = "1.0.0"
     Set ..Description = "description"
     Set ..Keywords = "keywords"
-	Set ..Author = ##class(%ZPM.PackageManager.Developer.ModuleAuthorInfo).%New()
+	Set ..Author = ##class(%ZPM.Storage.ModuleAuthorInfo).%New()
 	Set ..Author.Person = "your name"
 	Set ..Author.Organization = "your organization"
 	Set ..Author.CopyrightDate = $Piece($ZDate($Now(),3),"-")
 	Set ..Author.License = "MIT"
 	Set ..Author.Notes = "notes"
 
-    Set tModule = ##class(%ZPM.PackageManager.Core.ModuleReference).%New()
+    Set tModule = ##class(%ZPM.Storage.ModuleReference).%New()
     Set tModule.Name = "module"
     Do tModule.VersionStringSet("1.*")
     Do ..Dependencies.Insert(tModule)

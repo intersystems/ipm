@@ -110,7 +110,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
 					$$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList))
 					
-					Set tSC = ##class(%ZPM.PackageManager.Developer.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
+					Set tSC = ##class(%ZPM.Storage.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
 					$$$ThrowOnError(tSC)
 				}
 			}
@@ -225,7 +225,7 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
 	Quit tSC
 }
 
-Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pResourceReference As %ZPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set tResourceRefName = pResourceReference.Name
 	// Set LoadAsDirectory to 1 if resource reference name is a path. 

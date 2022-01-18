@@ -19,7 +19,7 @@ Method %Verify(ByRef pParams) As %Status
 		
 		// Inherited implementation:
 		If $$$comClassDefined("HS.Test.Manager") {
-			#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+			#dim tResource As %ZPM.Storage.ResourceReference
 			For i=1:1:..Module.Resources.Count() {
 				Set tResource = ..Module.Resources.GetAt(i)
 				Continue:(tResource.Scope'="verify")
@@ -172,7 +172,7 @@ Method %Configure(ByRef pParams) As %Status
 			Quit:tDepth=""
 			For i=1:1:tCount {
 				Set tModName = tDepthList(tDepth,i)
-				Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModName,,.tSC)
+				Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tModName,,.tSC)
 				If $$$ISERR(tSC) {
 					Quit
 				}

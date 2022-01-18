@@ -3,7 +3,7 @@ Class Test.PM.Integration.DependencyResolution Extends Test.PM.Integration.Base
 
 Method TestEverything()
 {
-	#dim tModule As %ZPM.PackageManager.Developer.Module
+	#dim tModule As %ZPM.Storage.Module
 	New $Namespace
 	Set tOrigNS = $Namespace
 	Try {
@@ -53,7 +53,7 @@ Method TestEverything()
 						Continue
 					}
           
-					Set tQualRef = ##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New()
+					Set tQualRef = ##class(%ZPM.Storage.QualifiedModuleInfo).%New()
 					Set tQualRef.ServerName = ..#REGISTRYNAME
 					Set tQualRef.Name = $Piece(tAssertValue," ",1)
 					Set tQualRef.VersionString = $Piece(tAssertValue," ",2)
@@ -100,7 +100,7 @@ Method TestEverything()
 						Continue
 					}
 					
-					Set tQualRef = ##class(%ZPM.PackageManager.Core.QualifiedModuleReference).%New()
+					Set tQualRef = ##class(%ZPM.Storage.QualifiedModuleInfo).%New()
 					Set tQualRef.ServerName = ..#REGISTRYNAME
 					Set tQualRef.Name = $Piece(tAssertValue," ",1)
 					Set tQualRef.VersionString = $Piece(tAssertValue," ",2)
@@ -143,8 +143,8 @@ Method PublishModules()
 Method UtilUninstallAll()
 {
 	For tModName = "Demo","HS.REST","HS.MDM","HS.JSON" {
-		If ##class(%ZPM.PackageManager.Developer.Module).NameExists($$$lcase(tModName)) {
-			Do $$$AssertStatusOK(##class(%ZPM.PackageManager.Developer.Module).Uninstall(tModName))
+		If ##class(%ZPM.Storage.Module).NameExists($$$lcase(tModName)) {
+			Do $$$AssertStatusOK(##class(%ZPM.Storage.Module).Uninstall(tModName))
 		}
 	}
 }

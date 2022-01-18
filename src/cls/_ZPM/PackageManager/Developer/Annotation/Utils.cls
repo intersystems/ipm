@@ -139,7 +139,7 @@ ClassMethod ProcessAnnotationsForModule(pModuleName As %String, pListOfModulesDe
 		*/
 		Set tResourceResults = ##class(%SQL.Statement).%ExecDirect(,
 					"select ID, UniqueName " _ 
-					"from %ZPM_PackageManager_Developer.ResourceReference " _
+					"from %ZPM_Storage.ResourceReference " _
 					"where ""Module""->Name = ? " _
 					"and isnull(IsAPI,1) = 1 " _ 
 					"and isnull(Generated, 0) = 0 " _ 
@@ -161,14 +161,14 @@ ClassMethod ProcessAnnotationsForModule(pModuleName As %String, pListOfModulesDe
 			quit:tResourceID=""
 			
 			// get child classes for the resource
-			Set tResource = ##class(%ZPM.PackageManager.Developer.ResourceReference).%OpenId(tResourceID,,.tSC)
+			Set tResource = ##class(%ZPM.Storage.ResourceReference).%OpenId(tResourceID,,.tSC)
 			$$$ThrowOnError(tSC)
 			Set tSC = tResource.ResolveChildren(.tChildArray)
 			$$$ThrowOnError(tSC)
 			
 			Kill tAPIClassArray
 			Kill tAPIPackageArray
-			Set tSC = ##class(%ZPM.PackageManager.Developer.ResourceReference).GetAPIScope(tResourceID, .tAPIClassArray, .tAPIPackageArray)
+			Set tSC = ##class(%ZPM.Storage.ResourceReference).GetAPIScope(tResourceID, .tAPIClassArray, .tAPIPackageArray)
 			$$$ThrowOnError(tSC)
 			
 			/*

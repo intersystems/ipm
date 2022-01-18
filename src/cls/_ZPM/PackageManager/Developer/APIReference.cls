@@ -1,4 +1,4 @@
-/// Represents a resource within a <class>%ZPM.PackageManager.Developer.ResourceReference</class> - 
+/// Represents a resource within a <class>%ZPM.Storage.ResourceReference</class> - 
 /// typically, a class or subpackage within a .PKG resource - that should be scanned for API annotations.
 Class %ZPM.PackageManager.Developer.APIReference Extends (%SerialObject, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
 {

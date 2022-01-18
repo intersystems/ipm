@@ -75,7 +75,7 @@ Method TearDown() As %Status
 	Quit tSC
 }
 
-ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName As %String, ByRef pModule As %ZPM.PackageManager.Developer.Module) As %Status
+ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName As %String, ByRef pModule As %ZPM.Storage.Module) As %Status
 {
 	New $Namespace
 	Set tInitNS = $Namespace
@@ -94,7 +94,7 @@ ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName A
 			Quit
 		}
 		
-		Do tReader.Correlate("Module","%ZPM.PackageManager.Developer.Module")
+		Do tReader.Correlate("Module","%ZPM.Storage.Module")
 		Do tReader.Next(.tModule,.tSC)
 		Set tName = tModule.Name_".ZPM"
 		Do tXData.Data.Rewind()
@@ -106,7 +106,7 @@ ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName A
 			Quit
 		}
 		
-		Set pModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen($Piece(tName,".",1,*-1),,.tStatus)
+		Set pModule = ##class(%ZPM.Storage.Module).NameOpen($Piece(tName,".",1,*-1),,.tStatus)
 		If $$$ISERR(tStatus) {
 			Quit
 		}

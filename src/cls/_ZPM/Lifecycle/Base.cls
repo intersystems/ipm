@@ -61,7 +61,7 @@ Method OnBeforeArtifact(pExportDirectory As %String, pWorkingDirectory As %Strin
 		// Notify resource processors
 		Set tKey = ""
 		For {
-			#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+			#dim tResource As %ZPM.Storage.ResourceReference
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:(tKey="")
 			
@@ -154,7 +154,7 @@ Method %Clean(ByRef pParams) As %Status
 		If (tLevel > 0) {
 			Set tKey = ""
 			For {
-				#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+				#dim tResource As %ZPM.Storage.ResourceReference
 				Set tResource = ..Module.Resources.GetNext(.tKey)
 				Quit:tKey=""
 				
@@ -255,8 +255,8 @@ Method %Clean(ByRef pParams) As %Status
 					Continue
 				}
 				ZKill pParams("Clean","Skip",tModName)
-				If ##class(%ZPM.PackageManager.Developer.Module).NameExists(tModName) {
-					Set tModObj = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModName,,.tModSC)
+				If ##class(%ZPM.Storage.Module).NameExists(tModName) {
+					Set tModObj = ##class(%ZPM.Storage.Module).NameOpen(tModName,,.tModSC)
 					If $$$ISERR(tModSC) {
 						Write !,"WARNING: "_$System.Status.GetErrorText(tModSC)
 						Continue
@@ -271,7 +271,7 @@ Method %Clean(ByRef pParams) As %Status
 						Quit
 					}
 					If '$Data(tParams("Clean","Skip",tModName)) {
-						Set tSC = ##class(%ZPM.PackageManager.Developer.Module).NameDelete(tModName)
+						Set tSC = ##class(%ZPM.Storage.Module).NameDelete(tModName)
 						If $$$ISERR(tSC) {
 							Quit
 						}
@@ -285,7 +285,7 @@ Method %Clean(ByRef pParams) As %Status
 		}
 		
 		If (tLevel > 0) && '$Get(pParams("Clean","Nested"),0) {
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Module).NameDelete(..Module.Name)
+			Set tSC = ##class(%ZPM.Storage.Module).NameDelete(..Module.Name)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -309,7 +309,7 @@ Method %Configure(ByRef pParams) As %Status
 		If (..Module.InstallerClass '= "") {
 			Set tVerbose = $Get(pParams("Verbose"),0)
       // getting custom parameters from command line or <Default> element
-      Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..Module, .pParams)
+      Do ##class(%ZPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..Module, .pParams)
 			Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
 			Set tDatabaseName = $Get(pParams("Configure","DatabaseName"))
 			Set tIsUpgrade = $Get(pParams("Configure","IsUpgrade"),0)
@@ -523,7 +523,7 @@ Method %Compile(ByRef pParams) As %Status
 		// Compile items within the module that are compilable using OnPhase
 		Set tKey = ""
 		For {
-			#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+			#dim tResource As %ZPM.Storage.ResourceReference
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:tKey=""
 			
@@ -799,7 +799,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			
 			If ($Extract(tFullResourceName) = "/") {
 				// Resources with paths are relative to the module root and are simply copied to the export directory.
-				Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tSrcModule,,.tSC)
+				Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tSrcModule,,.tSC)
 				If $$$ISERR(tSC) {
 					Quit
 				}
@@ -898,7 +898,7 @@ Method %Register(ByRef pParams) As %Status
 		Set tIsApplication = ..%IsA("%ZPM.PackageManager.Developer.Lifecycle.Application")
 		
 		Set tPublishClient = tServer.GetPublishService()
-		Set tModule = $Select(tIsApplication:##class(%ZPM.PackageManager.Core.Application).%New(),1:##class(%ZPM.PackageManager.Core.Module).%New())
+		Set tModule = $Select(tIsApplication:##class(%ZPM.PackageManager.Core.Application).%New(),1:##class(%ZPM.Repo.Remote.ModuleInfo).%New())
 		Set tModule.Name = ..Module.Name
 		If (0 && '..Module.IsLocked()) {
 			Set tSC = ..Module.Lock()
@@ -962,7 +962,7 @@ Method %Verify(ByRef pParams) As %Status
 			
 			If tMustCreate {
 				// Create a new namespace and load the module in it.
-				#dim tNSConfig As %ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig
+				#dim tNSConfig As %ZPM.Storage.ModuleSetting.NamespaceConfig
 				Set tNSConfig = ..Module.GetNamespaceConfig()
 				
 				// Create namespace in which to run tests and switch to it.
@@ -1020,7 +1020,7 @@ Method %Verify(ByRef pParams) As %Status
 		Set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
 		$$$ThrowOnError(tSC)
 		
-		#dim tResource As %ZPM.PackageManager.Developer.ResourceReference
+		#dim tResource As %ZPM.Storage.ResourceReference
 		For i=1:1:..Module.Resources.Count() {
 			Set tResource = ..Module.Resources.GetAt(i)
 			
@@ -1078,7 +1078,7 @@ Method %Publish(ByRef pParams) As %Status
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' does not support publishing modules.",tServer.Name))
 			$$$ThrowStatus(tSC)
 		}
-		Set tModule = $Select(tIsApplication:##class(%ZPM.PackageManager.Core.Application).%New(),1:##class(%ZPM.PackageManager.Core.Module).%New())
+		Set tModule = $Select(tIsApplication:##class(%ZPM.PackageManager.Core.Application).%New(),1:##class(%ZPM.Repo.Remote.ModuleInfo).%New())
 		Set tModule.Name = ..Module.Name
 		If tRelease && ('..Module.IsLocked()) {
 			Set tSC = ..Module.Lock()
@@ -1241,7 +1241,7 @@ Method %Document(ByRef pParams) As %Status
 					Merge tParams = pParams
 					Set tParams("Document","Recurse") = 0
 					Set tParams("Document","Dependencies") = tSubDependencies
-					Set tSC = ##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModuleName,$ListBuild("Document"),,.tParams)
+					Set tSC = ##class(%ZPM.Storage.Module).ExecutePhases(tModuleName,$ListBuild("Document"),,.tParams)
 					$$$ThrowOnError(tSC)
 					
 					Set tModuleDependencies = tModuleDependencies_$ListBuild(tModuleName)

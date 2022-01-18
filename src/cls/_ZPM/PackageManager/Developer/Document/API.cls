@@ -29,7 +29,7 @@ ClassMethod GetOther(Name As %String) As %String
 	Set tName = $Piece(Name,".",1,*-1)
 	Set tExt = $Piece(Name,".",*)
 	If (tExt = "API") {
-		If ##class(%ZPM.PackageManager.Developer.Module).NameExists(tName) {
+		If ##class(%ZPM.Storage.Module).NameExists(tName) {
 			Set tOthers = tName_".ZPM"
 		}
 	} ElseIf (tExt = "MODULE") {

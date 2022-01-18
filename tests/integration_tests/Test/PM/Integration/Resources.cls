@@ -19,7 +19,7 @@ Method TestResourceTypes()
 		}
 		
 		// Uninstall. This might fail; if it does that's fine.
-		Do ##class(%ZPM.PackageManager.Developer.Module).Uninstall("ResourceTest",1,1)
+		Do ##class(%ZPM.Storage.Module).Uninstall("ResourceTest",1,1)
 		
 		Set tParams("Verbose") = 1
 		Set tModuleDirectory = ##class(%File).NormalizeDirectory("_data/resource-test", tTestRoot)

@@ -9,7 +9,7 @@ Method %OnNew(pRoot As %String) As %Status [ Private, ServerOnly = 1 ]
 	Quit $$$OK
 }
 
-Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference")
+Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.Storage.ModuleInfo")
 {
 	Set tList = ##class(%Library.ListOfObjects).%New()
 	Set tQuery = "select Name,VersionString from %ZPM_Repo_Filesystem.Cache_OrderedMatches(?,?,?,?) m"
@@ -17,19 +17,19 @@ Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObject
 	Quit ..moduleSqlToList(tQuery,.pSearchCriteria,.tArgs)
 }
 
-Method HasModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Boolean
+Method HasModule(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean
 {
 	Quit ##class(%ZPM.Repo.Filesystem.Cache).RootNameVersionExists(..Root,pModuleReference.Name,pModuleReference.VersionString)
 }
 
-Method GetModuleManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.Object
+Method GetModuleManifest(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.Object
 {
 	Set tModule = ##class(%ZPM.Repo.Filesystem.Cache).RootNameVersionOpen(..Root,pModuleReference.Name,pModuleReference.VersionString,,.tStatus)
 	$$$ThrowOnError(tStatus)
 	Quit tModule.Manifest
 }
 
-Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference, Output AsArchive As %Boolean = 1) As %Stream.Object
+Method GetModule(pModuleReference As %ZPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 1) As %Stream.Object
 {
   Set AsArchive = 1
 	// ... and tgz it!
@@ -43,7 +43,7 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
 	Quit tFileBinStream
 }
 
-Method GetModuleDirectory(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %String
+Method GetModuleDirectory(pModuleReference As %ZPM.Storage.ModuleInfo) As %String
 {
 	// Get the module ...
 	Set tModule = ##class(%ZPM.Repo.Filesystem.Cache).RootNameVersionOpen(..Root,pModuleReference.Name,pModuleReference.VersionString,,.tStatus)
@@ -52,22 +52,22 @@ Method GetModuleDirectory(pModuleReference As %ZPM.PackageManager.Core.ResolvedM
 	Quit ##class(%File).NormalizeDirectory(tModule.Root_tModule.SubDirectory)
 }
 
-Method GetApplication(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.Object
+Method GetApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.Object
 {
 	Quit $$$NULLOREF
 }
 
-Method GetApplicationManifest(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Stream.Object
+Method GetApplicationManifest(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.Object
 {
 	Quit $$$NULLOREF
 }
 
-Method HasApplication(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleReference) As %Boolean
+Method HasApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean
 {
 	Quit 0
 }
 
-Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.PackageManager.Core.ResolvedModuleReference")
+Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.Storage.ModuleInfo")
 {
 	Quit ##class(%Library.ListOfObjects).%New()
 }

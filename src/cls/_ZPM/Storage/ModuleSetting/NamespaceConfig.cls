@@ -1,6 +1,6 @@
 /// Provides information on how to configure the namespace used for the Verify phase (for integration tests),
 /// and perhaps also at some point the settings used for a new namespace created to install an application-packaged module.
-Class %ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig Extends %ZPM.PackageManager.Developer.ModuleSetting
+Class %ZPM.Storage.ModuleSetting.NamespaceConfig Extends %ZPM.Storage.ModuleSetting
 {
 
 /*
@@ -15,7 +15,7 @@ Property EnableEnsemble As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpres
 /// May only be set to 1 if EnableEnsemble is also 1.
 Property EnableHealthShare As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = 0 ];
 
-Method MergeFrom(pOtherConfig As %ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig) As %ZPM.PackageManager.Developer.ModuleSetting.NamespaceConfig
+Method MergeFrom(pOtherConfig As %ZPM.Storage.ModuleSetting.NamespaceConfig) As %ZPM.Storage.ModuleSetting.NamespaceConfig
 {
 	Set ..EnableEnsemble = ..EnableEnsemble || pOtherConfig.EnableEnsemble
 	Set ..EnableHealthShare = ..EnableHealthShare || pOtherConfig.EnableHealthShare

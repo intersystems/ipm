@@ -12,11 +12,11 @@ Parameter DESCRIPTION As STRING;
 /// Comma-separated list of resource attribute names that this processor uses
 Parameter ATTRIBUTES As STRING;
 
-Property ResourceReference As %ZPM.PackageManager.Developer.ResourceReference(XMLPROJECTION = "NONE") [ Private ];
+Property ResourceReference As %ZPM.Storage.ResourceReference(XMLPROJECTION = "NONE") [ Private ];
 
 Property Params [ MultiDimensional ];
 
-Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pResourceReference As %ZPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..ResourceReference = pResourceReference
 	Do ..CopyAttributes()
@@ -74,8 +74,8 @@ Method ApplyDefaults()
 	Set tDefaults = ..ResourceReference.Module.Defaults
 	For tDefaultIndex = 1:1:tDefaults.Count() {
 		Set tDefault = tDefaults.GetAt(tDefaultIndex)
-		If tDefault.%IsA("%ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault") {
-			#dim tDefault As %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault
+		If tDefault.%IsA("%ZPM.Storage.ModuleSetting.ResourceProcessorDefault") {
+			#dim tDefault As %ZPM.Storage.ModuleSetting.ResourceProcessorDefault
 			Set tThisClass = $ClassName()
 			Set tFullClass = $$$DefaultProcessorPackageDot_tDefault.Class
 			If (tThisClass = tDefault.Class) || (tThisClass = tFullClass) {
@@ -95,7 +95,7 @@ Method ApplyDefaults()
 }
 
 /// Generated similarly to <method>CopyAttributes</method>
-Method CopyDefaultAttributes(pSource As %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault) [ CodeMode = objectgenerator, Private ]
+Method CopyDefaultAttributes(pSource As %ZPM.Storage.ModuleSetting.ResourceProcessorDefault) [ CodeMode = objectgenerator, Private ]
 {
 	Set tSC = $$$OK
 	Try {
@@ -125,7 +125,7 @@ Method CopyDefaultAttributes(pSource As %ZPM.PackageManager.Developer.ModuleSett
 	Quit tSC
 }
 
-Method SatisfiesCondition(pCondition As %ZPM.PackageManager.Developer.ModuleSetting.ProcessorDefault.Condition) As %Boolean
+Method SatisfiesCondition(pCondition As %ZPM.Storage.ModuleSetting.ResourceProcessorDefault.Condition) As %Boolean
 {
 	Set tValue = $Property($This, pCondition.Attribute)
 	Quit $Case(pCondition.Operator,
@@ -244,8 +244,8 @@ Method %Evaluate(pAttrValue) As %String [ Internal ]
 	Set tAttrValue = pAttrValue
 	If $Data(..Params) {
 		Merge tParams = ..Params
-		Do ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
-		Set tAttrValue = ##class(%ZPM.PackageManager.Developer.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
+		Do ##class(%ZPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
+		Set tAttrValue = ##class(%ZPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	}
 
 	If $Locate(tAttrValue,"(?i)\{name\}") {

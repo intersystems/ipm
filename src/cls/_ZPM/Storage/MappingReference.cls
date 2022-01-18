@@ -1,10 +1,14 @@
-Class %ZPM.PackageManager.Developer.MappingReference Extends (%Persistent, %ZPM.PackageManager.Core.MappingReference)
+Class %ZPM.Storage.MappingReference Extends (%Persistent, %XML.Adaptor, %ZPM.PackageManager.Core.ComparisonAdaptor)
 {
+
+Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
+
+Property Name As %String(MAXLEN = 2048, XMLPROJECTION = "attribute") [ Required ];
 
 /// Name index is unique per namespace.
 Index ResourceName On (Name, Source);
 
-Relationship Module As %ZPM.PackageManager.Developer.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Mappings ];
+Relationship Module As %ZPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Mappings ];
 
 /// Namespace from which it is mapped or copied
 Property Source As %String(XMLPROJECTION = "ATTRIBUTE");
@@ -31,9 +35,9 @@ Storage Default
 </Data>
 <DataLocation>{%%PARENT}("Mappings")</DataLocation>
 <DefaultData>MappingReferenceDefaultData</DefaultData>
-<IdLocation>^ZPM.Dev.ModuleC("Mappings")</IdLocation>
-<IndexLocation>^ZPM.Dev.MappingI</IndexLocation>
-<StreamLocation>^ZPM.Dev.MappingS</StreamLocation>
+<IdLocation>^%ZPM.Storage.ModuleC("Mappings")</IdLocation>
+<IndexLocation>^%ZPM.Storage.MappingReferenceI</IndexLocation>
+<StreamLocation>^%ZPM.Storage.MappingReferenceS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

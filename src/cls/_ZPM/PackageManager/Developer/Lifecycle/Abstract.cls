@@ -8,11 +8,11 @@ Class %ZPM.PackageManager.Developer.Lifecycle.Abstract Extends %RegisteredObject
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
 Parameter PHASES;
 
-Property Module As %ZPM.PackageManager.Developer.Module [ Private ];
+Property Module As %ZPM.Storage.Module [ Private ];
 
 Property PhaseList As %List;
 
-Method %OnNew(pModule As %ZPM.PackageManager.Developer.Module) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pModule As %ZPM.Storage.Module) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..Module = pModule
 	Quit $$$OK
