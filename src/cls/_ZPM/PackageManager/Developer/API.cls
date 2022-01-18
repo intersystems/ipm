@@ -91,7 +91,7 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.Storage.Module, Output
 			$$$ThrowStatus($$$ERROR($$$ItemNotCheckedOut,tDocName))
 		}
 		
-		Set tModuleStream = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(pSourceModule.Name,,.tSC)
+		Set tModuleStream = ##class(%ZPM.StudioDocument.ModuleStream).NameOpen(pSourceModule.Name,,.tSC)
 		If $ListFind($ListFromString($System.Status.GetErrorCodes(tSC)),$$$KeyValueNotFoundOpen) {
 			// It's possible that only the module exists - we'll skip the merge with the document's content if it does.
 			Set tSC = $$$OK

@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Document.APIStream Extends %ZPM.PackageManager.Developer.Document.AbstractStream
+Class %ZPM.PackageManager.Developer.Document.APIStream Extends %ZPM.StudioDocument.AbstractStream
 {
 
 Storage Default

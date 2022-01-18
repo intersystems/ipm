@@ -1,6 +1,6 @@
 /// Custom Studio document projection class to ensure that metadata globals are included in Studio Project exports.
 /// This will allow the package manager to be installed (and function properly) from a Studio project export.
-Class %ZPM.PackageManager.Developer.Document.Projection Extends %Projection.StudioDocument
+Class %ZPM.StudioDocument.Projection Extends %Projection.StudioDocument
 {
 
 ClassMethod CreateProjection(classname As %String, ByRef parameters As %String) As %Status

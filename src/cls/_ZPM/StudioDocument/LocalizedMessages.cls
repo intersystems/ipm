@@ -1,20 +1,20 @@
-Class %ZPM.PackageManager.Developer.Document.ErrorMessages Extends %ZPM.PackageManager.Developer.Document.AbstractDocument [ DependsOn = %ZPM.PackageManager.Developer.ErrorMessages.MessageFileStream ]
+Class %ZPM.StudioDocument.LocalizedMessages Extends %ZPM.StudioDocument.Abstract [ DependsOn = %ZPM.StudioDocument.LocalizedMessageStream ]
 {
 
-Projection RegisterExtension As %ZPM.PackageManager.Developer.Document.Projection(DocumentDescription = "Localizable Error Messages", DocumentExtension = "LOC", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/HealthShare/ErrorMessages");
+Projection RegisterExtension As %ZPM.StudioDocument.Projection(DocumentDescription = "Localizable Error Messages", DocumentExtension = "LOC", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/HealthShare/LocalizedMessages");
 
 Parameter EXTENSION = ".LOC";
 
-Parameter INFOGLOBAL = "^ZPM.Dev.Doc.ErrorMessages";
+Parameter INFOGLOBAL = "^ZPM.StudioDoc.LocalizedMessages";
 
-Parameter STREAMCLASS = "%ZPM.PackageManager.Developer.ErrorMessages.MessageFileStream";
+Parameter STREAMCLASS = "%ZPM.StudioDocument.LocalizedMessageStream";
 
 Method OnCompileDocument(ByRef qstruct As %String) As %Status
 {
 	Set tSC = $$$OK
 	Try {
 		TSTART
-		Set tMsgFile = ##class(%ZPM.PackageManager.Developer.ErrorMessages.MessageFileStream).NameOpen($Piece(..Name,".",1,*-1),,.tSC)
+		Set tMsgFile = ##class(%ZPM.StudioDocument.LocalizedMessageStream).NameOpen($Piece(..Name,".",1,*-1),,.tSC)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -88,7 +88,7 @@ ClassMethod OnDelete(name As %String) As %Status
 
 Query ItemList() As %SQLQuery(ROWSPEC = "name:%String,modified:%TimeStamp") [ SqlProc ]
 {
-	select Name, LastModifiedTimestamp from %ZPM_PackageManager_Developer_ErrorMessages.MessageFileStream
+	select Name, LastModifiedTimestamp from %ZPM_StudioDocument.LocalizedMessageStream
 }
 
 /// Given a full error message document name (with .LOC extension), returns the full name (with extension) of the associated .INC file.

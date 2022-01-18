@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Document.AbstractStream Extends %Persistent [ Abstract, NoExtent ]
+Class %ZPM.StudioDocument.AbstractStream Extends %Persistent [ Abstract, NoExtent ]
 {
 
 Index Name On Name [ Unique ];

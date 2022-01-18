@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Document.ModuleStream Extends %ZPM.PackageManager.Developer.Document.AbstractStream
+Class %ZPM.StudioDocument.ModuleStream Extends %ZPM.StudioDocument.AbstractStream
 {
 
 Storage Default
@@ -20,11 +20,11 @@ Storage Default
 <Value>LastModifiedTimestamp</Value>
 </Value>
 </Data>
-<DataLocation>^ZPM.Dev.ModuleDocD</DataLocation>
+<DataLocation>^%ZPM.StudioDoc752.ModuleStreamD</DataLocation>
 <DefaultData>ModuleStreamDefaultData</DefaultData>
-<IdLocation>^ZPM.Dev.ModuleDocD</IdLocation>
-<IndexLocation>^ZPM.Dev.ModuleDocI</IndexLocation>
-<StreamLocation>^ZPM.Dev.ModuleDocS</StreamLocation>
+<IdLocation>^%ZPM.StudioDoc752.ModuleStreamD</IdLocation>
+<IndexLocation>^%ZPM.StudioDoc752.ModuleStreamI</IndexLocation>
+<StreamLocation>^%ZPM.StudioDoc752.ModuleStreamS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

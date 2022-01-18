@@ -519,7 +519,7 @@ Method SaveFile(pPath As %String = "") As %Status
     // save 
     Try {
         $$$ThrowOnError(..XMLExportToStream(.tStream))
-        Set tXSL=##class(%Dictionary.CompiledXData).%OpenId("%ZPM.PackageManager.Developer.Document.Module||ExternalXSL").Data
+        Set tXSL=##class(%Dictionary.CompiledXData).%OpenId("%ZPM.StudioDocument.Module||ExternalXSL").Data
         $$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStream(tStream, tXSL, .tOutput))
 
         Set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||XSLT").Data

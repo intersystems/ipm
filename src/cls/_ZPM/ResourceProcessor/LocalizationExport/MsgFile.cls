@@ -2,7 +2,7 @@
 Class %ZPM.ResourceProcessor.LocalizationExport.MsgFile Extends (%RegisteredObject, %XML.Adaptor)
 {
 
-Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager/ErrorMessages";
+Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager/LocalizedMessages";
 
 Property Language As %String(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = {$$$DefaultLanguage}, Required ];
 

@@ -101,7 +101,7 @@ ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName A
 		
 		Set $Namespace = tInitNS
 			
-		Set tStatus = ##class(%ZPM.PackageManager.Developer.Document.Module).ImportStream(.tName,tXData.Data)
+		Set tStatus = ##class(%ZPM.StudioDocument.Module).ImportStream(.tName,tXData.Data)
 		If $$$ISERR(tStatus) {
 			Quit
 		}

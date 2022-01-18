@@ -1,15 +1,15 @@
 Include (%ZPM.PackageManager.Common, %occErrors)
 
-Class %ZPM.PackageManager.Developer.Document.Module Extends %ZPM.PackageManager.Developer.Document.AbstractDocument
+Class %ZPM.StudioDocument.Module Extends %ZPM.StudioDocument.Abstract
 {
 
-Projection RegisterExtension As %ZPM.PackageManager.Developer.Document.Projection(DocumentDescription = "Application Module", DocumentExtension = "ZPM", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/PackageManager");
+Projection RegisterExtension As %ZPM.StudioDocument.Projection(DocumentDescription = "Application Module", DocumentExtension = "ZPM", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/PackageManager");
 
 Parameter EXTENSION = ".ZPM";
 
-Parameter INFOGLOBAL = "^ZPM.Dev.Doc.Module";
+Parameter INFOGLOBAL = "^ZPM.StudioDoc.Module";
 
-Parameter STREAMCLASS = "%ZPM.PackageManager.Developer.Document.ModuleStream";
+Parameter STREAMCLASS = "%ZPM.StudioDocument.ModuleStream";
 
 /// Load the module definition <property>Name</property> into the stream <property>Code</property>
 Method Load() As %Status
@@ -22,7 +22,7 @@ Method Load() As %Status
 			Quit
 		}
 		Set tName = $Piece(..Name,".",1,*-1)
-		Set tModStream = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(tName,,.tSC)
+		Set tModStream = ##class(%ZPM.StudioDocument.ModuleStream).NameOpen(tName,,.tSC)
 		If $$$ISERR(tSC) && ($Piece($System.Status.GetErrorCodes(tSC),",") = $$$KeyValueNotFoundOpen) {
 			Set tSC = $$$OK
 			
@@ -60,7 +60,7 @@ Method Save() As %Status
 	Quit ..Load()
 }
 
-ClassMethod UpdatePersistentFromStream(pStream As %ZPM.PackageManager.Developer.Document.ModuleStream, Output pModule As %ZPM.Storage.Module) As %Status
+ClassMethod UpdatePersistentFromStream(pStream As %ZPM.StudioDocument.ModuleStream, Output pModule As %ZPM.Storage.Module) As %Status
 {
 	Set tSC = $$$OK
 	Set pModule = $$$NULLOREF
@@ -139,7 +139,7 @@ Method OnCompileDocument(ByRef qstruct As %String) As %Status
 	Set tSC = $$$OK
 	Try {
 		Set tNameNoExt = $Piece(..Name,".",1,*-1)
-		Set tModStream = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(tNameNoExt,,.tSC)
+		Set tModStream = ##class(%ZPM.StudioDocument.ModuleStream).NameOpen(tNameNoExt,,.tSC)
 		$$$ThrowOnError(tSC)
 		
 		Do tModStream.Contents.Clear()
@@ -183,13 +183,13 @@ ClassMethod ImportStream(pName As %String, pStream As %GlobalCharacterStream) As
 		}
 		
 		Set tName = $Piece(pName,".",1,*-1)
-		If ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameExists(tName) {
-			Set tModStream = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(tName,.tSC)
+		If ##class(%ZPM.StudioDocument.ModuleStream).NameExists(tName) {
+			Set tModStream = ##class(%ZPM.StudioDocument.ModuleStream).NameOpen(tName,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
 		} Else {
-			Set tModStream = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).%New()
+			Set tModStream = ##class(%ZPM.StudioDocument.ModuleStream).%New()
 			Set tModStream.Name = tName
 		}
 		
@@ -234,7 +234,7 @@ ClassMethod Delete(name As %String) As %Status
 		
 		Set tModuleName = $Piece(name,".",1,*-1)
 		TSTART
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameDelete(tModuleName)
+		Set tSC = ##class(%ZPM.StudioDocument.ModuleStream).NameDelete(tModuleName)
 		$$$ThrowOnError(tSC)
 		Set tSC = ##class(%ZPM.Storage.Module).NameDelete(tModuleName)
 		$$$ThrowOnError(tSC)
@@ -259,7 +259,7 @@ ClassMethod TimeStamp(name As %String) As %TimeStamp [ SqlProc ]
 	
 	Set tStamp = ""
 	Set tNameNoExt = $Piece(name,".",1,*-1)
-	Set tModStream = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(tNameNoExt)
+	Set tModStream = ##class(%ZPM.StudioDocument.ModuleStream).NameOpen(tNameNoExt)
 	If $IsObject(tModStream) {
 		Set tStamp = tModStream.LastModifiedTimestamp
 	} Else {
@@ -281,7 +281,7 @@ ClassMethod Exists(name As %String) As %Boolean
 			Quit
 		}
 		Set tName = $Piece(name,".",1,*-1)
-		Set tExists = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameExists(tName) 
+		Set tExists = ##class(%ZPM.StudioDocument.ModuleStream).NameExists(tName) 
 						|| ##class(%ZPM.Storage.Module).NameExists(tName)
 	} Catch e {
 		Set tExists = 0
@@ -292,10 +292,10 @@ ClassMethod Exists(name As %String) As %Boolean
 /// Subclasses must override
 Query ItemList() As %SQLQuery(ROWSPEC = "name:%String,modified:%TimeStamp") [ SqlProc ]
 {
-	select Name, LastModifiedTimestamp from %ZPM_PackageManager_Developer_Document.ModuleStream
+	select Name, LastModifiedTimestamp from %ZPM_StudioDocument.ModuleStream
 	union
 	select Name, LastModifiedTimestamp from %ZPM_Storage."Module"
-		where Name not in (select Name from %ZPM_PackageManager_Developer_Document.ModuleStream)
+		where Name not in (select Name from %ZPM_StudioDocument.ModuleStream)
 }
 
 /// Returns a comma-separated list of *individual* resources listed in the module manifest.

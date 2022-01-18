@@ -1,7 +1,7 @@
-Class %ZPM.PackageManager.Developer.Document.API Extends %ZPM.PackageManager.Developer.Document.AbstractDocument [ DependsOn = %ZPM.PackageManager.Developer.Document.APIStream ]
+Class %ZPM.PackageManager.Developer.Document.API Extends %ZPM.StudioDocument.Abstract [ DependsOn = %ZPM.PackageManager.Developer.Document.APIStream ]
 {
 
-Projection RegisterExtension As %ZPM.PackageManager.Developer.Document.Projection(DocumentDescription = "API Documentation", DocumentExtension = "API", DocumentNew = 0, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/HealthShare/APIDoc");
+Projection RegisterExtension As %ZPM.StudioDocument.Projection(DocumentDescription = "API Documentation", DocumentExtension = "API", DocumentNew = 0, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/HealthShare/APIDoc");
 
 Parameter EXTENSION = ".API";
 

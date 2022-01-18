@@ -1,7 +1,7 @@
-Class %ZPM.PackageManager.Developer.ErrorMessages.MessageFileStream Extends %ZPM.PackageManager.Developer.Document.AbstractStream
+Class %ZPM.StudioDocument.LocalizedMessageStream Extends %ZPM.StudioDocument.AbstractStream
 {
 
-ClassMethod Convert(pFilePath As %String, pSave As %Boolean = 1, Output pObject As %ZPM.PackageManager.Developer.ErrorMessages.MessageFileStream) As %Status
+ClassMethod Convert(pFilePath As %String, pSave As %Boolean = 1, Output pObject As %ZPM.StudioDocument.LocalizedMessageStream) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -40,7 +40,7 @@ ClassMethod Convert(pFilePath As %String, pSave As %Boolean = 1, Output pObject 
 
 Storage Default
 {
-<Data name="MessageFileStreamDefaultData">
+<Data name="LocalizedMessageStreamDefaultData">
 <Value name="1">
 <Value>%%CLASSNAME</Value>
 </Value>
@@ -51,17 +51,17 @@ Storage Default
 <Value>Contents</Value>
 </Value>
 <Value name="4">
-<Value>LastModifiedTimestamp</Value>
-</Value>
-<Value name="5">
 <Value>Hash</Value>
 </Value>
+<Value name="5">
+<Value>LastModifiedTimestamp</Value>
+</Value>
 </Data>
-<DataLocation>^ZPM.Dev.MsgFileD</DataLocation>
-<DefaultData>MessageFileStreamDefaultData</DefaultData>
-<IdLocation>^ZPM.Dev.MsgFileD</IdLocation>
-<IndexLocation>^ZPM.Dev.MsgFileI</IndexLocation>
-<StreamLocation>^ZPM.Dev.MsgFileS</StreamLocation>
+<DataLocation>^%ZPM.Studio752.LocalizedMe128ED</DataLocation>
+<DefaultData>LocalizedMessageStreamDefaultData</DefaultData>
+<IdLocation>^%ZPM.Studio752.LocalizedMe128ED</IdLocation>
+<IndexLocation>^%ZPM.Studio752.LocalizedMe128EI</IndexLocation>
+<StreamLocation>^%ZPM.Studio752.LocalizedMe128ES</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

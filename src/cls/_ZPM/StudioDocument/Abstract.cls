@@ -1,15 +1,15 @@
-Class %ZPM.PackageManager.Developer.Document.AbstractDocument Extends %Studio.AbstractDocument [ Abstract, DependsOn = %ZPM.PackageManager.Developer.Document.AbstractStream, Owner = {%Developer} ]
+Class %ZPM.StudioDocument.Abstract Extends %Studio.AbstractDocument [ Abstract, DependsOn = %ZPM.StudioDocument.AbstractStream, Owner = {%Developer} ]
 {
 
 /// The extension name, this can be a comma separated list of extensions if this class supports more than one.
 /// For details on the projection parameters see <class>%Projection.StudioDocument</class>.
-Projection RegisterExtension As %ZPM.PackageManager.Developer.Document.Projection(DocumentDescription = "", DocumentExtension = "", DocumentIcon = 0, DocumentNew = 0, DocumentType = "", XMLNamespace = "");
+Projection RegisterExtension As %ZPM.StudioDocument.Projection(DocumentDescription = "", DocumentExtension = "", DocumentIcon = 0, DocumentNew = 0, DocumentType = "", XMLNamespace = "");
 
 Parameter EXTENSION [ Abstract ];
 
 Parameter INFOGLOBAL [ Abstract ];
 
-/// Optional subclass of %ZPM.PackageManager.Developer.Document.AbstractStream that stores code in a character stream.
+/// Optional subclass of %ZPM.StudioDocument.AbstractStream that stores code in a character stream.
 Parameter STREAMCLASS;
 
 /// Runs at compile time to ensure that ..#<parameter>STREAMCLASS</parameter> is valid.
@@ -25,7 +25,7 @@ ClassMethod ValidateStreamClass() [ CodeMode = objectgenerator, Final, Internal,
 				$$$ThrowStatus($$$ERROR($$$CompiledClassDoesNotExist,tStreamClass))
 			}
 			
-			Set tRequiredSuper = "%ZPM.PackageManager.Developer.Document.AbstractStream"
+			Set tRequiredSuper = "%ZPM.StudioDocument.AbstractStream"
 			If '$ClassMethod(tStreamClass,"%Extends",tRequiredSuper) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Class '%1' does not extend '%2'",tStreamClass,tRequiredSuper)))
 			}
