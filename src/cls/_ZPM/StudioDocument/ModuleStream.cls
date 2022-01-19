@@ -20,11 +20,11 @@ Storage Default
 <Value>LastModifiedTimestamp</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.StudioDoc752.ModuleStreamD</DataLocation>
+<DataLocation>^ZPM.StudioDoc.ModuleStreamD</DataLocation>
 <DefaultData>ModuleStreamDefaultData</DefaultData>
-<IdLocation>^%ZPM.StudioDoc752.ModuleStreamD</IdLocation>
-<IndexLocation>^%ZPM.StudioDoc752.ModuleStreamI</IndexLocation>
-<StreamLocation>^%ZPM.StudioDoc752.ModuleStreamS</StreamLocation>
+<IdLocation>^ZPM.StudioDoc.ModuleStreamD</IdLocation>
+<IndexLocation>^ZPM.StudioDoc.ModuleStreamI</IndexLocation>
+<StreamLocation>^ZPM.StudioDoc.ModuleStreamS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

@@ -29,11 +29,11 @@ Storage Default
 <Value>SuppressCompilation</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.General.SettingsD</DataLocation>
+<DataLocation>^ZPM.General.SettingsD</DataLocation>
 <DefaultData>SettingsDefaultData</DefaultData>
-<IdLocation>^%ZPM.General.SettingsD</IdLocation>
-<IndexLocation>^%ZPM.General.SettingsI</IndexLocation>
-<StreamLocation>^%ZPM.General.SettingsS</StreamLocation>
+<IdLocation>^ZPM.General.SettingsD</IdLocation>
+<IndexLocation>^ZPM.General.SettingsI</IndexLocation>
+<StreamLocation>^ZPM.General.SettingsS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

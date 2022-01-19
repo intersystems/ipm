@@ -57,11 +57,11 @@ Storage Default
 <Value>LastModifiedTimestamp</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.Studio752.LocalizedMe128ED</DataLocation>
+<DataLocation>^ZPM.StudioDoc.LocalizedMsgD</DataLocation>
 <DefaultData>LocalizedMessageStreamDefaultData</DefaultData>
-<IdLocation>^%ZPM.Studio752.LocalizedMe128ED</IdLocation>
-<IndexLocation>^%ZPM.Studio752.LocalizedMe128EI</IndexLocation>
-<StreamLocation>^%ZPM.Studio752.LocalizedMe128ES</StreamLocation>
+<IdLocation>^ZPM.StudioDoc.LocalizedMsgD</IdLocation>
+<IndexLocation>^ZPM.StudioDoc.LocalizedMsgI</IndexLocation>
+<StreamLocation>^ZPM.StudioDoc.LocalizedMsgS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

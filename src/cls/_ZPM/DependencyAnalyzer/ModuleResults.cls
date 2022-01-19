@@ -68,11 +68,11 @@ Storage Default
 <Value>TimeStamp</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.Depende8370.ModuleResultsD</DataLocation>
+<DataLocation>^ZPM.DependencyAnalyzer.ModuleD</DataLocation>
 <DefaultData>ModuleResultsDefaultData</DefaultData>
-<IdLocation>^%ZPM.Depende8370.ModuleResultsD</IdLocation>
-<IndexLocation>^%ZPM.Depende8370.ModuleResultsI</IndexLocation>
-<StreamLocation>^%ZPM.Depende8370.ModuleResultsS</StreamLocation>
+<IdLocation>^ZPM.DependencyAnalyzer.ModuleD</IdLocation>
+<IndexLocation>^ZPM.DependencyAnalyzer.ModuleI</IndexLocation>
+<StreamLocation>^ZPM.DependencyAnalyzer.ModuleS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

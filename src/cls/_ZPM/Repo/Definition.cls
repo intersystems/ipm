@@ -233,11 +233,11 @@ Storage Default
 <Value>ReadOnly</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.Repo.DefinitionD</DataLocation>
+<DataLocation>^ZPM.Repo.DefinitionD</DataLocation>
 <DefaultData>DefinitionDefaultData</DefaultData>
-<IdLocation>^%ZPM.Repo.DefinitionD</IdLocation>
-<IndexLocation>^%ZPM.Repo.DefinitionI</IndexLocation>
-<StreamLocation>^%ZPM.Repo.DefinitionS</StreamLocation>
+<IdLocation>^ZPM.Repo.DefinitionD</IdLocation>
+<IndexLocation>^ZPM.Repo.DefinitionI</IndexLocation>
+<StreamLocation>^ZPM.Repo.DefinitionS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

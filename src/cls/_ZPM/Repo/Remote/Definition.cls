@@ -149,4 +149,25 @@ Method GetSortOrder() As %Integer [ Private ]
 	Quit 2 + $Case(..%Id(),"":1,:..%Id())
 }
 
+Storage Default
+{
+<Data name="DefinitionDefaultData1">
+<Subscript>"Definition"</Subscript>
+<Value name="1">
+<Value>URL</Value>
+</Value>
+<Value name="2">
+<Value>Username</Value>
+</Value>
+<Value name="3">
+<Value>Password</Value>
+</Value>
+<Value name="4">
+<Value>DeploymentEnabled</Value>
+</Value>
+</Data>
+<DefaultData>DefinitionDefaultData1</DefaultData>
+<Type>%Storage.Persistent</Type>
+}
+
 }

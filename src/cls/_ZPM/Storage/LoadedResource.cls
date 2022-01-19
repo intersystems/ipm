@@ -150,11 +150,11 @@ Storage Default
 <Value>LoadedResource</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.Storage.LoadedResourceD</DataLocation>
+<DataLocation>^ZPM.Storage.LoadedResourceD</DataLocation>
 <DefaultData>LoadedResourceDefaultData</DefaultData>
-<IdLocation>^%ZPM.Storage.LoadedResourceD</IdLocation>
-<IndexLocation>^%ZPM.Storage.LoadedResourceI</IndexLocation>
-<StreamLocation>^%ZPM.Storage.LoadedResourceS</StreamLocation>
+<IdLocation>^ZPM.Storage.LoadedResourceD</IdLocation>
+<IndexLocation>^ZPM.Storage.LoadedResourceI</IndexLocation>
+<StreamLocation>^ZPM.Storage.LoadedResourceS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

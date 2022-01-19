@@ -103,9 +103,9 @@ Storage Default
 </Data>
 <DataLocation>{%%PARENT}("Invokes")</DataLocation>
 <DefaultData>InvokeReferenceDefaultData</DefaultData>
-<IdLocation>^%ZPM.Storage.ModuleC("Invokes")</IdLocation>
-<IndexLocation>^%ZPM.Storage.InvokeReferenceI</IndexLocation>
-<StreamLocation>^%ZPM.Storage.InvokeReferenceS</StreamLocation>
+<IdLocation>^ZPM.Storage.InvokeReferenceC("Invokes")</IdLocation>
+<IndexLocation>^ZPM.Storage.InvokeReferenceI</IndexLocation>
+<StreamLocation>^ZPM.Storage.InvokeReferenceS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

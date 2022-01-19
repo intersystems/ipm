@@ -1444,7 +1444,7 @@ Storage Default
 <Value>GlobalScope</Value>
 </Value>
 <Value name="3">
-<Value>Name</Value>
+<Value>VersionString</Value>
 </Value>
 <Value name="4">
 <Value>Version</Value>
@@ -1492,17 +1492,17 @@ Storage Default
 <Value>AfterInstallMessage</Value>
 </Value>
 <Value name="19">
-<Value>Repository</Value>
+<Value>Name</Value>
 </Value>
 <Value name="20">
-<Value>VersionString</Value>
+<Value>Repository</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.Storage.ModuleD</DataLocation>
+<DataLocation>^ZPM.Storage.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
-<IdLocation>^%ZPM.Storage.ModuleD</IdLocation>
-<IndexLocation>^%ZPM.Storage.ModuleI</IndexLocation>
-<StreamLocation>^%ZPM.Storage.ModuleS</StreamLocation>
+<IdLocation>^ZPM.Storage.ModuleD</IdLocation>
+<IndexLocation>^ZPM.Storage.ModuleI</IndexLocation>
+<StreamLocation>^ZPM.Storage.ModuleS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

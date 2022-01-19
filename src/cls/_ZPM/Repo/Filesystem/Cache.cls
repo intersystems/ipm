@@ -115,32 +115,32 @@ Storage Default
 <Value>Description</Value>
 </Value>
 <Value name="5">
-<Value>Manifest</Value>
+<Value>LastModified</Value>
 </Value>
 <Value name="6">
-<Value>VersionString</Value>
+<Value>Manifest</Value>
 </Value>
 <Value name="7">
 <Value>Repository</Value>
 </Value>
 <Value name="8">
-<Value>LastModified</Value>
-</Value>
-<Value name="9">
 <Value>SemVer</Value>
 </Value>
-<Value name="10">
+<Value name="9">
 <Value>SubDirectory</Value>
 </Value>
-<Value name="11">
+<Value name="10">
 <Value>Version</Value>
 </Value>
+<Value name="11">
+<Value>VersionString</Value>
+</Value>
 </Data>
-<DataLocation>^%ZPM.Repo.Filesystem.CacheD</DataLocation>
+<DataLocation>^ZPM.Repo.Filesystem.CacheD</DataLocation>
 <DefaultData>CacheDefaultData</DefaultData>
-<IdLocation>^%ZPM.Repo.Filesystem.CacheD</IdLocation>
-<IndexLocation>^%ZPM.Repo.Filesystem.CacheI</IndexLocation>
-<StreamLocation>^%ZPM.Repo.Filesystem.CacheS</StreamLocation>
+<IdLocation>^ZPM.Repo.Filesystem.CacheD</IdLocation>
+<IndexLocation>^ZPM.Repo.Filesystem.CacheI</IndexLocation>
+<StreamLocation>^ZPM.Repo.Filesystem.CacheS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

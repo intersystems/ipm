@@ -542,32 +542,32 @@ Storage Default
 <Value>Name</Value>
 </Value>
 <Value name="3">
-<Value>Preload</Value>
+<Value>Scope</Value>
 </Value>
 <Value name="4">
-<Value>Generated</Value>
+<Value>Preload</Value>
 </Value>
 <Value name="5">
-<Value>IsAPI</Value>
+<Value>Generated</Value>
 </Value>
 <Value name="6">
-<Value>ProcessorClass</Value>
+<Value>IsAPI</Value>
 </Value>
 <Value name="7">
-<Value>Deploy</Value>
+<Value>ProcessorClass</Value>
 </Value>
 <Value name="8">
-<Value>OverrideName</Value>
+<Value>Deploy</Value>
 </Value>
 <Value name="9">
-<Value>Scope</Value>
+<Value>OverrideName</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Resources")</DataLocation>
 <DefaultData>ResourceReferenceDefaultData</DefaultData>
-<IdLocation>^%ZPM.Storage.ModuleC("Resources")</IdLocation>
-<IndexLocation>^%ZPM.Storage.ResourceRef6040I</IndexLocation>
-<StreamLocation>^%ZPM.Storage.ResourceRef6040S</StreamLocation>
+<IdLocation>^ZPM.Storage.ResourceReferenceC("Resources")</IdLocation>
+<IndexLocation>^ZPM.Storage.ResourceReferenceI</IndexLocation>
+<StreamLocation>^ZPM.Storage.ResourceReferenceS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

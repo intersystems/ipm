@@ -35,9 +35,9 @@ Storage Default
 </Data>
 <DataLocation>{%%PARENT}("Mappings")</DataLocation>
 <DefaultData>MappingReferenceDefaultData</DefaultData>
-<IdLocation>^%ZPM.Storage.ModuleC("Mappings")</IdLocation>
-<IndexLocation>^%ZPM.Storage.MappingReferenceI</IndexLocation>
-<StreamLocation>^%ZPM.Storage.MappingReferenceS</StreamLocation>
+<IdLocation>^ZPM.Storage.MappingReferenceC("Mappings")</IdLocation>
+<IndexLocation>^ZPM.Storage.MappingReferenceI</IndexLocation>
+<StreamLocation>^ZPM.Storage.MappingReferenceS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

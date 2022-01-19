@@ -56,11 +56,11 @@ Storage Default
 <Value>ReferencedClassExists</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.DependencyAna8370.ProblemD</DataLocation>
+<DataLocation>^ZPM.DependencyAnalyzer.ProblemD</DataLocation>
 <DefaultData>ProblemDefaultData</DefaultData>
-<IdLocation>^%ZPM.DependencyAna8370.ProblemD</IdLocation>
-<IndexLocation>^%ZPM.DependencyAna8370.ProblemI</IndexLocation>
-<StreamLocation>^%ZPM.DependencyAna8370.ProblemS</StreamLocation>
+<IdLocation>^ZPM.DependencyAnalyzer.ProblemD</IdLocation>
+<IndexLocation>^ZPM.DependencyAnalyzer.ProblemI</IndexLocation>
+<StreamLocation>^ZPM.DependencyAnalyzer.ProblemS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

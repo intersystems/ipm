@@ -69,11 +69,11 @@ Storage Default
 <Value>Interoperability</Value>
 </Value>
 </Data>
-<DataLocation>^%ZPM.Storage.SystemRequi5D02D</DataLocation>
+<DataLocation>^ZPM.Storage.SystemRequirementsD</DataLocation>
 <DefaultData>SystemRequirementsDefaultData</DefaultData>
-<IdLocation>^%ZPM.Storage.SystemRequi5D02D</IdLocation>
-<IndexLocation>^%ZPM.Storage.SystemRequi5D02I</IndexLocation>
-<StreamLocation>^%ZPM.Storage.SystemRequi5D02S</StreamLocation>
+<IdLocation>^ZPM.Storage.SystemRequirementsD</IdLocation>
+<IndexLocation>^ZPM.Storage.SystemRequirementsI</IndexLocation>
+<StreamLocation>^ZPM.Storage.SystemRequirementsS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

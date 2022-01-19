@@ -35,4 +35,16 @@ Method GetSortOrder() As %Integer [ Private ]
 	Quit 1
 }
 
+Storage Default
+{
+<Data name="DefinitionDefaultData1">
+<Subscript>"Definition"</Subscript>
+<Value name="1">
+<Value>IsLocalCache</Value>
+</Value>
+</Data>
+<DefaultData>DefinitionDefaultData1</DefaultData>
+<Type>%Storage.Persistent</Type>
+}
+
 }
