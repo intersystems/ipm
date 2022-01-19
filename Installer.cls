@@ -22,7 +22,7 @@ XData PM [ XMLNamespace = INSTALLER ]
   <Import File="${SRCDIR}inc" Recurse="1"/>
   <Import File="${SRCDIR}cls" Recurse="1" />
   
-  <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" CheckStatus="true" />
+  <Invoke Class="%ZPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="%ZPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/> 
     <Arg Value="${TRACKINGID}"/>
@@ -57,7 +57,7 @@ ClassMethod AsyncSetup(Args...)
 ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
     If (pRegistry'="") {
-      $$$QuitOnError(##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry))
+      $$$QuitOnError(##class(%ZPM.Main).Shell("repo -t registry -name registry -url "_ pRegistry))
     }
     $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry))
     $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetAnalyticsAvailable(1))
@@ -68,12 +68,12 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
 
 ClassMethod ZPMLoad(pDirectoryName)
 {
-  Quit ##class(%ZPM.PackageManager).Shell("load -dev "_pDirectoryName)
+  Quit ##class(%ZPM.Main).Shell("load -dev "_pDirectoryName)
 }
 
 ClassMethod ZPMCompile()
 {
-  Quit ##class(%ZPM.PackageManager).Shell("ZPM compile")
+  Quit ##class(%ZPM.Main).Shell("ZPM compile")
 }
 
 ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, modified As %String, qstruct) As %Status

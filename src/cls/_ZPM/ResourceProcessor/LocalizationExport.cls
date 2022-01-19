@@ -158,14 +158,14 @@ ClassMethod SaveMessageFile(pDocName As %String, pFileObject As %ZPM.ResourcePro
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
 				Quit
 			}
-			Do ##class(%ZPM.PackageManager.Developer.Utils).BeginCaptureOutput(.tCookie)
+			Do ##class(%ZPM.Utils.Module).BeginCaptureOutput(.tCookie)
 			Set tSC = tRtn.Compile("ckvd")
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
 	If $Data(tCookie) {
-		Do ##class(%ZPM.PackageManager.Developer.Utils).EndCaptureOutput(tCookie,.pConsoleOutput)
+		Do ##class(%ZPM.Utils.Module).EndCaptureOutput(tCookie,.pConsoleOutput)
 	}
 	Quit tSC
 }
@@ -177,7 +177,7 @@ ClassMethod Export(pDocName As %String, pSource As %ZPM.ResourceProcessor.Locali
 	Try {
 		New %SourceControl
 		
-		Do ##class(%ZPM.PackageManager.Developer.Utils).BeginCaptureOutput(.tCookie)
+		Do ##class(%ZPM.Utils.Module).BeginCaptureOutput(.tCookie)
 		
 		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
 		
@@ -214,7 +214,7 @@ ClassMethod Export(pDocName As %String, pSource As %ZPM.ResourceProcessor.Locali
 	}
 	
 	// Ensure I/O redirection ends.
-	Do ##class(%ZPM.PackageManager.Developer.Utils).EndCaptureOutput(tCookie,.pSourceControlOutput)
+	Do ##class(%ZPM.Utils.Module).EndCaptureOutput(tCookie,.pSourceControlOutput)
 	Quit tSC
 }
 

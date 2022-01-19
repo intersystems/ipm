@@ -20,7 +20,7 @@ Method TestNewNamespaceInstall()
 	#; 	Set tUsrCmd = "repo -p4 -n Users -path //Users/tleavitt/PackageManager/modules/HS.StandaloneFormBuilder/"
 	#; 	For tCmd = tAppCmd,tUsrCmd {
 	#; 		Do $$$LogMessage(tCmd)
-	#; 		Do ##class(%ZPM.PackageManager).ShellInternal(tCmd,.tException)
+	#; 		Do ##class(%ZPM.Main).ShellInternal(tCmd,.tException)
 	#; 		If $IsObject(tException) {
 	#; 			Throw tException
 	#; 		}
@@ -31,7 +31,7 @@ Method TestNewNamespaceInstall()
 	#; 	Set tRef.Name = "HS.StandaloneFormBuilder"
 	#; 	Set tRef.VersionString = "0.0.1+snapshot"
 	#; 	Set tParams("Verbose")=1
-	#; 	Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).LoadQualifiedReference(tRef,.tParams)
+	#; 	Set tSC = ##class(%ZPM.Utils.Module).LoadQualifiedReference(tRef,.tParams)
 	#; 	Do $$$AssertStatusOK(tSC,"Loaded Standalone Form Builder module successfully.")
 	#; } Catch e {
 	#; 	Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
 <Class name="TSL.Lifecycle">
-<Super>%ZPM.PackageManager.Developer.Lifecycle.Application</Super>
 <TimeCreated>64357,39225.766566</TimeCreated>
 
 <Method name="OnBeforeCaptureDatabase">

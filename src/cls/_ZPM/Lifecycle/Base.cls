@@ -193,7 +193,7 @@ Method CheckBeforeClean(ByRef pParams, Output pSkip As %Boolean = 0) As %Status
 		
 		If '$Get(pParams("Clean","Force")) {
 			// Check to see if anything depends on this module and return an error status if it does.
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).GetDependentsList(.tList,,..Module.Name)
+			Set tSC = ##class(%ZPM.Utils.Module).GetDependentsList(.tList,,..Module.Name)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -513,11 +513,11 @@ Method %Reload(ByRef pParams) As %Status
 			Set tSource = tMapping.Source
 			
 			Set tSC = $Case(tExtension,
-				"GBL":##class(%ZPM.PackageManager.Developer.Utils).AddGlobalMapping($namespace,tName,tSource),
-				"INC":##class(%ZPM.PackageManager.Developer.Utils).AddRoutineMapping($namespace,tName,"INC",tSource),
-				"MAC":##class(%ZPM.PackageManager.Developer.Utils).AddRoutineMapping($namespace,tName,"MAC",tSource),
-				"PKG":##class(%ZPM.PackageManager.Developer.Utils).AddPackageMapping($namespace,tName,tSource),
-				"":##class(%ZPM.PackageManager.Developer.Utils).AddRoutineMapping($namespace,tName,"ALL",tSource))
+				"GBL":##class(%ZPM.Utils.Module).AddGlobalMapping($namespace,tName,tSource),
+				"INC":##class(%ZPM.Utils.Module).AddRoutineMapping($namespace,tName,"INC",tSource),
+				"MAC":##class(%ZPM.Utils.Module).AddRoutineMapping($namespace,tName,"MAC",tSource),
+				"PKG":##class(%ZPM.Utils.Module).AddPackageMapping($namespace,tName,tSource),
+				"":##class(%ZPM.Utils.Module).AddRoutineMapping($namespace,tName,"ALL",tSource))
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -990,11 +990,13 @@ Method %Register(ByRef pParams) As %Status
       Set tSC = $$$OK
 			Quit
 		}
-		
-		Set tIsApplication = ..%IsA("%ZPM.PackageManager.Developer.Lifecycle.Application")
-		
+
 		Set tPublishClient = tServer.GetPublishService()
-		Set tModule = $Select(tIsApplication:##class(%ZPM.PackageManager.Core.Application).%New(),1:##class(%ZPM.Repo.Remote.ModuleInfo).%New())
+		If '$IsObject(tPublishClient) {
+			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' does not support publishing modules.",tServer.Name))
+			$$$ThrowStatus(tSC)
+		}
+		Set tModule = ##class(%ZPM.Repo.Remote.ModuleInfo).%New()
 		Set tModule.Name = ..Module.Name
 		If (0 && '..Module.IsLocked()) {
 			Set tSC = ..Module.Lock()
@@ -1012,11 +1014,8 @@ Method %Register(ByRef pParams) As %Status
 			Quit
 		}
 		
-		If tIsApplication {
-			Do tPublishClient.PublishApplication(tModule)
-		} Else {
-			Do tPublishClient.PublishModule(tModule)
-		}
+		Do tPublishClient.PublishModule(tModule)
+		
 		
 		If $$$ISOK(tSC) {
 			Write:tVerbose !,..Module.Name," ",..Module.VersionString," registered to local cache."
@@ -1045,7 +1044,7 @@ Method %Verify(ByRef pParams) As %Status
 			Set tNewNamespace = $Namespace_"-VERIFY"
 			
 			If $Get(pParams("Verify","Reuse"),0) || $Get(pParams("Verify","SkipLoad"),0) {
-				Set tModuleExists = ##class(%ZPM.PackageManager.Developer.Utils).NamespaceHasModule(tNewNamespace,..Module.Name)
+				Set tModuleExists = ##class(%ZPM.Utils.Module).NamespaceHasModule(tNewNamespace,..Module.Name)
 				If (tModuleExists) {
 					// Permit the VERIFY namespace to be reused.
 					Set tMustCreate = 0
@@ -1107,7 +1106,7 @@ Method %Verify(ByRef pParams) As %Status
 						Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No module root defined for module '%1'",..Module.Name))
 						$$$ThrowStatus(tSC)
 					}
-					$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadModuleFromDirectory(tRoot,.tParams))
+					$$$ThrowOnError(##class(%ZPM.Utils.Module).LoadModuleFromDirectory(tRoot,.tParams))
 				}
 			}
 		}
@@ -1143,7 +1142,7 @@ Method OnInstallFromPayload(ByRef pParams) As %Status
 	Try {
 		Set tTmpStream = ##class(%Stream.FileBinary).%New()
 		$$$ThrowOnError(tTmpStream.CopyFromAndSave(..Payload))
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadModuleFromArchive(..Module.Name,..Module.VersionString,tTmpStream,.pParams))
+		$$$ThrowOnError(##class(%ZPM.Utils.Module).LoadModuleFromArchive(..Module.Name,..Module.VersionString,tTmpStream,.pParams))
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -1167,14 +1166,12 @@ Method %Publish(ByRef pParams) As %Status
 			Set tNewVersion = ##class(%ZPM.General.SemanticVersion).FromString(tNewVersion)
 		}
 		
-		Set tIsApplication = ..%IsA("%ZPM.PackageManager.Developer.Lifecycle.Application")
-		
 		Set tPublishClient = tServer.GetPublishService()
 		If '$IsObject(tPublishClient) {
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' does not support publishing modules.",tServer.Name))
 			$$$ThrowStatus(tSC)
 		}
-		Set tModule = $Select(tIsApplication:##class(%ZPM.PackageManager.Core.Application).%New(),1:##class(%ZPM.Repo.Remote.ModuleInfo).%New())
+		Set tModule = ##class(%ZPM.Repo.Remote.ModuleInfo).%New()
 		Set tModule.Name = ..Module.Name
 		If tRelease && ('..Module.IsLocked()) {
 			Set tSC = ..Module.Lock()
@@ -1201,16 +1198,14 @@ Method %Publish(ByRef pParams) As %Status
 			Quit
 		}
 		
-		If tIsApplication {
-			Do tPublishClient.PublishApplication(tModule)
-		} Else {
-			Do tPublishClient.PublishModule(tModule)
-		}
+
+		Do tPublishClient.PublishModule(tModule)
+		
 		
 		// May need to update the version of the currently-installed module.
 		If $Data(tNewVersion) {
 			Set ..Module.Version = tNewVersion
-			Set tSC = ##class(%ZPM.PackageManager.Developer.API).ExportDocumentForObject(..Module)
+			Set tSC = ##class(%ZPM.Utils.Module).ExportDocumentForObject(..Module)
 			$$$ThrowOnError(tSC)
 		}
 	} Catch e {
@@ -1248,8 +1243,8 @@ Method %Document(ByRef pParams) As %Status
 	Try {
 		TSTART
 		// Clear out existing documentation for THIS module.
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Annotation.Utils).EraseAnnotationDataForModule(..Module.Name)
-		$$$ThrowOnError(tSC)
+		// Set tSC = ##class(%ZPM.PackageManager.Developer.Annotation.Utils).EraseAnnotationDataForModule(..Module.Name)
+		// $$$ThrowOnError(tSC)
 		
 		// Recurse (unless told otherwise) to ensure documentation for dependencies is up to date.
 		Set tModuleDependencies = ""
@@ -1272,8 +1267,8 @@ Method %Document(ByRef pParams) As %Status
 				}
 				
 				// Erase existing annotation data for the dependency, since we will later rebuild it (and there may be conflicts with existing data).
-				Set tSC = ##class(%ZPM.PackageManager.Developer.Annotation.Utils).EraseAnnotationDataForModule(tModuleName)
-				$$$ThrowOnError(tSC)
+				// Set tSC = ##class(%ZPM.PackageManager.Developer.Annotation.Utils).EraseAnnotationDataForModule(tModuleName)
+				// $$$ThrowOnError(tSC)
 				
 				Set tDepth = $List(tModuleInfo)
 				Set tServer = $List(tModuleInfo,2)
@@ -1349,8 +1344,8 @@ Method %Document(ByRef pParams) As %Status
 		
 		// TODO: call ##class(%ZPM.PackageManager.Developer.Annotation.Utils).ProcessAnnotationsForModule directly and generate/update new document
 		// (a subclass of %Studio.AbstractDocument)
-		Set tSC = ..Module.UpdateAPIDocumentation(tModuleDependencies)
-		$$$ThrowOnError(tSC)
+		// Set tSC = ..Module.UpdateAPIDocumentation(tModuleDependencies)
+		// $$$ThrowOnError(tSC)
 		TCOMMIT
 	} Catch e {
 		Set tSC = e.AsStatus()

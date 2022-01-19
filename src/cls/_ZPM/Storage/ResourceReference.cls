@@ -31,9 +31,6 @@ Property Attributes As array Of %String(MAXLEN = "", XMLKEYNAME = "Name", XMLNAM
 /// If true or unset, resources will be scanned for annotations.
 Property IsAPI As %Boolean(XMLPROJECTION = "ATTRIBUTE");
 
-/// Children of this resource that constitute its API. (Primarily relevant for packages.)
-Property APIs As list Of %ZPM.PackageManager.Developer.APIReference(STORAGEDEFAULT = "array", XMLNAME = "API", XMLPROJECTION = "ELEMENT");
-
 /// Specifies a class that handles lifecycle events for this resource
 /// Typically only applicable to directory/file resources
 Property ProcessorClass As %Dictionary.Classname(XMLPROJECTION = "ATTRIBUTE");
@@ -326,43 +323,6 @@ ClassMethod NonNullResourceNameOpen(pResourceName As %String, pConcurrency As %I
 	Quit tResult
 }
 
-ClassMethod GetAPIScope(pResourceReferenceID As %String, ByRef pAPIClassArray, ByRef pAPIPackageArray) As %Status
-{
-	Set tSC = $$$OK
-	Kill pAPIClassArray
-	Kill pAPIPackageArray
-	
-	Try {
-		
-		Set tAPIResult = ##class(%SQL.Statement).%ExecDirect(,
-					"select APIs_Resource " _ 
-					"from %ZPM_Storage.ResourceReference_APIs "_
-					"where ResourceReference = ? ",
-					pResourceReferenceID)
-		If (tAPIResult.%SQLCODE < 0) {
-			$$$ThrowStatus($$$ERROR($$$SQLCode,tAPIResult.%SQLCODE,tAPIResult.%Message))
-		}
-		While tAPIResult.%Next(.tSC) {
-			$$$ThrowOnError(tSC)
-			Set tResource = tAPIResult.%Get("APIs_Resource")
-			
-			Set tTrimmed = $piece(tResource,".",1,*-1)
-			Set tResourceType = $piece(tResource,".",*) // "CLS", "PKG", etc.
-			If tResourceType = "CLS" {
-				Set pAPIClassArray(tTrimmed) = ""
-			}
-			Elseif tResourceType = "PKG" {
-				Set pAPIPackageArray(tTrimmed) = $length(tTrimmed, ".")
-				// we set the array value as the length to save time later when we're applying the packages to resource class members
-			}
-		}
-	} 
-	Catch tException {
-		Set tSC = tException.AsStatus()
-	}
-	Quit tSC
-}
-
 ClassMethod GetStatus(InternalName As %String, Output pReferenced As %Boolean, Output pEditable As %Boolean, Output pSourceModuleName As %String, Output pMessage As %String) As %Status
 {
 	Set tSC = $$$OK
@@ -519,11 +479,6 @@ Method GetSortKey() As %String
 
 Storage Default
 {
-<Data name="APIs">
-<Attribute>APIs</Attribute>
-<Structure>subnode</Structure>
-<Subscript>"APIs"</Subscript>
-</Data>
 <Data name="Attributes">
 <Attribute>Attributes</Attribute>
 <Structure>subnode</Structure>

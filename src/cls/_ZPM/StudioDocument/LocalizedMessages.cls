@@ -5,7 +5,7 @@ Projection RegisterExtension As %ZPM.StudioDocument.Projection(DocumentDescripti
 
 Parameter EXTENSION = ".LOC";
 
-Parameter INFOGLOBAL = "^ZPM.Dev.Doc.LocalizedMessages";
+Parameter INFOGLOBAL = "^ZPM.StuDoc.LocalizedMessages";
 
 Parameter STREAMCLASS = "%ZPM.StudioDocument.LocalizedMessageStream";
 

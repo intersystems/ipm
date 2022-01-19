@@ -1,6 +1,6 @@
 Include (%occInclude, %occErrors, %syConfig, %syPrompt, %ZPM.PackageManager.Common)
 
-Class %ZPM.PackageManager.Developer.Utils [ System = 3 ]
+Class %ZPM.Utils.Module [ System = 3 ]
 {
 
 /// SSL/TLS config to use for HTTPS requests made by package manager code.
@@ -365,14 +365,19 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			}
 			
 			// Don't need to register if loading from the local server.
-			If (tLocalServer.Name '= pServerName) && $IsObject($Get(tPayload)) && '##class(%ZPM.PackageManager.Server.Module).NameVersionExists(pModuleName, pVersion) {
+			If (tLocalServer.Name '= pServerName) && $IsObject($Get(tPayload)) {
 				Set tCacheMod = ##class(%ZPM.Repo.Remote.ModuleInfo).%New()
 				Set tCacheMod.Name = pModuleName
 				Set tCacheMod.VersionString = pVersion
 				Set tCacheMod.Manifest = tClient.GetModuleManifest(tModRef)
 				Do tPayload.Rewind()
 				Do tCacheMod.Payload.CopyFrom(tPayload)
-				Do tLocalServer.GetPublishService().PublishModule(tCacheMod)
+                Set tPublishClient = tLocalServer.GetPublishService()
+                If '$IsObject(tPublishClient) {
+			        Set tSC = $$$ERROR($$$GeneralError, "Publishing modules not supported.")
+			        $$$ThrowStatus(tSC)
+		        }
+				Do tPublishClient.PublishModule(tCacheMod)
 			}
 		}
 	} Catch e {
@@ -899,6 +904,99 @@ ClassMethod GetModuleNameFromXML(pDirectory As %String, Output name As %String) 
 	Return $$$OK
 }
 
+ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.Storage.Module, Output pSourceControlOutput) As %Status
+{
+	Set tSC = $$$OK
+	Set tCookie = ""
+	Try {
+		New %SourceControl
+		
+		Do ##class(%ZPM.Utils.Module).BeginCaptureOutput(.tCookie)
+		
+		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		
+		Set tDocName = pSourceModule.Name_".ZPM"
+		
+		Set tSC = ##class(%Studio.SourceControl.Interface).GetStatus(tDocName,.tIsInSourceControl,.tIsEditable)
+		$$$ThrowOnError(tSC)
+		
+		If tIsInSourceControl && 'tIsEditable {
+			// Try to make the document editable.
+			Set tSC = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.Interface).%OnMakeModuleEditable(pSourceModule)
+			$$$ThrowOnError(tSC)
+		}
+		
+		// Did we actually make the document editable?
+		Set tSC = ##class(%Studio.SourceControl.Interface).GetStatus(tDocName,,.tIsEditable)
+		$$$ThrowOnError(tSC)
+		
+		// If still not editable, error out.
+		If 'tIsEditable {
+			$$$ThrowStatus($$$ERROR($$$ItemNotCheckedOut,tDocName))
+		}
+		
+		Set tModuleStream = ##class(%ZPM.StudioDocument.ModuleStream).NameOpen(pSourceModule.Name,,.tSC)
+		If $ListFind($ListFromString($System.Status.GetErrorCodes(tSC)),$$$KeyValueNotFoundOpen) {
+			// It's possible that only the module exists - we'll skip the merge with the document's content if it does.
+			Set tSC = $$$OK
+		}
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		
+		If $IsObject(tModuleStream) {
+			// Extract comments from existing document stream
+			Set tHandler = ##class(%ZPM.Utils.XMLCommentHandler).%New()
+			Set tReader = ##class(%XML.SAX.Parser).%New()
+			Set tSC = ##Class(%XML.SAX.Parser).ParseStream(tModuleStream.Contents,tHandler)
+			$$$ThrowOnError(tSC)
+		}
+		
+		// Use document API
+		#dim tExportStream As %Stream.Object
+		Set tSC = pSourceModule.XMLExportToStream(.tExportStream,,"literal,indent")
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		
+		If $IsObject(tModuleStream) {
+			// Reapply comments to exported XML stream
+			Set tSC = tHandler.Reapply(.tExportStream)
+			$$$ThrowOnError(tSC)
+		}
+		
+		// Save the document.
+		Set tRtn = ##class(%Library.RoutineMgr).%OpenId(tDocName)
+		If (tRtn = $$$NULLOREF) {
+			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module %1 does not exist.",pModuleName))
+			Quit
+		}
+		
+		// NOTE: tRtn.Code is a %ZPM.StudioDocument.Module
+		Do tRtn.Code.Code.Clear()
+		Set tHeader = tExportStream.ReadLine()
+		If ($Extract(tHeader,1,2) '= "<?") {
+			Do tRtn.Code.Code.WriteLine("<?xml version=""1.0""?>")
+		}
+		Do tExportStream.Rewind()
+		Set tSC = tRtn.Code.Code.CopyFrom(tExportStream)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		
+		Set tSC = tRtn.%Save()
+		If $$$ISERR(tSC) {
+			Quit
+		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	
+	// Ensure I/O redirection ends.
+	Do ##class(%ZPM.Utils.Module).EndCaptureOutput(tCookie,.pSourceControlOutput)
+	Quit tSC
+}
+
 ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %String = "") As %Status
 {
 	Set tSC = $$$OK
@@ -1028,7 +1126,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			New $Namespace
 			Set tInitNamespace = $Namespace
 			// Ensure we load "preload" resources into the correct code database (the namespace default one), since this is before mappings are set up.
-			Set $Namespace = "^^"_##class(%ZPM.PackageManager.Developer.Utils).GetRoutineDatabaseDir($Namespace)
+			Set $Namespace = "^^"_##class(%ZPM.Utils.Module).GetRoutineDatabaseDir($Namespace)
 			Set tSC = $system.OBJ.LoadDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($TLevel:"/multicompile=0",1:""),,1)
 			$$$ThrowOnError(tSC)
 			Set $Namespace = tInitNamespace
@@ -1372,7 +1470,7 @@ ClassMethod CopyItems(itemspec, source, target, qspec)
     try {
         new $namespace
         set $namespace = target
-		set tSC = ##class(%ZPM.PackageManager.Developer.Utils).ResolveItems(.itemlist,itemspec,source) quit:$$$ISERR(tSC)
+		set tSC = ##class(%ZPM.Utils.Module).ResolveItems(.itemlist,itemspec,source) quit:$$$ISERR(tSC)
         set filestream=##class(%FileCharacterStream).%New()
         do filestream.Write("")
         set tSC = $$exportItems(source,.itemlist,filestream.Filename) quit:$$$ISERR(tSC)
@@ -1627,7 +1725,7 @@ ClassMethod LockWithCurrentDependencies(pModuleName As %String) As %Status
 		$$$ThrowOnError(tModule.%Save())
 		
 		// Use the API to update the module manifest on disk from the updated persistent object
-		Set tStatus = ##class(%ZPM.PackageManager.Developer.API).ExportDocumentForObject(tModule,.tSourceControlOutput)
+		Set tStatus = ..ExportDocumentForObject(tModule,.tSourceControlOutput)
 		
 		// Always show any output (before checking tStatus)
 		For tLine=1:1:$Get(tSourceControlOutput) {

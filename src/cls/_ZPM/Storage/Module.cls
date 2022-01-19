@@ -507,7 +507,7 @@ Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
 			Kill tParams
 			Merge tParams("qstruct") = qstruct
 			Merge tParams = pParams
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).LoadDependencies(.tDependencyGraph,.tParams)
+			Set tSC = ##class(%ZPM.Utils.Module).LoadDependencies(.tDependencyGraph,.tParams)
 			If $$$ISERR(tSC) { Quit }
 		}
 	} Catch e {
@@ -597,7 +597,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					Set tOtherDeps = tOtherDeps_$ListBuild(tExistingDepKey)
 				}
 				
-				Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).GetRequiredVersionExpression(tDep.Name,tOtherDeps,.tInstalledReqExpr,.tInstalledConstraintList)
+				Set tSC = ##class(%ZPM.Utils.Module).GetRequiredVersionExpression(tDep.Name,tOtherDeps,.tInstalledReqExpr,.tInstalledConstraintList)
 				If $$$ISERR(tSC) {
 					Quit
 				}
@@ -861,7 +861,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 			Kill tParams
 			Set tParams("Verbose") = 0
 			Set tParams("qstruct") = "k"
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).LoadDependencies(.pDependencyGraph,.tParams)
+			Set tSC = ##class(%ZPM.Utils.Module).LoadDependencies(.pDependencyGraph,.tParams)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -915,37 +915,6 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
-	Quit tSC
-}
-
-/// Extract annotations from classes in the module, and generate output XML to file
-/// <var>pDependencies</var> is a $ListBuild list of module names on which this module depends
-Method UpdateAPIDocumentation(pDependencies As %List = "") As %Status
-{
-	Set tSC = $$$OK
-	
-	Try {
-		#Dim tWarningList as %Library.ListOfDataTypes
-		#Dim tAnnotationStream as %Stream.TmpBinary
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Annotation.Utils).ProcessAnnotationsForModule(..Name, pDependencies, .tAnnotationStream, .tWarningList)
-		$$$ThrowOnError(tSC)
-		
-		Set tKey = ""
-		While 1 {
-			Set tWarning = tWarningList.GetNext(.tKey)
-			Quit:tKey=""
-			
-			Write !, "warning: " _ tWarning
-		}
-		
-		// Create/update .API server document
-		Set tAPIDoc = ##class(%Library.RoutineMgr).%New(..Name_".API")
-		$$$ThrowOnError(tAPIDoc.Code.ImportFromXML(tAnnotationStream))
-		$$$ThrowOnError(tAPIDoc.%Save())
-	} Catch tException {		
-		Set tSC = tException.AsStatus()
-	}
-	
 	Quit tSC
 }
 
@@ -1058,14 +1027,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 			// Default to "module"
 			Set ..Packaging = "module"
 		}
-		
-		If (..InstallerClass '= "") && $$$comClassDefined(..InstallerClass) {
-			Set tBaseClass = "%ZPM.AbstractInstaller"
-			If '$ClassMethod(..InstallerClass,"%Extends",tBaseClass) {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid installer class '%1' - must extend %2",..InstallerClass,tBaseClass))
-				Quit
-			}
-		}
+
 		
 		// Can have only one NamespaceConfig module setting.
 		Set tNSConfigCount = 0
@@ -1215,7 +1177,7 @@ ClassMethod ValidateStream(pManifest As %Stream.Object, pModuleReference As %ZPM
 		Set tModVersion = pModuleReference.VersionString
 		Set tModSource = pModuleReference.ServerName
 			
-		Set pModule = ##class(%ZPM.PackageManager.Developer.Utils).GetModuleObjectFromStream(pManifest, .tModuleFound)
+		Set pModule = ##class(%ZPM.Utils.Module).GetModuleObjectFromStream(pManifest, .tModuleFound)
 		Set tCorrSC = $$$OK
 		If tModuleFound {
 			// Ensure that module name and version match.

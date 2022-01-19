@@ -32,8 +32,8 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			
 			// Format: ^^directory (to which the global is currently mapped)
 			Set tGlobalDBDir = $$$GBLDB(@("^"_$Piece(..ResourceReference.Name,".",1,*-1)))
-			Set tGlobalDB = ##class(%ZPM.PackageManager.Developer.Utils).GetGlobalDatabase($Namespace)
-			Set tExpectedDir = "^^"_##class(%ZPM.PackageManager.Developer.Utils).GetDatabaseDirectory(tGlobalDB)
+			Set tGlobalDB = ##class(%ZPM.Utils.Module).GetGlobalDatabase($Namespace)
+			Set tExpectedDir = "^^"_##class(%ZPM.Utils.Module).GetDatabaseDirectory(tGlobalDB)
 			
 			// Normalize the directory name in case of case-insensitivity
 			Set tGlobalDBDir = ##class(%File).NormalizeDirectory($e(tGlobalDBDir,3,*))
@@ -41,7 +41,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			
 			// See if global must be mapped to be loaded into the current default DB for globals
 			If 'tGlobalScope && (tGlobalDBDir '= tExpectedDir) && '$Get(pParams("NoMapping"),0) {
-				Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).AddGlobalMapping($Namespace,tName,tGlobalDB)
+				Set tSC = ##class(%ZPM.Utils.Module).AddGlobalMapping($Namespace,tName,tGlobalDB)
 				If $$$ISERR(tSC) {
 					Quit
 				}

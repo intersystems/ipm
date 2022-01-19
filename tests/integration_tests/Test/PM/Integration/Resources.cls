@@ -23,7 +23,7 @@ Method TestResourceTypes()
 		
 		Set tParams("Verbose") = 1
 		Set tModuleDirectory = ##class(%File).NormalizeDirectory("_data/resource-test", tTestRoot)
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).LoadModuleFromDirectory(tModuleDirectory,.tParams)
+		Set tSC = ##class(%ZPM.Utils.Module).LoadModuleFromDirectory(tModuleDirectory,.tParams)
 		Do $$$AssertStatusOK(tSC,"Loaded ResourceTest module successfully.")
 		
 		For tClass = "ResourceTest.MyClass","ResourceTest.APackage.SomeClass" {

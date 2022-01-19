@@ -41,7 +41,7 @@ ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
 				Set pRoot = ##class(%Library.File).NormalizeDirectory(pRoot)
 				
 				Set tCmd = "ROBOCOPY "_tEmptyDir_" "_pRoot_" /MIR"
-				Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(tCmd,.tLog,.tErr)
+				Set tSC = ##class(%ZPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr)
 			} Catch e {
 				Set tSC = e.AsStatus()
 			}
@@ -98,7 +98,7 @@ ClassMethod CopyDir(pSource As %String, pDest As %String, pDeleteFirst As %Boole
 			Set pSource = ##class(%Library.File).NormalizeDirectory(pSource)
 			Set pDest = ##class(%Library.File).NormalizeDirectory(pDest)
 			Set tCmd = "ROBOCOPY "_pSource_" "_pDest_" /E"
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(tCmd,.tLog,.tErr)
+			Set tSC = ##class(%ZPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr)
       If (pVerbose) {
         For i=1:1:$Get(tLog) {
           Write tLog(i),!
@@ -123,7 +123,7 @@ ClassMethod MakeDirectoryWriteable(pDirectory As %String, Output pCmd, Output pO
 		} ElseIf $$$isUNIX {
 			Set pCmd = "chmod -R 775 "_##class(%Library.File).NormalizeDirectory(pDirectory)
 		}
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(pCmd,.pOutputLog,.pErrLog)
+		Set tSC = ##class(%ZPM.Utils.Module).RunCommandViaZF(pCmd,.pOutputLog,.pErrLog)
 		$$$ThrowOnError(tSC)
 		if ($get(pErrLog(1))'="") {
 			set error = pErrLog(1)

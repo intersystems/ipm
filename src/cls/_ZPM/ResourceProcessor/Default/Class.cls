@@ -16,8 +16,8 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 		Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
 		If 'tGlobalScope {
 			Set tPackage = $p(tName,".",1,*-1)
-			Set tSourceDB = ##class(%ZPM.PackageManager.Developer.Utils).GetRoutineDatabase($Namespace)
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).AddPackageMapping($namespace,tPackage,tSourceDB)
+			Set tSourceDB = ##class(%ZPM.Utils.Module).GetRoutineDatabase($Namespace)
+			Set tSC = ##class(%ZPM.Utils.Module).AddPackageMapping($namespace,tPackage,tSourceDB)
 			If $$$ISERR(tSC) {
 				Quit
 			}

@@ -82,7 +82,7 @@ Method %Package(ByRef pParams) As %Status
 			Set tModuleName = tModuleLocations(tIndex)
 			Set tIsPackageManager = (tModuleName = "ZHSLIB") && (..Module.Name '= "ZHSLIB")
 			If tIsPackageManager {
-				Set tRtn($i(tRtn)) = " If '$$$comClassDefined(""%ZPM.PackageManager"") {"
+				Set tRtn($i(tRtn)) = " If '$$$comClassDefined(""%ZPM.Main"") {"
 			}
 			If tIncludePackageManager {
 				If (tModuleName = "ZHSLIB") {

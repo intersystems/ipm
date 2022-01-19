@@ -6,11 +6,6 @@ Method PublishModule(pModule As %ZPM.Repo.Remote.ModuleInfo) As %Boolean
   Quit ..Publish(pModule)
 }
 
-Method PublishApplication(pApplication As %ZPM.PackageManager.Core.Application) As %Boolean
-{
-  Quit ..Publish(pApplication)
-}
-
 Method Publish(pModule As %ZPM.Repo.Remote.ModuleInfo) As %Boolean
 {
   if (..Username="") || (..Password="") {

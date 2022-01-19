@@ -57,7 +57,7 @@ Method TestEverything()
 					Set tQualRef.ServerName = ..#REGISTRYNAME
 					Set tQualRef.Name = $Piece(tAssertValue," ",1)
 					Set tQualRef.VersionString = $Piece(tAssertValue," ",2)
-					Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).LoadQualifiedReference(tQualRef)
+					Set tSC = ##class(%ZPM.Utils.Module).LoadQualifiedReference(tQualRef)
 					Do $$$AssertStatusOK(tSC,"Installed "_tAssertValue)
 				}
 				
@@ -104,7 +104,7 @@ Method TestEverything()
 					Set tQualRef.ServerName = ..#REGISTRYNAME
 					Set tQualRef.Name = $Piece(tAssertValue," ",1)
 					Set tQualRef.VersionString = $Piece(tAssertValue," ",2)
-					Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).LoadQualifiedReference(tQualRef)
+					Set tSC = ##class(%ZPM.Utils.Module).LoadQualifiedReference(tQualRef)
 					If (tAssertType = "AssertInstalledAfter") {
 						Do $$$AssertStatusOK(tSC,"Installed "_tAssertValue)
 					} Else {

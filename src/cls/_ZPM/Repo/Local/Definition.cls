@@ -14,13 +14,13 @@ Property IsLocalCache As %Integer [ InitialExpression = 1, ReadOnly ];
 /// Returns a client to interact with this server.
 Method GetPackageService() As %ZPM.Repo.IPackageService
 {
-	Quit ##class(%ZPM.PackageManager.Server.PackageService).%New()
+	Quit $$$NULLOREF
 }
 
 /// Returns a client to publish modules/applications to this server.
 Method GetPublishService() As %ZPM.Repo.IPublishService
 {
-	Quit ##class(%ZPM.PackageManager.Server.PublishService).%New()
+	Quit $$$NULLOREF
 }
 
 /// Handles modifiers/data attributes provided from the package manager shell.

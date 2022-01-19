@@ -2,7 +2,7 @@ Include (%syGluedef, %sySecurity, %syPrompt, %ZPM.PackageManager.Common, %ZPM.Fo
 
 IncludeGenerator %ZPM.PackageManager.Common
 
-Class %ZPM.PackageManager Extends %ZPM.CLI
+Class %ZPM.Main Extends %ZPM.CLI
 {
 
 Parameter DOMAIN = "ZPM";
@@ -516,9 +516,6 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Reinstall(.tCommandInfo)
 			} ElseIf (tCommandInfo = "uninstall") {
 				Do ..Uninstall(.tCommandInfo)
-			} ElseIf (tCommandInfo = "clear-cache") {
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Server.Module).%DeleteExtent())
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Server.Application).%DeleteExtent())
 			} ElseIf (tCommandInfo = "manage") {
 				Do ..Manage(.tCommandInfo)
 			} ElseIf (tCommandInfo = "list-installed") {
@@ -627,7 +624,7 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-/// Get list Namespace, example do ##(%ZPM.PackageManager).GetListNamespace(.ns)
+/// Get list Namespace, example do ##(%ZPM.Main).GetListNamespace(.ns)
 ClassMethod GetListNamespace(ByRef namespace)
 {
 	New $Namespace
@@ -660,7 +657,7 @@ ClassMethod DrawColumn(desc) As %String
 }
 
 /// Get List Modules
-/// example d ##class(%ZPM.PackageManager).GetListModules("zpm",.list)
+/// example d ##class(%ZPM.Main).GetListModules("zpm",.list)
 ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
 {
 	Set tQuery = "select Name,VersionString,Description,ExternalName from %ZPM_Storage.""MODULE"""
@@ -777,7 +774,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 }
 
 /// Get Default Command of Registry
-/// example d ##class(%ZPM.PackageManager).GetDefaultCommandRegistry()
+/// example d ##class(%ZPM.Main).GetDefaultCommandRegistry()
 ClassMethod GetDefaultCommandRegistry()
 {
 	New $Namespace
@@ -924,7 +921,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	}
 	
 	// Reindex tables with semantic version indices
-	For tClass = "%ZPM.PackageManager.Server.Module","%ZPM.PackageManager.Server.Application","%ZPM.Repo.Filesystem.Cache" {
+	For tClass = "%ZPM.Repo.Filesystem.Cache" {
 		Write !,"Reindexing ",tClass,"... "
 		$$$ThrowOnError($ClassMethod(tClass,"%BuildIndices",,1,1))
 		Write "done."
@@ -1355,7 +1352,7 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	} Elseif pSearchString'="" { 
 		Set where=" WHERE name = ?"
 	}
-	Set tQuery = "SELECT Name,Version,Repository,Description FROM %ZPM_PackageManager_Developer.Utils_GetModuleList(?) "_where
+	Set tQuery = "SELECT Name,Version,Repository,Description FROM %ZPM_Utils.Module_GetModuleList(?) "_where
 	If (pSearchString = "") {
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName)
 	} Else {
@@ -1402,7 +1399,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 	set RepoName=$p($p($p(tDirectoryName,"/",*),".git")," ")
 	set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
 	if $Get(tParams("zpm","Branch"))'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
-	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(tCmd,.tLog,.tErr))
+	$$$ThrowOnError(##class(%ZPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr))
       	set tDirectoryName = TempDir_slash_RepoName
       	If ($Get(tParams("Verbose"))) {
 			write !,"Create tempory directory "_TempDir
@@ -1427,11 +1424,11 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadNewModule(tDirectoryName,.tParams))
+		$$$ThrowOnError(##class(%ZPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($PIECE(tDirectoryName, ".", *)) = "tgz" {
 		Set tTargetDirectory = $$$FileTempDirSys
 		Set tSC = ##class(%ZPM.General.Archive).Extract(tDirectoryName, tTargetDirectory)
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadNewModule(tTargetDirectory, .tParams))
+		$$$ThrowOnError(##class(%ZPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
 	}
 }
 
@@ -1489,7 +1486,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 			Do ##class(%ZPM.Lifecycle.Base).GetDefaultParameters(.tParams)
 			Merge tParams = pCommandInfo("data")
 			Set tParams("Install") = 1
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadModuleReference(tResult.ServerName,tResult.Name,tResult.VersionString,.tParams))
+			$$$ThrowOnError(##class(%ZPM.Utils.Module).LoadModuleReference(tResult.ServerName,tResult.Name,tResult.VersionString,.tParams))
 		}
 	} Else {
 		Set tPrefix = ""
@@ -1541,7 +1538,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 	Merge tParams = pCommandInfo("data")
 	Set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
 	If $$$HasModifier(pCommandInfo,"all") {
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).UninstallAll(tForce,.tParams))
+		$$$ThrowOnError(##class(%ZPM.Utils.Module).UninstallAll(tForce,.tParams))
     Return
 	} Else {
 		Set tModuleName = pCommandInfo("parameters","module")
@@ -1601,9 +1598,9 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 		// TODO: see if there is anything installed in this namespace.
 	}
 	
-	Set tNSMenu($i(tNSMenu)) = "Install an application"
-	Set tNSMenu($i(tNSMenu)) = "Upgrade/repair an application"
-	Set tNSMenu($i(tNSMenu)) = "Uninstall an application"
+	Set tNSMenu($i(tNSMenu)) = "Install an application (not yet supported)"
+	Set tNSMenu($i(tNSMenu)) = "Upgrade/repair an application (not yet supported)"
+	Set tNSMenu($i(tNSMenu)) = "Uninstall an application (not yet supported)"
 	Set tNSMenu($i(tNSMenu)) = "Switch namespace"
 	Set tNSMenu($i(tNSMenu)) = "Quit"
 	
@@ -1629,107 +1626,11 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 		}
 		
 		If (tValue = 1) {
-			// Construct an instance of %ZPM.PackageManager.Core.InstallationInfo
-			Set tInfo = ##class(%ZPM.PackageManager.Core.InstallationInfo).%New()
-			
-			Set tNamespace = ""
-			While (tNamespace = "") {
-				Set tResponse = ##class(%Library.Prompt).GetString("Namespace:",.tNamespace)
-				If (tResponse '= $$$SuccessResponse) {
-					$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-				}
-				If ##class(%SYS.Namespace).Exists(tNamespace) {
-					Write !,"Namespace '",tNamespace,"' already selects. Please enter a new namespace name."
-					Set tNamespace = ""
-				}
-			}
-			Set tInfo.Namespace = tNamespace
-			
-			Set tModName = ""
-			Set tResponse = ##class(%Library.Prompt).GetString("Application name:",.tModName)
-			If (tResponse '= $$$SuccessResponse) {
-				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-			}
-			
-			Set tModVersion = ""
-			Set tResponse = ##class(%Library.Prompt).GetString("Application version/range:",.tModVersion)
-			If (tResponse '= $$$SuccessResponse) {
-				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-			}
-			
-			Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
-			Set tSearchCriteria.Name = tModName
-			Set tSearchCriteria.VersionExpression = tModVersion
-			Set tSearchCriteria.IncludeSnapshots = 1
-			Set tSearchCriteria.IncludePrerelease = 1
-			$$$ThrowOnError(##class(%ZPM.Repo.Utils).SearchRepositoriesForApplication(tSearchCriteria,.tResults))
-			
-			If (tResults.Count() > 0) {
-				#dim tResult As %ZPM.Storage.QualifiedModuleInfo
-				If (tResults.Count() = 1) {
-					Set tInfo.ModuleReference = tResults.GetAt(1)
-				} ElseIf (tResults.Count() > 1) {
-					For i=1:1:tResults.Count() {
-						Set tResult = tResults.GetAt(i)
-						Set tOptArray(i) = tResult.Name_" "_tResult.VersionString_" @ "_tResult.ServerName
-					}
-					
-					Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask)
-					If (tResponse '= $$$SuccessResponse) {
-						$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-					}
-					
-					Set tInfo.ModuleReference = tResults.GetAt(tValue)
-				}
-			} Else {
-				Write !,tModName_" "_tModVersion_" not found in any repository."
-				Continue
-			}
-			
-			// TODO: Parameters
-			
-			$$$ThrowOnError(##class(%ZPM.Repo.Utils).InstallApplication(tInfo))
-			
-			Set $Namespace = tNamespace
+			Write !,"This feature is not yet implemented."
 		} ElseIf (tValue = 2) {
-			// TODO: Implement, based on things installed in the current namespace.
 			Write !,"This feature is not yet implemented."
 		} ElseIf (tValue = 3) {
-			// List installed modules with application packaging.
-			
-			Kill tModuleList
-			Set tModuleList = 0
-			
-			#dim tRes As %SQL.StatementResult
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name,LifecycleClass from %ZPM_Storage.""Module""")
-			If (tRes.%SQLCODE < 0) {
-				$$$ThrowStatus($$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message))
-			}
-			While (tRes.%Next(.tSC)) {
-				$$$ThrowOnError(tSC)
-				set tLifecycleClass = tRes.LifecycleClass
-				if (tLifecycleClass '= "") && ($Length(tLifecycleClass,".") = 1) {
-					set tLifecycleClass = $$$DefaultLifecyclePackageDot_tLifecycleClass
-				}
-				If $ClassMethod(tLifecycleClass,"%Extends","%ZPM.PackageManager.Developer.Lifecycle.Application") {
-					Set tModuleList($i(tModuleList)) = tRes.%Get("Name")
-				}
-			}
-			$$$ThrowOnError(tSC)
-			
-			Set tUninstallAppIdx = ""
-			While (tUninstallAppIdx = "") {
-				Set tResponse = ##class(%Library.Prompt).GetMenu("Which application?",.tUninstallAppIdx,.tModuleList,,$$$InitialDisplayMask)
-				If (tResponse '= $$$SuccessResponse) {
-					$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-				}
-			}
-			
-			// Construct an instance of %ZPM.PackageManager.Core.InstallationInfo
-			Set tInfo = ##class(%ZPM.PackageManager.Core.InstallationInfo).%New()
-			Set tInfo.Namespace = $Namespace
-			Set tInfo.ModuleReference.Name = tModuleList(tUninstallAppIdx)
-			$$$ThrowOnError(##class(%ZPM.Repo.Utils).UninstallApplication(tInfo))
+			Write !,"This feature is not yet implemented."
 		} ElseIf (tValue = 4) {
 			Set tNamespace = ""
 		} ElseIf (tValue = 5) {
@@ -1871,10 +1772,10 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
 	
 	If tTree {
 		New %tree
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).GetDependentsAsTree(.%tree,.tErrorList,tModName,tVersion,tRepos)
+		Set tSC = ##class(%ZPM.Utils.Module).GetDependentsAsTree(.%tree,.tErrorList,tModName,tVersion,tRepos)
 		$$$ThrowOnError(tSC)
 	} Else {
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).GetDependentsList(.tList,.tErrorList,tModName,tVersion,tRepos)
+		Set tSC = ##class(%ZPM.Utils.Module).GetDependentsList(.tList,.tErrorList,tModName,tVersion,tRepos)
 		$$$ThrowOnError(tSC)
 	}
 	
@@ -1987,7 +1888,7 @@ ClassMethod PrintTree(ByRef pTree)
 ClassMethod ListOrphans(ByRef pCommandInfo) [ Private ]
 {
 	Set tType = $$$GetModifier(pCommandInfo,"type")
-	Set tResult = ##class(%ZPM.PackageManager.Developer.Utils).OrphanedResourcesFunc($Namespace,tType)
+	Set tResult = ##class(%ZPM.Utils.Module).OrphanedResourcesFunc($Namespace,tType)
 	While tResult.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Write tResult.%Get("Name"),!
@@ -2026,7 +1927,7 @@ ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 			
 			Set tModule = ##class(%ZPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 			$$$ThrowOnError(tSC)
-			Set tSC = ##class(%ZPM.PackageManager.Developer.API).ExportDocumentForObject(tModule,.tSourceControlOutput)
+			Set tSC = ##class(%ZPM.Utils.Module).ExportDocumentForObject(tModule,.tSourceControlOutput)
 			$$$ThrowOnError(tSC)
 			For tLine=1:1:$Get(tSourceControlOutput) {
 				Write tSourceControlOutput(tLine),!
@@ -2276,7 +2177,7 @@ ClassMethod UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Boo
 	Quit tSC
 #; These are the actual contents of %ZLANGC00 (to be added/updated)
 $$$STARTTAG
-ZPM(pArgs...) Do ##class(%ZPM.PackageManager).Shell(pArgs...) Quit
+ZPM(pArgs...) Do ##class(%ZPM.Main).Shell(pArgs...) Quit
 $$$ENDTAG
 #; Need an extra line down here to avoid the end bracket being on the same line as $$$ENDTAG - a comment is just fine.
 }

@@ -375,7 +375,7 @@ ClassMethod CreateNamespace(pNSName As %String, pCodeDBName As %String, pDataDBN
 		}
 		
 		// Always add mapping for ^%ZPM.Dev.* to the CODE database (for modules)
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).AddGlobalMapping(pNSName,"HS.PM.Dev.*",pCodeDBName)
+		Set tSC = ##class(%ZPM.Utils.Module).AddGlobalMapping(pNSName,"HS.PM.Dev.*",pCodeDBName)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -512,7 +512,7 @@ ClassMethod MapPackageEquivalently(pPackageName As %String, pSourceNamespace As 
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Could not find database name for '%1'",tDBDir)))
 		}
 		$$$ThrowOnError(tSC)
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).AddPackageMapping(pMappedToNamespace, pPackageName, $ListGet(tDBList))
+		Set tSC = ##class(%ZPM.Utils.Module).AddPackageMapping(pMappedToNamespace, pPackageName, $ListGet(tDBList))
 		$$$ThrowOnError(tSC)
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -539,7 +539,7 @@ ClassMethod MapRoutineEquivalently(pRoutineName As %String, pSourceNamespace As 
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Could not find database name for '%1'",tDBDir)))
 		}
 		$$$ThrowOnError(tSC)
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).AddRoutineMapping(pMappedToNamespace, pRoutineName, pType, $ListGet(tDBList))
+		Set tSC = ##class(%ZPM.Utils.Module).AddRoutineMapping(pMappedToNamespace, pRoutineName, pType, $ListGet(tDBList))
 		$$$ThrowOnError(tSC)
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -566,7 +566,7 @@ ClassMethod MapGlobalEquivalently(pGlobalName As %String, pSourceNamespace As %S
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Could not find database name for '%1'",tDBDir)))
 		}
 		$$$ThrowOnError(tSC)
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).AddGlobalMapping(pMappedToNamespace, pGlobalName, $ListGet(tDBList))
+		Set tSC = ##class(%ZPM.Utils.Module).AddGlobalMapping(pMappedToNamespace, pGlobalName, $ListGet(tDBList))
 		$$$ThrowOnError(tSC)
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -647,7 +647,7 @@ ClassMethod CleanBuild(pModuleToClean As %String, Output pDoBuild As %Boolean = 
 				Quit
 			}
 		}
-		Set tSC = ##class(%ZPM.PackageManager).Shell("uninstall -r -f "_pModuleToClean)
+		Set tSC = ##class(%ZPM.Main).Shell("uninstall -r -f "_pModuleToClean)
 		Set pDoBuild = 1
 	} Catch e {
 		Set tSC = e.AsStatus()
