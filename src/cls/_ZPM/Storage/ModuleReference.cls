@@ -48,7 +48,7 @@ Storage Default
 </Value>
 </Data>
 <State>ModuleReferenceState</State>
-<StreamLocation>^%ZPM.Storage.ModuleReferenceS</StreamLocation>
+<StreamLocation>^ZPM.Storage.ModuleReferenceS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

@@ -6,7 +6,7 @@ Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 Storage Default
 {
-<StreamLocation>^%ZPM.Storage.ModuleSettingS</StreamLocation>
+<StreamLocation>^ZPM.Storage.ModuleSettingS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

@@ -27,7 +27,7 @@ Storage Default
 </Value>
 </Data>
 <State>ConditionState</State>
-<StreamLocation>^%ZPM.Storage.Mod91AE.ConditionS</StreamLocation>
+<StreamLocation>^ZPM.Storage.ModSet.RP.CondS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

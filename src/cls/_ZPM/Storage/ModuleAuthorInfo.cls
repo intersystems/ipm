@@ -37,7 +37,7 @@ Storage Default
 </Value>
 </Data>
 <State>ModuleAuthorInfoState</State>
-<StreamLocation>^%ZPM.Storage.ModuleAuthorInfoS</StreamLocation>
+<StreamLocation>^ZPM.Storage.ModuleAuthorInfoS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

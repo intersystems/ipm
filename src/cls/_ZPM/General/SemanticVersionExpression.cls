@@ -118,7 +118,7 @@ Storage Default
 </Value>
 </Data>
 <State>SemanticVersionExpressionState</State>
-<StreamLocation>^%ZPM.General.SemanticVer1833S</StreamLocation>
+<StreamLocation>^ZPM.General.SemVerExpressionS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

@@ -217,7 +217,7 @@ Storage Default
 </Value>
 </Data>
 <State>RangeState</State>
-<StreamLocation>^%ZPM.General.SemantiAF25.RangeS</StreamLocation>
+<StreamLocation>^ZPM.General.SemVer.RangeS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

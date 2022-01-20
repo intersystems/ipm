@@ -131,7 +131,7 @@ Storage Default
 </Value>
 </Data>
 <State>ComparatorState</State>
-<StreamLocation>^%ZPM.General.SeAF25.ComparatorS</StreamLocation>
+<StreamLocation>^ZPM.General.SemVer.CompS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 

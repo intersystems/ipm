@@ -22,7 +22,7 @@ Storage Default
 </Value>
 </Data>
 <State>ModuleInfoState</State>
-<StreamLocation>^%ZPM.Storage.ModuleInfoS</StreamLocation>
+<StreamLocation>^ZPM.Storage.ModuleInfoS</StreamLocation>
 <Type>%Storage.Serial</Type>
 }
 
