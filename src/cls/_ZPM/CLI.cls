@@ -108,14 +108,14 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 	If pMarkdownFormat {
 		Write "h2. "
 	}
-	Write $$$EscapeOrFormat(pCommandName, ##class(%ZPM.Main).TerminalPromptColor())
+	Write $$$EscapeOrFormat(pCommandName, ..TerminalPromptColor())
 	
 	If pMarkdownFormat {
 		Write !, "Syntax: {{", pCommandName
 	}
 	
 	If $Data(pCommandStruct("modifiers")) && '$Get(pCommandStruct("trailingModifiers"),0) {
-		Write $$$EscapeOrFormat(" [flags]", ##class(%ZPM.Main).TerminalPromptColor())
+		Write $$$EscapeOrFormat(" [flags]", ..TerminalPromptColor())
 	}
 	
 	If $Data(pCommandStruct("parameters")) {
@@ -131,19 +131,19 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 			Write " "
 			// Non-required parameters are surrounded with [] brackets
 			If 'pCommandStruct("parameters", tParamName, "required") {
-				Write $$$EscapeOrFormat("[", ##class(%ZPM.Main).TerminalPromptColor())
+				Write $$$EscapeOrFormat("[", ..TerminalPromptColor())
 				Set tEndingBrackets = tEndingBrackets + 1
 			}
-			Write $$$EscapeOrFormat("<"_tParamName_">", ##class(%ZPM.Main).TerminalPromptColor())
+			Write $$$EscapeOrFormat("<"_tParamName_">", ..TerminalPromptColor())
 		}
 		
 		For i=1:1:tEndingBrackets {
-			Write $$$EscapeOrFormat("]", ##class(%ZPM.Main).TerminalPromptColor())
+			Write $$$EscapeOrFormat("]", ..TerminalPromptColor())
 		}
 	}
 	
 	If $Data(pCommandStruct("modifiers")) && $Get(pCommandStruct("trailingModifiers"),0) {
-		Write $$$EscapeOrFormat(" [flags]", ##class(%ZPM.Main).TerminalPromptColor())
+		Write $$$EscapeOrFormat(" [flags]", ..TerminalPromptColor())
 	}
 	
 	If pMarkdownFormat {
@@ -852,6 +852,11 @@ ClassMethod FormatName(pName As %String) As %String
 		Set resultString = resultString _ letter
 	}
 	Return resultString
+}
+
+ClassMethod TerminalPromptColor() As %String
+{
+	quit $Case(##class(%ZPM.Repo.UniversalSettings).GetValue("TerminalPrompt"),"green":$$$Green,"red":$$$Red,"magenta":$$$Magenta,"yellow":$$$Yellow,"blue":$$$Blue,"cyan":$$$Cyan,"none":$$$Default,:$$$Default)
 }
 
 }

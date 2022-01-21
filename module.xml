@@ -18,20 +18,5 @@
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
   <Resource Name="%ZLANGC00.MAC" Generated="true"/>
   <Resource Name="/doc/README.txt"/>
-  <API>
-    <Item Type="class" Name="%ZPM.Storage.ModuleReference" Public="true"></Item>
-    <Item Type="class" Name="%ZPM.Lifecycle.Base" Public="true"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Main:Shell" Public="true"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Utils.Build:RetrieveBuiltDatabase" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Utils.Build:InitializeBuildNamespace" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Utils.Build:SwitchToBuildNamespace" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Storage.Module:ExecutePhases" Public="true"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Utils.Module:GetDependentsList" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Utils.Module:GetDependentsAsTree" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.ResourceProcessor.LocalizationExport:GetMessageFile" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.ResourceProcessor.LocalizationExport:SaveMessageFile" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Utils.Build:SwitchToNamespace" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.Utils.Build:InitializeNamespace" Public="false"></Item>
-  </API>
 </Module>
 </Document></Export>

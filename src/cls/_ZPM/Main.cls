@@ -425,11 +425,6 @@ ClassMethod Shell(pCommand As %String, pTerminateOnError As %Boolean = 0, pHaltO
 	Quit tSC
 }
 
-ClassMethod TerminalPromptColor() As %String
-{
-	quit $Case(##class(%ZPM.Repo.UniversalSettings).GetValue("TerminalPrompt"),"green":$$$Green,"red":$$$Red,"magenta":$$$Magenta,"yellow":$$$Yellow,"blue":$$$Blue,"cyan":$$$Cyan,"none":$$$Default,:$$$Default)
-}
-
 ClassMethod TerminalPrompt() As %String
 {
 	set tp=##class(%SYSTEM.Process).TerminalPrompt()
