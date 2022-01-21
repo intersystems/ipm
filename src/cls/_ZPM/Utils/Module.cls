@@ -843,7 +843,7 @@ ClassMethod UninstallAll(pForce As %Boolean, ByRef pParams) As %Status
 /// If 1, only snapshots; if 0, only non-snapshots.
 ClassMethod GetInstalledModuleListSQL(Output pSQL As %String, pSnapshots As %Boolean = "") As %Status
 {
-	Set pSQL = "select Name from %ZHSLIB_PackageManager_Developer.""Module"""
+	Set pSQL = "select Name from %ZPM_Storage.""Module"""
 	If (pSnapshots = 0) {
 		Set pSQL = pSQL_" where Version_Build <> 'snapshot'"
 	} ElseIf (pSnapshots = 1) {
@@ -857,12 +857,52 @@ ClassMethod GetModuleListSQL(Output pSQL As %String) As %Status
 {
 	Try {
 		Set tSC = $$$OK
-		Set pSQL = "select * from %ZHSLIB_PackageManager_Developer.API_GetAvailableModuleNames()"
+		Set pSQL = "select * from %ZPM_Utils.Module_GetAvailableModuleNames()"
 
 	} Catch ex {
 		Set tSC = ex.AsStatus()
 	}
 	Quit tSC
+}
+
+Query GetAvailableModuleNames() As %Query(ROWSPEC = "Name:%String") [ SqlProc ]
+{
+}
+
+ClassMethod GetAvailableModuleNamesExecute(ByRef qHandle As %Binary) As %Status
+{
+	Set tSC = $$$OK
+	Try {
+		Set tSearchCriteria = ##class(%ZPM.Repo.SearchCriteria).%New()
+		Set tSC = ##class(%ZPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		
+		For i=1:1:tResults.Count() {
+			#dim tRef As %ZPM.Storage.QualifiedModuleInfo = tResults.GetAt(i)
+			Set qHandle(tRef.Name) = ""
+		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+ClassMethod GetAvailableModuleNamesFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = GetAvailableModuleNamesExecute ]
+{
+	Set qHandle = $Order(qHandle($Get(qHandle)))
+	If (qHandle = "") {
+		Set AtEnd = 1
+	} Else {
+		Set Row = $ListBuild(qHandle)
+	}
+	Quit $$$OK
+}
+
+ClassMethod GetAvailableModuleNamesClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = GetAvailableModuleNamesExecute ]
+{
+	Quit $$$OK
 }
 
 Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String") [ SqlProc ]
