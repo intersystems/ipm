@@ -839,6 +839,32 @@ ClassMethod UninstallAll(pForce As %Boolean, ByRef pParams) As %Status
 	Quit tSC
 }
 
+/// If <var>pSnapshots</var> is empty, lists all modules.
+/// If 1, only snapshots; if 0, only non-snapshots.
+ClassMethod GetInstalledModuleListSQL(Output pSQL As %String, pSnapshots As %Boolean = "") As %Status
+{
+	Set pSQL = "select Name from %ZHSLIB_PackageManager_Developer.""Module"""
+	If (pSnapshots = 0) {
+		Set pSQL = pSQL_" where Version_Build <> 'snapshot'"
+	} ElseIf (pSnapshots = 1) {
+		Set pSQL = pSQL_" where Version_Build = 'snapshot'"
+	}
+	Set pSQL = pSQL_" order by Name"
+	Quit $$$OK
+}
+
+ClassMethod GetModuleListSQL(Output pSQL As %String) As %Status
+{
+	Try {
+		Set tSC = $$$OK
+		Set pSQL = "select * from %ZHSLIB_PackageManager_Developer.API_GetAvailableModuleNames()"
+
+	} Catch ex {
+		Set tSC = ex.AsStatus()
+	}
+	Quit tSC
+}
+
 Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String") [ SqlProc ]
 {
 }
