@@ -1,4 +1,4 @@
-Class %ZPM.DataType.ResourceName Extends %ZPM.DataType.RegExString [ ClassType = datatype ]
+Class %ZPM.PackageManager.Developer.ResourceName Extends %ZPM.PackageManager.Core.RegExString [ ClassType = datatype ]
 {
 
 Parameter MAXLEN = 255;
