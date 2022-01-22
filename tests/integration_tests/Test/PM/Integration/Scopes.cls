@@ -4,7 +4,7 @@ Class Test.PM.Integration.Scopes Extends Test.PM.Integration.Base
 
 Method TestEverything()
 {
-	#dim tModule As %ZPM.PackageManager.Developer.Module
+	#dim tModule As %ZPM.Storage.Module
 	
 	New $Namespace
 	Set tOrigNS = $Namespace
@@ -17,7 +17,7 @@ Method TestEverything()
 		Set $Namespace = ..#CLIENTNS
 		
 		// Create modules
-		Set tLocalServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonOpen(1,,.tSC)
+		Set tLocalServer = ##class(%ZPM.Repo.Local.Definition).SingletonOpen(1,,.tSC)
 		Quit:'$$$AssertStatusOK(tSC,"Local server found")
 		For i=1:1:4 {
 			Kill tModule

@@ -24,7 +24,7 @@ Method TestVersions()
 
 Method AssertVersionValid(pVersion As %String)
 {
-	Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersion).IsValid(pVersion)
+	Set tSC = ##class(%ZPM.General.SemanticVersion).IsValid(pVersion)
 	If '$$$AssertStatusOK(tSC,pVersion_" is accepted as a valid semantic version.") {
 		Do $$$LogMessage($System.Status.GetErrorText(tSC))
 	}
@@ -32,7 +32,7 @@ Method AssertVersionValid(pVersion As %String)
 
 Method AssertVersionNotValid(pVersion As %String)
 {
-	Do $$$AssertStatusNotOK(##class(%ZPM.PackageManager.Core.SemanticVersion).IsValid(pVersion),pVersion_" is not accepted as a valid semantic version.")
+	Do $$$AssertStatusNotOK(##class(%ZPM.General.SemanticVersion).IsValid(pVersion),pVersion_" is not accepted as a valid semantic version.")
 }
 
 }

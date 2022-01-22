@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
 <Class name="TSL.TestInstaller">
-<Super>%ZPM.AbstractInstaller</Super>
 <TimeCreated>64320,54824.475426</TimeCreated>
 
 <Method name="OnConfigureComponent">

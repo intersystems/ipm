@@ -12,11 +12,11 @@ ROUTINE %ZPM.PackageManager.Common [Type=INC]
 #define ZPMDeferModifyResources %ZZPMDeferModifyResources
 
 #; Default packages for package manager, module lifecycle classes and resource processors
-#define ZPMRootPackage "%ZPM.PackageManager"
+#define ZPMRootPackage "%ZPM"
 
-#define DefaultLifecyclePackage $$$ZPMRootPackage_".Developer.Lifecycle"
+#define DefaultLifecyclePackage $$$ZPMRootPackage_".Lifecycle"
 #define DefaultLifecyclePackageDot $$$DefaultLifecyclePackage_"."
-#define DefaultProcessorPackage $$$ZPMRootPackage_".Developer.Processor"
+#define DefaultProcessorPackage $$$ZPMRootPackage_".ResourceProcessor"
 #define DefaultProcessorPackageDot $$$DefaultProcessorPackage_"."
 
 #; Various globals
