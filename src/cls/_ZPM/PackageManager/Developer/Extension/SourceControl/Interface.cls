@@ -35,7 +35,7 @@ ClassMethod %GetPage() As %String [ Final ]
 	Quit $Parameter(tClass,"SETTINGSPAGE")
 }
 
-ClassMethod %OnBeforePhase(pModule As %ZPM.Storage.Module, pPhase As %String, ByRef pParams) As %Status [ Final ]
+ClassMethod %OnBeforePhase(pModule As %ZPM.PackageManager.Developer.Module, pPhase As %String, ByRef pParams) As %Status [ Final ]
 {
 	Set tClass = ..%GetClass()
 	If (tClass = "") {
@@ -44,7 +44,7 @@ ClassMethod %OnBeforePhase(pModule As %ZPM.Storage.Module, pPhase As %String, By
 	Quit $ClassMethod(tClass,"OnBeforePhase",pModule,pPhase,.pParams)
 }
 
-ClassMethod %OnAfterPhase(pModule As %ZPM.Storage.Module, pPhase As %String, ByRef pParams) As %Status [ Final ]
+ClassMethod %OnAfterPhase(pModule As %ZPM.PackageManager.Developer.Module, pPhase As %String, ByRef pParams) As %Status [ Final ]
 {
 	Set tClass = ..%GetClass()
 	If (tClass = "") {
@@ -53,7 +53,7 @@ ClassMethod %OnAfterPhase(pModule As %ZPM.Storage.Module, pPhase As %String, ByR
 	Quit $ClassMethod(tClass,"OnAfterPhase",pModule,pPhase,.pParams)
 }
 
-ClassMethod %OnChangeModuleRoot(pModule As %ZPM.Storage.Module) As %Status [ Final ]
+ClassMethod %OnChangeModuleRoot(pModule As %ZPM.PackageManager.Developer.Module) As %Status [ Final ]
 {
 	Set tClass = ..%GetClass()
 	If (tClass = "") {
@@ -62,7 +62,7 @@ ClassMethod %OnChangeModuleRoot(pModule As %ZPM.Storage.Module) As %Status [ Fin
 	Quit $ClassMethod(tClass,"OnChangeModuleRoot",pModule)
 }
 
-ClassMethod %OnModifyResources(pModule As %ZPM.Storage.Module) As %Status [ Final ]
+ClassMethod %OnModifyResources(pModule As %ZPM.PackageManager.Developer.Module) As %Status [ Final ]
 {
 	Set tClass = ..%GetClass()
 	If (tClass = "") {
@@ -71,7 +71,7 @@ ClassMethod %OnModifyResources(pModule As %ZPM.Storage.Module) As %Status [ Fina
 	Quit $ClassMethod(tClass,"OnModifyResources",pModule)
 }
 
-ClassMethod %OnMakeModuleEditable(pModule As %ZPM.Storage.Module) As %Status [ Final ]
+ClassMethod %OnMakeModuleEditable(pModule As %ZPM.PackageManager.Developer.Module) As %Status [ Final ]
 {
 	Set tClass = ..%GetClass()
 	If (tClass = "") {
@@ -133,31 +133,31 @@ ClassMethod Configure() As %Status
 }
 
 /// Invoked before each lifecycle phase
-ClassMethod OnBeforePhase(pModule As %ZPM.Storage.Module, pPhase As %String, ByRef pParams) As %Status [ Abstract, Internal ]
+ClassMethod OnBeforePhase(pModule As %ZPM.PackageManager.Developer.Module, pPhase As %String, ByRef pParams) As %Status [ Abstract, Internal ]
 {
 	Quit $$$OK
 }
 
 /// Invoked after each lifecycle phase
-ClassMethod OnAfterPhase(pModule As %ZPM.Storage.Module, pPhase As %String, ByRef pParams) As %Status [ Abstract, Internal ]
+ClassMethod OnAfterPhase(pModule As %ZPM.PackageManager.Developer.Module, pPhase As %String, ByRef pParams) As %Status [ Abstract, Internal ]
 {
 	Quit $$$OK
 }
 
 /// Invoked when the list of resources for a module changes.
-ClassMethod OnModifyResources(pModule As %ZPM.Storage.Module) As %Status [ Abstract, Internal ]
+ClassMethod OnModifyResources(pModule As %ZPM.PackageManager.Developer.Module) As %Status [ Abstract, Internal ]
 {
 	Quit $$$OK
 }
 
 /// Invoked when an existing module is reloaded from a different directory than its known module root
-ClassMethod OnChangeModuleRoot(pModule As %ZPM.Storage.Module) As %Status
+ClassMethod OnChangeModuleRoot(pModule As %ZPM.PackageManager.Developer.Module) As %Status
 {
 	Quit $$$OK
 }
 
 /// Invoked when the user has attempted to edit a module document reported by the active Studio extension as read-only (i.e., because it is not checked out)
-ClassMethod OnMakeModuleEditable(pModule As %ZPM.Storage.Module) As %Status
+ClassMethod OnMakeModuleEditable(pModule As %ZPM.PackageManager.Developer.Module) As %Status
 {
 	Quit $$$OK
 }

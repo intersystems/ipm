@@ -80,7 +80,7 @@ Method TestParser()
 	// Verify output matches
 	For i=1:1:tCommands {
 		Kill tParsedCommandInfo,tExpectedCommandInfo
-		Do $$$AssertStatusOK(##class(%ZPM.Main).%ParseCommandInput(tCommands(i),.tParsedCommandInfo))
+		Do $$$AssertStatusOK(##class(%ZPM.PackageManager).%ParseCommandInput(tCommands(i),.tParsedCommandInfo))
 		Merge tExpectedCommandInfo = tResults(i)
 		If '$$$AssertTrue(..CompareArrays(.tParsedCommandInfo,.tExpectedCommandInfo,.tMessage),"Parsed correctly: "_tCommands(i)) {
 			Do $$$LogMessage(tMessage)
@@ -118,13 +118,13 @@ Method TestRepository()
 
 Method RunCommand(pCommand As %String)
 {
-	Do ##class(%ZPM.Main).Shell(pCommand)
+	Do ##class(%ZPM.PackageManager).Shell(pCommand)
 	Do $$$LogMessage("Run command: "_pCommand)
 }
 
 Method AssertNoException(pCommand As %String)
 {
-	Do ##class(%ZPM.Main).ShellInternal(pCommand,.tException)
+	Do ##class(%ZPM.PackageManager).ShellInternal(pCommand,.tException)
 	If '$$$AssertEquals(tException,"","No exceptions occurred running command: "_pCommand) {
 		Do $$$LogMessage(tException.DisplayString())
 	}

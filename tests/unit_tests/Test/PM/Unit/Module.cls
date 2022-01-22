@@ -3,7 +3,7 @@ Class Test.PM.Unit.Module Extends %UnitTest.TestCase
 
 Method TestEvaluateAttribute()
 {
-  Set tModule = ##class(%ZPM.Storage.Module).%New()
+  Set tModule = ##class(%ZPM.PackageManager.Developer.Module).%New()
 
   Set tests = $ListBuild(
     "${cspdir}","{$cspdir}",

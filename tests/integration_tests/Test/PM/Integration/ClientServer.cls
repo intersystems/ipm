@@ -3,7 +3,7 @@ Class Test.PM.Integration.ClientServer Extends Test.PM.Integration.Base
 
 Method TestEverything()
 {
-	#dim tModule As %ZPM.Storage.Module
+	#dim tModule As %ZPM.PackageManager.Developer.Module
 	
 	New $Namespace
 	Set tOrigNS = $Namespace

@@ -22,7 +22,7 @@ XData PM [ XMLNamespace = INSTALLER ]
   <Import File="${SRCDIR}inc" Recurse="1"/>
   <Import File="${SRCDIR}cls" Recurse="1" />
   
-  <Invoke Class="%ZPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
+  <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="%ZPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/> 
     <Arg Value="${TRACKINGID}"/>
@@ -57,23 +57,23 @@ ClassMethod AsyncSetup(Args...)
 ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
     If (pRegistry'="") {
-      $$$QuitOnError(##class(%ZPM.Main).Shell("repo -t registry -name registry -url "_ pRegistry))
+      $$$QuitOnError(##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry))
     }
-    $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry))
-    $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetAnalyticsAvailable(1))
-    $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
-    $$$QuitOnError(##class(%ZPM.Repo.UniversalSettings).SetValue("ColorScheme",""))
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetDefaultRegistry(pRegistry))
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1))
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetValue("ColorScheme",""))
     Quit $$$OK
 }
 
 ClassMethod ZPMLoad(pDirectoryName)
 {
-  Quit ##class(%ZPM.Main).Shell("load -dev "_pDirectoryName)
+  Quit ##class(%ZPM.PackageManager).Shell("load -dev "_pDirectoryName)
 }
 
 ClassMethod ZPMCompile()
 {
-  Quit ##class(%ZPM.Main).Shell("ZPM compile")
+  Quit ##class(%ZPM.PackageManager).Shell("ZPM compile")
 }
 
 ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, modified As %String, qstruct) As %Status
@@ -124,12 +124,12 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
 ClassMethod NeedInstall(Output version As %String)
 {
   try {
-    set module = ##class(%ZPM.Storage.Module).NameOpen("zpm")
+    set module = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
     if '$ISOBJECT(module) {
       RETURN 1
     }
 
-    set version = ##class(%ZPM.General.SemanticVersion).FromString(..#VERSION)
+    set version = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(..#VERSION)
     if $isobject(version) {
       RETURN version.Follows(module.Version)
     }
@@ -155,10 +155,10 @@ ClassMethod Make(pPackage As %Stream.Object, ByRef pStream As %Stream.TmpCharact
 {
   Set tSC = $$$OK
   try {
-		Set tModule = ##class(%ZPM.Storage.Module).NameOpen("zpm")
+		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
 
     Set tmpDir = ##class(%File).NormalizeDirectory($$$FileTempDir)
-    $$$ThrowOnError(##class(%ZPM.General.Archive).Extract(pPackage, tmpDir))
+    $$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Archive).Extract(pPackage, tmpDir))
 
     Do ..CollectPackage(tmpDir, .tList, tmpDir)
 

@@ -33,15 +33,15 @@ ClassMethod GetHomeModuleName(pInternalName As %String) As %String [ SqlProc ]
 	Quit $Select($IsObject(tModule):tModule.Name,1:"")
 }
 
-ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %String = "", Output pResourceReference As %ZPM.Storage.ResourceReference = "") As %ZPM.Storage.Module
+ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %String = "", Output pResourceReference As %ZPM.PackageManager.Developer.ResourceReference = "") As %ZPM.PackageManager.Developer.Module
 {
 	Set pResourceName = ""
 	Set pResourceReference = $$$NULLOREF
 	Set tModule = $$$NULLOREF
 	Set tFullName = $Piece(pInternalName,".",1,*-1)
 	Set tExtension = $Piece(pInternalName,".",*)
-	If (tExtension = "INC") && ##class(%ZPM.Storage.ResourceReference).NonNullResourceNameExists(tFullName_".LOC",.tResourceID) {
-		Set pResourceReference = ##class(%ZPM.Storage.ResourceReference).%OpenId(tResourceID,,.tSC)
+	If (tExtension = "INC") && ##class(%ZPM.PackageManager.Developer.ResourceReference).NonNullResourceNameExists(tFullName_".LOC",.tResourceID) {
+		Set pResourceReference = ##class(%ZPM.PackageManager.Developer.ResourceReference).%OpenId(tResourceID,,.tSC)
 		$$$ThrowOnError(tSC)
 		Set tModule = pResourceReference.Module
 		Set pResourceName = tFullName_".LOC"
@@ -53,8 +53,8 @@ ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %St
 			If (i < tNameParts) {
 				// Test with added slash.
 				Set tFolderName = tResourceName_"/"
-				If ##class(%ZPM.Storage.ResourceReference).NonNullResourceNameExists(tFolderName,.tResourceID) {
-					Set pResourceReference = ##class(%ZPM.Storage.ResourceReference).%OpenId(tResourceID,,.tSC)
+				If ##class(%ZPM.PackageManager.Developer.ResourceReference).NonNullResourceNameExists(tFolderName,.tResourceID) {
+					Set pResourceReference = ##class(%ZPM.PackageManager.Developer.ResourceReference).%OpenId(tResourceID,,.tSC)
 					$$$ThrowOnError(tSC)
 					Set tModule = pResourceReference.Module
 					Set pResourceName = tFolderName
@@ -62,8 +62,8 @@ ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %St
 				}
 			}
 			
-			If ##class(%ZPM.Storage.ResourceReference).NonNullResourceNameExists(tResourceName,.tResourceID) {
-				Set pResourceReference = ##class(%ZPM.Storage.ResourceReference).%OpenId(tResourceID,,.tSC)
+			If ##class(%ZPM.PackageManager.Developer.ResourceReference).NonNullResourceNameExists(tResourceName,.tResourceID) {
+				Set pResourceReference = ##class(%ZPM.PackageManager.Developer.ResourceReference).%OpenId(tResourceID,,.tSC)
 				$$$ThrowOnError(tSC)
 				Set tModule = pResourceReference.Module
 				Set pResourceName = tResourceName
@@ -92,15 +92,15 @@ ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %St
 					:pInternalName)
 				
 				// First pass: see if it's already in a module.
-				If (tPass = 1) && ##class(%ZPM.Storage.ResourceReference).NonNullResourceNameExists(tResourceName,.tResourceID)  {
-					Set pResourceReference = ##class(%ZPM.Storage.ResourceReference).%OpenId(tResourceID,,.tSC)
+				If (tPass = 1) && ##class(%ZPM.PackageManager.Developer.ResourceReference).NonNullResourceNameExists(tResourceName,.tResourceID)  {
+					Set pResourceReference = ##class(%ZPM.PackageManager.Developer.ResourceReference).%OpenId(tResourceID,,.tSC)
 					$$$ThrowOnError(tSC)
 					Set tModule = pResourceReference.Module
 				}
 				
 				// Second pass: not yet in a module - find the best match based on module/package naming conventions.
-				If (tPass = 2) && ##class(%ZPM.Storage.Module).NameExists(tModuleName,.tModuleID) {
-					Set tModule = ##class(%ZPM.Storage.Module).%OpenId(tModuleID,,.tSC)
+				If (tPass = 2) && ##class(%ZPM.PackageManager.Developer.Module).NameExists(tModuleName,.tModuleID) {
+					Set tModule = ##class(%ZPM.PackageManager.Developer.Module).%OpenId(tModuleID,,.tSC)
 					$$$ThrowOnError(tSC)
 				}
 				
@@ -113,5 +113,6 @@ ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %St
 	}
 	Quit tModule
 }
+
 
 }

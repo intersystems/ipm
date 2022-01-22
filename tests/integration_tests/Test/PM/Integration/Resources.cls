@@ -11,7 +11,7 @@ Method TestResourceTypes()
 	Try {
 		Set tTestRoot = $Get(^UnitTestRoot)
 		
-		$$$ThrowOnError(##class(%ZPM.Repo.Utils).InitializeLocalCache(.tCreated))
+		$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).InitializeLocalCache(.tCreated))
 		If (tCreated) {
 			Do $$$LogMessage("Initialized local cache.")
 		} Else {
@@ -19,11 +19,11 @@ Method TestResourceTypes()
 		}
 		
 		// Uninstall. This might fail; if it does that's fine.
-		Do ##class(%ZPM.Storage.Module).Uninstall("ResourceTest",1,1)
+		Do ##class(%ZPM.PackageManager.Developer.Module).Uninstall("ResourceTest",1,1)
 		
 		Set tParams("Verbose") = 1
 		Set tModuleDirectory = ##class(%File).NormalizeDirectory("_data/resource-test", tTestRoot)
-		Set tSC = ##class(%ZPM.Utils.Module).LoadModuleFromDirectory(tModuleDirectory,.tParams)
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).LoadModuleFromDirectory(tModuleDirectory,.tParams)
 		Do $$$AssertStatusOK(tSC,"Loaded ResourceTest module successfully.")
 		
 		For tClass = "ResourceTest.MyClass","ResourceTest.APackage.SomeClass" {
