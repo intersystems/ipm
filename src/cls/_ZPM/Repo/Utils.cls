@@ -93,33 +93,6 @@ ClassMethod RetrieveApplicationPackage(pQualifiedReference As %ZPM.Storage.Quali
 	Quit tSC
 }
 
-/// Creates a local cache entry in the ServerDefinition table if none exists
-ClassMethod InitializeLocalCache(Output pCreated As %Boolean = 0) As %Status
-{
-	Set tSC = $$$OK
-	Try {
-		Set tLocalCache = ##class(%ZPM.Repo.Local.Definition).SingletonOpen(1,,.tSC)
-		If $$$ISERR(tSC) && ($System.Status.GetErrorCodes(tSC) '= $$$KeyValueNotFoundOpen) {
-			Quit
-		}
-		If $IsObject(tLocalCache) {
-			Quit
-		}
-		Set tLocalCache = ##class(%ZPM.Repo.Local.Definition).%New()
-		Set tLocalCache.Name = "(Local Cache)"
-		Set tLocalCache.Prereleases = 1
-		Set tLocalCache.Snapshots = 1
-		Set tSC = tLocalCache.%Save()
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set pCreated = 1
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
-
 ClassMethod GetZPMVersion()
 {
     New $Namespace

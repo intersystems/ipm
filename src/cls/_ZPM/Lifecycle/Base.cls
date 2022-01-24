@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$ListBuild("Clean","Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify","Register","Publish","Configure","Unconfigure")};
+Parameter PHASES = {$ListBuild("Clean","Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify","Configure","Unconfigure")};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -142,8 +142,6 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 		"Test":			$lb("Reload","*","Validate","Compile","Activate","Test"),
 		"Package":		$lb("Reload","*","Validate","Compile","Activate","Package"),
 		"Verify":		$lb("Reload","*","Validate","Compile","Activate","Package","Verify"),
-		"Register":		$lb("Reload","*","Validate","Compile","Activate","Package","Register"),
-		"Publish":		$lb("Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
 		"Configure":	$lb("Configure"),
 		"Unconfigure":	$lb("Unconfigure"),
 		:				""
@@ -977,59 +975,6 @@ Method %Package(ByRef pParams) As %Status [ Abstract ]
 	Quit tSC
 }
 
-Method %Register(ByRef pParams) As %Status
-{
-	Set tSC = $$$OK
-	Try {
-		Set tVerbose = $Get(pParams("Verbose"))
-		
-		// "Register" just means "Publish to the local repository"
-		Set tServer = ##class(%ZPM.Repo.Local.Definition).SingletonOpen(1,,.tSC)
-		If $$$ISERR(tSC) {
-      #; No local cache, ignoring
-      Set tSC = $$$OK
-			Quit
-		}
-
-		Set tPublishClient = tServer.GetPublishService()
-		If '$IsObject(tPublishClient) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' does not support publishing modules.",tServer.Name))
-			$$$ThrowStatus(tSC)
-		}
-		Set tModule = ##class(%ZPM.Repo.Remote.ModuleInfo).%New()
-		Set tModule.Name = ..Module.Name
-		If (0 && '..Module.IsLocked()) {
-			Set tSC = ..Module.Lock()
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		}
-		Set tModule.VersionString = ..Module.VersionString
-		Set tSC = ..Module.XMLExportToStream(tModule.Manifest)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set tSC = tModule.Payload.CopyFromAndSave(..Payload)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Do tPublishClient.PublishModule(tModule)
-		
-		
-		If $$$ISOK(tSC) {
-			Write:tVerbose !,..Module.Name," ",..Module.VersionString," registered to local cache."
-		}
-	} Catch e {
-		If (e.Name["ZSOAP") {
-			Set tSC = $Get(%objlasterror,e.AsStatus())
-		} Else {
-			Set tSC = e.AsStatus()
-		}
-	}
-	Quit tSC
-}
-
 Method %Verify(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
@@ -1145,75 +1090,6 @@ Method OnInstallFromPayload(ByRef pParams) As %Status
 		$$$ThrowOnError(##class(%ZPM.Utils.Module).LoadModuleFromArchive(..Module.Name,..Module.VersionString,tTmpStream,.pParams))
 	} Catch e {
 		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
-
-Method %Publish(ByRef pParams) As %Status
-{
-	Set tSC = $$$OK
-	Try {
-		Set tRelease = $Get(pParams("Release"),0)
-		If $Data(pParams("PublishTo"),tPublishTo) && ($Get(tPublishTo) '= "") {
-			Set tServer = ##class(%ZPM.Repo.Definition).ServerDefinitionKeyOpen(tPublishTo,,.tSC)
-			$$$ThrowOnError(tSC)
-		} Else {
-			Set tServer = ##class(%ZPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.tSC)
-			$$$ThrowOnError(tSC)
-		}
-		
-		If $Data(pParams("NewVersion"),tNewVersion) && ($Get(tNewVersion) '= "") {
-			Set tNewVersion = ##class(%ZPM.General.SemanticVersion).FromString(tNewVersion)
-		}
-		
-		Set tPublishClient = tServer.GetPublishService()
-		If '$IsObject(tPublishClient) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' does not support publishing modules.",tServer.Name))
-			$$$ThrowStatus(tSC)
-		}
-		Set tModule = ##class(%ZPM.Repo.Remote.ModuleInfo).%New()
-		Set tModule.Name = ..Module.Name
-		If tRelease && ('..Module.IsLocked()) {
-			Set tSC = ..Module.Lock()
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		}
-		Set tSC = ..%Installer(.pParams)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set tModule.VersionString = ..Module.VersionString
-		Set tSC = ..Module.XMLExportToStream(tModule.Manifest)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set tSC = tModule.Payload.CopyFrom(..Payload)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tSC = tModule.Installer.CopyFrom(..Installer)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-
-		Do tPublishClient.PublishModule(tModule)
-		
-		
-		// May need to update the version of the currently-installed module.
-		If $Data(tNewVersion) {
-			Set ..Module.Version = tNewVersion
-			Set tSC = ##class(%ZPM.Utils.Module).ExportDocumentForObject(..Module)
-			$$$ThrowOnError(tSC)
-		}
-	} Catch e {
-		If (e.Name["ZSOAP") {
-			Set tSC = $Get(%objlasterror,e.AsStatus())
-		} Else {
-			Set tSC = e.AsStatus()
-		}
 	}
 	Quit tSC
 }

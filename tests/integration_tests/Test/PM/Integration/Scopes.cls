@@ -17,8 +17,6 @@ Method TestEverything()
 		Set $Namespace = ..#CLIENTNS
 		
 		// Create modules
-		Set tLocalServer = ##class(%ZPM.Repo.Local.Definition).SingletonOpen(1,,.tSC)
-		Quit:'$$$AssertStatusOK(tSC,"Local server found")
 		For i=1:1:4 {
 			Kill tModule
 			Quit:'$$$AssertStatusOK(..ReadXDataToModule(tOrigNS,"ServerModule"_i,.tModule),"Loaded module from XData block ServerModule"_i)

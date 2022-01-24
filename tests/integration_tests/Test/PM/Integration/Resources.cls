@@ -11,13 +11,6 @@ Method TestResourceTypes()
 	Try {
 		Set tTestRoot = $Get(^UnitTestRoot)
 		
-		$$$ThrowOnError(##class(%ZPM.Repo.Utils).InitializeLocalCache(.tCreated))
-		If (tCreated) {
-			Do $$$LogMessage("Initialized local cache.")
-		} Else {
-			Do $$$LogMessage("Local cache already exists.")
-		}
-		
 		// Uninstall. This might fail; if it does that's fine.
 		Do ##class(%ZPM.Storage.Module).Uninstall("ResourceTest",1,1)
 		

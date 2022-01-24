@@ -18,7 +18,6 @@ Method Setup() As %Status
 		New $Namespace
 		do $$$AssertStatusOK(##class(%ZPM.Repo.Filesystem.Definition).%DeleteExtent())
 		do $$$AssertStatusOK(##class(%ZPM.Repo.Remote.Definition).%DeleteExtent())
-		do $$$AssertStatusOK(##class(%ZPM.Repo.Local.Definition).%DeleteExtent())
 		
 		If '$$$AssertStatusOK(##class(%ZPM.Test.Utils).CreateNamespace(..#CLIENTNS)) {
 			Quit
@@ -27,10 +26,6 @@ Method Setup() As %Status
 		
 		// Client namespace setup
 		Set $Namespace = ..#CLIENTNS
-		
-		// Create local cache repository in client namespace
-		Do $$$AssertStatusOK(##class(%ZPM.Repo.Utils).InitializeLocalCache(.tCreated))
-		Do $$$AssertTrue(tCreated,"Local cache created.")
 		
 		if ($system.Util.GetEnviron("TEST_REGISTRY")="") {
 			Do $$$AssertFailure("Registry Server not defined")

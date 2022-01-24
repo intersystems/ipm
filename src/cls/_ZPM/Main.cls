@@ -41,8 +41,6 @@ The standard lifecycle phases are:
 * test: runs any unit tests associated with the module, in the current namespace.
 * package: exports the module's resources and bundles them into a module artifact (.tgz file).
 * verify: installs that artifact in a separate namespace, then runs integration tests (if any).
-* register: saves that artifact into the current namespace's module cache. This is accessible to other instances configured to look at the current namespace as a module repository.
-* publish: saves that artifact to the repository for which deployment is enabled. Currently, there may only be one of these per namespace.
 </description>
 <example description="Compiles the module named &quot;MyModuleName&quot;">module-action MyModuleName compile</example>
 <example description="Performs multiple actions on the module named &quot;MyModuleName&quot;; &quot;clean&quot; deletes all of its dependenices, and &quot;install&quot; will then re-download them, package the module, and register it in the current namespace's module cache.">MyModuleName clean register</example>
@@ -56,7 +54,7 @@ The standard lifecycle phases are:
 </command>
 
 <command name="init" aliases="initialize">
-<description>Configures new namespace for use of package manager (interactive). This sets up the local cache and allows for configuration of studio extensions for source control and the package manager itself. In the case of Perforce-based source control, prompts are included for username, password, Perforce workspace, and a few other settings.</description>
+<description>Configures new namespace for use of package manager (interactive). This allows for configuration of studio extensions for source control and the package manager itself. In the case of Perforce-based source control, prompts are included for username, password, Perforce workspace, and a few other settings.</description>
 <modifier name="noprompt" aliases="quiet,q" description="If specified, no prompts will be shown." />
 <modifier name="zpm" aliases="cli" description="If specified, the zpm command will be configured." />
 <modifier name="extension" aliases="ext" value="true" description="Studio extension to configure for the current namespace (in addition to the Package Manager extension - e.g., for source control)" />
@@ -296,10 +294,6 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
 <parameter name="module" required="true" description="Name of module to uninstall" />
-</command>
-
-<command name="clear-cache">
-<description>Clears the cache of artifacts downloaded for installation in the current namespace. (As an optimization, downloaded module/application artifacts are stored in the database for local retrieval later.)</description>
 </command>
 
 <command name="cos">
@@ -903,14 +897,6 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 {
 	// In quiet mode, no prompts should be shown.
 	Set tQuiet = $$$HasModifier(pCommandInfo,"noprompt")
-	
-	// Local artifact cache
-	$$$ThrowOnError(##class(%ZPM.Repo.Utils).InitializeLocalCache(.tCreated))
-	If (tCreated) {
-		Write !,"Initialized local cache."
-	} Else {
-		Write !,"Local cache already exists."
-	}
 	
 	// Reindex tables with semantic version indices
 	For tClass = "%ZPM.Repo.Filesystem.Cache" {

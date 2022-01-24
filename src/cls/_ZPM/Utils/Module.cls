@@ -211,10 +211,6 @@ ClassMethod LoadQualifiedReference(pReference As %ZPM.Storage.QualifiedModuleInf
 	Try {
 		#dim tReference As %ZPM.Storage.QualifiedModuleInfo
 		Set tReference = pReference.%ConstructClone()
-		If (tReference.ServerName = "") && ##class(%ZPM.Repo.Local.Definition).SingletonExists(1,.tID) {
-			Set tServer = ##class(%ZPM.Repo.Local.Definition).%OpenId(tID)
-			Set tReference.ServerName = tServer.Name
-		}
 		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, .pParams, .pDependencyGraph)
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -355,30 +351,6 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		}
 		If $$$ISERR(tSC) {
 			Quit
-		}
-		
-		// If remote load is successful, also register the module in the local cache.
-		If 'tModRef.Version.IsSnapshot() && ##class(%ZPM.Repo.Local.Definition).SingletonExists(1) {
-			Set tLocalServer = ##class(%ZPM.Repo.Local.Definition).SingletonOpen(1,,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			
-			// Don't need to register if loading from the local server.
-			If (tLocalServer.Name '= pServerName) && $IsObject($Get(tPayload)) {
-				Set tCacheMod = ##class(%ZPM.Repo.Remote.ModuleInfo).%New()
-				Set tCacheMod.Name = pModuleName
-				Set tCacheMod.VersionString = pVersion
-				Set tCacheMod.Manifest = tClient.GetModuleManifest(tModRef)
-				Do tPayload.Rewind()
-				Do tCacheMod.Payload.CopyFrom(tPayload)
-                Set tPublishClient = tLocalServer.GetPublishService()
-                If '$IsObject(tPublishClient) {
-			        Set tSC = $$$ERROR($$$GeneralError, "Publishing modules not supported.")
-			        $$$ThrowStatus(tSC)
-		        }
-				Do tPublishClient.PublishModule(tCacheMod)
-			}
 		}
 	} Catch e {
 		If (e.Name["ZSOAP") {

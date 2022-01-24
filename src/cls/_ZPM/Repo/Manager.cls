@@ -66,10 +66,6 @@ Method SearchRepositoriesForModule(pSearchCriteria As %ZPM.Repo.SearchCriteria, 
 				Quit
 			}
 			
-			If pForceRemoteRepo && tServer.%IsA("%ZPM.Repo.Local.Definition") {
-				Continue
-			}
-			
 			// Only remote repositories support keywords, for now.
 			If (pSearchCriteria.Keywords.Count() > 0) && tServer.%IsA("%ZPM.Repo.Filesystem.Definition") {
 				Continue
@@ -200,10 +196,6 @@ Method SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCrite
 			Set tServer = ##class(%ZPM.Repo.Definition).%OpenId(tRes.%Get("ID"),,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
-			}
-			
-			If pForceRemoteRepo && tServer.%IsA("%ZPM.Repo.Local.Definition") {
-				Continue
 			}
 			
 			Set tClient = ..CheckServiceCache(tServer.Name,.tAvailable)
