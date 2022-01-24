@@ -1,6 +1,8 @@
 Class %ZPM.DependencyAnalyzer.ModuleResults Extends %Persistent
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.DependencyAnalyzer.Module";
+
 Index TargetModule On TargetModule;
 
 Property TargetModule As %String(MAXLEN = 255) [ Required ];

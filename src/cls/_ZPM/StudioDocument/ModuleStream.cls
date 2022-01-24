@@ -1,6 +1,8 @@
 Class %ZPM.StudioDocument.ModuleStream Extends %ZPM.StudioDocument.AbstractStream
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.StudioDoc.ModuleStream";
+
 Storage Default
 {
 <Data name="ModuleStreamDefaultData">

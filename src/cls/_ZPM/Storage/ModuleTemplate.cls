@@ -1,6 +1,8 @@
 Class %ZPM.Storage.ModuleTemplate Extends %ZPM.Storage.Module
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModuleTemplate";
+
 Property TemplateResources [ MultiDimensional ];
 
 Property ModuleFolder As %String(XMLPROJECTION = "NONE");

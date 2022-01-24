@@ -3,6 +3,8 @@ Include %ZPM.PackageManager.Common
 Class %ZPM.Storage.ResourceReference Extends (%Persistent, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor)
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ResourceReference";
+
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 // Property Name As %ZPM.DataType.ResourceName(XMLPROJECTION = "attribute") [ Required ];

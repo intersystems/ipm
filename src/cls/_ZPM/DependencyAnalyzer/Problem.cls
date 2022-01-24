@@ -1,6 +1,8 @@
 Class %ZPM.DependencyAnalyzer.Problem Extends %Persistent
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.DependencyAnalyzer.Problem";
+
 Index Run On Run [ Type = bitmap ];
 
 Relationship Run As %ZPM.DependencyAnalyzer.ModuleResults [ Cardinality = one, Inverse = Problems ];

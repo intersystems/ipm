@@ -1,6 +1,8 @@
 Class %ZPM.Repo.Filesystem.Definition Extends %ZPM.Repo.Definition
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Repo.Filesystem.Definition";
+
 Parameter DISPLAYNAME As STRING = "Filesystem";
 
 Parameter MONIKER As STRING = "filesystem";

@@ -1,6 +1,8 @@
 Class %ZPM.StudioDocument.LocalizedMessageStream Extends %ZPM.StudioDocument.AbstractStream
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.StudioDoc.LocalMsgStream";
+
 ClassMethod Convert(pFilePath As %String, pSave As %Boolean = 1, Output pObject As %ZPM.StudioDocument.LocalizedMessageStream) As %Status
 {
 	Set tSC = $$$OK
@@ -57,11 +59,11 @@ Storage Default
 <Value>LastModifiedTimestamp</Value>
 </Value>
 </Data>
-<DataLocation>^ZPM.StudioDoc.LocalizedMsgD</DataLocation>
+<DataLocation>^ZPM.StudioDoc.LocalMsgStreamD</DataLocation>
 <DefaultData>LocalizedMessageStreamDefaultData</DefaultData>
-<IdLocation>^ZPM.StudioDoc.LocalizedMsgD</IdLocation>
-<IndexLocation>^ZPM.StudioDoc.LocalizedMsgI</IndexLocation>
-<StreamLocation>^ZPM.StudioDoc.LocalizedMsgS</StreamLocation>
+<IdLocation>^ZPM.StudioDoc.LocalMsgStreamD</IdLocation>
+<IndexLocation>^ZPM.StudioDoc.LocalMsgStreamI</IndexLocation>
+<StreamLocation>^ZPM.StudioDoc.LocalMsgStreamS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

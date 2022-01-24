@@ -1,6 +1,8 @@
 Class %ZPM.Repo.Remote.Definition Extends %ZPM.Repo.Definition
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Repo.Remote.Definition";
+
 Parameter DISPLAYNAME As STRING = "Remote Repository";
 
 Parameter MONIKER As STRING = "registry";

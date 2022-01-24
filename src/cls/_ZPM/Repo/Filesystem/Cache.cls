@@ -3,6 +3,8 @@ Include %occErrors
 Class %ZPM.Repo.Filesystem.Cache Extends (%Persistent, %ZPM.General.ModuleInfo)
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Repo.Filesystem.Cache";
+
 Index CacheItemIndex On (Root, SubDirectory) [ Data = LastModified, Unique ];
 
 Property Root As %String(MAXLEN = 260) [ Required ];

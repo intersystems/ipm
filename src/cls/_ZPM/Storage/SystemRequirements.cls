@@ -1,6 +1,8 @@
 Class %ZPM.Storage.SystemRequirements Extends (%Persistent, %XML.Adaptor)
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.SystemRequirements";
+
 Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version", XMLPROJECTION = "ATTRIBUTE");
 
 Property Version As %ZPM.General.SemanticVersionExpression(XMLPROJECTION = "NONE");

@@ -3,6 +3,8 @@ Include (%syPrompt, %ZPM.PackageManager.Common)
 Class %ZPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %ZPM.CLI.Commands) [ Abstract ]
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Repo.Definition";
+
 Parameter DOMAIN = "ZPM";
 
 /// Display name for this type of repository, shown in the UI and package manager shell.

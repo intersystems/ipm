@@ -1,6 +1,8 @@
 Class %ZPM.Storage.InvokeReference Extends (%Persistent, %XML.Adaptor)
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.InvokeReference";
+
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 Property Class As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ Required ];

@@ -3,6 +3,8 @@ Include (%occErrors, %ZPM.PackageManager.Common)
 Class %ZPM.Storage.Module Extends (%Persistent, %ZPM.General.ModuleInfo, %ZPM.Utils.ComparisonAdaptor) [ StorageStrategy = "" ]
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.Module";
+
 Parameter DOMAIN = "ZPM";
 
 Index Name On Name [ Unique ];

@@ -1,6 +1,8 @@
 Class %ZPM.Repo.Local.Definition Extends %ZPM.Repo.Definition
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Repo.Local.Definition";
+
 Parameter DISPLAYNAME As STRING = "Local Cache";
 
 Parameter MONIKER As STRING = "local";

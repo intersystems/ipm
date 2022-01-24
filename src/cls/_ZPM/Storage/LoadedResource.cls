@@ -1,6 +1,8 @@
 Class %ZPM.Storage.LoadedResource Extends %Persistent
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.LoadedResource";
+
 Property Namespace As %String(MAXLEN = 64) [ Required ];
 
 Property ModuleName As %String(MAXLEN = 255) [ Required ];

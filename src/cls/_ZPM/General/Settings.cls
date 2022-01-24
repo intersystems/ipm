@@ -3,6 +3,8 @@
 Class %ZPM.General.Settings Extends %ZPM.General.AbstractSettings
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.General.Settings";
+
 /// A string to show in the grouping of settings for this class
 Parameter DESCRIPTION = "General Package Manager Settings";
 
