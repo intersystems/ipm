@@ -1,6 +1,8 @@
 Class %ZPM.Repo.Remote.ModuleInfo Extends (%RegisteredObject, %ZPM.General.ModuleInfo)
 {
 
+/// Since %ZPM.General.ModuleInfo is XML enabled, XMLTYPEs of all its child classes must be able to differentiate from each other
+/// So set it differently to avoid having the same XMLTYPE (default to be "ModuleInfo" taken from the classname) with %ZPM.Storage.ModuleInfo 
 Parameter XMLTYPE = "CoreModule";
 
 Property Payload As %Stream.GlobalBinary(%JSONFIELDNAME = "package");
@@ -21,7 +23,7 @@ ClassMethod ManifestBuildValueArray(pDocument As %Library.Binary, ByRef pValueAr
 		If '$IsObject(tDocument) {
 			Quit
 		}
-		Set tXData = ##class(%Dictionary.XDataDefinition).%OpenId("%ZPM.Repo.Remote.ModuleInfo||ManifestTransform",,.tSC)
+		Set tXData = ##class(%Dictionary.XDataDefinition).%OpenId($Classname()_"||ManifestTransform",,.tSC)
 		If $$$ISERR(tSC) {
 			Quit
 		}
