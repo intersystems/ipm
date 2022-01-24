@@ -725,6 +725,11 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 	
 	Set tSrc = "src"
 	Do ##class(%Library.Prompt).GetString("Enter module source folder:", .tSrc)	
+	Set tExp = $$$GetModifier(pCommandInfo,"export")
+	If tExp'="" {
+		set tPathSrc=##class(%File).NormalizeDirectory(tPath_"\"_tSrc)
+		Do ##class(%ZPM.Storage.ModuleTemplate).ExportResources(tPathSrc,tExp)
+	}
 	Do tTemplate.ReadResorces(tSrc)
 
 	// web applications
