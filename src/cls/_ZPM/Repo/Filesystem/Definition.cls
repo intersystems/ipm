@@ -107,7 +107,7 @@ Trigger RootChanged [ Event = UPDATE, Foreach = row/object ]
 	New tOldRoot
 	If ({Root*C}) {
 		Set tOldRoot = {Root*O}
-		&sql(delete from %ZPM_REPO_Filesystem.Cache where Root = :tOldRoot)
+		&sql(delete from %ZPM_Repo_Filesystem.Cache where Root = :tOldRoot)
 		If (SQLCODE < 0) {
 			Set %ok = 0
 		}

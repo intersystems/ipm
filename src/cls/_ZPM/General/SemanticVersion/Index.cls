@@ -6,7 +6,7 @@
 /// </p>
 /// <p>To use this index in a class, define an index on a string property (the module name) and a property of type <class>%ZPM.General.SemanticVersion</class>.
 /// <code>
-/// Index SemVer On (Name, Version) As %ZPM.PackageManager.Server.SemVerIndex;
+/// Index SemVer On (Name, Version) As %ZPM.General.SemanticVersion.Index;
 /// </code>
 /// You must also define a property with the same name as that index, as follows:
 /// <code>
@@ -14,22 +14,22 @@
 /// </code>
 /// </p>
 /// <p>For an example, see <class>%ZPM.PackageManager.Server.Module</class>.</p>
-/// <p>To use the generated Find method and the %ZPM.PackageManager.Server.SemVerFind (as in the example of %ZPM_PackageManager_Server._Module):
+/// <p>To use the generated Find method and the %ZPM.General.SemanticVersion.Find (as in the example of %ZPM_PackageManager_Server._Module):
 /// <code>
 /// SELECT Name,VersionString FROM %ZPM_PackageManager_Server._Module WHERE ID %INSET %ZPM_PackageManager_Server.Module_SemVerFind('HS.JSON','0.x','snapshot')
 /// </code>
-/// To facilitate ordering by semantic version, classes that define such indices may also implement class queries to wrap %ZPM.PackageManager.Server.SemVerFind:Matches.
+/// To facilitate ordering by semantic version, classes that define such indices may also implement class queries to wrap %ZPM.General.SemanticVersion.Find:Matches.
 /// </p>
-Class %ZPM.PackageManager.Server.SemVerIndex Extends %Library.FunctionalIndex [ ClassType = index, System = 3 ]
+Class %ZPM.General.SemanticVersion.Index Extends %Library.FunctionalIndex [ ClassType = index, System = 3 ]
 {
 
 ClassMethod Find(pName As %Binary, pVersionExpression As %String = "", pParameters As %String = "") As %Library.Binary [ CodeMode = generator, ServerOnly = 1, SqlProc ]
 {
 	// Above, pName needs to be %Binary due to inheritance.
-	// Don't generate if %mode is "method" - this prevents generation for %ZPM.PackageManager.Server.SemVerIndex itself.
+	// Don't generate if %mode is "method" - this prevents generation for %ZPM.General.SemanticVersion.Index itself.
     If (%mode '= "method") {
         Set tIdxGlobal = ..IndexLocationForCompile(%class,%property)
-        $$$GENERATE(" Quit ##class(%ZPM.PackageManager.Server.SemVerFind).%New("_$$$QUOTE(%class)_","_$$$QUOTE(%property)_",$Name("_tIdxGlobal_"),pName,pVersionExpression,pParameters)")
+        $$$GENERATE(" Quit ##class(%ZPM.General.SemanticVersion.Find).%New("_$$$QUOTE(%class)_","_$$$QUOTE(%property)_",$Name("_tIdxGlobal_"),pName,pVersionExpression,pParameters)")
     }
 }
 
@@ -103,13 +103,13 @@ ClassMethod SortEndIndex() [ CodeMode = generator, ServerOnly = 1 ]
 
 ClassMethod Insert(pGlobal, pID, pName, pVersion)
 {
-	Set tGlobal = ##class(%ZPM.PackageManager.Server.SemVerIndex).GetIndexGlobalNode(pGlobal, pName, pVersion)
+	Set tGlobal = ##class(%ZPM.General.SemanticVersion.Index).GetIndexGlobalNode(pGlobal, pName, pVersion)
 	Set @tGlobal@(pID) = pVersion
 }
 
 ClassMethod Delete(pGlobal, pID, pName, pVersion)
 {
-	Set tGlobal = ##class(%ZPM.PackageManager.Server.SemVerIndex).GetIndexGlobalNode(pGlobal, pName, pVersion)
+	Set tGlobal = ##class(%ZPM.General.SemanticVersion.Index).GetIndexGlobalNode(pGlobal, pName, pVersion)
 	Kill @tGlobal@(pID)
 }
 
@@ -157,7 +157,7 @@ ClassMethod Node(pName, pVersion) As %String [ CodeMode = generator, ServerOnly 
 {
     If (%mode '= "method") {
         Set tIdxGlobal = ..IndexLocationForCompile(%class,%property)
-        $$$GENERATE(" Quit ##class(%ZPM.PackageManager.Server.SemVerIndex).GetIndexGlobalNode($Name("_tIdxGlobal_"),pName,pVersion)")
+        $$$GENERATE(" Quit ##class(%ZPM.General.SemanticVersion.Index).GetIndexGlobalNode($Name("_tIdxGlobal_"),pName,pVersion)")
     }
 }
 

@@ -1,7 +1,7 @@
-/// Class to enable use of <class>%ZPM.PackageManager.Server.SemVerIndex</class> with %FIND.
-/// For detailed documentation, see <class>%ZPM.PackageManager.Server.SemVerIndex</class>.
+/// Class to enable use of <class>%ZPM.General.SemanticVersion.Index</class> with %FIND.
+/// For detailed documentation, see <class>%ZPM.General.SemanticVersion.Index</class>.
 /// TODO: emulate bitmap index by overriding GetChunk/NextChunk/PreviousChunk?
-Class %ZPM.PackageManager.Server.SemVerFind Extends %SQL.AbstractFind
+Class %ZPM.General.SemanticVersion.Find Extends %SQL.AbstractFind
 {
 
 Property BaseIndexGlobal As %String [ Private, ReadOnly ];

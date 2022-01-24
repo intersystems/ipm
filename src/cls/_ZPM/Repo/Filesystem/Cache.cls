@@ -16,7 +16,7 @@ Property LastModified As %TimeStamp [ Required ];
 /// Full module manifest
 Property Manifest As %Stream.GlobalCharacter;
 
-Index SemVer On (Name, Version) As %ZPM.PackageManager.Server.SemVerIndex;
+Index SemVer On (Name, Version) As %ZPM.General.SemanticVersion.Index;
 
 /// Property associated with the index to allow quick $Query'ing over SemVer order based on ID
 Property SemVer As %String(MAXLEN = 512) [ SqlComputeCode = {set {*} = ##class(%ZPM.Repo.Filesystem.Cache).SemVerNode({Name},{Version})}, SqlComputed, SqlComputeOnChange = (%%INSERT, %%UPDATE) ];
@@ -41,20 +41,20 @@ Query OrderedMatches(pRoot As %String = "", pName As %String = "", pVersionExpre
 
 ClassMethod OrderedMatchesExecute(ByRef qHandle As %Binary, pRoot As %String = "", pName As %String = "", pVersionExpression As %String = "*", pParameters As %String = "") As %Status
 {
-	Set tSC = ##class(%ZPM.PackageManager.Server.SemVerFind).MatchesExecute(.qHandle,$classname(),"SemVer",..SemVerIndexLocation(),pName,pVersionExpression,pParameters)
+	Set tSC = ##class(%ZPM.General.SemanticVersion.Find).MatchesExecute(.qHandle,$classname(),"SemVer",..SemVerIndexLocation(),pName,pVersionExpression,pParameters)
 	Set qHandle("root") = pRoot
 	Quit tSC
 }
 
 ClassMethod OrderedMatchesClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = OrderedMatchesExecute ]
 {
-	Quit ##class(%ZPM.PackageManager.Server.SemVerFind).MatchesClose(.qHandle)
+	Quit ##class(%ZPM.General.SemanticVersion.Find).MatchesClose(.qHandle)
 }
 
 ClassMethod OrderedMatchesFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = OrderedMatchesExecute ]
 {
 	For {
-		Set tSC = ##class(%ZPM.PackageManager.Server.SemVerFind).MatchesFetch(.qHandle,.tRow,.AtEnd)
+		Set tSC = ##class(%ZPM.General.SemanticVersion.Find).MatchesFetch(.qHandle,.tRow,.AtEnd)
 		If AtEnd {
 			Quit
 		}
