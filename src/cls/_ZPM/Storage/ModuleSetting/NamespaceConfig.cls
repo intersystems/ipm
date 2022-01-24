@@ -3,6 +3,8 @@
 Class %ZPM.Storage.ModuleSetting.NamespaceConfig Extends %ZPM.Storage.ModuleSetting
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModSet.NSConfig";
+
 /*
 	If this class is eventually used to represent common details for installation of application-packaged modules,
 	the set of options here will likely need future expansion.

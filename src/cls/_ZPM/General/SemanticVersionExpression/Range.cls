@@ -1,6 +1,8 @@
 Class %ZPM.General.SemanticVersionExpression.Range Extends %SerialObject
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.General.SemVer.Range";
+
 Property Expression As %String [ ReadOnly ];
 
 Property Comparators As list Of %ZPM.General.SemanticVersionExpression.Comparator;

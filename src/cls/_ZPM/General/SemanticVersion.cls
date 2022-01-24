@@ -1,6 +1,8 @@
 Class %ZPM.General.SemanticVersion Extends (%SerialObject, %XML.Adaptor) [ StorageStrategy = "" ]
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.General.SemanticVersion";
+
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 Property Major As %Integer(MINVAL = 0) [ Required ];

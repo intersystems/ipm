@@ -1,6 +1,8 @@
 Class %ZPM.General.SemanticVersionExpression Extends (%SerialObject, %XML.Adaptor) [ StorageStrategy = "" ]
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.General.SemVerExpression";
+
 Property Options As list Of %ZPM.General.SemanticVersionExpression.Range;
 
 Property Expression As %String(MAXLEN = "");

@@ -2,6 +2,8 @@
 Class %ZPM.Storage.ModuleSetting.ResourceProcessorDefault.Condition Extends (%SerialObject, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor)
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModSet.RP.Cond";
+
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 /// Name of other attribute to test

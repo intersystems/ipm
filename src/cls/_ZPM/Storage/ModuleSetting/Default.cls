@@ -4,6 +4,8 @@
 Class %ZPM.Storage.ModuleSetting.Default Extends %ZPM.Storage.ModuleSetting
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModSet.Default";
+
 Property Name As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE");
 
 Property Value As %String(MAXLEN = 1000, XMLPROJECTION = "ATTRIBUTE");

@@ -3,6 +3,8 @@
 Class %ZPM.Storage.ModuleReference Extends (%SerialObject, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor) [ StorageStrategy = "" ]
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModuleReference";
+
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 Property Name As %String(MAXLEN = 255) [ Required ];

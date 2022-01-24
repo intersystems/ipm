@@ -1,6 +1,8 @@
 Class %ZPM.Storage.ModuleAuthorInfo Extends (%SerialObject, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor)
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModuleAuthorInfo";
+
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 Parameter XMLIGNOREINVALIDTAG = 1;

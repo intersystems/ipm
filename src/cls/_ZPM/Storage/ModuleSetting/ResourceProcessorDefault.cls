@@ -1,6 +1,8 @@
 Class %ZPM.Storage.ModuleSetting.ResourceProcessorDefault Extends %ZPM.Storage.ModuleSetting
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModSet.RP";
+
 /// Resource processor class to which this default setting applies
 Property Class As %Dictionary.Classname(XMLPROJECTION = "ATTRIBUTE") [ Required ];
 

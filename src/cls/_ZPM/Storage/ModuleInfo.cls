@@ -2,6 +2,8 @@
 Class %ZPM.Storage.ModuleInfo Extends (%SerialObject, %ZPM.General.ModuleInfo) [ StorageStrategy = "" ]
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModuleInfo";
+
 Storage Default
 {
 <Data name="ModuleInfoState">

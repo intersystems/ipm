@@ -1,6 +1,8 @@
 Class %ZPM.Storage.ModuleSetting.Parameter Extends %ZPM.Storage.ModuleSetting
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.ModSet.Param";
+
 /// Name of the parameter (may contain "." to indicate a subscript in the array passed to lifecycle phases)
 Property Name As %String(XMLPROJECTION = "ATTRIBUTE");
 

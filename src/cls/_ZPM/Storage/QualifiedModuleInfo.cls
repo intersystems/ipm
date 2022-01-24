@@ -3,6 +3,8 @@
 Class %ZPM.Storage.QualifiedModuleInfo Extends %ZPM.Storage.ModuleInfo
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.Storage.QualifyModInfo";
+
 /// The name of the repository the module is in (The Name property in <class>%ZPM.Repo.Definition</class>. <br />
 Property ServerName As %String;
 

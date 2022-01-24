@@ -1,6 +1,8 @@
 Class %ZPM.General.SemanticVersionExpression.Comparator Extends %SerialObject
 {
 
+Parameter DEFAULTGLOBAL = "^ZPM.General.SemVer.Comp";
+
 Property Expression As %String [ ReadOnly ];
 
 Property Operator As %String(VALUELIST = ",=,<,<=,>,>=") [ InitialExpression = "=", Required ];
