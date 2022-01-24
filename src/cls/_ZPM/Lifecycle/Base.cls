@@ -1341,11 +1341,6 @@ Method %Document(ByRef pParams) As %Status
 		} Else {
 			Set tModuleDependencies = $Get(pParams("Document","Dependencies"))
 		}
-		
-		// TODO: call ##class(%ZPM.PackageManager.Developer.Annotation.Utils).ProcessAnnotationsForModule directly and generate/update new document
-		// (a subclass of %Studio.AbstractDocument)
-		// Set tSC = ..Module.UpdateAPIDocumentation(tModuleDependencies)
-		// $$$ThrowOnError(tSC)
 		TCOMMIT
 	} Catch e {
 		Set tSC = e.AsStatus()
