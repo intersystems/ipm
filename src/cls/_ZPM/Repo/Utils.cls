@@ -48,51 +48,6 @@ ClassMethod RetrieveModulePackage(pQualifiedReference As %ZPM.Storage.QualifiedM
 	Quit tSC
 }
 
-/// Returns a list of all resolved module references matching the search criteria from configured repositories.
-ClassMethod SearchRepositoriesForApplication(pSearchCriteria As %ZPM.Repo.SearchCriteria, Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%ZPM.Storage.QualifiedModuleInfo"), pForceRemoteRepo As %Boolean = 0) As %Status
-{
-	Set tSC = $$$OK
-	Set pResults = $$$NULLOREF
-	Try {
-		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
-		$$$ThrowOnError(tSC)
-		Set tSC = tManager.SearchRepositoriesForApplication(pSearchCriteria,.pResults)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
-
-/// Loads the module reference 
-ClassMethod RetrieveApplicationManifest(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pManifestStream As %Stream.Object) As %Status
-{
-	Set tSC = $$$OK
-	Set pManifestStream = $$$NULLOREF
-	Try {
-		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
-		$$$ThrowOnError(tSC)
-		Set tSC = tManager.RetrieveApplicationManifest(pQualifiedReference,.pManifestStream)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
-
-/// Loads the application package 
-ClassMethod RetrieveApplicationPackage(pQualifiedReference As %ZPM.Storage.QualifiedModuleInfo, Output pPackageStream As %Stream.Object) As %Status
-{
-	Set tSC = $$$OK
-	Set pPackageStream = $$$NULLOREF
-	Try {
-		Set tManager = ##class(%ZPM.Repo.Manager).%Get(.tSC)
-		$$$ThrowOnError(tSC)
-		Set tSC = tManager.RetrieveApplicationPackage(pQualifiedReference,.pPackageStream)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
-
 ClassMethod GetZPMVersion()
 {
     New $Namespace

@@ -1,18 +1,6 @@
 Class %ZPM.Repo.IPackageService [ Abstract ]
 {
 
-Method GetApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.Object [ Abstract ]
-{
-}
-
-Method GetApplicationDirectory(pModuleReference As %ZPM.Storage.ModuleInfo) As %String [ Abstract ]
-{
-}
-
-Method GetApplicationManifest(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.Object [ Abstract ]
-{
-}
-
 Method GetModule(pModuleReference As %ZPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 0) As %Stream.Object [ Abstract ]
 {
 }
@@ -25,15 +13,7 @@ Method GetModuleManifest(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream
 {
 }
 
-Method HasApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean [ Abstract ]
-{
-}
-
 Method HasModule(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean [ Abstract ]
-{
-}
-
-Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.Storage.ModuleInfo") [ Abstract ]
 {
 }
 

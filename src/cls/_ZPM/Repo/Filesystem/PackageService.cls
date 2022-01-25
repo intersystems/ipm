@@ -52,31 +52,11 @@ Method GetModuleDirectory(pModuleReference As %ZPM.Storage.ModuleInfo) As %Strin
 	Quit ##class(%File).NormalizeDirectory(tModule.Root_tModule.SubDirectory)
 }
 
-Method GetApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.Object
-{
-	Quit $$$NULLOREF
-}
-
-Method GetApplicationManifest(pModuleReference As %ZPM.Storage.ModuleInfo) As %Stream.Object
-{
-	Quit $$$NULLOREF
-}
-
-Method HasApplication(pModuleReference As %ZPM.Storage.ModuleInfo) As %Boolean
-{
-	Quit 0
-}
-
-Method ListApplications(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%ZPM.Storage.ModuleInfo")
-{
-	Quit ##class(%Library.ListOfObjects).%New()
-}
-
 /// Returns 1 if the service supports a particular method.
 ClassMethod Supports(pMethod As %String) As %Boolean
 {
-	// Filesystem package service only supports module packaging for now.
-	Quit '(pMethod [ "Application")
+	// Returns 1 as no need to check for application stuff
+	Quit 1
 }
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.
