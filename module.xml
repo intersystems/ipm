@@ -17,6 +17,8 @@
   <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test"/>
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
   <Resource Name="%ZLANGC00.MAC" Generated="true"/>
+  <Resource Name="%ZPM.Formatting.INC"/>
+  <Resource Name="%ZPM.PackageManager.Common.INC"/>
   <Resource Name="/doc/README.txt"/>
 </Module>
 </Document></Export>
