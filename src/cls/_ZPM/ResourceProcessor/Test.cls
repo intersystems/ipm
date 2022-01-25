@@ -209,7 +209,6 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 		Set tResourceInfo("Scope") = ..Phase
 		Set tResourceInfo("Deploy") = 0
 		Set tResourceInfo("Processor") = $This
-		Set tResourceInfo("IsAPI") = 0
 		Set tResourceInfo("UnitTest") = 1
 		Set tResource = $Case(..Package '= "", 1: ..Package, : ..Class)_..Extension
 		$$$ThrowOnError(##class(%ZPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.pResourceArray))

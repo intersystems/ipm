@@ -29,10 +29,6 @@ Property Generated As %Boolean(XMLPROJECTION = "ATTRIBUTE");
 /// May be referred to in lifecycle methods
 Property Attributes As array Of %String(MAXLEN = "", XMLKEYNAME = "Name", XMLNAME = "Attribute", XMLNIL = 0, XMLPROJECTION = "ELEMENT");
 
-/// May be set to false to avoid the overhead of scanning for API annotations.
-/// If true or unset, resources will be scanned for annotations.
-Property IsAPI As %Boolean(XMLPROJECTION = "ATTRIBUTE");
-
 /// Specifies a class that handles lifecycle events for this resource
 /// Typically only applicable to directory/file resources
 Property ProcessorClass As %Dictionary.Classname(XMLPROJECTION = "ATTRIBUTE");
@@ -508,15 +504,12 @@ Storage Default
 <Value>Generated</Value>
 </Value>
 <Value name="6">
-<Value>IsAPI</Value>
-</Value>
-<Value name="7">
 <Value>ProcessorClass</Value>
 </Value>
-<Value name="8">
+<Value name="7">
 <Value>Deploy</Value>
 </Value>
-<Value name="9">
+<Value name="8">
 <Value>OverrideName</Value>
 </Value>
 </Data>
