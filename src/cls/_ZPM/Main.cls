@@ -41,6 +41,7 @@ The standard lifecycle phases are:
 * test: runs any unit tests associated with the module, in the current namespace.
 * package: exports the module's resources and bundles them into a module artifact (.tgz file).
 * verify: installs that artifact in a separate namespace, then runs integration tests (if any).
+* publish: saves that artifact to the repository for which deployment is enabled. Currently, there may only be one of these per namespace.
 </description>
 <example description="Compiles the module named &quot;MyModuleName&quot;">module-action MyModuleName compile</example>
 <example description="Performs multiple actions on the module named &quot;MyModuleName&quot;; &quot;clean&quot; deletes all of its dependenices, and &quot;install&quot; will then re-download them, package the module, and register it in the current namespace's module cache.">MyModuleName clean register</example>
