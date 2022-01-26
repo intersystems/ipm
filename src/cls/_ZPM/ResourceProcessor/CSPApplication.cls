@@ -263,7 +263,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 			(..DelegatedAuthEnabled * $$$AutheDelegated) +
 			(..KerberosAuthEnabled * $$$AutheK5API) +
 			(..LoginTokenEnabled * $$$AutheLoginToken)
-		
+
 		If tProperties("AutheEnabled") = 0 {
 			kill tProperties("AutheEnabled")
 		}
@@ -293,6 +293,9 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 		}
 		If matchRoles=":" $$$ThrowOnError($$$ERROR($$$GeneralError,"Missing role "_matchRolesR))
 		Set tProperties("MatchRoles") = matchRoles
+    If (..DelegatedAuthEnabled) {
+      Do ..ActivateDelegated(matchRoles)
+    }		
 
 		// If we have a "Serve Files Timeout" and Serve Files is set to "Always", change to "Always and Cached."
 		// Unfortunately (or perhaps by design?) ServeFiles is a boolean in %Installer.CSPApplication.
@@ -357,6 +360,21 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
 		Set tSC = ex.AsStatus()
 	} 
 	Quit tSC
+}
+
+/// Enable Delegated Auth system-wide
+/// And add role to CSPSystem, so, it will have access to do delegated auth
+ClassMethod ActivateDelegated(Role As %String = "") As %Status
+{
+  New $Namespace
+  Set $Namespace = "%SYS"
+  $$$QuitOnError(##class(Security.System).Get(, .p))
+  Set p("AutheEnabled") = $ZBoolean(p("AutheEnabled"), $$$AutheDelegated, 7)
+  $$$QuitOnError(##class(Security.System).Modify(, .p))
+  If (Role '= "") {
+    $$$QuitOnError(##class(Security.Users).AddRoles("CSPSystem", Role))
+  }
+  Quit $$$OK
 }
 
 /// This removes an existing CSP application
