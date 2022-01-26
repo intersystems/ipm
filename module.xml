@@ -17,23 +17,8 @@
   <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test"/>
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
   <Resource Name="%ZLANGC00.MAC" Generated="true"/>
+  <Resource Name="%ZPM.Formatting.INC"/>
+  <Resource Name="%ZPM.PackageManager.Common.INC"/>
   <Resource Name="/doc/README.txt"/>
-  <API>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Annotation.Utils:ExtractAnnotations" Public="true"></Item>
-    <Item Type="class" Name="%ZPM.PackageManager.Core.ModuleReference" Public="true"></Item>
-    <Item Type="class" Name="%ZPM.PackageManager.Developer.Lifecycle.Abstract" Public="true"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager:Shell" Public="true"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Build:RetrieveBuiltDatabase" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Build:InitializeBuildNamespace" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Build:SwitchToBuildNamespace" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Module:ExecutePhases" Public="true"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Utils:GetDependentsList" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Utils:GetDependentsAsTree" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.API:UpdateAPIDocumentation" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.API.ErrorMessages:GetMessageFile" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.API.ErrorMessages:SaveMessageFile" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Build:SwitchToNamespace" Public="false"></Item>
-    <Item Type="class" SubType="Method" Name="%ZPM.PackageManager.Developer.Build:InitializeNamespace" Public="false"></Item>
-  </API>
 </Module>
 </Document></Export>
