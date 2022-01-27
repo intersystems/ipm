@@ -349,6 +349,19 @@ default-modifiers -delete
 <parameter name="module" description="Name of module to rearrange" />
 </command>
 
+<command name="dependency-analyzer" aliases="deps">
+<description>
+	Inspects all classes in the provided module and checks for invalid references
+	to classes that are either not in the module or not in one of the module's
+	dependencies.
+	The invalid references are written to the current device.
+</description>
+<parameter name="module" required="true" description="Name of module to inspect" />
+<example description="Runs the dependency analyzer on the module MyModuleName.">
+	deps MyModuleName
+</example>
+</command>
+
 <command name="version" aliases="ver">
 <description>Prints the currently-installed package manager and registry version (excluding +snapshot or other build information)</description>
 </command>
@@ -514,6 +527,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Import(.tCommandInfo)
 			} ElseIf (tCommandInfo = "run-from-file") {
 				Do ..ProcessRunFromFile(.tCommandInfo)
+			} ElseIf (tCommandInfo = "dependency-analyzer") {
+				Do ..RunDependencyAnalyzer(.tCommandInfo)
 			} ElseIf (tCommandInfo = "config") {
 				Do ..Config(.tCommandInfo)
 			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
@@ -1556,6 +1571,17 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 			Do ..%Help()
 		}
 	}
+}
+
+/// Run Dependency Analyzer for the given module
+ClassMethod RunDependencyAnalyzer(ByRef pCommandInfo)
+{
+	Set moduleName = $Get(pCommandInfo("parameters", "module"))
+	If (moduleName = "") {
+		$$$ThrowStatus($$$ERROR($$$GeneralError, "Module name must be provided. Run help command to see syntax"))
+	}
+	// Status can be ignored as it is written to the current device
+	Do ##class(%ZPM.DependencyAnalyzer).RunForModule(moduleName, , 1)
 }
 
 Query ActiveNamespaces() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
