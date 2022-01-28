@@ -32,7 +32,7 @@ ClassMethod RunForAllModules() As %Status
 
 /// @API.Method
 /// @Modifier Availability InterSystems
-ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVerbose As %Boolean = 1, pSave As %Boolean = 1, pProgressListener As %ZPM.PackageManager.Developer.IProgressListener = {$$$NULLOREF}, Output pRunID As %String) As %Status
+ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVerbose As %Boolean = 1, pSave As %Boolean = 1, Output pRunID As %String) As %Status
 {
 	Set pRunID = ""
 	Set tSC = $$$OK
@@ -43,17 +43,11 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 		Set tModule = ##class(%ZPM.Storage.Module).NameOpen(pModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
 		
-		If $IsObject(pProgressListener) {
-			Do pProgressListener.PushStage("Building dependency graph")
-		}
+		Write !, "Building dependency graph..."
 		
 		// Build dependency graph so that we can test if resources are coming from a dependent module.
 		Set tSC = tModule.BuildDependencyGraph(.tGraph)
 		$$$ThrowOnError(tSC)
-		
-		If $IsObject(pProgressListener) {
-			Do pProgressListener.PopStage()
-		}
 		
 		// Include this module in the graph.
 		Set tGraph(pModuleName) = ""
@@ -70,9 +64,8 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 		Set tNextCounter = $$$ZPMDependencyTempDataNext
 		Kill $$$ZPMDependencyTempData(tNextCounter)
 		
-		If $IsObject(pProgressListener) {
-			Do pProgressListener.PushStage("Scanning classes in module")
-		}
+		Write !, "Scanning classes in module..."
+
 		Set tClassCount = 0
 		
 		Set tResourceKey = ""
@@ -103,34 +96,17 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 				If (tExt = "CLS") {
 					Set tClass = $Piece(tChildKey,".",1,*-1)
 					// Queue search of class
-					Set tSC = tQueue.QueueCallback("##class("_$classname()_").ExtractClassReferencesToName","##class("_$classname()_").ClassExtractionComplete",tClass,tNextCounter,pProgressListener)
+					Set tSC = tQueue.QueueCallback("##class("_$classname()_").ExtractClassReferencesToName","##class("_$classname()_").ClassExtractionComplete",tClass,tNextCounter)
 					$$$ThrowOnError(tSC)
 					Set tClassCount = tClassCount + 1
 				}
 			}
 		}
 		
-		If $IsObject(pProgressListener) {
-			Do pProgressListener.SetStageTotalUnits(tClassCount)
-		}
-		
 		Set tSC = tQueue.WaitForComplete()
 		$$$ThrowOnError(tSC)
 		
-		If $IsObject(pProgressListener) {
-			Do pProgressListener.PopStage()
-			Do pProgressListener.PushStage("Checking module references.")
-			Set tClassCount = 0
-			Set tReferenceKey = ""
-			For {
-				Set tReferenceKey = $Order($$$ZPMDependencyTempData(tNextCounter,tReferenceKey))
-				If (tReferenceKey = "") {
-					Quit
-				}
-				Set tClassCount = tClassCount + 1
-			}
-			Do pProgressListener.SetStageTotalUnits(tClassCount)
-		}
+		Write !, "Checking module references..."
 		
 		// Iterate through classes and find home modules (or omit if it's a library class)
 		Set tReferenceKey = ""
@@ -138,11 +114,6 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 			Set tReferenceKey = $Order($$$ZPMDependencyTempData(tNextCounter,tReferenceKey))
 			If (tReferenceKey = "") {
 				Quit
-			}
-			
-			// Track this beforehand because of all the "continue"s.
-			If $IsObject(pProgressListener) {
-				Do pProgressListener.NotifyUnitCompleted(tReferenceKey)
 			}
 			
 			Set tTopPackage = $Piece(tReferenceKey,".")	
@@ -187,11 +158,7 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 			}
 			Merge pInvalidReferences(tHomeModuleName,tReferenceKey) = $$$ZPMDependencyTempData(tNextCounter,tReferenceKey)
 		}
-		
-		If $IsObject(pProgressListener) {
-			Do pProgressListener.PopStage()
-			Do pProgressListener.PushStage("Saving Results.")
-		}
+			Write !, "Saving Results..."
 		
 		// Represent results as objects
 		Set tModuleKey = ""
@@ -258,10 +225,6 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 			Set pRunID = tRun.%Id()
 		}
 		
-		If $IsObject(pProgressListener) {
-			Do pProgressListener.PopStage()
-		}
-		
 		If pVerbose {
 			Do tRun.Display()
 		}
@@ -305,19 +268,15 @@ Query LatestResults(pProblemModule As %String) As %SQLQuery [ SqlProc ]
 	having Run->ID = MAX(Run->ID %FOREACH (Run->TargetModule))
 }
 
-ClassMethod ExtractClassReferencesToName(pSourceClass As %String, pTargetSubscript As %String, pProgressListener As %ZPM.PackageManager.Developer.IProgressListener) As %Status
+ClassMethod ExtractClassReferencesToName(pSourceClass As %String, pTargetSubscript As %String) As %Status
 {
 	Set tSC = ..ExtractClassReferences(pSourceClass,.tResults)
 	Merge $$$ZPMDependencyTempData(pTargetSubscript) = tResults
 	Quit tSC
 }
 
-ClassMethod ClassExtractionComplete(pSourceClass As %String, pTargetSubscript As %String, pProgressListener As %ZPM.PackageManager.Developer.IProgressListener) As %Status
+ClassMethod ClassExtractionComplete(pSourceClass As %String, pTargetSubscript As %String) As %Status
 {
-	Set pProgressListener = $$$objIntToOref(+pProgressListener)
-	If $IsObject(pProgressListener) {
-		Do pProgressListener.NotifyUnitCompleted(pSourceClass)
-	}
 	Quit $$$OK
 }
 
