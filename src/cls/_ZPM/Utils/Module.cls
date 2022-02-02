@@ -929,6 +929,48 @@ ClassMethod GetModuleListClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter
 	Quit $$$OK
 }
 
+Query ListProcessorAttributes(pProcessorClass As %String) As %Query(ROWSPEC = "Name:%String,Type:%String,Description:%String,Default:%String,Required:%Boolean,VALUELIST:%String,DISPLAYLIST:%String,MINLEN:%String,MAXLEN:%String,MINVAL:%Integer,MAXVAL:%Integer") [ SqlProc ]
+{
+}
+
+ClassMethod ListProcessorAttributesExecute(ByRef qHandle As %Binary, pProcessorClass As %String = "") As %Status
+{
+	Set tSC = $$$OK
+	Try {
+		Set qHandle("pointer") = ""
+		Set tSuper = "%ZPM.ResourceProcessor.Abstract"
+		If '$$$comClassDefined(pProcessorClass) && $$$comClassDefined($$$DefaultProcessorPackageDot_pProcessorClass) {
+			Set pProcessorClass = $$$DefaultProcessorPackageDot_pProcessorClass
+		}
+		If '$ClassMethod(pProcessorClass,"%Extends",tSuper) {
+			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Class '%1' does not extend '%2'",pProcessorClass,tSuper))
+			Quit
+		}
+		Set tSC = $ClassMethod(pProcessorClass,"GetAttributeMetadata",.tMetadata)
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		Merge qHandle("data") = tMetadata
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+ClassMethod ListProcessorAttributesFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = ListAttributesExecute ]
+{
+	Set qHandle("pointer") = $Order(qHandle("data",qHandle("pointer")),1,Row)
+	If (qHandle("pointer") = "") {
+		Set AtEnd = 1
+	}
+	Quit $$$OK
+}
+
+ClassMethod ListProcessorAttributesClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = ListAttributesExecute ]
+{
+	Quit $$$OK
+}
+
 ClassMethod GetModuleNameFromXML(pDirectory As %String, Output name As %String) As %Status
 {
 	Set stream=##class(%Stream.FileBinary).%New()
