@@ -21,14 +21,11 @@ Method TestEverything()
 			Kill tModule
 			Quit:'$$$AssertStatusOK(..ReadXDataToModule(tOrigNS,"ServerModule"_i,.tModule),"Loaded module from XData block ServerModule"_i)
 			Set tModules(i) = tModule
-			
-			// Publish module
-			Do $$$AssertStatusOK(tModule.Lifecycle.Register(),"Registered "_tModule.Name_" "_tModule.VersionString)
 		}
 		
 		Kill tGraph
 		For i=2:1:4 {
-			For tEndPhase = "Activate","Test","Package","Verify","Register" {
+			For tEndPhase = "Activate","Test","Package","Verify" {
 				Set tModule = tModules(i)
 				Kill tGraph
 				Set tSC = tModule.BuildDependencyGraph(.tGraph,,,,tModule.Lifecycle.GetCompletePhases($ListBuild(tEndPhase)))

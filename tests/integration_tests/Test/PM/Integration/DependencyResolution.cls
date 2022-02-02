@@ -127,7 +127,6 @@ Method TestEverything()
 Method PublishModules()
 {
   Set tOrigNS = $Namespace
-  do ##class(%ZPM.PackageManager.Server.Module).%DeleteExtent()
   // Publish modules
   For i=1:1:11,100:1:103 {
     // If we're loading a module with dependencies, clear out things that might have conflicting dependencies first.
