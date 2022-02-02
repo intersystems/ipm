@@ -68,7 +68,7 @@ Method UtilGetRow(pName As %String, Output pResult As %SQL.StatementResult) As %
 {
 	Set pResult = $$$NULLOREF
 	Try {
-		Set pResult = ##class(%SQL.Statement).%ExecDirect(,"call %ZPM_PackageManager_Developer.API_ListProcessorAttributes(?)",$classname())
+		Set pResult = ##class(%SQL.Statement).%ExecDirect(,"call %ZPM_Utils.Module_ListProcessorAttributes(?)",$classname())
 		If (pResult.%SQLCODE < 0) {
 			Throw ##class(%Exception.SQL).CreateFromSQLCODE(pResult.%SQLCODE,pResult.%Message)
 		}

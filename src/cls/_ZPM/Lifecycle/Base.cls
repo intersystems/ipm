@@ -71,7 +71,7 @@ ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary
 {
 	If ($Extract(pResourceName) = "/") {
 		If pResourceName [ "/internal/testing/" {
-			Quit $$$DefaultProcessorPackageDot_"UnitTest"
+			Quit $$$DefaultProcessorPackageDot_"Test"
 		}
 		Quit ""
 	}
