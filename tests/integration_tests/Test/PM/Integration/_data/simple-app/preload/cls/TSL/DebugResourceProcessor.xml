@@ -2,7 +2,7 @@
 <Export generator="Cache" version="25">
 <Class name="TSL.DebugResourceProcessor">
 <IncludeCode>TSL.SimpleAppInclude</IncludeCode>
-<Super>%ZPM.PackageManager.Developer.Processor.Abstract</Super>
+<Super>%ZPM.ResourceProcessor.Abstract</Super>
 <TimeCreated>64366,52180.605442</TimeCreated>
 
 <Method name="OnBeforePhase">
