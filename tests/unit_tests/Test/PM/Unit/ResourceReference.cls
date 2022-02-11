@@ -21,13 +21,13 @@ Method TestDirectoryResources()
 
 Method AssertResourceNameValid(pResourceName As %String)
 {
-	Set tSC = ##class(%ZPM.Storage.ResourceReference).NameIsValid(pResourceName)
+	Set tSC = ##class(%IPM.Storage.ResourceReference).NameIsValid(pResourceName)
 	Do $$$AssertStatusOK(tSC,"Resource name "_pResourceName_" is valid.")
 }
 
 Method AssertResourceNameInvalid(pResourceName As %String)
 {
-	Set tSC = ##class(%ZPM.Storage.ResourceReference).NameIsValid(pResourceName)
+	Set tSC = ##class(%IPM.Storage.ResourceReference).NameIsValid(pResourceName)
 	Do $$$AssertEquals($System.Status.GetErrorCodes(tSC),$$$DTPattern,"Resource name "_pResourceName_" is invalid.")
 }
 

@@ -3,7 +3,7 @@ Class Test.PM.Integration.StandaloneFormBuilder Extends Test.PM.Integration.Base
 
 Method TestNewNamespaceInstall()
 {
-	#; #dim tModule As %ZPM.Storage.Module
+	#; #dim tModule As %IPM.Storage.Module
 	
 	#; New $Namespace
 	#; Set tOrigNS = $Namespace
@@ -20,18 +20,18 @@ Method TestNewNamespaceInstall()
 	#; 	Set tUsrCmd = "repo -p4 -n Users -path //Users/tleavitt/PackageManager/modules/HS.StandaloneFormBuilder/"
 	#; 	For tCmd = tAppCmd,tUsrCmd {
 	#; 		Do $$$LogMessage(tCmd)
-	#; 		Do ##class(%ZPM.Main).ShellInternal(tCmd,.tException)
+	#; 		Do ##class(%IPM.Main).ShellInternal(tCmd,.tException)
 	#; 		If $IsObject(tException) {
 	#; 			Throw tException
 	#; 		}
 	#; 	}
 		
-	#; 	Set tRef = ##class(%ZPM.Storage.QualifiedModuleInfo).%New()
+	#; 	Set tRef = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
 	#; 	Set tRef.ServerName = "Users"
 	#; 	Set tRef.Name = "HS.StandaloneFormBuilder"
 	#; 	Set tRef.VersionString = "0.0.1+snapshot"
 	#; 	Set tParams("Verbose")=1
-	#; 	Set tSC = ##class(%ZPM.Utils.Module).LoadQualifiedReference(tRef,.tParams)
+	#; 	Set tSC = ##class(%IPM.Utils.Module).LoadQualifiedReference(tRef,.tParams)
 	#; 	Do $$$AssertStatusOK(tSC,"Loaded Standalone Form Builder module successfully.")
 	#; } Catch e {
 	#; 	Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")

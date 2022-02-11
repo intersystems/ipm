@@ -1,4 +1,4 @@
-Class Test.PM.Unit.ResourceProcessor.AttributeMetadata Extends (%UnitTest.TestCase, %ZPM.ResourceProcessor.Abstract)
+Class Test.PM.Unit.ResourceProcessor.AttributeMetadata Extends (%UnitTest.TestCase, %IPM.ResourceProcessor.Abstract)
 {
 
 /// Comma-separated list of resource attribute names that this processor uses

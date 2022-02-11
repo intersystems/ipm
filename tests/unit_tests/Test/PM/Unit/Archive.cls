@@ -27,7 +27,7 @@ Method TestCreateAndExtractArchive()
 		
 		// Create archive
 		Set tTGZFile = tDir("temp")_"test.tgz"
-		Set tSC = ##class(%ZPM.General.Archive).Create(tDir("input"),tTGZFile)
+		Set tSC = ##class(%IPM.General.Archive).Create(tDir("input"),tTGZFile)
 		If '$$$AssertStatusOK(tSC,"Archive created successfully.") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No sense in continuing unit test."))
 		}
@@ -37,7 +37,7 @@ Method TestCreateAndExtractArchive()
 		
 		// Extract archive
 		Set tFile = tDir("output")_"test.txt"
-		Set tSC = ##class(%ZPM.General.Archive).Extract(tTGZFile,tDir("output"))
+		Set tSC = ##class(%IPM.General.Archive).Extract(tTGZFile,tDir("output"))
 		If '$$$AssertStatusOK(tSC,"Archive extracted successfully.") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No sense in continuing unit test."))
 		}

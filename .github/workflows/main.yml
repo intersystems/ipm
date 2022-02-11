@@ -11,15 +11,15 @@ on:
       - released
 env:
   PREVIOUS: 2019.4.0.383.0
-  CURRENT: 2020.1.0.215.0
-  LATEST: 2021.1.0.215.3
+  LATEST: 2021.2.0.651.0
+  PREVIEW: 2022.1.0.114.0
 jobs:
   build:
     timeout-minutes: 20
     strategy:
       matrix:
         # version: [previous, current, latest]
-        version: [latest]
+        version: [latest, preview]
         platform: [common, health]
     runs-on: ubuntu-latest
     steps:
@@ -32,11 +32,12 @@ jobs:
       - name: Set image
         id: image
         run: |
-          IMAGE=store/intersystems/iris-community
-          [ '${{ matrix.platform }}' == 'health' ] && IMAGE=store/intersystems/irishealth-community
-          VERSION=${{ env.CURRENT }}
+          IMAGE=containers.intersystems.com/intersystems/iris-community
+          [ '${{ matrix.platform }}' == 'health' ] && IMAGE=containers.intersystems.com/intersystems/irishealth-community
+          VERSION=${{ env.LATEST }}
           [ '${{ matrix.version }}' == 'previous' ] && VERSION=${{ env.PREVIOUS }}
           [ '${{ matrix.version }}' == 'latest' ] && VERSION=${{ env.LATEST }}
+          [ '${{ matrix.version }}' == 'preview' ] && VERSION=${{ env.preview }}
           echo ::set-output name=name::${IMAGE}:${VERSION}
       - name: Setup version
         id: version
@@ -156,7 +157,7 @@ jobs:
       - name: Create Beta Release
         id: create_release
         uses: actions/create-release@v1
-        if: github.event.pull_request.head.repo.full_name == github.repository && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common' && github
+        if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -165,7 +166,7 @@ jobs:
           prerelease: ${{ github.event_name != 'release' }}
       - name: Upload Beta Release Asset
         uses: actions/upload-release-asset@v1
-        if: github.event.pull_request.head.repo.full_name == github.repository && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
+        if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
