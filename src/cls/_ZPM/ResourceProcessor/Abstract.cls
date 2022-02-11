@@ -225,9 +225,9 @@ Method OnGetUniqueName(Output pUniqueName)
 {
 }
 
-Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo) As %Status
+Method GetSourceControlInfo(Output pInfo As %ZPM.ExtensionBase.ResourceInfo) As %Status
 {
-	Set pInfo = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo).%New()
+	Set pInfo = ##class(%ZPM.ExtensionBase.ResourceInfo).%New()
 	Quit $$$OK
 }
 

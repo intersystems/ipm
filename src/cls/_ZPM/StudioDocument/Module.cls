@@ -122,7 +122,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %ZPM.StudioDocument.ModuleStre
 			Quit
 		}
 		
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.Interface).%OnModifyResources(pModule)
+		Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnModifyResources(pModule)
 		If $$$ISERR(tSC) {
 			Quit
 		}

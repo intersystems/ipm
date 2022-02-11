@@ -1002,7 +1002,7 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.Storage.Module, Output
 		
 		If tIsInSourceControl && 'tIsEditable {
 			// Try to make the document editable.
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.Interface).%OnMakeModuleEditable(pSourceModule)
+			Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnMakeModuleEditable(pSourceModule)
 			$$$ThrowOnError(tSC)
 		}
 		
@@ -1149,11 +1149,11 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		If $Get(pParams("DeveloperMode"),0) {
 			Set tCurrentSourceControl = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
 			If (tCurrentSourceControl = "") {
-				Set tCompositeSCClass = "%ZPM.PackageManager.Developer.Extension.Composite"
+				Set tCompositeSCClass = "%ZPM.ExtensionBase.Composite"
 				$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
 				Set tPrimaryExtension = "%ZPM.PackageManager.Developer.Extension.SourceControl.ISC"
 				Set tSecondaryExtensions = $ListBuild("%ZPM.PackageManager.Developer.Extension.PackageManager")
-				$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Extension.Composite).SetExtensionClasses(tPrimaryExtension,tSecondaryExtensions))
+				$$$ThrowOnError(##class(%ZPM.ExtensionBase.Composite).SetExtensionClasses(tPrimaryExtension,tSecondaryExtensions))
 			}
 		}
 		
@@ -1706,7 +1706,7 @@ ClassMethod OrphanedResourcesExecute(ByRef qHandle As %Binary, pNamespace As %St
 			}
 			
 			Set tName = tResult.%Get("Name")
-			If '$IsObject(##class(%ZPM.PackageManager.Developer.Extension.Utils).FindHomeModule(tName)) {
+			If '$IsObject(##class(%ZPM.ExtensionBase.Utils).FindHomeModule(tName)) {
 				Set ^||%ZPM.OrphanedResources($i(^||%ZPM.OrphanedResources)) = $ListBuild(tName)
 			}
 		}

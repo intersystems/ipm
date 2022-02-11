@@ -991,9 +991,9 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	Set tSCClassChanged = 0
 	
 	Set tPrimaryClass = ""
-	Set tCompositeSCClass = "%ZPM.PackageManager.Developer.Extension.Composite"
+	Set tCompositeSCClass = "%ZPM.ExtensionBase.Composite"
 	Set tPackageMgrSCClass = "%ZPM.PackageManager.Developer.Extension.PackageManager"
-	Set tSCInterface = "%ZPM.PackageManager.Developer.Extension.SourceControl.Interface"
+	Set tSCInterface = "%ZPM.ExtensionBase.Interface"
 	Set tOldSourceControlClass = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
 	
 	If (tOldSourceControlClass '= "") && '$$$comClassDefined(tOldSourceControlClass) {
@@ -1004,7 +1004,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	
 	If (tOldSourceControlClass '= "") && (tOldSourceControlClass '= tCompositeSCClass) && (tOldSourceControlClass '= tPackageMgrSCClass) {
 		Write !,"Enabling package manager extension... "
-		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Extension.Composite).SetExtensionClasses(tOldSourceControlClass,$ListBuild(tPackageMgrSCClass)))
+		$$$ThrowOnError(##class(%ZPM.ExtensionBase.Composite).SetExtensionClasses(tOldSourceControlClass,$ListBuild(tPackageMgrSCClass)))
 		Write "done."
 		Set tOldSourceControlClass = tCompositeSCClass
 	}
@@ -1012,8 +1012,8 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	If (tOldSourceControlClass = "") {
 		Write !,"No Studio extension is currently configured for this namespace."
 	} ElseIf (tOldSourceControlClass = tCompositeSCClass) {
-		Set tPrimaryClass = ##class(%ZPM.PackageManager.Developer.Extension.Composite).GetPrimaryExtensionClass()
-		Set tExtensionClasses = ##class(%ZPM.PackageManager.Developer.Extension.Composite).GetSubExtensionClasses()
+		Set tPrimaryClass = ##class(%ZPM.ExtensionBase.Composite).GetPrimaryExtensionClass()
+		Set tExtensionClasses = ##class(%ZPM.ExtensionBase.Composite).GetSubExtensionClasses()
 		Write !,"Currently configured to use the following extension classes: "
 		Set tPtr = 0
 		While $ListNext(tExtensionClasses,tPtr,tClass) {
@@ -1041,7 +1041,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 			Set tValue = $$$GetModifier(pCommandInfo,"extension")
 		} Else {
 			Set tValue = ""
-			Set tHelp = "Note: only subclasses of %ZPM.PackageManager.Developer.Extension.SourceControl.Interface are listed."
+			Set tHelp = "Note: only subclasses of %ZPM.ExtensionBase.Interface are listed."
 			Set tResponse = ##class(%Library.Prompt).GetArray("Which class?",.tValue,$ListBuild($classname()_":SourceControlClasses"),,,.tHelp,$$$InitialDisplayMask)
 			If (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
@@ -1056,7 +1056,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 			// Just configure the package manager source control class. (Gaining the "Package Manager" menu.)
 			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
 			Set tSecondaryExtension = $ListBuild("%ZPM.PackageManager.Developer.Extension.PackageManager")
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Extension.Composite).SetExtensionClasses(tValue,tSecondaryExtension))
+			$$$ThrowOnError(##class(%ZPM.ExtensionBase.Composite).SetExtensionClasses(tValue,tSecondaryExtension))
 			Write " done."
 			
 			// To see if it changed, compare to primary class (if found earlier) or old source control class (if we weren't combining extensions before)
@@ -1075,7 +1075,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	If (##class(%Studio.SourceControl.Interface).SourceControlClassGet() = tCompositeSCClass) {
 		// Default to having the user configure the extension after changing it.
 		Set tResult = tSCClassChanged
-		Set tPrimaryClass = ##class(%ZPM.PackageManager.Developer.Extension.Composite).GetPrimaryExtensionClass()
+		Set tPrimaryClass = ##class(%ZPM.ExtensionBase.Composite).GetPrimaryExtensionClass()
 		If $ClassMethod(tPrimaryClass,"%Extends",tSCInterface) && 'tQuiet {
 			Set tHelp = "Enter 'Yes' to configure settings for the selected source control class. Some of these may be namespace-specific, and some may be instance-wide."
 			Set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to configure source control options?",.tResult,.tHelp)
@@ -1381,7 +1381,7 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 
 Query SourceControlClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
 {
-	select Name as "ID",Name from %Dictionary.ClassDefinition_SubclassOf('%ZPM.PackageManager.Developer.Extension.SourceControl.Interface')
+	select Name as "ID",Name from %Dictionary.ClassDefinition_SubclassOf('%ZPM.ExtensionBase.Interface')
 }
 
 ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]

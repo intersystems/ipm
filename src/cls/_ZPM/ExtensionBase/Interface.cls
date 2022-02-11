@@ -1,5 +1,5 @@
 /// Additional inteface for source control extensions to implement to plug in to module lifecycles.
-Class %ZPM.PackageManager.Developer.Extension.SourceControl.Interface [ Abstract ]
+Class %ZPM.ExtensionBase.Interface [ Abstract ]
 {
 
 /// Name of page to help configure source control on a per-module basis
@@ -12,7 +12,7 @@ ClassMethod %GetClass() As %String [ Final ]
 		Quit ""
 	}
 	
-	If '$ClassMethod(tExtensionClass,"%Extends","%ZPM.PackageManager.Developer.Extension.Composite") {
+	If '$ClassMethod(tExtensionClass,"%Extends","%ZPM.ExtensionBase.Composite") {
 		Quit ""
 	}
 	

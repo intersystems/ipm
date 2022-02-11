@@ -227,9 +227,9 @@ Method OnGetUniqueName(Output pUniqueName)
 	Set pUniqueName = $Case(..Package '= "", 1: ..Package, : ..Class)_..Extension
 }
 
-Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo) As %Status
+Method GetSourceControlInfo(Output pInfo As %ZPM.ExtensionBase.ResourceInfo) As %Status
 {
-	Set pInfo = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo).%New()
+	Set pInfo = ##class(%ZPM.ExtensionBase.ResourceInfo).%New()
 	Set pInfo.SourceControlAware = 1
 	Set pInfo.Prefix = $Case(..Package '= "", 1: ..Package_".", : ..Class)
 	Set pInfo.RelativePath = ..ResourceReference.Name

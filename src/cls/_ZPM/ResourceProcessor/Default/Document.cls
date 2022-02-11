@@ -304,9 +304,9 @@ Method OnItemRelativePath(pItemName As %String) As %String
 	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_tSourceRoot_..Directory_"/"_$tr($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 }
 
-Method GetSourceControlInfo(Output pInfo As %ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo) As %Status
+Method GetSourceControlInfo(Output pInfo As %ZPM.ExtensionBase.ResourceInfo) As %Status
 {
-	Set pInfo = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo).%New()
+	Set pInfo = ##class(%ZPM.ExtensionBase.ResourceInfo).%New()
 	Set pInfo.SourceControlAware = 1
 	Set pInfo.RelativePath = ..Directory
 	Set pInfo.ResourceType = ..Extension

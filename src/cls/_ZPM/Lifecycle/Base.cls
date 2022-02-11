@@ -545,7 +545,7 @@ Method %Reload(ByRef pParams) As %Status
 			If tVerbose {
 				Write !,"Changing module root from '"_..Module.Root_"' to '"_tRoot_"'"
 			}
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.Interface).%OnChangeModuleRoot(..Module)
+			Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnChangeModuleRoot(..Module)
 			$$$ThrowOnError(tSC)
 		}
 		
@@ -579,7 +579,7 @@ Method %Reload(ByRef pParams) As %Status
 		}
 		
 		// call %OnModifyResources to let the source control class do any other mapping it needs to
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Extension.SourceControl.Interface).%OnModifyResources(..Module)
+		Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnModifyResources(..Module)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

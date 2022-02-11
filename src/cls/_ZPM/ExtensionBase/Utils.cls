@@ -1,4 +1,4 @@
-Class %ZPM.PackageManager.Developer.Extension.Utils
+Class %ZPM.ExtensionBase.Utils
 {
 
 /// Corrects internal names for routines with slashes instead of dots, as a workaround for PL 145107

@@ -1,5 +1,5 @@
 /// Description
-Class %ZPM.PackageManager.Developer.Extension.CompositeMethodOverrides
+Class %ZPM.ExtensionBase.CompositeMethodOverrides
 {
 
 ClassMethod SetExtensionClasses(pPrimaryClassName As %String, pSubExtensionClassNames As %List) As %Status
@@ -17,6 +17,5 @@ ClassMethod GetSubExtensionClasses() As %List [ SqlProc ]
 {
 	Quit ""
 }
-
 
 }

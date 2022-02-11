@@ -42,7 +42,7 @@ ClassMethod TrackResourceNames(pModuleName As %String, pResourceName As %String,
 			Set tInstance.Namespace = pNamespace
 			Set tInstance.ModuleName = pModuleName
 			Set tInstance.ResourceUniqueName = pResourceName
-			Set tInstance.LoadedResource = ##class(%ZPM.PackageManager.Developer.Extension.Utils).CorrectInternalNames(tName)
+			Set tInstance.LoadedResource = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(tName)
 			$$$ThrowOnError(tInstance.%Save())
 			Set tRecordsCreated = 1
 		}
@@ -84,7 +84,7 @@ ClassMethod Validate(pNamespace As %String = {$Namespace}, Output pErrorList) As
 		
 		// Find any resources that were loaded as part of a different module than the one that says it contains them.
 		Set tQuery = "select LoadedResource,ModuleName,ActualModule from ( "_
-			"	select LoadedResource,ModuleName,%ZPM_PackageManager_Developer_Extension.Utils_GetHomeModuleName(LoadedResource) ActualModule "_
+			"	select LoadedResource,ModuleName,%ZPM_ExtensionBase.Utils_GetHomeModuleName(LoadedResource) ActualModule "_
 			"	from %ZPM_Storage.LoadedResource "_
 			"	where Namespace = ?)"_
 			"	where ModuleName != ActualModule"
