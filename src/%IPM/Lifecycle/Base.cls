@@ -1170,7 +1170,7 @@ Method %Installer(ByRef pParams) As %Status
 	Try {
 		If ..Module.Name = "zpm" {
 			Write !,"Build Installer for ", ..Module.Name
-			Set tSC = ##class(%IPM.Installer).Make(..Payload, ..Installer)
+			Set tSC = ##class(IPM.Installer).Make(..Payload, ..Installer)
 			If $$$ISERR(tSC) {
 				Quit
 			}

@@ -134,7 +134,7 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 				}
 				
         Set tFileName = tFilesResult.%Get("Name")
-        continue:tFileName="%IPM.Installer.cls"
+        continue:tFileName="IPM.Installer.cls"
         Set tName = $Piece(tFileName, ".", 1, *-1)
         Set tDeployedClass = -1
         Set tCheckName = tFileName
