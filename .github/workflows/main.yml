@@ -80,10 +80,11 @@ jobs:
       - name: Test and Verify
         timeout-minutes: 15
         run: |
-          docker run --network zpm -d --rm --init \
+          docker run --network zpm -d --rm \
             -e TEST_REGISTRY=http://registry:52773/registry/ \
             -e TEST_REGISTRY_USER=admin \
             -e TEST_REGISTRY_PASSWORD=securepassword \
+            -v `pwd`:/home/irisowner/ipm/ \
             zpm
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
