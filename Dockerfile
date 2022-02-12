@@ -5,8 +5,8 @@ ARG REGISTRY=https://pm.community.intersystems.com
 
 RUN --mount=type=bind,src=.,dst=/home/irisowner/ipm/ \
   iris start iris && \
-  iris session iris "##class(%SYSTEM.OBJ).Load(\"/home/irisowner/ipm/Installer.cls\",\"ck\")" && \
-  iris session iris "##class(IPM.Installer).setup(\"/home/irisowner/ipm/\",3)" && \
+  iris session iris -U%SYS "##class(%SYSTEM.OBJ).Load(\"/home/irisowner/ipm/Installer.cls\",\"ck\")" && \
+  iris session iris -U%SYS "##class(IPM.Installer).setup(\"/home/irisowner/ipm/\",3)" && \
   iris stop iris quietly
 
 
