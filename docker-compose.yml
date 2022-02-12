@@ -1,4 +1,4 @@
-version: '3.6'
+version: '3'
 services:
   iris:
     build: 
@@ -7,7 +7,9 @@ services:
     restart: always
     ports: 
       - 52774:52773
+    command:
+      - -a
+      - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
     volumes:
+      - ./:/home/irisowner/ipm/
       - ~/iris.key:/usr/irissys/mgr/iris.key
-      - ./:/irisdev/app
-      - ./src/csp:/usr/irissys/mgr/csp/irisapp

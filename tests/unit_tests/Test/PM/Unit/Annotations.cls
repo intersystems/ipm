@@ -6,9 +6,9 @@ Class Test.PM.Unit.Annotations Extends %UnitTest.TestCase
 /// @TestMethod
 Method TestAnnotationRetrieval()
 {
-	#; #dim tAnnotation As %ZPM.PackageManager.Developer.Annotation
+	#; #dim tAnnotation As %IPM.PackageManager.Developer.Annotation
 	
-	#; Do $$$AssertStatusOK(##class(%ZPM.PackageManager.Developer.Annotation.Utils).ExtractAnnotations($classname(),.tList),"Extracted annotations from current class.")
+	#; Do $$$AssertStatusOK(##class(%IPM.PackageManager.Developer.Annotation.Utils).ExtractAnnotations($classname(),.tList),"Extracted annotations from current class.")
 	
 	#; Set tExpected($ListBuild("Test.PM.Unit.Annotations","","","SampleTestClass")) = ""
 	#; Set tExpected($ListBuild("Test.PM.Unit.Annotations","Method","TestAnnotationRetrieval","TestMethod")) = ""
