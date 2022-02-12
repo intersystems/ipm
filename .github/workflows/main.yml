@@ -37,7 +37,7 @@ jobs:
           VERSION=${{ env.LATEST }}
           [ '${{ matrix.version }}' == 'previous' ] && VERSION=${{ env.PREVIOUS }}
           [ '${{ matrix.version }}' == 'latest' ] && VERSION=${{ env.LATEST }}
-          [ '${{ matrix.version }}' == 'preview' ] && VERSION=${{ env.preview }}
+          [ '${{ matrix.version }}' == 'preview' ] && VERSION=${{ env.PREVIEW }}
           echo ::set-output name=name::${IMAGE}:${VERSION}
       - name: Setup version
         id: version
@@ -51,7 +51,13 @@ jobs:
           cat module.xml
           echo ::set-output name=number::${VERSION}
       - name: Build
-        run: docker build --rm --build-arg BASE=${{ steps.image.outputs.name }} -t zpm .
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: false
+          load: true
+          tags: zpm
+          build-args: BASE=${{ steps.image.outputs.name }}
       - name: Run temporary registry
         timeout-minutes: 15
         run: |
