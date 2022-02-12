@@ -98,7 +98,7 @@ jobs:
       - name: Test and publish to temporary registry
         timeout-minutes: 15
         run: |
-          docker run --network zpm -d --rm --init zpm
+          docker run --network zpm -d --rm -v `pwd`:/home/irisowner/ipm/ zpm
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -195,7 +195,7 @@ jobs:
         if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         run: |
           [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
-            docker run -d --rm --init zpm
+            docker run -d --rm -v `pwd`:/home/irisowner/ipm/ zpm
             CONTAINER=`docker ps -lq`
             sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
             /bin/echo -e '' \
