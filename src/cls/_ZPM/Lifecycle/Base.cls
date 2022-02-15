@@ -545,7 +545,7 @@ Method %Reload(ByRef pParams) As %Status
 			If tVerbose {
 				Write !,"Changing module root from '"_..Module.Root_"' to '"_tRoot_"'"
 			}
-			Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnChangeModuleRoot(..Module)
+			Set tSC = ##class(%ZPM.ExtensionBase.SourceControl.Interface).%OnChangeModuleRoot(..Module)
 			$$$ThrowOnError(tSC)
 		}
 		
@@ -554,7 +554,7 @@ Method %Reload(ByRef pParams) As %Status
 		Set tSC = ..Module.%Save() quit:$$$ISERR(tSC)
 		
 		Set tGlobalScope = ..Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
-		Set tAbsolutePrefix = $c($parameter("%ZPM.PackageManager.Developer.Extension.SourceControl.ISC","NOPREFIXCHARCODE"))
+		Set tAbsolutePrefix = $c($parameter("%ZPM.Extension.SourceControl.Perforce.Main","NOPREFIXCHARCODE"))
 		
 		// Ensures, for example, that HS.PM isn't mapped to ^Sources("ZPM","HS.PM")_"HS/module.xml"
 		If tDeveloperMode {
@@ -579,7 +579,7 @@ Method %Reload(ByRef pParams) As %Status
 		}
 		
 		// call %OnModifyResources to let the source control class do any other mapping it needs to
-		Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnModifyResources(..Module)
+		Set tSC = ##class(%ZPM.ExtensionBase.SourceControl.Interface).%OnModifyResources(..Module)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

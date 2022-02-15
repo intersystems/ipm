@@ -1,5 +1,5 @@
 /// Interface for classes that require some level of configuration.
-/// SETTINGS and DESCRIPTION are used to dynamically populate %ZPM.PackageManager.Developer.Extension.PackageManager.UI.Configuration
+/// SETTINGS and DESCRIPTION are used to dynamically populate %ZPM.Extension.ServerMenu.Configuration
 /// with all classes that implement IConfigurable.
 Class %ZPM.General.IConfigurable [ Abstract ]
 {

@@ -1,5 +1,7 @@
-Class %ZPM.PackageManager.Developer.Extension.UniversalSettings Extends %ZPM.General.AbstractSettings
+Class %ZPM.ExtensionBase.UniversalSettings Extends %ZPM.General.AbstractSettings
 {
+
+Parameter DEFAULTGLOBAL = "^ZPM.ExtensionBase.UniSettings";
 
 /// A string to show in the grouping of settings for this class
 Parameter DESCRIPTION = "Universal source control options";
@@ -47,8 +49,8 @@ Storage Default
 <Description>
 <![CDATA[This class has storage mapped to the global that stores other namespace-specific source control-related settings. The index and stream globals are expected to never be used.]]></Description>
 <IdLocation>^%SYS("SourceControl")</IdLocation>
-<IndexLocation>^%SYS("SourceControl","%ZPM.PackageManager.Developer.Extension.UniversalSettingsI")</IndexLocation>
-<StreamLocation>^%SYS("SourceControl","%ZPM.PackageManager.Developer.Extension.UniversalSettingsS")</StreamLocation>
+<IndexLocation>^%SYS("SourceControl","%ZPM.ExtensionBase.UniversalSettingsI")</IndexLocation>
+<StreamLocation>^%SYS("SourceControl","%ZPM.ExtensionBase.UniversalSettingsS")</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

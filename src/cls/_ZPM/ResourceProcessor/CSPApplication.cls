@@ -426,9 +426,9 @@ Method OnGetUniqueName(Output pUniqueName)
 	}
 }
 
-Method GetSourceControlInfo(Output pInfo As %ZPM.ExtensionBase.ResourceInfo) As %Status
+Method GetSourceControlInfo(Output pInfo As %ZPM.ExtensionBase.SourceControl.ResourceInfo) As %Status
 {
-	Set pInfo = ##class(%ZPM.ExtensionBase.ResourceInfo).%New()
+	Set pInfo = ##class(%ZPM.ExtensionBase.SourceControl.ResourceInfo).%New()
 	If (..Url '= "") {
 		Set pInfo.SourceControlAware = 1
 		Set pInfo.ResourceType = "/CSP/"

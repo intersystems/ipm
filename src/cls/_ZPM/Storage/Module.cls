@@ -276,7 +276,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				}
 				
 				// Notify source control (no-op if not configured)
-				Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnBeforePhase(tModule,tOnePhase,.pParams)
+				Set tSC = ##class(%ZPM.ExtensionBase.SourceControl.Interface).%OnBeforePhase(tModule,tOnePhase,.pParams)
 				$$$ThrowOnError(tSC)
 				$$$ThrowOnError(tLifecycle.OnBeforeResourceProcessing(tOnePhase, .pParams))
 				// Notify resource processors
@@ -335,7 +335,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				///Works after resource processing
 				$$$ThrowOnError(tLifecycle.OnAfterResourceProcessing(tOnePhase, .pParams))
 				// Notify source control (no-op if not configured)
-				Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnAfterPhase(tModule,tOnePhase,.pParams)
+				Set tSC = ##class(%ZPM.ExtensionBase.SourceControl.Interface).%OnAfterPhase(tModule,tOnePhase,.pParams)
 				$$$ThrowOnError(tSC)
 			} Catch e {
 				Set tSC = e.AsStatus()

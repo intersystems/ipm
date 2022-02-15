@@ -434,7 +434,7 @@ Trigger OnChange [ Event = INSERT/UPDATE, Foreach = row/object, Time = AFTER ]
 		}
 		
 		// TODO: Defer somehow, for the event of multiple changes to the same module's resources being %Save'd at the same time??
-		Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnModifyResources(tModule)
+		Set tSC = ##class(%ZPM.ExtensionBase.SourceControl.Interface).%OnModifyResources(tModule)
 	} Catch tEx {
 		Set tSC = tEx.AsStatus()
 	}

@@ -28,7 +28,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		Set tRoot = ..ResourceReference.Module.Root
 		If (pPhase = "Reload") {
 			Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
-			Set tSourcesPrefix = $c($parameter("%ZPM.PackageManager.Developer.Extension.SourceControl.ISC","NOPREFIXCHARCODE"))
+			Set tSourcesPrefix = $c($parameter("%ZPM.Extension.SourceControl.Perforce.Main","NOPREFIXCHARCODE"))
 			
 			// Format: ^^directory (to which the global is currently mapped)
 			Set tGlobalDBDir = $$$GBLDB(@("^"_$Piece(..ResourceReference.Name,".",1,*-1)))

@@ -1,4 +1,4 @@
-Class %ZPM.ExtensionBase.ResourceInfo Extends %RegisteredObject
+Class %ZPM.ExtensionBase.SourceControl.ResourceInfo Extends %RegisteredObject
 {
 
 /// Set to 1 for resources that may be mapped to files/source control

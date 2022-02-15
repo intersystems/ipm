@@ -95,7 +95,7 @@ Method Display()
 /// Called from package manager shell to create or update an instance of this class.
 /// Acceptable values in <var>pModifiers</var> and <var>pData</var> may vary between classes, but
 /// some (such as "name", "enabled", "snapshots", and "prereleases") are common to all.
-/// For a full list of modifiers, see the Commands XDATA block in <class>%ZPM.PackageManager</class>.
+/// For a full list of modifiers, see the Commands XDATA block in <class>%ZPM.Main</class>.
 /// If specified, <var>pExpectedType</var> will be compared against the full classname of the existing
 /// instance matched by <var>pModifiers("name")</var>; an error will be returned if they do not match.
 ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData, pExpectedType As %Dictionary.Classname = "") As %Status [ Final ]

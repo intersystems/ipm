@@ -1002,7 +1002,7 @@ ClassMethod ExportDocumentForObject(pSourceModule As %ZPM.Storage.Module, Output
 		
 		If tIsInSourceControl && 'tIsEditable {
 			// Try to make the document editable.
-			Set tSC = ##class(%ZPM.ExtensionBase.Interface).%OnMakeModuleEditable(pSourceModule)
+			Set tSC = ##class(%ZPM.ExtensionBase.SourceControl.Interface).%OnMakeModuleEditable(pSourceModule)
 			$$$ThrowOnError(tSC)
 		}
 		
@@ -1151,8 +1151,8 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			If (tCurrentSourceControl = "") {
 				Set tCompositeSCClass = "%ZPM.ExtensionBase.Composite"
 				$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
-				Set tPrimaryExtension = "%ZPM.PackageManager.Developer.Extension.SourceControl.ISC"
-				Set tSecondaryExtensions = $ListBuild("%ZPM.PackageManager.Developer.Extension.PackageManager")
+				Set tPrimaryExtension = "%ZPM.Extension.SourceControl.Perforce.Main"
+				Set tSecondaryExtensions = $ListBuild("%ZPM.Extension.ServerMenu.MenuItems")
 				$$$ThrowOnError(##class(%ZPM.ExtensionBase.Composite).SetExtensionClasses(tPrimaryExtension,tSecondaryExtensions))
 			}
 		}

@@ -1,5 +1,5 @@
 /// Additional inteface for source control extensions to implement to plug in to module lifecycles.
-Class %ZPM.ExtensionBase.Interface [ Abstract ]
+Class %ZPM.ExtensionBase.SourceControl.Interface [ Abstract ]
 {
 
 /// Name of page to help configure source control on a per-module basis

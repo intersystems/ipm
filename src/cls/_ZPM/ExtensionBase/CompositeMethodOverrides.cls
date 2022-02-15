@@ -23,7 +23,7 @@ Property MainJob As %String;
 Property Namespace As %String [ InitialExpression = {$Namespace} ];
 
 /// Cache of information related to mapping of resources across namespaces
-Property ResourceMappingCache As %ZPM.PackageManager.Developer.Extension.ResourceMappingCache [ InitialExpression = {##class(%ZPM.PackageManager.Developer.Extension.ResourceMappingCache).%Get()} ];
+Property ResourceMappingCache As %ZPM.ExtensionBase.ResourceMappingCache [ InitialExpression = {##class(%ZPM.ExtensionBase.ResourceMappingCache).%Get()} ];
 
 Parameter PRIMARYEXTENSIONGBL = {"^SYS(""SourceControl"",""%ZPM.ExtensionBase.Composite"",""PrimaryExtensionClass"")"};
 
@@ -171,9 +171,9 @@ Method GetSubExtension(pClassName As %String) As %Studio.Extension.Base
 
 Method GetMenuExtension(pMenuID As %String, pInternalName As %String = "") As %Studio.Extension.Base
 {
-	Set tSettings = ##class(%ZPM.PackageManager.Developer.Extension.UniversalSettings).%Get(.tSC)
+	Set tSettings = ##class(%ZPM.ExtensionBase.UniversalSettings).%Get(.tSC)
 	If $$$ISOK(tSC) && tSettings.MappedSourceControl {
-		Set tCache = ##class(%ZPM.PackageManager.Developer.Extension.ResourceMappingCache).%Get()
+		Set tCache = ##class(%ZPM.ExtensionBase.ResourceMappingCache).%Get()
 		If (pInternalName '= "") && ($Length(pInternalName,",") = 1) {
 			Set tSourceNamespace = ..FindNamespaceForInternalName(pInternalName)
 			If (tSourceNamespace '= ..Namespace) {
@@ -271,12 +271,12 @@ ClassMethod FindNamespaceForInternalName(pInternalName As %String) As %String
 		Quit tNamespace
 	}
 	
-	Set tSettings = ##class(%ZPM.PackageManager.Developer.Extension.UniversalSettings).%Get(.tSC)
+	Set tSettings = ##class(%ZPM.ExtensionBase.UniversalSettings).%Get(.tSC)
 	If $$$ISERR(tSC) || 'tSettings.MappedSourceControl {
 		Quit tNamespace
 	}
 	
-	Set tCache = ##class(%ZPM.PackageManager.Developer.Extension.ResourceMappingCache).%Get()
+	Set tCache = ##class(%ZPM.ExtensionBase.ResourceMappingCache).%Get()
 	If $Data(tCache.InternalNameMap($Namespace,pInternalName),tNamespace) {
 		Quit tNamespace
 	}
@@ -304,7 +304,7 @@ ClassMethod FindNamespaceForInternalName(pInternalName As %String) As %String
 
 ClassMethod FindNamespaceForDatabase(pDatabase As %String, Output pNamespace As %String) As %Status
 {
-	Set tCache = ##class(%ZPM.PackageManager.Developer.Extension.ResourceMappingCache).%Get()
+	Set tCache = ##class(%ZPM.ExtensionBase.ResourceMappingCache).%Get()
 	New $Namespace
 	Set tInitNamespace = $Namespace
 	Set pNamespace = $Namespace

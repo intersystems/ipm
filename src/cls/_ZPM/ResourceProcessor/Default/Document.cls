@@ -58,7 +58,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		Set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
 		If ((pPhase = "Reload") && tInScope) || tInCurrentPhase {
 			// Runs in Reload normally, and also in Test for test scope / Verify for verify scope
-			Set tSourcesPrefix = $c($parameter("%ZPM.PackageManager.Developer.Extension.SourceControl.ISC","NOPREFIXCHARCODE"))
+			Set tSourcesPrefix = $c($parameter("%ZPM.Extension.SourceControl.Perforce.Main","NOPREFIXCHARCODE"))
 			
 			If '$Get(pParams("NoMapping"),0) {
 			// Disabled mapping of resources. It creates more problems than solves. 
@@ -304,9 +304,9 @@ Method OnItemRelativePath(pItemName As %String) As %String
 	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_tSourceRoot_..Directory_"/"_$tr($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 }
 
-Method GetSourceControlInfo(Output pInfo As %ZPM.ExtensionBase.ResourceInfo) As %Status
+Method GetSourceControlInfo(Output pInfo As %ZPM.ExtensionBase.SourceControl.ResourceInfo) As %Status
 {
-	Set pInfo = ##class(%ZPM.ExtensionBase.ResourceInfo).%New()
+	Set pInfo = ##class(%ZPM.ExtensionBase.SourceControl.ResourceInfo).%New()
 	Set pInfo.SourceControlAware = 1
 	Set pInfo.RelativePath = ..Directory
 	Set pInfo.ResourceType = ..Extension
