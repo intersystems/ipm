@@ -1,3 +1,5 @@
+/// This class provides the API and interface to work with multiple Studio extensions
+/// It directs the action and lifecycle calls to corresponding primary/secondary extension class
 Class %ZPM.ExtensionBase.Composite Extends (%Studio.Extension.Base, %ZPM.ExtensionBase.CompositeMethodOverrides)
 {
 

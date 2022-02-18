@@ -1,4 +1,5 @@
-/// Description
+/// This class contains inheritence hacks to override final methods in %Studio.* methods
+/// And provides utilities to work with extension classes and namespace-specific source control classes
 Class %ZPM.ExtensionBase.CompositeMethodOverrides
 {
 
