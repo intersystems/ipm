@@ -1,7 +1,11 @@
+
 # ObjectScript Package Manager Client - ZPM
 
 [![Gitter](https://img.shields.io/badge/chat-on%20telegram-blue.svg)](https://t.me/joinchat/FoZ4Mw58zQJwtbLzQrty3Q)
-
+ [![Gitter](https://img.shields.io/badge/Available%20on-Intersystems%20Open%20Exchange-00b2a9.svg)](https://openexchange.intersystems.com/package/zpm)
+ [![Quality Gate Status](https://community.objectscriptquality.com/api/project_badges/measure?project=intersystems_iris_community%2Fzpm&metric=alert_status)](https://community.objectscriptquality.com/dashboard?id=intersystems_iris_community%2Fzpm)
+ <img alt="GitHub last commit" src="https://img.shields.io/github/last-commit/intersystems-community/zpm">
+ 
 Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and Frontend packages, and any files into InterSystems IRIS published on the official [ZPM Registry](https://pm.community.intersystems.com/packages/-/all) or private ZPM registry of your own.
 
 ## Documentation
