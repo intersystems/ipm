@@ -1,4 +1,4 @@
-ROUTINE %ZPM.PackageManager.Common [Type=INC]
+ROUTINE %ZPM.Common [Type=INC]
 
 #define FileTempDirSys	$zu(140,17,##class(%SYS.System).TempDirectory())
 

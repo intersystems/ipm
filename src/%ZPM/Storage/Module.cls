@@ -1,4 +1,4 @@
-Include (%occErrors, %ZPM.PackageManager.Common)
+Include (%occErrors, %ZPM.Common)
 
 Class %ZPM.Storage.Module Extends (%Persistent, %ZPM.General.ModuleInfo, %ZPM.Utils.ComparisonAdaptor) [ StorageStrategy = "" ]
 {

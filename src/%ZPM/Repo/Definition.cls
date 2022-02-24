@@ -1,4 +1,4 @@
-Include (%syPrompt, %ZPM.PackageManager.Common)
+Include (%syPrompt, %ZPM.Common)
 
 Class %ZPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %ZPM.CLI.Commands) [ Abstract ]
 {

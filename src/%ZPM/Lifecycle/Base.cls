@@ -1,4 +1,4 @@
-Include (%occErrors, %syGluedef, %ZPM.PackageManager.Common)
+Include (%occErrors, %syGluedef, %ZPM.Common)
 
 Class %ZPM.Lifecycle.Base Extends %RegisteredObject [ Abstract ]
 {

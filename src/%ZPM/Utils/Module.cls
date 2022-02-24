@@ -1,4 +1,4 @@
-Include (%occInclude, %occErrors, %syConfig, %syPrompt, %ZPM.PackageManager.Common)
+Include (%occInclude, %occErrors, %syConfig, %syPrompt, %ZPM.Common)
 
 Class %ZPM.Utils.Module [ System = 3 ]
 {

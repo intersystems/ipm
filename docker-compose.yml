@@ -9,5 +9,4 @@ services:
       - 52774:52773
     volumes:
       - ~/iris.key:/usr/irissys/mgr/iris.key
-      - ./:/irisdev/app
-      - ./src/csp:/usr/irissys/mgr/csp/irisapp
+      - ./:/home/irisowner/zpm/

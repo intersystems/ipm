@@ -1,6 +1,6 @@
-Include (%syGluedef, %sySecurity, %syPrompt, %ZPM.PackageManager.Common, %ZPM.Formatting)
+Include (%syGluedef, %sySecurity, %syPrompt, %ZPM.Common, %ZPM.Formatting)
 
-IncludeGenerator %ZPM.PackageManager.Common
+IncludeGenerator %ZPM.Common
 
 Class %ZPM.Main Extends %ZPM.CLI
 {

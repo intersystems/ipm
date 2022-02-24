@@ -1,4 +1,4 @@
-Include %ZPM.PackageManager.Common
+Include %ZPM.Common
 
 /// Superclass for all classes used to process lifecycle events for resources
 Class %ZPM.ResourceProcessor.Abstract Extends %RegisteredObject [ Abstract, PropertyClass = %ZPM.ResourceProcessor.PropertyParameters ]

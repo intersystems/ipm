@@ -1,4 +1,4 @@
-Include %ZPM.PackageManager.Common
+Include %ZPM.Common
 
 Class %ZPM.Storage.ResourceReference Extends (%Persistent, %XML.Adaptor, %ZPM.Utils.ComparisonAdaptor)
 {

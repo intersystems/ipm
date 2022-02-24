@@ -1,4 +1,4 @@
-Include %ZPM.PackageManager.Common
+Include %ZPM.Common
 
 Class %ZPM.General.InstallContext Extends %ZPM.General.Singleton
 {

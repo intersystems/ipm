@@ -1,4 +1,4 @@
-Include (%ZPM.PackageManager.Common, %occErrors)
+Include (%ZPM.Common, %occErrors)
 
 Class %ZPM.StudioDocument.Module Extends %ZPM.StudioDocument.Abstract
 {

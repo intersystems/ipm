@@ -1,7 +1,7 @@
 Class %ZPM.General.LogManager.Message Extends %RegisteredObject
 {
 
-/// Severity display name -> logical value also available via macros in %ZPM.PackageManager.Common.inc: <br />
+/// Severity display name -> logical value also available via macros in %ZPM.Common.inc: <br />
 /// <example>
 /// $$$ZPMLogTRACE
 /// $$$ZPMLogINFO
