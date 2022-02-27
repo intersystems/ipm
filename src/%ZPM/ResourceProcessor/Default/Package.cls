@@ -13,9 +13,9 @@ Property Format As %String(VALUELIST = ",UDL,XML");
 
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "cls" ];
 
-Property FilenameTranslateIdentifier As %String [ InitialExpression = ".%" ];
+Property FilenameTranslateIdentifier As %String [ InitialExpression = "." ];
 
-Property FilenameTranslateAssociator As %String [ InitialExpression = "/_" ];
+Property FilenameTranslateAssociator As %String [ InitialExpression = "/" ];
 
 Property LoadAsDirectory As %Boolean [ InitialExpression = 1 ];
 
