@@ -1349,25 +1349,19 @@ ClassMethod %RegExReplace(pString, pName, pValue) As %String
 Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
 {
 	Set tAttrValue = pAttrValue
-	Set tRoot = $Case(..Root,"":"",:##class(%File).NormalizeDirectory(..Root))
-  Set tInstallDir = ##class(%File).GetDirectory($zu(86))
-	Set tMgrDir = $System.Util.ManagerDirectory()
-  Set tBinDir = $System.Util.BinaryDirectory()
-	Set tCSPDir = ##class(%File).NormalizeDirectory("csp", tInstallDir)
-  Set tLibDir = ##class(%File).NormalizeDirectory("lib", tInstallDir)
-  Set tVerbose = +$Get(pParams("Verbose"))
-  Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
-
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "namespace", $Namespace)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "ns",        $Namespace)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "mgrdir",    tMgrDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "cspdir",    tCSPDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "root",      tRoot)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "bindir",    tBinDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "libdir",    tLibDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "verbose",   tVerbose)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "webroot",   urlRoot)
-
+	set lAttrValue=$zconvert(tAttrValue,"L")
+  	Set:lAttrValue["namespace" tAttrValue = ..%RegExReplace(tAttrValue, "namespace", $Namespace)
+	Set:lAttrValue["ns" tAttrValue = ..%RegExReplace(tAttrValue, "ns", $Namespace)
+	Set:lAttrValue["mgrdir" tAttrValue = ..%RegExReplace(tAttrValue, "mgrdir", $System.Util.ManagerDirectory())
+	Set:lAttrValue["cspdir" tAttrValue = ..%RegExReplace(tAttrValue, "cspdir", ##class(%File).NormalizeDirectory("csp", ##class(%File).GetDirectory($zu(86))))
+	Set:lAttrValue["root" tAttrValue = ..%RegExReplace(tAttrValue, "root", $Case(..Root,"":"",:##class(%File).NormalizeDirectory(..Root)))
+	Set:lAttrValue["bindir" tAttrValue = ..%RegExReplace(tAttrValue, "bindir", $System.Util.BinaryDirectory())
+	Set:lAttrValue["libdir" tAttrValue = ..%RegExReplace(tAttrValue, "libdir", ##class(%File).NormalizeDirectory("lib", ##class(%File).GetDirectory($zu(86))))
+	Set:lAttrValue["verbose" tAttrValue = ..%RegExReplace(tAttrValue, "verbose", +$Get(pParams("Verbose")))
+	if lAttrValue["webroot" {
+		Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)	
+		Set tAttrValue = ..%RegExReplace(tAttrValue, "webroot",   urlRoot)
+	}
   Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", tAttrValue)
   While regex.Locate() {
     Set expr = regex.Group(1)
@@ -1471,3 +1465,4 @@ Storage Default
 }
 
 }
+
