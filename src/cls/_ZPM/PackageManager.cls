@@ -1445,6 +1445,10 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
   if (tModuleName = "") {
     Quit $$$OK
   }
+  if (tModuleName = "zpm") {
+    new $namespace
+    set $namespace="%SYS"
+  }
 	If tRegistry = "" {
 		Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1,,.tSC)
 		If $isobject(tServer) {
