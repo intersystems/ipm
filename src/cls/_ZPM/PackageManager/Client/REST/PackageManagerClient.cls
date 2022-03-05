@@ -242,10 +242,10 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
       Set tRequest.Username = ..Username
       Set tRequest.Password = ..Password
 		}
-  	set proxy=$System.Util.GetEnviron("https_proxy")
-	if proxy'="" {
+      set proxy=$System.Util.GetEnviron("https_proxy")
+      if proxy'="" {
 		Do ##class(%Net.URLParser).Parse(proxy,.pr)
-		if (pr("scheme")="https") {
+		if (tRequest.Https) {
 			set tRequest.ProxyHTTPS=1
 			set tRequest.ProxyTunnel=1
 		}
