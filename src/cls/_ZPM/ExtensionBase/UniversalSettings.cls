@@ -3,7 +3,7 @@ Class %ZPM.ExtensionBase.UniversalSettings Extends %ZPM.General.AbstractSettings
 
 Parameter DEFAULTGLOBAL = "^ZPM.ExtensionBase.UniSettings";
 
-/// A string to show in the grouping of settings for this class
+/// A string to show in the grouping of settings for this class.
 Parameter DESCRIPTION = "Universal source control options";
 
 /// An inherited IDKey index on this property means that the default value is
