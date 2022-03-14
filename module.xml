@@ -3,7 +3,7 @@
 <Document name="ZPM.ZPM"><Module>
   <Name>ZPM</Name>
   <GlobalScope>true</GlobalScope>
-  <Version>0.3.3-SNAPSHOT</Version>
+  <Version>0.4.0-SNAPSHOT</Version>
   <ExternalName>Package Management System</ExternalName>
   <Description>Provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
   <Keywords>Package Manager</Keywords>
@@ -13,12 +13,10 @@
   </Author>
   <Packaging>module</Packaging>
   <SourcesRoot>src</SourcesRoot>
-  <Resource Name="%ZPM.PKG"/>
+  <Resource Name="%IPM.PKG"/>
   <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test"/>
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
   <Resource Name="%ZLANGC00.MAC" Generated="true"/>
-  <Resource Name="%ZPM.Formatting.INC"/>
-  <Resource Name="%ZPM.PackageManager.Common.INC"/>
   <Resource Name="/doc/README.txt"/>
 </Module>
 </Document></Export>

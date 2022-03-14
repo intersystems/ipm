@@ -4,7 +4,7 @@ Class Test.PM.Integration.Scopes Extends Test.PM.Integration.Base
 
 Method TestEverything()
 {
-	#dim tModule As %ZPM.Storage.Module
+	#dim tModule As %IPM.Storage.Module
 	
 	New $Namespace
 	Set tOrigNS = $Namespace

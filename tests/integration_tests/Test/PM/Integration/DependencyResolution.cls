@@ -3,7 +3,7 @@ Class Test.PM.Integration.DependencyResolution Extends Test.PM.Integration.Base
 
 Method TestEverything()
 {
-	#dim tModule As %ZPM.Storage.Module
+	#dim tModule As %IPM.Storage.Module
 	New $Namespace
 	Set tOrigNS = $Namespace
 	Try {
@@ -14,14 +14,14 @@ Method TestEverything()
     Do ..PublishModules()
   
 		#; // Get annotations for local module XDATA blocks; put into array by module (XDATA) name.
-		#; If '$$$AssertStatusOK(##class(%ZPM.PackageManager.Developer.Annotation.Utils).ExtractAnnotations($classname(),.tAnnotationList)) {
+		#; If '$$$AssertStatusOK(##class(%IPM.PackageManager.Developer.Annotation.Utils).ExtractAnnotations($classname(),.tAnnotationList)) {
 		#; 	Quit
     #; }
     
 		Kill tAssertArray
 		
 		#; For i=1:1:tAnnotationList.Count() {
-		#; 	#dim tAnnotation As %ZPM.PackageManager.Developer.Annotation
+		#; 	#dim tAnnotation As %IPM.PackageManager.Developer.Annotation
 		#; 	Set tAnnotation = tAnnotationList.GetAt(i)
 		#; 	If (tAnnotation.MemberType = "XData") {
 		#; 		Set tAssertArray(tAnnotation.MemberName,$i(tAssertArray(tAnnotation.MemberName))) = $ListBuild(tAnnotation.Tag,$$$lcase(tAnnotation.Value))
@@ -53,11 +53,11 @@ Method TestEverything()
 						Continue
 					}
           
-					Set tQualRef = ##class(%ZPM.Storage.QualifiedModuleInfo).%New()
+					Set tQualRef = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
 					Set tQualRef.ServerName = ..#REGISTRYNAME
 					Set tQualRef.Name = $Piece(tAssertValue," ",1)
 					Set tQualRef.VersionString = $Piece(tAssertValue," ",2)
-					Set tSC = ##class(%ZPM.Utils.Module).LoadQualifiedReference(tQualRef)
+					Set tSC = ##class(%IPM.Utils.Module).LoadQualifiedReference(tQualRef)
 					Do $$$AssertStatusOK(tSC,"Installed "_tAssertValue)
 				}
 				
@@ -100,11 +100,11 @@ Method TestEverything()
 						Continue
 					}
 					
-					Set tQualRef = ##class(%ZPM.Storage.QualifiedModuleInfo).%New()
+					Set tQualRef = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
 					Set tQualRef.ServerName = ..#REGISTRYNAME
 					Set tQualRef.Name = $Piece(tAssertValue," ",1)
 					Set tQualRef.VersionString = $Piece(tAssertValue," ",2)
-					Set tSC = ##class(%ZPM.Utils.Module).LoadQualifiedReference(tQualRef)
+					Set tSC = ##class(%IPM.Utils.Module).LoadQualifiedReference(tQualRef)
 					If (tAssertType = "AssertInstalledAfter") {
 						Do $$$AssertStatusOK(tSC,"Installed "_tAssertValue)
 					} Else {
@@ -142,8 +142,8 @@ Method PublishModules()
 Method UtilUninstallAll()
 {
 	For tModName = "Demo","HS.REST","HS.MDM","HS.JSON" {
-		If ##class(%ZPM.Storage.Module).NameExists($$$lcase(tModName)) {
-			Do $$$AssertStatusOK(##class(%ZPM.Storage.Module).Uninstall(tModName))
+		If ##class(%IPM.Storage.Module).NameExists($$$lcase(tModName)) {
+			Do $$$AssertStatusOK(##class(%IPM.Storage.Module).Uninstall(tModName))
 		}
 	}
 }

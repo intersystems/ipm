@@ -16,10 +16,10 @@ Method Setup() As %Status
 	Set tSC = $$$OK
 	Try {
 		New $Namespace
-		do $$$AssertStatusOK(##class(%ZPM.Repo.Filesystem.Definition).%DeleteExtent())
-		do $$$AssertStatusOK(##class(%ZPM.Repo.Remote.Definition).%DeleteExtent())
+		do $$$AssertStatusOK(##class(%IPM.Repo.Filesystem.Definition).%DeleteExtent())
+		do $$$AssertStatusOK(##class(%IPM.Repo.Remote.Definition).%DeleteExtent())
 		
-		If '$$$AssertStatusOK(##class(%ZPM.Test.Utils).CreateNamespace(..#CLIENTNS)) {
+		If '$$$AssertStatusOK(##class(%IPM.Test.Utils).CreateNamespace(..#CLIENTNS)) {
 			Quit
 		}
 		Set ..ClientNSCreated = 1
@@ -32,7 +32,7 @@ Method Setup() As %Status
 			Quit
 		}
 		if ('..RegistryAdded) {
-			Set tServerDefn = ##class(%ZPM.Repo.Remote.Definition).%New()
+			Set tServerDefn = ##class(%IPM.Repo.Remote.Definition).%New()
 			Set tServerDefn.Name = ..#REGISTRYNAME
 			Set tServerDefn.Enabled = 1
 			Set tServerDefn.URL = $system.Util.GetEnviron("TEST_REGISTRY")
@@ -59,10 +59,10 @@ Method TearDown() As %Status
 	Set tSC = $$$OK
 	Try {
 		New $Namespace
-		Set tSC = ##class(%ZPM.Test.Utils).DeleteNamespace(..#CLIENTNS)
+		Set tSC = ##class(%IPM.Test.Utils).DeleteNamespace(..#CLIENTNS)
 		Do:..ClientNSCreated $$$AssertStatusOK(tSC,"Client namespace deleted.")
 		if ..RegistryAdded {
-			Do $$$AssertStatusOK(##class(%ZPM.Repo.Definition).ServerDefinitionKeyDelete(..#REGISTRYNAME))
+			Do $$$AssertStatusOK(##class(%IPM.Repo.Definition).ServerDefinitionKeyDelete(..#REGISTRYNAME))
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -70,7 +70,7 @@ Method TearDown() As %Status
 	Quit tSC
 }
 
-ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName As %String, ByRef pModule As %ZPM.Storage.Module) As %Status
+ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName As %String, ByRef pModule As %IPM.Storage.Module) As %Status
 {
 	New $Namespace
 	Set tInitNS = $Namespace
@@ -89,19 +89,19 @@ ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName A
 			Quit
 		}
 		
-		Do tReader.Correlate("Module","%ZPM.Storage.Module")
+		Do tReader.Correlate("Module","%IPM.Storage.Module")
 		Do tReader.Next(.tModule,.tSC)
 		Set tName = tModule.Name_".ZPM"
 		Do tXData.Data.Rewind()
 		
 		Set $Namespace = tInitNS
 			
-		Set tStatus = ##class(%ZPM.StudioDocument.Module).ImportStream(.tName,tXData.Data)
+		Set tStatus = ##class(%IPM.StudioDocument.Module).ImportStream(.tName,tXData.Data)
 		If $$$ISERR(tStatus) {
 			Quit
 		}
 		
-		Set pModule = ##class(%ZPM.Storage.Module).NameOpen($Piece(tName,".",1,*-1),,.tStatus)
+		Set pModule = ##class(%IPM.Storage.Module).NameOpen($Piece(tName,".",1,*-1),,.tStatus)
 		If $$$ISERR(tStatus) {
 			Quit
 		}
