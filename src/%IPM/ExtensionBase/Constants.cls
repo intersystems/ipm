@@ -1,5 +1,5 @@
 /// Provides class parameters for the magic numbers from <class>%Studio.Extension.Base</class> (used in the UserAction and AfterUserAction methods).
-Class %ZPM.ExtensionBase.Constants [ Abstract ]
+Class %IPM.ExtensionBase.Constants [ Abstract ]
 {
 
 /// Type (first argument to UserAction/AfterUserAction) for menu item-based actions

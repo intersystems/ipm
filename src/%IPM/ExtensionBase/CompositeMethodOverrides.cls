@@ -1,6 +1,6 @@
 /// This class contains inheritence hacks to override final methods in %Studio.* methods
 /// And provides utilities to work with extension classes and namespace-specific source control classes
-Class %ZPM.ExtensionBase.CompositeMethodOverrides
+Class %IPM.ExtensionBase.CompositeMethodOverrides
 {
 
 /// Array of top-level menu ID to configured handling class.
@@ -24,11 +24,11 @@ Property MainJob As %String;
 Property Namespace As %String [ InitialExpression = {$Namespace} ];
 
 /// Cache of information related to mapping of resources across namespaces
-Property ResourceMappingCache As %ZPM.ExtensionBase.ResourceMappingCache [ InitialExpression = {##class(%ZPM.ExtensionBase.ResourceMappingCache).%Get()} ];
+Property ResourceMappingCache As %IPM.ExtensionBase.ResourceMappingCache [ InitialExpression = {##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()} ];
 
-Parameter PRIMARYEXTENSIONGBL = {"^SYS(""SourceControl"",""%ZPM.ExtensionBase.Composite"",""PrimaryExtensionClass"")"};
+Parameter PRIMARYEXTENSIONGBL = {"^SYS(""SourceControl"",""%IPM.ExtensionBase.Composite"",""PrimaryExtensionClass"")"};
 
-Parameter SUBEXTENSIONGBL = {"^SYS(""SourceControl"",""%ZPM.ExtensionBase.Composite"",""SubExtensionClasses"")"};
+Parameter SUBEXTENSIONGBL = {"^SYS(""SourceControl"",""%IPM.ExtensionBase.Composite"",""SubExtensionClasses"")"};
 
 /// This just calls the <method>Login</method> to perform an initialisation.
 /// Note that this is called by Studio automatically via the <class>%Studio.SourceControl.Interface</class>
@@ -172,9 +172,9 @@ Method GetSubExtension(pClassName As %String) As %Studio.Extension.Base
 
 Method GetMenuExtension(pMenuID As %String, pInternalName As %String = "") As %Studio.Extension.Base
 {
-	Set tSettings = ##class(%ZPM.ExtensionBase.UniversalSettings).%Get(.tSC)
+	Set tSettings = ##class(%IPM.ExtensionBase.UniversalSettings).%Get(.tSC)
 	If $$$ISOK(tSC) && tSettings.MappedSourceControl {
-		Set tCache = ##class(%ZPM.ExtensionBase.ResourceMappingCache).%Get()
+		Set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
 		If (pInternalName '= "") && ($Length(pInternalName,",") = 1) {
 			Set tSourceNamespace = ..FindNamespaceForInternalName(pInternalName)
 			If (tSourceNamespace '= ..Namespace) {
@@ -272,12 +272,12 @@ ClassMethod FindNamespaceForInternalName(pInternalName As %String) As %String
 		Quit tNamespace
 	}
 	
-	Set tSettings = ##class(%ZPM.ExtensionBase.UniversalSettings).%Get(.tSC)
+	Set tSettings = ##class(%IPM.ExtensionBase.UniversalSettings).%Get(.tSC)
 	If $$$ISERR(tSC) || 'tSettings.MappedSourceControl {
 		Quit tNamespace
 	}
 	
-	Set tCache = ##class(%ZPM.ExtensionBase.ResourceMappingCache).%Get()
+	Set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
 	If $Data(tCache.InternalNameMap($Namespace,pInternalName),tNamespace) {
 		Quit tNamespace
 	}
@@ -305,7 +305,7 @@ ClassMethod FindNamespaceForInternalName(pInternalName As %String) As %String
 
 ClassMethod FindNamespaceForDatabase(pDatabase As %String, Output pNamespace As %String) As %Status
 {
-	Set tCache = ##class(%ZPM.ExtensionBase.ResourceMappingCache).%Get()
+	Set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
 	New $Namespace
 	Set tInitNamespace = $Namespace
 	Set pNamespace = $Namespace

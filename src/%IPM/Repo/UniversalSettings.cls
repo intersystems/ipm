@@ -1,4 +1,4 @@
-/// ZPM settings are placed in ^IPM.settings global in %SYS namespace
+/// IPM settings are placed in ^IPM.settings global in %SYS namespace
 /// Use this class to set or get settings
 /// 
 /// Available settings

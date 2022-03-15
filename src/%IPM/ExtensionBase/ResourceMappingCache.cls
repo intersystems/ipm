@@ -1,4 +1,4 @@
-Class %ZPM.ExtensionBase.ResourceMappingCache Extends %ZPM.General.Singleton
+Class %IPM.ExtensionBase.ResourceMappingCache Extends %IPM.General.Singleton
 {
 
 Property MenuMap [ MultiDimensional ];

@@ -1,7 +1,7 @@
 Class %IPM.Storage.LoadedResource Extends %Persistent
 {
 
-Parameter DEFAULTGLOBAL = "^IRIS.Temp.ZPM.LoadedResource";
+Parameter DEFAULTGLOBAL = "^IRIS.Temp.IPM.LoadedResource";
 
 Property Namespace As %String(MAXLEN = 64) [ Required ];
 
@@ -152,11 +152,11 @@ Storage Default
 <Value>LoadedResource</Value>
 </Value>
 </Data>
-<DataLocation>^IRIS.Temp.ZPM.LoadedResourceD</DataLocation>
+<DataLocation>^IRIS.Temp.IPM.LoadedResourceD</DataLocation>
 <DefaultData>LoadedResourceDefaultData</DefaultData>
-<IdLocation>^IRIS.Temp.ZPM.LoadedResourceD</IdLocation>
-<IndexLocation>^IRIS.Temp.ZPM.LoadedResourceI</IndexLocation>
-<StreamLocation>^IRIS.Temp.ZPM.LoadedResourceS</StreamLocation>
+<IdLocation>^IRIS.Temp.IPM.LoadedResourceD</IdLocation>
+<IndexLocation>^IRIS.Temp.IPM.LoadedResourceI</IndexLocation>
+<StreamLocation>^IRIS.Temp.IPM.LoadedResourceS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

@@ -1,22 +1,22 @@
 /// This class provides the API and interface to work with multiple Studio extensions
 /// It directs the action and lifecycle calls to corresponding primary/secondary extension class
-Class %ZPM.ExtensionBase.Composite Extends (%Studio.Extension.Base, %ZPM.ExtensionBase.CompositeMethodOverrides)
+Class %IPM.ExtensionBase.Composite Extends (%Studio.Extension.Base, %IPM.ExtensionBase.CompositeMethodOverrides)
 {
 
 Query MainMenus(Classname As %String) As %SQLQuery [ SqlProc ]
 {
-SELECT Name, Type FROM %Studio_Extension.Menu WHERE MenuBase %INLIST %ZPM_ExtensionBase.Composite_GetSubExtensionClasses()
+SELECT Name, Type FROM %Studio_Extension.Menu WHERE MenuBase %INLIST %IPM_ExtensionBase.Composite_GetSubExtensionClasses()
 }
 
 Query MenuItems(Classname As %String, MenuName As %String, InternalName As %String, SelectedText As %String) As %SQLQuery [ SqlProc ]
 {
-SELECT MenuItem_Name, MenuItem_Enabled, MenuItem_Save, MenuItem_Separator FROM %Studio_Extension.Menu_MenuItem WHERE Menu->MenuBase %INLIST %ZPM_ExtensionBase.Composite_GetSubExtensionClasses() AND Menu->Name = :MenuName
+SELECT MenuItem_Name, MenuItem_Enabled, MenuItem_Save, MenuItem_Separator FROM %Studio_Extension.Menu_MenuItem WHERE Menu->MenuBase %INLIST %IPM_ExtensionBase.Composite_GetSubExtensionClasses() AND Menu->Name = :MenuName
 }
 
 Method AfterUserAction(Type As %Integer, Name As %String, InternalName As %String, Answer As %Integer, Msg As %String = "", ByRef Reload As %Boolean) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = $Select(Type:..GetPrimaryExtension(InternalName),1:..GetMenuExtension(Name,InternalName))
 	If '$IsObject(tExtension) {
 		Quit ##super(Type,.Name,.InternalName,.Answer,.Msg,.Reload)
@@ -27,7 +27,7 @@ Method AfterUserAction(Type As %Integer, Name As %String, InternalName As %Strin
 Method ExternalName(InternalName As %String) As %String
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName)
@@ -38,7 +38,7 @@ Method ExternalName(InternalName As %String) As %String
 Method GetStatus(InternalName As %String, ByRef IsInSourceControl As %Boolean, ByRef Editable As %Boolean, ByRef IsCheckedOut As %Boolean, ByRef UserCheckedOut As %String) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName,.IsInSourceControl,.Editable,.IsCheckedOut,.UserCheckedOut)
@@ -75,7 +75,7 @@ ClassMethod IsGenerated(Name As %String) As %String
 Method IsInSourceControl(InternalName As %String) As %Boolean
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName)
@@ -86,7 +86,7 @@ Method IsInSourceControl(InternalName As %String) As %Boolean
 Method IsReadOnly(InternalName As %String) As %Boolean
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName)
@@ -114,7 +114,7 @@ Method IsReadOnly(InternalName As %String) As %Boolean
 Method ItemIconState(InternalName As %String) As %Integer
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName)
@@ -160,7 +160,7 @@ Method OnAfterClassCompile(List As %String, Level As %Integer, ByRef qstruct As 
 Method OnAfterCompile(InternalName As %String) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName)
@@ -171,7 +171,7 @@ Method OnAfterCompile(InternalName As %String) As %Status
 Method OnAfterDelete(InternalName As %String) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName)
@@ -182,7 +182,7 @@ Method OnAfterDelete(InternalName As %String) As %Status
 Method OnAfterLoad(InternalName As %String, Object As %RegisteredObject = {$$$NULLOREF}) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName,.Object)
@@ -193,7 +193,7 @@ Method OnAfterLoad(InternalName As %String, Object As %RegisteredObject = {$$$NU
 Method OnAfterSave(InternalName As %String, Object As %RegisteredObject = {$$$NULLOREF}) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName,.Object)
@@ -204,7 +204,7 @@ Method OnAfterSave(InternalName As %String, Object As %RegisteredObject = {$$$NU
 Method OnAfterStorage(InternalName As %String, Location As %String = "") As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName,.Location)
@@ -233,7 +233,7 @@ Method OnBeforeClassCompile(List As %String, Level As %Integer, ByRef qstruct As
 Method OnBeforeCompile(InternalName As %String, ByRef qstruct As %String) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName,.qstruct)
@@ -244,7 +244,7 @@ Method OnBeforeCompile(InternalName As %String, ByRef qstruct As %String) As %St
 Method OnBeforeDelete(InternalName As %String) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName)
@@ -255,7 +255,7 @@ Method OnBeforeDelete(InternalName As %String) As %Status
 Method OnBeforeLoad(InternalName As %String) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName)
@@ -266,7 +266,7 @@ Method OnBeforeLoad(InternalName As %String) As %Status
 Method OnBeforeSave(InternalName As %String, Location As %String = "", Object As %RegisteredObject = {$$$NULLOREF}) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(.InternalName,.Location,.Object)
@@ -277,7 +277,7 @@ Method OnBeforeSave(InternalName As %String, Location As %String = "", Object As
 Method OnBeforeTimestamp(InternalName As %String)
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetPrimaryExtension(InternalName)
 	If '$IsObject(tExtension) {
 		Do ##super(.InternalName)
@@ -289,7 +289,7 @@ Method OnBeforeTimestamp(InternalName As %String)
 Method OnMenuItem(MenuName As %String, InternalName As %String, SelectedText As %String, ByRef Enabled As %Boolean, ByRef DisplayName As %String) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = ..GetMenuExtension(MenuName,InternalName)
 	If '$IsObject(tExtension) {
 		Quit ##super(MenuName,InternalName,SelectedText,.Enabled,.DisplayName)
@@ -300,7 +300,7 @@ Method OnMenuItem(MenuName As %String, InternalName As %String, SelectedText As 
 Method UserAction(Type As %Integer, Name As %String, InternalName As %String, SelectedText As %String, ByRef Action As %String, ByRef Target As %String, ByRef Msg As %String, ByRef Reload As %Boolean) As %Status
 {
 	New $Namespace
-	Set InternalName = ##class(%ZPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
+	Set InternalName = ##class(%IPM.ExtensionBase.Utils).CorrectInternalNames(InternalName)
 	Set tExtension = $Select(Type:..GetPrimaryExtension(InternalName),1:..GetMenuExtension(Name,InternalName))
 	If '$IsObject(tExtension) {
 		Quit ##super(Type,Name,.InternalName,.SelectedText,.Action,.Target,.Msg,.Reload)
