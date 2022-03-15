@@ -1,5 +1,9 @@
 /// Additional inteface for source control extensions to implement to plug in to module lifecycles.
+<<<<<<< HEAD:src/%IPM/ExtensionBase/SourceControl/Interface.cls
 Class %IPM.ExtensionBase.SourceControl.Interface [ Abstract ]
+=======
+Class %IPM.PackageManager.Developer.Extension.SourceControl.Interface [ Abstract ]
+>>>>>>> 9978352e58b9926ce0ad0dd115f0edb16c99ed68:src/%IPM/PackageManager/Developer/Extension/SourceControl/Interface.cls
 {
 
 /// Name of page to help configure source control on a per-module basis
@@ -12,7 +16,11 @@ ClassMethod %GetClass() As %String [ Final ]
 		Quit ""
 	}
 	
+<<<<<<< HEAD:src/%IPM/ExtensionBase/SourceControl/Interface.cls
 	If '$ClassMethod(tExtensionClass,"%Extends","%IPM.ExtensionBase.Composite") {
+=======
+	If '$ClassMethod(tExtensionClass,"%Extends","%IPM.PackageManager.Developer.Extension.Composite") {
+>>>>>>> 9978352e58b9926ce0ad0dd115f0edb16c99ed68:src/%IPM/PackageManager/Developer/Extension/SourceControl/Interface.cls
 		Quit ""
 	}
 	

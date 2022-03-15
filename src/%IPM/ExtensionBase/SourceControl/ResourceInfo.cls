@@ -1,4 +1,8 @@
+<<<<<<< HEAD:src/%IPM/ExtensionBase/SourceControl/ResourceInfo.cls
 Class %IPM.ExtensionBase.SourceControl.ResourceInfo Extends %RegisteredObject
+=======
+Class %IPM.PackageManager.Developer.Extension.SourceControl.ResourceInfo Extends %RegisteredObject
+>>>>>>> 9978352e58b9926ce0ad0dd115f0edb16c99ed68:src/%IPM/PackageManager/Developer/Extension/SourceControl/ResourceInfo.cls
 {
 
 /// Set to 1 for resources that may be mapped to files/source control

@@ -1,4 +1,8 @@
+<<<<<<< HEAD:src/%IPM/ExtensionBase/Utils.cls
 Class %IPM.ExtensionBase.Utils
+=======
+Class %IPM.PackageManager.Developer.Extension.Utils
+>>>>>>> 9978352e58b9926ce0ad0dd115f0edb16c99ed68:src/%IPM/PackageManager/Developer/Extension/Utils.cls
 {
 
 /// Corrects internal names for routines with slashes instead of dots, as a workaround for PL 145107
