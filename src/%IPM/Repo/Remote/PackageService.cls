@@ -88,7 +88,7 @@ Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive A
     Set tRequest = ..GetHttpRequest()
     Set tRequest.Timeout = 300
     Set tSC = tRequest.Get(tRequest.Location_path)
-    $$$ThrowOnError(tSC)
+    
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
       Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz")
@@ -102,6 +102,13 @@ Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive A
       Set token = tRequest.HttpResponse.GetHeader("INSTALLTOKEN")
       If (token'="") {
         Set ^IRIS.TempZPMRInst(name,version) = token
+      }
+    } Else {
+      If $$$ISERR(tSC) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "tRequest Get Error"))
+      }
+      If (tRequest.HttpResponse.StatusCode'=200) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "tRequest statuscode not 200"))
       }
     }
   }
