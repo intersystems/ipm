@@ -1,7 +1,5 @@
 # ObjectScript Package Manager Client - ZPM
 
-[![Gitter](https://img.shields.io/badge/chat-on%20telegram-blue.svg)](https://t.me/joinchat/FoZ4Mw58zQJwtbLzQrty3Q)
-
 Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and Frontend packages, and any files into InterSystems IRIS published on the official [ZPM Registry](https://pm.community.intersystems.com/packages/-/all) or private ZPM registry of your own.
 
 ## Documentation
