@@ -554,7 +554,7 @@ Method %Reload(ByRef pParams) As %Status
 		Set tSC = ..Module.%Save() quit:$$$ISERR(tSC)
 		
 		Set tGlobalScope = ..Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
-		Set tAbsolutePrefix = $c($parameter("%IPM.Extension.SourceControl.Perforce.Main","NOPREFIXCHARCODE"))
+		Set tAbsolutePrefix = $c($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 		
 		// Ensures, for example, that HS.PM isn't mapped to ^Sources("ZPM","HS.PM")_"HS/module.xml"
 		If tDeveloperMode {

@@ -1,4 +1,4 @@
-Class %IPM.Storage.ModuleSetting.ResourceProcessorDefault Extends %IPM.Storage.ModuleSetting
+Class %IPM.Storage.ModuleSetting.ProcessorDefault Extends %IPM.Storage.ModuleSetting
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Storage.ModSet.RP";
@@ -10,12 +10,12 @@ Property Class As %Dictionary.Classname(XMLPROJECTION = "ATTRIBUTE") [ Required 
 Property Attributes As array Of %String(MAXLEN = "", XMLKEYNAME = "Name", XMLNAME = "Attribute", XMLPROJECTION = "ELEMENT");
 
 /// Conditions under which the default settings apply
-Property Conditions As list Of %IPM.Storage.ModuleSetting.ResourceProcessorDefault.Condition(XMLNAME = "Condition", XMLPROJECTION = "ELEMENT");
+Property Conditions As list Of %IPM.Storage.ModuleSetting.ProcessorDefault.Condition(XMLNAME = "Condition", XMLPROJECTION = "ELEMENT");
 
 Storage Default
 {
-<Data name="ResourceProcessorDefaultState">
-<Subscript>"ResourceProcessorDefault"</Subscript>
+<Data name="ProcessorDefaultState">
+<Subscript>"ProcessorDefault"</Subscript>
 <Value name="1">
 <Value>Class</Value>
 </Value>
@@ -26,7 +26,7 @@ Storage Default
 <Value>Conditions</Value>
 </Value>
 </Data>
-<State>ResourceProcessorDefaultState</State>
+<State>ProcessorDefaultState</State>
 <Type>%Storage.Serial</Type>
 }
 
