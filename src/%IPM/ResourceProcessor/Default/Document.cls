@@ -61,9 +61,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 				Set tSourcesPrefix = $c($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 				
 				If '$Get(pParams("NoMapping"),0) {
-					// Disabled mapping of resources. It creates more problems than solves. 
-					// Moreover, the removal of mapping during uninstallation is not implemented.
-					// $$$ThrowOnError(..OnConfigureMappings(.pParams))
+					$$$ThrowOnError(..OnConfigureMappings(.pParams))
 				}
 				
 				If '..ResourceReference.Generated {
