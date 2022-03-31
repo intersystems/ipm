@@ -242,6 +242,19 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
       Set tRequest.Username = ..Username
       Set tRequest.Password = ..Password
 		}
+      set proxy=$System.Util.GetEnviron("https_proxy")
+      if proxy'="" {
+		Do ##class(%Net.URLParser).Parse(proxy,.pr)
+		if (tRequest.Https) {
+			set tRequest.ProxyHTTPS=1
+			set tRequest.ProxyTunnel=1
+		}
+		set tRequest.ProxyPort=pr("port")
+		set tRequest.ProxyServer=pr("host")
+		if pr("username")'="",pr("password")'="" {
+			set tRequest.ProxyAuthorization="Basic "_$system.Encryption.Base64Encode(pr("username")_":"_pr("password"))
+		}
+	}
   }
   Return tRequest
 }
