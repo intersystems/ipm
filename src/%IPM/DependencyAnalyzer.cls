@@ -11,7 +11,7 @@ ClassMethod RunForAllModules() As %Status
 	Set tOneSC = $$$OK
 	Try {
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-			"select Name from %IPM_Storage.""MODULE""")
+			"select Name from %IPM_Storage.""MODULEBASE""")
 		If (tRes.%SQLCODE < 0) {
 			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 		}
