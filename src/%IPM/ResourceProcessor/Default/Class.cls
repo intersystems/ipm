@@ -7,7 +7,7 @@ Parameter DESCRIPTION As STRING = "Standard resource processor for class definit
 /// Export format
 Property Format As %String(VALUELIST = ",UDL,XML");
 
-/// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
+/// Subclasses may override to customize mapping behavior at the beginning of the Reload phase
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
