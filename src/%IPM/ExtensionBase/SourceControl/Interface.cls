@@ -5,6 +5,8 @@ Class %IPM.ExtensionBase.SourceControl.Interface [ Abstract ]
 /// Name of page to help configure source control on a per-module basis
 Parameter SETTINGSPAGE;
 
+Parameter NOPREFIXCHARCODE = 8;
+
 ClassMethod %GetClass() As %String [ Final ]
 {
 	Set tExtensionClass = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()

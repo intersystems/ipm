@@ -74,8 +74,8 @@ Method ApplyDefaults()
 	Set tDefaults = ..ResourceReference.Module.Defaults
 	For tDefaultIndex = 1:1:tDefaults.Count() {
 		Set tDefault = tDefaults.GetAt(tDefaultIndex)
-		If tDefault.%IsA("%IPM.Storage.ModuleSetting.ResourceProcessorDefault") {
-			#dim tDefault As %IPM.Storage.ModuleSetting.ResourceProcessorDefault
+		If tDefault.%IsA("%IPM.Storage.ModuleSetting.ProcessorDefault") {
+			#dim tDefault As %IPM.Storage.ModuleSetting.ProcessorDefault
 			Set tThisClass = $ClassName()
 			Set tFullClass = $$$DefaultProcessorPackageDot_tDefault.Class
 			If (tThisClass = tDefault.Class) || (tThisClass = tFullClass) {
@@ -95,7 +95,7 @@ Method ApplyDefaults()
 }
 
 /// Generated similarly to <method>CopyAttributes</method>
-Method CopyDefaultAttributes(pSource As %IPM.Storage.ModuleSetting.ResourceProcessorDefault) [ CodeMode = objectgenerator, Private ]
+Method CopyDefaultAttributes(pSource As %IPM.Storage.ModuleSetting.ProcessorDefault) [ CodeMode = objectgenerator, Private ]
 {
 	Set tSC = $$$OK
 	Try {
@@ -125,7 +125,7 @@ Method CopyDefaultAttributes(pSource As %IPM.Storage.ModuleSetting.ResourceProce
 	Quit tSC
 }
 
-Method SatisfiesCondition(pCondition As %IPM.Storage.ModuleSetting.ResourceProcessorDefault.Condition) As %Boolean
+Method SatisfiesCondition(pCondition As %IPM.Storage.ModuleSetting.ProcessorDefault.Condition) As %Boolean
 {
 	Set tValue = $Property($This, pCondition.Attribute)
 	Quit $Case(pCondition.Operator,
