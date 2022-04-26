@@ -616,7 +616,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 	Kill pErrorList
 	Try {
 		If '$ListLength(pRepoNames) {
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name from %IPM_Storage.""ModuleBase""")
+			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name from %IPM_Storage.""Module""")
 			If (tRes.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 			}
@@ -815,7 +815,7 @@ ClassMethod UninstallAll(pForce As %Boolean, ByRef pParams) As %Status
 /// If 1, only snapshots; if 0, only non-snapshots.
 ClassMethod GetInstalledModuleListSQL(Output pSQL As %String, pSnapshots As %Boolean = "") As %Status
 {
-	Set pSQL = "select Name from %IPM_Storage.""ModuleBase"""
+	Set pSQL = "select Name from %IPM_Storage.""Module"""
 	If (pSnapshots = 0) {
 		Set pSQL = pSQL_" where Version_Build <> 'snapshot'"
 	} ElseIf (pSnapshots = 1) {
