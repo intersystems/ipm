@@ -88,10 +88,7 @@ Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive A
     Set tRequest = ..GetHttpRequest()
     Set tRequest.Timeout = 300
     Set tSC = tRequest.Get(tRequest.Location_path)
-<<<<<<< HEAD
     
-=======
->>>>>>> 6ed90b1622ecb424240db583b102050e289ba26c
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
       Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz")
