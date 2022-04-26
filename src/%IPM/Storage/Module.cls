@@ -1,6 +1,6 @@
 Include (%occErrors, %IPM.Common)
 
-Class %IPM.Storage.Module Extends (%Persistent, %IPM.General.ModuleInfo, %IPM.Utils.ComparisonAdaptor) [ StorageStrategy = "", SqlTableName = ModuleBase ]
+Class %IPM.Storage.Module Extends (%Persistent, %IPM.General.ModuleInfo, %IPM.Utils.ComparisonAdaptor) [ StorageStrategy = "" ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Storage.Module";
