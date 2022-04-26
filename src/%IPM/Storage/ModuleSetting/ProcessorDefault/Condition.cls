@@ -1,5 +1,5 @@
 /// Tested in the SatisfiesCondition method of <class>%IPM.ResourceProcessor.Abstract</class>
-Class %IPM.Storage.ModuleSetting.ResourceProcessorDefault.Condition Extends (%SerialObject, %XML.Adaptor, %IPM.Utils.ComparisonAdaptor)
+Class %IPM.Storage.ModuleSetting.ProcessorDefault.Condition Extends (%SerialObject, %XML.Adaptor, %IPM.Utils.ComparisonAdaptor)
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Storage.ModSet.RP.Cond";

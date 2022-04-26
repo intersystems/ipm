@@ -53,68 +53,69 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		Set tVerbose = $Get(pParams("Verbose"),0)
 		Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
 		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-    Set tName = $TRANSLATE(tName, "%", "_")
-    Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
+    	Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
 		Set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
 		If ((pPhase = "Reload") && tInScope) || tInCurrentPhase {
-			// Runs in Reload normally, and also in Test for test scope / Verify for verify scope
-			Set tSourcesPrefix = $c($parameter("%IPM.Extension.SourceControl.Perforce.Main","NOPREFIXCHARCODE"))
-			
-			If '$Get(pParams("NoMapping"),0) {
-			// Disabled mapping of resources. It creates more problems than solves. 
-			// Moreover, the removal of mapping during uninstallation is not implemented.
-			// $$$ThrowOnError(..OnConfigureMappings(.pParams))
-			}
-			
-			If '..ResourceReference.Generated {
-				Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
-				Set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory)
-        If ('##class(%File).DirectoryExists(tResourceDirectory)) {
-          Quit 
-        }
-
-        Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_..Directory_"/")
-        if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
-          Set tResourceDirectory = tResourceCatDirectory
-        } 
-        ElseIf (..Directory="mac") {
-          Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_"rtn/")
-          if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
-            Set tResourceDirectory = tResourceCatDirectory
-          }
-        }
-    
-				If tDeveloperMode && (..Extension '= "") && (tName '= "") {
-					Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix_tResourceDirectory
+			For tName = tName, $TRANSLATE(tName, "%", "_"), $TRANSLATE(tName, "_", "") {
+				// Runs in Reload normally, and also in Test for test scope / Verify for verify scope
+				Set tSourcesPrefix = $c($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
+				
+				If '$Get(pParams("NoMapping"),0) {
+					$$$ThrowOnError(..OnConfigureMappings(.pParams))
 				}
 				
-				If '..ResourceReference.Preload {
-					Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
-					Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $tr(tName,..FilenameTranslateIdentifier,..FilenameTranslateAssociator))_tFileExtension
-					If ($$$lcase(tFileExtension)=".xml")&&('##class(%File).Exists(tResourcePath)) {
-            Set $PIECE(tResourcePath, ".", *) = "cls"
-            Set ..Format = "UDL"
-          } 
-          ElseIf ($$$lcase(tFileExtension)=".cls")&&('##class(%File).Exists(tResourcePath)) {
-            Set $PIECE(tResourcePath, ".", *) = "xml"
-            Set ..Format = "XML"            
-          }
-
-          If ('##class(%File).Exists(tResourcePath) && ##class(%File).Exists($tr(tResourcePath,"_","%"))) {
-            Set tResourcePath = $tr(tResourcePath,"_","%")
-          }
-          
-					If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
-						Set $PIECE(tResourcePath, ".", *) = "rtn"
+				If '..ResourceReference.Generated {
+					Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
+					Set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory)
+					If ('##class(%File).DirectoryExists(tResourceDirectory)) {
+						Quit 
 					}
 
-					$$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList))
+					Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_..Directory_"/")
+					if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
+						Set tResourceDirectory = tResourceCatDirectory
+					} 
+					ElseIf (..Directory="mac") {
+						Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_"rtn/")
+						if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
+							Set tResourceDirectory = tResourceCatDirectory
+						}
+					}
+			
+					If tDeveloperMode && (..Extension '= "") && (tName '= "") {
+						Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix_tResourceDirectory
+					}
 					
-					Set tSC = ##class(%IPM.Storage.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
-					$$$ThrowOnError(tSC)
+					If '..ResourceReference.Preload {
+						Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
+						Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $tr(tName,".","/"))_tFileExtension
+						If ($$$lcase(tFileExtension)=".xml")&&('##class(%File).Exists(tResourcePath)) {
+							Set $PIECE(tResourcePath, ".", *) = "cls"
+							Set ..Format = "UDL"
+						} 
+						ElseIf ($$$lcase(tFileExtension)=".cls")&&('##class(%File).Exists(tResourcePath)) {
+							Set $PIECE(tResourcePath, ".", *) = "xml"
+							Set ..Format = "XML"            
+						}
+			
+						If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
+							Set $PIECE(tResourcePath, ".", *) = "rtn"
+						}
+																		
+						if '##class(%File).Exists(tResourcePath) {
+							Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
+							continue
+						}
+
+						$$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList))
+						
+						Set tSC = ##class(%IPM.Storage.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
+						$$$ThrowOnError(tSC)
+					}
 				}
+				Set pResourceHandled = 1
+				Quit
 			}
-			Set pResourceHandled = 1
 		} ElseIf (pPhase = "Compile") {
 			If tInScope {
 				// If Compile is false, indicate that the resource's compilation phase has already been handled and nothing special should happen.

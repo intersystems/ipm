@@ -1,5 +1,7 @@
 /// This class provides the API and interface to work with multiple Studio extensions
 /// It directs the action and lifecycle calls to corresponding primary/secondary extension class
+/// Set Inheritance to right, so that on conflict definitions, CompositeMethodOverrides.cls will take over %Studio.Extension.Base.cls
+/// This way, CompositeMethodOverrides.cls can override final methods in %Studio.* methods
 Class %IPM.ExtensionBase.Composite Extends (%Studio.Extension.Base, %IPM.ExtensionBase.CompositeMethodOverrides) [ Inheritance = right, Owner = {%Developer} ]
 {
 
