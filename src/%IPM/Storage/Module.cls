@@ -808,7 +808,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 {
 	Set tStatement = ##class(%SQL.Statement).%New()
-	$$$ThrowOnError(tStatement.%Prepare("select Dependencies_Name as ModuleName from %IPM_Storage.Module_Dependencies where ""Module""->Name = ?"))
+	$$$ThrowOnError(tStatement.%Prepare("select Dependencies_Name as ModuleName from %IPM_Storage.ModuleBase_Dependencies where ""ModuleBase""->Name = ?"))
 	
 	Set tKnownDependencyList = ""
 	Set tSearchList = $ListBuild(pModuleName)
@@ -1322,10 +1322,10 @@ Method Lock() As %Status
 
 Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List = "") As %SQLQuery [ SqlProc ]
 {
-	select distinct %exact Dependencies_VersionString "Version",%DLIST("Module"->Name) "Names"
-	from %IPM_Storage.Module_Dependencies
+	select distinct %exact Dependencies_VersionString "Version",%DLIST("ModuleBase"->Name) "Names"
+	from %IPM_Storage.ModuleBase_Dependencies
 	where Dependencies_Name = :pOfModuleName and
-		(:pExcludeModuleNames is null or "Module"->Name not %INLIST :pExcludeModuleNames)
+		(:pExcludeModuleNames is null or "ModuleBase"->Name not %INLIST :pExcludeModuleNames)
 	group by Dependencies_VersionString
 }
 
