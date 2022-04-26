@@ -1,6 +1,6 @@
 /// This class provides the API and interface to work with multiple Studio extensions
 /// It directs the action and lifecycle calls to corresponding primary/secondary extension class
-Class %IPM.ExtensionBase.Composite Extends (%Studio.Extension.Base, %IPM.ExtensionBase.CompositeMethodOverrides)
+Class %IPM.ExtensionBase.Composite Extends (%Studio.Extension.Base, %IPM.ExtensionBase.CompositeMethodOverrides) [ Inheritance = right, Owner = {%Developer} ]
 {
 
 Query MainMenus(Classname As %String) As %SQLQuery [ SqlProc ]
