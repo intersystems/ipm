@@ -138,7 +138,7 @@ ClassMethod SetSubExtensionClasses(pClassNames As %List) As %Status
 		If $$$ISERR(tStatus) {
 			Quit
 		}
-		Set @..#SUBEXTENSIONGBL = pClassNames
+		Set @..#SUBEXTENSIONGBL = tClassNames
 	} Catch e {
 		Set tStatus = e.AsStatus()
 	}
