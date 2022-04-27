@@ -81,7 +81,7 @@ ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary
 		"CLS":"Class",
 		"INC":"Include",
 		"MAC":"Routine",
-		"LOC":"LocalizedErrorMessages",
+		"LOC":"LocalizedMessages",
 		"GBL":"Global",
 		"DFI":"DeepSeeItem",
 		"LUT":"Interoperability",
@@ -569,7 +569,6 @@ Method %Reload(ByRef pParams) As %Status
 		For {
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:tKey=""
-			
 			If $IsObject(tResource.Processor) {
 				Set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
 			}
