@@ -47,7 +47,7 @@ Relationship Mappings As %IPM.Storage.MappingReference(XMLITEMNAME = "Mapping", 
 Relationship Invokes As %IPM.Storage.InvokeReference(XMLITEMNAME = "Invoke", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
 /// Lifecycle class used by default for this module
-Property LifecycleClass As %Dictionary.Classname;
+Property LifecycleClass As %Dictionary.Classname [ InitialExpression = "%IPM.Lifecycle.Module" ];
 
 /// Lifecycle class to use for a specific command (may be overridden from command line)
 Property OverrideLifecycleClass As %Dictionary.Classname [ Transient ];

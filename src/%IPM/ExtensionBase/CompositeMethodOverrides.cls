@@ -89,6 +89,9 @@ ClassMethod SetPrimaryExtensionClass(pClassName As %String) As %Status
 	Set tStatus = $$$OK
 	Set tInitTLevel = $TLevel
 	Try {
+		If '##class(%Library.ClassDefinition).%ExistsId(pClassName) {
+			Quit
+		}
 		If '$ClassMethod(pClassName,"%Extends","%Studio.Extension.Base") {
 			Set tStatus = $$$ERROR($$$GeneralError,"Class '"_pClassName_"' does not extend %Studio.Extension.Base")
 			Quit
@@ -120,6 +123,9 @@ ClassMethod SetSubExtensionClasses(pClassNames As %List) As %Status
 			If ($Get(tClassName) = "") {
 				Continue
 			}
+		If '##class(%Library.ClassDefinition).%ExistsId(tClassName) {
+			Continue
+		}
 			If '$ClassMethod(tClassName,"%Extends","%Studio.Extension.Base") {
 				Set tStatus = $$$ERROR($$$GeneralError,"Class '"_tClassName_"' does not extend %Studio.Extension.Base")
 				Quit
