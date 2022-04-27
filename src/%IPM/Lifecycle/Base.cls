@@ -504,12 +504,13 @@ Method %Reload(ByRef pParams) As %Status
 		// Set up mappings
 		Set tKey = ""
 		For {
+			#dim tMapping As %IPM.Storage.MappingReference
 			Set tMapping = ..Module.Mappings.GetNext(.tKey)
 			Quit:tKey=""
 			
 			Set tName = $Piece(tMapping.Name,".",1,*-1)
 			Set tExtension = $Piece(tMapping.Name,".",*)
-			Set tSource = tMapping.Source
+			Set tSource = tMapping.SourceResolved
 			
 			Set tSC = $Case(tExtension,
 				"GBL":##class(%IPM.Utils.Module).AddGlobalMapping($namespace,tName,tSource),
@@ -519,6 +520,9 @@ Method %Reload(ByRef pParams) As %Status
 				"":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,"ALL",tSource))
 			If $$$ISERR(tSC) {
 				Quit
+			}
+			If (tVerbose) {
+				Write !, "Added "_tExtension_" mapping "_tName_" from database "_tSource
 			}
 		}
 		If $$$ISERR(tSC) {

@@ -18,9 +18,6 @@ Property Source As %String(MAXLEN = 64, XMLPROJECTION = "ATTRIBUTE");
 /// Resolved value after evaluating any permitted expressions in <property>Source</property>.
 Property SourceResolved As %String(MAXLEN = 64, XMLPROJECTION = "NONE") [ SqlComputeCode = { Set {*} = ##class(%IPM.Utils.Module).%EvaluateSystemExpression({Source}) }, SqlComputed ];
 
-/// Namespace from which it is mapped or copied
-Property Source As %String(XMLPROJECTION = "ATTRIBUTE");
-
 /// If set to true, this source code is not shipped in application packaging.
 /// (Of course, it must be included in module packaging.)
 Property Deploy As %Boolean(XMLPROJECTION = "ATTRIBUTE");
