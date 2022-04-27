@@ -1980,4 +1980,70 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 	Quit tSC
 }
 
+/// Evaluates an expression in a provided string. <br />
+/// These special expressions are case-insensitive. <br />
+/// Current valid expressions:
+/// <ul>
+/// 	<li>{$namespace} - the current namespace. </li>
+/// 	<li>{$namespaceLower} - the current namespace in lower case. </li>
+/// 	<li>{$namespaceRoutineDB} - the default routines database for the current namespace. </li>
+/// 	<li>{$namespaceGlobalsDB} - the default globals database for the current namespace. </li>
+/// 	<li>{$installDir} - the instance's install directory </li>
+/// 	<li>{$dataDir} - the instance's data directory </li>
+/// 	<li>{$mgrDir} - the instance's mgr directory. </li>
+/// 	<li>{$cspDir} - the instance's root CSP directory. </li>
+/// </ul>
+ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal ]
+{
+	If (pString '[ "{") {
+		Return pString
+	}
+	Set result = pString
+	Do ..GetDatabaseInfoForNamespace($Namespace, .properties)
+	If $Locate(result,"(?i)\{\$namespace\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespace\}",$Namespace)
+	}
+	If $Locate(result,"(?i)\{\$namespaceLower\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespace\}",$ZConvert($Namespace,"L"))
+	}
+	If $Locate(result,"(?i)\{\$namespaceRoutineDB\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceRoutineDB\}",$Get(properties("Routines")))
+	}
+	If $Locate(result,"(?i)\{\$namespaceGlobalsDB\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceGlobalsDB\}",$Get(properties("Globals")))
+	}
+	If $Locate(result,"(?i)\{\$installDir\}") {
+		Set dir = $System.Util.InstallDirectory()
+		Set result = ..%RegExReplace(result,"(?i)\{\$installDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$dataDir\}") {
+		Set dir = $System.Util.DataDirectory()
+		Set result = ..%RegExReplace(result,"(?i)\{\$dataDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$mgrDir\}") {
+		Set dir = ##class(%Library.File).ManagerDirectory()
+		Set result = ..%RegExReplace(result,"(?i)\{\$mgrDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$cspDir\}") {
+		Set dir = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"csp")
+		Set result = ..%RegExReplace(result,"(?i)\{\$cspDir\}",dir)
+	}
+	Return result
+}
+
+/// Wrapper around Config.Namespaces:Get()
+ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pProperties) [ Internal ]
+{
+	Kill pProperties
+	New $Namespace
+	Set $Namespace = "%SYS"
+	Set sc = $ClassMethod("Config.Namespaces", "Get", pNamespace, .pProperties)
+}
+
+ClassMethod %RegExReplace(pString, pRegEx, pValue) As %String [ Internal ]
+{
+	Quit ##class(%Regex.Matcher).%New(pRegEx,pString).ReplaceAll($Replace(pValue,"\","\\"))
+}
+
+
 }
