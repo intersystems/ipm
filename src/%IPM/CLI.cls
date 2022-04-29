@@ -50,7 +50,6 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 		// List commands
 		If 'tMarkdown {
 			Write !, $$$FormattedLine($$$Underlined, "Available commands:")
-			Write !, "NOTE: [] around a parameter indicates it is optional"
 			Write !
 		}
 		Set tCommand = ""
@@ -66,103 +65,274 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 			
 			Kill tOneCommandStruct
 			Merge tOneCommandStruct = tCommandStruct(tCommand)
-			Do ..%HelpForCommand(tCommand,.tOneCommandStruct,tVerbose,tMarkdown)
+			Do ..%HelpForCommand(tCommand,.tOneCommandStruct,tVerbose,tMarkdown,$Get(tCommandStruct(-1, "maxLength"),0))
 			
 			Write !
 		}
 		
 		If 'tVerbose {
-			Write !, "For more detail, run:", !?2, "help <command-name>", !, "or", !?2, "help -v"
+			Write !!, "For more detail, run:", !?2, "help <command-name>", !, "or", !?2, "help -v"
 		}
 	}
 	Write !
 }
 
-ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDetailed As %Boolean = 0, pMarkdownFormat As %Boolean = 0)
+ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDetailed As %Boolean = 0, pMarkdownFormat As %Boolean = 0, pMaxLength As %Integer = 0)
 {
-	// Macro to escape if in markdown
-	#define Escape(%string) $Select(pMarkdownFormat:$Replace(%string,"[","\["),1:%string)
+	/*
+	 * Structure on Terminal is adapted from git help
+	 */
+	
+	/// Section separator in Markdown
+	#define SectionSeparator $Case(pMarkdownFormat, 1: "-----", : "")
 	// Macro to format strings if printing to terminal and to escape if in markdown
-	#define EscapeOrFormat(%string, %format) $Case(pMarkdownFormat, 1:$Replace(%string, "[", "\["), :$$$FormattedLine(%format, %string))
+	#define EscapeOrFormat(%string, %format) $Case(pMarkdownFormat, 1:$Replace(%string, "|", "\|"), :$$$FormattedLine(%format, %string))
 	// Bullet point if in Terminal
-	#define BulletPoint $Case(pMarkdownFormat, 1: "", :$Char(8729)_" ")
-	// Black square if in Terminal
+	#define BulletPoint $Case(pMarkdownFormat, 1: "", :$Char(9675)_" ")
+	// Black square if in Terminal. No longer used but kept in case we want to use it again in future
 	#define BlackSquare $Case(pMarkdownFormat, 1: "", :$Char(9632)_" ")
-
-  #define DefaultGroup "-"
 	
-  #define Indent 2
-	
+	Set tIndent = 4
 	Set tIsAlias = $Data(pCommandStruct)<10
 	If pMarkdownFormat && tIsAlias {
-		Write !, "----", !, "h2. ", pCommandName
-		Write !, "_Alias for [", pCommandStruct, "|#", pCommandStruct, "]_"
+		Write !, "##"_pCommandName
+		Write !, "_Alias for ["_pCommandStruct_"](#"_pCommandStruct_")_"
+		Write !, $$$SectionSeparator
 	}
 	
 	// Don't show full documentation for aliases 
+	// This will only happen when displaying all documentation for Markdown
 	If tIsAlias {
 		Return
 	}
 	
-	Write !, $Select(pMarkdownFormat:"----",1:""), !
-	If pMarkdownFormat {
-		Write "h2. "
-	}
-	Write $$$EscapeOrFormat(pCommandName, ..TerminalPromptColor())
-	
-	If pMarkdownFormat {
-		Write !, "Syntax: {{", pCommandName
-	}
-	
-	If $Data(pCommandStruct("modifiers")) && '$Get(pCommandStruct("trailingModifiers"),0) {
-		Write $$$EscapeOrFormat(" [flags]", ..TerminalPromptColor())
-	}
-	
-	If $Data(pCommandStruct("parameters")) {
-		Set tKey = ""
-		Set tEndingBrackets = 0
-		While 1 {
-			Set tKey = $Order(pCommandStruct("parameters",tKey),1,tParamName)
-			// Only deal with ordered parameters, not named
-			If (tKey = "") || (tKey '= +tKey) {
-				Quit
-			}
-			
-			Write " "
-			// Non-required parameters are surrounded with [] brackets
-			If 'pCommandStruct("parameters", tParamName, "required") {
-				Write $$$EscapeOrFormat("[", ..TerminalPromptColor())
-				Set tEndingBrackets = tEndingBrackets + 1
-			}
-			Write $$$EscapeOrFormat("<"_tParamName_">", ..TerminalPromptColor())
+	If '(pDetailed) {
+		Set tIndent = 10
+		If (pMaxLength > tIndent) {
+			// Do twice max length to account for aliases (which are usually shorter so this should be sufficient)
+			Set tIndent = 2 * pMaxLength + 2
+		}
+		// Command name and aliases
+		Write !, pCommandName
+		If $Data(pCommandStruct("aliases"), tAliases) {
+			Write ", "_$Replace(tAliases, ",", ", ")
+		}
+		// Summary
+		If $Data(pCommandStruct("summary"), tSummary) {
+			Write ?tIndent, $ZStrip(tSummary, "<>CW")
+		} ElseIf $Data(pCommandStruct("description"), tDescription) {
+			Write ?tIndent, $ZStrip(tDescription, "<>CW")
+		}
+	} Else {
+		// Command name and format
+		If pMarkdownFormat {
+			Write "## "
+		}
+		Write $$$EscapeOrFormat(pCommandName, $$$Red)
+		If pMarkdownFormat {
+			Write !, "**Syntax:** `", pCommandName
+		}
+		If $Data(pCommandStruct("modifiers")) && '$Get(pCommandStruct("trailingModifiers"),0) {
+			Write $$$EscapeOrFormat(" [flags]", $$$Red)
 		}
 		
-		For i=1:1:tEndingBrackets {
-			Write $$$EscapeOrFormat("]", ..TerminalPromptColor())
+		If $Data(pCommandStruct("parameters")) {
+			Set tKey = ""
+			Set tEndingBrackets = 0
+			While 1 {
+				Set tKey = $Order(pCommandStruct("parameters",tKey),1,tParamName)
+				// Only deal with ordered parameters, not named
+				If (tKey = "") || (tKey '= +tKey) {
+					Quit
+				}
+				Write " "
+				// Non-required parameters are surrounded with [] brackets
+				If 'pCommandStruct("parameters", tParamName, "required") {
+					Write $$$EscapeOrFormat("[", $$$Red)
+					Set tEndingBrackets = tEndingBrackets + 1
+				}
+				Write $$$EscapeOrFormat("<"_tParamName_">", $$$Red)
+			}
+			
+			For i=1:1:tEndingBrackets {
+				Write $$$EscapeOrFormat("]", $$$Red)
+			}
 		}
-	}
-	
-	If $Data(pCommandStruct("modifiers")) && $Get(pCommandStruct("trailingModifiers"),0) {
-		Write $$$EscapeOrFormat(" [flags]", ..TerminalPromptColor())
-	}
-	
-	If pMarkdownFormat {
-		Write "}}"
-	}
-	
-	If $Data(pCommandStruct("aliases"), tAliases) {
-		Write !, ?$$$Indent, $$$BlackSquare_"Alias"_$Case($Length(tAliases, ","), 1:"", :"es")_": "_$Replace(tAliases, ",", ", ")
-	}
-	
-	If $Data(pCommandStruct("description"), tDescription) {
-		Write !, ?$$$Indent, $$$BlackSquare_"Description: "_tDescription
-	}
-	
-	If (pDetailed) {
-    Do ..%HelpForCommandDetails(.pCommandStruct, pMarkdownFormat)
+		
+		If $Data(pCommandStruct("modifiers")) && $Get(pCommandStruct("trailingModifiers"),0) {
+			Write $$$EscapeOrFormat(" [flags]", $$$Red)
+		}
+		If pMarkdownFormat {
+			Write "`"
+		} Else {
+			Write !, "NOTE: [] around an argument indicates it is optional. Flags are always optional"
+		}
+
+		// Aliases
+		Write !
+		If $Data(pCommandStruct("aliases"), tAliases) {
+			Set tAliases = $Replace(tAliases, ",", ", ")
+			If pMarkdownFormat {
+				Write !, "**Alias(es):** "_tAliases
+			} Else {
+				Write !, $$$EscapeOrFormat("ALIAS"_$Case($Length(tAliases, ","), 1:"", :"ES")_": ",$$$Bold)_tAliases
+			}
+			Write !
+		}
+
+		// Description
+		If $Data(pCommandStruct("description"), tDescription) {
+			Write !
+			If pMarkdownFormat {
+				// Strip all leading AND trailing white space + control characters
+				Write "**Description:** "_$ZStrip(tDescription, "<>CW")
+			} Else {
+				Write $$$EscapeOrFormat("DESCRIPTION:",$$$Bold)
+				// Strip trailing control characters and white space. Indentation is handled
+				// by formatting correctly within the Commands XData block
+				Write !, $ZStrip(tDescription, ">CW")
+			}
+		}
+
+		// Arguments
+		If $Data(pCommandStruct("parameters")) {
+			Write !!
+			If (pMarkdownFormat) {
+				Write "### Arguments"
+			} Else {
+				Write $$$EscapeOrFormat("ARGUMENTS:",$$$Bold)
+			}
+			If pMarkdownFormat {
+				Write !, "| Name | Description |"
+				Write !, "| "_$$$SectionSeparator_" | "_$$$SectionSeparator_" |"
+			}
+			Set tKey = ""
+			For {
+				Set tKey = $Order(pCommandStruct("parameters",tKey),1,tParamName)
+				If (tKey = "") || (tKey '= +tKey) {
+					// Only deal with ordered parameters, not named
+					Quit
+				}
+				
+				Write !
+				If pMarkdownFormat {
+					Write "| "
+				} Else {
+					Write ?(tIndent*2)
+				}
+				Write $$$BulletPoint_tParamName
+				If pMarkdownFormat {
+					Write " | "
+				}
+				
+				Kill tParamInfo
+				Merge tParamInfo = pCommandStruct("parameters",tParamName)
+				If ($Data(tParamInfo("description"), tDescription)) {
+					If pMarkdownFormat {
+						Write $ZStrip(tDescription, "<>CW")
+					} Else {
+						Write ": "_tDescription
+					}
+				}
+				If pMarkdownFormat {
+					Write " |"
+				}
+			}
+		}
+
+		// Modifiers
+		If $Data(pCommandStruct("modifiers")) {
+			Write !!
+			If (pMarkdownFormat) {
+				Write "### Flags"
+			} Else {
+				Write $$$EscapeOrFormat("FLAGS:",$$$Bold)
+			}
+			If pMarkdownFormat {
+				Write !, "| Flag | Description |"
+				Write !, "| "_$$$SectionSeparator_" | "_$$$SectionSeparator_" |"
+			}
+			Set tKey = 1000
+			While 1 {
+				Set tKey = $Order(pCommandStruct("modifiers",tKey))
+				If (tKey = "") {
+					Quit
+				}
+				Write !
+				If pMarkdownFormat {
+					Write "| "
+				} Else {
+					Write ?(tIndent*2)
+				}
+				Kill tModInfo
+				Merge tModInfo = pCommandStruct("modifiers",tKey)
+
+				Set tFlagList = $ListBuild(tKey)
+				If ($Data(tModInfo("aliases"),tAliases)) {
+					Set tFlagList = tFlagList _ $ListFromString(tAliases, ",")
+				}
+				Set tValueAppend = ""
+				If $Get(tModInfo("value")) {
+					Set tValueAppend = $Case($Data(tModInfo("valueList"),tValueList),
+						1: " <"_$Replace(tValueList,",","/")_">",
+						 : " <value>")
+				}
+				Set tPtr = 0
+				Set tAppendedFlagList = ""
+				While $ListNext(tFlagList, tPtr, tFlag) {
+					Set tAppendedFlagList = tAppendedFlagList _ $ListBuild("-"_tFlag_tValueAppend)
+				}
+				Write $ListToString(tAppendedFlagList, ", ")
+
+				If pMarkdownFormat {
+					Write " | "
+				}
+				If ($Data(tModInfo("description"),tDescription)) {
+					If pMarkdownFormat {
+						Write $ZStrip(tDescription, "<>CW")
+					} Else {
+						Write !, ?(tIndent*4), tDescription
+					}
+				}
+				If pMarkdownFormat {
+					Write " |"
+				}
+			}
+		}
+		
+		// Examples
+		If $Data(pCommandStruct("examples")) {
+			Write !!
+			If (pMarkdownFormat) {
+				Write "### Examples"
+			} Else {
+				Write $$$EscapeOrFormat("EXAMPLES:",$$$Bold)
+			}
+			If pMarkdownFormat {
+				Write !,"| Command | Description |"
+				Write !, "| "_$$$SectionSeparator_" | "_$$$SectionSeparator_" |"
+			}
+			Set tKey = ""
+			For {
+				Set tKey = $Order(pCommandStruct("examples",tKey))
+				If (tKey = "") {
+					Quit
+				}
+				Set tExampleDescription = $Get(pCommandStruct("examples",tKey,"description"))
+				Set tExample = $ZStrip(pCommandStruct("examples",tKey), "<>WC")
+				If pMarkdownFormat {
+					Write !, "| `"_tExample_"` | "_tExampleDescription_" |"
+				} Else {
+					Write !, ?(tIndent*2), $$$BulletPoint_tExampleDescription
+					Write !!, ?(tIndent*4), "zpm """, tExample, """", !
+				}
+			}
+		}
+
+		// End with horizontal line in markdown
+		Write !, $$$SectionSeparator, !
 	}
 }
-
 ClassMethod %HelpForCommandDetails(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
   Do ..%HelpForCommandParameters(.pCommandStruct, pMarkdownFormat)
@@ -404,7 +574,7 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					} ElseIf $Data(tCommandStructure(0,"default"),tDefaultCommand) {
 						// tAccum just got the first parameter, so pass it along to the default command.
 						Set pCommandInfo = tDefaultCommand
-						Set tParamName = $Get(tCommandStructure(tDefaultCommand,"parameters",$i(tParamCount)))
+						Set tParamName = $Get(tCommandStructure(tDefaultCommand,"parameters",$Increment(tParamCount)))
 						If (tParamName = "") {
 							$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Too many parameters to command '%1'; only %2 expected.",pCommandInfo,tParamCount-1)))
 						}
@@ -447,7 +617,7 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Set tAccum = ""
 					Set tState = $$$PREARGUMENT
 				} ElseIf (tState = $$$PARAMETERVALUE) || ((tState = $$$TRAILINGPARAMETERVALUE) && (tChar = "")) {
-					Set tParamName = $Get(tCommandStructure(pCommandInfo,"parameters",$i(tParamCount)))
+					Set tParamName = $Get(tCommandStructure(pCommandInfo,"parameters",$Increment(tParamCount)))
 					If (tParamName = "") {
 						$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Too many parameters to command '%1'; only %2 expected.",pCommandInfo,tParamCount-1)))
 					}
@@ -469,7 +639,7 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Continue
 				} ElseIf ((tState = $$$PARAMETERVALUE) || (tState = $$$TRAILINGPARAMETERVALUE))
 					&& $Get(tCommandStructure(pCommandInfo,"trailingModifiers")) {
-						Set tParamName = $Get(tCommandStructure(pCommandInfo,"parameters",$i(tParamCount)))
+						Set tParamName = $Get(tCommandStructure(pCommandInfo,"parameters",$Increment(tParamCount)))
 						If (tParamName = "") {
 							$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Too many parameters to command '%1'; only %2 expected.",pCommandInfo,tParamCount-1)))
 						}
@@ -509,7 +679,7 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Set tState = $$$PREARGUMENT
 					Continue
 				} ElseIf (tState = $$$PARAMETERVALUEQUOTED) {
-					Set tParamName = $Get(tCommandStructure(pCommandInfo,"parameters",$i(tParamCount)))
+					Set tParamName = $Get(tCommandStructure(pCommandInfo,"parameters",$Increment(tParamCount)))
 					If (tParamName = "") {
 						$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Too many parameters to command '%1'; only %2 expected.",pCommandInfo,tParamCount-1)))
 					}
