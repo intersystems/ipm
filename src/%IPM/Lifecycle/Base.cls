@@ -380,7 +380,7 @@ Method %Clean(ByRef pParams) As %Status
 		}
 		
 		If (tLevel > 0) && '$Get(pParams("Clean","Nested"),0) {
-			Set tSC = ##class(%IPM.Storage.Module).NameDelete(..Module.Name)
+			Set tSC = ##class(%IPM.StudioDocument.Module).Delete(..Module.Name_".ZPM")
 			If $$$ISERR(tSC) {
 				Quit
 			}
