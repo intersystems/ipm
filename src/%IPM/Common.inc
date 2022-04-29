@@ -25,6 +25,9 @@ ROUTINE %IPM.Common [Type=INC]
 #def1arg ZPMTempLoadGraph(%subscripts) ^CacheTemp.PackageManagerLoad(%subscripts)
 #define ZPMDependencyTempData ^CacheTemp.ZZPMDependency
 #define ZPMDependencyTempDataNext $Increment($$$ZPMDependencyTempData)
+/// Global to keep track of packages in the current namespace for invalid reference
+/// checks in the dependency analyzer
+#define ZPMDependencyNsPackages ^CacheTemp.ZHSPMDepNsPackages
 #define ZPMDefaultModifiers ^%IPM.DefaultModifiers
 
 #; Temp global used to store source control output from CSP pages to be shown in Studio/Atelier console

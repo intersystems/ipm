@@ -2,6 +2,14 @@ Include %IPM.Common
 
 Class %IPM.DependencyAnalyzer
 {
+/// Prefix to indentify .inc files
+Parameter INCPREFIX = "!!!INC.";
+
+/// Suffix for different file types
+Parameter INCSUFFIX = ".INC";
+
+Parameter CLSSUFFIX = ".CLS";
+
 
 /// @API.Method
 /// @Modifier Availability InterSystems

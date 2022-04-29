@@ -132,7 +132,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
     <modifier name="remote" description="Create/update a remote server repository" />
     <modifier name="local" aliases="l" description="Create/update the local namespace cache" />
     <modifier name="perforce" aliases="p4" description="Create/update a Perforce workspace repository" />
-    <modifier name="type" value="true" aliases="t" description="Subclass of %ZHSLIB.PackageManager.Client.ServerDefinition to create/modify/delete or implementation of %ZHSLIB.PackageManager.Core.IPackageService or %ZHSLIB.PackageManager.Core.IPublishService to enable/disable" />
+    <modifier name="type" value="true" aliases="t" description="Subclass of %IPM.Repo.Definition to create/modify/delete or implementation of %IPM.Repo.IPackageService or %IPM.Repo.IPublishService to enable/disable" />
     <!-- File repository modifiers -->
     <modifier name="depth" aliases="d" value="true" description="For filesystem repositories, specifies the depth (number of folders underneath the root) to search for files named module.xml" />
     <modifier name="path" aliases="p" value="true" description="For filesystem repositories, specifies the path to the root directory" />
