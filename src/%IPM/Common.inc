@@ -6,10 +6,10 @@ ROUTINE %IPM.Common [Type=INC]
 #define ZPMStudioDocumentModule %ZPMStudioDocumentModule
 
 #; Local % Variable to track modules already handled for a given end goal
-#define ZPMHandledModules %ZZPMHandledModules
+#define ZPMHandledModules %ZPMHandledModules
 
 #; Local % Variable to indicate that ^Sources update trigger should not be run for modifications to individual resources
-#define ZPMDeferModifyResources %ZZPMDeferModifyResources
+#define ZPMDeferModifyResources %ZPMDeferModifyResources
 
 #; Default packages for package manager, module lifecycle classes and resource processors
 #define ZPMRootPackage "%IPM"
@@ -23,11 +23,11 @@ ROUTINE %IPM.Common [Type=INC]
 #define ZPMConfig ^IPM.Config
 #define ZPMTempLoadGraphRoot ^CacheTemp.PackageManagerLoad
 #def1arg ZPMTempLoadGraph(%subscripts) ^CacheTemp.PackageManagerLoad(%subscripts)
-#define ZPMDependencyTempData ^CacheTemp.ZZPMDependency
+#define ZPMDependencyTempData ^CacheTemp.ZPMDependency
 #define ZPMDependencyTempDataNext $Increment($$$ZPMDependencyTempData)
 /// Global to keep track of packages in the current namespace for invalid reference
 /// checks in the dependency analyzer
-#define ZPMDependencyNsPackages ^CacheTemp.ZHSPMDepNsPackages
+#define ZPMDependencyNsPackages ^CacheTemp.ZPMDepNsPackages
 #define ZPMDefaultModifiers ^%IPM.DefaultModifiers
 
 #; Temp global used to store source control output from CSP pages to be shown in Studio/Atelier console
@@ -47,7 +47,7 @@ ROUTINE %IPM.Common [Type=INC]
 
 #; Perforce-related macros
 #define ZPMStripP4Dots(%in) $Case($Extract(%in,*-2,*),"...":$Extract(%in,1,*-3),1:%in)
-#define ZPMP4HostStatus(%host) ^CacheTemp.ZZPMP4HostStatus(%host)
+#define ZPMP4HostStatus(%host) ^CacheTemp.ZPMP4HostStatus(%host)
 
 #; CLI tools
 #define HasModifier(%array,%x) ''$Data(%array("modifiers",%x))

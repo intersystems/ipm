@@ -210,9 +210,9 @@ ClassMethod RunForModule(pModuleName As %String, Output pInvalidReferences, pVer
 							
 							Set tProblem = ##class(%IPM.DependencyAnalyzer.Problem).%New()
 							Set tProblem.ReferencedModule = $Case(tModuleKey,$c(0):"",:tModuleKey)
-							Set tProblem.ReferencedClassExists = (tModuleKey '= $c(0))
-							Set tProblem.ReferencedClass = tReferencedClassKey
-							Set tProblem.ProblemClass = tReferencingClassKey
+							Set tProblem.ReferencedItemExists = (tModuleKey '= $c(0))
+							Set tProblem.ReferencedItem = tReferencedClassKey
+							Set tProblem.ProblemItem = tReferencingClassKey
 							Set tProblem.ProblemMember = tMemberKey
 							Set tProblem.ProblemLine = tLineKey
 							Set tProblem.ProblemCode = tLine
@@ -270,7 +270,7 @@ ClassMethod GetSysPackageNames(Output pSysPackageNameArray) [ Internal ]
 /// @Modifier Availability InterSystems
 Query LatestResults(pProblemModule As %String) As %SQLQuery [ SqlProc ]
 {
-	select Run->TargetModule,ProblemClass,ReferencedModule,ReferencedClass,ProblemMember,ProblemLine,ProblemCode
+	select Run->TargetModule,ProblemItem,ReferencedModule,ReferencedItem,ProblemMember,ProblemLine,ProblemCode
 	from %IPM_DependencyAnalyzer.Problem
 	where :pProblemModule is null or :pProblemModule = Run->TargetModule
 	having Run->ID = MAX(Run->ID %FOREACH (Run->TargetModule))

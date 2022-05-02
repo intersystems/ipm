@@ -40,7 +40,7 @@ Storage Default
 <Value>Run</Value>
 </Value>
 <Value name="3">
-<Value>ProblemClass</Value>
+<Value>ProblemItem</Value>
 </Value>
 <Value name="4">
 <Value>ProblemMember</Value>
@@ -55,10 +55,10 @@ Storage Default
 <Value>ReferencedModule</Value>
 </Value>
 <Value name="8">
-<Value>ReferencedClass</Value>
+<Value>ReferencedItem</Value>
 </Value>
 <Value name="9">
-<Value>ReferencedClassExists</Value>
+<Value>ReferencedItemExists</Value>
 </Value>
 <Value name="10">
 <Value>ProblemFileType</Value>
