@@ -115,7 +115,7 @@ ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %St
 	
 	If '$IsObject(tModule) && (tExtension = "INC") {
 		// Try to find in specific resources
-		Set tProcessorClass = "LegacyErrorMessages"
+		Set tProcessorClass = "LegacyLocalizedMessages"
 		Set tProcessorClassFullForm = $$$DefaultProcessorPackageDot_tProcessorClass
 		Set tQuery = "SELECT ID, Name, ""Module"" FROM %IPM_Storage.ResourceReference "_
 			"WHERE ProcessorClass = '"_tProcessorClass_"' "_
