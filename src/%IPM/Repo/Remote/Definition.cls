@@ -23,36 +23,6 @@ Property DeploymentEnabled As %Boolean [ InitialExpression = 1 ];
 
 Index DeploymentServer On DeploymentEnabled [ Unique ];
 
-XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
-{
-<commands>
-<command name="repo">
-<group name="Remote repository">
-
-<modifier name="remote" aliases="r" description="Create/update a remote server repository" />
-<modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
-<modifier name="publish-url" value="true" description="For remote repositories, specifies the URL for package publishing web services."/>
-<modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
-<modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
-<modifier name="reset-defaults" value="false" description="Reset to default repository" />
-<modifier name="sslconfig" aliases="ssl" value="true" description="For remote repositories, specifies the SSL configuration name to use when connecting." />
-
-<example description="Switch to test registery">
-repo -r -n registry -url https://test.pm.community.intersystems.com/registry/ -user "test" -pass "test"
-</example>
-
-<example description="Reset to default registry (pm.community.intersystems.com) and it is equivalent to a command">
-repo -r -n registry -reset-defaults
-</example>
-<example description=" ">
-repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass ""
-</example>
-
-</group>
-</command>
-</commands>
-}
-
 /// This callback method is invoked by the <METHOD>%Save</METHOD> method to 
 /// provide notification that the object is being saved. It is called before 
 /// any data is written to disk.

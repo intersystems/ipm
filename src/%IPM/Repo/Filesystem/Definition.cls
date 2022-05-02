@@ -20,25 +20,6 @@ Property Depth As %Integer [ InitialExpression = 0, Required ];
 /// Prompt to use for Root in interactive configuration of this repository type
 Parameter RootPromptString = {$$$Text("Root File Path:","ZPM")};
 
-XData Commands
-{
-<commands>
-<command name="repo">
-<group name="Filesystem repository">
-
-<modifier name="filesystem" aliases="f,fs" description="Create/update a filesystem repository" />
-<modifier name="depth" aliases="d" value="true" description="For filesystem repositories, specifies the depth (number of folders underneath the root) to search for files named module.xml" />
-<modifier name="path" aliases="p" value="true" description="For filesystem repositories, specifies the path to the root directory" />
-
-<example description="Create a repository pointing to the filesystem with name LocalFiles, accepting snapshots, looking for files named module.xml up to 2 directories deep in C:\MyWorkspace\RootModuleDir\">
-repo -name LocalFiles -snapshots 1 -fs -depth 2 -path C:\MyWorkspace\RootModuleDir\
-</example>
-
-</group>
-</command>
-</commands>
-}
-
 Method RootSet(%val) As %Status
 {
 	If (%val '= "") {
@@ -259,7 +240,7 @@ Method GetModuleStreamFromFile(pFilename As %String, Output pStream As %Stream.G
 		$$$ThrowOnError(tSC)
 		
 		Set tMetaStream.LineTerminator = $Select($$$isWINDOWS:$c(13,10),$$$isUNIX:$c(10))
-		Set pName = $ZConvert(tMetaStream.ReadLine(), "L")
+		Set pName = tMetaStream.ReadLine()
 		Set pVersion = tMetaStream.ReadLine()
 	} Catch e {
 		Set tOuterSC = $$$ERROR($$$GeneralError,$$$FormatText("Error loading module from file '%1'",pFilename))
