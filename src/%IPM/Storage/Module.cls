@@ -76,12 +76,6 @@ Property Defaults As list Of %IPM.Storage.ModuleSetting(CLASSNAME = 1, STORAGEDE
 
 Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
-Method NameSet(val As %RawString) As %Status
-{
-	Set i%Name = $$$lcase(val)
-	Return $$$OK
-}
-
 ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 {
 	Set tSC = $$$OK
@@ -542,7 +536,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 		For i=1:1:..Dependencies.Count() {
 			#dim tDep As %IPM.Storage.ModuleReference
 			Set tDep = ..Dependencies.GetAt(i)
-			
+			Write !, "Building dependency graph for: "_..Name_", in runs number: "_i_", dependency name: "_tDep.Name
 			Set tModulePath = pModulePath
 			If '..HasScope(pPhases,tDep.Scope) {
 				Continue
@@ -670,6 +664,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 			} Else {
 				Set tResultFound = 0
 				For j=1:1:tQualifiedReferences.Count() {
+					Write !, "Having some qualified references, at count: "_j
 					Kill tDependencyGraph,tSubModules
 					Merge tDependencyGraph = pDependencyGraph
 					Merge tSubModules = pSubModules

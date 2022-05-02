@@ -1118,7 +1118,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
 		$$$ThrowOnError(tSC)
 		
-		Set tFirstLoaded = $$$lcase($Order(tLoadedList("")))
+		Set tFirstLoaded = $Order(tLoadedList(""))
     
 		If (tFirstLoaded = "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
@@ -1126,7 +1126,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		If ($Order(tLoadedList(tFirstLoaded)) '= "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"module.xml contains multiple documents."))
 		}
-		If ($Piece(tFirstLoaded,".",*) '= "zpm") {
+		If ($Piece(tFirstLoaded,".",*) '= "ZPM") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
 		}
 		
