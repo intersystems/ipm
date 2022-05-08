@@ -45,10 +45,6 @@ ROUTINE %IPM.Common [Type=INC]
 #; System method/special variable wrappers
 #define InProgrammerMode ##class(%SYSTEM.Process).IsProgrammerMode()
 
-#; Perforce-related macros
-#define ZPMStripP4Dots(%in) $Case($Extract(%in,*-2,*),"...":$Extract(%in,1,*-3),1:%in)
-#define ZPMP4HostStatus(%host) ^CacheTemp.ZPMP4HostStatus(%host)
-
 #; CLI tools
 #define HasModifier(%array,%x) ''$Data(%array("modifiers",%x))
 #define GetModifier(%array,%x) $Get(%array("modifiers",%x))

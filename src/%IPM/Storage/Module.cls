@@ -536,7 +536,6 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 		For i=1:1:..Dependencies.Count() {
 			#dim tDep As %IPM.Storage.ModuleReference
 			Set tDep = ..Dependencies.GetAt(i)
-			Write !, "Building dependency graph for: "_..Name_", in runs number: "_i_", dependency name: "_tDep.Name
 			Set tModulePath = pModulePath
 			If '..HasScope(pPhases,tDep.Scope) {
 				Continue
