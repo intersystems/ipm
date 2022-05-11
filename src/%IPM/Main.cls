@@ -128,25 +128,8 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
     <modifier name="prereleases" aliases="pre" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for prerelease software" />
     <modifier name="read-only" aliases="ro" value="true" valueList="0,1" description="For any repository, specifies that modules installed from it are ALWAYS installed in non-developer mode, effectively making them read only" />
     <!-- Repository types  -->
-    <modifier name="filesystem" aliases="f,fs" description="Create/update a filesystem repository" />
-    <modifier name="remote" description="Create/update a remote server repository" />
     <modifier name="local" aliases="l" description="Create/update the local namespace cache" />
-    <modifier name="perforce" aliases="p4" description="Create/update a Perforce workspace repository" />
     <modifier name="type" value="true" aliases="t" description="Subclass of %IPM.Repo.Definition to create/modify/delete or implementation of %IPM.Repo.IPackageService or %IPM.Repo.IPublishService to enable/disable" />
-    <!-- File repository modifiers -->
-    <modifier name="depth" aliases="d" value="true" description="For filesystem repositories, specifies the depth (number of folders underneath the root) to search for files named module.xml" />
-    <modifier name="path" aliases="p" value="true" description="For filesystem repositories, specifies the path to the root directory" />
-    <!-- Perforce repository modifier -->
-    <modifier name="spec" value="true" description="A Perforce file specification (e.g., @changelist or @label) at which modules will be discovered and at which files will be synced. Default is #head." />
-    <modifier name="shelves" value="true" description="A comma-separated list of Perforce shelved changelists to unshelve into the workspace before building the repository." />
-    <modifier name="force-update" aliases="force" description="For Perforce repositories, indicates that the repository should be updated even if no changes have been submitted since the last time it was updated." />
-    <modifier name="recurse" value="true" aliases="r" description="Recurse in branches that contain modules (by default, this option is not selected)" />
-    <!-- Remote repository modifiers -->
-    <modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
-    <modifier name="publish-url" value="true" description="For remote repositories, specifies the URL for package publishing web services."/>
-    <modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
-    <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
-    <modifier name="sslconfig" aliases="ssl" value="true" description="For remote repositories, specifies the SSL configuration name to use when connecting." />
     <!-- Modifiers specific to -enable -->
     <modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
 
@@ -156,12 +139,6 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
     </example>
     <example description="Delete all repositories">
         repo -delete-all
-    </example>
-    <example description="Create a repository pointing to the filesystem with name LocalFiles, accepting snapshots, looking for files named module.xml up to 2 directories deep in C:\MyWorkspace\RootModuleDir\">
-        repo -name LocalFiles -snapshots 1 -fs -depth 2 -path C:\MyWorkspace\RootModuleDir\
-    </example>
-    <example description="Create a repository pointing to the perforce depot with name AppModules, marking the repository as read-only, looking for files named module.xml at all levels under the depot path //healthshare/appmodules/">
-        repo -name AppModules -read-only 1 -p4 -path //healthshare/appmodules/
     </example>
     <example description="Delete the repository named &quot;LocalFiles&quot;">
         repo -n LocalFiles -delete

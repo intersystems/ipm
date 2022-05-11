@@ -663,7 +663,6 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 			} Else {
 				Set tResultFound = 0
 				For j=1:1:tQualifiedReferences.Count() {
-					Write !, "Having some qualified references, at count: "_j
 					Kill tDependencyGraph,tSubModules
 					Merge tDependencyGraph = pDependencyGraph
 					Merge tSubModules = pSubModules
