@@ -733,7 +733,7 @@ ClassMethod DrawColumn(desc) As %String
 /// example d ##class(%IPM.Main).GetListModules("zpm",.list)
 ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
 {
-	Set tQuery = "select Name,VersionString,Description,ExternalName from %IPM_Storage.""MODULE"""
+	Set tQuery = "select Name,VersionString,Description,ExternalName from %IPM_Storage.ModuleItem"
 	If StartsWith'="" { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery_ " where name %StartsWith ?",StartsWith) }
 	Else { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)}
 	If (tRes.%SQLCODE < 0) {
@@ -1674,7 +1674,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		quit:'..GetListModule(,.tModMap)	
 		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
 			"select ""Module""->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
-			"from %IPM_Storage.Module_Dependencies")
+			"from %IPM_Storage.ModuleItem_Dependencies")
     $$$ThrowSQLIfError(tDepRes.%SQLCODE, tDepRes.%Message)
 		While tDepRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
@@ -1725,7 +1725,7 @@ ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
 	new $namespace
 	set $namespace=ns
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
-		"select * from %IPM_Storage.""MODULE""")
+		"select * from %IPM_Storage.ModuleItem")
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
@@ -1936,7 +1936,7 @@ ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 	Try {
 		If (tAll) {
 			Set tResult = ##class(%SQL.Statement).%ExecDirect(,
-				"select Name from %IPM_Storage.""Module"" where DeveloperMode = 1")
+				"select Name from %IPM_Storage.ModuleItem where DeveloperMode = 1")
 			If (tResult.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE,tResult.%Message)
 			}

@@ -294,7 +294,7 @@ Query ItemList() As %SQLQuery(ROWSPEC = "name:%String,modified:%TimeStamp") [ Sq
 {
 	select Name, LastModifiedTimestamp from %IPM_StudioDocument.ModuleStream
 	union
-	select Name, LastModifiedTimestamp from %IPM_Storage."Module"
+	select Name, LastModifiedTimestamp from %IPM_Storage.ModuleItem
 		where Name not in (select Name from %IPM_StudioDocument.ModuleStream)
 }
 
