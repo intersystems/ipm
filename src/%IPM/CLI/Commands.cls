@@ -34,33 +34,10 @@ XData Schema [ Internal, MimeType = application/xml ]
             <xs:choice minOccurs="0" maxOccurs="unbounded">
 
               <!-- A modifier is a flag that controls the behavior of the command. -->
-              <xs:element name="modifier">
-                <xs:complexType>
-                  <!-- Modifier name -->
-                  <xs:attribute name="name" type="string" use="required"/>
+              <xs:element name="modifier" type="modifier"/>
 
-                  <!-- Modifier name -->
-                  <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
-
-                  <!-- Comma-separated list of aliases -->
-                  <xs:attribute name="aliases" type="string" use="optional"/>
-
-                  <!-- If true, the modifier name is followed in the command string by a value -->
-                  <xs:attribute name="value" type="xs:boolean" use="optional" default="false"/>
-
-                  <!-- If true, the modifier name is followed in the command string by a value -->
-                  <xs:attribute name="description" type="string" use="optional"/>
-
-                  <!-- If set, this provides a fixed list of valid values for the modifier -->
-                  <xs:attribute name="valueList" type="string" use="optional"/>
-
-                  <!-- If set, the value is put into the specified subscript of "data" instead of "parameters" -->
-                  <xs:attribute name="dataAlias" type="string" use="optional"/>
-
-                  <!-- If set, the specified value is put into the info("data","<dataAlias>") - for commands that don't take values -->
-                  <xs:attribute name="dataValue" type="string" use="optional"/>
-                </xs:complexType>
-              </xs:element>
+              <!-- A group contains command modifiers that have specific usage. -->
+              <xs:element name="group" type="group"/>
 
               <!-- A parameter is a space-delimted string provided to a command without a modifier. These appear in order at the end of the command. -->
               <xs:element name="parameter">
@@ -108,6 +85,43 @@ XData Schema [ Internal, MimeType = application/xml ]
       </xs:choice>
     </xs:complexType>
   </xs:element>
+
+
+  <!-- A modifier is a flag that controls the behavior of the command. -->
+  <xs:complexType name="modifier">
+    <!-- Modifier name -->
+    <xs:attribute name="name" type="string" use="required"/>
+
+    <!-- Modifier name -->
+    <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
+
+    <!-- Comma-separated list of aliases -->
+    <xs:attribute name="aliases" type="string" use="optional"/>
+
+    <!-- If true, the modifier name is followed in the command string by a value -->
+    <xs:attribute name="value" type="xs:boolean" use="optional" default="false"/>
+
+    <!-- If true, the modifier name is followed in the command string by a value -->
+    <xs:attribute name="description" type="string" use="optional"/>
+
+    <!-- If set, this provides a fixed list of valid values for the modifier -->
+    <xs:attribute name="valueList" type="string" use="optional"/>
+
+    <!-- If set, the value is put into the specified subscript of "data" instead of "parameters" -->
+    <xs:attribute name="dataAlias" type="string" use="optional"/>
+
+    <!-- If set, the specified value is put into the info("data","<dataAlias>") - for commands that don't take values -->
+    <xs:attribute name="dataValue" type="string" use="optional"/>
+  </xs:complexType>
+
+  <!-- Group controls the domain of functionality that some modifiers belong to, for example: modifiers for 'repo' command that is used for remote repository -->
+  <xs:complexType name="group">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="modifier" type="modifier"/>
+      <xs:element name="example" type="example"/>
+    </xs:choice>
+    <xs:attribute name="name" type="string" use="required"/>
+  </xs:complexType>
 
   <!-- example element with content -->
   <xs:complexType name="example">

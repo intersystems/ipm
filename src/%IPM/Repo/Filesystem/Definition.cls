@@ -24,6 +24,7 @@ XData Commands
 {
 <commands>
 <command name="repo">
+<group name="Filesystem repository">
 
 <modifier name="filesystem" aliases="f,fs" description="Create/update a filesystem repository" />
 <modifier name="depth" aliases="d" value="true" description="For filesystem repositories, specifies the depth (number of folders underneath the root) to search for files named module.xml" />
@@ -33,6 +34,7 @@ XData Commands
 repo -name LocalFiles -snapshots 1 -fs -depth 2 -path C:\MyWorkspace\RootModuleDir\
 </example>
 
+</group>
 </command>
 </commands>
 }

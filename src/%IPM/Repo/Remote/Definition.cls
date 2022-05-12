@@ -27,6 +27,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 {
 <commands>
 <command name="repo">
+<group name="Remote repository">
 
 <modifier name="remote" aliases="r" description="Create/update a remote server repository" />
 <modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
@@ -47,6 +48,7 @@ repo -r -n registry -reset-defaults
 repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass ""
 </example>
 
+</group>
 </command>
 </commands>
 }
