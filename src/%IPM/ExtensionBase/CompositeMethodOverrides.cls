@@ -48,13 +48,9 @@ Method %OnNew(initval As %String) As %Status [ Final ]
 				Quit
 			}
 			Set tStatus = ..SubExtensions.SetAt(tExt,tClassName)
-			If $$$ISERR(tStatus) {
-				Quit
-			}
+			$$$ThrowOnError(tStatus)
 			Set tStatus = ..MapMenus(tClassName)
-			If $$$ISERR(tStatus) {
-				Quit
-			}
+			$$$ThrowOnError(tStatus)
 		}
 	} Catch e {
 		Set tStatus = e.AsStatus()
@@ -69,13 +65,9 @@ ClassMethod SetExtensionClasses(pPrimaryClassName As %String, pSubExtensionClass
 	Try {
 		TSTART
 		Set tStatus = ..SetPrimaryExtensionClass(pPrimaryClassName)
-		If $$$ISERR(tStatus) {
-			Quit
-		}
+		$$$ThrowOnError(tStatus)
 		Set tStatus = ..SetSubExtensionClasses(pSubExtensionClassNames)
-		If $$$ISERR(tStatus) {
-			Quit
-		}
+		$$$ThrowOnError(tStatus)
 		TCOMMIT
 	} Catch e {
 		Set tStatus = e.AsStatus()
@@ -123,9 +115,9 @@ ClassMethod SetSubExtensionClasses(pClassNames As %List) As %Status
 			If ($Get(tClassName) = "") {
 				Continue
 			}
-		If '##class(%Library.ClassDefinition).%ExistsId(tClassName) {
-			Continue
-		}
+			If '##class(%Library.ClassDefinition).%ExistsId(tClassName) {
+				Continue
+			}
 			If '$ClassMethod(tClassName,"%Extends","%Studio.Extension.Base") {
 				Set tStatus = $$$ERROR($$$GeneralError,"Class '"_tClassName_"' does not extend %Studio.Extension.Base")
 				Quit
@@ -135,10 +127,8 @@ ClassMethod SetSubExtensionClasses(pClassNames As %List) As %Status
 				Set tClassNames(tClassName) = ""
 			}
 		}
-		If $$$ISERR(tStatus) {
-			Quit
-		}
-		Set @..#SUBEXTENSIONGBL = pClassNames
+		$$$ThrowOnError(tStatus)
+		Set @..#SUBEXTENSIONGBL = tClassNames
 	} Catch e {
 		Set tStatus = e.AsStatus()
 	}
@@ -224,9 +214,7 @@ Method MapMenus(pSourceClass As %String) As %Status [ Private ]
 	Try {
 		Set tStmt = ##class(%SQL.Statement).%New()
 		Set tStatus = tStmt.%PrepareClassQuery(pSourceClass,"MainMenus")
-		If $$$ISERR(tStatus) {
-			Quit
-		}
+		$$$ThrowOnError(tStatus)
 		Set tResult = tStmt.%Execute(pSourceClass)
 		If (tResult.%SQLCODE < 0) {
 			Set tStatus = $$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message)
@@ -235,9 +223,7 @@ Method MapMenus(pSourceClass As %String) As %Status [ Private ]
 		While tResult.%Next(.tStatus) {
 			Set tStatus = ..MenuMap.SetAt(pSourceClass,tResult.%Get("Name"))
 		}
-		If $$$ISERR(tStatus) {
-			Quit
-		}
+		$$$ThrowOnError(tStatus)
 	} Catch e {
 		Set tStatus = e.AsStatus()
 	}
