@@ -54,6 +54,9 @@ Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObject
         Set tModRef.Repository = item.repository
         Set tModRef.VersionString = version
         Set tModRef.Description = item.description
+        If (item."all_versions" '= "") {
+          Set tModRef.AllVersions = item."all_versions".%ToJSON()
+        }
         Do tList.Insert(tModRef)
       }      
     }

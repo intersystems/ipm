@@ -16,6 +16,8 @@ Property Version As %ZPM.General.SemanticVersion(%JSONINCLUDE = "NONE", XMLPROJE
 
 Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLNAME = "Version") [ Required ];
 
+Property AllVersions As %String(%JSONINCLUDE = "NONE", MAXLEN = "", XMLPROJECTION = "NONE") [ Transient ];
+
 /// The repository from which this module was loaded.
 /// Is "" if the module was loaded using the load command (i.e. directly from a file and not from a repository).
 Property Repository As %String(MAXLEN = "", XMLPROJECTION = "NONE");
