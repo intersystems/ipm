@@ -1600,11 +1600,6 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 {
-  If ($Get(pCommandInfo("parameters","module"))="") {
-    Set tCommandInfo("parameters","command") = "uninstall"
-    Do ..%Help(.tCommandInfo)
-    Quit 
-  }
 	Merge tParams = pCommandInfo("data")
 	Set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
 	If $$$HasModifier(pCommandInfo,"all") {
