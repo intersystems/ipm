@@ -74,7 +74,8 @@ jobs:
             -p 52773:52773 \
             -v /tmp/registry:/home/irisowner/registry \
             docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
-            -p /home/irisowner/registry/password.txt
+            -p /home/irisowner/registry/password.txt \
+            --check-caps false
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
       - name: Test and Verify
@@ -85,7 +86,7 @@ jobs:
             -e TEST_REGISTRY_USER=admin \
             -e TEST_REGISTRY_PASSWORD=securepassword \
             -v `pwd`:/home/irisowner/zpm/ \
-            zpm
+            zpm --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -98,7 +99,7 @@ jobs:
       - name: Test and publish to temporary registry
         timeout-minutes: 15
         run: |
-          docker run --network zpm -d --rm -v `pwd`:/home/irisowner/zpm/ zpm
+          docker run --network zpm -d --rm -v `pwd`:/home/irisowner/zpm/ zpm --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -117,7 +118,7 @@ jobs:
         timeout-minutes: 15
         run: |
           wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }}
+          docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -135,7 +136,7 @@ jobs:
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }}
+          docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -195,7 +196,7 @@ jobs:
         if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         run: |
           [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
-            docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm
+            docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm --check-caps false
             CONTAINER=`docker ps -lq`
             sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
             /bin/echo -e '' \
