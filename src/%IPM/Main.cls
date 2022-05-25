@@ -58,8 +58,8 @@ The standard lifecycle phases are:
 <description>Configures new namespace for use of package manager (interactive). This allows for configuration of studio extensions for source control and the package manager itself. In the case of Perforce-based source control, prompts are included for username, password, Perforce workspace, and a few other settings.</description>
 <modifier name="noprompt" aliases="quiet,q" description="If specified, no prompts will be shown." />
 <modifier name="zpm" aliases="cli" description="If specified, the zpm command will be configured." />
-<modifier name="extension" aliases="ext" value="true" description="Perforce extension to configure for the current namespace (in addition to the Package Manager extension - e.g., for source control)" />
-<modifier name="menuextension" aliases="menuext" value="true" description="Server menu extension (Package Manager extension for Studio, vscode menu, etc.) to configure for the current namespace" />
+<modifier name="extension" aliases="ext" value="true" description="Generic extension (e.g., extension class for source control) to configure for the current namespace " />
+<modifier name="menuextension" aliases="menuext" value="true" description="Server menu extension (Package Manager extension for server menus such as Studio, vscode menu, etc.) to configure for the current namespace" />
 </command>
 
 <command name="reload">
@@ -1001,31 +1001,32 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 			Set tServerMenuExtClass = $$$GetModifier(pCommandInfo,"menuextension")
 		}
 	} Else {
-			Set tValue = ""
-			Set tStatement = ##class(%SQL.Statement).%New()
-			$$$ThrowOnError(tStatement.%PrepareClassQuery($classname(), "ServerMenuExtensionClasses"))
-			Set tResultSet=tStatement.%Execute()
-			While tResultSet.%Next(.tSC) {
-				$$$ThrowOnError(tSC)
-				// if there's only one satisfied subclass, directly set it
-				// if not, tServerMenuExtClass will be overwritten by user input to the prompt below
-				Set tServerMenuExtClass = tResultSet.%Get("Name")
-			}
+		Set tValue = ""
+		Set tStatement = ##class(%SQL.Statement).%New()
+		$$$ThrowOnError(tStatement.%PrepareClassQuery($classname(), "ServerMenuExtensionClasses"))
+		Set tResultSet=tStatement.%Execute()
+		$$$ThrowSQLIfError(tResultSet.%SQLCODE, tResultSet.%Message)
+		While tResultSet.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			If (tResultSet.%ROWCOUNT > 1) {
-				// if has more than one satisfied subclass, let user choose which server menu extension class to set
-				Set tHelp = "Note: only subclasses of %IPM.ExtensionBase.ServerMenu.Interface are listed."
-				Set tResponse = ##class(%Library.Prompt).GetArray("Which class to set as the server menu extension class?",.tValue, $ListBuild($classname()_":ServerMenuExtensionClasses"),,,.tHelp,$$$InitialDisplayMask)
-				If (tResponse '= $$$SuccessResponse) {
-					$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-				}
-				If (tValue '= "") {
-					Set tServerMenuExtClass = tValue
-				}
+			// if there's only one satisfied subclass, directly set it
+			// if not, tServerMenuExtClass will be overwritten by user input to the prompt below
+			Set tServerMenuExtClass = tResultSet.%Get("Name")
+		}
+		$$$ThrowOnError(tSC)
+		If (tResultSet.%ROWCOUNT > 1) {
+			// if has more than one satisfied subclass, let user choose which server menu extension class to set
+			Set tHelp = "Note: only subclasses of %IPM.ExtensionBase.ServerMenu.Interface are listed."
+			Set tResponse = ##class(%Library.Prompt).GetArray("Which class to set as the server menu extension class?",.tValue, $ListBuild($classname()_":ServerMenuExtensionClasses"),,,.tHelp,$$$InitialDisplayMask)
+			If (tResponse '= $$$SuccessResponse) {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
-			If (tServerMenuExtClass '= "") {
-				Write !, "Setting "_tServerMenuExtClass_" as the server menu extension class."
+			If (tValue '= "") {
+				Set tServerMenuExtClass = tValue
 			}
+		}
+		If (tServerMenuExtClass '= "") {
+			Write !, "Setting "_tServerMenuExtClass_" as the server menu extension class."
+		}
 	}
 
 	Set tSCInterface = "%IPM.ExtensionBase.SourceControl.Interface"

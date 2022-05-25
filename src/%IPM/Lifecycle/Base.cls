@@ -493,7 +493,7 @@ Method %Reload(ByRef pParams) As %Status
 			Quit
 		}
 		set first = $$$lcase(first)
-    If ($Piece(first,".",*) '= "zpm") {
+    	If ($Piece(first,".",*) '= "zpm") {
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
 		}
