@@ -98,7 +98,8 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
     <!-- Modifiers -->
     <modifier name="noprompt" aliases="quiet,q" description="If specified, no prompts will be shown." />
     <modifier name="zpm" aliases="cli" description="If specified, the zpm command will be configured." />
-    <modifier name="extension" aliases="ext" value="true" description="Studio extension to configure for the current namespace (in addition to the Package Manager extension - e.g., for source control)" />
+	<modifier name="extension" aliases="ext" value="true" description="Generic extension (e.g., extension class for source control) to configure for the current namespace " />
+	<modifier name="menuextension" aliases="menuext" value="true" description="Server menu extension (Package Manager extension for server menus such as Studio, vscode menu, etc.) to configure for the current namespace" />
   </command>
 
   <command name="repo" aliases="repository" dataPrefix="D">
@@ -1068,7 +1069,42 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	
 	Set tPrimaryClass = ""
 	Set tCompositeSCClass = "%IPM.ExtensionBase.Composite"
-	Set tPackageMgrSCClass = "%IPM.Extension.ServerMenu.MenuItems"
+	Set tServerMenuExtClass = ""
+
+	// set server menu extension class (tServerMenuExtClass)
+	If tQuiet {
+		If $$$HasModifier(pCommandInfo,"menuextension") {
+			Set tServerMenuExtClass = $$$GetModifier(pCommandInfo,"menuextension")
+		}
+	} Else {
+		Set tValue = ""
+		Set tStatement = ##class(%SQL.Statement).%New()
+		$$$ThrowOnError(tStatement.%PrepareClassQuery($classname(), "ServerMenuExtensionClasses"))
+		Set tResultSet=tStatement.%Execute()
+		$$$ThrowSQLIfError(tResultSet.%SQLCODE, tResultSet.%Message)
+		While tResultSet.%Next(.tSC) {
+			$$$ThrowOnError(tSC)
+			// if there's only one satisfied subclass, directly set it
+			// if not, tServerMenuExtClass will be overwritten by user input to the prompt below
+			Set tServerMenuExtClass = tResultSet.%Get("Name")
+		}
+		$$$ThrowOnError(tSC)
+		If (tResultSet.%ROWCOUNT > 1) {
+			// if has more than one satisfied subclass, let user choose which server menu extension class to set
+			Set tHelp = "Note: only subclasses of %IPM.ExtensionBase.ServerMenu.Interface are listed."
+			Set tResponse = ##class(%Library.Prompt).GetArray("Which class to set as the server menu extension class?",.tValue, $ListBuild($classname()_":ServerMenuExtensionClasses"),,,.tHelp,$$$InitialDisplayMask)
+			If (tResponse '= $$$SuccessResponse) {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+			}
+			If (tValue '= "") {
+				Set tServerMenuExtClass = tValue
+			}
+		}
+		If (tServerMenuExtClass '= "") {
+			Write !, "Setting "_tServerMenuExtClass_" as the server menu extension class."
+		}
+	}
+
 	Set tSCInterface = "%IPM.ExtensionBase.SourceControl.Interface"
 	Set tOldSourceControlClass = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
 	
@@ -1078,9 +1114,9 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		Set tOldSourceControlClass = ""
 	}
 	
-	If (tOldSourceControlClass '= "") && (tOldSourceControlClass '= tCompositeSCClass) && (tOldSourceControlClass '= tPackageMgrSCClass) {
-		Write !,"Enabling package manager extension... "
-		$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tOldSourceControlClass,$ListBuild(tPackageMgrSCClass)))
+	If (tOldSourceControlClass '= "") && (tOldSourceControlClass '= tCompositeSCClass) && (tOldSourceControlClass '= tServerMenuExtClass) {
+		Write !,"Enabling package manager extension if present... "
+		$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tOldSourceControlClass,$ListBuild(tServerMenuExtClass)))
 		Write "done."
 		Set tOldSourceControlClass = tCompositeSCClass
 	}
@@ -1125,13 +1161,13 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		}
 		
 		If (tValue = "") {
-			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tPackageMgrSCClass))
-			Write !,!,"Removed source control class. Package manager extension still enabled."
+			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tServerMenuExtClass))
+			Write !,!,"Removed source control class. Package manager extension still enabled if present."
 		} Else {
 			Write !,!,"Setting ",tValue," as the source control class for this namespace..."
 			// Just configure the package manager source control class. (Gaining the "Package Manager" menu.)
 			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
-			Set tSecondaryExtension = $ListBuild("%IPM.Extension.ServerMenu.MenuItems")
+			Set tSecondaryExtension = $ListBuild(tServerMenuExtClass)
 			$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tValue,tSecondaryExtension))
 			Write " done."
 			
@@ -1142,8 +1178,8 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		}
 	} ElseIf (tOldSourceControlClass = "") {
 		// Just configure the package manager source control class. (Gaining the "Package Manager" menu.)
-		$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tPackageMgrSCClass))
-		Write !,!,"Enabled package manager extension."
+		$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tServerMenuExtClass))
+		Write !,!,"Enabled package manager extension if present."
 	}
 	
 	// If we're not just using the package manager, check for configuration method on primary source control class
@@ -1458,6 +1494,11 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 Query SourceControlClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
 {
 	select Name as "ID",Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.SourceControl.Interface')
+}
+
+Query ServerMenuExtensionClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
+{
+	select Name as "ID",Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.ServerMenu.Interface')
 }
 
 ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]

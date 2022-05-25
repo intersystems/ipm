@@ -1145,19 +1145,6 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			}
 		}
 		
-		// If we have specified developer mode, but do not have a source control extension enabled, then set up a reasonable default.
-		If $Get(pParams("DeveloperMode"),0) {
-			Set tCurrentSourceControl = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
-			If (tCurrentSourceControl = "") {
-				Set tCompositeSCClass = "%IPM.ExtensionBase.Composite"
-				$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
-				Set tPrimaryExtension = "%IPM.Extension.SourceControl.Perforce.Main"
-				Set tSecondaryExtensions = $ListBuild("%IPM.Extension.ServerMenu.MenuItems")
-				$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tPrimaryExtension,tSecondaryExtensions))
-			}
-		}
-		
-		#dim tModule As %IPM.Storage.Module
 		Set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
