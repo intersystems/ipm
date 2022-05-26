@@ -39,6 +39,7 @@ repo -name LocalFiles -snapshots 1 -fs -depth 2 -path C:\MyWorkspace\RootModuleD
 </commands>
 }
 
+
 Method RootSet(%val) As %Status
 {
 	If (%val '= "") {
@@ -259,7 +260,7 @@ Method GetModuleStreamFromFile(pFilename As %String, Output pStream As %Stream.G
 		$$$ThrowOnError(tSC)
 		
 		Set tMetaStream.LineTerminator = $Select($$$isWINDOWS:$c(13,10),$$$isUNIX:$c(10))
-		Set pName = $ZConvert(tMetaStream.ReadLine(), "L")
+		Set pName = tMetaStream.ReadLine()
 		Set pVersion = tMetaStream.ReadLine()
 	} Catch e {
 		Set tOuterSC = $$$ERROR($$$GeneralError,$$$FormatText("Error loading module from file '%1'",pFilename))

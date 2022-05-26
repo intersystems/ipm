@@ -380,7 +380,7 @@ Method %Clean(ByRef pParams) As %Status
 		}
 		
 		If (tLevel > 0) && '$Get(pParams("Clean","Nested"),0) {
-			Set tSC = ##class(%IPM.Storage.Module).NameDelete(..Module.Name)
+			Set tSC = ##class(%IPM.StudioDocument.Module).Delete(..Module.Name_".ZPM")
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -492,8 +492,7 @@ Method %Reload(ByRef pParams) As %Status
 			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.")
 			Quit
 		}
-		set first = $$$lcase(first)
-    	If ($Piece(first,".",*) '= "zpm") {
+    	If ($Piece(first,".",*) '= "ZPM") {
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
 		}
@@ -504,12 +503,13 @@ Method %Reload(ByRef pParams) As %Status
 		// Set up mappings
 		Set tKey = ""
 		For {
+			#dim tMapping As %IPM.Storage.MappingReference
 			Set tMapping = ..Module.Mappings.GetNext(.tKey)
 			Quit:tKey=""
 			
 			Set tName = $Piece(tMapping.Name,".",1,*-1)
 			Set tExtension = $Piece(tMapping.Name,".",*)
-			Set tSource = tMapping.Source
+			Set tSource = tMapping.SourceResolved
 			
 			Set tSC = $Case(tExtension,
 				"GBL":##class(%IPM.Utils.Module).AddGlobalMapping($namespace,tName,tSource),
@@ -519,6 +519,9 @@ Method %Reload(ByRef pParams) As %Status
 				"":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,"ALL",tSource))
 			If $$$ISERR(tSC) {
 				Quit
+			}
+			If (tVerbose) {
+				Write !, "Added "_tExtension_" mapping "_tName_" from database "_tSource
 			}
 		}
 		If $$$ISERR(tSC) {

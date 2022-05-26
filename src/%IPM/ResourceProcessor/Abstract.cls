@@ -231,29 +231,34 @@ Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.Res
 	Quit $$$OK
 }
 
-/// Evaluates an expression in an attribute
+
+/// Evaluates an expression in a provided string. <br />
+/// These special expressions are case-insensitive. <br />
 /// Current valid expressions:
-/// {$namespace} - the current namespace
-/// {$mgrdir} - the instance's mgr directory
-/// {$cspdir} - the instance's root CSP directory
-/// {$root} - the resource's module's root directory
-/// {name} - the name of the resource
-/// These special expressions are case-insensitive.
-Method %Evaluate(pAttrValue) As %String [ Internal ]
+/// <ul>
+/// 	<li>{$root} - the resource's module's root directory </li>
+/// 	<li>{name} - the name of the resource </li>
+/// </ul>
+/// In addition to these, look at expressions supported by %EvaluateSystemExpression
+/// in class <class>%IPM.Utils.Module</class>.
+Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
 {
-	Set tAttrValue = pAttrValue
-	If $Data(..Params) {
-		Merge tParams = ..Params
-		Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
-		Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
+	If (pAttrValue '[ "{") {
+		Return pAttrValue
 	}
-
-	If $Locate(tAttrValue,"(?i)\{name\}") {
-		Set tName = ..ResourceReference.Name
-   	Set tAttrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", tAttrValue).ReplaceAll($Replace(tName, "\","\\"))
+	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(pAttrValue)
+	If $Locate(attrValue,"(?i)\{\$root\}") {
+		Set root = ..ResourceReference.Module.Root
+		If (root '= "") {
+			Set root = ##class(%Library.File).NormalizeDirectory(root)
+		}
+		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{\$root\}",root)
 	}
-
-  Quit ..ResourceReference.Module.%Evaluate(tAttrValue)
+	If $Locate(attrValue,"(?i)\{name\}") {
+		Set name = ..ResourceReference.Name
+		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{name\}",name)
+	}
+	Return attrValue
 }
 
 ClassMethod GetDescription(pClassName As %String) As %String [ SqlProc ]

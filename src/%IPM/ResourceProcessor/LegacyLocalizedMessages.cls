@@ -159,7 +159,7 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 			Set tPtr = 0
 			While $ListNext(tIncludeList,tPtr,tInclude) {
 				If $Data(tInclude) || ($Piece(..includeFiles,":") '= "") {
-					Set tName = $Piece(..includeFiles,":")_".INC"
+					Set tName = $Piece(..includeFiles,":",2)_".INC"
 					Set pResourceArray(tName) = ..ResourceReference.Module.Name
 					Set pResourceArray(tName,"Generated") = 1
 				}

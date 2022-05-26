@@ -1,7 +1,7 @@
 Class %IPM.StudioDocument.LocalizedMessages Extends %IPM.StudioDocument.Abstract [ DependsOn = %IPM.StudioDocument.LocalizedMessageStream ]
 {
 
-Projection RegisterExtension As %IPM.StudioDocument.Projection(DocumentDescription = "Localizable Error Messages", DocumentExtension = "LOC", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/HealthShare/ErrorMessages");
+Projection RegisterExtension As %IPM.StudioDocument.Projection(DocumentDescription = "Localizable Error Messages", DocumentExtension = "LOC", DocumentNew = 1, DocumentType = "xml", XMLNamespace = "http://www.intersystems.com/HealthShare/LocalizedMessages");
 
 Parameter EXTENSION = ".LOC";
 

@@ -7,7 +7,8 @@ Index Run On Run [ Type = bitmap ];
 
 Relationship Run As %IPM.DependencyAnalyzer.ModuleResults [ Cardinality = one, Inverse = Problems ];
 
-Property ProblemClass As %Dictionary.Classname [ Required ];
+/// Caller item with file type suffix
+Property ProblemItem As %String(MAXLEN = 255) [ Required ];
 
 Property ProblemMember As %Dictionary.Identifier [ Required ];
 
@@ -17,14 +18,16 @@ Property ProblemCode As %String(MAXLEN = "") [ Required ];
 
 Property ReferencedModule As %String(MAXLEN = 255);
 
-Property ReferencedClass As %Dictionary.Classname [ Required ];
+Property ReferencedItem As %String(MAXLEN = 255) [ Required ];
 
-Property ReferencedClassExists As %Boolean [ InitialExpression = 1 ];
+Property ReferencedFileType As %String(MAXLEN = 255) [ InitialExpression = ".CLS" ];
+
+Property ReferencedItemExists As %Boolean [ InitialExpression = 1 ];
 
 /// Returns a string that, when shown in the Studio output pane, can be clicked to jump to this location in code.
 Method ToString() As %String [ CodeMode = expression ]
 {
-..ProblemClass_".CLS("_..ProblemMember_"+"_..ProblemLine_") "_..ProblemCode
+..ProblemItem_"("_..ProblemMember_"+"_..ProblemLine_") "_..ProblemCode
 }
 
 Storage Default
@@ -37,7 +40,7 @@ Storage Default
 <Value>Run</Value>
 </Value>
 <Value name="3">
-<Value>ProblemClass</Value>
+<Value>ProblemItem</Value>
 </Value>
 <Value name="4">
 <Value>ProblemMember</Value>
@@ -52,10 +55,28 @@ Storage Default
 <Value>ReferencedModule</Value>
 </Value>
 <Value name="8">
-<Value>ReferencedClass</Value>
+<Value>ReferencedItem</Value>
 </Value>
 <Value name="9">
-<Value>ReferencedClassExists</Value>
+<Value>ReferencedItemExists</Value>
+</Value>
+<Value name="10">
+<Value>ProblemFileType</Value>
+</Value>
+<Value name="11">
+<Value>ProblemIncludeFile</Value>
+</Value>
+<Value name="12">
+<Value>ProblemItem</Value>
+</Value>
+<Value name="13">
+<Value>ReferencedItem</Value>
+</Value>
+<Value name="14">
+<Value>ReferencedItemExists</Value>
+</Value>
+<Value name="15">
+<Value>ReferencedFileType</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.DependencyAnalyzer.ProblemD</DataLocation>

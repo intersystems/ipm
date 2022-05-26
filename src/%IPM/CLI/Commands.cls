@@ -20,136 +20,141 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 }
 
 /// This is the Schema which defines the form of the Commands XData block
-XData Schema [ Internal ]
+XData Schema [ Internal, MimeType = application/xml ]
 {
 <?xml version="1.0"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" >
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-<xs:element name="commands">
-<xs:complexType>
-<xs:choice minOccurs="0" maxOccurs="unbounded">
-<xs:element name="command">
-<xs:complexType>
-<xs:choice minOccurs="0" maxOccurs="unbounded">
+  <xs:element name="commands">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
 
-<!-- A modifier is a flag that controls the behavior of the command. -->
-<xs:element name="modifier" type="modifier"/>
+        <xs:element name="command">
+          <xs:complexType>
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
 
-<xs:element name="group">
-<xs:complexType>
+              <!-- A modifier is a flag that controls the behavior of the command. -->
+              <xs:element name="modifier" type="modifier"/>
 
-<xs:choice minOccurs="0" maxOccurs="unbounded">
-<xs:element name="modifier" type="modifier"/>
-<xs:element name="example" type="example"/>
-</xs:choice>
+              <!-- A group contains command modifiers that have specific usage. -->
+              <xs:element name="group" type="group"/>
 
-<xs:attribute name="name" type="string" use="required"/>
+              <!-- A parameter is a space-delimted string provided to a command without a modifier. These appear in order at the end of the command. -->
+              <xs:element name="parameter">
+                <xs:complexType>
+                  <!-- Parameter name -->
+                  <xs:attribute name="name" type="string" use="required"/>
 
-</xs:complexType>
-</xs:element>
+                  <!-- Parameter required? -->
+                  <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
 
-<!-- A parameter is a space-delimted string provided to a command without a modifier. These appear in order at the end of the command. -->
-<xs:element name="parameter">
-<xs:complexType>
-<!-- Parameter name -->
-<xs:attribute name="name" type="string" use="required"/>
+                  <!-- Description of what this parameter does -->
+                  <xs:attribute name="description" type="string" use="optional"/>
 
-<!-- Parameter required? -->
-<xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
+                  <!-- If set to true (default is false), parameter will take all trailing input (including spaces) -->
+                  <xs:attribute name="trailing" type="xs:boolean" use="optional" default="false"/>
+                </xs:complexType>
+              </xs:element>
 
-<!-- Description of what this parameter does -->
-<xs:attribute name="description" type="string" use="optional"/>
+              <!-- Example of how to use the command -->
+              <xs:element name="example" type="example" />
 
-<!-- If set to true (default is false), parameter will take all trailing input (including spaces) -->
-<xs:attribute name="trailing" type="xs:boolean" use="optional" default="false"/>
-</xs:complexType>
-</xs:element>
+              <!-- Description of command -->
+              <xs:element name="description" type="description" minOccurs="1" maxOccurs="1" />
 
-<!-- Example of how to use the command -->
-<xs:element name="example" type="example" />
+              <!-- Summary of command -->
+              <xs:element name="summary" type="description" />
+            </xs:choice>
 
-<!-- Description of command -->
-<xs:element name="description" type="description"/>
-</xs:choice>
+            <!-- Name of the command -->
+            <xs:attribute name="name" type="string" use="required"/>
 
-<!-- Name of the command -->
-<xs:attribute name="name" type="string" use="optional"/>
+            <!-- If set to true, this is the default command if the parser does not match any. The name is ignored, and is instead treated as the first parameter. -->
+            <xs:attribute name="default" type="xs:boolean" use="optional" default="false"/>
 
-<!-- If set to true, this is the default command if the parser does not match any. The name is ignored, and is instead treated as the first parameter. -->
-<xs:attribute name="default" type="xs:boolean" use="optional" default="false"/>
+            <!-- Comma-separated list of aliases -->
+            <xs:attribute name="aliases" type="string" use="optional"/>
 
-<!-- Comma-separated list of aliases -->
-<xs:attribute name="aliases" type="string" use="optional"/>
+            <!-- If true, modifiers are at the end of the command. -->
+            <xs:attribute name="trailingModifiers" type="xs:boolean" use="optional" default="false" />
 
-<!-- If true, modifiers are at the end of the command. -->
-<xs:attribute name="trailingModifiers" type="xs:boolean" use="optional" default="false" />
+            <!-- If set, modifiers starting with this prefix are put into the "data" subscript of the command array. -->
+            <xs:attribute name="dataPrefix" type="string" use="optional" />
+          </xs:complexType>
+        </xs:element>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
 
-<!-- If set, modifiers starting with this prefix are put into the "data" subscript of the command array. -->
-<xs:attribute name="dataPrefix" type="string" use="optional" />
-</xs:complexType>
-</xs:element>
-</xs:choice>
-</xs:complexType>
-</xs:element>
 
-<xs:complexType name="modifier">
-<!-- Modifier name -->
-<xs:attribute name="name" type="string" use="required"/>
+  <!-- A modifier is a flag that controls the behavior of the command. -->
+  <xs:complexType name="modifier">
+    <!-- Modifier name -->
+    <xs:attribute name="name" type="string" use="required"/>
 
-<!-- Modifier name -->
-<xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
+    <!-- Modifier name -->
+    <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
 
-<!-- Comma-separated list of aliases -->
-<xs:attribute name="aliases" type="string" use="optional"/>
+    <!-- Comma-separated list of aliases -->
+    <xs:attribute name="aliases" type="string" use="optional"/>
 
-<!-- If true, the modifier name is followed in the command string by a value -->
-<xs:attribute name="value" type="xs:boolean" use="optional" default="false"/>
+    <!-- If true, the modifier name is followed in the command string by a value -->
+    <xs:attribute name="value" type="xs:boolean" use="optional" default="false"/>
 
-<!-- If true, the modifier name is followed in the command string by a value -->
-<xs:attribute name="description" type="string" use="optional"/>
+    <!-- If true, the modifier name is followed in the command string by a value -->
+    <xs:attribute name="description" type="string" use="optional"/>
 
-<!-- If set, this provides a fixed list of valid values for the modifier -->
-<xs:attribute name="valueList" type="string" use="optional"/>
+    <!-- If set, this provides a fixed list of valid values for the modifier -->
+    <xs:attribute name="valueList" type="string" use="optional"/>
 
-<!-- If set, the value is put into the specified subscript of "data" instead of "parameters" -->
-<xs:attribute name="dataAlias" type="string" use="optional"/>
+    <!-- If set, the value is put into the specified subscript of "data" instead of "parameters" -->
+    <xs:attribute name="dataAlias" type="string" use="optional"/>
 
-<!-- If set, the specified value is put into the info("data","<dataAlias>") - for commands that don't take values -->
-<xs:attribute name="dataValue" type="string" use="optional"/>
-</xs:complexType>
+    <!-- If set, the specified value is put into the info("data","<dataAlias>") - for commands that don't take values -->
+    <xs:attribute name="dataValue" type="string" use="optional"/>
+  </xs:complexType>
 
-<!-- example element with content -->
-<xs:complexType name="example">
-<xs:simpleContent>
-<xs:extension base="string">
-<xs:attribute name="description" type="string" />
-</xs:extension>
-</xs:simpleContent>
-</xs:complexType>
+  <!-- Group controls the domain of functionality that some modifiers belong to, for example: modifiers for 'repo' command that is used for remote repository -->
+  <xs:complexType name="group">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="modifier" type="modifier"/>
+      <xs:element name="example" type="example"/>
+    </xs:choice>
+    <xs:attribute name="name" type="string" use="required"/>
+  </xs:complexType>
 
-<!-- description element with content -->
-<xs:complexType name="description">
-<xs:simpleContent>
-<xs:extension base="string">
-</xs:extension>
-</xs:simpleContent>
-</xs:complexType>
+  <!-- example element with content -->
+  <xs:complexType name="example">
+    <xs:simpleContent>
+      <xs:extension base="string">
+        <xs:attribute name="description" type="string" use="required" />
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
 
-<!-- disallow, allow, require  -->
-<xs:simpleType name="modifierValue">
-  <xs:restriction base="xs:string">
-    <xs:enumeration value="disallow" />
-    <xs:enumeration value="allow" />
-    <xs:enumeration value="require" />
-  </xs:restriction>
-</xs:simpleType>
+  <!-- description element with content -->
+  <xs:complexType name="description">
+    <xs:simpleContent>
+      <xs:extension base="string">
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
 
-<!-- String of minimum length 1 -->
-<xs:simpleType name="string">
-<xs:restriction base="xs:string">
-<xs:minLength value="1"/>
-</xs:restriction>
-</xs:simpleType>
+  <!-- disallow, allow, require  -->
+  <xs:simpleType name="modifierValue">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="disallow" />
+      <xs:enumeration value="allow" />
+      <xs:enumeration value="require" />
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- String of minimum length 1 -->
+  <xs:simpleType name="string">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
 
 </xs:schema>
 }
@@ -213,14 +218,19 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
 			}
 			
 			Do %code.WriteLine(" Kill pCommandStructure")
-			
+			// Compute the max length of a command. Used for pretty printing in %Help
+			Set tMaxLengthCommand = 0
 			Set tChild = ""
 			For {
 				Set tChild = $Order(tMap(1,"c",tChild))
 				Quit:(tChild="")
 				#Define empty """"""
 				If (tMap(tChild) = "command") {
-					Set tName = $$$QUOTE(tMap(tChild,"a","name"))
+					Set tName = tMap(tChild,"a","name")
+					If ($Length(tName) > tMaxLengthCommand) {
+						Set tMaxLengthCommand = $Length(tName)
+					}
+					Set tName = $$$QUOTE(tName)
 					Set tExample = $$$QUOTE($Get(tMap(tChild,"a","example")))
 					If ($Get(tMap(tChild,"a","default")) = "true") {
 						Do %code.WriteLine(" Set pCommandStructure(0,""default"") = "_tName)
@@ -268,7 +278,7 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
                 Set tContentNode = $Order(tMap(tCommChild,"c",0))
                 If (tContentNode '= "") {
                   // Different version of $$$QUOTE to convert newlines into $c(10) (for example) - this is what zwrite calls.
-                  Set tExampleContent = $$Quote^%qcr($Replace($ZStrip(tMap(tContentNode),"<>C"),$c(10),$c(13,10)))
+                  Set tExampleContent = $$Quote^%qcr($Replace($ZStrip(tMap(tContentNode),"<>C"),$Char(10),$Char(13,10)))
                   If 0,(tGroupName = $$$QUOTE($$$DefaultGroup)) {
                     Do %code.WriteLine(" Set pCommandStructure("_tName_",""examples"",$i(pCommandStructure("_tName_",""examples""))) = "_tExampleContent)
                     Do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""examples"",pCommandStructure("_tName_",""examples""),""description"") = "_tDesc)
@@ -278,12 +288,12 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
                     Do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""groups"","_tGroupName_",""examples"",tExampleIndex,""description"") = "_tDesc)
                   }
                 }
-              } ElseIf (tMap(tCommChild) = "description") {
+              } ElseIf (tMap(tCommChild) = "description") || (tMap(tCommChild) = "summary") {
                 Set tContentNode = $Order(tMap(tCommChild,"c",0))
                 If (tContentNode '= "") {
                   // Different version of $$$QUOTE to convert newlines into $c(10) (for example) - this is what zwrite calls.
-                  Set tDescContent = $$Quote^%qcr($Replace($ZStrip(tMap(tContentNode),"<>C"),$c(10),$c(13,10)))
-                  Do %code.WriteLine(" Set pCommandStructure("_tName_",""description"") = "_tDescContent)
+								Set tDescContent = $$Quote^%qcr($Replace($ZStrip(tMap(tContentNode),"<>C"),$Char(10),$Char(13,10)))
+								Do %code.WriteLine(" Set pCommandStructure("_tName_","_$$$QUOTE(tMap(tCommChild))_") = "_tDescContent)
                 }
               } Else {
                 // Common: name, required, description
@@ -327,6 +337,7 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
 					}
 				}
 			}
+			Do %code.WriteLine(" Set pCommandStructure(-1, ""maxLength"") = "_tMaxLengthCommand)
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()  

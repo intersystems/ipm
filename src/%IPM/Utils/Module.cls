@@ -1077,7 +1077,7 @@ ClassMethod ExportDocumentForObject(pSourceModule As %IPM.Storage.Module, Output
 	Quit tSC
 }
 
-ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %String = "") As %Status
+ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %String = "", pSynchronous As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set tInitTLevel = $TLevel
@@ -1118,7 +1118,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
 		$$$ThrowOnError(tSC)
 		
-		Set tFirstLoaded = $$$lcase($Order(tLoadedList("")))
+		Set tFirstLoaded = $Order(tLoadedList(""))
     
 		If (tFirstLoaded = "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
@@ -1126,7 +1126,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		If ($Order(tLoadedList(tFirstLoaded)) '= "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"module.xml contains multiple documents."))
 		}
-		If ($Piece(tFirstLoaded,".",*) '= "zpm") {
+		If ($Piece(tFirstLoaded,".",*) '= "ZPM") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
 		}
 		
@@ -1185,8 +1185,16 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		Set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
 		If 'tInstallContext.ModuleIsDependency(tModuleName) {
-			Set tSC = tModule.LoadDependencies("",.pParams)
-			$$$ThrowOnError(tSC)
+			If 'pSynchronous {
+				// Regular async multi-threaded loading of dependencies
+				Set tSC = tModule.LoadDependencies("",.pParams)
+				$$$ThrowOnError(tSC)
+			} Else {
+				// Temporary custom loading of dependencies in a synchronous
+				// manner to prevent lock timeouts until lifecycle rework
+				// is complete (HSIEO-4450)
+				Do ..SyncLoadDependencies(tModule, .pParams)
+			}
 		}
 		
 		Set tPath = pDirectory_"preload"
@@ -1230,6 +1238,122 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 	}
 	Quit tSC
 }
+
+/// Temporary workaround to synchronously load dependencies. Can be removed once
+/// HSIEO-4450 is complete.
+ClassMethod SyncLoadDependencies(pModule As %IPM.Storage.Module, ByRef pParams)
+{
+	Set isVerbose = $Get(pParams("Verbose"),0)
+
+	/* 
+	 * Call to BuildDependencyGraph copied from %IPM.Storage.Module:LoadDependencies
+	 */
+
+	Set reloadSnapshots = +$Get(pParams("UpdateSnapshots"))
+	Set permitDowngrade = +$Get(pParams("PermitDowngrade"))
+	Write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
+	Set sc = pModule.BuildDependencyGraph(.depdendencyGraph,,reloadSnapshots,,"",,,,,,permitDowngrade)
+	$$$ThrowOnError(sc)
+	Write "Done."
+
+	/* This setting is copied from %IPM.Main:Install */
+	Set pParams("Install") = 1
+	
+	Do ..ConstructInvertedDependencyGraph(.depdendencyGraph, .invertedDependencyGraph)
+	If isVerbose {
+		Write !, "Created inverted dependency graph from dependency graph"
+	}
+
+	#dim flatDepList As %Library.ListOfObjects
+	Set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
+	If isVerbose {
+		Write !, "Constructed flat dependency list from inverted dependency graph"
+		Write !, "Starting installation of dependencies..."
+		Write !	
+	}
+	For i = 1:1:flatDepList.Count() {
+		#dim moduleReference As %IPM.Storage.QualifiedModuleInfo
+		Set moduleReference = flatDepList.GetAt(i)
+		If (moduleReference.ServerName = "") {
+			// Ignore modules already installed that do not need to be installed again
+			Continue
+		}
+		Set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, .pParams)
+		$$$ThrowOnError(sc)
+	}
+}
+
+/// Construct an inverted dependency graph from the dependency graph of a module. <br />
+/// @Argument	pDependencyGraph			Dependency graph constructed. <br />
+/// @Argument	pInvertedDependencyGraph	Inverted dependency graph constructed. <br />
+ClassMethod ConstructInvertedDependencyGraph(ByRef pDependencyGraph, Output pInvertedDependencyGraph)
+{
+	Set moduleName = ""
+	While 1 {
+		Set moduleName = $Order(pDependencyGraph(moduleName), 1, data)
+		If (moduleName = "") {
+			Quit
+		}
+		// Invert dependency graph, subscripts (<module>, <depends on>)
+		Set pInvertedDependencyGraph(moduleName) = $List(data, 2, 3)
+		Set dependentKey = ""
+		For {
+			Set dependentKey = $Order(pDependencyGraph(moduleName, dependentKey))
+			If (dependentKey = "") {
+				Quit
+			}
+			Set pInvertedDependencyGraph($Piece(dependentKey, " "), moduleName) = ""
+		}
+	}
+}
+
+/// Given an inverted dependency graph, construct an ordered dependency list.
+/// The ordering is from least dependent module to most dependent. It is essentially a 
+/// flattened dependency graph. <br />
+/// @Argument	pInvertedDependencyGraph		Inverted dependency graph. <br />
+ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDependencyGraph) As %Library.ListOfObjects(ELEMENTTYPE="%IPM.Storage.QualifiedModuleInfo")
+{
+	#dim moduleReference As %IPM.Storage.QualifiedModuleInfo
+	Set orderedDependencyList = ##class(%Library.ListOfObjects).%New()
+	Set moduleName = ""
+	While 1 {
+		// Note that all nodes have to be killed eventually because no cyclic dependencies
+		// are allowed to exist
+		If '$Data(pInvertedDependencyGraph) {
+			Quit
+		}
+		Set moduleName = $Order(pInvertedDependencyGraph(moduleName))
+		If (moduleName = "") {
+			Set moduleName = $Order(pInvertedDependencyGraph(moduleName))
+		}
+		
+		// If it has no remaining dependencies
+		If $Data(pInvertedDependencyGraph(moduleName)) < 10 {
+			Set $ListBuild(repositoryName, versionString) = $Get(pInvertedDependencyGraph(moduleName))
+			// Create qualified module reference to add to list
+			Set moduleReference = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
+			Set moduleReference.Name = moduleName
+			Set moduleReference.VersionString = versionString
+			Set moduleReference.ServerName = repositoryName
+			$$$ThrowOnError(orderedDependencyList.Insert(moduleReference))
+			// Remove node from graph
+			Kill pInvertedDependencyGraph(moduleName)
+			// Remove from all entries in graph
+			Set dependencyName = ""
+			While 1 {
+				Set dependencyName = $Order(pInvertedDependencyGraph(dependencyName))
+				If (dependencyName = "") {
+					Quit
+				}
+				ZKill pInvertedDependencyGraph(dependencyName, moduleName)
+			}
+		}
+	}
+	Return orderedDependencyList
+}
+
+
+
 
 ClassMethod CheckLicenseKey() As %Boolean
 {
@@ -1967,5 +2091,71 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 	}
 	Quit tSC
 }
+
+/// Evaluates an expression in a provided string. <br />
+/// These special expressions are case-insensitive. <br />
+/// Current valid expressions:
+/// <ul>
+/// 	<li>{$namespace} - the current namespace. </li>
+/// 	<li>{$namespaceLower} - the current namespace in lower case. </li>
+/// 	<li>{$namespaceRoutineDB} - the default routines database for the current namespace. </li>
+/// 	<li>{$namespaceGlobalsDB} - the default globals database for the current namespace. </li>
+/// 	<li>{$installDir} - the instance's install directory </li>
+/// 	<li>{$dataDir} - the instance's data directory </li>
+/// 	<li>{$mgrDir} - the instance's mgr directory. </li>
+/// 	<li>{$cspDir} - the instance's root CSP directory. </li>
+/// </ul>
+ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal ]
+{
+	If (pString '[ "{") {
+		Return pString
+	}
+	Set result = pString
+	Do ..GetDatabaseInfoForNamespace($Namespace, .properties)
+	If $Locate(result,"(?i)\{\$namespace\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespace\}",$Namespace)
+	}
+	If $Locate(result,"(?i)\{\$namespaceLower\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespace\}",$ZConvert($Namespace,"L"))
+	}
+	If $Locate(result,"(?i)\{\$namespaceRoutineDB\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceRoutineDB\}",$Get(properties("Routines")))
+	}
+	If $Locate(result,"(?i)\{\$namespaceGlobalsDB\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceGlobalsDB\}",$Get(properties("Globals")))
+	}
+	If $Locate(result,"(?i)\{\$installDir\}") {
+		Set dir = $System.Util.InstallDirectory()
+		Set result = ..%RegExReplace(result,"(?i)\{\$installDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$dataDir\}") {
+		Set dir = $System.Util.DataDirectory()
+		Set result = ..%RegExReplace(result,"(?i)\{\$dataDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$mgrDir\}") {
+		Set dir = ##class(%Library.File).ManagerDirectory()
+		Set result = ..%RegExReplace(result,"(?i)\{\$mgrDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$cspDir\}") {
+		Set dir = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"csp")
+		Set result = ..%RegExReplace(result,"(?i)\{\$cspDir\}",dir)
+	}
+	Return result
+}
+
+/// Wrapper around Config.Namespaces:Get()
+ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pProperties) [ Internal ]
+{
+	Kill pProperties
+	New $Namespace
+	Set $Namespace = "%SYS"
+	Set sc = $ClassMethod("Config.Namespaces", "Get", pNamespace, .pProperties)
+}
+
+ClassMethod %RegExReplace(pString, pRegEx, pValue) As %String [ Internal ]
+{
+	Quit ##class(%Regex.Matcher).%New(pRegEx,pString).ReplaceAll($Replace(pValue,"\","\\"))
+}
+
 
 }

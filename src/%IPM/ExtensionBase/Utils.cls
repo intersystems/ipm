@@ -1,3 +1,4 @@
+Include %IPM.Common
 Class %IPM.ExtensionBase.Utils
 {
 
@@ -110,6 +111,44 @@ ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %St
 				}
 			}
 		}
+	}
+	
+	If '$IsObject(tModule) && (tExtension = "INC") {
+		// Try to find in specific resources
+		Set tProcessorClass = "LegacyLocalizedMessages"
+		Set tProcessorClassFullForm = $$$DefaultProcessorPackageDot_tProcessorClass
+		Set tQuery = "SELECT ID, Name, ""Module"" FROM %IPM_Storage.ResourceReference "_
+			"WHERE ProcessorClass = '"_tProcessorClass_"' "_
+			"OR ProcessorClass = '"_tProcessorClassFullForm_"'"
+		#dim tResultSet As %SQL.StatementResult
+		Set tResultSet = ##class(%SQL.Statement).%ExecDirect(, tQuery)
+		If (tResultSet.%SQLCODE < 0) {
+			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResultSet.%SQLCODE, tResultSet.%Message)
+		}
+		While tResultSet.%Next(.tSC) {
+			$$$ThrowOnError(tSC)
+			#dim tReference As %IPM.Storage.ResourceReference
+			Set tReference = ##class(%IPM.Storage.ResourceReference).%OpenId(tResultSet.%Get("ID"), , .tSC)
+			$$$ThrowOnError(tSC)
+			#dim tProcessor As %IPM.ResourceProcessor.LegacyLocalizedMessages
+			If '$IsObject(tReference.Processor) {
+				// Unable to resolve so ignore
+				Continue
+			}
+			Kill tChildResources
+			Set tSC = tReference.Processor.OnResolveChildren(.tChildResources)
+			If $$$ISERR(tSC) {
+				// Unable to resolve children so ignore
+				Continue
+			}
+			If $Data(tChildResources(pInternalName)) {
+				// Found matching module so return
+				Set pResourceReference = tReference
+				Set pResourceName = tResultSet.%Get("Name")
+				Return ##class(%IPM.Storage.Module).%OpenId(tResultSet.%Get("Module"))
+			}
+		}
+		$$$ThrowOnError(tSC)
 	}
 	Quit tModule
 }

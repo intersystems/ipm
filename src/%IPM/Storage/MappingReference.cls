@@ -12,8 +12,11 @@ Index ResourceName On (Name, Source);
 
 Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Mappings ];
 
-/// Namespace from which it is mapped or copied
-Property Source As %String(XMLPROJECTION = "ATTRIBUTE");
+/// Database from which it is mapped or copied
+Property Source As %String(MAXLEN = 64, XMLPROJECTION = "ATTRIBUTE");
+
+/// Resolved value after evaluating any permitted expressions in <property>Source</property>.
+Property SourceResolved As %String(MAXLEN = 64, XMLPROJECTION = "NONE") [ SqlComputeCode = { Set {*} = ##class(%IPM.Utils.Module).%EvaluateSystemExpression({Source}) }, SqlComputed ];
 
 /// If set to true, this source code is not shipped in application packaging.
 /// (Of course, it must be included in module packaging.)
@@ -33,6 +36,9 @@ Storage Default
 </Value>
 <Value name="4">
 <Value>Deploy</Value>
+</Value>
+<Value name="5">
+<Value>SourceResolved</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Mappings")</DataLocation>

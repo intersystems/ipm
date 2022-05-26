@@ -22,9 +22,10 @@ Method Display()
 			Quit
 		}
 		
-		Set tSub1 = $Select(tProblem.ReferencedClassExists:tProblem.ReferencedModule,1:" ")
-		Set tSub2 = tProblem.ReferencedClass
-		Set tProblemMap(tSub1,tSub2,$Increment(tProblemMap(tSub1,tSub2))) = tProblem.ToString()
+		Set tSub1 = $Select(tProblem.ReferencedItemExists:tProblem.ReferencedModule,1:" ")
+		Set tSub2 = tProblem.ReferencedFileType
+		Set tSub3 = tProblem.ReferencedItem
+		Set tProblemMap(tSub1,tSub2,tSub3, $Increment(tProblemMap(tSub1,tSub2,tSub3))) = tProblem.ToString()
 	}
 	
 	Set tReferencedModuleKey = ""
@@ -37,21 +38,28 @@ Method Display()
 			Write !!
 		}
 		If (tReferencedModuleKey = " ") {
-			Write "Invalid references to missing classes:"
+			Write "Invalid references to missing classes/include file"
 		} Else {
 			Write "Invalid references to module ",tReferencedModuleKey," :"
 		}
 		
-		Set tReferencedClassKey = ""
+		Set tFileTypeKey = ""
 		For {
-			Set tReferencedClassKey = $Order(tProblemMap(tReferencedModuleKey,tReferencedClassKey),1,tLineCount)
-			If (tReferencedClassKey = "") {
+			Set tFileTypeKey = $Order(tProblemMap(tReferencedModuleKey,tFileTypeKey))
+			If (tFileTypeKey = "") {
 				Quit
 			}
-			Write !,"Class ",tReferencedClassKey,$Case(tReferencedModuleKey," ":" (missing)",:" (@ "_tReferencedModuleKey_")")
+			Set tReferencedItemKey = ""
+			For {
+				Set tReferencedItemKey = $Order(tProblemMap(tReferencedModuleKey,tFileTypeKey, tReferencedItemKey),1,tLineCount)
+				If (tReferencedItemKey = "") {
+					Quit
+				}
+				Write !, $Case(tFileTypeKey, ".INC": "Include File ",:"Class "),tReferencedItemKey_tFileTypeKey,$Case(tReferencedModuleKey," ":" (missing)",:" (@ "_tReferencedModuleKey_")")
 			
-			For tLine=1:1:tLineCount {
-				Write !,tProblemMap(tReferencedModuleKey,tReferencedClassKey,tLine)
+				For tLine=1:1:tLineCount {
+					Write !,tProblemMap(tReferencedModuleKey,tFileTypeKey,tReferencedItemKey, tLine)
+				}
 			}
 		}
 	}

@@ -247,6 +247,10 @@ Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [
 		Set ..EmbeddedProcessor = ##class(%IPM.ResourceProcessor.Default.Class).%New(pResourceReference)
 	}
 	Set ..EmbeddedProcessor.ExportFlags = ..ExportFlags
+	If (..Format '= "") {
+		Set ..EmbeddedProcessor.Format = ..Format
+		Set ..EmbeddedProcessor.FilenameExtension = $Case(..Format,"XML":"xml","UDL":"cls")
+	}
 	Quit tSC
 }
 
