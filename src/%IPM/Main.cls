@@ -194,11 +194,9 @@ repo -enable -app /csp/mynamespace -publish 1
 
 <!-- Modifiers -->
 <!-- Universal Actions -->
-<modifier name="delete-all" description="Deletes all repositories (possibly subject to a type filter: -filesystem, -remote, -local, -perforce)" />
-<modifier name="list" description="Lists all repositories (possibly subject to a type filter: -filesystem, -remote, -local, -perforce)" />
+<modifier name="delete-all" description="Deletes all repositories (possibly subject to a type filter: e.g -filesystem, -remote, -local)" />
+<modifier name="list" description="Lists all repositories (possibly subject to a type filter: e.g. -filesystem, -remote, -local)" />
 <modifier name="list-modules" aliases="modules,listmodules" description="List modules available in the specified repository (-n\[ame]), or in all configured repositories if no repository was specified." />
-<modifier name="enable" description="Enables package manager web services in this namespace." />
-<modifier name="disable" description="Disables package manager web services in this namespace." />
 <modifier name="info" description="Shows configuration details for the current namespace as a remote repository." />
 <modifier name="copy-from" value="true" description="Copies repository configuration from a different (specified) namespace" />
 <!-- General/shared modifiers -->
@@ -210,10 +208,7 @@ repo -enable -app /csp/mynamespace -publish 1
 <modifier name="prereleases" aliases="pre" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for prerelease software" />
 <modifier name="read-only" aliases="ro" value="true" valueList="0,1" description="For any repository, specifies that modules installed from it are ALWAYS installed in non-developer mode, effectively making them read only" />
 <!-- Repository types  -->
-<modifier name="local" aliases="l" description="Create/update the local namespace cache" />
 <modifier name="type" value="true" aliases="t" description="Subclass of %IPM.Repo.Definition to create/modify/delete or implementation of %IPM.Repo.IPackageService or %IPM.Repo.IPublishService to enable/disable" />
-<!-- Modifiers specific to -enable -->
-<modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
 
 </command>
 
@@ -407,17 +402,6 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 
 </command>
 
-<command name="clear-cache">
-<summary>
-	Clears the cache of artifacts downloaded for installation in the current namespace.
-</summary>
-<description>
-	Clears the cache of artifacts downloaded for installation in the current namespace.
-	(As an optimization, downloaded module/application artifacts are stored in the database
-	for local retrieval later.)
-</description>
-</command>
-
 <command name="cos" aliases="isc-os">
 <description>
 	Executes the provided ObjectScript expression.
@@ -448,21 +432,6 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 
 </command>
 
-<command name="manage" aliases="manager">
-<description>
-	Manages applications installed on this instance (interactive).
-</description>
-
-<!-- Examples -->
-<example description="Start the manager in the MYAPPNS namespace">
-	manage MYAPPNS
-</example>
-
-<!-- Parameters -->
-<parameter name="namespace" required="true" description="Namespace to start the manager in" />
-
-</command>
-
 <command name="list-installed" aliases="list">
 <description>
 	Lists modules installed in the current namespace.
@@ -472,14 +441,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Shows all installed modules in tree format.">
 	list-installed -tree
 </example>
-<example description="Shows all installed modules in list format, with the local source from where the module was installed.">
-	list-installed -showsource
-</example>
 
 <!-- Modifiers -->
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
-<modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
-<modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 
 </command>
 
@@ -1488,6 +1452,65 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			Write "No repositories found.", !
 		}
     Quit
+	} ElseIf $$$HasModifier(pCommandInfo,"copy-from") {
+		Set tSourceNamespace = $$$GetModifier(pCommandInfo,"copy-from")
+		Set tOldNamespace = $Namespace
+		New $Namespace
+		Try {
+			Set $Namespace = tSourceNamespace
+		} Catch e {
+			If (e.Name = "<NAMESPACE>") {
+				Write !,"Invalid namespace: ",tSourceNamespace
+				Return
+			}
+			Throw e
+		}
+		
+		Set tName = $$$GetModifier(pCommandInfo,"name")
+		If (tName '= "") {
+			Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName,,.tSC)
+			If $$$ISERR(tSC) && $System.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
+				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No repository with name '%1' exists in namespace '%2'",tName,tSourceNamespace))
+			}
+			$$$ThrowOnError(tSC)
+			Set tRepositories($Increment(tRepositories)) = tRepository
+		} Else {
+			// Find all the repositories in the source namespace
+			Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+				"select Name "_
+				"from %IPM_Repo.Definition "_
+				"order by %IPM_Repo.Definition_SortOrder(ID) desc")
+			If (tRes.%SQLCODE < 0) {
+				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+			}
+			While tRes.%Next(.tSC) {
+				$$$ThrowOnError(tSC)
+				Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+				$$$ThrowOnError(tSC)
+				Set tRepositories($Increment(tRepositories)) = tRepository
+			}
+			$$$ThrowOnError(tSC)
+		}
+		
+		Set $Namespace = tOldNamespace
+		For tIndex=1:1:$Get(tRepositories) {
+			// Deep clone in case there are ever other referenced objects that need to be carried across.
+			// This is not relevant for any current repository types, but is most likely to be correct in
+			// hypothetical cases where it may matter. (A Git or GitHub-based repository, for example, would
+			// probably need to store more information that would be carried across this way.)
+			Set tNewRepository = tRepositories(tIndex).%ConstructClone(1)
+			If ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(tNewRepository.Name) {
+				Write !,"Repository already defined: ",tNewRepository.Name,"; skipping."
+				Continue
+			}
+			Set tOneSC = tNewRepository.%Save()
+			If $$$ISOK(tOneSC) {
+				Write !,"Copied:"
+				Do tNewRepository.Display()
+			}
+			Set tSC = $System.Status.AppendStatus(tSC,tOneSC)
+		}
+		$$$ThrowOnError(tSC)
 	} ElseIf $$$HasModifier(pCommandInfo,"list-modules") {
     Do ..Search(.pCommandInfo)
 		Quit
@@ -1853,7 +1876,8 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		set tDesc=+$g(pCommandInfo("data","Desc"))
 		quit:'..GetListModule(,.tModMap,'tDesc)
 		Set tMod = ""
-		For { Set tMod = $Order(tModMap(tMod),1,tVersion)
+		For { 
+			Set tMod = $Order(tModMap(tMod),1,tVersion)
 			Quit:(tMod="")
 			Write !,$$$FormattedLine($$$Green,tMod)," ",tVersion_" "
 			If tDesc,$Data(tModMap(tMod,"L"),Lock) {
