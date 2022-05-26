@@ -403,6 +403,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="recurse" aliases="r" description="Also recursively uninstall dependencies. By default, will not uninstall dependencies that are also required by other installed modules; the -force flag overrides this." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
 
 </command>
 
