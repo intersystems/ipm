@@ -47,7 +47,7 @@ with what is in the database.
 * activate: performs post-compilation installation/configuration steps.
 * document: regenerates the API documentation for the module
 * test: runs any unit tests associated with the module, in the current namespace.
-* package: exports the module's resources and bundles them into a module artifact (.zip file).
+* package: exports the module's resources and bundles them into a module artifact (.tgz file).
 * verify: installs that artifact in a separate namespace, then runs integration tests (if any).
 * register: saves that artifact into the current namespace's module cache.
 This is accessible to other instances configured to look at the current namespace as a
@@ -234,8 +234,14 @@ load C:\module\root\path\
 <example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
 load -dev -verbose C:\module\root\path\
 </example>
+<example description="Loads the module in branch feature-1 from remote repository https://github.com/user/repository.git.">
+load https://github.com/user/repository.git
+load https://github.com/user/repository.git -branch feature-1
+</example>
+
 
 <!-- Modifiers -->
+<modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
@@ -535,6 +541,20 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <!-- Modifiers -->
 <modifier name="all" description="If specified, rearrange all modules loaded in development mode (rather than just the current one)." />
 </command>
+
+<command name="dependency-analyzer" aliases="deps">
+<description>
+	Inspects all classes in the provided module and checks for invalid references
+	to classes that are either not in the module or not in one of the module's
+	dependencies.
+	The invalid references are written to the current device.
+</description>
+<parameter name="module" required="true" description="Name of module to inspect" />
+<example description="Runs the dependency analyzer on the module MyModuleName.">
+	deps MyModuleName
+</example>
+</command>
+
 
 <command name="version">
 <description>
