@@ -132,9 +132,8 @@ ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Bool
 		Set pInstance.Username = $Get(pModifiers("username"),"")
 		Set pInstance.Password = $Get(pModifiers("password"),"")	
 	
-		If $Data(pModifiers("url"),tURL) {
-			Set pInstance.URL = tURL
-		}
+		Set pInstance.URL = tUrl
+		
 		If ((pInstance.%Id()="")&&..DeploymentServerExists(1)) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server."_$$$NL_" Use ""repo -r -n registry -url <new url>"" to switch to another server"_$$$NL))
 		}
