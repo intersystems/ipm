@@ -1370,6 +1370,7 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 		Set:($Length(name)>maxlenname) maxlenname = $Length(name)
 		Set @$$$gn@(name)=$Listbuild(tRes.%Get("Version"),tRes.%Get("Repository"),tRes.%Get("Description"))
 	}
+	$$$ThrowOnError(tSC)
 	Set name=""
 	For { 
 		Set name = $Order(@$$$gn@(name)) 
