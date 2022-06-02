@@ -3,7 +3,7 @@ Include (%syPrompt, %IPM.Common)
 Class %IPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %IPM.CLI.Commands) [ Abstract ]
 {
 
-Parameter DEFAULTGLOBAL = "^%IPM.Repo.Definition";
+Parameter DEFAULTGLOBAL = "^IPM.Repo.Definition";
 
 Parameter DOMAIN = "ZPM";
 
@@ -235,11 +235,11 @@ Storage Default
 <Value>ReadOnly</Value>
 </Value>
 </Data>
-<DataLocation>^%IPM.Repo.DefinitionD</DataLocation>
+<DataLocation>^IPM.Repo.DefinitionD</DataLocation>
 <DefaultData>DefinitionDefaultData</DefaultData>
-<IdLocation>^%IPM.Repo.DefinitionD</IdLocation>
-<IndexLocation>^%IPM.Repo.DefinitionI</IndexLocation>
-<StreamLocation>^%IPM.Repo.DefinitionS</StreamLocation>
+<IdLocation>^IPM.Repo.DefinitionD</IdLocation>
+<IndexLocation>^IPM.Repo.DefinitionI</IndexLocation>
+<StreamLocation>^IPM.Repo.DefinitionS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 
