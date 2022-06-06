@@ -2352,7 +2352,7 @@ ClassMethod UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Boo
 	Quit tSC
 #; These are the actual contents of %ZLANGC00 (to be added/updated)
 $$$STARTTAG
-ZPM(pArgs...) Do ##class(%IPM.Main).Shell(pArgs...) Quit
+ZPM(pArgs...) If $System.CLS.IsMthd("%IPM.Main", "Shell") { Do ##class(%IPM.Main).Shell(pArgs...) Quit } Else { Write !, "InterSystems Package Manager is not installed in this namespace." Quit }
 $$$ENDTAG
 #; Need an extra line down here to avoid the end bracket being on the same line as $$$ENDTAG - a comment is just fine.
 }

@@ -4,7 +4,7 @@ Class %IPM.General.Singleton Extends %RegisteredObject [ Abstract ]
 {
 
 /// If set to 1, calls to %Get must return an instance of this class created in the current namespace; a new instance will be created if none exists.
-Parameter NAMESPACESCOPE As BOOLEAN = 0;
+Parameter NAMESPACESCOPE As BOOLEAN = 1;
 
 /// PPG in which to track references to the instance of this class
 Parameter PPG As STRING = "^||%IPM.Singleton";
