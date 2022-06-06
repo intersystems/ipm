@@ -10,16 +10,16 @@ on:
     types:
       - released
 env:
-  PREVIOUS: 2020.1.1.408.0
-  LATEST: 2021.1.0.215.3
-  PREVIEW: 2022.1.0.199.0
+  PREVIOUS: 2021.2.0.651.0
+  LATEST: 2022.1.0.209.0
+  # PREVIEW: 2022.1.0.199.0
 jobs:
   build:
     timeout-minutes: 20
     strategy:
       matrix:
-        # version: [previous, current, latest]
-        version: [latest, preview]
+        version: [previous, current]
+        # version: [latest, preview]
         platform: [common, health]
     runs-on: ubuntu-latest
     steps:

@@ -1,12 +1,11 @@
 version: '3.6'
 services:
   iris:
-    build: 
-      context: .
-      
+    build: .
     restart: always
     ports: 
       - 52774:52773
     volumes:
+      - --check-caps false
       - ~/iris.key:/usr/irissys/mgr/iris.key
       - ./:/home/irisowner/zpm/
