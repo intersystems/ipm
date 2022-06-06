@@ -64,17 +64,13 @@ jobs:
           echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
           docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
           docker network create zpm
-          mkdir -p /tmp/registry/
-          rm -rf /tmp/registry/password.*
-          echo securepassword > /tmp/registry/password.txt
           docker run --init --rm -d \
             --network zpm \
             --name registry \
             --network-alias registry \
-            -p 52773:52773 \
             -v /tmp/registry:/home/irisowner/registry \
             docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
-            -p /home/irisowner/registry/password.txt \
+            -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'" \
             --check-caps false
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
@@ -84,7 +80,7 @@ jobs:
           docker run --network zpm -d --rm \
             -e TEST_REGISTRY=http://registry:52773/registry/ \
             -e TEST_REGISTRY_USER=admin \
-            -e TEST_REGISTRY_PASSWORD=securepassword \
+            -e TEST_REGISTRY_PASSWORD=SYS \
             -v `pwd`:/home/irisowner/zpm/ \
             zpm --check-caps false
           CONTAINER=`docker ps -lq`
@@ -108,7 +104,7 @@ jobs:
             'zpm "install dsw":1\n' \
             'zpm "install sslclient":1\n' \
             'zpm "list":1\n' \
-            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password securepassword":1\n' \
+            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
             'zpm "publish zpm -v":1' \
             'zpm "publish sslclient -v":1' \
             'halt\n' \
