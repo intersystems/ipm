@@ -14,198 +14,263 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 {
 <?xml version="1.0"?>
 <commands>
-  <command name="help" aliases="?">
-    <description>
-        Displays help information for the shell or a particular command.
-    </description>
+<command name="help" aliases="?">
+<description>Displays help information for the shell or a particular command.</description>
 
-    <!-- Parameters -->
-    <parameter name="command" description="Command for which help information should be displayed" />
+<!-- Parameters -->
+<parameter name="command" description="Command for which help information should be displayed" />
 
-    <!-- Modifiers -->
-    <modifier name="verbose" aliases="v" description="Show full detail" />
-    <modifier name="markdown" aliases="m" description="Print detail in markdown format (for easy transfer to external documentation)" />
-  </command>
+<!-- Modifiers -->
+<modifier name="verbose" aliases="v" description="Show full detail" />
+<modifier name="markdown" aliases="m" description="Print detail in markdown format (for easy transfer to external documentation)" />
+</command>
 
-  <command name="quit" aliases="q,exit">
-    <description>
-        Exits the package manager shell.
-    </description>
-  </command>
+<command name="quit" aliases="q,exit">
+<description>Exits the package manager shell.</description>
+</command>
 
-  <command name="module-action" default="true" dataPrefix="D" trailingModifiers="true">
-  	<summary>
-		Performs operations on modules - compiling, running tests, packaging/registering, etc.
-	</summary>
-    <description>
-        Performs operations on modules - compiling, running tests, packaging/registering, etc.
-        You can use this by starting a command with the module name.
-        Note that flags appear *after* all actions.
+<command name="module-action" default="true" dataPrefix="D" trailingModifiers="true">
+<summary>Performs operations on modules - compiling, running tests, packaging/registering, etc.</summary>
+<description>
+Performs operations on modules - compiling, running tests, packaging/registering, etc.
+You can use this by starting a command with the module name.
+Note that flags appear *after* all actions.
 
-        The standard lifecycle phases are:
-        * clean: removes all dependencies that are not required by other installed modules and
-        their resources. Dependencies required by other modules will also be removed if the -DClean.Force=1 flag is specified.
-        * reload: pulls module source code into the namespace from disk. Does not compile.
-        * validate: ensures that module resource processor attributes are valid, and that the
-        resources exported to the filesystem (and possible to source control) are consistent
-        with what is in the database.
-        * compile: compiles all resources within the module.
-        * activate: performs post-compilation installation/configuration steps.
-        * document: regenerates the API documentation for the module
-        * test: runs any unit tests associated with the module, in the current namespace.
-        * package: exports the module's resources and bundles them into a module artifact (.zip file).
-        * verify: installs that artifact in a separate namespace, then runs integration tests (if any).
-        * register: saves that artifact into the current namespace's module cache.
-        This is accessible to other instances configured to look at the current namespace as a
-        module repository.
-        * publish: saves that artifact to the repository for which deployment is enabled.
-        Currently, there may only be one of these per namespace.
-    </description>
+The standard lifecycle phases are:
+* clean: removes all dependencies that are not required by other installed modules and
+their resources. Dependencies required by other modules will also be removed if the -DClean.Force=1 flag is specified.
+* reload: pulls module source code into the namespace from disk. Does not compile.
+* validate: ensures that module resource processor attributes are valid, and that the
+resources exported to the filesystem (and possible to source control) are consistent
+with what is in the database.
+* compile: compiles all resources within the module.
+* activate: performs post-compilation installation/configuration steps.
+* document: regenerates the API documentation for the module
+* test: runs any unit tests associated with the module, in the current namespace.
+* package: exports the module's resources and bundles them into a module artifact (.tgz file).
+* verify: installs that artifact in a separate namespace, then runs integration tests (if any).
+* register: saves that artifact into the current namespace's module cache.
+This is accessible to other instances configured to look at the current namespace as a
+module repository.
+* publish: saves that artifact to the repository for which deployment is enabled.
+Currently, there may only be one of these per namespace.
+</description>
 
-    <!-- Parameters -->
-    <parameter name="module" required="true" description="Name of module on which to perform lifecycle actions" />
-    <parameter name="actions" required="true" description="Space-delimited list of module lifecycle phases to run" trailing="true" />
+<!-- Examples -->
+<example description="Compiles the module named &quot;MyModuleName&quot;">module-action MyModuleName compile</example>
+<example description="Performs multiple actions on the module named &quot;MyModuleName&quot;; &quot;clean&quot; deletes all of its dependenices, and &quot;install&quot; will then re-download them, package the module, and register it in the current namespace's module cache.">MyModuleName clean register</example>
+<example description="Compiles the module named MyUIModule with verbose output and pParams(&quot;UIFW&quot;,&quot;force&quot;) (passed to all lifecycle phases) set to 42.">MyUIModule compile -v -DUIFW.force=42</example>
 
-    <!-- Modifiers -->
-    <modifier name="only" aliases="o" description="Only runs the specified phase(s), rather than also running predecessors." />
-    <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-    <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-    <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module on which to perform lifecycle actions" />
+<parameter name="actions" required="true" description="Space-delimited list of module lifecycle phases to run" trailing="true" />
 
-    <!-- Examples -->
-    <example description="Compiles the module named &quot;MyModuleName&quot;">
-        module-action MyModuleName compile
-    </example>
-    <example description="Performs multiple actions on the module named &quot;MyModuleName&quot;; &quot;clean&quot; deletes all of its dependenices, and &quot;install&quot; will then re-download them, package the module, and register it in the current namespace's module cache.">
-        MyModuleName clean register
-    </example>
-    <example description="Compiles the module named MyUIModule with verbose output and pParams(&quot;UIFW&quot;,&quot;force&quot;) (passed to all lifecycle phases) set to 42.">
-        MyUIModule compile -v -DUIFW.force=42
-    </example>
-  </command>
+<!-- Modifiers -->
+<modifier name="only" aliases="o" description="Only runs the specified phase(s), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 
-  <command name="init" aliases="initialize">
-	<summary>
-		Configures the current namespace for package manager use.
-	</summary>
-    <description>
-        Configures new namespace for use of package manager (interactive). This sets up the
-        local cache and allows for configuration of studio extensions for source control and
-        the package manager itself. In the case of Perforce-based source control, prompts are
-        included for username, password, Perforce workspace, and a few other settings.
-    </description>
+</command>
 
-    <!-- Modifiers -->
-    <modifier name="noprompt" aliases="quiet,q" description="If specified, no prompts will be shown." />
-    <modifier name="zpm" aliases="cli" description="If specified, the zpm command will be configured." />
-    <modifier name="extension" aliases="ext" value="true" description="Studio extension to configure for the current namespace (in addition to the Package Manager extension - e.g., for source control)" />
-  </command>
+<command name="init" aliases="initialize">
+<summary>Configures the current namespace for package manager use.</summary>
+<description>
+Configures new namespace for use of package manager (interactive). This sets up the
+local cache and allows for configuration of studio extensions for source control and
+the package manager itself. In the case of Perforce-based source control, prompts are
+included for username, password, Perforce workspace, and a few other settings.
+</description>
 
-  <command name="repo" aliases="repository" dataPrefix="D">
-  	<summary>
-        Configures the current namespace to search for modules in a repository.
-    </summary>
-    <description>
-        Configures the current namespace to search for modules on a remote server or on the
-        local filesystem.
-    </description>
-	
-    <!-- Modifiers -->
-    <!-- Universal Actions -->
-    <modifier name="delete-all" description="Deletes all repositories (possibly subject to a type filter: -filesystem, -remote, -local, -perforce)" />
-    <modifier name="list" description="Lists all repositories (possibly subject to a type filter: -filesystem, -remote, -local, -perforce)" />
-    <modifier name="list-modules" aliases="modules,listmodules" description="List modules available in the specified repository (-n\[ame]), or in all configured repositories if no repository was specified." />
-    <modifier name="enable" description="Enables package manager web services in this namespace." />
-    <modifier name="disable" description="Disables package manager web services in this namespace." />
-    <modifier name="info" description="Shows configuration details for the current namespace as a remote repository." />
-    <modifier name="copy-from" value="true" description="Copies repository configuration from a different (specified) namespace" />
-    <!-- General/shared modifiers -->
-    <modifier name="name" aliases="n" value="true" description="Namespace-unique name for the module" />
-    <modifier name="delete" description="Deletes the current namespace's reference to the named repository" />
-    <modifier name="publish" value="true" valueList="0,1" description="When configuring a remote repository, specifies that publishing of packages to the repository is allowed. When configuring the current namespace with -enable, specifies that publishing is also enabled. "/>
-    <!-- General properties -->
-    <modifier name="snapshots" aliases="s" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for snapshot builds (i.e., those with a semantic version ending in '+snapshot', indicating a 'latest' build of a particular version)." />
-    <modifier name="prereleases" aliases="pre" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for prerelease software" />
-    <modifier name="read-only" aliases="ro" value="true" valueList="0,1" description="For any repository, specifies that modules installed from it are ALWAYS installed in non-developer mode, effectively making them read only" />
-    <!-- Repository types  -->
-    <modifier name="local" aliases="l" description="Create/update the local namespace cache" />
-    <modifier name="type" value="true" aliases="t" description="Subclass of %IPM.Repo.Definition to create/modify/delete or implementation of %IPM.Repo.IPackageService or %IPM.Repo.IPublishService to enable/disable" />
-    <!-- Modifiers specific to -enable -->
-    <modifier name="app" value="true" description="When enabling a namespace to serve as a remote repository, specifies the web application to allow web service access." />
+<!-- Modifiers -->
+<modifier name="noprompt" aliases="quiet,q" description="If specified, no prompts will be shown." />
+<modifier name="zpm" aliases="cli" description="If specified, the zpm command will be configured." />
+<modifier name="extension" aliases="ext" value="true" description="Generic extension (e.g., extension class for source control) to configure for the current namespace " />
+<modifier name="menuextension" aliases="menuext" value="true" description="Server menu extension (Package Manager extension for server menus such as Studio, vscode menu, etc.) to configure for the current namespace" />
+</command>
 
-    <!-- Examples -->
-    <example description="List all repositories">
-        repo -list
-    </example>
-    <example description="Delete all repositories">
-        repo -delete-all
-    </example>
-    <example description="Delete the repository named &quot;LocalFiles&quot;">
-        repo -n LocalFiles -delete
-    </example>
-    <example description="Lists all modules (and versions) available from the repository named &quot;AppModules&quot;">
-        repo -n AppModules -list-modules
-    </example>
-    <example description="Enables package manager web services in this namespace via the /csp/mynamespace/ web application, including web services for publishing. Note that security (e.g., authentication settings, required role) should be configured separately as part of this web application.">
-        repo -enable -app /csp/mynamespace -publish 1
-    </example>
-  </command>
+<command name="reload">
+<description>
+This command is an alias for `module-action module-name reload`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform reload action" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (reload), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
 
-  <command name="load" dataPrefix="D">
-	<summary>
-        Loads a module from the specified directory into the current namespace.
-    </summary>
-    <description>
-        Loads a module from the specified directory into the current namespace.
-        Dependencies are also loaded automatically, provided that they can be found in
-        repositories configured with the 'repo' command.
-    </description>
+<command name="compile">
+<description>
+This command is an alias for `module-action module-name compile`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform compile action" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (compile), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
 
-    <!-- Parameters -->
-    <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
+<command name="test">
+<description>
+This command is an alias for `module-action module-name test`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform test action" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (test),rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
 
-    <!-- Modifiers -->
-    <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-    <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-    <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<command name="package">
+<description>
+This command is an alias for `module-action module-name package`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform package actions" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (package), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="path" aliases="p" dataAlias="Path" value="true" description="Use specified path to export package." />
+</command>
 
-    <!-- Examples -->
-    <example description="Loads the module described in C:\module\root\path\module.xml">
-        load C:\module\root\path\
-    </example>
-    <example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
-        load -dev -verbose C:\module\root\path\
-    </example>
-  </command>
+<command name="verify">
+<description>
+This command is an alias for `module-action module-name verify`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform verify action" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (verify), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
 
-  <command name="import">
-    <description>
-        Imports classes from a file or file(s), reexporting to source control if needed.
-    </description>
+<command name="publish">
+<description>
+This command is an alias for `module-action module-name publish`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform publish actions" />
+<modifier name="only" aliases="o" description="Only runs the specified phase (publish), rather than also running predecessors." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
 
-    <!-- Parameters -->
-    <parameter name="source" description="File or directory to import" required="true" />
+<command name="config">
+<description>Update ZPM settings. Setting is a key-value pair.</description>
+<example description="Disable collecting analytics data">config set analytics 0</example>
+<example description="Enable collecting analytics data">config set analytics 1</example>
+<example description="list all settings">config list</example>
+<example description="get value for analytics key">config get analytics</example>
+<example description="reset to default value for analytics key">config delete analytics</example>
+<parameter name="action" required="true" description="One of settings actions: list, get, set, delete" />
+<parameter name="key" required="false" description="Setting key" />
+<parameter name="value" required="false" description="Setting value" />
+</command>
 
-    <!-- Modifiers -->
-    <modifier name="quiet" aliases="q" description="Produces minimal output from the command." />
-    <modifier name="verbose" aliases="v" description="Produces verbose output from the command." />
-    <modifier name="norecurse" description="If importing a directory, do not recurse (default is to load directories recursively)" />
-    <modifier name="nocompile" description="Skip compiling imported classes (default is to compile them)" />
+<command name="repo" aliases="repository" dataPrefix="D">
+<summary>Configures the current namespace to search for modules in a repository.</summary>
+<description>
+Configures the current namespace to search for modules on a remote server or on the
+local filesystem.
+</description>
 
-    <!-- Examples -->
-    <example description="Import and compile the class or classes from the given file">
-        import C:\Temp\MyExport.xml
-    </example>
-    <example description="Import the classes from the given directory, located at its root level only. Classes are loaded but not compiled.">
-        import C:\Temp\MyFlatExportDir\ -norecurse -nocompile
-    </example>
-  </command>
+<!-- Examples -->
+<example description="List all repositories">
+repo -list
+</example>
+<example description="Delete all repositories">
+repo -delete-all
+</example>
+<example description="Delete the repository named &quot;LocalFiles&quot;">
+repo -n LocalFiles -delete
+</example>
+<example description="Lists all modules (and versions) available from the repository named &quot;AppModules&quot;">
+repo -n AppModules -list-modules
+</example>
+<example description="Enables package manager web services in this namespace via the /csp/mynamespace/ web application, including web services for publishing. Note that security (e.g., authentication settings, required role) should be configured separately as part of this web application.">
+repo -enable -app /csp/mynamespace -publish 1
+</example>
+
+<!-- Modifiers -->
+<!-- Universal Actions -->
+<modifier name="delete-all" description="Deletes all repositories (possibly subject to a type filter: e.g -filesystem, -remote, -local)" />
+<modifier name="list" description="Lists all repositories (possibly subject to a type filter: e.g. -filesystem, -remote, -local)" />
+<modifier name="list-modules" aliases="modules,listmodules" description="List modules available in the specified repository (-n\[ame]), or in all configured repositories if no repository was specified." />
+<modifier name="info" description="Shows configuration details for the current namespace as a remote repository." />
+<modifier name="copy-from" value="true" description="Copies repository configuration from a different (specified) namespace" />
+<!-- General/shared modifiers -->
+<modifier name="name" aliases="n" value="true" description="Namespace-unique name for the module" />
+<modifier name="delete" description="Deletes the current namespace's reference to the named repository" />
+<modifier name="publish" value="true" valueList="0,1" description="When configuring a remote repository, specifies that publishing of packages to the repository is allowed. When configuring the current namespace with -enable, specifies that publishing is also enabled. "/>
+<!-- General properties -->
+<modifier name="snapshots" aliases="s" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for snapshot builds (i.e., those with a semantic version ending in '+snapshot', indicating a 'latest' build of a particular version)." />
+<modifier name="prereleases" aliases="pre" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for prerelease software" />
+<modifier name="read-only" aliases="ro" value="true" valueList="0,1" description="For any repository, specifies that modules installed from it are ALWAYS installed in non-developer mode, effectively making them read only" />
+<!-- Repository types  -->
+<modifier name="type" value="true" aliases="t" description="Subclass of %IPM.Repo.Definition to create/modify/delete or implementation of %IPM.Repo.IPackageService or %IPM.Repo.IPublishService to enable/disable" />
+
+</command>
+
+<command name="load" dataPrefix="D">
+<summary>
+Loads a module from the specified directory into the current namespace.
+</summary>
+<description>
+Loads a module from the specified directory into the current namespace.
+Dependencies are also loaded automatically, provided that they can be found in
+repositories configured with the 'repo' command.
+</description>
+
+<!-- Examples -->
+<example description="Loads the module described in C:\module\root\path\module.xml">
+load C:\module\root\path\
+</example>
+<example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
+load -dev -verbose C:\module\root\path\
+</example>
+<example description="Loads the module in branch feature-1 from remote repository https://github.com/user/repository.git.">
+load https://github.com/user/repository.git
+load https://github.com/user/repository.git -branch feature-1
+</example>
+
+
+<!-- Modifiers -->
+<modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+
+<!-- Parameters -->
+<parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
+
+</command>
+
+<command name="import">
+<description>Imports classes from a file or file(s), reexporting to source control if needed.</description>
+
+<!-- Examples -->
+<example description="Import and compile the class or classes from the given file">
+	import C:\Temp\MyExport.xml
+</example>
+<example description="Import the classes from the given directory, located at its root level only. Classes are loaded but not compiled.">
+	import C:\Temp\MyFlatExportDir\ -norecurse -nocompile
+</example>
+
+<!-- Parameters -->
+<parameter name="source" description="File or directory to import" required="true" />
+
+<!-- Modifiers -->
+<modifier name="quiet" aliases="q" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" description="Produces verbose output from the command." />
+<modifier name="norecurse" description="If importing a directory, do not recurse (default is to load directories recursively)" />
+<modifier name="nocompile" description="Skip compiling imported classes (default is to compile them)" />
+
+</command>
 
   <command name="run-from-file" aliases="run">
-	<summary>
-		Runs Package Manager Shell commands provided in a file.
-	</summary>
-    <description>
+<summary>Runs Package Manager Shell commands provided in a file.</summary>
+<description>
         Imports either a text file or a JSON file that contains Package Manager Shell commands and runs them sequentially
         in the current namespace.
         Expected format if the file is a text file (with a .txt extension):
@@ -220,259 +285,282 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
         }
         where each nested object contains key-value pairs. Note that for modifiers that have no value associated with them
         (such as -verbose), the value of the key-value pair for the modifier is ignored.
-    </description>
+</description>
 
-    <!-- Parameters -->
-    <parameter name="file" description="File to import" required="true" />
+<!-- Examples -->
+<example description="Run the commands present in the text file.">
+run-from-file C:\Temp\MyCommands.text, where contents of the file are as follows:
+	repo -name Test -p4 -path //Users/test/
+	install -dev TestModule -latest -DNoMapping=1 -DDeploy.Parameter="TESTDEPLOY"
+</example>
+<example description="Run the commands present in the JSON file.">
+run C:\Temp\MyCommands.json, where contents of the file are as follows:
+	{
+		"commands": [
+			{
+				"command": "repo",
+				"modifiers": {
+					"name": "Test",
+					"p4": "",
+					"path": "//Users/test/"
+				}
+			},
+			{
+				"command": "install",
+				"parameters": {
+					"module": "TestModule"
+				},
+				"modifiers": {
+					"dev": "",
+					"latest": ""
+				},
+				"custom_modifiers": {
+					"NoMapping": 1,
+					"Deploy.Parameter": "TESTDEPLOY"
+				}
+			}
+		]
+	}
+</example>
 
-    <!-- Modifiers -->
-    <modifier name="dry-run" aliases="d" description="Does not actually run the commands. Simply displays what would be run." />
+<!-- Parameters -->
+<parameter name="file" description="File to import" required="true" />
 
-    <!-- Examples -->
-    <example description="Run the commands present in the text file.">
-        run-from-file C:\Temp\MyCommands.text, where contents of the file are as follows:
-            repo -name Test -p4 -path //Users/test/
-            install -dev TestModule -latest -DNoMapping=1 -DDeploy.Parameter="TESTDEPLOY"
-    </example>
-    <example description="Run the commands present in the JSON file.">
-        run C:\Temp\MyCommands.json, where contents of the file are as follows:
-            {
-                "commands": [
-                    {
-                        "command": "repo",
-                        "modifiers": {
-                            "name": "Test",
-                            "p4": "",
-                            "path": "//Users/test/"
-                        }
-                    },
-                    {
-                        "command": "install",
-                        "parameters": {
-                            "module": "TestModule"
-                        },
-                        "modifiers": {
-                            "dev": "",
-                            "latest": ""
-                        },
-                        "custom_modifiers": {
-                            "NoMapping": 1,
-                            "Deploy.Parameter": "TESTDEPLOY"
-                        }
-                    }
-                ]
-            }
-    </example>
-  </command>
+<!-- Modifiers -->
+<modifier name="dry-run" aliases="d" description="Does not actually run the commands. Simply displays what would be run." />
 
-  <command name="install" dataPrefix="D">
-    <description>
-        Installs a module available in a configured repository.
-    </description>
+</command>
 
-    <!-- Parameters -->
-    <parameter name="module" required="true" description="Name of module to install" />
-    <parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
+<command name="install" dataPrefix="D">
+<description>Installs a module available in a configured repository.</description>
 
-    <!-- Modifiers -->
-    <modifier name="latest" aliases="l" description="Installs the latest available version of this module without prompting the user." />
-    <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-    <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-    <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-    <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
+<!-- Examples -->
+<example description="Installs the most recent 1.x version of HS.JSON available in any configured repository in the current namespace.">
+	install HS.JSON 1.x
+</example>
 
-    <!-- Examples -->
-    <example description="Installs the most recent 1.x version of HS.JSON available in any configured repository in the current namespace.">
-        install HS.JSON 1.x
-    </example>
-  </command>
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module to install" />
+<parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
 
-  <command name="reinstall" dataPrefix="D">
-	<summary>
-		Reinstalls the already installed version of the provided module.
-	</summary>
-    <description>
-        Reinstalls an already-installed module from the latest version available in a configured
-        repository. By default, updates dependencies of that module as well.
-    </description>
+<!-- Modifiers -->
+<modifier name="latest" aliases="l" description="Installs the latest available version of this module without prompting the user." />
+<modifier name="prompt" aliases="p" description="Prompts user which version to install, if more then one found." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
 
-    <!-- Parameters -->
-    <parameter name="module" required="true" description="Name of module to reinstall" />
-    <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+</command>
 
-    <!-- Modifiers -->
-    <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-    <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-    <modifier name="shallow" aliases="s" dataAlias="UpdateSnapshots" dataValue="0" description="Suppresses updating of dependencies with '+snapshot' versions." />
+<command name="reinstall" dataPrefix="D">
+<summary>Reinstalls the already installed version of the provided module.</summary>
+<description>
+	Reinstalls an already-installed module from the latest version available in a configured
+	repository. By default, updates dependencies of that module as well.
+</description>
 
-    <!-- Examples -->
-    <example description="Reinstalls the currently-installed version of the ZHSLIB module, in development mode">
-        reinstall -dev ZHSLIB
-    </example>
-  </command>
+<!-- Examples -->
+<example description="Reinstalls the currently-installed version of the ZHSLIB module, in development mode">
+	reinstall -dev ZHSLIB
+</example>
 
-  <command name="uninstall" dataPrefix="D">
-	<summary>
-		Uninstalls a module currently installed in this namespace.
-	</summary>
-    <description>
-        Uninstalls a module currently installed locally. This will be prevented if other modules
-        depend on the named module, unless the -force flag is specified.
-    </description>
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module to reinstall" />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 
-    <!-- Parameters -->
-    <parameter name="module" required="true" description="Name of module to uninstall" />
+<!-- Modifiers -->
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="shallow" aliases="s" dataAlias="UpdateSnapshots" dataValue="0" description="Suppresses updating of dependencies with '+snapshot' versions." />
 
-    <!-- Modifiers -->
-    <modifier name="all" aliases="a" description="Uninstalls all modules installed in the current namespace." />
-    <modifier name="global" aliases="g" dataAlias="Clean.GlobalScope" dataValue="1" description="Also uninstalls modules with 'global scope' (available in all namespaces); by default, these are skipped." />
-    <modifier name="force" aliases="f" description="If specified, the module will be uninstalled even if other modules depend on it." />
-    <modifier name="recurse" aliases="r" description="Also recursively uninstall dependencies. By default, will not uninstall dependencies that are also required by other installed modules; the -force flag overrides this." />
-    <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-    <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
 
-    <!-- Examples -->
-    <example description="Uninstalls HS.JSON from the current namespace.">
-        uninstall HS.JSON
-    </example>
-  </command>
+<command name="uninstall" dataPrefix="D">
+<summary>Uninstalls a module currently installed in this namespace.</summary>
+<description>
+	Uninstalls a module currently installed locally. This will be prevented if other modules
+	depend on the named module, unless the -force flag is specified.
+</description>
 
-  <command name="clear-cache">
-	<summary>
-		Clears the cache of artifacts downloaded for installation in the current namespace.
-	</summary>
-    <description>
-        Clears the cache of artifacts downloaded for installation in the current namespace.
-        (As an optimization, downloaded module/application artifacts are stored in the database
-        for local retrieval later.)
-    </description>
-  </command>
+<!-- Examples -->
+<example description="Uninstalls HS.JSON from the current namespace.">
+	uninstall HS.JSON
+</example>
 
-  <command name="cos" aliases="isc-os">
-    <description>
-        Executes the provided ObjectScript expression.
-    </description>
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module to uninstall" />
 
-    <!-- Parameters -->
-    <parameter name="expression" required="true" trailing="true" description="ObjectScript expression(s) to execute" />
+<!-- Modifiers -->
+<modifier name="all" aliases="a" description="Uninstalls all modules installed in the current namespace." />
+<modifier name="global" aliases="g" dataAlias="Clean.GlobalScope" dataValue="1" description="Also uninstalls modules with 'global scope' (available in all namespaces); by default, these are skipped." />
+<modifier name="force" aliases="f" description="If specified, the module will be uninstalled even if other modules depend on it." />
+<modifier name="recurse" aliases="r" description="Also recursively uninstall dependencies. By default, will not uninstall dependencies that are also required by other installed modules; the -force flag overrides this." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
 
-    <!-- Examples -->
-    <example description="Run the Objectscript expression to set the namespace to MYAPP">
-        cos set $Namespace = "MYAPP"
-    </example>
-  </command>
+</command>
 
-  <command name="orphans">
-    <description>
-        Lists resources in the current namespace's default code database that are not part of any module.
-    </description>
+<command name="cos" aliases="isc-os">
+<description>
+	Executes the provided ObjectScript expression.
+</description>
 
-    <!-- Modifiers -->
-    <modifier name="type" aliases="t" value="true" description="Type (e.g., extension) of resource to show; if unspecified, all types are included." />
+<!-- Examples -->
+<example description="Run the Objectscript expression to set the namespace to MYAPP">
+	cos set $Namespace = "MYAPP"
+</example>
 
-    <!-- Examples -->
-    <example description="List resources that are classes that are not part of any module in the current namespace">
-        orphans -type CLS
-    </example>
-  </command>
+<!-- Parameters -->
+<parameter name="expression" required="true" trailing="true" description="ObjectScript expression(s) to execute" />
 
-  <command name="manage" aliases="manager">
-    <description>
-        Manages applications installed on this instance (interactive).
-    </description>
+</command>
 
-    <!-- Parameters -->
-    <parameter name="namespace" required="true" description="Namespace to start the manager in" />
+<command name="orphans">
+<description>
+	Lists resources in the current namespace's default code database that are not part of any module.
+</description>
 
-    <!-- Examples -->
-    <example description="Start the manager in the MYAPPNS namespace">
-        manage MYAPPNS
-    </example>
-  </command>
+<!-- Examples -->
+<example description="List resources that are classes that are not part of any module in the current namespace">
+	orphans -type CLS
+</example>
 
-  <command name="list-installed" aliases="list">
-    <description>
-        Lists modules installed in the current namespace.
-    </description>
+<!-- Modifiers -->
+<modifier name="type" aliases="t" value="true" description="Type (e.g., extension) of resource to show; if unspecified, all types are included." />
 
-    <!-- Modifiers -->
-    <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
-    <modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
-    <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
+</command>
 
-    <!-- Examples -->
-    <example description="Shows all installed modules in tree format.">
-        list-installed -tree
-    </example>
-    <example description="Shows all installed modules in list format, with the local source from where the module was installed.">
-        list-installed -showsource
-    </example>
-  </command>
+<command name="list-installed" aliases="list">
+<description>
+	Lists modules installed in the current namespace.
+</description>
 
-  <command name="list-dependents" aliases="dependents">
-    <description>
-        Lists modules dependent on the specified module.
-    </description>
+<!-- Examples -->
+<example description="Shows all installed modules in tree format.">
+	list-installed -tree
+</example>
 
-    <!-- Parameters -->
-    <parameter name="module" required="true" description="Name of module for which dependent modules will be found" />
-    <parameter name="version" description="Version of the module for which dependent modules will be found (in all configured repositories)" />
+<!-- Modifiers -->
+<modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
 
-    <!-- Modifiers -->
-    <modifier name="tree" aliases="t" description="If specified, show as a tree (rather than a flattened list)" />
-    <modifier name="repos" aliases="r" value="true" description="Comma-separated list of repository names to search in. If unspecified, the version of the module in the current namespace will be used instead." />
+</command>
 
-    <!-- Examples -->
-    <example description="Lists all currently-installed modules dependent on all 'HS.JSON' versions">
-        list-dependents HS.JSON
-    </example>
-    <example description="Lists all currently-installed modules in the 'AppModules' repository dependent on all 'HS.JSON' versions">
-        list-dependents -repos AppModules HS.JSON
-    </example>
-    <example description="Lists all currently-installed modules in the 'AppModules' repository dependent on 'HS.JSON' version '0.0.1+snapshot', as a tree">
-        dependents -t -r AppModules HS.JSON 0.0.1+snapshot
-    </example>
-  </command>
+<command name="list-dependents" aliases="dependents">
+<description>
+	Lists modules dependent on the specified module.
+</description>
 
-  <command name="default-modifiers" dataPrefix="D">
-    <description>
-        Manages default modifiers to use for all package manager commands in the current namespace.
-    </description>
+<!-- Examples -->
+<example description="Lists all currently-installed modules dependent on all 'HS.JSON' versions">
+	list-dependents HS.JSON
+</example>
+<example description="Lists all currently-installed modules in the 'AppModules' repository dependent on all 'HS.JSON' versions">
+	list-dependents -repos AppModules HS.JSON
+</example>
+<example description="Lists all currently-installed modules in the 'AppModules' repository dependent on 'HS.JSON' version '0.0.1+snapshot', as a tree">
+	dependents -t -r AppModules HS.JSON 0.0.1+snapshot
+</example>
 
-    <!-- Modifiers -->
-    <modifier name="set" description="Set the default modifiers to the provided modifiers. Note: this just appends to existing modifiers. DOES NOT delete any defaults." />
-    <modifier name="get" description="Prints the default modifiers to the current device." />
-    <modifier name="delete" description="Deletes all registered default modifiers." />
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module for which dependent modules will be found" />
+<parameter name="version" description="Version of the module for which dependent modules will be found (in all configured repositories)" />
 
-    <!-- Examples -->
-    <example description="Set custom modifiers -DNoTransaction=1 and -DUpdateSnapshots=1 with every package manager command">
-        default-modifiers -set -DNoTransaction=1 -DUpdateSnapshots=1
-    </example>
-    <example description="Get currently set custom modifiers.">
-        default-modifiers -get
-    </example>
-    <example description="Delete currently set custom modifiers.">
-        default-modifiers -delete
-    </example>
-  </command>
+<!-- Modifiers -->
+<modifier name="tree" aliases="t" description="If specified, show as a tree (rather than a flattened list)" />
+<modifier name="repos" aliases="r" value="true" description="Comma-separated list of repository names to search in. If unspecified, the version of the module in the current namespace will be used instead." />
 
-  <command name="arrange">
-    <description>
-        Rearranges the resources in a module manifest to follow the standard format.
-    </description>
+</command>
 
-    <!-- Parameters -->
-    <parameter name="module" description="Name of module to rearrange" />
+<command name="default-modifiers" dataPrefix="D">
+<description>
+	Manages default modifiers to use for all package manager commands in the current namespace.
+</description>
 
-    <!-- Modifiers -->
-    <modifier name="all" description="If specified, rearrange all modules loaded in development mode (rather than just the current one)." />
-  </command>
+<!-- Modifiers -->
+<modifier name="set" description="Set the default modifiers to the provided modifiers. Note: this just appends to existing modifiers. DOES NOT delete any defaults." />
+<modifier name="get" description="Prints the default modifiers to the current device." />
+<modifier name="delete" description="Deletes all registered default modifiers." />
 
-  <command name="version">
-    <description>
-        Prints the currently-installed package manager version.
-    </description>
-  </command>
+<!-- Examples -->
+<example description="Set custom modifiers -DNoTransaction=1 and -DUpdateSnapshots=1 with every package manager command">
+	default-modifiers -set -DNoTransaction=1 -DUpdateSnapshots=1
+</example>
+<example description="Get currently set custom modifiers.">
+	default-modifiers -get
+</example>
+<example description="Delete currently set custom modifiers.">
+	default-modifiers -delete
+</example>
+</command>
+
+<command name="arrange">
+<description>
+	Rearranges the resources in a module manifest to follow the standard format.
+</description>
+
+<!-- Parameters -->
+<parameter name="module" description="Name of module to rearrange" />
+
+<!-- Modifiers -->
+<modifier name="all" description="If specified, rearrange all modules loaded in development mode (rather than just the current one)." />
+</command>
+
+<command name="dependency-analyzer" aliases="deps">
+<description>
+	Inspects all classes in the provided module and checks for invalid references
+	to classes that are either not in the module or not in one of the module's
+	dependencies.
+	The invalid references are written to the current device.
+</description>
+<parameter name="module" required="true" description="Name of module to inspect" />
+<example description="Runs the dependency analyzer on the module MyModuleName.">
+	deps MyModuleName
+</example>
+</command>
+
+
+<command name="version">
+<description>
+	Prints the currently-installed package manager version.
+</description>
+</command>
+
+<command name="generate" aliases="gen">
+<description>Generates module.xml</description>
+<example description="Generates module.xml for your module in interactive mode ">generate</example>
+<example description="Generates template in the specified folder /my/path">generate -t /my/path</example>
+<example description="Export CLS,MAC,INC,DFI in the specified folder /my/path/src">
+generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,IgnorePacket3
+ byte=1 isGenerated
+ byte=2 isSystem
+ byte=3 isPercented
+ byte=4 isMapped
+ byte=5 isDFI
+</example>
+<modifier name="template" aliases="t" description="Generates module.xml template in the specified folder" />
+<modifier name="author" aliases="a" description="Request information about the author" />
+<parameter name="path" description="Directory on the local filesystem, containing a file named module.xml" />
+<modifier name="export" aliases="e" value="true" description="Export resource in path" />
+</command>
+
+<command name="search" aliases="find">
+<description>Shows all modules in current registry or namespaces</description>
+<example description="Shows all modules in current registry">search -r</example>
+<modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
+<modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
+<parameter name="searchString" description="Search string, * can be used" />
+<example description="Shows a description of all modules in the name of which there is a context">find -d *tools*</example>
+</command>
+
+<command name="namespace" aliases="zn"> 
+<description>See list modules in namespace and go to the namespace</description>
+<example description="Show all modules in all namespaces">zn *</example>
+<example description="Show all modules in namespaces by context">zn sql*</example>
+<parameter name="name" description="Name namespace, * or context name*" />
+</command>
+
 </commands>
 }
 
@@ -1068,7 +1156,42 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	
 	Set tPrimaryClass = ""
 	Set tCompositeSCClass = "%IPM.ExtensionBase.Composite"
-	Set tPackageMgrSCClass = "%IPM.Extension.ServerMenu.MenuItems"
+	Set tServerMenuExtClass = ""
+
+	// set server menu extension class (tServerMenuExtClass)
+	If tQuiet {
+		If $$$HasModifier(pCommandInfo,"menuextension") {
+			Set tServerMenuExtClass = $$$GetModifier(pCommandInfo,"menuextension")
+		}
+	} Else {
+		Set tValue = ""
+		Set tStatement = ##class(%SQL.Statement).%New()
+		$$$ThrowOnError(tStatement.%PrepareClassQuery($classname(), "ServerMenuExtensionClasses"))
+		Set tResultSet=tStatement.%Execute()
+		$$$ThrowSQLIfError(tResultSet.%SQLCODE, tResultSet.%Message)
+		While tResultSet.%Next(.tSC) {
+			$$$ThrowOnError(tSC)
+			// if there's only one satisfied subclass, directly set it
+			// if not, tServerMenuExtClass will be overwritten by user input to the prompt below
+			Set tServerMenuExtClass = tResultSet.%Get("Name")
+		}
+		$$$ThrowOnError(tSC)
+		If (tResultSet.%ROWCOUNT > 1) {
+			// if has more than one satisfied subclass, let user choose which server menu extension class to set
+			Set tHelp = "Note: only subclasses of %IPM.ExtensionBase.ServerMenu.Interface are listed."
+			Set tResponse = ##class(%Library.Prompt).GetArray("Which class to set as the server menu extension class?",.tValue, $ListBuild($classname()_":ServerMenuExtensionClasses"),,,.tHelp,$$$InitialDisplayMask)
+			If (tResponse '= $$$SuccessResponse) {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+			}
+			If (tValue '= "") {
+				Set tServerMenuExtClass = tValue
+			}
+		}
+		If (tServerMenuExtClass '= "") {
+			Write !, "Setting "_tServerMenuExtClass_" as the server menu extension class."
+		}
+	}
+
 	Set tSCInterface = "%IPM.ExtensionBase.SourceControl.Interface"
 	Set tOldSourceControlClass = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
 	
@@ -1078,9 +1201,9 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		Set tOldSourceControlClass = ""
 	}
 	
-	If (tOldSourceControlClass '= "") && (tOldSourceControlClass '= tCompositeSCClass) && (tOldSourceControlClass '= tPackageMgrSCClass) {
-		Write !,"Enabling package manager extension... "
-		$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tOldSourceControlClass,$ListBuild(tPackageMgrSCClass)))
+	If (tOldSourceControlClass '= "") && (tOldSourceControlClass '= tCompositeSCClass) && (tOldSourceControlClass '= tServerMenuExtClass) {
+		Write !,"Enabling package manager extension if present... "
+		$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tOldSourceControlClass,$ListBuild(tServerMenuExtClass)))
 		Write "done."
 		Set tOldSourceControlClass = tCompositeSCClass
 	}
@@ -1125,13 +1248,13 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		}
 		
 		If (tValue = "") {
-			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tPackageMgrSCClass))
-			Write !,!,"Removed source control class. Package manager extension still enabled."
+			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tServerMenuExtClass))
+			Write !,!,"Removed source control class. Package manager extension still enabled if present."
 		} Else {
 			Write !,!,"Setting ",tValue," as the source control class for this namespace..."
 			// Just configure the package manager source control class. (Gaining the "Package Manager" menu.)
 			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
-			Set tSecondaryExtension = $ListBuild("%IPM.Extension.ServerMenu.MenuItems")
+			Set tSecondaryExtension = $ListBuild(tServerMenuExtClass)
 			$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tValue,tSecondaryExtension))
 			Write " done."
 			
@@ -1142,8 +1265,8 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		}
 	} ElseIf (tOldSourceControlClass = "") {
 		// Just configure the package manager source control class. (Gaining the "Package Manager" menu.)
-		$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tPackageMgrSCClass))
-		Write !,!,"Enabled package manager extension."
+		$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tServerMenuExtClass))
+		Write !,!,"Enabled package manager extension if present."
 	}
 	
 	// If we're not just using the package manager, check for configuration method on primary source control class
@@ -1329,6 +1452,65 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			Write "No repositories found.", !
 		}
     Quit
+	} ElseIf $$$HasModifier(pCommandInfo,"copy-from") {
+		Set tSourceNamespace = $$$GetModifier(pCommandInfo,"copy-from")
+		Set tOldNamespace = $Namespace
+		New $Namespace
+		Try {
+			Set $Namespace = tSourceNamespace
+		} Catch e {
+			If (e.Name = "<NAMESPACE>") {
+				Write !,"Invalid namespace: ",tSourceNamespace
+				Return
+			}
+			Throw e
+		}
+		
+		Set tName = $$$GetModifier(pCommandInfo,"name")
+		If (tName '= "") {
+			Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName,,.tSC)
+			If $$$ISERR(tSC) && $System.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
+				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No repository with name '%1' exists in namespace '%2'",tName,tSourceNamespace))
+			}
+			$$$ThrowOnError(tSC)
+			Set tRepositories($Increment(tRepositories)) = tRepository
+		} Else {
+			// Find all the repositories in the source namespace
+			Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+				"select Name "_
+				"from %IPM_Repo.Definition "_
+				"order by %IPM_Repo.Definition_SortOrder(ID) desc")
+			If (tRes.%SQLCODE < 0) {
+				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+			}
+			While tRes.%Next(.tSC) {
+				$$$ThrowOnError(tSC)
+				Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+				$$$ThrowOnError(tSC)
+				Set tRepositories($Increment(tRepositories)) = tRepository
+			}
+			$$$ThrowOnError(tSC)
+		}
+		
+		Set $Namespace = tOldNamespace
+		For tIndex=1:1:$Get(tRepositories) {
+			// Deep clone in case there are ever other referenced objects that need to be carried across.
+			// This is not relevant for any current repository types, but is most likely to be correct in
+			// hypothetical cases where it may matter. (A Git or GitHub-based repository, for example, would
+			// probably need to store more information that would be carried across this way.)
+			Set tNewRepository = tRepositories(tIndex).%ConstructClone(1)
+			If ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(tNewRepository.Name) {
+				Write !,"Repository already defined: ",tNewRepository.Name,"; skipping."
+				Continue
+			}
+			Set tOneSC = tNewRepository.%Save()
+			If $$$ISOK(tOneSC) {
+				Write !,"Copied:"
+				Do tNewRepository.Display()
+			}
+			Set tSC = $System.Status.AppendStatus(tSC,tOneSC)
+		}
+		$$$ThrowOnError(tSC)
 	} ElseIf $$$HasModifier(pCommandInfo,"list-modules") {
     Do ..Search(.pCommandInfo)
 		Quit
@@ -1458,6 +1640,11 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 Query SourceControlClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
 {
 	select Name as "ID",Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.SourceControl.Interface')
+}
+
+Query ServerMenuExtensionClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
+{
+	select Name as "ID",Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.ServerMenu.Interface')
 }
 
 ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
@@ -1600,11 +1787,6 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 {
-  If ($Get(pCommandInfo("parameters","module"))="") {
-    Set tCommandInfo("parameters","command") = "uninstall"
-    Do ..%Help(.tCommandInfo)
-    Quit 
-  }
 	Merge tParams = pCommandInfo("data")
 	Set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
 	If $$$HasModifier(pCommandInfo,"all") {
@@ -1694,7 +1876,8 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		set tDesc=+$g(pCommandInfo("data","Desc"))
 		quit:'..GetListModule(,.tModMap,'tDesc)
 		Set tMod = ""
-		For { Set tMod = $Order(tModMap(tMod),1,tVersion)
+		For { 
+			Set tMod = $Order(tModMap(tMod),1,tVersion)
 			Quit:(tMod="")
 			Write !,$$$FormattedLine($$$Green,tMod)," ",tVersion_" "
 			If tDesc,$Data(tModMap(tMod,"L"),Lock) {
@@ -2169,7 +2352,7 @@ ClassMethod UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Boo
 	Quit tSC
 #; These are the actual contents of %ZLANGC00 (to be added/updated)
 $$$STARTTAG
-ZPM(pArgs...) Do ##class(%IPM.Main).Shell(pArgs...) Quit
+ZPM(pArgs...) If $System.CLS.IsMthd("%IPM.Main", "Shell") { Do ##class(%IPM.Main).Shell(pArgs...) Quit } Else { Write !, "InterSystems Package Manager is not installed in this namespace." Quit }
 $$$ENDTAG
 #; Need an extra line down here to avoid the end bracket being on the same line as $$$ENDTAG - a comment is just fine.
 }

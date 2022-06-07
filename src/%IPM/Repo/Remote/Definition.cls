@@ -27,6 +27,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 {
 <commands>
 <command name="repo">
+<group name="Remote repository">
 
 <modifier name="remote" aliases="r" description="Create/update a remote server repository" />
 <modifier name="url" value="true" description="For remote repositories, specifies the URL for package retrieval web services." />
@@ -47,6 +48,7 @@ repo -r -n registry -reset-defaults
 repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass ""
 </example>
 
+</group>
 </command>
 </commands>
 }
@@ -130,9 +132,8 @@ ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Bool
 		Set pInstance.Username = $Get(pModifiers("username"),"")
 		Set pInstance.Password = $Get(pModifiers("password"),"")	
 	
-		If $Data(pModifiers("url"),tURL) {
-			Set pInstance.URL = tURL
-		}
+		Set pInstance.URL = tUrl
+		
 		If ((pInstance.%Id()="")&&..DeploymentServerExists(1)) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server."_$$$NL_" Use ""repo -r -n registry -url <new url>"" to switch to another server"_$$$NL))
 		}

@@ -53,7 +53,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		Set tVerbose = $Get(pParams("Verbose"),0)
 		Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
 		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-    	Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
+		Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
 		Set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
 		If ((pPhase = "Reload") && tInScope) || tInCurrentPhase {
 			For tName = tName, $TRANSLATE(tName, "%", "_"), $TRANSLATE(tName, "_", "") {

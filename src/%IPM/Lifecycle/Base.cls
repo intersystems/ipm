@@ -492,7 +492,7 @@ Method %Reload(ByRef pParams) As %Status
 			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.")
 			Quit
 		}
-    If ($Piece(first,".",*) '= "ZPM") {
+    	If ($Piece(first,".",*) '= "ZPM") {
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
 		}

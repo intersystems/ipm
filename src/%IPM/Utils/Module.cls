@@ -1145,19 +1145,6 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			}
 		}
 		
-		// If we have specified developer mode, but do not have a source control extension enabled, then set up a reasonable default.
-		If $Get(pParams("DeveloperMode"),0) {
-			Set tCurrentSourceControl = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
-			If (tCurrentSourceControl = "") {
-				Set tCompositeSCClass = "%IPM.ExtensionBase.Composite"
-				$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
-				Set tPrimaryExtension = "%IPM.Extension.SourceControl.Perforce.Main"
-				Set tSecondaryExtensions = $ListBuild("%IPM.Extension.ServerMenu.MenuItems")
-				$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tPrimaryExtension,tSecondaryExtensions))
-			}
-		}
-		
-		#dim tModule As %IPM.Storage.Module
 		Set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
@@ -1410,12 +1397,15 @@ ClassMethod AddPackageMapping(pNamespace As %String, pMapping As %String, pFrom 
 				Quit
 			}
 		}
+		Set tPrevNS = $namespace
 		New $namespace
 		Set $namespace = "%SYS"
 		If '##class(Config.MapPackages).Exists(pNamespace,pMapping) {
 			Set tProps("Database") = pFrom
 			$$$ThrowOnError(##class(Config.MapPackages).Create(pNamespace,pMapping,.tProps,,$$$CPFSave))
 			If 'pSkipActivation {
+				New $namespace
+				Set $namespace = tPrevNS
 				$$$ThrowOnError(..ActivateMappings(pNamespace))
 			}
 		}
@@ -1429,11 +1419,14 @@ ClassMethod RemovePackageMapping(pNamespace As %String, pMapping As %String, pSk
 {
 	Set tSC = $$$OK
 	Try {
+		Set tPrevNS = $namespace
 		New $namespace
 		Set $namespace = "%SYS"
 		If ##class(Config.MapPackages).Exists(pNamespace,pMapping) {
 			$$$ThrowOnError(##class(Config.MapPackages).Delete(pNamespace,pMapping,,$$$CPFSave))
 			If 'pSkipActivation {
+				New $namespace
+				Set $namespace = tPrevNS
 				$$$ThrowOnError(..ActivateMappings(pNamespace))
 			}
 		}
@@ -1453,6 +1446,7 @@ ClassMethod AddRoutineMapping(pNamespace As %String, pMapping As %String, pType 
 				Quit
 			}
 		}
+		Set tPrevNS = $namespace
 		New $namespace
 		Set $namespace = "%SYS"
 		Set pMapping = pMapping_$S(pType="ALL":"",1:"_"_pType)
@@ -1460,6 +1454,8 @@ ClassMethod AddRoutineMapping(pNamespace As %String, pMapping As %String, pType 
 			Set tProps("Database") = pFrom
 			$$$ThrowOnError(##class(Config.MapRoutines).Create(pNamespace,pMapping,.tProps,,$$$CPFSave))
 			If 'pSkipActivation {
+				New $namespace
+				Set $namespace = tPrevNS
 				$$$ThrowOnError(..ActivateMappings(pNamespace))
 			}
 		}
@@ -1473,12 +1469,15 @@ ClassMethod RemoveRoutineMapping(pNamespace As %String, pMapping As %String, pTy
 {
 	Set tSC = $$$OK
 	Try {
+		Set tPrevNS = $namespace
 		New $namespace
 		Set $namespace = "%SYS"
 		Set pMapping = pMapping_$S(pType="ALL":"",1:"_"_pType)
 		If ##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
 			$$$ThrowOnError(##class(Config.MapRoutines).Delete(pNamespace,pMapping,,$$$CPFSave))
 			If 'pSkipActivation {
+				New $namespace
+				Set $namespace = tPrevNS
 				$$$ThrowOnError(..ActivateMappings(pNamespace))
 			}
 		}
@@ -1492,13 +1491,14 @@ ClassMethod AddGlobalMapping(pNamespace As %String, pMapping As %String, pFrom A
 {
 	Set tSC = $$$OK
 	Try {
-				If $$$ucase(pNamespace) = "%ALL" {
+		If $$$ucase(pNamespace) = "%ALL" {
 			Set tSC = ..CreateAllNamespace()
 			If $$$ISERR(tSC) {
 				Quit
 			}
 		}
-    New $namespace
+		Set tPrevNS = $namespace
+    	New $namespace
 	 	Set $namespace = "%SYS"
 		If (pMapping [ ":(") {
 			// 2008 has glo:(subs), 2009 has glo(subs)
@@ -1517,6 +1517,8 @@ ClassMethod AddGlobalMapping(pNamespace As %String, pMapping As %String, pFrom A
 			If pSkipActivation {
 				Set pChanged = 1
 			} Else {
+				New $namespace
+				Set $namespace = tPrevNS
 				$$$ThrowOnError(..ActivateMappings(pNamespace))
 			}
 		}
@@ -1530,6 +1532,7 @@ ClassMethod RemoveGlobalMapping(pNamespace As %String, pMapping As %String = "",
 {
 	Set tSC = $$$OK
 	Try {
+		Set tPrevNS = $namespace
 		New $namespace
 		Set $namespace = "%SYS"
 		If pMapping [ ":(" {
@@ -1541,6 +1544,8 @@ ClassMethod RemoveGlobalMapping(pNamespace As %String, pMapping As %String = "",
 			If pSkipActivation {
 				Set pChanged = 1
 			} Else {
+				New $namespace
+				Set $namespace = tPrevNS
 				$$$ThrowOnError(..ActivateMappings(pNamespace))
 			}
 		}

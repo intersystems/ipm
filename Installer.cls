@@ -18,14 +18,11 @@ XData PM [ XMLNamespace = INSTALLER ]
 <Default Name="REGISTRY" Value="https://pm.community.intersystems.com" />
 <Default Name="TRACKINGID" Value="UA-126752118-1" />
 
-<Namespace Name="%ALL" Code="%DEFAULTDB" Data="%DEFAULTDB" Create="yes" Ensemble="0">
+<Namespace Name="${CURNS}" Code="${CURNSRoutineDB}" Data="${CURNSGlobalDB}" Create="no" Ensemble="0">
   <Configuration>
-    <ClassMapping Package="%IPM" From="IRISSYS" />
-    <RoutineMapping Routines="%IPM*" Type="ALL" From="IRISSYS" /> 
-    <GlobalMapping Global="%IPM*" From="IRISSYS" Collation="5" />
+      <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
   </Configuration>
-</Namespace>
-<Namespace Name="${CURNS}">
+
   <Import File="${SRCDIR}" Recurse="1"/>
   
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
@@ -48,6 +45,13 @@ ClassMethod setup(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.I
   #; Let our XGL document generate code for this method. 
   Do %code.WriteLine(" If $Data(pVars, path)#10,path'="""" Set pVars(""MODDIR"")=path")
   Do %code.WriteLine(" Set pVars(""CURNS"")=$namespace")
+  Do %code.WriteLine(" Set prevNS = $namespace")
+  Do %code.WriteLine("  New $Namespace")
+  Do %code.WriteLine("  Set $Namespace = ""%SYS"" ")
+  Do %code.WriteLine("  kill properties")
+  Do %code.WriteLine("  Set sc = $ClassMethod(""Config.Namespaces"", ""Get"", prevNS, .properties)")
+  Do %code.WriteLine(" Set pVars(""CURNSRoutineDB"")=$Get(properties(""Routines""))")
+  Do %code.WriteLine(" Set pVars(""CURNSGlobalDB"")=$Get(properties(""Globals""))")
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "PM")
 }
 
@@ -75,7 +79,7 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
 
 ClassMethod ZPMLoad(pDirectoryName)
 {
-  Quit ##class(%IPM.Main).Shell("load -dev "_pDirectoryName)
+  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName)
 }
 
 ClassMethod ZPMCompile()
