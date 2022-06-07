@@ -120,7 +120,8 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 					Set tResourceCache(tCacheResult.%Get("UniqueName")) = ""
 				}
 			}
-			
+			// include hidden files
+			Set ^%SYS("Studio","ShowHidden") = 1
 			Set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
         "select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
 				tPackage_"*.cls,"_tPackage_"*.mac,"_tPackage_"*.int,"_tPackage_"*.inc")
