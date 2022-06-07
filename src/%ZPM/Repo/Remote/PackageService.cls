@@ -84,15 +84,18 @@ Method GetModule(pModuleReference As %ZPM.Storage.ModuleInfo, Output AsArchive A
 
     #; why it's needed here?
     #; 
-    #; Do ##class(%Net.URLParser).Parse(tPackageUrl,.tComponents)
-    #; If ($Data(tComponents("path"))#2) {
-    #;   If ($Extract(tComponents("path"),1,1)="/") {
-    #;       Set path = $Extract(tComponents("path"),2,*)	
-    #;   }
-    #; }
+    #; registry returns full url http://146.190.30.249:52773/download/sslclient/-/sslclient-1.0.4.tgz
+    #; 1) host&port can be wrong in this url (available only for local requests)
+    #; 2) path doesn't include "appname" that we have in tRequest.Location
+    Do ##class(%Net.URLParser).Parse(tPackageUrl,.tComponents)
+    If ($Data(tComponents("path"))#2) {
+      If ($Extract(tComponents("path"),1,1)="/") {
+         Set path = $Extract(tComponents("path"),2,*)	
+      }
+    }
     Set tRequest = ..GetHttpRequest()
     Set tRequest.Timeout = 300
-    Set tSC = tRequest.Get(tPackageUrl)
+    Set tSC = tRequest.Get(tRequest.Location_path)
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
       Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz")
