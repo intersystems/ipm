@@ -142,7 +142,7 @@ Method DoCopy(tSource, tTarget, pParams)
         Set tSC = $$$ERROR($$$GeneralError, "Source file does not exists")
         Quit
       }
-      If '##class(%File).CopyFile(tSource, tTarget,'..Overlay, .return) {
+      If '##class(%File).CopyFile(tSource, tTarget, 1, .return) {
         Set tSC = $$$ERROR($$$GeneralError, "File not copied: " _ return)
         Quit
       }
