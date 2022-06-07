@@ -54,8 +54,11 @@ Method ListModules(pSearchCriteria As %ZPM.Repo.SearchCriteria) As %ListOfObject
         Set tModRef.Repository = item.repository
         Set tModRef.VersionString = version
         Set tModRef.Description = item.description
+        If (item."all_versions" '= "") {
+          Set tModRef.AllVersions = item."all_versions".%ToJSON()
+        }
         Do tList.Insert(tModRef)
-      }      
+      }
     }
   }
   
@@ -200,7 +203,9 @@ Method IsAvailable() As %Boolean
   
   Set tRequest.Timeout = 30
   Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"_ping"))
-  set status =tRequest.HttpResponse.StatusCode
+  If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode = 401 {
+     $$$ThrowStatus($$$ERROR($$$GeneralError, "Registry "_..Location_": аuthorization required."))
+  }
   If $$$ISOK(tSC) && (tRequest.HttpResponse.StatusCode = 200) {
     Set tAvailable = 1
   }
@@ -241,8 +246,14 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
     Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
     
 		If (..Username '= "") && (..Password '= "") {
-      Set tRequest.Username = ..Username
-      Set tRequest.Password = ..Password
+      If (..Username = "_apikey") {
+        // key auth
+        Do tRequest.SetHeader("apikey",..Password)
+      } Else {
+        // basic auth
+        Set tRequest.Username = ..Username
+        Set tRequest.Password = ..Password
+      }
 		}
       set proxy=$System.Util.GetEnviron("https_proxy")
       if proxy'="" {

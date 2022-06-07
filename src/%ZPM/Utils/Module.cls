@@ -877,7 +877,7 @@ ClassMethod GetAvailableModuleNamesClose(ByRef qHandle As %Binary) As %Status [ 
 	Quit $$$OK
 }
 
-Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String") [ SqlProc ]
+Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,AllVersions:%String") [ SqlProc ]
 {
 }
 
@@ -902,7 +902,7 @@ ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String) A
 			Set tList = tClient.ListModules(tSearchCriteria)
 			For i=1:1:tList.Count() {
 				Set tMod = tList.GetAt(i)
-				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description)
+				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description,tMod.AllVersions)
 			}
 		}
 		
