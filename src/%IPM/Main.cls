@@ -1855,7 +1855,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		// TODO: deal with cyclic dependencies?
 		quit:'..GetListModule(,.tModMap)	
 		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
-			"select ""Module""->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
+			"select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
 			"from %IPM_Storage.ModuleItem_Dependencies")
     $$$ThrowSQLIfError(tDepRes.%SQLCODE, tDepRes.%Message)
 		While tDepRes.%Next(.tSC) {

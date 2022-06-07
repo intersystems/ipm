@@ -117,7 +117,7 @@ ClassMethod FindHomeModule(pInternalName As %String, Output pResourceName As %St
 		// Try to find in specific resources
 		Set tProcessorClass = "LegacyLocalizedMessages"
 		Set tProcessorClassFullForm = $$$DefaultProcessorPackageDot_tProcessorClass
-		Set tQuery = "SELECT ID, Name, ""Module"" FROM %IPM_Storage.ResourceReference "_
+		Set tQuery = "SELECT ID, Name, ModuleItem FROM %IPM_Storage.ResourceReference "_
 			"WHERE ProcessorClass = '"_tProcessorClass_"' "_
 			"OR ProcessorClass = '"_tProcessorClassFullForm_"'"
 		#dim tResultSet As %SQL.StatementResult

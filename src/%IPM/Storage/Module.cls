@@ -1,9 +1,9 @@
 Include (%occErrors, %IPM.Common)
 
-Class %IPM.Storage.Module Extends (%Persistent, %IPM.General.ModuleInfo, %IPM.Utils.ComparisonAdaptor) [ StorageStrategy = "" ]
+Class %IPM.Storage.Module Extends (%Persistent, %IPM.General.ModuleInfo, %IPM.Utils.ComparisonAdaptor) [ StorageStrategy = "", SqlTableName = ModuleItem ]
 {
 
-Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleItem";
+Parameter DEFAULTGLOBAL = "^IPM.Storage.Module";
 
 Parameter DOMAIN = "ZPM";
 
@@ -801,7 +801,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 {
 	Set tStatement = ##class(%SQL.Statement).%New()
-	$$$ThrowOnError(tStatement.%Prepare("select Dependencies_Name as ModuleName from %IPM_Storage.ModuleItem_Dependencies where ""Module""->Name = ?"))
+	$$$ThrowOnError(tStatement.%Prepare("select Dependencies_Name as ModuleName from %IPM_Storage.ModuleItem_Dependencies where ModuleItem->Name = ?"))
 	
 	Set tKnownDependencyList = ""
 	Set tSearchList = $ListBuild(pModuleName)
@@ -1315,10 +1315,10 @@ Method Lock() As %Status
 
 Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List = "") As %SQLQuery [ SqlProc ]
 {
-	select distinct %exact Dependencies_VersionString "Version",%DLIST("Module"->Name) "Names"
+	select distinct %exact Dependencies_VersionString "Version",%DLIST("ModuleItem"->Name) "Names"
 	from %IPM_Storage.ModuleItem_Dependencies
 	where Dependencies_Name = :pOfModuleName and
-		(:pExcludeModuleNames is null or "Module"->Name not %INLIST :pExcludeModuleNames)
+		(:pExcludeModuleNames is null or "ModuleItem"->Name not %INLIST :pExcludeModuleNames)
 	group by Dependencies_VersionString
 }
 
@@ -1455,11 +1455,11 @@ Storage Default
 <Value>Repository</Value>
 </Value>
 </Data>
-<DataLocation>^IPM.Storage.ModuleItemD</DataLocation>
+<DataLocation>^IPM.Storage.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
-<IdLocation>^IPM.Storage.ModuleItemD</IdLocation>
-<IndexLocation>^IPM.Storage.ModuleItemI</IndexLocation>
-<StreamLocation>^IPM.Storage.ModuleItemS</StreamLocation>
+<IdLocation>^IPM.Storage.ModuleD</IdLocation>
+<IndexLocation>^IPM.Storage.ModuleI</IndexLocation>
+<StreamLocation>^IPM.Storage.ModuleS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 
