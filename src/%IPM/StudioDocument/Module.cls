@@ -294,7 +294,7 @@ Query ItemList() As %SQLQuery(ROWSPEC = "name:%String,modified:%TimeStamp") [ Sq
 {
 	select Name, LastModifiedTimestamp from %IPM_StudioDocument.ModuleStream
 	union
-	select Name, LastModifiedTimestamp from %IPM_Storage."Module"
+	select Name, LastModifiedTimestamp from %IPM_Storage.ModuleItem
 		where Name not in (select Name from %IPM_StudioDocument.ModuleStream)
 }
 
@@ -308,7 +308,7 @@ ClassMethod GetOther(Name As %String) As %String
 		If (tExt = "ZPM") {
 			Set tModuleName = $Piece(Name,".",1,*-1)
 			Set tResources = ##class(%SQL.Statement).%ExecDirect(,
-				"select UniqueName from %IPM_Storage.ResourceReference where ""Module""->Name = ?",
+				"select UniqueName from %IPM_Storage.ResourceReference where ModuleItem->Name = ?",
 				tModuleName)
 			If (tResources.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResources.%SQLCODE,tResources.%Message)
