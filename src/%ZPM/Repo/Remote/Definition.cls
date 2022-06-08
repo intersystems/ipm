@@ -19,6 +19,8 @@ Property Username As %String(MAXLEN = "");
 
 Property Password As %String(MAXLEN = "");
 
+Property Token As %String(MAXLEN = "");
+
 Property DeploymentEnabled As %Boolean [ InitialExpression = 1 ];
 
 Index DeploymentServer On DeploymentEnabled [ Unique ];
@@ -34,6 +36,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 <modifier name="publish-url" value="true" description="For remote repositories, specifies the URL for package publishing web services."/>
 <modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
+<modifier name="token" aliases="t" value="true" description="For remote repositories, specifies the key to use when connecting." />
 <modifier name="reset-defaults" value="false" description="Reset to default repository" />
 <modifier name="sslconfig" aliases="ssl" value="true" description="For remote repositories, specifies the SSL configuration name to use when connecting." />
 
@@ -85,6 +88,7 @@ Method GetPackageService() As %ZPM.Repo.IPackageService
 	Set tClient.Location = ..URL
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
+	Set tClient.Token = ..Token
 	Quit tClient
 }
 
@@ -95,6 +99,7 @@ Method GetPublishService() As %ZPM.Repo.IPublishService
 	Set tClient.Location = ..URL
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
+	Set tClient.Token = ..Token
 	Quit tClient
 }
 
@@ -108,6 +113,9 @@ Method Display()
 	}
 	If (..Password '= "") {
 		Write !,$c(9),"Password: ",$c(9),$Case(..Password,"":"<unset>",:"<set>")
+	}
+	If (..Token '= "") {
+		Write !,$c(9),"Token: ",$c(9),$Case(..Token,"":"<unset>",:"<set>")
 	}
 }
 
@@ -129,7 +137,8 @@ ClassMethod OnConfigure(pInstance As %ZPM.Repo.Definition, pInteractive As %Bool
 		}
 		
 		Set pInstance.Username = $Get(pModifiers("username"),"")
-		Set pInstance.Password = $Get(pModifiers("password"),"")	
+		Set pInstance.Password = $Get(pModifiers("password"),"")
+		Set pInstance.Token = $Get(pModifiers("token"),"")
 	
 		If $Data(pModifiers("url"),tURL) {
 			Set pInstance.URL = tURL
@@ -164,6 +173,9 @@ Storage Default
 </Value>
 <Value name="4">
 <Value>DeploymentEnabled</Value>
+</Value>
+<Value name="5">
+<Value>Token</Value>
 </Value>
 </Data>
 <DefaultData>DefinitionDefaultData1</DefaultData>
