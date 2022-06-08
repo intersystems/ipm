@@ -308,7 +308,7 @@ ClassMethod GetOther(Name As %String) As %String
 		If (tExt = "ZPM") {
 			Set tModuleName = $Piece(Name,".",1,*-1)
 			Set tResources = ##class(%SQL.Statement).%ExecDirect(,
-				"select UniqueName from %IPM_Storage.ResourceReference where ModuleItem->Name = ?",
+				"select UniqueName from %IPM_Storage.ResourceReference where ""Module""->Name = ?",
 				tModuleName)
 			If (tResources.%SQLCODE < 0) {
 				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResources.%SQLCODE,tResources.%Message)
