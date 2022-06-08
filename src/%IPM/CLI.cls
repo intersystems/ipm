@@ -683,9 +683,6 @@ ClassMethod %GetCommandStructure(Output pCommandStructure)
 /// Utility method for setting multiple subscripts based on .-delimited <var>pDataName</var>
 ClassMethod SetData(pTargetArray, pDataName, pDataValue, pCustomParam = 0) [ Private ]
 {
-	If (pCustomParam && (pDataName'[".")) {
-		Set pDataName = "zpm."_pDataName
-	}
 	Set tPieces = $ListFromString(pDataName,".")
 	Set tValue = pDataValue
 	For i=$ListLength(tPieces):-1:1 {

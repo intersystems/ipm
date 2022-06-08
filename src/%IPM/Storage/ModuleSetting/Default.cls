@@ -20,8 +20,8 @@ ClassMethod GetCustomParameters(Output customParams, module As %IPM.Storage.Modu
         Quit:(key="")
         If (default.%ClassName(1)="%IPM.Storage.ModuleSetting.Default") {
             Set customParams(default.Name) = default.Value
-            If ($Data(pParams("zpm",default.Name))) {
-                Set customParams(default.Name) = $Get(pParams("zpm",default.Name))
+            If ($Data(pParams(default.Name))) {
+                Set customParams(default.Name) = $Get(pParams(default.Name))
             }
         }
     }

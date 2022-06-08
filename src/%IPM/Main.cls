@@ -1655,7 +1655,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 	set:$Extract(tDirectoryName,*)="/" tDirectoryName=$Extract(tDirectoryName,1,*-1)
 	set RepoName=$p($p($p(tDirectoryName,"/",*),".git")," ")
 	set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
-	if $Get(tParams("zpm","Branch"))'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
+	if $Get(tParams("Branch"))'="" set tCmd=tCmd_" -b "_tParams("Branch")
 	$$$ThrowOnError(##class(%IPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr))
       	set tDirectoryName = TempDir_slash_RepoName
       	If ($Get(tParams("Verbose"))) {

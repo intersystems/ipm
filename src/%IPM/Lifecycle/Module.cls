@@ -74,7 +74,7 @@ Method %Package(ByRef pParams) As %Status
 	Set tSC = $$$OK
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
-		Set tExportDirectory = $Get(pParams("zpm", "Path"))
+		Set tExportDirectory = $Get(pParams("Path"))
 		If (tExportDirectory'="") && ('##class(%File).DirectoryExists(tExportDirectory)) {
       Set tExportDirectory = ##class(%File).NormalizeDirectory(tExportDirectory)
 			If '##class(%File).CreateDirectoryChain(tExportDirectory,.tReturn) {
