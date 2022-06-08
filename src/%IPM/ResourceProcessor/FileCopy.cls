@@ -137,9 +137,8 @@ Method DoCopy(tSource, tTarget, pParams)
 
     Write:tVerbose !,"Copying ",tSource," to ",tTarget
     If (copyAsFile) {
-      Write:tVerbose " as file "
       If '##class(%File).Exists(tSource) {
-        Set tSC = $$$ERROR($$$GeneralError, "Source file does not exists")
+        Set tSC = $$$ERROR($$$GeneralError, "Source file does not exists: "_tSource)
         Quit
       }
       If '##class(%File).CopyFile(tSource, tTarget, 1, .return) {
