@@ -36,7 +36,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 <modifier name="publish-url" value="true" description="For remote repositories, specifies the URL for package publishing web services."/>
 <modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
-<modifier name="token" aliases="t" value="true" description="For remote repositories, specifies the key to use when connecting." />
+<modifier name="token" value="true" description="For remote repositories, specifies the key to use when connecting." />
 <modifier name="reset-defaults" value="false" description="Reset to default repository" />
 <modifier name="sslconfig" aliases="ssl" value="true" description="For remote repositories, specifies the SSL configuration name to use when connecting." />
 
