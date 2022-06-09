@@ -58,25 +58,10 @@ Storage Default
 <Value>ReferencedItem</Value>
 </Value>
 <Value name="9">
-<Value>ReferencedItemExists</Value>
+<Value>ReferencedFileType</Value>
 </Value>
 <Value name="10">
-<Value>ProblemFileType</Value>
-</Value>
-<Value name="11">
-<Value>ProblemIncludeFile</Value>
-</Value>
-<Value name="12">
-<Value>ProblemItem</Value>
-</Value>
-<Value name="13">
-<Value>ReferencedItem</Value>
-</Value>
-<Value name="14">
 <Value>ReferencedItemExists</Value>
-</Value>
-<Value name="15">
-<Value>ReferencedFileType</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.DependencyAnalyzer.ProblemD</DataLocation>
