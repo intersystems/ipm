@@ -7,6 +7,8 @@ Property Username As %String;
 
 Property Password As %String;
 
+Property Token As %String;
+
 Method GetInfo(url As %String) As %DynamicObject
 {
  	Set tRequest = ..GetHttpRequest()
@@ -245,29 +247,28 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
     #; in case of redirection
     Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
     
+    If (..Token '= "") {
+      // key auth
+      Do tRequest.SetHeader("apikey",..Token)
+    }
 		If (..Username '= "") && (..Password '= "") {
-      If (..Username = "_apikey") {
-        // key auth
-        Do tRequest.SetHeader("apikey",..Password)
-      } Else {
-        // basic auth
-        Set tRequest.Username = ..Username
-        Set tRequest.Password = ..Password
+      // basic auth
+      Set tRequest.Username = ..Username
+      Set tRequest.Password = ..Password
+		}
+    set proxy=$System.Util.GetEnviron("https_proxy")
+    if proxy'="" {
+		  Do ##class(%Net.URLParser).Parse(proxy,.pr)
+		  if (tRequest.Https) {
+        set tRequest.ProxyHTTPS=1
+        set tRequest.ProxyTunnel=1
       }
-		}
-      set proxy=$System.Util.GetEnviron("https_proxy")
-      if proxy'="" {
-		Do ##class(%Net.URLParser).Parse(proxy,.pr)
-		if (tRequest.Https) {
-			set tRequest.ProxyHTTPS=1
-			set tRequest.ProxyTunnel=1
-		}
-		set tRequest.ProxyPort=pr("port")
-		set tRequest.ProxyServer=pr("host")
-		if pr("username")'="",pr("password")'="" {
-			set tRequest.ProxyAuthorization="Basic "_$system.Encryption.Base64Encode(pr("username")_":"_pr("password"))
-		}
-	}
+      set tRequest.ProxyPort=pr("port")
+      set tRequest.ProxyServer=pr("host")
+      if pr("username")'="",pr("password")'="" {
+        set tRequest.ProxyAuthorization="Basic "_$system.Encryption.Base64Encode(pr("username")_":"_pr("password"))
+      }
+    }
   }
   Return tRequest
 }
