@@ -120,11 +120,13 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 					Set tResourceCache(tCacheResult.%Get("UniqueName")) = ""
 				}
 			}
-			// include hidden files
+			// include hidden files by temporarily enable showHidden global for Studio search
+			Set tHidden = ^%SYS("Studio","ShowHidden")
 			Set ^%SYS("Studio","ShowHidden") = 1
 			Set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
-        "select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
+        		"select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
 				tPackage_"*.cls,"_tPackage_"*.mac,"_tPackage_"*.int,"_tPackage_"*.inc")
+			Set ^%SYS("Studio","ShowHidden") = tHidden
 			If (tFilesResult.%SQLCODE < 0) {
 				Set tSC = $$$ERROR($$$SQLCode,tFilesResult.%SQLCODE,tFilesResult.%Message)
 				Quit
