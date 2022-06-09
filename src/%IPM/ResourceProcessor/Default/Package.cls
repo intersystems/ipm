@@ -32,7 +32,7 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 			// If yes, skip creating unnecessary mappings
 			// (Spec,Dir=1,OrderBy=1,SystemFiles=1,Flat,NotStudio=0,ShowGenerated=0,Filter,RoundTime=0,Mapped=0)
 			// Set mapped=0 since we only want to check whether the file exists in the current routine DB
-			Set tResult = ##class(%Library.RoutineMgr).StudioOpenDialogFunc("tName.*",1,1,1,,,,,,0)
+			Set tResult = ##class(%Library.RoutineMgr).StudioOpenDialogFunc(tName_".*",1,1,1,,,,,,0)
 			Set tNeedExplicitMapping = 1
 			While tResult.%Next(.tSC) {
 				If $$$ISERR(tSC) {
