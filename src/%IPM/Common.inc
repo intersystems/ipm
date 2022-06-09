@@ -3,13 +3,13 @@ ROUTINE %IPM.Common [Type=INC]
 #define FileTempDirSys	$zu(140,17,##class(%SYS.System).TempDirectory())
 
 #; Helper for XML import of documents
-#define ZPMStudioDocumentModule %ZPMStudioDocumentModule
+#define ZPMStudioDocumentModule %IPMStudioDocumentModule
 
 #; Local % Variable to track modules already handled for a given end goal
-#define ZPMHandledModules %ZPMHandledModules
+#define ZPMHandledModules %IPMHandledModules
 
 #; Local % Variable to indicate that ^Sources update trigger should not be run for modifications to individual resources
-#define ZPMDeferModifyResources %ZPMDeferModifyResources
+#define ZPMDeferModifyResources %IPMDeferModifyResources
 
 #; Default packages for package manager, module lifecycle classes and resource processors
 #define ZPMRootPackage "%IPM"
@@ -21,17 +21,17 @@ ROUTINE %IPM.Common [Type=INC]
 
 #; Various globals
 #define ZPMConfig ^IPM.Config
-#define ZPMTempLoadGraphRoot ^CacheTemp.PackageManagerLoad
-#def1arg ZPMTempLoadGraph(%subscripts) ^CacheTemp.PackageManagerLoad(%subscripts)
-#define ZPMDependencyTempData ^CacheTemp.ZPMDependency
+#define ZPMTempLoadGraphRoot ^IRIS.Temp.PackageManagerLoad
+#def1arg ZPMTempLoadGraph(%subscripts) ^IRIS.Temp.PackageManagerLoad(%subscripts)
+#define ZPMDependencyTempData ^IRIS.Temp.IPMDependency
 #define ZPMDependencyTempDataNext $Increment($$$ZPMDependencyTempData)
 /// Global to keep track of packages in the current namespace for invalid reference
 /// checks in the dependency analyzer
-#define ZPMDependencyNsPackages ^CacheTemp.ZPMDepNsPackages
+#define ZPMDependencyNsPackages ^IRIS.Temp.ZPMDepNsPackages
 #define ZPMDefaultModifiers ^%IPM.DefaultModifiers
 
 #; Temp global used to store source control output from CSP pages to be shown in Studio/Atelier console
-#define ZPMExtensionOutput ^CacheTemp.ZPMExtensionOutput($Username,$Namespace)
+#define ZPMExtensionOutput ^IRIS.Temp.ZPMExtensionOutput($Username,$Namespace)
 #define ZPMExtensionOutputClear Kill $$$ZPMExtensionOutput
 #define ZPMExtensionOutputSet(%array) $$$ZPMExtensionOutputClear Merge $$$ZPMExtensionOutput = %array
 #define ZPMExtensionOutputGet(%array) Merge %array = $$$ZPMExtensionOutput
