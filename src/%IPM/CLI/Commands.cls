@@ -25,136 +25,136 @@ XData Schema [ Internal, MimeType = application/xml ]
 <?xml version="1.0"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
 
-  <xs:element name="commands">
-    <xs:complexType>
-      <xs:choice minOccurs="0" maxOccurs="unbounded">
+<xs:element name="commands">
+<xs:complexType>
+<xs:choice minOccurs="0" maxOccurs="unbounded">
 
-        <xs:element name="command">
-          <xs:complexType>
-            <xs:choice minOccurs="0" maxOccurs="unbounded">
+<xs:element name="command">
+<xs:complexType>
+<xs:choice minOccurs="0" maxOccurs="unbounded">
 
-              <!-- A modifier is a flag that controls the behavior of the command. -->
-              <xs:element name="modifier" type="modifier"/>
+<!-- A modifier is a flag that controls the behavior of the command. -->
+<xs:element name="modifier" type="modifier"/>
 
-              <!-- A group contains command modifiers that have specific usage. -->
-              <xs:element name="group" type="group"/>
+<!-- A group contains command modifiers that have specific usage. -->
+<xs:element name="group" type="group"/>
 
-              <!-- A parameter is a space-delimted string provided to a command without a modifier. These appear in order at the end of the command. -->
-              <xs:element name="parameter">
-                <xs:complexType>
-                  <!-- Parameter name -->
-                  <xs:attribute name="name" type="string" use="required"/>
-
-                  <!-- Parameter required? -->
-                  <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
-
-                  <!-- Description of what this parameter does -->
-                  <xs:attribute name="description" type="string" use="optional"/>
-
-                  <!-- If set to true (default is false), parameter will take all trailing input (including spaces) -->
-                  <xs:attribute name="trailing" type="xs:boolean" use="optional" default="false"/>
-                </xs:complexType>
-              </xs:element>
-
-              <!-- Example of how to use the command -->
-              <xs:element name="example" type="example" />
-
-              <!-- Description of command -->
-              <xs:element name="description" type="description" minOccurs="1" maxOccurs="1" />
-
-              <!-- Summary of command -->
-              <xs:element name="summary" type="description" />
-            </xs:choice>
-
-            <!-- Name of the command -->
-            <xs:attribute name="name" type="string" use="required"/>
-
-            <!-- If set to true, this is the default command if the parser does not match any. The name is ignored, and is instead treated as the first parameter. -->
-            <xs:attribute name="default" type="xs:boolean" use="optional" default="false"/>
-
-            <!-- Comma-separated list of aliases -->
-            <xs:attribute name="aliases" type="string" use="optional"/>
-
-            <!-- If true, modifiers are at the end of the command. -->
-            <xs:attribute name="trailingModifiers" type="xs:boolean" use="optional" default="false" />
-
-            <!-- If set, modifiers starting with this prefix are put into the "data" subscript of the command array. -->
-            <xs:attribute name="dataPrefix" type="string" use="optional" />
-          </xs:complexType>
-        </xs:element>
-      </xs:choice>
-    </xs:complexType>
-  </xs:element>
-
-
-  <!-- A modifier is a flag that controls the behavior of the command. -->
-  <xs:complexType name="modifier">
-    <!-- Modifier name -->
+<!-- A parameter is a space-delimted string provided to a command without a modifier. These appear in order at the end of the command. -->
+<xs:element name="parameter">
+  <xs:complexType>
+    <!-- Parameter name -->
     <xs:attribute name="name" type="string" use="required"/>
 
-    <!-- Modifier name -->
+    <!-- Parameter required? -->
     <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
 
-    <!-- Comma-separated list of aliases -->
-    <xs:attribute name="aliases" type="string" use="optional"/>
-
-    <!-- If true, the modifier name is followed in the command string by a value -->
-    <xs:attribute name="value" type="xs:boolean" use="optional" default="false"/>
-
-    <!-- If true, the modifier name is followed in the command string by a value -->
+    <!-- Description of what this parameter does -->
     <xs:attribute name="description" type="string" use="optional"/>
 
-    <!-- If set, this provides a fixed list of valid values for the modifier -->
-    <xs:attribute name="valueList" type="string" use="optional"/>
-
-    <!-- If set, the value is put into the specified subscript of "data" instead of "parameters" -->
-    <xs:attribute name="dataAlias" type="string" use="optional"/>
-
-    <!-- If set, the specified value is put into the info("data","<dataAlias>") - for commands that don't take values -->
-    <xs:attribute name="dataValue" type="string" use="optional"/>
+    <!-- If set to true (default is false), parameter will take all trailing input (including spaces) -->
+    <xs:attribute name="trailing" type="xs:boolean" use="optional" default="false"/>
   </xs:complexType>
+</xs:element>
 
-  <!-- Group controls the domain of functionality that some modifiers belong to, for example: modifiers for 'repo' command that is used for remote repository -->
-  <xs:complexType name="group">
-    <xs:choice minOccurs="0" maxOccurs="unbounded">
-      <xs:element name="modifier" type="modifier"/>
-      <xs:element name="example" type="example"/>
-    </xs:choice>
-    <xs:attribute name="name" type="string" use="required"/>
-  </xs:complexType>
+<!-- Example of how to use the command -->
+<xs:element name="example" type="example" />
 
-  <!-- example element with content -->
-  <xs:complexType name="example">
-    <xs:simpleContent>
-      <xs:extension base="string">
-        <xs:attribute name="description" type="string" use="required" />
-      </xs:extension>
-    </xs:simpleContent>
-  </xs:complexType>
+<!-- Description of command -->
+<xs:element name="description" type="description" minOccurs="1" maxOccurs="1" />
 
-  <!-- description element with content -->
-  <xs:complexType name="description">
-    <xs:simpleContent>
-      <xs:extension base="string">
-      </xs:extension>
-    </xs:simpleContent>
-  </xs:complexType>
+<!-- Summary of command -->
+<xs:element name="summary" type="description" />
+</xs:choice>
 
-  <!-- disallow, allow, require  -->
-  <xs:simpleType name="modifierValue">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="disallow" />
-      <xs:enumeration value="allow" />
-      <xs:enumeration value="require" />
-    </xs:restriction>
-  </xs:simpleType>
+<!-- Name of the command -->
+<xs:attribute name="name" type="string" use="required"/>
 
-  <!-- String of minimum length 1 -->
-  <xs:simpleType name="string">
-    <xs:restriction base="xs:string">
-      <xs:minLength value="1"/>
-    </xs:restriction>
-  </xs:simpleType>
+<!-- If set to true, this is the default command if the parser does not match any. The name is ignored, and is instead treated as the first parameter. -->
+<xs:attribute name="default" type="xs:boolean" use="optional" default="false"/>
+
+<!-- Comma-separated list of aliases -->
+<xs:attribute name="aliases" type="string" use="optional"/>
+
+<!-- If true, modifiers are at the end of the command. -->
+<xs:attribute name="trailingModifiers" type="xs:boolean" use="optional" default="false" />
+
+<!-- If set, modifiers starting with this prefix are put into the "data" subscript of the command array. -->
+<xs:attribute name="dataPrefix" type="string" use="optional" />
+</xs:complexType>
+</xs:element>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+
+
+<!-- A modifier is a flag that controls the behavior of the command. -->
+<xs:complexType name="modifier">
+<!-- Modifier name -->
+<xs:attribute name="name" type="string" use="required"/>
+
+<!-- Modifier name -->
+<xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
+
+<!-- Comma-separated list of aliases -->
+<xs:attribute name="aliases" type="string" use="optional"/>
+
+<!-- If true, the modifier name is followed in the command string by a value -->
+<xs:attribute name="value" type="xs:boolean" use="optional" default="false"/>
+
+<!-- If true, the modifier name is followed in the command string by a value -->
+<xs:attribute name="description" type="string" use="optional"/>
+
+<!-- If set, this provides a fixed list of valid values for the modifier -->
+<xs:attribute name="valueList" type="string" use="optional"/>
+
+<!-- If set, the value is put into the specified subscript of "data" instead of "parameters" -->
+<xs:attribute name="dataAlias" type="string" use="optional"/>
+
+<!-- If set, the specified value is put into the info("data","<dataAlias>") - for commands that don't take values -->
+<xs:attribute name="dataValue" type="string" use="optional"/>
+</xs:complexType>
+
+<!-- Group controls the domain of functionality that some modifiers belong to, for example: modifiers for 'repo' command that is used for remote repository -->
+<xs:complexType name="group">
+<xs:choice minOccurs="0" maxOccurs="unbounded">
+<xs:element name="modifier" type="modifier"/>
+<xs:element name="example" type="example"/>
+</xs:choice>
+<xs:attribute name="name" type="string" use="required"/>
+</xs:complexType>
+
+<!-- example element with content -->
+<xs:complexType name="example">
+<xs:simpleContent>
+<xs:extension base="string">
+<xs:attribute name="description" type="string" use="required" />
+</xs:extension>
+</xs:simpleContent>
+</xs:complexType>
+
+<!-- description element with content -->
+<xs:complexType name="description">
+<xs:simpleContent>
+<xs:extension base="string">
+</xs:extension>
+</xs:simpleContent>
+</xs:complexType>
+
+<!-- disallow, allow, require  -->
+<xs:simpleType name="modifierValue">
+<xs:restriction base="xs:string">
+<xs:enumeration value="disallow" />
+<xs:enumeration value="allow" />
+<xs:enumeration value="require" />
+</xs:restriction>
+</xs:simpleType>
+
+<!-- String of minimum length 1 -->
+<xs:simpleType name="string">
+<xs:restriction base="xs:string">
+<xs:minLength value="1"/>
+</xs:restriction>
+</xs:simpleType>
 
 </xs:schema>
 }
