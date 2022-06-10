@@ -328,4 +328,26 @@ Method OnGetUniqueName(Output pUniqueName)
 	}
 }
 
+
+/// Returns a boolean of whether current file exists in the the routine database of the current namespace exists in current namespace's database
+/// Helper method to be used in derived classes' OnConfigureMappings() to skip creating unnecessary mapping
+ClassMethod FileExistsInCurrentNS(pFileName As %String) As %Boolean
+{
+	Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
+	// Check if current file exists in the the routine database of the current namespace exists in current namespace('s database)
+	// If yes, skip creating unnecessary mappings
+	// (Spec,Dir=1,OrderBy=1,SystemFiles=1,Flat,NotStudio=0,ShowGenerated=0,Filter,RoundTime=0,Mapped=0)
+	// Set mapped=0 since we only want to check whether the file exists in the current routine DB
+	Set tResult = ##class(%Library.RoutineMgr).StudioOpenDialogFunc(pFileName_".*",1,1,1,,,,,,0)
+	Set tNeedExplicitMapping = 1
+	While tResult.%Next(.tSC) {
+		$$$ThrowOnError(tSC)
+		if ($ZConvert(tResult.%Get("Name"),"U") = $ZConvert(pFileName, "U")) {
+			Set tNeedExplicitMapping = 0
+		}
+	}
+	$$$ThrowOnError(tSC)
+	Return tNeedExplicitMapping
+}
+
 }

@@ -59,25 +59,9 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
 		Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
 		If 'tGlobalScope {
-			Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
-			// Check if current file exists in the the routine database of the current namespace exists in current namespace('s database)
-			// If yes, skip creating unnecessary mappings
-			// (Spec,Dir=1,OrderBy=1,SystemFiles=1,Flat,NotStudio=0,ShowGenerated=0,Filter,RoundTime=0,Mapped=0)
-			// Set mapped=0 since we only want to check whether the file exists in the current routine DB
-			Set tResult = ##class(%Library.RoutineMgr).StudioOpenDialogFunc(tName_".*",1,1,1,,,,,,0)
-			Set tNeedExplicitMapping = 1
-			While tResult.%Next(.tSC) {
-				If $$$ISERR(tSC) {
-					Quit
-				}
-				if ($ZConvert(tResult.%Get("Name"),"U") = $ZConvert(tName, "U")) {
-					Set tNeedExplicitMapping = 0
-				}
-			}
-			If $$$ISERR(tSC) {
-				Quit
-			}
+			Set tNeedExplicitMapping = ..FileExistsInCurrentNS(tName)
 			If tNeedExplicitMapping {
+				Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
 				Set tSC = ##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,,tSourceDB)
 				If $$$ISERR(tSC) {
 					Quit
