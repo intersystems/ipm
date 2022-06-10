@@ -245,9 +245,9 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
 {
 	Set tAttrValue = pAttrValue
 	If $Data(..Params) {
-			Merge tParams = ..Params
-			Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
-			Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
+		Merge tParams = ..Params
+		Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..ResourceReference.Module, .tParams)
+		Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	}
 	If (tAttrValue '[ "{") {
 		Return tAttrValue
