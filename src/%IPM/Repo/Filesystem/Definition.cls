@@ -39,7 +39,6 @@ repo -name LocalFiles -snapshots 1 -fs -depth 2 -path C:\MyWorkspace\RootModuleD
 </commands>
 }
 
-
 Method RootSet(%val) As %Status
 {
 	If (%val '= "") {
