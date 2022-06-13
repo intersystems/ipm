@@ -446,6 +446,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 
 <!-- Modifiers -->
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
+<modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
 
 </command>
 
@@ -961,32 +962,24 @@ ClassMethod GetDefaultCommandRegistry()
 /// Version client and registry
 ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
-	New $Namespace
-  	Do ..GetListNamespace(.namespace)
-  
-	Set $Namespace="%SYS"
-
+	
 	Do ..GetListModules("zpm",.list)
 	If $Data(list("zpm")) {
 			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,"zpm ")_$ListGet(list("zpm"),1)
 	}
-	Set ns=""
-	For { Set ns=$Order(namespace(ns)) Quit:ns=""
-		Kill list
-		try {
-			Set $namespace=ns
-			Do ..GetListModules("zpm",.list)
-			If $Data(list("zpm-registry")) {
-				Write !,(ns)_"> "_$$$FormattedLine($$$Green,"zpm-registry ")_$ListGet(list("zpm-registry"),1)
-				Set Found=ns
-				Do ..GetDefaultCommandRegistry()
-			}
-		} catch {
-			// just ignore inaccessible namespaces
-		}
+
+	Kill list
+	Set tRegInstalled = 0
+
+	Do ..GetListModules("zpm",.list)
+	If $Data(list("zpm-registry")) {
+		Set tRegInstalled = 1
+		Write !,$$$FormattedLine($$$Green,"zpm-registry ")_$ListGet(list("zpm-registry"),1)
+		Do ..GetDefaultCommandRegistry()
 	}
-	Set $namespace="%SYS"
-	If '$Data(Found) Write !," Locally installed zpm-registry not found" 
+	
+
+	If 'tRegInstalled Write !," Locally installed zpm-registry not found" 
 	
 	// Get URL current registry
 	Set tRes = ##class(%IPM.Repo.Remote.Definition).ExtentFunc()
