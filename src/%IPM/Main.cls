@@ -225,9 +225,11 @@ repositories configured with the 'repo' command.
 <!-- Examples -->
 <example description="Loads the module described in C:\module\root\path\module.xml">
 load C:\module\root\path\
+load C:\module\root\path\module-0.0.1.tgz
 </example>
 <example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
 load -dev -verbose C:\module\root\path\
+load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 </example>
 <example description="Loads the module in branch feature-1 from remote repository https://github.com/user/repository.git.">
 load https://github.com/user/repository.git
@@ -521,9 +523,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 </command>
 
 
-<command name="version">
+<command name="version" aliases="ver">
 <description>
-	Prints the currently-installed package manager version.
+	Prints the currently-installed package manager and registry version (excluding +snapshot or other build information)
 </description>
 </command>
 
