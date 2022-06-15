@@ -253,12 +253,13 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
 		Return tAttrValue
 	}
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
-	If $Locate(attrValue,"(?i)\{\$root\}") {
+	// for backward compatibility, supporting both {$root} and ${root}
+	If $Locate(attrValue,"(?i)\{\$root\}|\$\{root\}") {
 		Set root = ..ResourceReference.Module.Root
 		If (root '= "") {
 			Set root = ##class(%Library.File).NormalizeDirectory(root)
 		}
-		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{\$root\}",root)
+		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{\$root\}|\$\{root\}",root)
 	}
 	If $Locate(attrValue,"(?i)\{name\}") {
 		Set name = ..ResourceReference.Name

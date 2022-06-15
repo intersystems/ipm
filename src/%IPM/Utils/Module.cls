@@ -2115,6 +2115,7 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 /// Current valid expressions:
 /// <ul>
 /// 	<li>{$namespace} - the current namespace. </li>
+/// 	<li>{$ns} - the current namespace. </li>
 /// 	<li>{$namespaceLower} - the current namespace in lower case. </li>
 /// 	<li>{$namespaceRoutineDB} - the default routines database for the current namespace. </li>
 /// 	<li>{$namespaceGlobalsDB} - the default globals database for the current namespace. </li>
@@ -2122,7 +2123,11 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 /// 	<li>{$dataDir} - the instance's data directory </li>
 /// 	<li>{$mgrDir} - the instance's mgr directory. </li>
 /// 	<li>{$cspDir} - the instance's root CSP directory. </li>
+/// 	<li>{$binDir} - the instance's bin directory.</li>
+/// 	<li>{$libDir} - the instance's lib directory.</li>
+/// 	<li>{$webroot} - the instance's constructed url with host and port (e.g. http://123.45.678.90:52773/) </li>
 /// </ul>
+/// For backward compatibility, supporting both ${var} and {$var}
 ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal ]
 {
 	If (pString '[ "{") {
@@ -2130,33 +2135,48 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	}
 	Set result = pString
 	Do ..GetDatabaseInfoForNamespace($Namespace, .properties)
-	If $Locate(result,"(?i)\{\$namespace\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$namespace\}",$Namespace)
+	If $Locate(result,"(?i)\{\$namespace\}|\$\{namespace\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespace\}|\$\{namespace\}",$Namespace)
 	}
-	If $Locate(result,"(?i)\{\$namespaceLower\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$namespace\}",$ZConvert($Namespace,"L"))
+	If $Locate(result,"(?i)\{\$ns\}|\$\{ns\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$ns\}|\$\{ns\}",$Namespace)
 	}
-	If $Locate(result,"(?i)\{\$namespaceRoutineDB\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceRoutineDB\}",$Get(properties("Routines")))
+	If $Locate(result,"(?i)\{\$namespaceLower\}|\$\{namespaceLower\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceLower\}|\$\{namespaceLower\}",$ZConvert($Namespace,"L"))
 	}
-	If $Locate(result,"(?i)\{\$namespaceGlobalsDB\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceGlobalsDB\}",$Get(properties("Globals")))
+	If $Locate(result,"(?i)\{\$namespaceRoutineDB\}|\$\{namespaceRoutineDB\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceRoutineDB\}|\$\{namespaceRoutineDB\}",$Get(properties("Routines")))
 	}
-	If $Locate(result,"(?i)\{\$installDir\}") {
+	If $Locate(result,"(?i)\{\$namespaceGlobalsDB\}|\$\{namespaceGlobalsDB\}") {
+		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceGlobalsDB\}|\$\{namespaceGlobalsDB\}",$Get(properties("Globals")))
+	}
+	If $Locate(result,"(?i)\{\$installDir\}|\$\{installDir\}") {
 		Set dir = $System.Util.InstallDirectory()
-		Set result = ..%RegExReplace(result,"(?i)\{\$installDir\}",dir)
+		Set result = ..%RegExReplace(result,"(?i)\{\$installDir\}|\$\{installDir\}",dir)
 	}
-	If $Locate(result,"(?i)\{\$dataDir\}") {
+	If $Locate(result,"(?i)\{\$dataDir\}|\$\{dataDir\}") {
 		Set dir = $System.Util.DataDirectory()
-		Set result = ..%RegExReplace(result,"(?i)\{\$dataDir\}",dir)
+		Set result = ..%RegExReplace(result,"(?i)\{\$dataDir\}|\$\{dataDir\}",dir)
 	}
-	If $Locate(result,"(?i)\{\$mgrDir\}") {
+	If $Locate(result,"(?i)\{\$mgrDir\}|\$\{mgrDir\}") {
 		Set dir = ##class(%Library.File).ManagerDirectory()
-		Set result = ..%RegExReplace(result,"(?i)\{\$mgrDir\}",dir)
+		Set result = ..%RegExReplace(result,"(?i)\{\$mgrDir\}|\$\{mgrDir\}",dir)
 	}
-	If $Locate(result,"(?i)\{\$cspDir\}") {
+	If $Locate(result,"(?i)\{\$cspDir\}|\$\{cspDir\}") {
 		Set dir = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"csp")
-		Set result = ..%RegExReplace(result,"(?i)\{\$cspDir\}",dir)
+		Set result = ..%RegExReplace(result,"(?i)\{\$cspDir\}|\$\{cspDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$binDir\}|\$\{binDir\}") {
+		Set dir = $System.Util.BinaryDirectory()
+		Set result = ..%RegExReplace(result,"(?i)\{\$binDir\}|\$\{binDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$libDir\}|\$\{libDir\}") {
+		Set dir = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"lib")
+		Set result = ..%RegExReplace(result,"(?i)\{\$libDir\}|\$\{libDir\}",dir)
+	}
+	If $Locate(result,"(?i)\{\$webroot\}|\$\{webroot\}") {
+		Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
+		Set result = ..%RegExReplace(result,"(?i)\{\$webroot\}|\$\{webroot\}",urlRoot)
 	}
 	Return result
 }

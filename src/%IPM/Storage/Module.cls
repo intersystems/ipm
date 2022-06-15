@@ -1332,44 +1332,39 @@ ClassMethod %RegExReplace(pString, pName, pValue) As %String
   Quit tString
 }
 
-/// Evaluates an expression in an attribute
+/// Evaluates an expression in a provided string. <br />
+/// These special expressions are case-insensitive. <br />
 /// Current valid expressions:
-/// {$namespace} - the current namespace
-/// {$mgrdir} - the instance's mgr directory
-/// {$cspdir} - the instance's root CSP directory
-/// {$root} - the resource's module's root directory
-/// These special expressions are case-insensitive.
-Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
+/// <ul>
+/// 	<li>{$root} - the module's root directory </li>
+/// 	<li>{name} - the name of the module </li>
+/// </ul>
+/// In addition to these, look at expressions supported by %EvaluateSystemExpression
+/// in class <class>%IPM.Utils.Module</class>.
+Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 {
 	Set tAttrValue = pAttrValue
-	Set tRoot = $Case(..Root,"":"",:##class(%File).NormalizeDirectory(..Root))
-  Set tInstallDir = ##class(%File).GetDirectory($zu(86))
-	Set tMgrDir = $System.Util.ManagerDirectory()
-  Set tBinDir = $System.Util.BinaryDirectory()
-	Set tCSPDir = ##class(%File).NormalizeDirectory("csp", tInstallDir)
-  Set tLibDir = ##class(%File).NormalizeDirectory("lib", tInstallDir)
-  Set tVerbose = +$Get(pParams("Verbose"))
-  Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
+	Merge tParams = pParams
+	Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, ..NameOpen(..Name), .tParams)
+	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "namespace", $Namespace)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "ns",        $Namespace)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "mgrdir",    tMgrDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "cspdir",    tCSPDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "root",      tRoot)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "bindir",    tBinDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "libdir",    tLibDir)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "verbose",   tVerbose)
-	Set tAttrValue = ..%RegExReplace(tAttrValue, "webroot",   urlRoot)
-
-  Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", tAttrValue)
-  While regex.Locate() {
-    Set expr = regex.Group(1)
-    Set value = ..%EvaluateExpression(expr)
-    Set $Extract(tAttrValue, regex.Start, regex.End - 1) = value
-    Set regex.Text = tAttrValue
-  }
-  
-	Quit tAttrValue
+	If (tAttrValue '[ "{") {
+		Return tAttrValue
+	}
+	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
+	// for backward compatibility, supporting both {$root} and ${root}
+	If $Locate(attrValue,"(?i)\{\$root\}|\$\{root\}") {
+		Set root = ..Root
+		If (root '= "") {
+			Set root = ##class(%Library.File).NormalizeDirectory(root)
+		}
+		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{\$root\}|\$\{root\}",root)
+	}
+	If $Locate(attrValue,"(?i)\{name\}") {
+		Set name = ..Name
+		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{name\}",name)
+	}
+	Return attrValue
 }
 
 Method %EvaluateExpression(pExpr) As %String [ Internal ]
