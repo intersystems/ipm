@@ -1344,22 +1344,19 @@ ClassMethod %RegExReplace(pString, pName, pValue) As %String
 Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 {
 	Set tAttrValue = pAttrValue
-	Merge tParams = pParams
-	Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, ..NameOpen(..Name), .tParams)
-	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
-
 	If (tAttrValue '[ "{") {
 		Return tAttrValue
 	}
-	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
-	// for backward compatibility, supporting both {$root} and ${root}
-	If $Locate(attrValue,"(?i)\{\$root\}|\$\{root\}") {
-		Set root = ..Root
-		If (root '= "") {
-			Set root = ##class(%Library.File).NormalizeDirectory(root)
-		}
-		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{\$root\}|\$\{root\}",root)
+	Merge tParams = pParams
+	Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, ..NameOpen(..Name), .tParams)
+	Set root = ..Root
+	If (root '= "") {
+		Set root = ##class(%Library.File).NormalizeDirectory(root)
 	}
+	Set customParams("root") = root
+	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
+	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
+
 	If $Locate(attrValue,"(?i)\{name\}") {
 		Set name = ..Name
 		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{name\}",name)
