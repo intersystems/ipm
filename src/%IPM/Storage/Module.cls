@@ -1364,15 +1364,6 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Return attrValue
 }
 
-Method %EvaluateExpression(pExpr) As %String [ Internal ]
-{
-  Try {
-    return @pExpr
-  } Catch ex {
-  }
-  Return ""
-}
-
 Storage Default
 {
 <Data name="Defaults">
