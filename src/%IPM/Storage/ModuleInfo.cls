@@ -22,6 +22,9 @@ Storage Default
 <Value name="5">
 <Value>Repository</Value>
 </Value>
+<Value name="6">
+<Value>DisplayName</Value>
+</Value>
 </Data>
 <State>ModuleInfoState</State>
 <StreamLocation>^IPM.Storage.ModuleInfoS</StreamLocation>

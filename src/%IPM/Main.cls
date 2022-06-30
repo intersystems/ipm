@@ -1706,7 +1706,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	
 	Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
 	Set tSearchCriteria.Registry = tRegistry
-	Set tSearchCriteria.Name = tModuleName
+	Set tSearchCriteria.Name = $$$lcase(tModuleName)
 	Set tSearchCriteria.VersionExpression = tVersion
 	Set tSearchCriteria.Keywords = tKeywords
 	$$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
@@ -1720,14 +1720,14 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 		} ElseIf (tResults.Count() > 0) {
 			For i=1:1:tResults.Count() {
 				Set tResultInfo = tResults.GetAt(i)
-				Set tOptArray(i) = tResultInfo.Name_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
+				Set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
 			}
 			
 			Set tValue = ""
-      Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
-      If (tResponse '= $$$SuccessResponse) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-      }
+      		Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
+      		If (tResponse '= $$$SuccessResponse) {
+        		$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+      		}
 			
 			If (tValue '= "") {
 				Set tResult = tResults.GetAt(tValue)
@@ -1910,7 +1910,7 @@ ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
 	set in=""
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Set name=tRes.%Get("Name")
+		Set name=$Select(tRes.%Get("DisplayName")="": tRes.%Get("Name"), 1: tRes.%Get("DisplayName"))
 		set in=in_"'"_name_"',"
 		set list=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
 		For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
@@ -1932,7 +1932,8 @@ ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Set Mod(tRes.%Get("Name"),"R")=$Listbuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"))
+		Set name = $Select(tRes.%Get("DisplayName")="": tRes.%Get("Name"), 1: tRes.%Get("DisplayName"))
+		Set Mod(name,"R")=$Listbuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"))
 	}
 	quit $$$OK
 }

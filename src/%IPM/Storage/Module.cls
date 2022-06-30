@@ -76,6 +76,14 @@ Property Defaults As list Of %IPM.Storage.ModuleSetting(CLASSNAME = 1, STORAGEDE
 
 Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
+
+Method NameSet(val As %RawString) As %Status
+{
+	Set i%Name = $$$lcase(val)
+	Set i%DisplayName = val
+	Return $$$OK
+}
+
 ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 {
 	Set tSC = $$$OK
@@ -257,13 +265,13 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				}
 				Set tLifecycle = tModule.Lifecycle
 				Set tLifecycle.PhaseList = tPhases
-				Write !,"["_pModuleName_"]",$c(9),"Module object refreshed."
+				Write !,"["_tModule.DisplayName_"]",$c(9),"Module object refreshed."
 				Continue
 			}
 			
 			Set tSC = $$$OK
 			Try {
-				Write !,"["_pModuleName_"]",$c(9),tOnePhase," START"
+				Write !,"["_tModule.DisplayName_"]",$c(9),tOnePhase," START"
 				// for the reload phase, print root from which module is being loaded
 				If tOnePhase = "Reload" {
 					Write " ("_tModule.Root_")"
@@ -336,9 +344,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			}
 			
 			If $$$ISERR(tSC) {
-				Write !,"["_pModuleName_"]",$c(9),tOnePhase," FAILURE"
+				Write !,"["_tModule.DisplayName_"]",$c(9),tOnePhase," FAILURE"
 			} else {
-				Write !,"["_pModuleName_"]",$c(9),tOnePhase," SUCCESS"
+				Write !,"["_tModule.DisplayName_"]",$c(9),tOnePhase," SUCCESS"
 			}
 			If tTiming {
 				Write " ("_($zh-tStart)_" s)"
@@ -346,7 +354,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			$$$ThrowOnError(tSC)
 		}
 		If tOverallTiming {
-			Write !,"["_pModuleName_"]",$c(9),"(total time: ",($zh-tFullStart)," s)"
+			Write !,"["_tModule.DisplayName_"]",$c(9),"(total time: ",($zh-tFullStart)," s)"
 		}
 	} catch e {
 		set tSC = e.AsStatus()
@@ -1448,6 +1456,9 @@ Storage Default
 </Value>
 <Value name="20">
 <Value>Repository</Value>
+</Value>
+<Value name="21">
+<Value>DisplayName</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>

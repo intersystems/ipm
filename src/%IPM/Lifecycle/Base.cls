@@ -483,7 +483,7 @@ Method %Reload(ByRef pParams) As %Status
 		Set tSC = $system.OBJ.Load(tRoot_"module.xml","/nodisplay",.error,.tLoadedList) quit:$$$ISERR(tSC)
 		
 		// Validate loaded module
-		Set first = $o(tLoadedList(""))
+		Set first = $$$lcase($o(tLoadedList("")))
 		If (first = "") {
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
