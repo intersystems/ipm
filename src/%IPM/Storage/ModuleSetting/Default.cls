@@ -45,7 +45,7 @@ ClassMethod EvaluateAttribute(attribute As %String, ByRef customParams) As %Stri
     For {
         Set name = $Order(customParams(name))
         Quit:(name="")
-        Set regex=##class(%Regex.Matcher).%New("\$\{"_name_"\}", attribute)
+        Set regex=##class(%Regex.Matcher).%New("\$\{"_name_"\}|\{\$"_name_"\}", attribute)
         Set attribute = regex.ReplaceAll(customParams(name))
     }
     return attribute
