@@ -1910,7 +1910,7 @@ ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
 	set in=""
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Set name=$Select(tRes.%Get("DisplayName")="": tRes.%Get("Name"), 1: tRes.%Get("DisplayName"))
+		Set name=tRes.%Get("DisplayName")
 		set in=in_"'"_name_"',"
 		set list=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
 		For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
@@ -1932,7 +1932,7 @@ ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
 	}
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Set name = $Select(tRes.%Get("DisplayName")="": tRes.%Get("Name"), 1: tRes.%Get("DisplayName"))
+		Set name = tRes.%Get("DisplayName")
 		Set Mod(name,"R")=$Listbuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"))
 	}
 	quit $$$OK

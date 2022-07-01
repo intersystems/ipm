@@ -1,6 +1,6 @@
 Include (%occErrors, %IPM.Common)
 
-Class %IPM.Storage.Module Extends (%Persistent, %IPM.General.ModuleInfo, %IPM.Utils.ComparisonAdaptor) [ StorageStrategy = "", SqlTableName = ModuleItem ]
+Class %IPM.Storage.Module Extends (%Persistent, %IPM.General.ModuleInfo, %IPM.Utils.ComparisonAdaptor) [ SqlTableName = ModuleItem, StorageStrategy = "" ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Storage.Module";
@@ -75,14 +75,6 @@ Property DeveloperMode As %Boolean(ForceCodeGenerate = 0, XMLPROJECTION = "NONE"
 Property Defaults As list Of %IPM.Storage.ModuleSetting(CLASSNAME = 1, STORAGEDEFAULT = "array", XMLNAME = "Defaults", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE", XMLTYPECONSTRAINT = "SUBSTITUTIONGROUP");
 
 Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
-
-
-Method NameSet(val As %RawString) As %Status
-{
-	Set i%Name = $$$lcase(val)
-	Set i%DisplayName = val
-	Return $$$OK
-}
 
 ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 {
@@ -1459,6 +1451,9 @@ Storage Default
 </Value>
 <Value name="21">
 <Value>DisplayName</Value>
+</Value>
+<Value name="22">
+<Value>DisplayNameInternal</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>

@@ -121,7 +121,7 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 				}
 			}
 			// include hidden files by temporarily enable showHidden global for Studio search
-			Set tHidden = $Get(^%SYS("Studio", "ShowHidden"), "undefined")
+			Set tHidden = $Get(^%SYS("Studio", "ShowHidden"), $Char(0))
 			Set ^%SYS("Studio","ShowHidden") = 1
 			Set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
         		"select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
@@ -176,7 +176,7 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 					Set pResourceArray(tFileName,"Generated") = 1
 				}
 			}
-			If (tHidden = "undefined") {
+			If (tHidden = $Char(0)) {
 				kill ^%SYS("Studio", "ShowHidden")
 			} Else {
 				Set ^%SYS("Studio", "ShowHidden") = tHidden

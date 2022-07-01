@@ -25,6 +25,9 @@ Storage Default
 <Value name="6">
 <Value>DisplayName</Value>
 </Value>
+<Value name="7">
+<Value>DisplayNameInternal</Value>
+</Value>
 </Data>
 <State>ModuleInfoState</State>
 <StreamLocation>^IPM.Storage.ModuleInfoS</StreamLocation>

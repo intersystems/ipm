@@ -260,8 +260,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			Quit
 		}
 		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-		Set tModRef.Name = $$$lcase(pModuleName)
-		Set tModRef.DisplayName = pModuleName
+		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
 		
 		// Make sure we're not downgrading.

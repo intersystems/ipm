@@ -21,8 +21,18 @@ Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLN
 /// Is "" if the module was loaded using the load command (i.e. directly from a file and not from a repository).
 Property Repository As %String(MAXLEN = "", XMLPROJECTION = "NONE");
 
-/// Case-sensitive display name of the module
-Property DisplayName As %IPM.DataType.ModuleName;
+/// Case-sensitive display name of the module as it appears in the module manifest
+Property DisplayNameInternal As %IPM.DataType.ModuleName;
+
+Property DisplayName As %IPM.DataType.ModuleName [ SqlComputeCode = { Set {*} = $Case({DisplayNameInternal}, "": {Name}, : {DisplayNameInternal})} ];
+
+
+Method NameSet(val As %RawString) As %Status
+{
+	Set i%Name = $$$lcase(val)
+	Set i%DisplayNameInternal = val
+	Return $$$OK
+}
 
 Method VersionStringSet(tValue) As %Status
 {

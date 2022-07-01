@@ -44,6 +44,9 @@ Storage Default
 <Value name="7">
 <Value>DisplayName</Value>
 </Value>
+<Value name="8">
+<Value>DisplayNameInternal</Value>
+</Value>
 </Data>
 <Type>%Storage.Serial</Type>
 }
