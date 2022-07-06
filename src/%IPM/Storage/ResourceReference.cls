@@ -204,9 +204,9 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 	} Catch tException {
 		Set tSC = tException.AsStatus()
 	}
-	If $DATA(tHidden) {
+	If $Data(tHidden) {
 		If (tHidden = $Char(0)) {
-			kill ^%SYS("Studio", "ShowHidden")
+			Kill ^%SYS("Studio", "ShowHidden")
 		} Else {
 			Set ^%SYS("Studio", "ShowHidden") = tHidden
 		}

@@ -24,7 +24,7 @@ Property Repository As %String(MAXLEN = "", XMLPROJECTION = "NONE");
 /// Case-sensitive display name of the module as it appears in the module manifest
 Property DisplayNameInternal As %IPM.DataType.ModuleName(%JSONINCLUDE = "NONE") [ Internal ];
 
-Property DisplayName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "displayname") [ SqlComputeCode = { Set {*} = $Case({DisplayNameInternal}, "": {Name}, : {DisplayNameInternal})}, SqlComputed, Calculated ];
+Property DisplayName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "displayName") [ SqlComputeCode = { Set {*} = $Case({DisplayNameInternal}, "": {Name}, : {DisplayNameInternal})}, SqlComputed, Calculated ];
 
 
 Method NameSet(val As %RawString) As %Status
