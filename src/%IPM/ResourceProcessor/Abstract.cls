@@ -253,17 +253,15 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
 		Return tAttrValue
 	}
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
-	// for backward compatibility, supporting both {$root} and ${root}
-	If $Locate(attrValue,"(?i)\{\$root\}|\$\{root\}") {
-		Set root = ..ResourceReference.Module.Root
-		If (root '= "") {
-			Set root = ##class(%Library.File).NormalizeDirectory(root)
-		}
-		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{\$root\}|\$\{root\}",root)
+	Set root = ..ResourceReference.Module.Root
+	If (root '= "") {
+		Set root = ##class(%Library.File).NormalizeDirectory(root)
+		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue, "root", root)
 	}
+	// {name} expression does not contain dollar sign; handle separately
 	If $Locate(attrValue,"(?i)\{name\}") {
 		Set name = ..ResourceReference.Name
-		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{name\}",name)
+		Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
 	}
 	Return attrValue
 }

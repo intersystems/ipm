@@ -1322,16 +1322,6 @@ Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List
 	group by Dependencies_VersionString
 }
 
-ClassMethod %RegExReplace(pString, pName, pValue) As %String
-{
-  set tString = pString
-  Set tRegEx = "(?i)\{\$" _ pName _ "\}"
-	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
-  Set tRegEx = "(?i)\$\{" _ pName _ "\}"
-	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
-  Quit tString
-}
-
 /// Evaluates an expression in a provided string. <br />
 /// These special expressions are case-insensitive. <br />
 /// Current valid expressions:

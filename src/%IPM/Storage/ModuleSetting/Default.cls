@@ -43,10 +43,9 @@ ClassMethod EvaluateAttribute(attribute As %String, ByRef customParams) As %Stri
 {
     Set name=""
     For {
-        Set name = $Order(customParams(name))
+        Set name = $Order(customParams(name), 1, value)
         Quit:(name="")
-        Set regex=##class(%Regex.Matcher).%New("\$\{"_name_"\}|\{\$"_name_"\}", attribute)
-        Set attribute = regex.ReplaceAll(customParams(name))
+        Set attribute = ##class(%IPM.Utils.Module).%RegExReplace(attribute, name, value)
     }
     return attribute
 }
