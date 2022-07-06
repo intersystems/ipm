@@ -1450,9 +1450,6 @@ Storage Default
 <Value>Repository</Value>
 </Value>
 <Value name="21">
-<Value>DisplayName</Value>
-</Value>
-<Value name="22">
 <Value>DisplayNameInternal</Value>
 </Value>
 </Data>

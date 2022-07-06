@@ -138,9 +138,6 @@ Storage Default
 <Value>VersionString</Value>
 </Value>
 <Value name="12">
-<Value>DisplayName</Value>
-</Value>
-<Value name="13">
 <Value>DisplayNameInternal</Value>
 </Value>
 </Data>

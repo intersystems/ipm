@@ -176,11 +176,6 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 					Set pResourceArray(tFileName,"Generated") = 1
 				}
 			}
-			If (tHidden = $Char(0)) {
-				kill ^%SYS("Studio", "ShowHidden")
-			} Else {
-				Set ^%SYS("Studio", "ShowHidden") = tHidden
-			}
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -209,7 +204,13 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 	} Catch tException {
 		Set tSC = tException.AsStatus()
 	}
-	
+	If $DATA(tHidden) {
+		If (tHidden = $Char(0)) {
+			kill ^%SYS("Studio", "ShowHidden")
+		} Else {
+			Set ^%SYS("Studio", "ShowHidden") = tHidden
+		}
+	}
 	Quit tSC
 }
 
