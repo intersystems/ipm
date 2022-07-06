@@ -2180,12 +2180,12 @@ ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pPropertie
 
 ClassMethod %RegExReplace(pString, pName, pValue) As %String [ Internal ]
 {
-  set tString = pString
-  Set tRegEx = "(?i)\{\$" _ pName _ "\}"
+	Set tString = pString
+	Set tRegEx = "(?i)\{\$" _ pName _ "\}"
 	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
-  Set tRegEx = "(?i)\$\{" _ pName _ "\}"
+	Set tRegEx = "(?i)\$\{" _ pName _ "\}"
 	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
-  Quit tString
+	Quit tString
 }
 
 }
