@@ -41,6 +41,9 @@ Storage Default
 <Value name="6">
 <Value>ServerName</Value>
 </Value>
+<Value name="7">
+<Value>DisplayNameInternal</Value>
+</Value>
 </Data>
 <Type>%Storage.Serial</Type>
 }

@@ -121,12 +121,11 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 				}
 			}
 			// include hidden files by temporarily enable showHidden global for Studio search
-			Set tHidden = ^%SYS("Studio","ShowHidden")
+			Set tHidden = $Get(^%SYS("Studio", "ShowHidden"), $Char(0))
 			Set ^%SYS("Studio","ShowHidden") = 1
 			Set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
         		"select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
 				tPackage_"*.cls,"_tPackage_"*.mac,"_tPackage_"*.int,"_tPackage_"*.inc")
-			Set ^%SYS("Studio","ShowHidden") = tHidden
 			If (tFilesResult.%SQLCODE < 0) {
 				Set tSC = $$$ERROR($$$SQLCode,tFilesResult.%SQLCODE,tFilesResult.%Message)
 				Quit
@@ -136,17 +135,17 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 					Quit
 				}
 				
-        Set tFileName = tFilesResult.%Get("Name")
-        continue:tFileName="IPM.Installer.cls"
-        Set tName = $Piece(tFileName, ".", 1, *-1)
-        Set tDeployedClass = -1
-        Set tCheckName = tFileName
-        If $$$lcase($Piece(tFileName,".",*))="cls" {
-          Set tDeployedClass = $$$defClassKeyGet(tName, $$$cCLASSdeployed)
-          If (tDeployedClass=2) {
-				    Set tCheckName = $$$defClassKeyGet(tName,$$$cCLASSgeneratedby)
-          }
-        }
+        		Set tFileName = tFilesResult.%Get("Name")
+        		continue:tFileName="IPM.Installer.cls"
+        		Set tName = $Piece(tFileName, ".", 1, *-1)
+        		Set tDeployedClass = -1
+        		Set tCheckName = tFileName
+        		If $$$lcase($Piece(tFileName,".",*))="cls" {
+          			Set tDeployedClass = $$$defClassKeyGet(tName, $$$cCLASSdeployed)
+          			If (tDeployedClass=2) {
+				    	Set tCheckName = $$$defClassKeyGet(tName,$$$cCLASSgeneratedby)
+          			}
+        		}
 				
 				If pCheckModuleOwnership {
 					// Skip resources owned by other modules (using cache).
@@ -205,7 +204,13 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 	} Catch tException {
 		Set tSC = tException.AsStatus()
 	}
-	
+	If $Data(tHidden) {
+		If (tHidden = $Char(0)) {
+			Kill ^%SYS("Studio", "ShowHidden")
+		} Else {
+			Set ^%SYS("Studio", "ShowHidden") = tHidden
+		}
+	}
 	Quit tSC
 }
 

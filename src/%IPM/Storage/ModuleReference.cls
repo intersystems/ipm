@@ -27,6 +27,12 @@ Method VersionStringSet(tValue) As %Status
 	Quit tSC
 }
 
+Method NameSet(val As %RawString) As %Status
+{
+	set i%Name = $$$lcase(val)
+	QUIT $$$OK
+}
+
 Storage Default
 {
 <Data name="ModuleReferenceState">

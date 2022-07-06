@@ -137,6 +137,9 @@ Storage Default
 <Value name="11">
 <Value>VersionString</Value>
 </Value>
+<Value name="12">
+<Value>DisplayNameInternal</Value>
+</Value>
 </Data>
 <DataLocation>^IPM.Repo.Filesystem.CacheD</DataLocation>
 <DefaultData>CacheDefaultData</DefaultData>

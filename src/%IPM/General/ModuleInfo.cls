@@ -8,6 +8,7 @@ Parameter XMLIGNOREINVALIDTAG = 1;
 
 Parameter XMLIGNOREINVALIDATTRIBUTE = 1;
 
+/// lowercase storage name of the module
 Property Name As %IPM.DataType.ModuleName(%JSONFIELDNAME = "name") [ Required ];
 
 Property Description As %String(%JSONFIELDNAME = "description", MAXLEN = 1000);
@@ -19,6 +20,19 @@ Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLN
 /// The repository from which this module was loaded.
 /// Is "" if the module was loaded using the load command (i.e. directly from a file and not from a repository).
 Property Repository As %String(MAXLEN = "", XMLPROJECTION = "NONE");
+
+/// Case-sensitive display name of the module as it appears in the module manifest
+Property DisplayNameInternal As %IPM.DataType.ModuleName(%JSONINCLUDE = "NONE") [ Internal ];
+
+Property DisplayName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "displayName") [ SqlComputeCode = { Set {*} = $Case({DisplayNameInternal}, "": {Name}, : {DisplayNameInternal})}, SqlComputed, Calculated ];
+
+
+Method NameSet(val As %RawString) As %Status
+{
+	Set i%Name = $$$lcase(val)
+	Set i%DisplayNameInternal = val
+	Return $$$OK
+}
 
 Method VersionStringSet(tValue) As %Status
 {

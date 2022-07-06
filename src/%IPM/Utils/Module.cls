@@ -1119,6 +1119,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		$$$ThrowOnError(tSC)
 		
 		Set tFirstLoaded = $Order(tLoadedList(""))
+		
     
 		If (tFirstLoaded = "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
@@ -1126,11 +1127,12 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		If ($Order(tLoadedList(tFirstLoaded)) '= "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"module.xml contains multiple documents."))
 		}
-		If ($Piece(tFirstLoaded,".",*) '= "ZPM") {
+		If ($$$lcase($Piece(tFirstLoaded,".",*)) '= "zpm") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
 		}
-		
-		Set tModuleName = $Piece(tFirstLoaded,".",1,*-1)
+
+		Set tDisplayName = $Piece(tFirstLoaded, ".", 1, *-1)
+		Set tModuleName = $$$lcase(tDisplayName)
 		
 		If (pRepository '= "") {
 			// Force developer mode to be 0 if repository is read only.
@@ -1139,12 +1141,12 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 					// Set in pParams directly so that this value gets transmitted downstream
 					Set pParams("DeveloperMode") = 0
 					If tVerbose {
-						Write !, "Repository "_pRepository_" is Read-Only so "_tModuleName_" will be loaded in non-developer mode"
+						Write !, "Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode"
 					}
 				}
 			}
 		}
-		
+
 		Set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
@@ -1222,7 +1224,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		}
 		Set pParams("RootDirectory") = pDirectory
 		If tVerbose || $Get(pParams("Multicompile","Verbose"),0) {
-			Write !,"Loading "_tModuleName_" in process "_$Job
+			Write !,"Loading "_tDisplayName_" in process "_$Job
 		}
 		Set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName,$lb("Activate"),1,.pParams)
 		If $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
