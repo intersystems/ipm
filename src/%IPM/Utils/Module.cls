@@ -2135,49 +2135,37 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	}
 	Set result = pString
 	Do ..GetDatabaseInfoForNamespace($Namespace, .properties)
-	If $Locate(result,"(?i)\{\$namespace\}|\$\{namespace\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$namespace\}|\$\{namespace\}",$Namespace)
-	}
-	If $Locate(result,"(?i)\{\$ns\}|\$\{ns\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$ns\}|\$\{ns\}",$Namespace)
-	}
-	If $Locate(result,"(?i)\{\$namespaceLower\}|\$\{namespaceLower\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceLower\}|\$\{namespaceLower\}",$ZConvert($Namespace,"L"))
-	}
-	If $Locate(result,"(?i)\{\$namespaceRoutineDB\}|\$\{namespaceRoutineDB\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceRoutineDB\}|\$\{namespaceRoutineDB\}",$Get(properties("Routines")))
-	}
-	If $Locate(result,"(?i)\{\$namespaceGlobalsDB\}|\$\{namespaceGlobalsDB\}") {
-		Set result = ..%RegExReplace(result,"(?i)\{\$namespaceGlobalsDB\}|\$\{namespaceGlobalsDB\}",$Get(properties("Globals")))
-	}
-	If $Locate(result,"(?i)\{\$installDir\}|\$\{installDir\}") {
-		Set dir = $System.Util.InstallDirectory()
-		Set result = ..%RegExReplace(result,"(?i)\{\$installDir\}|\$\{installDir\}",dir)
-	}
-	If $Locate(result,"(?i)\{\$dataDir\}|\$\{dataDir\}") {
-		Set dir = $System.Util.DataDirectory()
-		Set result = ..%RegExReplace(result,"(?i)\{\$dataDir\}|\$\{dataDir\}",dir)
-	}
-	If $Locate(result,"(?i)\{\$mgrDir\}|\$\{mgrDir\}") {
-		Set dir = ##class(%Library.File).ManagerDirectory()
-		Set result = ..%RegExReplace(result,"(?i)\{\$mgrDir\}|\$\{mgrDir\}",dir)
-	}
-	If $Locate(result,"(?i)\{\$cspDir\}|\$\{cspDir\}") {
-		Set dir = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"csp")
-		Set result = ..%RegExReplace(result,"(?i)\{\$cspDir\}|\$\{cspDir\}",dir)
-	}
-	If $Locate(result,"(?i)\{\$binDir\}|\$\{binDir\}") {
-		Set dir = $System.Util.BinaryDirectory()
-		Set result = ..%RegExReplace(result,"(?i)\{\$binDir\}|\$\{binDir\}",dir)
-	}
-	If $Locate(result,"(?i)\{\$libDir\}|\$\{libDir\}") {
-		Set dir = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"lib")
-		Set result = ..%RegExReplace(result,"(?i)\{\$libDir\}|\$\{libDir\}",dir)
-	}
-	If $Locate(result,"(?i)\{\$webroot\}|\$\{webroot\}") {
-		Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
-		Set result = ..%RegExReplace(result,"(?i)\{\$webroot\}|\$\{webroot\}",urlRoot)
-	}
+	Set result = ..%RegExReplace(result,"namespace", $Namespace)
+	
+	Set result = ..%RegExReplace(result, "ns", $Namespace)
+
+	Set result = ..%RegExReplace(result, "namespaceLower", $ZConvert($Namespace,"L"))
+	
+	Set result = ..%RegExReplace(result, "namespaceRoutineDB", $Get(properties("Routines")))
+	
+	Set result = ..%RegExReplace(result, "namespaceGlobalsDB", $Get(properties("Globals")))
+
+	Set installDir = $System.Util.InstallDirectory()
+	Set result = ..%RegExReplace(result,"installDir", installDir)
+
+	Set dataDir = $System.Util.DataDirectory()
+	Set result = ..%RegExReplace(result,"dataDir", dataDir)
+
+	Set mgrDir = ##class(%Library.File).ManagerDirectory()
+	Set result = ..%RegExReplace(result,"mgrDir", mgrDir)
+
+	Set cspDir = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"csp")
+	Set result = ..%RegExReplace(result,"cspDir", cspDir)
+	
+	Set binDir = $System.Util.BinaryDirectory()
+	Set result = ..%RegExReplace(result, "binDir", binDir)
+
+	Set libDir = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"lib")
+	Set result = ..%RegExReplace(result, "libDir", libDir)
+
+	Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
+	Set result = ..%RegExReplace(result, "webroot", urlRoot)
+
 	Return result
 }
 
@@ -2190,10 +2178,14 @@ ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pPropertie
 	Set sc = $ClassMethod("Config.Namespaces", "Get", pNamespace, .pProperties)
 }
 
-ClassMethod %RegExReplace(pString, pRegEx, pValue) As %String [ Internal ]
+ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %String) As %String [ Internal ]
 {
-	Quit ##class(%Regex.Matcher).%New(pRegEx,pString).ReplaceAll($Replace(pValue,"\","\\"))
+	Set tString = pString
+	Set tRegEx = "(?i)\{\$" _ pName _ "\}"
+	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
+	Set tRegEx = "(?i)\$\{" _ pName _ "\}"
+	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
+	Quit tString
 }
-
 
 }

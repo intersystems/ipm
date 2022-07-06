@@ -1322,16 +1322,6 @@ Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List
 	group by Dependencies_VersionString
 }
 
-ClassMethod %RegExReplace(pString, pName, pValue) As %String
-{
-  set tString = pString
-  Set tRegEx = "(?i)\{\$" _ pName _ "\}"
-	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
-  Set tRegEx = "(?i)\$\{" _ pName _ "\}"
-	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
-  Quit tString
-}
-
 /// Evaluates an expression in a provided string. <br />
 /// These special expressions are case-insensitive. <br />
 /// Current valid expressions:
@@ -1356,11 +1346,11 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Set customParams("root") = root
 	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
+	
+	// {name} expression does not contain dollar sign; handle separately
+	Set name = ..Name
+	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
 
-	If $Locate(attrValue,"(?i)\{name\}") {
-		Set name = ..Name
-		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{name\}",name)
-	}
 	Return attrValue
 }
 
