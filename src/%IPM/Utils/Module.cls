@@ -2178,7 +2178,7 @@ ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pPropertie
 	Set sc = $ClassMethod("Config.Namespaces", "Get", pNamespace, .pProperties)
 }
 
-ClassMethod %RegExReplace(pString, pName, pValue) As %String [ Internal ]
+ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %String) As %String [ Internal ]
 {
 	Set tString = pString
 	Set tRegEx = "(?i)\{\$" _ pName _ "\}"

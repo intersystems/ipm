@@ -1346,11 +1346,11 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Set customParams("root") = root
 	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
+	
+	// {name} expression does not contain dollar sign; handle separately
+	Set name = ..Name
+	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
 
-	If $Locate(attrValue,"(?i)\{name\}") {
-		Set name = ..Name
-		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{name\}",name)
-	}
 	Return attrValue
 }
 

@@ -259,10 +259,8 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
 		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue, "root", root)
 	}
 	// {name} expression does not contain dollar sign; handle separately
-	If $Locate(attrValue,"(?i)\{name\}") {
-		Set name = ..ResourceReference.Name
-		Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
-	}
+	Set name = ..ResourceReference.Name
+	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
 	Return attrValue
 }
 
