@@ -1322,16 +1322,6 @@ Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List
 	group by Dependencies_VersionString
 }
 
-ClassMethod %RegExReplace(pString, pName, pValue) As %String
-{
-  set tString = pString
-  Set tRegEx = "(?i)\{\$" _ pName _ "\}"
-	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
-  Set tRegEx = "(?i)\$\{" _ pName _ "\}"
-	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
-  Quit tString
-}
-
 /// Evaluates an expression in a provided string. <br />
 /// These special expressions are case-insensitive. <br />
 /// Current valid expressions:
@@ -1344,36 +1334,24 @@ ClassMethod %RegExReplace(pString, pName, pValue) As %String
 Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 {
 	Set tAttrValue = pAttrValue
-	Merge tParams = pParams
-	Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, ..NameOpen(..Name), .tParams)
-	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
-
 	If (tAttrValue '[ "{") {
 		Return tAttrValue
 	}
+	Merge tParams = pParams
+	Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, ..NameOpen(..Name), .tParams)
+	Set root = ..Root
+	If (root '= "") {
+		Set root = ##class(%Library.File).NormalizeDirectory(root)
+	}
+	Set customParams("root") = root
+	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
-	// for backward compatibility, supporting both {$root} and ${root}
-	If $Locate(attrValue,"(?i)\{\$root\}|\$\{root\}") {
-		Set root = ..Root
-		If (root '= "") {
-			Set root = ##class(%Library.File).NormalizeDirectory(root)
-		}
-		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{\$root\}|\$\{root\}",root)
-	}
-	If $Locate(attrValue,"(?i)\{name\}") {
-		Set name = ..Name
-		Set attrValue = ##class(%IPM.Utils.Module).%RegExReplace(attrValue,"(?i)\{name\}",name)
-	}
-	Return attrValue
-}
+	
+	// {name} expression does not contain dollar sign; handle separately
+	Set name = ..Name
+	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
 
-Method %EvaluateExpression(pExpr) As %String [ Internal ]
-{
-  Try {
-    return @pExpr
-  } Catch ex {
-  }
-  Return ""
+	Return attrValue
 }
 
 Storage Default
