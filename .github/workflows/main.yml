@@ -12,7 +12,7 @@ on:
 env:
   PREVIOUS: 2021.2.0.651.0
   LATEST: 2022.1.0.209.0
-  # PREVIEW: 2022.1.0.199.0
+  # PREVIEW: 2022.2.0.270.0
 jobs:
   build:
     timeout-minutes: 20
@@ -70,8 +70,7 @@ jobs:
             -p 52773:52773 \
             --network-alias registry \
             docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
-            -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'" \
-            --check-caps false
+            -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker logs $REGISTRY
@@ -93,6 +92,20 @@ jobs:
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER
+      - name: Restart temporary registry
+        timeout-minutes: 15
+        run: |
+          docker rm -f registry || true
+          docker run --rm -d \
+            --network zpm \
+            --name registry \
+            -p 52773:52773 \
+            --network-alias registry \
+            docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
+            -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
+          REGISTRY=`docker ps -lq`
+          sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker logs $REGISTRY
       - name: Test and publish to temporary registry
         timeout-minutes: 15
         run: |
@@ -108,12 +121,15 @@ jobs:
             'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
             'zpm "publish zpm -v":1' \
             'zpm "publish sslclient -v":1' \
+            'zpm "search":1' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER
       - name: Clean install current version and test new one
         timeout-minutes: 15
         run: |
+          curl http://localhost:52773/registry/packages/-/all | jq
+          curl http://localhost:52773/registry/packages/zpm/ | jq
           wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
           docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} --check-caps false
           CONTAINER=`docker ps -lq`
@@ -122,10 +138,13 @@ jobs:
             'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
             'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
             'zpm "list":1\n' \
-            'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/""":1\n' \
-            'zpm "install zpm":1\n' \
-            'zpm "install dsw":1\n' \
+            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
+            'zpm "repo -list"\n' \
+            'zpm "search":1\n' \
+            'zpm "install sslclient":1\n' \
+            'zpm "install zpm -v":1\n' \
             'zpm "list":1\n' \
+            'zpm "version":1\n' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER
