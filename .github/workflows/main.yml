@@ -18,8 +18,8 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        # version: [previous, current, latest]
-        version: [latest]
+        version: [previous, latest]
+        # version: [latest, preview]
         platform: [common, health]
     runs-on: ubuntu-latest
     steps:
@@ -32,11 +32,12 @@ jobs:
       - name: Set image
         id: image
         run: |
-          IMAGE=store/intersystems/iris-community
-          [ '${{ matrix.platform }}' == 'health' ] && IMAGE=store/intersystems/irishealth-community
-          VERSION=${{ env.CURRENT }}
+          IMAGE=containers.intersystems.com/intersystems/iris-community
+          [ '${{ matrix.platform }}' == 'health' ] && IMAGE=containers.intersystems.com/intersystems/irishealth-community
+          VERSION=${{ env.LATEST }}
           [ '${{ matrix.version }}' == 'previous' ] && VERSION=${{ env.PREVIOUS }}
           [ '${{ matrix.version }}' == 'latest' ] && VERSION=${{ env.LATEST }}
+          [ '${{ matrix.version }}' == 'preview' ] && VERSION=${{ env.PREVIEW }}
           echo ::set-output name=name::${IMAGE}:${VERSION}
       - name: Setup version
         id: version
@@ -50,40 +51,44 @@ jobs:
           cat module.xml
           echo ::set-output name=number::${VERSION}
       - name: Build
-        run: docker build --rm --build-arg BASE=${{ steps.image.outputs.name }} -t zpm .
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: false
+          load: true
+          tags: zpm
+          build-args: BASE=${{ steps.image.outputs.name }}
       - name: Run temporary registry
         timeout-minutes: 15
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
           docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
           docker network create zpm
-          mkdir -p /tmp/registry/
-          rm -rf /tmp/registry/password.*
-          echo securepassword > /tmp/registry/password.txt
-          docker run --init --rm -d \
+          docker run --rm -d \
             --network zpm \
             --name registry \
-            --network-alias registry \
             -p 52773:52773 \
-            -v /tmp/registry:/home/irisowner/registry \
+            --network-alias registry \
             docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker logs $REGISTRY
       - name: Test and Verify
         timeout-minutes: 15
         run: |
-          docker run --network zpm -d --rm --init \
+          docker run --network zpm -d --rm \
             -e TEST_REGISTRY=http://registry:52773/registry/ \
             -e TEST_REGISTRY_USER=admin \
-            -e TEST_REGISTRY_PASSWORD=securepassword \
-            zpm
+            -e TEST_REGISTRY_PASSWORD=SYS \
+            -v `pwd`:/home/irisowner/zpm/ \
+            zpm --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'zpm "list":1\n' \
-            'zpm "test zpm -v":1\n' \
-            'zpm "verify zpm -v":1' \
+            'zpm "test zpm -v -only":1\n' \
+            'zpm "verify zpm -v -only":1' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER
@@ -104,7 +109,7 @@ jobs:
       - name: Test and publish to temporary registry
         timeout-minutes: 15
         run: |
-          docker run --network zpm -d --rm --init zpm
+          docker run --network zpm -d --rm -v `pwd`:/home/irisowner/zpm/ zpm --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -113,7 +118,7 @@ jobs:
             'zpm "install dsw":1\n' \
             'zpm "install sslclient":1\n' \
             'zpm "list":1\n' \
-            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password securepassword":1\n' \
+            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
             'zpm "publish zpm -v":1' \
             'zpm "publish sslclient -v":1' \
             'zpm "search":1' \
@@ -126,7 +131,7 @@ jobs:
           curl http://localhost:52773/registry/packages/-/all | jq
           curl http://localhost:52773/registry/packages/zpm/ | jq
           wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }}
+          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -147,7 +152,7 @@ jobs:
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --init --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }}
+          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -176,7 +181,7 @@ jobs:
       - name: Create Beta Release
         id: create_release
         uses: actions/create-release@v1
-        if: github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
+        if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -185,7 +190,7 @@ jobs:
           prerelease: ${{ github.event_name != 'release' }}
       - name: Upload Beta Release Asset
         uses: actions/upload-release-asset@v1
-        if: github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
+        if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -207,7 +212,7 @@ jobs:
         if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         run: |
           [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
-            docker run -d --rm --init zpm
+            docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm --check-caps false
             CONTAINER=`docker ps -lq`
             sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
             /bin/echo -e '' \
