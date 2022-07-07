@@ -81,15 +81,17 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
     Set tPackageUrl = tRes.url
     Set tHash = tRes.hash
 
-    Do ##class(%Net.URLParser).Parse(tPackageUrl,.tComponents)
-    If ($Data(tComponents("path"))#2) {
-      If ($Extract(tComponents("path"),1,1)="/") {
-          Set path = $Extract(tComponents("path"),2,*)	
-      }
-    }
+    #; why it's needed here?
+    #; 
+    #; Do ##class(%Net.URLParser).Parse(tPackageUrl,.tComponents)
+    #; If ($Data(tComponents("path"))#2) {
+    #;   If ($Extract(tComponents("path"),1,1)="/") {
+    #;       Set path = $Extract(tComponents("path"),2,*)	
+    #;   }
+    #; }
     Set tRequest = ..GetHttpRequest()
     Set tRequest.Timeout = 300
-    Set tSC = tRequest.Get(tRequest.Location_path)
+    Set tSC = tRequest.Get(tPackageUrl)
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
       Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz")
