@@ -142,10 +142,10 @@ ClassMethod Expfilename(code, wd)
 }
 
 /// returns list of non-system csp applications in the current namespace
-ClassMethod GetCSPApplications(Output pApplications As %List) As %Status
+ClassMethod GetCSPApplications(Output pApplications As %List, currentNamespace = {$Namespace}) As %Status
 {
     Set pApplications = ""
-    Set currentNamespace = $Namespace
+    
     New $Namespace
     Set $Namespace = "%SYS"
     Set statement = ##class(%SQL.Statement).%New()
@@ -162,7 +162,7 @@ ClassMethod GetCSPApplications(Output pApplications As %List) As %Status
 }
 
 /// adds a web application to the temporary array of module resources
-Method AddWebApps(pApps As %String, Output cspapps As %List) As %Status
+Method AddWebApps(pApps As %String, Output cspapps As %List, curns = {$Namespace}) As %Status
 {
     Set tAppList = ""
     Set pApps = $ZSTRIP(pApps,"<>W")
@@ -172,7 +172,7 @@ Method AddWebApps(pApps As %String, Output cspapps As %List) As %Status
         Set tAppList = $Listfromstring(pApps,",")
     }
     Set cspapps = ""
-    Set curns=$Namespace
+    
     New $Namespace
     Set $Namespace = "%SYS"
     For i=1:1:$Listlength(tAppList) {
