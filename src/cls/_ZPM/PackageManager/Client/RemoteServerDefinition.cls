@@ -172,10 +172,10 @@ Storage Default
 <Value>URL</Value>
 </Value>
 <Value name="5">
-<Value>DeploymentEnabled</Value>
-</Value>
-<Value name="5">
 <Value>Token</Value>
+</Value>
+<Value name="6">
+<Value>DeploymentEnabled</Value>
 </Value>
 </Data>
 <DefaultData>RemoteServerDefinitionDefaultData</DefaultData>
