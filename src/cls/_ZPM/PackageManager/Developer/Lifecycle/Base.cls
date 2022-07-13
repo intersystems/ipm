@@ -432,7 +432,7 @@ Method %Reload(ByRef pParams) As %Status
 		
 		Set tPreloadRoot = tRoot_"preload"
 		If ##class(%File).DirectoryExists(tPreloadRoot) {
-			Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_"/compile", , 1)
+			Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_"/compile" _ $Select($TLevel:"/multicompile=0", 1: ""), , 1)
 			If $$$ISERR(tSC) {
 				Quit
 			}
