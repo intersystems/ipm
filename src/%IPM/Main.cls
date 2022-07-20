@@ -510,18 +510,35 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="all" description="If specified, rearrange all modules loaded in development mode (rather than just the current one)." />
 </command>
 
-<command name="dependency-analyzer" aliases="deps">
-<description>
-	Inspects all classes in the provided module and checks for invalid references
-	to classes that are either not in the module or not in one of the module's
-	dependencies.
-	The invalid references are written to the current device.
-</description>
-<parameter name="module" required="true" description="Name of module to inspect" />
-<example description="Runs the dependency analyzer on the module MyModuleName.">
-	deps MyModuleName
-</example>
-</command>
+  <command name="dependency-analyzer" aliases="deps">
+  	<summary>
+		Computes references to other items/modules for a given module/item.
+	</summary>
+    <description>
+        For a module, inspects all items in the provided module and checks for invalid references to items 
+        that are not in the module and not in any of the module's dependencies.
+		For an item, finds all its references to other items, or optionally list 
+		just the invalid references of the item as well.
+		Dependency analyzer supports .cls and .inc items. Other item types are not yet supported.
+		The references are written to the current device.
+    </description>
+    <!-- Parameters -->
+    <parameter name="moduleOrItem" required="true" description="Name of module / item to inspect" />
+	<!-- Modifiers -->
+	<modifier name="invalid-only" value="true" description="Will only be applied when the input is an item name. Default to 1, i.e default to show invalid references only. If specified to 0, will show all references to the item." />
+    <modifier name="ignore-str" value="true" description="If specified, ignore specific string references provided as a comma-separated string, including class names" />
+	<modifier name="ignore-str-all" description="If specified, ignore all string references, including class names" />
+    <!-- Examples -->
+    <example description="Runs the dependency analyzer on the module MyModuleName to find invalid references, and ignore string references MyClassName1 and MyClassName2.">
+        deps MyModuleName -ignore-str MyClassName1,MyClassName2
+    </example>
+    <example description="Runs the dependency analyzer on item MyClassName3.cls to find all its references, and ignore all string references.">
+        deps MyClassName3.cls -invalid-only 0 -ignore-str-all
+    </example>
+    <example description="Runs the dependency analyzer on item MyIncludeName.inc to find all invalid references in it.">
+        deps MyIncludeName.inc
+    </example>
+  </command>
 
 
 <command name="version" aliases="ver">
@@ -1829,12 +1846,30 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 /// Run Dependency Analyzer for the given module
 ClassMethod RunDependencyAnalyzer(ByRef pCommandInfo)
 {
-	Set moduleName = $Get(pCommandInfo("parameters", "module"))
-	If (moduleName = "") {
-		$$$ThrowStatus($$$ERROR($$$GeneralError, "Module name must be provided. Run help command to see syntax"))
+	Set ignoredStringRef = $$$GetModifier(pCommandInfo,"ignore-str")
+	Set ignoreAll = $$$HasModifier(pCommandInfo,"ignore-str-all")
+	Set invalidOnly = $$$GetModifier(pCommandInfo,"invalid-only")
+	If (ignoreAll) {
+		Set ignoredStringRef = $char(0)
 	}
+	Set moduleOrItemName = $Get(pCommandInfo("parameters", "moduleOrItem"))
+	If (moduleOrItemName = "") {
+		$$$ThrowStatus($$$ERROR($$$GeneralError, "Module/item name must be provided. Run help command to see syntax"))
+	}
+	Write !, "Running dependency analyzer...", !, !
 	// Status can be ignored as it is written to the current device
-	Do ##class(%IPM.DependencyAnalyzer).RunForModule(moduleName, , 1)
+	If (invalidOnly = 0)  {
+		Do ##class(%IPM.DependencyAnalyzer).RunForAllReferences(moduleOrItemName, .allReferences, 1,,,,ignoredStringRef)
+		If '$Data(allReferences) {
+			Write !, "No references found!"
+		}
+	} Else {
+		Do ##class(%IPM.DependencyAnalyzer).RunForInvalidReferences(moduleOrItemName, .invalidReferences, 1,,,,ignoredStringRef)
+		If '$Data(invalidReferences) {
+			Write !, "No invalid references found!"
+		}
+	}
+	Write !
 }
 
 Query ActiveNamespaces() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
