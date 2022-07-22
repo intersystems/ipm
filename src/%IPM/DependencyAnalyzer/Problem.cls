@@ -24,6 +24,8 @@ Property ReferencedFileType As %String(MAXLEN = 255) [ InitialExpression = ".CLS
 
 Property ReferencedItemExists As %Boolean [ InitialExpression = 1 ];
 
+Property InvalidOnly As %Boolean [ InitialExpression = 1 ];
+
 /// Returns a string that, when shown in the Studio output pane, can be clicked to jump to this location in code.
 Method ToString() As %String [ CodeMode = expression ]
 {
@@ -63,6 +65,10 @@ Storage Default
 <Value name="10">
 <Value>ReferencedItemExists</Value>
 </Value>
+<Value name="11">
+<Value>InvalidOnly</Value>
+</Value>
+
 </Data>
 <DataLocation>^IPM.DependencyAnalyzer.ProblemD</DataLocation>
 <DefaultData>ProblemDefaultData</DefaultData>
