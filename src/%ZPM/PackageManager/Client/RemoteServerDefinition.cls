@@ -108,14 +108,17 @@ Method GetPublishService() As %ZPM.PackageManager.Core.IPublishService
 Method Display()
 {
 	Do ##super()
+
+	Write !,$c(9),"Deployment Enabled? ",$c(9),$Case(..DeploymentEnabled,1:"Yes",:"No")
+
 	If (..Username '= "") {
-		Write !,$c(9),"Username: ",$c(9),..Username
+		Write !,$c(9),"Username: ",$c(9),$c(9),..Username
 	}
 	If (..Password '= "") {
-		Write !,$c(9),"Password: ",$c(9),$Case(..Password,"":"<unset>",:"<set>")
+		Write !,$c(9),"Password: ",$c(9),$c(9),$Case(..Password,"":"<unset>",:"<set>")
 	}
 	If (..Token '= "") {
-		Write !,$c(9),"Token: ",$c(9),$Case(..Token,"":"<unset>",:"<set>")
+		Write !,$c(9),"Token: ",$c(9),$c(9),$c(9),$Case(..Token,"":"<unset>",:"<set>")
 	}
 }
 
@@ -125,9 +128,9 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 	Set tSC = $$$OK
 	Try {
 		Set tUrl = $Get(pModifiers("url"), pInstance.URL)
-    If (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
-      $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server with non-unique URL."))
-    }
+		If (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server with non-unique URL."))
+		}
 		If (pInteractive && (tUrl = "")) {
 			Set tPrompt = ..#URLPromptString
 			Set tResponse = ##class(%Library.Prompt).GetString(tPrompt, .tUrl)
@@ -139,12 +142,13 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 		Set pInstance.Username = $Get(pModifiers("username"),"")
 		Set pInstance.Password = $Get(pModifiers("password"),"")
 		Set pInstance.Token = $Get(pModifiers("token"),"")
+		Set pInstance.DeploymentEnabled = $Get(pModifiers("publish"),0)
 	
 		If $Data(pModifiers("url"),tURL) {
 			Set pInstance.URL = tURL
 		}
-		If ((pInstance.%Id()="")&&..DeploymentServerExists(1)) {
-			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server."_$$$NL_" Use ""repo -r -n registry -url <new url>"" to switch to another server"_$$$NL))
+		If (pInstance.DeploymentEnabled = 1) {
+			&sql(UPDATE %ZPM_PackageManager_Client.RemoteServerDefinition SET DeploymentEnabled = 0)
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
