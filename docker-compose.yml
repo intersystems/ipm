@@ -13,7 +13,6 @@ services:
       - ~/iris.key:/usr/irissys/mgr/iris.key
       - ./:/home/irisowner/zpm/
     command:
-      - --check-caps false
       - -a 
       - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
   registry:
@@ -21,6 +20,5 @@ services:
     ports: 
       - 52775:52773
     command:
-      - --check-caps false
       - -a 
       - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
