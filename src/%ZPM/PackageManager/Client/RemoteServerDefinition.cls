@@ -167,6 +167,20 @@ Method GetSortOrder() As %Integer [ Private ]
 	Quit 2 + $Case(..%Id(),"":1,:..%Id())
 }
 
+Query PublishingServer() As %SQLQuery
+{
+	SELECT 
+		ID,
+		CASE 
+			WHEN DeploymentEnabled = 1 THEN 1
+			WHEN Token IS NOT NULL THEN 2
+			WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
+			ELSE 999 
+		END PublishOrder
+	FROM %ZPM_PackageManager_Client.RemoteServerDefinition 
+	ORDER BY PublishOrder, ID
+}
+
 Storage Default
 {
 <Data name="RemoteServerDefinitionDefaultData">

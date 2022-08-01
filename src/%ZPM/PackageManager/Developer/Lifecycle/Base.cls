@@ -1058,16 +1058,28 @@ Method %Publish(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
-		Set tRelease = $Get(pParams("Release"),0)
-		If $Data(pParams("PublishTo"),tPublishTo) && ($Get(tPublishTo) '= "") {
+		Set tVerbose = $Get(pParams("Verbose"))
+		Set tRelease = $Get(pParams("Release"),$Get(pParams("zpm","Release"),0))
+		Set tPublishTo = $Get(pParams("PublishTo"),$Get(pParams("zpm","PublishTo"),""))
+		Set tNewVersion = $Get(pParams("NewVersion"),$Get(pParams("zpm","NewVersion"),""))
+
+		Set tServer =  ""
+		If tPublishTo '= "" {
 			Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tPublishTo,,.tSC)
-			$$$ThrowOnError(tSC)
 		} Else {
-			Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1,,.tSC)
-			$$$ThrowOnError(tSC)
+			Set tRS = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).PublishingServerFunc()
+			If (tRS.%SQLCODE = 0) && tRS.%Next() {
+				Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).%OpenId(tRS.ID)
+			}
+		}
+		if $$$ISERR(tSC)||'$IsObject(tServer) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Not found server for publishing."))
+		}
+		If tVerbose {
+			Write !,"Publish to: ", tServer.URL
 		}
 		
-		If $Data(pParams("NewVersion"),tNewVersion) && ($Get(tNewVersion) '= "") {
+		If tNewVersion '= "" {
 			Set tNewVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(tNewVersion)
 		}
 		
@@ -1112,7 +1124,8 @@ Method %Publish(ByRef pParams) As %Status
 		}
 		
 		// May need to update the version of the currently-installed module.
-		If $Data(tNewVersion) {
+		If $Data(tNewVersion),$IsObject(tNewVersion) {
+			Write:tVerbose !,"Version: ", tNewVersion.ToString()
 			Set ..Module.Version = tNewVersion
 			Set tSC = ##class(%ZPM.PackageManager.Developer.API).ExportDocumentForObject(..Module)
 			$$$ThrowOnError(tSC)
