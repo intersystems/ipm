@@ -151,9 +151,8 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 		If $Data(pModifiers("publish"), tPublish) {
 			Set pInstance.DeploymentEnabled = tPublish
 		}
-	
-		If $Data(pModifiers("url"),tURL) {
-			Set pInstance.URL = tURL
+		If tUrl'="" {
+			Set pInstance.URL = tUrl
 		}
 		If (pInstance.DeploymentEnabled = 1) {
 			Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1)
