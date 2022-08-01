@@ -142,13 +142,18 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 		Set pInstance.Username = $Get(pModifiers("username"),"")
 		Set pInstance.Password = $Get(pModifiers("password"),"")
 		Set pInstance.Token = $Get(pModifiers("token"),"")
-		Set pInstance.DeploymentEnabled = $Get(pModifiers("publish"),0)
+		#; DeploymentEnabled = 1 by default if no one, yet
+		Set pInstance.DeploymentEnabled = $Get(pModifiers("publish"), '##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerExists())
 	
 		If $Data(pModifiers("url"),tURL) {
 			Set pInstance.URL = tURL
 		}
 		If (pInstance.DeploymentEnabled = 1) {
-			&sql(UPDATE %ZPM_PackageManager_Client.RemoteServerDefinition SET DeploymentEnabled = 0)
+			Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1)
+			If $Isobject(tServer),tServer.URL'=tURL {
+				Set tServer.DeploymentEnabled = 0
+				$$$ThrowOnError(tServer.%Save())
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
