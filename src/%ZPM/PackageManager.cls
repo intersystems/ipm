@@ -118,7 +118,7 @@ This command is an alias for `module-action module-name verify`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
-<command name="publish">
+<command name="publish" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name publish`
 </description>
