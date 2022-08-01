@@ -118,7 +118,7 @@ This command is an alias for `module-action module-name verify`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
-<command name="publish">
+<command name="publish" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name publish`
 </description>
@@ -168,6 +168,8 @@ repo -n AppModules -list-modules
 <modifier name="publish" value="true" valueList="0,1" description="When configuring a remote repository, specifies that publishing of packages to the repository is allowed. When configuring the current namespace with -enable, specifies that publishing is also enabled. "/>
 
 <!-- General properties -->
+<modifier name="enable" value="false" description="For any repository, specifies that it can be used." />
+<modifier name="disable" value="false" description="For any repository, specifies that it can not be used." />
 <modifier name="snapshots" aliases="s" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for snapshot builds (i.e., those with a semantic version ending in '+snapshot', indicating a 'latest' build of a particular version)." />
 <modifier name="prereleases" aliases="pre" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for prerelease software" />
 <modifier name="read-only" aliases="ro" value="true" valueList="0,1" description="For any repository, specifies that modules installed from it are ALWAYS installed in non-developer mode, effectively making them read only" />
@@ -1321,6 +1323,13 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			Set tDescList($Increment(tDescList)) = tRepoTypeResult.%Get("Description")
 		}
 		$$$ThrowOnError(tSC)
+
+		if (tType = ""),(tName '= ""),##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyExists(tName) {
+			Set tInstance = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tName)
+			If $IsObject(tInstance) {
+				Set tType = tInstance.%ClassName(1)
+			}
+		}
 	
     If (tType = "") {
       Set tResponse = ##class(%Library.Prompt).GetMenu("Which sort of repository do you wish to configure?",.tDescIndex,.tDescList,,$$$InitialDisplayMask)
