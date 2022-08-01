@@ -21,7 +21,7 @@ Property Password As %String(MAXLEN = "");
 
 Property Token As %String(MAXLEN = "");
 
-Property DeploymentEnabled As %Boolean [ InitialExpression = 1 ];
+Property DeploymentEnabled As %Boolean [ InitialExpression = 0 ];
 
 Index DeploymentServer On DeploymentEnabled [ Unique ];
 
@@ -139,17 +139,25 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 			}
 		}
 		
-		Set pInstance.Username = $Get(pModifiers("username"),"")
-		Set pInstance.Password = $Get(pModifiers("password"),"")
-		Set pInstance.Token = $Get(pModifiers("token"),"")
-		Set pInstance.DeploymentEnabled = $Get(pModifiers("publish"), 0)
+		If $Data(pModifiers("username"), tUsername) {
+			Set pInstance.Username = tUsername
+		}
+		If $Data(pModifiers("password"), tPassword) {
+			Set pInstance.Password = tPassword
+		}
+		If $Data(pModifiers("token"), tToken) {
+			Set pInstance.Token = tToken
+		}
+		If $Data(pModifiers("publish"), tPublish) {
+			Set pInstance.DeploymentEnabled = tPublish
+		}
 	
 		If $Data(pModifiers("url"),tURL) {
 			Set pInstance.URL = tURL
 		}
 		If (pInstance.DeploymentEnabled = 1) {
 			Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1)
-			If $Isobject(tServer),tServer.URL'=tURL {
+			If $Isobject(tServer),tServer.URL'=pInstance.URL {
 				Set tServer.DeploymentEnabled = 0
 				$$$ThrowOnError(tServer.%Save())
 			}
@@ -169,14 +177,15 @@ Method GetSortOrder() As %Integer [ Private ]
 Query PublishingServer() As %SQLQuery
 {
 	SELECT 
-		ID,
 		CASE 
 			WHEN DeploymentEnabled = 1 THEN 1
 			WHEN Token IS NOT NULL THEN 2
 			WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
 			ELSE 999 
-		END PublishOrder
+		END PublishOrder,
+		ID, Name, URL
 	FROM %ZPM_PackageManager_Client.RemoteServerDefinition 
+	WHERE Enabled = 1
 	ORDER BY PublishOrder, ID
 }
 

@@ -153,6 +153,7 @@ ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pDat
 		$$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
 		
 		$$$ThrowOnError(tInstance.%Save())
+		Do tInstance.Display()
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
