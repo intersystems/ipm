@@ -82,12 +82,12 @@ ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 Method Display()
 {
 	Write !,..Name
-	Write !,$c(9),"Source: ",$c(9),..Details
-	Write !,$c(9),"Enabled?",$c(9),$$$YesNo(..Enabled)
-	Write !,$c(9),"Available?",$c(9),$$$YesNo(..GetPackageService().IsAvailable())
+	Write !,$c(9),"Source: ",$c(9),$c(9),..Details
+	Write !,$c(9),"Enabled?",$c(9),$c(9),$$$YesNo(..Enabled)
+	Write !,$c(9),"Available?",$c(9),$c(9),$$$YesNo(..GetPackageService().IsAvailable())
 	Write !,$c(9),"Use for Snapshots?",$c(9),$$$YesNo(..Snapshots)
 	Write !,$c(9),"Use for Prereleases?",$c(9),$$$YesNo(..Prereleases)
-	Write !,$c(9),"Is Read-Only?",$c(9),$$$YesNo(..ReadOnly)
+	Write !,$c(9),"Is Read-Only?",$c(9),$c(9),$$$YesNo(..ReadOnly)
 }
 
 /// Called from package manager shell to create or update an instance of this class.
@@ -153,6 +153,7 @@ ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pDat
 		$$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
 		
 		$$$ThrowOnError(tInstance.%Save())
+		Do tInstance.Display()
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

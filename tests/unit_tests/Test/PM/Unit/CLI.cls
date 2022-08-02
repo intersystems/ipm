@@ -106,12 +106,14 @@ Method TestRepository()
 	
 	// Update repositories
 	Do ..AssertNoException("repo -n UTFILE -fs -snapshots 0")
-	Do ..AssertNoException("repo -name UTSERVER -r -prereleases 0")
+	Do ..AssertNoException("repo -name UTSERVER -r -prereleases 0 -url http://registry/")
+	Do ..AssertNoException("repo -name TEST -r -prereleases 0 -url http://newregistry/ -publish 1")
 	Do ..RunCommand("repo -list")
 	
 	// Cleanup (again)
 	Do ..RunCommand("repo -n UTFILE -delete")
 	Do ..RunCommand("repo -name UTSERVER -delete")
+	Do ..RunCommand("repo -name TEST -delete")
 
 	Do ..RunCommand("repo -r -name registry -reset-defaults")
 }
