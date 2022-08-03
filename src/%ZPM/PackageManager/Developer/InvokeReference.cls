@@ -11,7 +11,7 @@ Property When As %String(MAXLEN = 255, VALUELIST = ",Before,After", XMLPROJECTIO
 
 Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = 0 ];
 
-Property Arg As list Of %String(XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
+Property Arg As list Of %String(MAXLEN = 255, XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
 
 Relationship Module As %ZPM.PackageManager.Developer.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes ];
 
