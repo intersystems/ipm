@@ -58,7 +58,7 @@ ClassMethod FromString(pExpr As %String, Output pComparator As %IPM.General.Sema
 		
 		Set pComparator.Major = $Piece(pExpr,".",1)
 		Set pComparator.Minor = $Piece(pExpr,".",2)
-		Set tEnd = $Piece(pExpr,".",3)
+		Set tEnd = $Piece(pExpr,".",3,*)
 		Set pComparator.Patch = $Piece($Piece(tEnd,"-"),"+") // Before -prerelease and/or +build
 		Set pComparator.Prerelease = $Piece($Piece(tEnd,"-",2),"+") // After - and possibly before +build
 		Set pComparator.Build = $Piece(tEnd,"+",2)
@@ -78,8 +78,11 @@ ClassMethod FromString(pExpr As %String, Output pComparator As %IPM.General.Sema
 
 Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
-	// Must prereleases match?
-	Set tEquals = (..Operator [ "=") && (pVersion.Major = ..Major) && (pVersion.Minor = ..Minor) && (pVersion.Patch = ..Patch) && (pVersion.Prerelease = ..Prerelease)
+	Set tEquals = (..Operator [ "=") && (pVersion.Major = ..Major) && (pVersion.Minor = ..Minor) && (pVersion.Patch = ..Patch)
+	If ($Extract(..Operator,1) = "=") {
+		// Means direct equality and not <= or >= so compare pre-release as well
+		Set tEquals = tEquals && (pVersion.Prerelease = ..Prerelease)
+	}
 	If tEquals || (..Operator = "=") {
 		Quit tEquals
 	}

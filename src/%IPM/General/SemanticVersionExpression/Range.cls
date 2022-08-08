@@ -50,8 +50,10 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %IPM.General.Sema
 				
 				// Partial version as min version: add zeros.
 				Set tMinDotLength = $Length(tMin,".")
-				For i=3:-1:tMinDotLength {
-					Set tMin = tMin_".0"
+				If (tMinDotLength < 3) {
+					For i=2:-1:tMinDotLength {
+						Set tMin = tMin_".0"
+					}
 				}
 				Set $List(tExpressions,*) = ">="_tMin
 				
@@ -61,7 +63,7 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %IPM.General.Sema
 				If (tMaxDotLength < 3) {
 					Set tOp = "<"
 					Set $Piece(tMax,".",tMaxDotLength) = 1 + $Piece(tMax,".",tMaxDotLength)
-					For i=3:-1:tMaxDotLength {
+					For i=2:-1:tMaxDotLength {
 						Set tMax = tMax_".0"
 					}
 				}

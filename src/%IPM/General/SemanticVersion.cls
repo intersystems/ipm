@@ -63,7 +63,8 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 	Set tPointer = 0
 	Set tPreIdentifiers = $ListFromString(..Prerelease,".")
 	While $ListNext(tPreIdentifiers,tPointer,tIdentifier) {
-		If (+tIdentifier > 0) && (+tIdentifier '= tIdentifier) {
+		Set tNumeric = $ZStrip(tIdentifier, "*ACPW")
+		If (+tNumeric > 0) && (+tNumeric '= tNumeric) {
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Numeric identifier (%1) in version's prerelease (%2) cannot contain leading zeros.",tIdentifier,..Prerelease))
 		}
 	}
