@@ -2383,7 +2383,59 @@ ClassMethod UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Boo
 	Quit tSC
 #; These are the actual contents of %ZLANGC00 (to be added/updated)
 $$$STARTTAG
-ZPM(pArgs...) If $System.CLS.IsMthd("%IPM.Main", "Shell") { Do ##class(%IPM.Main).Shell(pArgs...) Quit } Else { Write !, "InterSystems Package Manager is not installed in this namespace." Quit }
+ZPM(pArgs...)
+ If $System.CLS.IsMthd("%IPM.Main", "Shell") { 
+ 	Do ##class(%IPM.Main).Shell(pArgs...) Quit
+ } Else {
+	Set ZPMXMLDir = ##class(%File).NormalizeFilename("ZPM.xml", ##class(%File).ManagerDirectory())
+ 	Write !, "InterSystems Package Manager(IPM) is not installed in this namespace.", !
+ 	Set tList(1) = "Enable IPM for this namespace"
+ 	Set tList(2) = "Enable IPM for all non-%SYS explicit namespaces"
+ 	Set tList(3) = "No"
+ 	Set tValue = 1
+ 	Set tResponse = ##class(%Library.Prompt).GetMenu("Do you want to enable IPM?", .tValue, .tList,,128)
+	If (tResponse '= 1) {
+		Write !, "Unsupported response. Operation cancelled."
+		Quit
+	}
+	If (tValue = 1) {
+		If ($Namespace = "%SYS") || ($ZCONVERT($Namespace, "U") '= $Namespace) {
+			Write !, "IPM is not supported for %SYS namespace and implicit namespaces."
+			Quit
+		}
+		Write !, "Enabling IPM for this namespace: "_$Namespace
+		Set tSC = $system.OBJ.Load(ZPMXMLDir,"ck")
+		If (tSC '= 1) {
+			Write !, $system.Status.GetErrorText(tSC)
+		}
+	} ElseIf (tValue = 2) {
+		Write !, "Enabling IPM system-wide..."
+		New $Namespace
+		Set $Namespace = "%SYS"
+		Set tSC = ##class(%SYS.Namespace).ListAll(.tAllNS)
+		If (tSC '= 1) {
+			Write !, $system.Status.GetErrorText(tSC)
+			Quit
+		}
+	  	Set currentNS=$ORDER(tAllNS(""))
+	 	While (currentNS '="") {
+			If (currentNS '= "%SYS") && ($ZCONVERT(currentNS, "U") = currentNS) {
+				New $Namespace
+				Set $Namespace = currentNS
+				If '$System.CLS.IsMthd("%IPM.Main", "Shell") {
+					Write !, "Enabling IPM for namespace "_currentNS_"..."
+					Set tSC = $system.OBJ.Load(ZPMXMLDir,"ck")
+					If (tSC '= 1) {
+						Write !, $system.Status.GetErrorText(tSC)
+					}
+				}
+			}
+			Set currentNS = $ORDER(tAllNS(currentNS))
+		}
+		Write !, "IPM enabled system-wide."
+ 	}
+ 	Quit
+ }
 $$$ENDTAG
 #; Need an extra line down here to avoid the end bracket being on the same line as $$$ENDTAG - a comment is just fine.
 }
