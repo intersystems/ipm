@@ -80,6 +80,19 @@ Method NameSet(val As %RawString) As %Status
 	Return $$$OK
 }
 
+Method HaveToDeploy() As %Boolean
+{
+	Set deploy = 0
+	Set key = ""
+	For {
+		Set ref = ..Resources.GetNext(.key)
+		Quit:key=""
+		Set deploy = +ref.Deploy
+		Quit:deploy
+	}
+	Quit ''deploy
+}
+
 ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 {
 	Set tSC = $$$OK
@@ -214,6 +227,13 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
   
 		If pIsComplete {
 			Set tPhases = tLifecycle.GetCompletePhases(pPhases)
+			If $ListFind(tPhases, "Package"), tModule.HaveToDeploy() {
+				if 'tModule.DeveloperMode {
+					Set tSC = $$$ERROR($$$GeneralError, "Only modules marked as Deployed and installed in Developer Mode are allowed to be packaged for publishing.")
+					$$$ThrowStatus(tSC)
+				}
+				Set tPhases = $ListBuild("PrepareDeploy") _ tPhases
+			}
 		} Else {
 			Set tPhases = pPhases
 		}
@@ -267,7 +287,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			
 			Set tSC = $$$OK
 			Try {
-				Write !,"["_pModuleName_"]",$c(9),tOnePhase," START"
+				Write !,"["_$Namespace_"|"_pModuleName_"]",$c(9),tOnePhase," START"
 				// for the reload phase, print root from which module is being loaded
 				If tOnePhase = "Reload" {
 					Write " ("_tModule.Root_")"
@@ -342,7 +362,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			If $$$ISERR(tSC) {
 				Write !,"["_pModuleName_"]",$c(9),tOnePhase," FAILURE"
 			} else {
-				Write !,"["_pModuleName_"]",$c(9),tOnePhase," SUCCESS"
+				Write !,"["_$Namespace_"|"_pModuleName_"]",$c(9),tOnePhase," SUCCESS"
 			}
 			If tTiming {
 				Write " ("_($zh-tStart)_" s)"
@@ -354,6 +374,11 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		}
 	} catch e {
 		set tSC = e.AsStatus()
+	}
+	If $$$ISERR(tSC),$Data(pParams("PackageDeployNamespace"),tPackageDeployNamespace),tPackageDeployNamespace'="" {
+  Set $Namespace = $Get(pParams("InitNamespace"))
+		Do ##class(%ZPM.PackageManager.Developer.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
+		Kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
 	}
 	quit tSC
 }
@@ -1017,10 +1042,10 @@ Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 			Set tDirectory = ##class(%File).GetDirectory(tExternalName,1)
 			If (tDirectory '= "") {
 				Set ..Root = tDirectory
-				If (..DeveloperMode = "") {
-					// For backward-compatibility
-					Set ..DeveloperMode = 1
-				}
+				#; If (..DeveloperMode = "") {
+				#; 	// For backward-compatibility
+				#; 	Set ..DeveloperMode = 1
+				#; }
 			}
 		}
 	} Catch e {
@@ -1504,4 +1529,3 @@ Storage Default
 }
 
 }
-

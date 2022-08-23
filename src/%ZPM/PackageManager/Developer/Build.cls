@@ -40,7 +40,7 @@ ClassMethod InitializeNamespace(pPostfix As %String, pVerbose As %Boolean = 1, O
 				Write " and Ensemble-enabling it."
 			}
 		}
-		$$$ThrowOnError(..CreateNamespace(pNewNamespace, tBuildDBName, tBuildDBName, pVerbose, pNSConfig))
+		$$$ThrowOnError(..CreateNamespace(pNewNamespace, tBuildDBName, tDataDBName, pVerbose, pNSConfig))
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -279,9 +279,11 @@ ClassMethod DeleteDatabase(pDBName As %String, pIsLibraryDatabase As %Boolean = 
 			Set tPath = ##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"mgr/"_$$$lcase(pDBName))
 		}
 		
-		// Delete database
-		Set tSC = ##class(Config.Databases).Delete(pDBName)
-		Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
+		If ##class(Config.Databases).Exists(pDBName) {
+			// Delete database
+			Set tSC = ##class(Config.Databases).Delete(pDBName)
+			Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
+		}
 
 		// Delete database file
 		If ##class(%Library.File).Exists(tPath_"IRIS.DAT") {
@@ -399,11 +401,12 @@ ClassMethod CreateNamespace(pNSName As %String, pCodeDBName As %String, pDataDBN
 
 /// Delete the given namespace with name <var>pNSName</var>. <br />
 /// Optionally indicate whether this is a component namespace (like HSLIB). <br />
-ClassMethod DeleteNamespace(pNSName As %String) As %Status
+ClassMethod DeleteNamespace(pNSName As %String, pVerbose As %Boolean = 0) As %Status
 {
 	New $Namespace
 	Set tFinalStatus = $$$OK
 	Try {
+		If pVerbose Write !,"Deleting namespace: " _ pNSName
 		Set $Namespace = "%SYS"
 		Set tLowerName = $ZConvert(pNSName,"L")
 		// The csp directory is lower case on unix but upper case on windows
@@ -421,30 +424,31 @@ ClassMethod DeleteNamespace(pNSName As %String) As %Status
 		Set tSC = ..DeleteWebApplications(pNSName)
 		Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
 
+		Set tDBList = ""
 		// Delete namespace
-		Set tSC = ##class(Config.Namespaces).Delete(pNSName)
-		Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
+		If ##class(Config.Namespaces).Exists(pNSName) {
+			Do ##class(Config.Namespaces).Get(pNSName, .params)
+			Set tDBList = tDBList _ $ListBuild(params("Routines"))
+			Set tDBList = tDBList _ $ListBuild(params("Globals"))
+			Set tSC = ##class(Config.Namespaces).Delete(pNSName)
+			Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
+		}
+		Else {
+			Set tDBList = tDBList _ $ListBuild(pNSName _ "-CODE")
+			Set tDBList = tDBList _ $ListBuild(pNSName _ "-DATA")
+		}
 
 		// Delete secondary databases
 		Set tSecondaryDB = pNSName_##class(%Library.EnsembleMgr).#SECONDARYSUFFIX
 		Set tEnsTempDB = pNSName_##class(%Library.EnsembleMgr).#TEMPSUFFIX
-		For tOtherDB = tSecondaryDB,tEnsTempDB {
-			Set tSC = $$$OK
-			Set tDB = ##class(Config.Databases).Open(tOtherDB,,.tSC)
-			If $IsObject(tDB) {
-				// Delete database
-				Set tSC = ##class(Config.Databases).Delete(tOtherDB)
-				Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
-				
-				// Delete database file
-				Set tOtherPath = tDB.Directory
-				Set tSC = ##class(SYS.Database).DeleteDatabase(tOtherPath)
-				Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
-			} ElseIf $$$ISERR(tSC) {
-				Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
-			}
+		Set tDBList = tDBList _ $ListBuild(tSecondaryDB, tEnsTempDB)
+		Set ptr = 0
+		While $ListNext(tDBList, ptr, tDB) {
+			If pVerbose Write !,"Deleting database: " _ tDB
+			Set tSC = ..DeleteDatabase(tDB)
+			Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
 		}
-		
+
 		// Delete csp directory
 		If tWebPathExists {
 			Set tDirRemoved = ##class(%Library.File).RemoveDirectoryTree(tWebPath)

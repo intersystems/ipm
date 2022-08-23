@@ -152,11 +152,21 @@ Method ExtractTo(pDest As %String) As %Status
         return sc
       }
     } else {
+      #; no idea, why it's needed, but IRIS.DAT filename not allowed
+      set irisdat = 0
       set fullPath = ##class(%File).NormalizeFilename(..name, pDest)
+      if $Extract(fullPath, * - 7, *) = "IRIS.DAT" {
+        set irisdat = 1
+        set fullPath = $Extract(fullPath, 1, * - 8) _ "iris.dat"
+      }
       set fs = ##class(%Stream.FileBinary).%New()
-      set fs.Filename = fullPath
-      do fs.CopyFromAndSave(..fileData)
+      $$$ThrowOnError(fs.LinkToFile(fullPath))
+      $$$ThrowOnError(fs.CopyFromAndSave(..fileData))
       do fs.%Close()
+      if irisdat {
+        set to = $Extract(fullPath, 1, * - 8) _ "IRIS.DAT"
+        $$$ThrowOnError(##class(%File).Rename(fullPath, to))
+      }
     }
   }
 }

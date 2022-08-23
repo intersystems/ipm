@@ -84,7 +84,7 @@ This command is an alias for `module-action module-name compile`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
-<command name="test">
+<command name="test" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name test`
 </description>
@@ -95,7 +95,7 @@ This command is an alias for `module-action module-name test`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
-<command name="package">
+<command name="package" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name package`
 </description>
@@ -107,7 +107,7 @@ This command is an alias for `module-action module-name package`
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Use specified path to export package." />
 </command>
 
-<command name="verify">
+<command name="verify" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name verify`
 </description>
@@ -1434,6 +1434,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
 	Merge tParams = pCommandInfo("data")
+  Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
   if $Extract(tDirectoryName,1,4)="http" {
 		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
 	}
@@ -1570,6 +1571,7 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $Listbuild($zcvt(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
+	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
