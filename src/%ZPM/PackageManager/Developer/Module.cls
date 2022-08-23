@@ -74,6 +74,8 @@ Property Defaults As list Of %ZPM.PackageManager.Developer.ModuleSetting(CLASSNA
 
 Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
+Property Deployed As %Boolean(XMLPROJECTION = "Element");
+
 Method NameSet(val As %RawString) As %Status
 {
 	Set i%Name = $$$lcase(val)
@@ -1042,10 +1044,9 @@ Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 			Set tDirectory = ##class(%File).GetDirectory(tExternalName,1)
 			If (tDirectory '= "") {
 				Set ..Root = tDirectory
-				#; If (..DeveloperMode = "") {
-				#; 	// For backward-compatibility
-				#; 	Set ..DeveloperMode = 1
-				#; }
+        If ..Deployed {
+          Set ..DeveloperMode = 0
+        }
 			}
 		}
 	} Catch e {
@@ -1518,6 +1519,9 @@ Storage Default
 </Value>
 <Value name="21">
 <Value>AfterInstallMessage</Value>
+</Value>
+<Value name="22">
+<Value>Deployed</Value>
 </Value>
 </Data>
 <DataLocation>^ZPM.Dev.ModuleD</DataLocation>

@@ -988,7 +988,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
 		
-		If $Data(pParams("DeveloperMode"),tDeveloperMode) {
+		If 'tModule.Deployed,$Data(pParams("DeveloperMode"),tDeveloperMode) {
 			Set tModule.DeveloperMode = tDeveloperMode
 			Set tModule.Root = pDirectory
 			Set tSC = tModule.%Save()
@@ -996,6 +996,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		} Else {
 			Set tDeveloperMode = +tModule.DeveloperMode
 		}
+    Set pParams("DeveloperMode") = tDeveloperMode
 		
 		If (tDeveloperMode && tUseTransactions) {
 			// In developer mode, save the module manifest so we can fix it even if errors occur afterward.

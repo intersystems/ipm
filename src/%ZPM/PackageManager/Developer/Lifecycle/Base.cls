@@ -1360,6 +1360,8 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		}
 		If $Data(tDeployRtnArray) {
 			Set ..HasDeployedResources = 1
+      Set ..Module.Deployed = 1
+      $$$ThrowOnError(..Module.%Save())
 			Set tRtn = ""
 			If (tVerbose) {
 				Write !,"The following routines are flagged for deployment:"
