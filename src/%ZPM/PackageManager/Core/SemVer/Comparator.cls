@@ -28,7 +28,12 @@ Method ToString() As %String [ CodeMode = expression ]
 
 Method ToResolvedString() As %String [ CodeMode = expression ]
 {
-..Operator_..Major_"."_..Minor_"."_..Patch_$Case(..Prerelease,"":"",:"-"_..Prerelease)_$Case(..Build,"":"",:"+"_..Build)
+..Operator 
+_ ..Major 
+_ "." _ ..Minor 
+_ $Case(..Patch, "": "", : "." _ ..Patch) 
+_ $Case(..Prerelease, "": "", : "-" _ ..Prerelease) 
+_ $Case(..Build, "": "", : "+" _ ..Build)
 }
 
 ClassMethod FromString(pExpr As %String, Output pComparator As %ZPM.PackageManager.Core.SemVer.Comparator) As %Status
@@ -77,7 +82,16 @@ ClassMethod FromString(pExpr As %String, Output pComparator As %ZPM.PackageManag
 Method Evaluate(pVersion As %ZPM.PackageManager.Core.SemanticVersion) As %Boolean
 {
 	// Must prereleases match?
-	Set tEquals = (..Operator [ "=") && (pVersion.Major = ..Major) && (pVersion.Minor = ..Minor) && (pVersion.Patch = ..Patch) && (pVersion.Prerelease = ..Prerelease)
+	Set tEquals = (..Operator [ "=")
+  If tEquals {
+    For part = "Major", "Minor", "Patch", "Prerelease" {
+      Set val1 = $Property(pVersion, part)
+      Set val2 = $Property($this, part)
+      Quit:((val1 = "")||(val2 = ""))
+      Quit:((val1 = "*")||(val2 = "*"))
+      Set tEquals = tEquals && (val1 = val2)
+    }
+  }
 	If tEquals || (..Operator = "=") {
 		Quit tEquals
 	}

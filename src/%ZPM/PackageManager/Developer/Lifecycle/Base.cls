@@ -1361,6 +1361,11 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		If $Data(tDeployRtnArray) {
 			Set ..HasDeployedResources = 1
       Set ..Module.Deployed = 1
+      If '$IsObject(..Module.SystemRequirements) {
+        Set ..Module.SystemRequirements = ##class(%ZPM.PackageManager.Developer.SystemRequirements).%New()
+      }
+      Set tSystemVersion = $System.Version.GetMajor() _ "." _ $System.Version.GetMinor()
+      Set ..Module.SystemRequirements.VersionString = tSystemVersion
       $$$ThrowOnError(..Module.%Save())
 			Set tRtn = ""
 			If (tVerbose) {

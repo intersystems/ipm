@@ -15,18 +15,33 @@ Property Build As RegExString(MAXLEN = 100, REGEX = "([0-9A-Za-z-])+(\.([0-9A-Za
 
 Method ToString() As %String [ CodeMode = expression ]
 {
-..Major_"."_..Minor_"."_..Patch_$Case(..Prerelease,"":"",:"-"_..Prerelease)_$Case(..Build,"":"",:"+"_..Build)
+..Major 
+_ "." _ ..Minor 
+_ $Case(..Patch, "": "", : "." _ ..Patch) 
+_ $Case(..Prerelease, "": "", : "-" _ ..Prerelease) 
+_ $Case(..Build, "": "", : "+" _ ..Build)
 }
 
 ClassMethod FromString(pString As %String) As %ZPM.PackageManager.Core.SemanticVersion
 {
-	Set tVer = ..%New()
-	Set tVer.Major = $Piece(pString,".",1)
-	Set tVer.Minor = $Piece(pString,".",2)
-	Set tVer.Patch = $Piece($Piece($Piece(pString,".",3),"-"),"+")
-	Set tVer.Prerelease = $Piece($Piece($Piece(pString,".",3,*),"-",2,*),"+")
-	Set tVer.Build = $Piece(pString,"+",2)
-	Quit tVer
+  Set tVer = ..%New()
+  Set tVer.Major = $Piece($Piece($Piece(pString,".",1),"-"),"+")
+  Set tVer.Minor = 0
+  Set tVer.Patch = 0
+  If ($Length(pString, ".") > 3) {
+    Set tVer.Patch = $Piece(pString,".",3)
+    Set tVer.Build = $Piece(pString,".",4)
+  }
+  If ($Length(pString, ".") > 2) {
+    Set tVer.Patch = +$Piece($Piece($Piece(pString,".",3),"-"),"+")
+  }
+  If ($Length(pString, ".") > 1) {
+    Set tVer.Minor = +$Piece($Piece($Piece(pString,".",2),"-"),"+")
+    Set tVer.Patch = +$Piece($Piece($Piece(pString,".",3),"-"),"+")
+  }
+  Set tVer.Prerelease = $Piece($Piece($Piece(pString,".",*),"-",2,*),"+")
+  Set tVer.Build = $Piece(pString,"+",2)
+  Quit tVer
 }
 
 ClassMethod FromListBuild(pList As %List) As %ZPM.PackageManager.Core.SemanticVersion

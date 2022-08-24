@@ -26,17 +26,12 @@ Method CheckRequirements() As %Status
 
 Method CheckVersion() As %Status
 {
-	Set tSystemMajor = $System.Version.GetMajor()
-	Set tSystemMinor = $System.Version.GetMinor()
+  Set tSystemVersion = +$System.Version.GetMajor() _ "." _ +$System.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
 	If (..VersionString = "") { Return $$$OK } 
 	Try {
-		Set tComparator = ..Version.Options.GetAt(1).Comparators.GetAt(1)
-		Set CurrentSystemVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString($System.Version.GetNumber())
-		If CurrentSystemVersion.Patch = "" { 
-			Set CurrentSystemVersion.Patch = 0
-		}
-		If ('tComparator.Evaluate(CurrentSystemVersion)) {
-			Return $$$ERROR($$$GeneralError,"The module cannot be installed on the current version ("_tSystemMajor_"."_tSystemMinor_") of the system, version """_..VersionString_""" is required")
+		Set CurrentSystemVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(tSystemVersion)
+		If ('..Version.IsSatisfiedBy(CurrentSystemVersion)) {
+			Return $$$ERROR($$$GeneralError,"The module cannot be installed on the current version (" _ tSystemVersion _ ") of the system, version """ _ ..VersionString _ """ is required")
 		}
 		Return $$$OK
 	} Catch ex {
