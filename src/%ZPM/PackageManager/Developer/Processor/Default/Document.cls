@@ -68,14 +68,22 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
       Set tCatDirectory = ""
       Set tCatDirectory = tCatDirectory _ $ListBuild(..Directory)
-      If (..Directory="mac") {
-        Set tCatDirectory = tCatDirectory _ $ListBuild("rtn")
-      }
-      If ('..DirectoryDefined),(..Directory'="") {
-        Set tCatDirectory = tCatDirectory _ $ListBuild("")
+      If ('..DirectoryDefined) {
+        If (..Directory="mac") {
+          Set tCatDirectory = tCatDirectory _ $ListBuild("rtn")
+        }
+        If (..Directory'="") {
+          Set tCatDirectory = tCatDirectory _ $ListBuild("")
+        }
       }
 
-      For tName = tName, $Translate(tName, "%", "_"), $Translate(tName, "_", "") {
+      Set tListNames = ""
+      Set tListNames = tListNames _ $ListBuild(tName)
+      Set tListNames = tListNames _ $ListBuild($Translate(tName, "%", "_"))
+      Set tListNames = tListNames _ $ListBuild($Translate(tName, "_", ""))
+
+      Set ptrn = 0
+      While $ListNext(tListNames, ptrn, tName) {
         // Runs in Reload normally, and also in Test for test scope / Verify for verify scope
         Set tSourcesPrefix = $Char(##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ISC).#NOPREFIXCHARCODE)
         
@@ -109,19 +117,24 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
         }
         
         If '..ResourceReference.Preload {
-          Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
-          Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName,".","/"))_tFileExtension
-          If ($$$lcase(tFileExtension)=".xml")&&('##class(%File).Exists(tResourcePath)) {
-            Set $Piece(tResourcePath, ".", *) = "cls"
-            Set ..Format = "UDL"
-          } 
-          ElseIf ($$$lcase(tFileExtension)=".cls")&&('##class(%File).Exists(tResourcePath)) {
-            Set $Piece(tResourcePath, ".", *) = "xml"
-            Set ..Format = "XML"
-          }
-
-          If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
-            Set $Piece(tResourcePath, ".", *) = "rtn"
+          Set tFileExtension = $Select(..LoadAsDirectory: "", 1: "." _ ..FilenameExtension)
+          Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)) _ tFileExtension
+          If '..LoadAsDirectory {
+            If ($$$lcase(tFileExtension)'=".xml")&&('##class(%File).Exists(tResourcePath)) {
+              Set tResourcePathXML = tResourcePath
+              Set $Piece(tResourcePathXML, ".", *) = "xml"
+              If (##class(%File).Exists(tResourcePathXML)) {
+                Set tResourcePath = tResourcePathXML
+                Set ..Format = "XML"
+              }
+            }
+            If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
+              Set tResourcePathRTN = tResourcePath
+              Set $Piece(tResourcePathRTN, ".", *) = "rtn"
+              If (##class(%File).Exists(tResourcePathRTN)) {
+                Set tResourcePath = tResourcePathRTN
+              }
+            }
           }
 
           If '##class(%File).Exists(tResourcePath) {
@@ -136,6 +149,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
         }
         
         Set pResourceHandled = 1
+        Set tSC = $$$OK
         Quit
       }
     } ElseIf (pPhase = "Compile") {
@@ -449,7 +463,7 @@ Method %OnNew(pResourceReference As %ZPM.PackageManager.Developer.ResourceRefere
 			Set ..Extension = $$$lcase(..#EXTENSION)
 		}
 	} Else {
-		Set ..Name = $Piece(tResourceRefName,".",1,*-1)
+		Set ..Name = $Piece(tResourceRefName, ".", 1, *-1)
 		Set ..Extension = $$$lcase($Case(..#EXTENSION,"":$Piece(tResourceRefName,".",*),:..#EXTENSION))
 		Set tSC = ##super(pResourceReference)
 		If (i%Directory = "") {

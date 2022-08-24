@@ -186,7 +186,7 @@ ClassMethod CreateDatabase(pDBName As %String, pInitFile As %String = "", pOverw
 		Set tPath = ##class(%Library.File).NormalizeDirectory(##class(%File).ManagerDirectory() _ pDBName)
 		If '##class(%Library.File).DirectoryExists(tPath) {
 			Set tCreated = ##class(%Library.File).CreateDirectory(tPath,.tResult)
-			If 'tCreated {
+			If '##class(%Library.File).Exists(tPath),'tCreated {
 				Set tSC = $$$ERROR($$$GeneralError,"Error creating directory '"_tPath_"': "_tResult)
 				Quit
 			}
@@ -334,7 +334,7 @@ ClassMethod CreateNamespace(pNSName As %String, pCodeDBName As %String, pDataDBN
 		//Create CSP directory
 		Set tWebPath = ##class(%Library.File).NormalizeDirectory(##class(%File).ParentDirectoryName(##class(%File).ManagerDirectory()) _ tCSP) _ pNSName
 		Set tCreated = ##class(%Library.File).CreateDirectory(tWebPath,.tResult)
-		If 'tCreated {
+		If '##class(%Library.File).Exists(tWebPath),'tCreated {
 			Set tSC = $$$ERROR($$$GeneralError,"Error creating directory '"_tWebPath_"': "_tResult)
 			Quit
 		}
