@@ -134,6 +134,22 @@ Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream
   $$$ThrowStatus($$$ERROR($$$GeneralError,"Download package manifest, something went wrong."))
 }
 
+Method GetModuleInstallerManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
+{
+  Set tRequest = ..GetHttpRequest()
+  Set tFileBinStream = ""
+
+  Set name = pModuleReference.Name
+  Set version = pModuleReference.VersionString
+
+  Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/" _ name _ "/"_version_"/installer"))
+  If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
+    Return tRequest.HttpResponse.Data
+  }
+
+  $$$ThrowStatus($$$ERROR($$$GeneralError,"Download package installer manifest, something went wrong."))
+}
+
 Method SendAnalyticsToRegistry(action As %String, data As %DynamicObject)
 {
     Set tRequest = ..GetHttpRequest()
