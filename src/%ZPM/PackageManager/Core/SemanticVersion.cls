@@ -28,19 +28,20 @@ ClassMethod FromString(pString As %String) As %ZPM.PackageManager.Core.SemanticV
   Set tVer.Major = $Piece($Piece($Piece(pString,".",1),"-"),"+")
   Set tVer.Minor = 0
   Set tVer.Patch = 0
-  If ($Length(pString, ".") > 3) {
+  If ($Length($Piece(pString, "-"), ".") > 3) {
     Set tVer.Patch = $Piece(pString,".",3)
     Set tVer.Build = $Piece(pString,".",4)
   }
-  If ($Length(pString, ".") > 2) {
-    Set tVer.Patch = +$Piece($Piece($Piece(pString,".",3),"-"),"+")
+  If ($Length($Piece(pString, "-"), ".") > 1) {
+    Set tVer.Minor = $Piece($Piece($Piece(pString,".",2),"-"),"+")
   }
-  If ($Length(pString, ".") > 1) {
-    Set tVer.Minor = +$Piece($Piece($Piece(pString,".",2),"-"),"+")
-    Set tVer.Patch = +$Piece($Piece($Piece(pString,".",3),"-"),"+")
+  If ($Length($Piece(pString, "-"), ".") > 2) {
+    Set tVer.Patch = $Piece($Piece($Piece(pString,".",3),"-"),"+")
   }
-  Set tVer.Prerelease = $Piece($Piece($Piece(pString,".",*),"-",2,*),"+")
-  Set tVer.Build = $Piece(pString,"+",2)
+  Set tVer.Prerelease = $Piece($Piece(pString, "-", 2, *), "+")
+  If ($Length(pString, "+") > 1) {
+    Set tVer.Build = $Piece(pString, "+", 2)
+  }
   Quit tVer
 }
 
@@ -51,10 +52,10 @@ ClassMethod FromListBuild(pList As %List) As %ZPM.PackageManager.Core.SemanticVe
 	Quit tVer
 }
 
-ClassMethod IsValid(pString As %String) As %Status
+ClassMethod IsValid(pString As %String, ByRef pVersion As %ZPM.PackageManager.Core.SemanticVersion) As %Status
 {
-	Set tVer = ..FromString(pString)
-	Quit tVer.%ValidateObject()
+	Set pVersion = ..FromString(pString)
+	Quit pVersion.%ValidateObject()
 }
 
 /// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to 

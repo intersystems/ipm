@@ -84,7 +84,7 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %ZPM.PackageManag
 			Set tPatch = $Piece(tMajorMinorPatch,".",3)
 			
 			// Detect different expression cases
-			Set tIsXRange = (tExpr = "") && (tMajorMinorPatch [ "x") || (tExpr = "*") || (tMinor = "") || (tPatch = "")
+			Set tIsXRange = (tMajorMinorPatch [ "x") || (tExpr = "*") || (tMinor = "") || (tPatch = "")
 			Set tIsTildeRange = ($Extract(tExpr) = "~")
 			Set tIsCaretRange = ($Extract(tExpr) = "^")
 			
