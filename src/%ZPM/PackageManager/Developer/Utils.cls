@@ -274,6 +274,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				If $$$ISERR(tSC) {
 					Quit
 				}
+
+        If $Get(pParams("Install")),tInstModule.DeveloperMode {
+					Set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
+					Quit
+        }
 				
 				If tInstModule.Version.Follows(tModRef.Version) {
 					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tInstModule.Name,tInstModule.VersionString,pVersion))
@@ -983,7 +988,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
 		
-		If $Data(pParams("DeveloperMode"),tDeveloperMode) {
+		If 'tModule.Deployed,$Data(pParams("DeveloperMode"),tDeveloperMode) {
 			Set tModule.DeveloperMode = tDeveloperMode
 			Set tModule.Root = pDirectory
 			Set tSC = tModule.%Save()
@@ -991,6 +996,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		} Else {
 			Set tDeveloperMode = +tModule.DeveloperMode
 		}
+    Set pParams("DeveloperMode") = tDeveloperMode
 		
 		If (tDeveloperMode && tUseTransactions) {
 			// In developer mode, save the module manifest so we can fix it even if errors occur afterward.
@@ -1803,4 +1809,3 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 }
 
 }
-

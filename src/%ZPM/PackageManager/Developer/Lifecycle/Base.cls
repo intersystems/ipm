@@ -405,7 +405,11 @@ Method %Reload(ByRef pParams) As %Status
 		If (tModuleName '= $Piece(first,".",1,*-1)) {
 			Set tSC = $$$ERROR($$$GeneralError,"Module name mismatch.") Quit
 		}
-		
+
+		#; Reopen, usefull in Packaging deployed modules
+		Set ..Module = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleName,,.tSC)
+		$$$ThrowOnError(tSC)
+
 		// Set up mappings
 		Set tKey = ""
 		For {
@@ -456,7 +460,7 @@ Method %Reload(ByRef pParams) As %Status
 		
 		Set ..Module.DeveloperMode = tDeveloperMode
 		Set ..Module.Root = tRoot
-		Set tSC = ..Module.%Save() quit:$$$ISERR(tSC)
+		$$$ThrowOnError(..Module.%Save())
 		
 		Set tGlobalScope = ..Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
 		Set tAbsolutePrefix = $c($parameter("%ZPM.PackageManager.Developer.Extension.SourceControl.ISC","NOPREFIXCHARCODE"))
@@ -576,6 +580,7 @@ Method %Compile(ByRef pParams) As %Status
 					For {
 						Set tOneResourceKey = $Order(tOneResourceList(tOneResourceKey))
 						Quit:(tOneResourceKey="")
+            Continue:('tDevMode)&&($Get(tOneResourceList(tOneResourceKey, "Deploy")))
 						Set tCompileFlagMap(tFlags,tResource.Name,tOneResourceKey) = ""
 					}
 				}
@@ -635,7 +640,7 @@ Method %Compile(ByRef pParams) As %Status
 				}
 				
 				// Actually do the compile
-				If $Data(tCompileArray) {
+				If $Data(tCompileArray)>1 {
 					Set tCompiledSomething = 1
 					Set tStruct = $Select(tVerbose:"d",1:"-d")_$Select(tNoCompileLock:"-l",1:"")_tFlags
 					Set tSC = $System.OBJ.CompileList(.tCompileArray,.tStruct)
@@ -660,7 +665,7 @@ Method %Compile(ByRef pParams) As %Status
 			}
 			
 			// Cycle detection
-			If 'tCompiledSomething {
+			If 'tCompiledSomething,'..HasDeployedResources {
 				Set tFailedResources = ""
 				Set tResource = ""
 				For {
@@ -864,6 +869,17 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			}
 			$$$ThrowOnError(tSC)
 		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+Method %PrepareDeploy(ByRef pParams) As %Status [ Abstract ]
+{
+	Set tSC = $$$OK
+	Try {
+		// TODO: Implement
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -1282,17 +1298,17 @@ Method %MakeDeployed(ByRef pParams) As %Status
 	Try {
 		Set tDev = ..Module.DeveloperMode
 		Set tVerbose = $Get(pParams("Verbose"))
-		If tDev && tVerbose {
-			Write !,"Module is in developer mode; will only report what WOULD be deployed."
-		}
+		#; If tDev && tVerbose {
+		#; 	Write !,"Module is in developer mode; will only report what WOULD be deployed."
+		#; }
 		
 		// Default implementation: see which resources are expicitly flagged with Deploy = true.
 		// Build an array of those, then mark them as deployed.
-		Set tSC = ..Module.GetResolvedReferences(.tResourceArray,1,..PhaseList,1,.pDependencyGraph)
+		$$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,1,..PhaseList,1,.pDependencyGraph))
 		If $$$ISERR(tSC) {
 			Quit
 		}
-		
+
 		Set tResourceKey = ""
 		For {
 			Set tResourceKey = $Order(tResourceArray(tResourceKey))
@@ -1313,7 +1329,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 			
 			If tDeploy {
 				Set tName = $Piece(tResourceKey,".",1,*-1)
-				Set tExt = $Piece(tResourceKey,".",*)
+				Set tExt = $$$ucase($Piece(tResourceKey,".",*))
 				If (tExt = "CLS") {
 					Set tDeployClassArray($Piece(tResourceKey,".",1,*-1)) = ""
 				} ElseIf (tExt = "MAC") || (tExt = "INT") {
@@ -1330,24 +1346,31 @@ Method %MakeDeployed(ByRef pParams) As %Status
 			Set ..HasDeployedResources = 1
 			If (tVerbose) {
 				Set tClass = ""
-				Write !,"The following classes "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+				Write !,"The following classes are flagged for deployment:"
+				#; Write !,"The following classes "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
 				For {
 					Set tClass = $Order(tDeployClassArray(tClass))
 					Quit:tClass=""
 					Write !,$c(9),tClass
 				}
 			}
-			If 'tDev {
-				$$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
-			}
+			$$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
 		} ElseIf tVerbose {
 			Write !,"No classes to mark as deployed."
 		}
 		If $Data(tDeployRtnArray) {
 			Set ..HasDeployedResources = 1
+      Set ..Module.Deployed = 1
+      If '$IsObject(..Module.SystemRequirements) {
+        Set ..Module.SystemRequirements = ##class(%ZPM.PackageManager.Developer.SystemRequirements).%New()
+      }
+      Set tSystemVersion = $System.Version.GetMajor() _ "." _ $System.Version.GetMinor()
+      Set ..Module.SystemRequirements.VersionString = tSystemVersion
+      $$$ThrowOnError(..Module.%Save())
 			Set tRtn = ""
 			If (tVerbose) {
-				Write !,"The following routines "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+				Write !,"The following routines are flagged for deployment:"
+				#; Write !,"The following routines "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
 			}
 			For {
 				Set tRtn = $Order(tDeployRtnArray(tRtn))

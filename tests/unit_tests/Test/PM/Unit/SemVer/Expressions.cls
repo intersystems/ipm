@@ -71,6 +71,14 @@ Method TestEquivalenceCaretRanges()
 	Do ..AssertEquivalent("^0.x", ">=0.0.0 <1.0.0")
 }
 
+Method TestIRISVersions()
+{
+	Do ..AssertSatisfied("2022.2", "2022.2")
+	Do ..AssertNotSatisfied("2022.2", "2022.1")
+	Do ..AssertNotSatisfied("2022.2", "2022.3")
+	Do ..AssertNotSatisfied("2022.2", "2023.1")
+}
+
 Method AssertEquivalent(pVersionExpression1 As %String, pVersionExpression2 As %String, pVerbose As %Boolean = 0) As %Boolean [ Internal, Private ]
 {
 	Set tEquivalent = 0
@@ -112,7 +120,7 @@ Method AssertSatisfied(pVersionExpression As %String, pVersion As %String) As %B
 			Do $$$AssertStatusOK(tSC,"Error evaluating expression: '"_pVersionExpression_"'")
 			Quit
 		}
-		Set tSatisfied = $$$AssertTrue(tVersion.Satisfies(tVersionExpression),"'"_pVersion_"' satisfies expression '"_pVersionExpression_"'")
+		Set tSatisfied = $$$AssertTrue(tVersion.Satisfies(tVersionExpression),"'"_pVersion_"' satisfies expression '"_ tVersionExpression.ToResolvedString() _"'")
 	} Catch e {
 		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
 	}
@@ -129,7 +137,7 @@ Method AssertNotSatisfied(pVersionExpression As %String, pVersion As %String) As
 			Do $$$AssertStatusOK(tSC,"Error evaluating expression: '"_pVersionExpression_"'")
 			Quit
 		}
-		Set tUnsatisfied = $$$AssertNotTrue(tVersion.Satisfies(tVersionExpression),"'"_pVersion_"' does not satisfy expression '"_pVersionExpression_"'")
+		Set tUnsatisfied = $$$AssertNotTrue(tVersion.Satisfies(tVersionExpression),"'"_pVersion_"' does not satisfy expression '"_ tVersionExpression.ToResolvedString() _ "'")
 	} Catch e {
 		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
 	}

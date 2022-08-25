@@ -241,6 +241,9 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
 			}
 			Set tRequest.Location = path
 		}
+    If $Extract(tRequest.Location, *) '= "/" {
+      Set tRequest.Location = tRequest.Location _ "/"
+    }
     #; in case of redirection
     Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
     
