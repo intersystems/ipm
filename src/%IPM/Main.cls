@@ -2506,7 +2506,6 @@ ClassMethod Enable(ByRef pCommandInfo)
 	While (currentNS '="") {
 		// avoid %SYS and implicit namespaces
 		If (currentNS '= "%SYS") && ($ZCONVERT(currentNS, "U") = currentNS) {
-			New $Namespace
 			Set $Namespace = currentNS
 			If '$System.CLS.IsMthd("%IPM.Main", "Shell") {
 				Set namespacesWithoutIPM(currentNS) = 1
@@ -2514,7 +2513,6 @@ ClassMethod Enable(ByRef pCommandInfo)
 		}
 		Set currentNS = $ORDER(allNS(currentNS))
 	}
-	New $Namespace
 	Set $Namespace = baseNS
 	If globally {
 		Merge targetNamespaces = namespacesWithoutIPM
@@ -2547,7 +2545,6 @@ ClassMethod Enable(ByRef pCommandInfo)
 			Set manifest = packageService.GetModuleInstallerManifest(ipmRef)
 			Set currentNS=$ORDER(targetNamespaces(""))
 			While (currentNS '="") {
-				New $Namespace
 				Set $Namespace = currentNS
 				Do $SYSTEM.OBJ.LoadStream(manifest, "ck")
 				If 'quiet {
@@ -2562,7 +2559,6 @@ ClassMethod Enable(ByRef pCommandInfo)
 		Set targetIPMFileName = ipmLocalArray(targetVersion)
 		Set currentNS=$ORDER(targetNamespaces(""))
 		While (currentNS '="") {
-			New $Namespace
 			Set $Namespace = currentNS
 			Do $SYSTEM.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), "ck")
 			If 'quiet {
