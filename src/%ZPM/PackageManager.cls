@@ -389,6 +389,8 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <example description="Shows all modules in current registry">search -r</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
 <modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
+<modifier name="versions" dataAlias="AllVersions" dataValue="1" description="Shows all versions for each module." />
+
 <parameter name="searchString" description="Search string, * can be used" />
 <example description="Shows a description of all modules in the name of which there is a context">find -d *tools*</example>
 </command>
@@ -1170,11 +1172,12 @@ ClassMethod ProcessRunFromFile(ByRef pCommandInfo) [ Internal ]
 ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 {
 	Set tRepo = $Get(pCommandInfo("data","Repo"),0)
-	Set tDesc= $Get(pCommandInfo("data","Description"),0)
+	Set tDesc = $Get(pCommandInfo("data","Description"),0)
+	Set tAllVersions = $Get(pCommandInfo("data","AllVersions"),0)
 	Set tSearchString = $Get(pCommandInfo("parameters","searchString"),"")
 	Set tName = $$$GetModifier(pCommandInfo,"name")
 	If (tName '= "") {
-		Do ..ShowModulesForRepository(tName, tRepo, tDesc, tSearchString)
+		Do ..ShowModulesForRepository(tName, tRepo, tDesc, tSearchString, tAllVersions)
 	} Else {
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %ZPM_PackageManager_Client.ServerDefinition")
 		If (tRes.%SQLCODE < 0) {
@@ -1186,7 +1189,7 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 				Write !!
 			}
 			Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
-			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo, tDesc, tSearchString)
+			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo, tDesc, tSearchString, tAllVersions)
 		}
 		$$$ThrowOnError(tSC)
 	}
@@ -1355,7 +1358,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "") [ Private ]
+ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "", pShowAllVersions As %Boolean = 0) [ Private ]
 {
 	#define gn "^||tmpDesc"
 	Kill @$$$gn
@@ -1365,11 +1368,11 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	} Elseif pSearchString'="" { 
 		Set where=" WHERE name = ?"
 	}
-	Set tQuery = "SELECT Name,Version,Repository,Description FROM %ZPM_PackageManager_Developer.Utils_GetModuleList(?) "_where
+	Set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %ZPM_PackageManager_Developer.Utils_GetModuleList(?,?) "_where
 	If (pSearchString = "") {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName)
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
 	} Else {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName, $Replace(pSearchString,"*","%"))
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions, $Replace(pSearchString,"*","%"))
 	}
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
@@ -1378,7 +1381,7 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 		$$$ThrowOnError(tSC)
 		Set name = tRes.%Get("Name")
 		Set:($Length(name)>maxlenname) maxlenname = $Length(name)
-		Set @$$$gn@(name)=$Listbuild(tRes.%Get("Version"),tRes.%Get("Repository"),tRes.%Get("Description"))
+		Set @$$$gn@(name)=$Listbuild(tRes.%Get("Version"),tRes.%Get("Repository"),tRes.%Get("Description"),tRes.%Get("Origin"),tRes.%Get("AllVersions"))
 	}
 	$$$ThrowOnError(tSC)
 	Set name=""
@@ -1387,15 +1390,26 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 		Quit:name=""
 		Write !,$$$FormattedLine($$$Green,name)
 		Write ?(maxlenname+1), $Listget(@$$$gn@(name),1)
-		If ( ($Listget(@$$$gn@(name),3)'="") && (pShowDesc=1) ) {
-			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_$Listget(@$$$gn@(name),3))
+		Set x = 0
+		If ( ($Listget(@$$$gn@(name),4)'="") ) {
+			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Blue,"From: ")_$Listget(@$$$gn@(name),4))
+			Set x = 1
 		}
-		If ( ($Listget(@$$$gn@(name),3)'="") && ($Listget(@$$$gn@(name),2)'="") && (pShowDesc=1) && (pShowRepo=1) ) {
-			Write !
+		If ( ($Listget(@$$$gn@(name),3)'="") && (pShowDesc=1) ) {
+			Write:(x=1) !
+			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_$Listget(@$$$gn@(name),3))
+			Set x = 1
 		}
 		If ( ($Listget(@$$$gn@(name),2)'="") && (pShowRepo=1) ) {
-			Write ?(maxlenname+7),$$$FormattedLine($$$Blue,"Repository: "_$Listget(@$$$gn@(name),2))
-		}	
+			Write:(x=1) !
+			Write ?(maxlenname+7),$$$FormattedLine($$$Blue,"Repository: ")_$Listget(@$$$gn@(name),2)
+			Set x = 1
+		}
+		If ( ($Listget(@$$$gn@(name),5)'="") && (pShowAllVersions=1) ) {
+			Write:(x=1) !
+			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Blue,"Versions: ")_$Listget(@$$$gn@(name),5))
+			Set x = 1
+		}
 	}
 }
 
