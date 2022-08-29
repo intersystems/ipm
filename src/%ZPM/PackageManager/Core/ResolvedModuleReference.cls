@@ -20,6 +20,12 @@ Storage Default
 <Value name="5">
 <Value>Repository</Value>
 </Value>
+<Value name="6">
+<Value>AllVersions</Value>
+</Value>
+<Value name="7">
+<Value>Origin</Value>
+</Value>
 </Data>
 <State>ResolvedModuleReferenceState</State>
 <StreamLocation>^ZPM.PackageManager9CFF.ResolvedMod1E11S</StreamLocation>
