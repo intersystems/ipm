@@ -32,21 +32,30 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
   Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
   $$$ThrowOnError(tSC)
 
-  If name = "" {
-    Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/-/all"))
+  Set tURL = tRequest.Location_"packages/-/all"
+  If (name '= "") {
+    Set tURL = tRequest.Location_"packages/" _ name
   }
-  Else {
-    Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/" _ name))
-  }
+  Do tRequest.SetParam("allVersions", pSearchCriteria.AllVersions)
+
+  Set tSC = tRequest.Get($$$URLENCODE(tURL))
+  
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
     Set tRes = {}.%FromJSON(tRequest.HttpResponse.Data)
     If ('tRes.%IsA("%Library.DynamicArray")) {
       Set tRes = [].%Push(tRes)
     }
-    
+
     Set tIter = tRes.%GetIterator()
 
     While tIter.%GetNext(.key, .item) {
+      Set allVersionsString = ""
+      If (item.allVersions) {
+        Set tIterVer = item.allVersions.%GetIterator()
+        While tIterVer.%GetNext(.key, .version) {
+          Set allVersionsString = allVersionsString_$LB(version)
+        }
+      }
       Set tIterVer = item.versions.%GetIterator()
       WHILE tIterVer.%GetNext(.verkey, .version) {
         Set tVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(version)
@@ -56,6 +65,8 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
         Set tModRef.Repository = item.repository
         Set tModRef.VersionString = version
         Set tModRef.Description = item.description
+        Set tModRef.AllVersions = $ListToString(allVersionsString, ", ")
+        Set tModRef.Origin = item.origin
         Do tList.Insert(tModRef)
       }
     }
