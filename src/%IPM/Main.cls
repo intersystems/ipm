@@ -2469,6 +2469,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		If '$DATA(ipmLocalArray(version)) {
 			If localOnly {
 				$$$ThrowOnError($$$ERROR($$$GeneralError,"No ipm-"_version_".xml installer file is found in "_XMLDir_" locally."))
+			} ElseIf 'quiet {
+				Write !, "No ipm-"_version_".xml installer file is found in "_XMLDir_" locally. Trying to download from the registry."
 			}
 			// need to get from remote registry server
 			Set useLocal = 0
@@ -2556,7 +2558,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				If 'quiet {
 					Write !, "IPM enabled for namespace "_currentNS
 				}
-				Set currentNS = $ORDER(allNS(currentNS))
+				Set currentNS = $ORDER(targetNamespaces(currentNS))
 			}
 		} Else {
 			$$$ThrowOnError($$$ERROR($$$GeneralError,"Failed to get a valid registry server in order to download the IPM manifest."))
@@ -2570,7 +2572,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			If 'quiet {
 				Write !, "IPM enabled for namespace "_currentNS
 			}
-			Set currentNS = $ORDER(allNS(currentNS))
+			Set currentNS = $ORDER(targetNamespaces(currentNS))
 		}
 	}
 }
