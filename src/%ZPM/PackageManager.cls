@@ -1390,25 +1390,17 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 		Quit:name=""
 		Write !,$$$FormattedLine($$$Green,name)
 		Write ?(maxlenname+1), $Listget(@$$$gn@(name),1)
-		Set x = 0
 		If ( ($Listget(@$$$gn@(name),4)'="") ) {
-			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Blue,"From: ")_$Listget(@$$$gn@(name),4))
-			Set x = 1
-		}
+			Write ..DrawColumn($$$FormattedLine($$$Blue," Proxied from: ")_$Listget(@$$$gn@(name),4))
+		} 
 		If ( ($Listget(@$$$gn@(name),3)'="") && (pShowDesc=1) ) {
-			Write:(x=1) !
-			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_$Listget(@$$$gn@(name),3))
-			Set x = 1
+			Write !,?(maxlenname+1),..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_$Listget(@$$$gn@(name),3))
 		}
 		If ( ($Listget(@$$$gn@(name),2)'="") && (pShowRepo=1) ) {
-			Write:(x=1) !
-			Write ?(maxlenname+7),$$$FormattedLine($$$Blue,"Repository: ")_$Listget(@$$$gn@(name),2)
-			Set x = 1
+			Write !,?(maxlenname+1),$$$FormattedLine($$$Blue,"Repository: ")_$Listget(@$$$gn@(name),2)
 		}
 		If ( ($Listget(@$$$gn@(name),5)'="") && (pShowAllVersions=1) ) {
-			Write:(x=1) !
-			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Blue,"Versions: ")_$Listget(@$$$gn@(name),5))
-			Set x = 1
+			Write !,?(maxlenname+1),..DrawColumn($$$FormattedLine($$$Blue,"Versions: ")_$Listget(@$$$gn@(name),5))
 		}
 	}
 }
