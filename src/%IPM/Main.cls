@@ -2417,7 +2417,7 @@ $$$ENDTAG
 #; Need an extra line down here to avoid the end bracket being on the same line as $$$ENDTAG - a comment is just fine.
 }
 
-ClassMethod Enable(ByRef pCommandInfo)
+ClassMethod EnableIPM(ByRef pCommandInfo)
 {
 	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
 	Set globally = $$$HasModifier(pCommandInfo, "globally")
@@ -2428,8 +2428,11 @@ ClassMethod Enable(ByRef pCommandInfo)
 	Set targetVersion = "" 		// var to store the final version of IPM to be installed
 	Kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
 
-	// Get list of local IPM artifacts under /<instance install dir>/Mgr/IPM/
-	Set XMLDir = ##class(%File).NormalizeDirectory("IPM", ##class(%File).ManagerDirectory())
+	// Get list of local IPM artifacts under /<instance install dir>/lib/IPM/
+	Set XMLDir = $system.Util.InstallDirectory()
+	For subDirName = "lib", "IPM" {
+		Set XMLDir = ##class(%File).SubDirectoryName(XMLDir, subDirName)
+	}
   	Set statement = ##class(%SQL.Statement).%New()
   	Set sc = statement.%PrepareClassQuery("%File", "FileSet")
   	If $$$ISERR(sc) {
@@ -2438,7 +2441,7 @@ ClassMethod Enable(ByRef pCommandInfo)
 	}
 	// Valid IPM installation manifest should be of format: ipm-0.0.1.xml
 	Set resultSet = statement.%Execute(XMLDir, "ipm-*.xml")
-	If (resultSet.%SQLCODE '= 0) {
+	If ((resultSet.%SQLCODE '= 0) && '(resultSet.%Message [ "does not exist")) {
 		Write !, resultSet.%Message 
 		Quit
 	}
@@ -2465,7 +2468,7 @@ ClassMethod Enable(ByRef pCommandInfo)
 		Set targetVersion = version
 		If '$DATA(ipmLocalArray(version)) {
 			If localOnly {
-				$$$ThrowOnError($$$ERROR($$$GeneralError,"No ipm-"_version_".xml installer file is found locally."))
+				$$$ThrowOnError($$$ERROR($$$GeneralError,"No ipm-"_version_".xml installer file is found in "_XMLDir_" locally."))
 			}
 			// need to get from remote registry server
 			Set useLocal = 0
@@ -2473,6 +2476,9 @@ ClassMethod Enable(ByRef pCommandInfo)
 	} Else {
 		If quiet {
 			$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot install IPM in non-prompt mode without a specified IPM version."))
+		}
+		If (counter = 0) {
+			$$$ThrowOnError($$$ERROR($$$GeneralError,"No IPM version is found in "_XMLDir_" locally. Use version modifier to specify a version to download from the registry."))
 		}
 		// prompt user with local options
 		Set menuValue = 1
@@ -2520,7 +2526,7 @@ ClassMethod Enable(ByRef pCommandInfo)
 		Set specifiedNSs = $ListFromString(namespaces, ",")
 		Set ptr = 0
    		While $ListNext(specifiedNSs, ptr, value) {
-			If ('$DATA(namespaceWithoutIPM(value)) && 'quiet) {
+			If ('$DATA(namespacesWithoutIPM(value)) && 'quiet) {
 				Write !, value_" is either not a valid namespace to install IPM, or already has IPM installed. Skipped."
 			} Else {
 				Set targetNamespaces(value) = 1
