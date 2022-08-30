@@ -956,13 +956,16 @@ Method %Verify(ByRef pParams) As %Status
 	Set tSC = $$$OK
 	Try {
 		New $Namespace
-		Set tInitNS = $Namespace
+    Set tInitNS = $Select($Namespace="%SYS": "USER", 1: $Namespace)
 		Set tVerbose = $Get(pParams("Verbose"))
 		
 		If '$Get(pParams("Verify","InCurrentNamespace"),0) {
 			Set tMustCreate = 1
 			Set tMustLoad = 1
-			Set tNewNamespace = $Namespace_"-VERIFY"
+			Set tNewNamespace = tInitNS _ "-VERIFY"
+      If $Get(pParams("Verify", "PreDeleteNamespace")) {
+        Do ##class(%ZPM.PackageManager.Developer.Build).DeleteNamespace(tNewNamespace)
+      }
 			
 			If $Get(pParams("Verify","Reuse"),0) || $Get(pParams("Verify","SkipLoad"),0) {
 				Set tModuleExists = ##class(%ZPM.PackageManager.Developer.Utils).NamespaceHasModule(tNewNamespace,..Module.Name)

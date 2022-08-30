@@ -58,9 +58,11 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
         Set tModRef.VersionString = version
         Set tModRef.Description = item.description
         Set tModRef.Deployed = item.deployed
-        Set tIterPVer = item."platform_versions".%GetIterator()
-        While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
-          Do tModRef.PlatformVersions.Insert(platformVersion)
+        if $IsObject(item."platform_versions") {
+          Set tIterPVer = item."platform_versions".%GetIterator() 
+          While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
+            Do tModRef.PlatformVersions.Insert(platformVersion)
+          }
         }
         Do tList.Insert(tModRef)
       }
@@ -98,11 +100,11 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
       Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz")
-      do tFileBinStream.CopyFromAndSave(tRequest.HttpResponse.Data)      
+      do tFileBinStream.CopyFromAndSave(tRequest.HttpResponse.Data)
       If (tHash'="") {
         set tTestHash = $$$lcase(##class(%File).SHA1Hash(tFileBinStream.Filename, 1)) 
         if tTestHash'=tHash {
-          $$$ThrowStatus($$$ERROR($$$GeneralError, "Download module, hash mismatch."))
+          $$$ThrowStatus($$$ERROR($$$GeneralError, "Download module, hash mismatch. " _ tTestHash))
         }
       }
       Set token = tRequest.HttpResponse.GetHeader("INSTALLTOKEN")
@@ -112,7 +114,7 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
     }
   }
   If tFileBinStream="" {
-    $$$ThrowStatus($$$ERROR($$$GeneralError,"Download module, something went wrong."))
+    $$$ThrowStatus($$$ERROR($$$GeneralError,"Download module '" _ name _ "@" _ version _ "', something went wrong (StatusCode: " _ tRequest.HttpResponse.StatusCode _ ")." ))
   }
   Quit tFileBinStream
 }

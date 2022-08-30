@@ -725,7 +725,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					Set tDepth = $Select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
 					
 					If (pPass = $$$EXACT) {	
-						Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth,tQualifiedReference.ServerName,tModule.VersionString)
+						Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth, tQualifiedReference.ServerName, tModule.VersionString, tQualifiedReference.Deployed, tQualifiedReference.PlatformVersion)
 						Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
 						Set pSubModules(tDepth,tDep.Name) = tModule
 						Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
