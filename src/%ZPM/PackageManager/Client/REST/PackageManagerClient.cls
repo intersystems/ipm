@@ -32,12 +32,13 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
   Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
   $$$ThrowOnError(tSC)
 
-  If name = "" {
-    Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/-/all"))
+  Set tURL = tRequest.Location_"packages/-/all"
+  If (name '= "") {
+    Set tURL = tRequest.Location_"packages/" _ name
   }
-  Else {
-    Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/" _ name))
-  }
+
+  Set tSC = tRequest.Get($$$URLENCODE(tURL))
+
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
     Set tRes = {}.%FromJSON(tRequest.HttpResponse.Data)
     If ('tRes.%IsA("%Library.DynamicArray")) {
@@ -56,6 +57,13 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
         Set tModRef.Repository = item.repository
         Set tModRef.VersionString = version
         Set tModRef.Description = item.description
+        Set tModRef.Deployed = item.deployed
+        if $IsObject(item."platform_versions") {
+          Set tIterPVer = item."platform_versions".%GetIterator() 
+          While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
+            Do tModRef.PlatformVersions.Insert(platformVersion)
+          }
+        }
         Do tList.Insert(tModRef)
       }
     }
@@ -72,8 +80,13 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
 
   Set name = pModuleReference.Name
   Set version = pModuleReference.VersionString
+  Set deployed = pModuleReference.Deployed
 
-  Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"packages/" _ name _ "/" _ version))
+  If deployed {
+    Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
+  }
+
+  Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location _ "packages/" _ name _ "/" _ version _ $Select(deployed: "/" _ platformVersion, 1: "")))
   Set tPackageUrl = ""
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
     Set tRes = {}.%FromJSON(tRequest.HttpResponse.Data)
@@ -81,25 +94,17 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
     Set tPackageUrl = tRes.url
     Set tHash = tRes.hash
 
-    #; why it's needed here?
-    #; 
-    #; Do ##class(%Net.URLParser).Parse(tPackageUrl,.tComponents)
-    #; If ($Data(tComponents("path"))#2) {
-    #;   If ($Extract(tComponents("path"),1,1)="/") {
-    #;       Set path = $Extract(tComponents("path"),2,*)	
-    #;   }
-    #; }
     Set tRequest = ..GetHttpRequest()
     Set tRequest.Timeout = 300
     Set tSC = tRequest.Get(tPackageUrl)
     If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
       Set tFileBinStream = ##class(%Stream.FileBinary).%New()
       Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz")
-      do tFileBinStream.CopyFromAndSave(tRequest.HttpResponse.Data)      
+      do tFileBinStream.CopyFromAndSave(tRequest.HttpResponse.Data)
       If (tHash'="") {
         set tTestHash = $$$lcase(##class(%File).SHA1Hash(tFileBinStream.Filename, 1)) 
         if tTestHash'=tHash {
-          $$$ThrowStatus($$$ERROR($$$GeneralError, "Download module, hash mismatch."))
+          $$$ThrowStatus($$$ERROR($$$GeneralError, "Download module, hash mismatch. " _ tTestHash))
         }
       }
       Set token = tRequest.HttpResponse.GetHeader("INSTALLTOKEN")
@@ -109,7 +114,7 @@ Method GetModule(pModuleReference As %ZPM.PackageManager.Core.ResolvedModuleRefe
     }
   }
   If tFileBinStream="" {
-    $$$ThrowStatus($$$ERROR($$$GeneralError,"Download module, something went wrong."))
+    $$$ThrowStatus($$$ERROR($$$GeneralError,"Download module '" _ name _ "@" _ version _ "', something went wrong (StatusCode: " _ tRequest.HttpResponse.StatusCode _ ")." ))
   }
   Quit tFileBinStream
 }
@@ -241,6 +246,9 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
 			}
 			Set tRequest.Location = path
 		}
+    If $Extract(tRequest.Location, *) '= "/" {
+      Set tRequest.Location = tRequest.Location _ "/"
+    }
     #; in case of redirection
     Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
     

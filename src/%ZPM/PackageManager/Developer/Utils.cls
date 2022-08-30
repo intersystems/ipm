@@ -58,7 +58,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 				Set pParams("Multicompile","ModuleContext",tModuleName) = $ListBuild("Activate")
 				
 				// Invert dependency graph, subscripts (<module>,<depends on>)
-				Set tInvertedDependencyGraph(tModuleName) = $List(tData,2,3)
+				Set tInvertedDependencyGraph(tModuleName) = $List(tData,2,*)
 				
 				Set tDependentKey = ""
 				For {
@@ -112,7 +112,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 			}
 			// If no uninstalled dependencies remain...
 			If 'tHasUninstalledDependency {
-				Set $ListBuild(tServerName,tVersion) = tData
+				Set $ListBuild(tServerName, tVersion, tDeployed, tPlatformVersion) = tData
 				ZKill $$$ZPMTempLoadGraph(tCacheTempIndex,tModuleName)
 				
 				// Missing server name indicates that it's already present locally; nothing to do in that case.
@@ -123,7 +123,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 					Set tSC = pWorkQueue.QueueCallback(
 						"##class("_$classname()_").LoadModuleReference",
 						"##class("_$classname()_").LoadCompleted",
-						tServerName,tModuleName,tVersion,.pParams,.pDependencyGraph)
+						tServerName, tModuleName, tVersion, $Get(tDeployed), $Get(tPlatformVersion), .pParams, .pDependencyGraph)
 					$$$ThrowOnError(tSC)
 				} Else {
 					// Remove this module from dependencies.
@@ -167,7 +167,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 
 /// Intended to be invoked only as a work queue callback (so %status and %workqueue will be defined)
 /// Signature must match <method>LoadModuleReference</method> per work queue manager conventions.
-ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
+ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %String, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
@@ -207,22 +207,22 @@ ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersi
 
 ClassMethod LoadQualifiedReference(pReference As %ZPM.PackageManager.Core.QualifiedModuleReference, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		#dim tReference As %ZPM.PackageManager.Core.QualifiedModuleReference
-		Set tReference = pReference.%ConstructClone()
-		If (tReference.ServerName = "") && ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonExists(1,.tID) {
-			Set tServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).%OpenId(tID)
-			Set tReference.ServerName = tServer.Name
-		}
-		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, .pParams, .pDependencyGraph)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+  Set tSC = $$$OK
+  Try {
+    #dim tReference As %ZPM.PackageManager.Core.QualifiedModuleReference
+    Set tReference = pReference.%ConstructClone()
+    If (tReference.ServerName = "") && ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonExists(1,.tID) {
+      Set tServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).%OpenId(tID)
+      Set tReference.ServerName = tServer.Name
+    }
+    Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph)
+  } Catch e {
+    Set tSC = e.AsStatus()
+  }
+  Quit tSC
 }
 
-ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
+ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %Boolean, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
@@ -266,6 +266,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
+		Set tModRef.Deployed = pDeployed
 		
 		// Make sure we're not downgrading.
 		If '$Get(pParams("PermitDowngrade")) {
@@ -274,6 +275,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				If $$$ISERR(tSC) {
 					Quit
 				}
+
+        If $Get(pParams("Install")),tInstModule.DeveloperMode {
+					Set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
+					Quit
+        }
 				
 				If tInstModule.Version.Follows(tModRef.Version) {
 					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tInstModule.Name,tInstModule.VersionString,pVersion))
@@ -983,7 +989,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
 		
-		If $Data(pParams("DeveloperMode"),tDeveloperMode) {
+		If 'tModule.Deployed,$Data(pParams("DeveloperMode"),tDeveloperMode) {
 			Set tModule.DeveloperMode = tDeveloperMode
 			Set tModule.Root = pDirectory
 			Set tSC = tModule.%Save()
@@ -991,6 +997,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		} Else {
 			Set tDeveloperMode = +tModule.DeveloperMode
 		}
+    Set pParams("DeveloperMode") = tDeveloperMode
 		
 		If (tDeveloperMode && tUseTransactions) {
 			// In developer mode, save the module manifest so we can fix it even if errors occur afterward.
@@ -1803,4 +1810,3 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 }
 
 }
-

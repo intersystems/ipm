@@ -88,6 +88,12 @@ Storage Default
 <Value name="11">
 <Value>Repository</Value>
 </Value>
+<Value name="12">
+<Value>Deployed</Value>
+</Value>
+<Value name="13">
+<Value>PlatformVersion</Value>
+</Value>
 </Data>
 <DataLocation>^%ZPM.Server.ApplicationD</DataLocation>
 <DefaultData>ApplicationDefaultData</DefaultData>

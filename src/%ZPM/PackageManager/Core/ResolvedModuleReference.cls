@@ -2,6 +2,8 @@
 Class %ZPM.PackageManager.Core.ResolvedModuleReference Extends (%SerialObject, %ZPM.PackageManager.Core.ModuleInfo) [ StorageStrategy = "" ]
 {
 
+Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
+
 Storage Default
 {
 <Data name="ResolvedModuleReferenceState">
@@ -19,6 +21,15 @@ Storage Default
 </Value>
 <Value name="5">
 <Value>Repository</Value>
+</Value>
+<Value name="6">
+<Value>Deployed</Value>
+</Value>
+<Value name="7">
+<Value>PlatformVersion</Value>
+</Value>
+<Value name="8">
+<Value>PlatformVersions</Value>
 </Value>
 </Data>
 <State>ResolvedModuleReferenceState</State>
