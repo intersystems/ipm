@@ -1119,6 +1119,12 @@ Method %Publish(ByRef pParams) As %Status
 			Quit
 		}
 		Set tModule.VersionString = ..Module.VersionString
+    If (..Module.Deployed) {
+      Set tModule.Deployed = 1
+      If $IsObject(..Module.SystemRequirements) {
+        Set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
+      }
+    }
 		Set tSC = ..Module.XMLExportToStream(tModule.Manifest)
 		If $$$ISERR(tSC) {
 			Quit

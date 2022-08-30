@@ -207,23 +207,12 @@ ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersi
 
 ClassMethod LoadQualifiedReference(pReference As %ZPM.PackageManager.Core.QualifiedModuleReference, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		#dim tReference As %ZPM.PackageManager.Core.QualifiedModuleReference
-		Set tReference = pReference.%ConstructClone()
-		If (tReference.ServerName = "") && ##class(%ZPM.PackageManager.Client.LocalServerDefinition).SingletonExists(1,.tID) {
-			Set tServer = ##class(%ZPM.PackageManager.Client.LocalServerDefinition).%OpenId(tID)
-			Set tReference.ServerName = tServer.Name
-		}
-		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, .pParams, .pDependencyGraph)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
+  Set pServerName = pReference.ServerName
+  Set pModuleName = pReference.Name
+  Set pVersion = pReference.VersionString
+  Set pDeployed = pReference.Deployed
+  Set pPlatformVersion = pReference.PlatformVersion
 
-ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
-{
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
 	#dim tExpression As %ZPM.PackageManager.Core.SemanticVersionExpression
@@ -266,6 +255,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		Set tModRef = ##class(%ZPM.PackageManager.Core.ResolvedModuleReference).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
+		Set tModRef.Deployed = pDeployed
 		
 		// Make sure we're not downgrading.
 		If '$Get(pParams("PermitDowngrade")) {

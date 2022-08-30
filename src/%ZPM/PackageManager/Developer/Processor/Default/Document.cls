@@ -246,7 +246,8 @@ Method OnExportDeployedItem(pFullExportPath As %String, pItemName As %String, By
 
     }
     $$$ThrowOnError(##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullExportPath)))
-    $$$ThrowOnError($System.OBJ.Export(.list, tFullExportPath))
+    Set flags = $Select(tVerbose: "d", 1: "-d")
+    $$$ThrowOnError($System.OBJ.Export(.list, tFullExportPath, flags))
 
     Set pItemHandled = 1
   }

@@ -1505,7 +1505,14 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 			Do ##class(%ZPM.PackageManager.Developer.Lifecycle.Abstract).GetDefaultParameters(.tParams)
 			Merge tParams = pCommandInfo("data")
 			Set tParams("Install") = 1
-			$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadModuleReference(tResult.ServerName,tResult.Name,tResult.VersionString,.tParams))
+      If tResult.Deployed {
+        Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
+        Set tResult.PlatformVersion = platformVersion
+        If ('tResult.PlatformVersions.Find(platformVersion)) {
+          $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
+        }
+      }
+			$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadQualifiedReference(tResult, .tParams))
 		}
 	} Else {
 		Set tPrefix = ""

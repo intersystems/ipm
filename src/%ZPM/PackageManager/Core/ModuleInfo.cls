@@ -16,6 +16,11 @@ Property Version As %ZPM.PackageManager.Core.SemanticVersion(%JSONINCLUDE = "NON
 
 Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLNAME = "Version") [ Required ];
 
+Property Deployed As %Boolean(%JSONFIELDNAME = "deployed", XMLNAME = "Deployed");
+
+/// Version of IRIS for Deployed modules
+Property PlatformVersion As %String(%JSONFIELDNAME = "platform_version", MAXLEN = 10, XMLNAME = "PlatformVersion");
+
 /// The repository from which this module was loaded.
 /// Is "" if the module was loaded using the load command (i.e. directly from a file and not from a repository).
 Property Repository As %String(MAXLEN = "", XMLPROJECTION = "NONE");
