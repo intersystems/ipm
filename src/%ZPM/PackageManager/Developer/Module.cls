@@ -1523,6 +1523,9 @@ Storage Default
 <Value name="22">
 <Value>Deployed</Value>
 </Value>
+<Value name="23">
+<Value>PlatformVersion</Value>
+</Value>
 </Data>
 <DataLocation>^ZPM.Dev.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
