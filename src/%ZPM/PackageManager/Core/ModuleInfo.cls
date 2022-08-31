@@ -14,6 +14,10 @@ Property Description As %String(%JSONFIELDNAME = "description", MAXLEN = 1000);
 
 Property Version As %ZPM.PackageManager.Core.SemanticVersion(%JSONINCLUDE = "NONE", XMLPROJECTION = "NONE") [ Required ];
 
+Property AllVersions As %String;
+
+Property Origin As %String;
+
 Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLNAME = "Version") [ Required ];
 
 Property Deployed As %Boolean(%JSONFIELDNAME = "deployed", XMLNAME = "Deployed");

@@ -1521,9 +1521,15 @@ Storage Default
 <Value>AfterInstallMessage</Value>
 </Value>
 <Value name="22">
-<Value>Deployed</Value>
+<Value>AllVersions</Value>
 </Value>
 <Value name="23">
+<Value>Origin</Value>
+</Value>
+<Value name="24">
+<Value>Deployed</Value>
+</Value>
+<Value name="25">
 <Value>PlatformVersion</Value>
 </Value>
 </Data>

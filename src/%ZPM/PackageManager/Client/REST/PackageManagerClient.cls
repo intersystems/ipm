@@ -36,18 +36,26 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
   If (name '= "") {
     Set tURL = tRequest.Location_"packages/" _ name
   }
+  Do tRequest.SetParam("allVersions", pSearchCriteria.AllVersions)
 
   Set tSC = tRequest.Get($$$URLENCODE(tURL))
-
+  
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
     Set tRes = {}.%FromJSON(tRequest.HttpResponse.Data)
     If ('tRes.%IsA("%Library.DynamicArray")) {
       Set tRes = [].%Push(tRes)
     }
-    
+
     Set tIter = tRes.%GetIterator()
 
     While tIter.%GetNext(.key, .item) {
+      Set allVersionsString = ""
+      If (item.allVersions) {
+        Set tIterVer = item.allVersions.%GetIterator()
+        While tIterVer.%GetNext(.key, .version) {
+          Set allVersionsString = allVersionsString_$LB(version)
+        }
+      }
       Set tIterVer = item.versions.%GetIterator()
       WHILE tIterVer.%GetNext(.verkey, .version) {
         Set tVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(version)
@@ -64,6 +72,8 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
             Do tModRef.PlatformVersions.Insert(platformVersion)
           }
         }
+        Set tModRef.AllVersions = $ListToString(allVersionsString, ", ")
+        Set tModRef.Origin = item.origin
         Do tList.Insert(tModRef)
       }
     }

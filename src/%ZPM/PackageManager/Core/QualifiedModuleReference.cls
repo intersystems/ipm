@@ -42,13 +42,19 @@ Storage Default
 <Value>Description</Value>
 </Value>
 <Value name="7">
-<Value>PlatformVersion</Value>
+<Value>AllVersions</Value>
 </Value>
 <Value name="8">
-<Value>PlatformVersions</Value>
+<Value>Origin</Value>
 </Value>
 <Value name="9">
 <Value>Deployed</Value>
+</Value>
+<Value name="10">
+<Value>PlatformVersion</Value>
+</Value>
+<Value name="11">
+<Value>PlatformVersions</Value>
 </Value>
 </Data>
 <Type>%Storage.Serial</Type>
