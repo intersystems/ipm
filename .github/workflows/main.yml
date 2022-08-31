@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        version: [previous, latest, preview]
+        version: [previous, latest]
         platform: [common, health]
     runs-on: ubuntu-latest
     steps:
