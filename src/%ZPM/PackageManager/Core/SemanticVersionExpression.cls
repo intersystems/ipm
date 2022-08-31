@@ -5,9 +5,9 @@ Property Options As list Of %ZPM.PackageManager.Core.SemVer.Range;
 
 Property Expression As %String(MAXLEN = "");
 
-Method %OnNew(pRangeExpr As %String) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pRangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
 {
-	Set i%Expression = $Get(pRangeExpr)
+	Set i%Expression = pRangeExpr
 	Quit $$$OK
 }
 

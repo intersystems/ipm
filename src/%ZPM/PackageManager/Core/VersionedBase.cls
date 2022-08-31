@@ -40,6 +40,7 @@ ClassMethod CloneFrom(pSource As %ZPM.PackageManager.Core.VersionedBase) As %ZPM
 	Set tInst = ..%New()
 	Set tInst.Name = pSource.Name
 	Set tInst.Version = pSource.Version
+	Set tInst.PlatformVersion = pSource.PlatformVersion
 	Set tInst.Manifest = pSource.Manifest.%ConstructClone()
 	Set tInst.Payload = pSource.Payload.%ConstructClone()
 	Quit tInst

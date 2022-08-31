@@ -14,6 +14,8 @@ Method %OnNew(pServerName As %String = "", pResolvedReference As %ZPM.PackageMan
 	If (pResolvedReference '= "") {
 		Set ..Name = pResolvedReference.Name
 		Set ..Version = pResolvedReference.Version
+		Set ..Deployed = pResolvedReference.Deployed
+		Set ..PlatformVersions = pResolvedReference.PlatformVersions
 	}
 	Quit $$$OK
 }
@@ -40,10 +42,19 @@ Storage Default
 <Value>Description</Value>
 </Value>
 <Value name="7">
-<Value>Origin</Value>
+<Value>AllVersions</Value>
 </Value>
 <Value name="8">
-<Value>AllVersions</Value>
+<Value>Origin</Value>
+</Value>
+<Value name="9">
+<Value>Deployed</Value>
+</Value>
+<Value name="10">
+<Value>PlatformVersion</Value>
+</Value>
+<Value name="11">
+<Value>PlatformVersions</Value>
 </Value>
 </Data>
 <Type>%Storage.Serial</Type>

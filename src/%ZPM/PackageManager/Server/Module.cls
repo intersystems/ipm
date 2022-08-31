@@ -94,6 +94,12 @@ Storage Default
 <Value name="13">
 <Value>Origin</Value>
 </Value>
+<Value name="14">
+<Value>Deployed</Value>
+</Value>
+<Value name="15">
+<Value>PlatformVersion</Value>
+</Value>
 </Data>
 <DataLocation>^ZPM.Server.ModuleD</DataLocation>
 <DefaultData>PackageDefaultData</DefaultData>
