@@ -12,14 +12,13 @@ on:
 env:
   PREVIOUS: 2021.2.0.651.0
   LATEST: 2022.1.0.209.0
-  # PREVIEW: 2022.2.0.270.0
+  PREVIEW: 2022.2.0.311.0
 jobs:
   build:
     timeout-minutes: 20
     strategy:
       matrix:
-        version: [previous, latest]
-        # version: [latest, preview]
+        version: [previous, latest, preview]
         platform: [common, health]
     runs-on: ubuntu-latest
     steps:
@@ -39,6 +38,10 @@ jobs:
           [ '${{ matrix.version }}' == 'latest' ] && VERSION=${{ env.LATEST }}
           [ '${{ matrix.version }}' == 'preview' ] && VERSION=${{ env.PREVIEW }}
           echo ::set-output name=name::${IMAGE}:${VERSION}
+          FLAGS=
+          [[ $VERSION == 2021.* ]] && FLAGS=' --check-caps false'
+          [[ $VERSION == 2022.1.* ]] && FLAGS=' --check-caps false'
+          echo ::set-output name=flags::${FLAGS}
       - name: Setup version
         id: version
         run: |
@@ -82,7 +85,7 @@ jobs:
             -e TEST_REGISTRY_USER=admin \
             -e TEST_REGISTRY_PASSWORD=SYS \
             -v `pwd`:/home/irisowner/zpm/ \
-            zpm --check-caps false
+            zpm ${{ steps.image.outputs.flags }}
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -109,7 +112,7 @@ jobs:
       - name: Test and publish to temporary registry
         timeout-minutes: 15
         run: |
-          docker run --network zpm -d --rm -v `pwd`:/home/irisowner/zpm/ zpm --check-caps false
+          docker run --network zpm -d --rm -v `pwd`:/home/irisowner/zpm/ zpm ${{ steps.image.outputs.flags }}
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -131,7 +134,7 @@ jobs:
           curl http://localhost:52773/registry/packages/-/all | jq
           curl http://localhost:52773/registry/packages/zpm/ | jq
           wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} --check-caps false
+          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -152,7 +155,7 @@ jobs:
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} --check-caps false
+          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
@@ -212,7 +215,7 @@ jobs:
         if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
         run: |
           [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
-            docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm --check-caps false
+            docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm ${{ steps.image.outputs.flags }}
             CONTAINER=`docker ps -lq`
             sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
             /bin/echo -e '' \
