@@ -1494,6 +1494,12 @@ Storage Default
 <Value name="21">
 <Value>AfterInstallMessage</Value>
 </Value>
+<Value name="22">
+<Value>AllVersions</Value>
+</Value>
+<Value name="23">
+<Value>Origin</Value>
+</Value>
 </Data>
 <DataLocation>^ZPM.Dev.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
@@ -1504,4 +1510,3 @@ Storage Default
 }
 
 }
-

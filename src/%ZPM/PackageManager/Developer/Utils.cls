@@ -834,11 +834,11 @@ ClassMethod UninstallAll(pForce As %Boolean, ByRef pParams) As %Status
 	Quit tSC
 }
 
-Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String") [ SqlProc ]
+Query GetModuleList(pServer As %String, pShowAllVersions As %Boolean) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,Origin:%String,AllVersions:%String") [ SqlProc ]
 {
 }
 
-ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String) As %Status
+ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String, pShowAllVersions As %Boolean) As %Status
 {
 	If (pServer = "") {
 		Set qHandle = ""
@@ -856,10 +856,11 @@ ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String) A
 			Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
 			Set tSearchCriteria.IncludePrerelease = tServer.Prereleases
 			Set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
+			Set tSearchCriteria.AllVersions = pShowAllVersions
 			Set tList = tClient.ListModules(tSearchCriteria)
 			For i=1:1:tList.Count() {
 				Set tMod = tList.GetAt(i)
-				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description)
+				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
 			}
 		}
 		
@@ -1803,4 +1804,3 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 }
 
 }
-

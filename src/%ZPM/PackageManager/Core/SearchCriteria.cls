@@ -19,6 +19,8 @@ Property IncludeSnapshots As %Boolean;
 
 Property Keywords As list Of %String;
 
+Property AllVersions As %Boolean;
+
 Method KeywordsSet(%value) As %Status
 {
 	If $IsObject(%value) {
