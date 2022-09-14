@@ -70,7 +70,7 @@ ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary
 		}
 		Quit ""
 	}
-	Set tExtension = $Piece(pResourceName,".",*)
+	Set tExtension = $$$ucase($Piece(pResourceName,".",*))
 	Set tShortName = $Case(tExtension,
 		"PKG":"Package",
 		"CLS":"Class",

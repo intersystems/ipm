@@ -7,10 +7,6 @@ Parameter DESCRIPTION As STRING = "Standard resource processor for routines.";
 /// May be set to determine the value of <property>Extension</property> based on a static value rather than based on the resource name.
 Parameter EXTENSION = "MAC";
 
-/// Characters in the filename to use as the associator in $translate when determining the resource's filename on disk
-/// The default behavior is to replace "." with "/" and change "%" to "_"
-Property FilenameTranslateAssociator As %String [ InitialExpression = "/_" ];
-
 /// Directory relative to module root containing the exported resource.
 /// Defaults to the resource's extension (lower-case) if unspecified.
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "mac" ];

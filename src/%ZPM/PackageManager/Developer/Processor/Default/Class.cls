@@ -4,8 +4,12 @@ Class %ZPM.PackageManager.Developer.Processor.Default.Class Extends %ZPM.Package
 /// Description of resource processor class (shown in UI)
 Parameter DESCRIPTION As STRING = "Standard resource processor for class definitions.";
 
+Parameter EXTENSION = "CLS";
+
 /// Export format
 Property Format As %String(VALUELIST = ",UDL,XML");
+
+Property FilenameExtension As %String [ InitialExpression = "cls" ];
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
@@ -30,6 +34,9 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
+  If $ListFind($ListBuild("BPL","DTL"), $$$ucase($Piece(pItemName, ".", *))) {
+    Set $Piece(pItemName, ".", *) = "cls"
+  }
 	If (..Format = "") {
 		Set ..Format = $Case(..FilenameExtension,"cls":"UDL",:"XML")
 	}
