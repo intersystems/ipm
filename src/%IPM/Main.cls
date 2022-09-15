@@ -2609,7 +2609,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				}
 				New $Namespace
 				Set $Namespace = currentNS
-				Do $SYSTEM.OBJ.LoadStream(manifest, "ck")
+				Do $SYSTEM.OBJ.LoadStream(manifest, "ckd")
 				Write !, "IPM enabled for namespace "_currentNS
 			}
 		} Else {
