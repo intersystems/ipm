@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.Repo.Remote.PackageService Extends (%RegisteredObject, %IPM.Repo.IPackageService)
 {
 
@@ -18,6 +20,14 @@ Method GetInfo(url As %String) As %DynamicObject
   }
 
 	$$$ThrowStatus($$$ERROR($$$GeneralError,"Registry server not available."))
+}
+
+Method GetLatestIPMVersion() As %String
+{
+	Set jsonStream = ..GetModuleData($$$IPMModuleName)
+	Set versions = {}.%FromJSON(jsonStream)
+	Set latestVersion = versions.versions.%Pop()
+	Return latestVersion
 }
 
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")

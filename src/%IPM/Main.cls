@@ -586,10 +586,11 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 			Enable IPM in other namespaces.
 		</summary>
 		<!-- Modifiers -->
-		<modifier name="version" aliases="v" value="true" description="Specific version of IPM to be installed. Must specify if quiet flag is set."/>
+		<modifier name="version" aliases="v" value="true" description="A special version of IPM can be provided. If not specified, the latest version from the registry will be installed (hence is not required if quiet flag is set)."/>
 		<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM needs to be enabled."/>
 		<modifier name="globally" description="Will install IPM in all non-%SYS explicit namespaces that currently do not have IPM installed."/>
 		<modifier name="local-only" description="If specified, only local artifacts will be used for installation." />
+		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version." />
 		<modifier name="quiet" aliases="q" description="Non-terminal prompt mode." />
 		<!-- Examples -->
 		<example description="Install IPM version 0.3.4 in non-prompt mode in namespaces: NS1, NS2, NS3.">
@@ -600,6 +601,9 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		</example>
 		<example description="User wants to get the latest version of IPM from the registry server, and install it in all non-%SYS explicit namespaces.">
 			enable -v latest -globally
+		</example>
+		<example description="Install or upgrade IPM to latest IPM version in namespaces: NS1, NS2, NS3.">
+			enable -v latest -allow-upgrade NS1,NS2,NS3
 		</example>
 	</command>
 
@@ -863,7 +867,7 @@ ClassMethod DrawColumn(desc) As %String
 }
 
 /// Get List Modules
-/// example d ##class(%IPM.Main).GetListModules("zpm",.list)
+/// example d ##class(%IPM.Main).GetListModules($$$IPMModuleName,.list)
 ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
 {
 	Set tQuery = "select Name,VersionString,Description,ExternalName from %IPM_Storage.ModuleItem"
@@ -1005,18 +1009,18 @@ ClassMethod GetDefaultCommandRegistry()
 ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
 	
-	Do ..GetListModules("zpm",.list)
-	If $Data(list("zpm")) {
-			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,"zpm ")_$ListGet(list("zpm"),1)
+	Do ..GetListModules($$$IPMModuleName,.list)
+	If $Data(list($$$IPMModuleName)) {
+			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_$ListGet(list($$$IPMModuleName),1)
 	}
 
 	Kill list
 	Set tRegInstalled = 0
 
-	Do ..GetListModules("zpm",.list)
-	If $Data(list("zpm-registry")) {
+	Do ..GetListModules($$$IPMModuleName,.list)
+	If $Data(list($$$IPMServerRegistryModuleName)) {
 		Set tRegInstalled = 1
-		Write !,$$$FormattedLine($$$Green,"zpm-registry ")_$ListGet(list("zpm-registry"),1)
+		Write !,$$$FormattedLine($$$Green,$$$IPMServerRegistryModuleName_" ")_$ListGet(list($$$IPMServerRegistryModuleName),1)
 		Do ..GetDefaultCommandRegistry()
 	}
 	
@@ -2423,17 +2427,18 @@ $$$ENDTAG
 ClassMethod EnableIPM(ByRef pCommandInfo)
 {
 	Write !, "Version of IPM in current namespace: "
-	Do ..GetListModules("zpm",.list)
-	If $Data(list("zpm")) {
-			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,"zpm ")_$ListGet(list("zpm"),1)
+	Do ..GetListModules($$$IPMModuleName,.list)
+	If $Data(list($$$IPMModuleName)) {
+			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_$ListGet(list($$$IPMModuleName),1)
 	}
 	Kill list
 
 	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
 	Set globally = $$$HasModifier(pCommandInfo, "globally")
-	Set localOnly = $$$HasModifier(pCommandInfo, "localOnly")
+	Set localOnly = $$$HasModifier(pCommandInfo, "local-only")
 	Set version = $$$GetModifier(pCommandInfo, "version")
 	Set namespaces = $$$GetModifier(pCommandInfo, "namespaces")
+	Set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
 	Set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
 	Set targetVersion = "" 		// var to store the final version of IPM to be installed
 	Kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
@@ -2447,22 +2452,18 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	}
 
 
-	// Get list of local IPM artifacts under /<instance install dir>/lib/ipm/
+	// 1. Get list of local IPM artifacts under /<instance install dir>/lib/ipm/
 	Set XMLDir = $system.Util.InstallDirectory()
 	For subDirName = "lib", "ipm" {
 		Set XMLDir = ##class(%File).SubDirectoryName(XMLDir, subDirName)
 	}
   	Set statement = ##class(%SQL.Statement).%New()
   	Set sc = statement.%PrepareClassQuery("%File", "FileSet")
-  	If $$$ISERR(sc) {
-		Do $SYSTEM.Status.DisplayError(sc)
-		Quit
-	}
+  	$$$ThrowOnError(sc)
 	// Valid IPM installation manifest should be of format: ipm-0.0.1.xml
 	Set resultSet = statement.%Execute(XMLDir, "ipm-*.xml")
-	If ((resultSet.%SQLCODE '= 0) && '(resultSet.%Message [ "does not exist")) {
-		Write !, resultSet.%Message 
-		Quit
+	If (resultSet.%SQLCODE < 0)  {
+		$$$ThrowSQLIfError(resultSet.%SQLCODE,resultSet.%Message)
 	}
 	Kill ipmLocalArray			// multi-dim array to store local ipm manifests; ipmLocalArray(<version>)=<fileName>
 	Kill menuList				// menu to let user choose which version of local ipm to install (if not in quiet mode and no version is specified)
@@ -2471,7 +2472,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		Set fileName = resultSet.%Get("Name")
 		If (resultSet.%Get("Type") = "F") {
 			// get the exact version string from filename
-			Set exactIPMVer = $Piece($Piece(fileName, "ipm-", 2, *), ".xml")
+			Set exactIPMVer = $Piece($Piece(fileName, "ipm-", 2, *), ".xml", 1, *-1)
 			Set ipmLocalArray(exactIPMVer) = fileName
 			Set menuList($Increment(menuList)) = exactIPMVer_" (local version)"
 		}
@@ -2482,6 +2483,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"No ipm-<version>.xml installer file is found locally in directory: "__XMLDir))
 	}
 
+	// 2. Choose / propmpt user to choose which local/remote version of IPM to install
 	If (version '= "") {
 		Set targetVersion = version
 		If '$DATA(ipmLocalArray(version)) {
@@ -2503,16 +2505,15 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				Set targetVersion = "latest"
 			}
 		} Else {
+			// prompt user with option to download the latest version from registry
 			Set localIPMCount = menuList
 			If 'localOnly {
 				// Add remote version options to menuList
 				Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
 				$$$ThrowOnError(sc)
 				If $IsObject(server) {
-					Set packageService = server.GetPackageService()
-					Set jsonStream = packageService.GetModuleData("zpm")
-					Set versions = {}.%FromJSON(jsonStream)
-					// TO DECIDE: add all those versions to menuList and prompt user? Or...?
+					Set latestVersion = server.GetPackageService().GetLatestIPMVersion()
+					Set menuList($Increment(menuList)) = "latest"_" (remote version - "_latestVersion_")"
 				}
 				kill server
 				kill packageService
@@ -2523,45 +2524,52 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				$$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported response. Operation cancelled."))
 			}
 			Set targetVersion = $Piece(menuList(menuValue), " ") // get rid of (local version) or (remote version) suffix
+			zw targetVersion
 			If (menuValue > localIPMCount) {
 				Set useLocal = 0
 			}
 		}
 	}
-	// Now we know which exact version to install and we know whether we should install it with local artifact or get from registry
-	
-	// Now, figure out which namespaces to install
-	// Get all namespaces that currently do not have IPM enabled
+
+	// Now we know which exact version to install and we know whether we should install it with local artifact or get from registry,
+	// 3. Figure out which namespaces to install
 
 	// TODO: Let user interactively choose which namespaces to install IPM
 	Set baseNS = $Namespace
 	Set sc = ##class(%SYS.Namespace).ListAll(.allNS)
 	$$$ThrowOnError(sc)
-	Kill namespacesWithoutIPM		// multi-dim array to store all non-%SYS explicit namepaces that currently do not have IPM installed
+	// multi-dim array to store all non-%SYS explicit namepaces that 
+	// either have no IPM installed (if allow-upgrade is not set)
+	// or all of them (if allow-upgrade is set)
+	Kill namespacesForIPM
 	Set currentNS = ""
-	While 1 {
-		Set currentNS = $ORDER(allNS(currentNS))
-		If currentNS = "" {
-			Quit
-		}
-		// avoid %SYS and implicit namespaces
-		If (currentNS '= "%SYS") && ($ZCONVERT(currentNS, "U") = currentNS) {
-			New $Namespace
-			Set $Namespace = currentNS
-			If '$System.CLS.IsMthd("%IPM.Main", "Shell") {
-				Set namespacesWithoutIPM(currentNS) = 1
+	If allowUpgrade {
+		Merge namespacesForIPM = allNS
+	} Else {
+		While 1 {
+			Set currentNS = $ORDER(allNS(currentNS))
+			If currentNS = "" {
+				Quit
+			}
+			// avoid %SYS and implied namespaces
+			If (currentNS '= "%SYS") && ($ZCONVERT(currentNS, "U") = currentNS) {
+				New $Namespace
+				Set $Namespace = currentNS
+				If '$System.CLS.IsMthd("%IPM.Main", "Shell") {
+					Set namespacesForIPM(currentNS) = 1
+				}
 			}
 		}
 	}
 	Set $Namespace = baseNS
 	If globally {
-		Merge targetNamespaces = namespacesWithoutIPM
+		Merge targetNamespaces = namespacesForIPM
 	} ElseIf (namespaces '= "") {
 		Set specifiedNSs = $ListFromString(namespaces, ",")
 		Set ptr = 0
    		While $ListNext(specifiedNSs, ptr, value) {
-			If '$DATA(namespacesWithoutIPM(value)) {
-				Write !, value_" is either not a valid namespace to install IPM, or already has IPM installed. Skipped."
+			If '$DATA(namespacesForIPM(value)) {
+				Write !, value_" is not a valid namespace to install IPM"_$Select(allowUpgrade: ". ", 1: ", or it already has IPM installed. ")_"Skipped."
 			} Else {
 				Set targetNamespaces(value) = 1
 			}
@@ -2571,7 +2579,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		Write !, "Currently do not support interactively choose namespaces to install IPM. Use -namespaces or -globally modifier."
 		Return
 	}
-	// Now that we got all the namespaces that need to install IPM, do the actual installation
+
+	// 4. Now that we got all the namespaces that need to install IPM, do the actual installation
 	If 'useLocal {
 		Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
 		$$$ThrowOnError(sc)
@@ -2579,7 +2588,15 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Set packageService = server.GetPackageService()
 			Set ipmRef = ##class(%IPM.Storage.ModuleInfo).%New()
 			// TODO: Make this ipm eventually once the package name is changed
-			Set ipmRef.Name = "zpm"
+			Set ipmRef.Name = $$$IPMModuleName
+			If (targetVersion = "latest") {
+				// convert latest to semantic version so that it can be undestood by ModuleInfo class
+				Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
+				$$$ThrowOnError(sc)
+				If $IsObject(server) {
+					Set targetVersion = server.GetPackageService().GetLatestIPMVersion()
+				}
+			}
 			Set ipmRef.VersionString = targetVersion
 			
 			// Retrieve module installer manifest
@@ -2601,12 +2618,20 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	} Else {
 		Set targetIPMFileName = ipmLocalArray(targetVersion)
 		Set currentNS=$ORDER(targetNamespaces(""))
+		Set enabledNSList = ""
 		While (currentNS '="") {
 			Set $Namespace = currentNS
-			Do $SYSTEM.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), "ck")
-			Write !, "IPM enabled for namespace "_currentNS
+			Set tSC = $SYSTEM.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), "ck")
+			If $$$ISOK(tSC) {
+				Set enabledNSList = enabledNSList_$LB(currentNS)
+			} else {
+				Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
+				Write !, "IPM failed to enable for namespace "_currentNS
+				$$$ThrowOnError(tSC)
+			}
 			Set currentNS = $ORDER(targetNamespaces(currentNS))
 		}
+		Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
 	}
 }
 

@@ -53,3 +53,6 @@ ROUTINE %IPM.Common [Type=INC]
 
 /// OS corresponding slash
 #define SLASH $Select($$$isWINDOWS: "\", 1: "/")
+
+#define IPMModuleName "zpm"
+#define IPMServerRegistryModuleName "zpm-registry"
