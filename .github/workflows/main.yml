@@ -10,16 +10,30 @@ on:
     types:
       - released
 env:
-  PREVIOUS: 2021.2.0.651.0
-  LATEST: 2022.1.0.209.0
-  PREVIEW: 2022.2.0.311.0
+  name: |
+    iris-community
+    irishealth-community
 jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set-matrix.outputs.image }}
+    steps:
+      - id: set-matrix
+        run: |
+          image=""
+          for n in $name; do
+            tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]')
+            for tag in $tags; do image+='"'${n}:${tag}'",'; done
+          done;
+          echo ::set-output name=image::"[${image%?}]"
   build:
     timeout-minutes: 20
+    needs: 
+      - prepare-matrix
     strategy:
-      matrix:
-        version: [previous, latest]
-        platform: [common, health]
+      matrix: 
+        image: ${{ fromJson(needs.prepare-matrix.outputs.image) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
@@ -31,16 +45,11 @@ jobs:
       - name: Set image
         id: image
         run: |
-          IMAGE=containers.intersystems.com/intersystems/iris-community
-          [ '${{ matrix.platform }}' == 'health' ] && IMAGE=containers.intersystems.com/intersystems/irishealth-community
-          VERSION=${{ env.LATEST }}
-          [ '${{ matrix.version }}' == 'previous' ] && VERSION=${{ env.PREVIOUS }}
-          [ '${{ matrix.version }}' == 'latest' ] && VERSION=${{ env.LATEST }}
-          [ '${{ matrix.version }}' == 'preview' ] && VERSION=${{ env.PREVIEW }}
-          echo ::set-output name=name::${IMAGE}:${VERSION}
+          IMAGE=containers.intersystems.com/intersystems/${{ matrix.image }}
+          echo ::set-output name=name::${IMAGE}
           FLAGS=
-          [[ $VERSION == 2021.* ]] && FLAGS=' --check-caps false'
-          [[ $VERSION == 2022.1.* ]] && FLAGS=' --check-caps false'
+          [[ $IMAGE == *:2021.* ]] && FLAGS=' --check-caps false'
+          [[ $IMAGE == *:2022.1.* ]] && FLAGS=' --check-caps false'
           echo ::set-output name=flags::${FLAGS}
       - name: Setup version
         id: version
@@ -176,74 +185,73 @@ jobs:
         run: |
           docker stop registry
           docker network rm zpm
-      - uses: actions/upload-artifact@v2
-        if: matrix.version == 'latest' && matrix.platform == 'common'
-        with:
-          name: zpm-${{ steps.version.outputs.number }}
-          path: zpm-${{ steps.version.outputs.number }}.xml
-      - name: Create Beta Release
-        id: create_release
-        uses: actions/create-release@v1
-        if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.version.outputs.number }}
-          release_name: v${{ steps.version.outputs.number }}
-          prerelease: ${{ github.event_name != 'release' }}
-      - name: Upload Beta Release Asset
-        uses: actions/upload-release-asset@v1
-        if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: zpm-${{ steps.version.outputs.number }}.xml
-          asset_name: zpm-${{ steps.version.outputs.number }}.xml
-          asset_content_type: text/xml
-      - name: Upload Public Release Asset
-        uses: actions/upload-release-asset@v1
-        if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: zpm-${{ steps.version.outputs.number }}.xml
-          asset_name: zpm-${{ steps.version.outputs.number }}.xml
-          asset_content_type: text/xml
-      - name: Publish release
-        if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
-        run: |
-          [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
-            docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm ${{ steps.image.outputs.flags }}
-            CONTAINER=`docker ps -lq`
-            sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-            /bin/echo -e '' \
-              'zpm "list":1\n' \
-              'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
-              'zpm "publish zpm -v":1' \
-              'halt\n' \
-            | docker exec -i $CONTAINER iris session iris -U%SYS
-            docker stop $CONTAINER
-          ) || true
-  bump-release-version:
-    name: bump release version
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-    needs: build
-    steps:
-      - uses: actions/checkout@master
-        with:
-          ref: master
-      - run: |
-          VERSION=${{ github.event.release.tag_name }} && VERSION=${VERSION/v/}
-          NEXT_VERSION=`echo $VERSION | awk -F. '/[0-9]+\./{$NF++;print}' OFS=.`
-          [ $NEXT_VERSION != $VERSION ] && (
-            sed -i -E "s/<Version>(.*)<\/Version>/<Version>${NEXT_VERSION/v/}-SNAPSHOT<\/Version>/" module.xml
-            cat module.xml
-            git config --global user.name 'ProjectBot'
-            git config --global user.email 'bot@users.noreply.github.com'
-            git add module.xml
-            git commit -m 'auto bump version with release'
-            git push
-          )
+#       - uses: actions/upload-artifact@v2
+#         if: matrix.version == 'latest' && matrix.platform == 'common'
+#         with:
+#           name: zpm-${{ steps.version.outputs.number }}
+#           path: zpm-${{ steps.version.outputs.number }}.xml
+#       - name: Create Beta Release
+#         id: create_release
+#         uses: actions/create-release@v1
+#         if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         with:
+#           tag_name: v${{ steps.version.outputs.number }}
+#           release_name: v${{ steps.version.outputs.number }}
+#           prerelease: ${{ github.event_name != 'release' }}
+#       - name: Upload Beta Release Asset
+#         uses: actions/upload-release-asset@v1
+#         if: (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository) && github.event_name != 'release' && matrix.version == 'latest' && matrix.platform == 'common'
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         with:
+#           upload_url: ${{ steps.create_release.outputs.upload_url }}
+#           asset_path: zpm-${{ steps.version.outputs.number }}.xml
+#           asset_name: zpm-${{ steps.version.outputs.number }}.xml
+#           asset_content_type: text/xml
+#       - name: Upload Public Release Asset
+#         uses: actions/upload-release-asset@v1
+#         if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         with:
+#           upload_url: ${{ github.event.release.upload_url }}
+#           asset_path: zpm-${{ steps.version.outputs.number }}.xml
+#           asset_name: zpm-${{ steps.version.outputs.number }}.xml
+#           asset_content_type: text/xml
+#       - name: Publish release
+#         if: github.event_name == 'release' && matrix.version == 'latest' && matrix.platform == 'common'
+#         run: |
+#           [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
+#             docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm ${{ steps.image.outputs.flags }}
+#             CONTAINER=`docker ps -lq`
+#             sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+#             /bin/echo -e '' \
+#               'zpm "list":1\n' \
+#               'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
+#               'zpm "publish zpm -v":1' \
+#               'halt\n' \
+#             | docker exec -i $CONTAINER iris session iris -U%SYS
+#             docker stop $CONTAINER
+#           ) || true
+#   release:
+#     runs-on: ubuntu-latest
+#     if: github.event_name == 'release'
+#     needs: build
+#     steps:
+#       - uses: actions/checkout@master
+#         with:
+#           ref: master
+#       - run: |
+#           VERSION=${{ github.event.release.tag_name }} && VERSION=${VERSION/v/}
+#           NEXT_VERSION=`echo $VERSION | awk -F. '/[0-9]+\./{$NF++;print}' OFS=.`
+#           [ $NEXT_VERSION != $VERSION ] && (
+#             sed -i -E "s/<Version>(.*)<\/Version>/<Version>${NEXT_VERSION/v/}-SNAPSHOT<\/Version>/" module.xml
+#             cat module.xml
+#             git config --global user.name 'ProjectBot'
+#             git config --global user.email 'bot@users.noreply.github.com'
+#             git add module.xml
+#             git commit -m 'auto bump version with release'
+#             git push
+#           )
