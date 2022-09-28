@@ -63,7 +63,7 @@ jobs:
       - name: Setup version
         id: version
         env:
-          VERSION: ${{ needs.prepare.output.version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION}<\/Version>/" module.xml
           cat module.xml
