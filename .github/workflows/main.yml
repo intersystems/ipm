@@ -19,11 +19,12 @@ jobs:
     outputs:
       images: ${{ steps.set-matrix.outputs.images }}
       main: ${{ steps.set-matrix.outputs.main }}
-      version: ${{ steps.set-matrix.outputs.version }}
+      version: ${{ steps.version.outputs.number }}
     steps:
       - uses: actions/checkout@master
       - run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-      - id: set-matrix
+      - name: Images list
+        id: set-matrix
         run: |
           images=""
           for n in $name; do
