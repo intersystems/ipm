@@ -234,7 +234,7 @@ jobs:
       - name: Publish release
         if: github.event_name == 'release'
         run: |
-          docker run -d --rm -v `pwd`:/home/irisowner/zpm/ intersystemsdc/iris-community:latest
+          docker run -d --rm -v `pwd`:/home/irisowner/zpm/ intersystemsdc/iris-community:latest --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
