@@ -1511,6 +1511,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 		If (tResult '= "") {
 			Do ##class(%ZPM.PackageManager.Developer.Lifecycle.Abstract).GetDefaultParameters(.tParams)
 			Merge tParams = pCommandInfo("data")
+      Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
 			Set tParams("Install") = 1
       If tResult.Deployed {
         Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()

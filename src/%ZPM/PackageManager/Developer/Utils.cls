@@ -276,7 +276,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 					Quit
 				}
 
-        If $Get(pParams("Install")),tInstModule.DeveloperMode {
+        If $Get(pParams("Install")),pModuleName'="zpm",tInstModule.DeveloperMode {
 					Set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
 					Quit
         }
