@@ -242,8 +242,8 @@ jobs:
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
-            'set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/Installer.cls","ck")" \
-            'set sc=##class(%ZPM.Installer).setup("/home/irisowner/zpm/",3)" \
+            'set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/Installer.cls","ck")' \
+            'set sc=##class(%ZPM.Installer).setup("/home/irisowner/zpm/",3)' \
             'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
             'zpm "publish zpm -v":1' \
             'halt\n' \
