@@ -238,11 +238,12 @@ jobs:
         run: |
           sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION}<\/Version>/" module.xml
           cat module.xml
-          docker run -d --rm -v `pwd`:/home/irisowner/zpm/ intersystemsdc/iris-community:latest --check-caps false
+          docker run -d --rm -v `pwd`:/home/irisowner/zpm/ ${{ needs.prepare.outputs.main }}
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
-            'zpm "load /home/irisowner/zpm/ -v":1\n' \
+            'set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/Installer.cls","ck")" \
+            'set sc=##class(%ZPM.Installer).setup("/home/irisowner/zpm/",3)" \
             'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
             'zpm "publish zpm -v":1' \
             'halt\n' \
