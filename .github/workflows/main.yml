@@ -17,7 +17,7 @@ jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      images: ${{ steps.set-matrix.outputs.image }}
+      images: ${{ steps.set-matrix.outputs.images }}
       main: ${{ steps.set-matrix.outputs.main }}
       version: ${{ steps.set-matrix.outputs.version }}
     steps:
