@@ -234,18 +234,16 @@ jobs:
       - name: Publish release
         if: github.event_name == 'release'
         run: |
-          [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && (
-            docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm ${{ steps.image.outputs.flags }}
-            CONTAINER=`docker ps -lq`
-            sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-            /bin/echo -e '' \
-              'zpm "list":1\n' \
-              'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
-              'zpm "publish zpm -v":1' \
-              'halt\n' \
-            | docker exec -i $CONTAINER iris session iris -U%SYS
-            docker stop $CONTAINER
-          ) || true
+          docker run -d --rm -v `pwd`:/home/irisowner/zpm/ intersystemsdc/iris-community:latest
+          CONTAINER=`docker ps -lq`
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          /bin/echo -e '' \
+            'zpm "load /home/irisowner/zpm/ -v":1\n' \
+            'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
+            'zpm "publish zpm -v":1' \
+            'halt\n' \
+          | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker stop $CONTAINER
       - name: Upload Public Release Asset
         uses: actions/upload-release-asset@v1
         if: github.event_name == 'release'
