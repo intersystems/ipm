@@ -31,7 +31,7 @@ jobs:
             for tag in $tags; do images+='"'${n}:${tag}'",'; done
           done;
           echo ::set-output name=images::"[${images%?}]"
-          echo ::set-output name=main::${${images%%,*}%%\"%}
+          echo ::set-output name=main::${${images%%,*}//\"/}
       - name: Setup version
         id: version
         run: |
