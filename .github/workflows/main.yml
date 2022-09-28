@@ -238,7 +238,7 @@ jobs:
         run: |
           sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION}<\/Version>/" module.xml
           cat module.xml
-          docker run -d --rm -v `pwd`:/home/irisowner/zpm/ containers.intersystems.com/intersystems/${{ needs.prepare.outputs.main }}
+          docker run -d --rm -v `pwd`:/home/irisowner/zpm/ containers.intersystems.com/intersystems/${{ needs.prepare.outputs.main }} --check-caps false
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
