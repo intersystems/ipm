@@ -844,7 +844,7 @@ Query GetModuleList(pServer As %String, pShowAllVersions As %Boolean) As %Query(
 {
 }
 
-ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String, pShowAllVersions As %Boolean) As %Status
+ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String, pShowAllVersions As %Boolean = 0) As %Status
 {
 	If (pServer = "") {
 		Set qHandle = ""
