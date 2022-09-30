@@ -62,6 +62,7 @@ Method doInvoke(ByRef pParams) As %Status
   Do ..GetArgsArray(.pParams, .args)
 
   Try {
+    New $Namespace
     If ..CheckStatus {
       Set tSC = $ClassMethod(..Class, ..Method, args...)
     } Else {
