@@ -213,8 +213,8 @@ jobs:
           name: zpm-${{ needs.prepare.outputs.version }}
       - name: Create Beta Release
         id: create_release
-        uses: actions/create-release@v1
-        if: github.event_name != 'release'
+        uses: actions/create-release@v2
+        if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -223,7 +223,7 @@ jobs:
           prerelease: ${{ github.event_name != 'release' }}
       - name: Upload Beta Release Asset
         uses: actions/upload-release-asset@v1
-        if: github.event_name != 'release'
+        if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
