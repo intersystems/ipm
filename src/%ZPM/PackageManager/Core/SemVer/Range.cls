@@ -79,6 +79,10 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %ZPM.PackageManag
 			// Get part after operator and before build/metadata
 			// Normalize x ranges
 			Set tMajorMinorPatch = $Translate($ZStrip($Piece($Piece(tExpr,"-"),"+"),"<W","<>=^~"),"X*","xx")
+      if tMajorMinorPatch?1"20"2N1"."1N {
+        Set tExpr = tExpr _ ".0"
+        Set tMajorMinorPatch = tMajorMinorPatch _ ".0"
+      }
 			Set tMajor = $Piece(tMajorMinorPatch,".",1)
 			Set tMinor = $Piece(tMajorMinorPatch,".",2)
 			Set tPatch = $Piece(tMajorMinorPatch,".",3)
