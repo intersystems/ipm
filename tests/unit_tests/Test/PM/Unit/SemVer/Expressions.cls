@@ -77,6 +77,9 @@ Method TestIRISVersions()
 	Do ..AssertNotSatisfied("2022.2", "2022.1")
 	Do ..AssertNotSatisfied("2022.2", "2022.3")
 	Do ..AssertNotSatisfied("2022.2", "2023.1")
+
+	Do ..AssertSatisfied(">=2022.1", "2022.2")
+	Do ..AssertNotSatisfied(">=2022.1", "2021.2")
 }
 
 Method AssertEquivalent(pVersionExpression1 As %String, pVersionExpression2 As %String, pVerbose As %Boolean = 0) As %Boolean [ Internal, Private ]
