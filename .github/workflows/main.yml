@@ -213,7 +213,7 @@ jobs:
           name: zpm-${{ needs.prepare.outputs.version }}
       - name: Create Beta Release
         id: create_release
-        uses: actions/create-release@v2
+        uses: actions/create-release@v1
         if: github.event_name == 'push'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
