@@ -588,12 +588,12 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<!-- Modifiers -->
 		<modifier name="version" aliases="v" value="true" description="A special version of IPM can be provided. If not specified, the latest version from the registry will be installed (hence is not required if quiet flag is set)."/>
 		<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM needs to be enabled."/>
-		<modifier name="globally" description="Will install IPM in all non-%SYS explicit namespaces that currently do not have IPM installed."/>
-		<modifier name="local-only" description="If specified, only local artifacts will be used for installation." />
-		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version." />
-		<modifier name="quiet" aliases="q" description="Non-terminal prompt mode." />
+		<modifier name="globally" description="Will install IPM in all non-%SYS explicit namespaces that currently do not have IPM installed. By default, this modifier is not set and will not install globally."/>
+		<modifier name="local-only" description="If specified, only local artifacts will be used for installation. By default, this modifier is not set and will not limit to local artifacts." />
+		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By deafult, this modifier is not ste and will not allow upgrade." />
+		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 		<!-- Examples -->
-		<example description="Install IPM version 0.3.4 in non-prompt mode in namespaces: NS1, NS2, NS3.">
+		<example description="Install IPM version 0.3.4 in quiet mode in namespaces: NS1, NS2, NS3.">
 			enable -v 0.3.4 -q -ns NS1,NS2,NS3
 		</example>
 		<example description="Install IPM in all non-%SYS explicit namespaces, and select version later in terminal prompt menu.">
@@ -760,7 +760,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Set pException = $$$NULLOREF
 				Return
 			}
-        	Do ..DisplayError(pException.AsStatus())
+			Do ..DisplayError(pException.AsStatus())
 		}
 		#; if $TLevel>$GET(tTLev) TCOMMIT  write:$GET(tCommandInfo("data","Verbose")) !,"Completing a transaction",!
 		Set tCommand = ""
@@ -2442,16 +2442,17 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	Set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
 	Set targetVersion = "" 		// var to store the final version of IPM to be installed
 	Kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
+	Set loadFlag = "ck/displayerror=1/displaylog=0" // flags + modifiers to use when loading module manifest file / stream - ensure compilation and only display error instead of entire log
 
 	// basic sanity checks
 	If (quiet && (namespaces = "") && 'globally) {
-		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot install IPM in non-prompt mode without specifying namespaces to install."))
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot install IPM in quiet mode without specifying namespaces to install."))
 	}
 	If ((namespaces '= "") && globally) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global installation flag at the same time."))
 	}
 
-
+	New $Namespace
 	// 1. Get list of local IPM artifacts under /<instance install dir>/lib/ipm/
 	Set XMLDir = $system.Util.InstallDirectory()
 	For subDirName = "lib", "ipm" {
@@ -2496,23 +2497,37 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		}
 	} Else {
 		If quiet {
-			// Non-prompt mode + no version specified - either error out or install latest version from registry
+			// quiet mode + no version specified - either error out or install latest version from registry / locally
 			If localOnly {
-				$$$ThrowOnError($$$ERROR($$$GeneralError,"To install local IPM in non-prompt mode, a specific version must be specified using the version modifier."))
+				//using semantic version utility, find the latest local version and install
+				Set key = ""
+				While 1 {
+					Set key = $Order(ipmLocalArray(key))
+					Set currentVer = ipmLocalArray(key)
+					If (targetVersion = "") {
+						Set targetVersion = currentVer
+						Continue
+					}
+					Set semVerTarget = ##class(%ZHSLIB.PackageManager.Core.SemanticVersion).FromString(targetVersion)
+					Set semVerCurrent = ##class(%ZHSLIB.PackageManager.Core.SemanticVersion).FromString(currentVer)
+					If semVerCurrent.Follows(semVerTarget) {
+						Set targetVersion = currentVer
+					}
+				}
 			} Else {
-				Write !, "No IPM version is specified and is in non-prompt mode. Install the latest version of IPM from the registry."
+				Write !, "No IPM version is specified and is in quiet mode. Install the latest version of IPM from the registry."
 				Set useLocal = 0
 				Set targetVersion = "latest"
 			}
 		} Else {
 			// prompt user with option to download the latest version from registry
-			Set localIPMCount = menuList
+			Set localIPMCount = $Get(menuList, 0)
 			If 'localOnly {
 				// Add remote version options to menuList
 				Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
 				$$$ThrowOnError(sc)
 				If $IsObject(server) {
-					Set latestVersion = server.GetPackageService().GetLatestIPMVersion()
+					Set latestVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
 					Set menuList($Increment(menuList)) = "latest"_" (remote version - "_latestVersion_")"
 				}
 				kill server
@@ -2524,7 +2539,6 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				$$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported response. Operation cancelled."))
 			}
 			Set targetVersion = $Piece(menuList(menuValue), " ") // get rid of (local version) or (remote version) suffix
-			zw targetVersion
 			If (menuValue > localIPMCount) {
 				Set useLocal = 0
 			}
@@ -2553,7 +2567,6 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			}
 			// avoid %SYS and implied namespaces
 			If (currentNS '= "%SYS") && ($ZCONVERT(currentNS, "U") = currentNS) {
-				New $Namespace
 				Set $Namespace = currentNS
 				If '$System.CLS.IsMthd("%IPM.Main", "Shell") {
 					Set namespacesForIPM(currentNS) = 1
@@ -2594,8 +2607,11 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
 				$$$ThrowOnError(sc)
 				If $IsObject(server) {
-					Set targetVersion = server.GetPackageService().GetLatestIPMVersion()
+					Set targetVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
 				}
+			}
+			If (targetVersion = "") {
+				$$$ThrowOnError($$$ERROR($$$GeneralError,"Failed to find a satisfying target version of IPM to install."))
 			}
 			Set ipmRef.VersionString = targetVersion
 			
@@ -2607,9 +2623,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				If currentNS = "" {
 					Quit
 				}
-				New $Namespace
 				Set $Namespace = currentNS
-				Do $SYSTEM.OBJ.LoadStream(manifest, "ck/displayerror=0/displaylog=1")
+				Do $SYSTEM.OBJ.LoadStream(manifest, loadFlag)
 				Write !, "IPM enabled for namespace "_currentNS
 			}
 		} Else {
@@ -2619,19 +2634,24 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		Set targetIPMFileName = ipmLocalArray(targetVersion)
 		Set currentNS=$ORDER(targetNamespaces(""))
 		Set enabledNSList = ""
+		Set problematicList = ""
+		Set tOverallSC = $$$OK
 		While (currentNS '="") {
 			Set $Namespace = currentNS
-			Set tSC = $SYSTEM.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), "ck")
+			Set tSC = $SYSTEM.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag)
 			If $$$ISOK(tSC) {
-				Set enabledNSList = enabledNSList_$LB(currentNS)
+				Set enabledNSList = enabledNSList_$ListBuild(currentNS)
 			} else {
-				Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
-				Write !, "IPM failed to enable for namespace "_currentNS
-				$$$ThrowOnError(tSC)
+				Set problematicList = problematicList_$ListBuild(currentNS)
 			}
 			Set currentNS = $ORDER(targetNamespaces(currentNS))
+			Set tOverallSC = $$$ADDSC(tOverallSC,tSC)
 		}
 		Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
+		If $$$ISERR(tOverallSC) {
+			Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
+			$$$ThrowOnError(tOverallSC)
+		}
 	}
 }
 

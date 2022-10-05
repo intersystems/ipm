@@ -22,9 +22,9 @@ Method GetInfo(url As %String) As %DynamicObject
 	$$$ThrowStatus($$$ERROR($$$GeneralError,"Registry server not available."))
 }
 
-Method GetLatestIPMVersion() As %String
+Method GetLatestModuleVersion(pModuleName As %String) As %String
 {
-	Set jsonStream = ..GetModuleData($$$IPMModuleName)
+	Set jsonStream = ..GetModuleData(pModuleName)
 	Set versions = {}.%FromJSON(jsonStream)
 	Set latestVersion = versions.versions.%Pop()
 	Return latestVersion
