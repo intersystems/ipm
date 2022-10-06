@@ -1,0 +1,74 @@
+name: Publish to registry
+on:
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: 'Package repository'
+        required: true
+        type: string
+      version:
+        description: 'Set version'
+        required: false
+        type: string
+      base:
+        description: 'Base docker image with zpm installed'
+        required: true
+        default: 'intersystemsdc/irishealth-community:latest'
+        type: choice
+        options:
+          - 'intersystemsdc/irishealth-community:latest'
+          - 'intersystemsdc/iris-community:latest'
+      check-caps:
+        description: 'Use flag --check-caps'
+        type: boolean
+        required: true
+      registry:
+        description: 'URL for registry'
+        required: true
+        type: string
+        default: 'pm.community.intersystems.com'
+      namespace:
+        description: 'Namespace'
+        type: string
+        required: true
+        default: 'USER'
+env:
+  BASE: ${{ inputs.base }}
+  REGISTRY: ${{ inputs.registry }}
+  NAMESPACE: ${{ inputs.namespace }}
+  CHECK_CAPS: ${{ inputs.check-caps }}
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        repository: ${{ inputs.repository }}
+        ref: master
+    - name: Publish
+      run: |
+        [ '${CHECK_CAPS}' ] && DOCKER_FLAGS=' --check-caps false'
+        [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && REGISTRY_FLAGS="-username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}"
+        [ -n '${{ secrets.REGISTRY_TOKEN }}' ] && REGISTRY_FLAGS="-token ${{ secrets.REGISTRY_TOKEN }}"
+        REGISTRY_FLAGS+=' -url https://${REGISTRY}'
+        NAME=`grep -oPm1 "(?<=<Name>)[^<]+" module.xml | tr '[:upper:]' '[:lower:]'`
+        VERSION=`grep -oPm1 "(?<=<Version>)[^<]+" module.xml | cut -d- -f1`
+        [ -n '${{ inputs.version }}' ] && VERSION=${{ inputs.version }}
+        sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION/v/}<\/Version>/" module.xml
+       
+        docker run -d --rm -v `pwd`:/home/irisowner/${NAME}/ ${BASE} ${DOCKER_FLAGS}
+        CONTAINER=`docker ps -lq`
+        sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+        /bin/echo -e '' \
+          'zpm "repo -r -name registry ${REGISTRY_FLAGS}":1\n' \
+          'zpm "load /home/irisowner/${NAME}/ -v":1\n' \
+          'zpm "test ${NAME} -v":1' \
+          'zpm "publish ${NAME} -v":1' \
+          'halt\n' \
+        | docker exec -i $CONTAINER iris session iris -U ${NAMESPACE}
+        docker stop $CONTAINER
+
