@@ -22,6 +22,7 @@ on:
         description: 'Use flag --check-caps'
         type: boolean
         required: true
+        default: true
       registry:
         description: 'URL for registry'
         required: true
@@ -51,7 +52,7 @@ jobs:
         ref: master
     - name: Publish
       run: |
-        [ '${CHECK_CAPS}' ] && DOCKER_FLAGS=' --check-caps false'
+        [ ${CHECK_CAPS} ] && DOCKER_FLAGS=' --check-caps false'
         [ -n '${{ secrets.REGISTRY_USERNAME }}' ] && REGISTRY_FLAGS="-username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}"
         [ -n '${{ secrets.REGISTRY_TOKEN }}' ] && REGISTRY_FLAGS="-token ${{ secrets.REGISTRY_TOKEN }}"
         REGISTRY_FLAGS+=' -url https://${REGISTRY}'
@@ -64,10 +65,10 @@ jobs:
         CONTAINER=`docker ps -lq`
         sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
         /bin/echo -e '' \
-          'zpm "repo -r -name registry ${REGISTRY_FLAGS}":1\n' \
-          'zpm "load /home/irisowner/${NAME}/ -v":1\n' \
-          'zpm "test ${NAME} -v":1' \
-          'zpm "publish ${NAME} -v":1' \
+          "zpm \"repo -r -name registry ${REGISTRY_FLAGS}\":1\n" \
+          "zpm \"load /home/irisowner/${NAME}/ -v\":1\n" \
+          "zpm \"test ${NAME} -v\":1" \
+          "zpm \"publish ${NAME} -v\":1" \
           'halt\n' \
         | docker exec -i $CONTAINER iris session iris -U ${NAMESPACE}
         docker stop $CONTAINER
