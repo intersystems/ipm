@@ -49,7 +49,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         repository: ${{ inputs.repository }}
-        ref: master
+        ref: ''
     - name: Publish
       run: |
         [ ${CHECK_CAPS} ] && DOCKER_FLAGS=' --check-caps false'
