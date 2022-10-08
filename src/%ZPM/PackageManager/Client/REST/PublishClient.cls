@@ -13,7 +13,7 @@ Method PublishApplication(pApplication As %ZPM.PackageManager.Core.Application) 
 
 Method Publish(pModule As %ZPM.PackageManager.Core.VersionedBase) As %Boolean
 {
-  if (..Username="") || (..Password="") {
+  if ((..Username="") || (..Password="")) && (..Token="") {
     $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, authorization required."))
   }
   
