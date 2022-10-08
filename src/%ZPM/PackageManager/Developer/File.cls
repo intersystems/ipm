@@ -97,13 +97,11 @@ ClassMethod CopyDir(pSource As %String, pDest As %String, pDeleteFirst As %Boole
 			}
 			Set pSource = ##class(%Library.File).NormalizeDirectory(pSource)
 			Set pDest = ##class(%Library.File).NormalizeDirectory(pDest)
-			Set tCmd = "ROBOCOPY "_pSource_" "_pDest_" /E"
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(tCmd,.tLog,.tErr)
-      If (pVerbose) {
-        For i=1:1:$Get(tLog) {
-          Write tLog(i),!
-        }
+			Set tCmd = $lb("ROBOCOPY", pSource,pDest, "/E")
+      If ('pVerbose) {
+        Set stdout = ""
       }
+			Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommand(, tCmd,.stdout)
 		}
 	} Catch e {
 		Set tSC = $$$EMBEDSC(tBadSC,e.AsStatus())
