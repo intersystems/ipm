@@ -40,7 +40,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 				Set tRestoreParams = 1
 			}
 			
-			If ($Get(pParams("Threads")) = 1) || ($TLevel > 0) {
+			If ($Get(pParams("Threads")) = 1) || ($Tlevel > 0) {
 				Set tNumWorkers = -1 // Disable multithreading.
 			} Else {
 				Set tNumWorkers = $Get(pParams("Threads"),1) // Enable multicompile
@@ -117,12 +117,12 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 				
 				// Missing server name indicates that it's already present locally; nothing to do in that case.
 				If (tServerName '= "") {
-					If ($TLevel = 0) && ($Get(pParams("Multicompile","Verbose"),$Get(pParams("Verbose"),0))) {
+					If ($Tlevel = 0) && ($Get(pParams("Multicompile","Verbose"),$Get(pParams("Verbose"),0))) {
 						Write !,"Queuing module load: ",tModuleName," ",tVersion," @ ",tServerName
 					}
 					Set tSC = pWorkQueue.QueueCallback(
-						"##class("_$classname()_").LoadModuleReference",
-						"##class("_$classname()_").LoadCompleted",
+						"##class("_$ClassName()_").LoadModuleReference",
+						"##class("_$ClassName()_").LoadCompleted",
 						tServerName, tModuleName, tVersion, $Get(tDeployed), $Get(tPlatformVersion), .pParams, .pDependencyGraph)
 					$$$ThrowOnError(tSC)
 				} Else {
@@ -322,7 +322,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				}
 			}
 			Set tFileName = ""
-			If ($ISOBJECT(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
+			If ($IsObject(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
 				Set tFileName = tPayload.Filename
 			}
 			
@@ -331,11 +331,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				Set tHeader = tPayload.Read(2,.tSC)
 				If (tHeader = $Char(31, 139)) {
 					// This is a .tgz file
-					set tAsArchive = 1
+					Set tAsArchive = 1
 				}
 			}
 			If (tFileName="") {
-				Set tFileName = "module." _ $SELECT(tAsArchive: "tgz", 1: "xml")
+				Set tFileName = "module." _ $Select(tAsArchive: "tgz", 1: "xml")
 			}
 			Do tPayload.Rewind()
 			Set tTmpStream = ##class(%Stream.FileBinary).%New()
@@ -355,8 +355,8 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
           Set success = 0
           Set errorMsg = $System.Status.GetErrorText(tSC)
       }
-      if ($System.CLS.IsMthd(tClient, "CollectAnalytics")) {
-        do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
+      If ($System.CLS.IsMthd(tClient, "CollectAnalytics")) {
+        Do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
       }
 		}
 		If $$$ISERR(tSC) {
@@ -672,7 +672,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 				// If there's an error, note it and just move on.
 				If $$$ISERR(tGraphSC) {
 					// Non-fatal error
-					Set pErrorList($i(pErrorList)) = $ListBuild("",tModule.Name,tModule.VersionString,tGraphSC)
+					Set pErrorList($Increment(pErrorList)) = $ListBuild("",tModule.Name,tModule.VersionString,tGraphSC)
 					Continue
 				}
 				
@@ -718,7 +718,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 					Do tReader.Next(.tModule,.tCorrSC)
 					If $$$ISERR(tCorrSC) {
 						// Non-fatal error
-						Set pErrorList($i(pErrorList)) = $ListBuild(tRepoName,tModRef.Name,tModRef.VersionString,tCorrSC)
+						Set pErrorList($Increment(pErrorList)) = $ListBuild(tRepoName,tModRef.Name,tModRef.VersionString,tCorrSC)
 						Continue
 					}
 					
@@ -729,7 +729,7 @@ ClassMethod BuildAllDependencyGraphs(pRepoNames As %List = "", Output pGraphs, O
 					// If there's an error, note it and just move on.
 					If $$$ISERR(tGraphSC) {
 						// Non-fatal error
-						Set pErrorList($i(pErrorList)) = $ListBuild(tRepoName,tModRef.Name,tModRef.VersionString,tGraphSC)
+						Set pErrorList($Increment(pErrorList)) = $ListBuild(tRepoName,tModRef.Name,tModRef.VersionString,tGraphSC)
 						Continue
 					}
 					
@@ -872,7 +872,7 @@ ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String, p
 			Set tList = tClient.ListModules(tSearchCriteria)
 			For i=1:1:tList.Count() {
 				Set tMod = tList.GetAt(i)
-				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+				Set qHandle($Increment(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
 			}
 		}
 		
@@ -915,7 +915,7 @@ ClassMethod GetModuleNameFromXML(pDirectory As %String, Output name As %String) 
 ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %String = "") As %Status
 {
 	Set tSC = $$$OK
-	Set tInitTLevel = $TLevel
+	Set tInitTLevel = $Tlevel
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
 		Set tUseTransactions = '($Get(pParams("NoTransaction"),0) || $Get(pParams("NoJournal"),0))
@@ -948,9 +948,9 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			// Disable journalling with process-level switch.
 			Set tJournalMgr = ##class(%ZPM.PackageManager.Core.JournalManager).%New(0)
 		} ElseIf tUseTransactions {
-			TSTART
+			Tstart
 		}
-		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+		Set tSC = $System.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
 		$$$ThrowOnError(tSC)
 		
 		Set tFirstLoaded = $$$lcase($Order(tLoadedList("")))
@@ -1008,11 +1008,11 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		
 		If (tDeveloperMode && tUseTransactions) {
 			// In developer mode, save the module manifest so we can fix it even if errors occur afterward.
-			TCOMMIT
+			Tcommit
 			
 			// Nested transactions in underlying calls to LoadNewModule during the dependency resolution process may be rolled back at the end of this method.
 			// To debug a dependency, that module itself should be loaded in "developer mode"
-			TSTART
+			Tstart
 		}
 		
 		If '$Data($$$ZPMHandledModules($Namespace)) {
@@ -1036,21 +1036,21 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			Set tSC = tModule.LoadDependencies("",.pParams)
 			$$$ThrowOnError(tSC)
 		}
-		
+
 		Set tPath = pDirectory_"preload"
 		If ##class(%File).DirectoryExists(tPath) {
 			New $Namespace
 			Set tInitNamespace = $Namespace
 			// Ensure we load "preload" resources into the correct code database (the namespace default one), since this is before mappings are set up.
 			Set $Namespace = "^^"_##class(%ZPM.PackageManager.Developer.Utils).GetRoutineDatabaseDir($Namespace)
-			Set tSC = $system.OBJ.LoadDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($TLevel:"/multicompile=0",1:""),,1)
+			Set tSC = $System.OBJ.LoadDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($Tlevel:"/multicompile=0",1:""),,1)
 			$$$ThrowOnError(tSC)
 			Set $Namespace = tInitNamespace
 		} Else {
 			Write:tVerbose !,"Skipping preload - directory does not exist."
 		}
 		
-		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+		Set tSC = $System.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
 		$$$ThrowOnError(tSC)
 		Set tSC = tModule.%Reload()
 		$$$ThrowOnError(tSC)
@@ -1058,23 +1058,23 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		If (tDeveloperMode && tUseTransactions) {
 			// In developer mode, commit load of dependencies (if all went well) and don't wrap reload/compile of this module's code
 			// in a transaction; we want to be able to debug!
-			TCOMMIT
+			Tcommit
 		}
 		Set pParams("RootDirectory") = pDirectory
 		If tVerbose || $Get(pParams("Multicompile","Verbose"),0) {
 			Write !,"Loading "_tModuleName_" in process "_$Job
 		}
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModuleName,$lb("Activate"),1,.pParams)
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModuleName,$ListBuild("Activate"),1,.pParams)
 		If $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
-			TCOMMIT
+			Tcommit
 		}
 		$$$ThrowOnError(tSC)
 		Do tModule.WriteAfterInstallMessage()
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
-	While ($TLevel > tInitTLevel) {
-		TROLLBACK 1
+	While ($Tlevel > tInitTLevel) {
+		Trollback 1
 	}
 	Quit tSC
 }
@@ -1121,8 +1121,8 @@ ClassMethod AddPackageMapping(pNamespace As %String, pMapping As %String, pFrom 
 				Quit
 			}
 		}
-		New $namespace
-		Set $namespace = "%SYS"
+		New $Namespace
+		Set $Namespace = "%SYS"
 		If '##class(Config.MapPackages).Exists(pNamespace,pMapping) {
 			Set tProps("Database") = pFrom
 			$$$ThrowOnError(##class(Config.MapPackages).Create(pNamespace,pMapping,.tProps,,$$$CPFSave))
@@ -1140,8 +1140,8 @@ ClassMethod RemovePackageMapping(pNamespace As %String, pMapping As %String, pSk
 {
 	Set tSC = $$$OK
 	Try {
-		New $namespace
-		Set $namespace = "%SYS"
+		New $Namespace
+		Set $Namespace = "%SYS"
 		If ##class(Config.MapPackages).Exists(pNamespace,pMapping) {
 			$$$ThrowOnError(##class(Config.MapPackages).Delete(pNamespace,pMapping,,$$$CPFSave))
 			If 'pSkipActivation {
@@ -1164,9 +1164,9 @@ ClassMethod AddRoutineMapping(pNamespace As %String, pMapping As %String, pType 
 				Quit
 			}
 		}
-		New $namespace
-		Set $namespace = "%SYS"
-		Set pMapping = pMapping_$S(pType="ALL":"",1:"_"_pType)
+		New $Namespace
+		Set $Namespace = "%SYS"
+		Set pMapping = pMapping_$Select(pType="ALL":"",1:"_"_pType)
 		If '##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
 			Set tProps("Database") = pFrom
 			$$$ThrowOnError(##class(Config.MapRoutines).Create(pNamespace,pMapping,.tProps,,$$$CPFSave))
@@ -1184,9 +1184,9 @@ ClassMethod RemoveRoutineMapping(pNamespace As %String, pMapping As %String, pTy
 {
 	Set tSC = $$$OK
 	Try {
-		New $namespace
-		Set $namespace = "%SYS"
-		Set pMapping = pMapping_$S(pType="ALL":"",1:"_"_pType)
+		New $Namespace
+		Set $Namespace = "%SYS"
+		Set pMapping = pMapping_$Select(pType="ALL":"",1:"_"_pType)
 		If ##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
 			$$$ThrowOnError(##class(Config.MapRoutines).Delete(pNamespace,pMapping,,$$$CPFSave))
 			If 'pSkipActivation {
@@ -1209,8 +1209,8 @@ ClassMethod AddGlobalMapping(pNamespace As %String, pMapping As %String, pFrom A
 				Quit
 			}
 		}
-    New $namespace
-	 	Set $namespace = "%SYS"
+    New $Namespace
+	 	Set $Namespace = "%SYS"
 		If (pMapping [ ":(") {
 			// 2008 has glo:(subs), 2009 has glo(subs)
 			Set pMapping=$Piece(pMapping,":(")_"("_$Piece(pMapping,":(",2,*)
@@ -1219,7 +1219,7 @@ ClassMethod AddGlobalMapping(pNamespace As %String, pMapping As %String, pFrom A
 		If '##Class(Config.MapGlobals).Exists(pNamespace,pMapping) {
 			Set tProps("Database") = pFrom
 			If pSetCollation {
-				Set tDB=##class(SYS.Database).%OpenId($ZU(12)_pFrom)
+				Set tDB=##class(SYS.Database).%OpenId($ZUtil(12)_pFrom)
 				If $IsObject(tDB) {
 					Set tProps("Collation") = tDB.NewGlobalCollation
 				}
@@ -1241,8 +1241,8 @@ ClassMethod RemoveGlobalMapping(pNamespace As %String, pMapping As %String = "",
 {
 	Set tSC = $$$OK
 	Try {
-		New $namespace
-		Set $namespace = "%SYS"
+		New $Namespace
+		Set $Namespace = "%SYS"
 		If pMapping [ ":(" {
 			// 2008 has glo:(subs), 2009 has glo(subs)
 			Set pMapping=$Piece(pMapping,":(")_"("_$Piece(pMapping,":(",2,999) 
@@ -1255,10 +1255,10 @@ ClassMethod RemoveGlobalMapping(pNamespace As %String, pMapping As %String = "",
 				$$$ThrowOnError(..ActivateMappings(pNamespace))
 			}
 		}
-	} catch e {
-		set tSC = e.AsStatus()
+	} Catch e {
+		Set tSC = e.AsStatus()
 	}
-	quit tSC
+	Quit tSC
 }
 
 ClassMethod CreateAllNamespace() As %Status
@@ -1269,9 +1269,9 @@ ClassMethod CreateAllNamespace() As %Status
 	Set ns = "%All"
 	Set tSC = $$$OK
 
-	if ('##Class(Config.Namespaces).Exists(ns)) {
+	If ('##Class(Config.Namespaces).Exists(ns)) {
 
-		Set dbPrefix = $select($ZVERSION["IRIS": "IRIS", 1: "CACHE")
+		Set dbPrefix = $Select($ZVersion["IRIS": "IRIS", 1: "CACHE")
 		Set Properties("Globals") = dbPrefix _ "TEMP"
 		Set Properties("Routines") = dbPrefix _ "TEMP"
 		
@@ -1285,36 +1285,36 @@ ClassMethod CreateAllNamespace() As %Status
 
 ClassMethod GetRoutineDatabase(pNamespace As %String) As %String
 {
-	New $namespace
-	Set $namespace="%SYS"
+	New $Namespace
+	Set $Namespace="%SYS"
 	Quit ##class(Config.Namespaces).Open(pNamespace).Routines
 }
 
 ClassMethod GetGlobalDatabase(pNamespace As %String) As %String
 {
-	New $namespace
-	Set $namespace="%SYS"
+	New $Namespace
+	Set $Namespace="%SYS"
 	Quit ##class(Config.Namespaces).Open(pNamespace).Globals
 }
 
 ClassMethod GetRoutineDatabaseDir(pNamespace As %String) As %String
 {
-	New $namespace
-	Set $namespace="%SYS"
+	New $Namespace
+	Set $Namespace="%SYS"
 	Quit ..GetDatabaseDirectory(..GetRoutineDatabase(pNamespace))
 }
 
 ClassMethod GetGlobalDatabaseDir(pNamespace As %String) As %String
 {
-	New $namespace
-	Set $namespace="%SYS"
+	New $Namespace
+	Set $Namespace="%SYS"
 	Quit ..GetDatabaseDirectory(..GetGlobalDatabase(pNamespace))
 }
 
 ClassMethod GetDatabaseDirectory(pDatabase As %String) As %String
 {
-	New $namespace
-	Set $namespace="%SYS"
+	New $Namespace
+	Set $Namespace="%SYS"
 	Quit ##class(Config.Databases).Open(pDatabase).Directory
 }
 
@@ -1382,50 +1382,50 @@ ClassMethod CopyItemsInPackage(pPackage As %String, pFromNamespace As %String, p
 /// The syntax for itemspec is the Name attribute in <Resource> tag and <Mapping> tag
 ClassMethod CopyItems(itemspec, source, target, qspec)
 {
-    set tSC = $$$OK
-    try {
-        new $namespace
-        set $namespace = target
-		set tSC = ##class(%ZPM.PackageManager.Developer.Utils).ResolveItems(.itemlist,itemspec,source) quit:$$$ISERR(tSC)
-        set filestream=##class(%FileCharacterStream).%New()
-        do filestream.Write("")
-        set tSC = $$exportItems(source,.itemlist,filestream.Filename) quit:$$$ISERR(tSC)
-        set tSC = $system.OBJ.Load(filestream.Filename,"/nocompile/checkuptodate"_qspec) quit:$$$ISERR(tSC)
-    } catch ex {
-        set tSC = ex.AsStatus()
+    Set tSC = $$$OK
+    Try {
+        New $Namespace
+        Set $Namespace = target
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).ResolveItems(.itemlist,itemspec,source) Quit:$$$ISERR(tSC)
+        Set filestream=##class(%FileCharacterStream).%New()
+        Do filestream.Write("")
+        Set tSC = $$exportItems(source,.itemlist,filestream.Filename) Quit:$$$ISERR(tSC)
+        Set tSC = $System.OBJ.Load(filestream.Filename,"/nocompile/checkuptodate"_qspec) Quit:$$$ISERR(tSC)
+    } Catch ex {
+        Set tSC = ex.AsStatus()
     }
-    quit tSC
+    Quit tSC
     ;
 exportItems(namespace,itemlist,filename)
-    new $namespace
-    set $namespace = namespace
-    quit $system.OBJ.Export(.itemlist,filename,"/nodisplay"_qspec)
+    New $Namespace
+    Set $Namespace = namespace
+    Quit $System.OBJ.Export(.itemlist,filename,"/nodisplay"_qspec)
 }
 
 /// This method resolves itemspec used by Name sttribute in <Resource> and <Mapping>
 ClassMethod ResolveItems(itemlist, itemspec, namespace) As %Status
 {
-    set tSC = $$$OK
-    try {
-        new $namespace
-        set $namespace = namespace
-        kill itemlist
-        set type = $p(itemspec,".",*)
-        if type="PKG" do getPackage(.itemlist,$p(itemspec,".",1,*-1)) quit
-        if $lf($lb("CLS","MAC","INC"),type) set itemlist(itemspec) = "" quit
-    } catch ex {
-        set tSC = ex.AsStatus()
+    Set tSC = $$$OK
+    Try {
+        New $Namespace
+        Set $Namespace = namespace
+        Kill itemlist
+        Set type = $Piece(itemspec,".",*)
+        If type="PKG" Do getPackage(.itemlist,$Piece(itemspec,".",1,*-1)) Quit
+        If $ListFind($ListBuild("CLS","MAC","INC"),type) Set itemlist(itemspec) = "" Quit
+    } Catch ex {
+        Set tSC = ex.AsStatus()
     }
-    quit tSC
+    Quit tSC
 	;
 getPackage(itemlist,package)
-	set pplen = $l(package,".")
-	set class = package_"."
-	for  {
-		set class = $o(^oddDEF(class)) quit:class=""  quit:$p(class,".",1,pplen)'=package
-		set itemlist(class_".CLS") = ""
+	Set pplen = $Length(package,".")
+	Set class = package_"."
+	For  {
+		Set class = $Order(^oddDEF(class)) Quit:class=""  Quit:$Piece(class,".",1,pplen)'=package
+		Set itemlist(class_".CLS") = ""
 	}
-	quit
+	Quit
 	;
 }
 
@@ -1442,18 +1442,18 @@ ClassMethod BeginCaptureOutput(Output pCookie As %String) As %Status [ Procedure
 		If $Data(^||%capture) Set tSC=$$$ERROR($$$GeneralError,"Capture Already Active") Quit
 
 		#; If re-direction is already active
-		If $zutil(82,12) {
+		If $ZUtil(82,12) {
 			#; Retain the name of the re-directed routine
-			Set pCookie=$ZU(96,12)
-		} else {
+			Set pCookie=$ZUtil(96,12)
+		} Else {
 			Set pCookie=""
 		}
 
 		#; Use THIS routine for redirection
-		Use $io::("^"_$ZNAME)
+		Use $Io::("^"_$ZName)
 
 		#; Switch redirection on
-		Do $zutil(82,12,1)
+		Do $ZUtil(82,12,1)
 
 		Kill ^||%capture
 
@@ -1465,30 +1465,30 @@ ClassMethod BeginCaptureOutput(Output pCookie As %String) As %Status [ Procedure
    #; Internal Entry points for device re-direction
 rstr(sz,to) [rt] public {
 	New rt Set vr="rt"
-	Set rd=$zutil(82,12,0)
-	Set:$data(sz) vr=vr_"#"_sz Set:$data(to) vr=vr_":"_to
+	Set rd=$ZUtil(82,12,0)
+	Set:$Data(sz) vr=vr_"#"_sz Set:$Data(to) vr=vr_":"_to
 	Read @vr
-	Do:$data(to) $zutil(96,4,$t)
-	Do $zutil(82,12,rd)
+	Do:$Data(to) $ZUtil(96,4,$Test)
+	Do $ZUtil(82,12,rd)
 	Quit rt
   }
-wchr(s)public { Do write($char(s)) }
-wff() public { Do write($char(12)) }
+wchr(s)public { Do write($Char(s)) }
+wff() public { Do write($Char(12)) }
 wnl() public {
-	If '$data(^||%capture(0)) Set ^||%capture(0)=1,^(1)=""
-	Set ^||%capture($increment(^||%capture(0)))=""
+	If '$Data(^||%capture(0)) Set ^||%capture(0)=1,^(1)=""
+	Set ^||%capture($Increment(^||%capture(0)))=""
   }
 wstr(s) public { Do write(s) }
-wtab(s) public { Do write($justify("",s-$x)) }
+wtab(s) public { Do write($Justify("",s-$X)) }
 write(s) public {
-	Set lf=$find(s,$C(10))
+	Set lf=$Find(s,$Char(10))
 	While lf {
 	    Do write($Extract(s,1,lf-2)),wnl()
 	    Set s=$Extract(s,lf,*)
-	    Set lf=$find(s,$C(10))
+	    Set lf=$Find(s,$Char(10))
 	}
-	Set lno=$get(^||%capture(0)) Set:lno="" lno=1,^||%capture(0)=1
-	Set ^||%capture(lno)=$get(^||%capture(lno))_$translate(s,$char(13))
+	Set lno=$Get(^||%capture(0)) Set:lno="" lno=1,^||%capture(0)=1
+	Set ^||%capture(lno)=$Get(^||%capture(lno))_$Translate(s,$Char(13))
   }
 }
 
@@ -1499,22 +1499,22 @@ ClassMethod EndCaptureOutput(pCookie As %String, Output pText) As %Status
 
 	If pCookie'="" {
 		#; Use the original redirected routine
-		Use $io::("^"_pCookie)
-	} else {
+		Use $Io::("^"_pCookie)
+	} Else {
 		#; Otherwise switch redirection off
-		Do $zutil(82,12,0)
+		Do $ZUtil(82,12,0)
 	}
 
 	Try {
 		Set tLast=$Get(^||%capture(0),0)
 		For tKey=1:1:tLast-1 {
-			Set pText($i(pText)) = ^||%capture(tKey)
+			Set pText($Increment(pText)) = ^||%capture(tKey)
 		}
 		If tLast,^||%capture(tLast)'="" {
-			Set pText($i(pText)) = ^||%capture(tLast)
+			Set pText($Increment(pText)) = ^||%capture(tLast)
 		}
 	} Catch {
-		Set pText($i(pText)) = "Capture error: "_$ZE
+		Set pText($Increment(pText)) = "Capture error: "_$ZError
 	}
 
 	Kill ^||%capture
@@ -1543,7 +1543,7 @@ ClassMethod OrphanedResourcesExecute(ByRef qHandle As %Binary, pNamespace As %St
 			
 			Set tName = tResult.%Get("Name")
 			If '$IsObject(##class(%ZPM.PackageManager.Developer.Extension.Utils).FindHomeModule(tName)) {
-				Set ^||%ZPM.OrphanedResources($i(^||%ZPM.OrphanedResources)) = $ListBuild(tName)
+				Set ^||%ZPM.OrphanedResources($Increment(^||%ZPM.OrphanedResources)) = $ListBuild(tName)
 			}
 		}
 		
@@ -1595,9 +1595,9 @@ ClassMethod NamespaceHasModule(pNamespace As %String, pModuleName As %String) As
 ClassMethod LockWithCurrentDependencies(pModuleName As %String) As %Status
 {
 	Set tSC = $$$OK
-	Set tInitTLevel = $TLevel
+	Set tInitTLevel = $Tlevel
 	Try {
-		TSTART
+		Tstart
 		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(pModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
 		
@@ -1648,12 +1648,12 @@ ClassMethod LockWithCurrentDependencies(pModuleName As %String) As %Status
 			Write !,$Get(tSourceControlOutput(tLine))
 		}
 		$$$ThrowOnError(tStatus)
-		TCOMMIT
+		Tcommit
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
-	While ($TLevel > tInitTLevel) {
-		TROLLBACK 1
+	While ($Tlevel > tInitTLevel) {
+		Trollback 1
 	}
 	Quit tSC
 }
@@ -1742,8 +1742,8 @@ ClassMethod ConvertTimestampUTCToW3C(pDateTime As %TimeStamp) As %String
 ClassMethod GetInstallerProperties(pClass As %String = "", pExcept As %String = "") [ PublicList = (tExcept, tClass) ]
 {
 	Set tExcept = pExcept
-	If '$LISTVALID(pExcept) {
-		Set tExcept = $LISTFROMSTRING(pExcept)
+	If '$ListValid(pExcept) {
+		Set tExcept = $ListFromString(pExcept)
 	}
 	Set tClass = "%Installer."_pClass
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
@@ -1751,7 +1751,7 @@ ClassMethod GetInstallerProperties(pClass As %String = "", pExcept As %String = 
 		"WHERE Parent = :tClass AND (:tExcept IS NULL OR Name NOT %INLIST :tExcept) "_
 		"ORDER BY SequenceNumber")
 	Do tRes.%Next()
-	set res = tRes.%GetData(1)
+	Set res = tRes.%GetData(1)
 	Quit tRes.%GetData(1)
 }
 
@@ -1762,8 +1762,8 @@ ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutpu
 {
 	Set tSC = $$$OK
 	Set pRetCode = ""
-	Set IO = $IO
-	Set ZEOFMode = $ZU(68,40,1)
+	Set IO = $Io
+	Set ZEOFMode = $ZUtil(68,40,1)
 
 	Try {
 		Set tFile = ##class(%File).TempFilename("txt")
@@ -1771,10 +1771,10 @@ ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutpu
 		Set tErrFile = ##class(%File).TempFilename("txt")
 		If tErrFile="" Set tSC = $$$ERROR($$$ObjectScriptError, "Failed to obtain a temporary file name") Quit
 		If $System.Version.GetBuildOS()="VMS" {
-			Set pRetCode = $ZF(-1,pCmd,tFile)
+			Set pRetCode = $Zf(-1,pCmd,tFile)
 		} Else {
-			Set:pCmd[" 2>&1" pCmd = $P(pCmd,"2>&1",1)
-			Set pRetCode = $ZF(-1,pCmd_" > "_tFile_" 2> "_tErrFile)
+			Set:pCmd[" 2>&1" pCmd = $Piece(pCmd,"2>&1",1)
+			Set pRetCode = $Zf(-1,pCmd_" > "_tFile_" 2> "_tErrFile)
 		}
 		
 		$$$ThrowOnError(..GetFileLines(tFile,.pLogOutput))
@@ -1783,10 +1783,110 @@ ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutpu
 		Set tSC = ex.AsStatus()
 	}
 
-	If 'ZEOFMode Do $ZU(68,40,0) // Restore ZEOF mode
+	If 'ZEOFMode Do $ZUtil(68,40,0) // Restore ZEOF mode
 	Use IO
 	
 	Quit tSC
+}
+
+/// Run command with $ZF(-100) <br />
+/// <var>pCwd</var> - Working folder<br/ >
+/// <var>pCmd</var> - $ListBuild for command with arguments<br/ >
+/// <var>pLogOutput</var> - Pass filename or stream object, to get all output, empty string to ignore and have output from command in default output<br/ >
+/// <vr>pErrOutput</var> - if not specified, gets the value from pLogOutput<br/ >
+/// <vr>pRetCode</var> - Code returned by OS<br/ >
+ClassMethod RunCommand(pCwd As %String = "", pCmd As %String = "", ByRef pLogOutput As %Stream.Object, ByRef pErrOutput As %Stream.Object, Output pRetCode As %String) As %Status
+{
+  If (pCmd="") || ('$ListValid(pCmd)) || ($ListGet(pCmd) = "") {
+    Quit $$$ERROR($$$GeneralError,"Wrong command.")
+  }
+  If pCwd="", '##class(%File).DirectoryExists(pCwd) {
+    Quit $$$ERROR($$$GeneralError,"Working folder does not exists or inaccessible.")
+  }
+  Set tSC = $$$OK
+  Try {
+    Set currentDirectory = ##class(%SYSTEM.Process).CurrentDirectory(pCwd)
+    Set flags = ""
+    Set cmd = $ListGet(pCmd)
+    Set args = 0
+    For i = 2:1:$ListLength(pCmd) {
+      Set args($Increment(args)) = $ListGet(pCmd, i)
+    }
+    If '$Data(pLogOutput),$Data(pErrOutput) {
+      Set pLogOutput = pErrOutput
+    }
+    Set stdout = ..GetFilename4Output(.pLogOutput, .stdoutTmp)
+    Set stderr = ..GetFilename4Output(.pErrOutput, .stderrTmp)
+    If stdout '= "", stderr = "" {
+      Set stderr = stdout
+    }
+    If stdout '= "" {
+      Set flags = flags _ "/STDOUT=""" _ stdout _ """"
+    }
+    If stderr '= "" {
+      Set flags = flags _ "/STDERR=""" _ stderr _ """"
+    }
+    Set pRetCode = $Zf(-100, flags, cmd, args...)
+    $$$ThrowOnError(..ReadFileToStream(stdout, .pLogOutput, $Get(stdoutTmp)))
+    $$$ThrowOnError(..ReadFileToStream(stderr, .pErrOutput, $Get(stderrTmp)))
+
+    If pRetCode'=0 {
+      $$$ThrowStatus($$$ERROR($$$GeneralError, "Running command returned error."))
+    }
+  } Catch (ex) {
+    If ex.Code = 34 {
+      Set tSC = $$$ERROR($$$GeneralError, "Command " _ $Get(cmd) _ " not found.")
+    } 
+    else {
+      Set tSC = ex.AsStatus()
+    }
+  }
+  If $Get(currentDirectory)'="" {
+    Do ##class(%SYSTEM.Process).CurrentDirectory(currentDirectory)
+  }
+  Quit tSC
+}
+
+ClassMethod GetFilename4Output(pOutput As %Stream.Object, Output pAsTemporary = 0) As %String
+{
+  If '$Data(pOutput) {
+    Quit ""
+  }
+  Set filename = ##class(%Library.Device).GetNullDevice()
+  If $IsObject(pOutput),pOutput.%IsA("%Stream.Object") {
+    Do pOutput.Clear()
+    If pOutput.%IsA("%Stream.FileBinary") {
+      Set filename = pOutput.Filename
+    }
+    Else {
+      Set filename = ##class(%File).TempFilename()
+      Set pAsTemporary = 1
+    }
+  }
+  ElseIf '$IsObject(pOutput),pOutput'="",##class(%File).DirectoryExists(##class(%File).GetDirectory(pOutput)) {
+    Set filename = pOutput
+  }
+  Quit filename
+}
+
+ClassMethod ReadFileToStream(pFileName As %String = "", ByRef pOutput As %Stream.Object, pDeleteAfter As %Boolean = 0) As %Status
+{
+  If (pFileName="") || (pFileName=##class(%Library.Device).GetNullDevice()) {
+    Quit $$$OK
+  }
+  If '$Data(pOutput) || '$IsObject(pOutput) || (pFileName = pOutput) {
+    Quit $$$OK
+  }
+  If pOutput.%IsA("%Stream.FileBinary"), pOutput.Filename = pFileName {
+    Quit $$$OK
+  } 
+  Set tStream = $Select(pOutput.IsCharacter(): ##class(%Stream.FileCharacter).%New(), 1: ##class(%Stream.FileBinary).%New())
+  $$$QuitOnError(tStream.LinkToFile(pFileName))
+  $$$QuitOnError(pOutput.CopyFrom(tStream))
+  If pDeleteAfter {
+    Do ##class(%File).Delete(pFileName)
+  }
+  Quit $$$OK
 }
 
 ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Internal, Private ]
@@ -1795,19 +1895,19 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 	Try {
 		Kill pOutput
 		Close pFileName Open pFileName:("RS"):5
-		If '$T Set tSC = $$$ERROR($$$ObjectScriptError, "Failed to open temporary file '"_pFileName_"'") Quit
+		If '$Test Set tSC = $$$ERROR($$$ObjectScriptError, "Failed to open temporary file '"_pFileName_"'") Quit
 		Set TooMuch = 0
 		Use pFileName
 		For {
 			// Keep reading through end of file; save only first 32,000 characters
 			Set tLine = "" Read tLine:1
-			If '$T && (tLine=$C(-1)) Quit  // Exit by timeout
+			If '$Test && (tLine=$Char(-1)) Quit  // Exit by timeout
 			If $Length(tLine)<32000 {
-				Set pOutput($i(pOutput)) = tLine
+				Set pOutput($Increment(pOutput)) = tLine
 			} Else {
-				Set pOutput($i(pOutput)) = $E(tLine,1,32000)_" (more...)"
+				Set pOutput($Increment(pOutput)) = $Extract(tLine,1,32000)_" (more...)"
 			}
-			If ($ZEOF=-1) Quit  // Exit by EOF
+			If ($ZEof=-1) Quit  // Exit by EOF
 		}
 		Close pFileName:"D"
 	} Catch e {

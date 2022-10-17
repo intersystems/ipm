@@ -1479,11 +1479,12 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
 	Merge tParams = pCommandInfo("data")
-  Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-  If $Extract(tDirectoryName,1,4)="http" {
-		Set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
+  Set tParams("cmd") = "load"
+  if $Extract(tDirectoryName,1,4)="http" {
+		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
+    Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($Piece(tDirectoryName, ".", *)) = "tgz" {
 		Set tTargetDirectory = $$$FileTempDirSys
@@ -1550,6 +1551,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 			Do ##class(%ZPM.PackageManager.Developer.Lifecycle.Abstract).GetDefaultParameters(.tParams)
 			Merge tParams = pCommandInfo("data")
       Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
+			Set tParams("cmd") = "install"
 			Set tParams("Install") = 1
       If tResult.Deployed {
         Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
