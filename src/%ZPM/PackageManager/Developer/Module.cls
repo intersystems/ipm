@@ -1041,14 +1041,14 @@ Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 		}
 		Set tExternalName = ##class(%Studio.SourceControl.Interface).ExternalName(..Name_".ZPM")
 		If (tExternalName '= "") {
-			Set tDirectory = ##class(%File).GetDirectory(tExternalName,1)
+			Set tDirectory = ##class(%File).GetDirectory(tExternalName, 0)
 			If (tDirectory '= "") {
 				Set ..Root = tDirectory
-        If ..Deployed {
-          Set ..DeveloperMode = 0
-        }
 			}
 		}
+    If ..Deployed,..DeveloperMode {
+      Set ..DeveloperMode = 0
+    }
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

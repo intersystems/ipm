@@ -534,6 +534,9 @@ ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE
 	Set tSC = $$$OK
 	Kill pErrorList
 	Set pList = ##class(%Library.ListOfObjects).%New()
+  If $Get(pModuleName)="" {
+    Quit $$$OK
+  }
 	Try {
 		Set tSC = ..BuildAllDependencyGraphs(pRepoNames,.tGraphs,.pErrorList)
 		If $$$ISERR(tSC) {
@@ -570,6 +573,9 @@ ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE
 ClassMethod GetDependentsAsTree(Output pTree, Output pErrorList, pModuleName As %String, pModuleVersion As %String = "", pRepoNames As %List = "") As %Status
 {
 	New %DepTree
+  If $Get(pModuleName)="" {
+    Quit $$$OK
+  }
 	Set tSC = $$$OK
 	Kill pErrorList
 	Kill pTree
@@ -1752,7 +1758,7 @@ ClassMethod GetInstallerProperties(pClass As %String = "", pExcept As %String = 
 /// Copied from %Net.Remote.Utility:RunCommandViaCPIPE and modified slightly to fit these purposes:
 /// Run a command using $ZF(-1) and an external temporary file to store the command output. <br>
 /// If <var>pDeleteTempFile</var> is 0 (false), the temporary file is not deleted; in this case, it is up to the caller to delete it when done with it.
-ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutput, pTimeout As %Integer = 10, Output pRetCode As %String) As %Status
+ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutput, pTimeout As %Integer = 10, Output pRetCode As %String, pArgs... As %String) As %Status
 {
 	Set tSC = $$$OK
 	Set pRetCode = ""
