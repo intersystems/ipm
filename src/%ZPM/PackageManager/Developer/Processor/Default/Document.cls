@@ -88,7 +88,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
         Set tSourcesPrefix = $Char(##class(%ZPM.PackageManager.Developer.Extension.SourceControl.ISC).#NOPREFIXCHARCODE)
         
         If '$Get(pParams("NoMapping"),0) {
-          $$$ThrowOnError(..OnConfigureMappings(.pParams))
+        // Disabled mapping of resources. It creates more problems than solves. 
+        // Moreover, the removal of mapping during uninstallation is not implemented.
+        // $$$ThrowOnError(..OnConfigureMappings(.pParams))
         }
         
         If ..ResourceReference.Generated {
