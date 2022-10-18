@@ -523,6 +523,10 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
 
     Set target = ##class(%File).NormalizeDirectory("python", $System.Util.ManagerDirectory())
     Set command = $ListBuild("pip", "install", "-r", "requirements.txt", "-t", target)
+    if $$$isWINDOWS {
+  		set tBinDir = $System.Util.BinaryDirectory()_"irispip.exe"
+  		set command=$ListBuild(tBinDir,"install", "-r", "requirements.txt", "-t", target)
+    }
     If 'tVerbose {
       Set stdout = ""
     }
