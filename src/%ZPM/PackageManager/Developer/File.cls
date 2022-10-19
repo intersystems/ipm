@@ -40,8 +40,10 @@ ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
 				}
 				Set pRoot = ##class(%Library.File).NormalizeDirectory(pRoot)
 				
-				Set tCmd = "ROBOCOPY "_tEmptyDir_" "_pRoot_" /MIR"
-				Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(tCmd,.tLog,.tErr)
+				Set tCmd = $ListBuild("ROBOCOPY",tEmptyDir,pRoot,"/MIR")
+				Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommand(, tCmd,.stdout,,.retCode)
+				if $$$ISERR(tSC),$Get(retCode)=1 set tSC=$$$OK
+        
 			} Catch e {
 				Set tSC = e.AsStatus()
 			}
@@ -97,11 +99,12 @@ ClassMethod CopyDir(pSource As %String, pDest As %String, pDeleteFirst As %Boole
 			}
 			Set pSource = ##class(%Library.File).NormalizeDirectory(pSource)
 			Set pDest = ##class(%Library.File).NormalizeDirectory(pDest)
-			Set tCmd = $lb("ROBOCOPY", pSource,pDest, "/E")
-      If ('pVerbose) {
-        Set stdout = ""
-      }
-			Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommand(, tCmd,.stdout)
+			Set tCmd = $ListBuild("ROBOCOPY", pSource,pDest,"/E")
+	      If ('pVerbose) {
+	        Set stdout = ""
+	      }
+		  Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommand(, tCmd,.stdout,,.retCode)
+		  if $$$ISERR(tSC),$Get(retCode)=1 set tSC=$$$OK
 		}
 	} Catch e {
 		Set tSC = $$$EMBEDSC(tBadSC,e.AsStatus())
