@@ -39,10 +39,10 @@ ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
 					$$$ThrowStatus(tSC)
 				}
 				Set pRoot = ##class(%Library.File).NormalizeDirectory(pRoot)
-				
+				Set stdout=""
 				Set tCmd = $ListBuild("ROBOCOPY",tEmptyDir,pRoot,"/MIR")
 				Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommand(, tCmd,.stdout,,.retCode)
-				if $$$ISERR(tSC),$Get(retCode)=1 set tSC=$$$OK
+				if $$$ISERR(tSC),$Get(retCode)=1||($Get(retCode)=2) set tSC=$$$OK
         
 			} Catch e {
 				Set tSC = e.AsStatus()
@@ -120,11 +120,12 @@ ClassMethod MakeDirectoryWriteable(pDirectory As %String, Output pCmd, Output pO
 		Kill pOutputLog
 		Kill pErrLog
 		If $$$isWINDOWS {
-			Set pCmd = "attrib -r "_##class(%Library.File).NormalizeDirectory(pDirectory)_"*.* /s"
+			Set pCmd = $ListBuild("attrib","-r"_##class(%Library.File).NormalizeDirectory(pDirectory)_"*.*","/s")
+			Set stdout = ""
 		} ElseIf $$$isUNIX {
-			Set pCmd = "chmod -R 775 "_##class(%Library.File).NormalizeDirectory(pDirectory)
+			Set pCmd = $ListBuild("chmod","-R","775",##class(%Library.File).NormalizeDirectory(pDirectory))
 		}
-		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommandViaZF(pCmd,.pOutputLog,.pErrLog)
+		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommand(, pCmd,.stdout)
 		$$$ThrowOnError(tSC)
 		if ($get(pErrLog(1))'="") {
 			set error = pErrLog(1)
