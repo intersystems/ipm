@@ -104,7 +104,7 @@ ClassMethod CopyDir(pSource As %String, pDest As %String, pDeleteFirst As %Boole
 	        Set stdout = ""
 	      }
 		  Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommand(, tCmd,.stdout,,.retCode)
-		  if $$$ISERR(tSC),$Get(retCode)=1 set tSC=$$$OK
+		  if $$$ISERR(tSC),$Get(retCode)=1||($Get(retCode)=2) set tSC=$$$OK
 		}
 	} Catch e {
 		Set tSC = $$$EMBEDSC(tBadSC,e.AsStatus())
