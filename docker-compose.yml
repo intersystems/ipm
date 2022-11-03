@@ -1,15 +1,24 @@
 version: '3'
 services:
   iris:
-    build: 
-      context: .
-      
+    build: .
     restart: always
+    environment:
+      - TEST_REGISTRY=http://registry:52773/registry/
+      - TEST_REGISTRY_USER=admin
+      - TEST_REGISTRY_PASSWORD=SYS
     ports: 
       - 52774:52773
-    command:
-      - -a
-      - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
     volumes:
-      - ./:/home/irisowner/ipm/
       - ~/iris.key:/usr/irissys/mgr/iris.key
+      - ./:/home/irisowner/zpm/
+    command:
+      - -a 
+      - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
+  registry:
+    image: docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
+    ports: 
+      - 52775:52773
+    command:
+      - -a 
+      - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'

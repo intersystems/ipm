@@ -853,7 +853,7 @@ ClassMethod FormatName(pName As %String) As %String
 
 ClassMethod TerminalPromptColor() As %String
 {
-	quit $Case(##class(%IPM.Repo.UniversalSettings).GetValue("TerminalPrompt"),"green":$$$Green,"red":$$$Red,"magenta":$$$Magenta,"yellow":$$$Yellow,"blue":$$$Blue,"cyan":$$$Cyan,"none":$$$Default,:$$$Default)
+	Quit $Case(##class(%IPM.Repo.UniversalSettings).GetValue("TerminalPrompt"),"green":$$$Green,"red":$$$Red,"magenta":$$$Magenta,"yellow":$$$Yellow,"blue":$$$Blue,"cyan":$$$Cyan,"none":$$$Default,:$$$Default)
 }
 
 }

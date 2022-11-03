@@ -4,6 +4,9 @@ ROUTINE %IPM.Formatting [Type=INC]
 #define ColorScheme $Case(##class(%IPM.Repo.UniversalSettings).GetValue("ColorScheme"),"none":0,:1)
 /// Returns a line with given formatting, clearing the formatting at the end of the line
 #define FormattedLine(%formatCode, %line) $Select($$$ColorScheme:$$$ControlSequence(%formatCode)_%line_$$$ControlSequence($$$ResetAll),1:%line)
+#define pad(%width, %text) $Justify("", %width - $Length(%text))
+#define FormattedLinePadRight(%formatCode, %line, %width) $Select($$$ColorScheme:$$$ControlSequence(%formatCode)_%line_$$$ControlSequence($$$ResetAll),1:%line)_$$$pad(%width,%line)
+#define FormattedLinePadLeft(%formatCode, %line, %width) $$$pad(%width,%line)_$Select($$$ColorScheme:$$$ControlSequence(%formatCode)_%line_$$$ControlSequence($$$ResetAll),1:%line)
 
 /// Creates the control sequence for the formatting based on the code
 #define ControlSequence(%code) $Char(27)_"["_%code_"m"

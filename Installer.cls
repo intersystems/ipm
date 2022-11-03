@@ -208,6 +208,7 @@ ClassMethod CompactPackage(ByRef pList) As %Status
   set file = ""
   for i=1:1:$Get(pList) {
     Set $LISTBUILD(file, name) = pList(i)
+    Write !,"Compact: ", file
     
     set tmpFile = ##class(%File).TempFilename("gz")
 

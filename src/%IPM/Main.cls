@@ -7,7 +7,7 @@ Class %IPM.Main Extends %IPM.CLI
 
 Parameter DOMAIN = "ZPM";
 
-Parameter STANDARDPHASES = {$Listbuild("reload","compile","test","package","verify","publish")};
+Parameter STANDARDPHASES = {$ListBuild("reload","compile","test","package","verify","publish")};
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -111,7 +111,7 @@ This command is an alias for `module-action module-name compile`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
-<command name="test">
+<command name="test" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name test`
 </description>
@@ -122,7 +122,7 @@ This command is an alias for `module-action module-name test`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
-<command name="package">
+<command name="package" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name package`
 </description>
@@ -134,7 +134,7 @@ This command is an alias for `module-action module-name package`
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Use specified path to export package." />
 </command>
 
-<command name="verify">
+<command name="verify" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name verify`
 </description>
@@ -145,7 +145,7 @@ This command is an alias for `module-action module-name verify`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
-<command name="publish">
+<command name="publish" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name publish`
 </description>
@@ -204,6 +204,8 @@ repo -enable -app /csp/mynamespace -publish 1
 <modifier name="delete" description="Deletes the current namespace's reference to the named repository" />
 <modifier name="publish" value="true" valueList="0,1" description="When configuring a remote repository, specifies that publishing of packages to the repository is allowed. When configuring the current namespace with -enable, specifies that publishing is also enabled. "/>
 <!-- General properties -->
+<modifier name="enable" value="false" description="For any repository, specifies that it can be used." />
+<modifier name="disable" value="false" description="For any repository, specifies that it can not be used." />
 <modifier name="snapshots" aliases="s" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for snapshot builds (i.e., those with a semantic version ending in '+snapshot', indicating a 'latest' build of a particular version)." />
 <modifier name="prereleases" aliases="pre" value="true" valueList="0,1" description="For any repository, specifies that it should be used to look for prerelease software" />
 <modifier name="read-only" aliases="ro" value="true" valueList="0,1" description="For any repository, specifies that modules installed from it are ALWAYS installed in non-developer mode, effectively making them read only" />
@@ -240,6 +242,7 @@ load https://github.com/user/repository.git -branch feature-1
 <!-- Modifiers -->
 <modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="nodev" dataAlias="DeveloperMode" dataValue="0" description="Disables the DeveloperMode flag for the module's lifecycle." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 
@@ -404,7 +407,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 
 </command>
 
-<command name="cos" aliases="isc-os">
+<command name="exec" aliases="cos">
 <description>
 	Executes the provided ObjectScript expression.
 </description>
@@ -443,6 +446,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Shows all installed modules in tree format.">
 	list-installed -tree
 </example>
+
+<!-- Parameters -->
+<parameter name="searchString" description="Search string, * can be used." />
 
 <!-- Modifiers -->
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
@@ -570,6 +576,8 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <example description="Shows all modules in current registry">search -r</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
 <modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
+<modifier name="versions" dataAlias="AllVersions" dataValue="1" description="Shows all versions for each module." />
+
 <parameter name="searchString" description="Search string, * can be used" />
 <example description="Shows a description of all modules in the name of which there is a context">find -d *tools*</example>
 </command>
@@ -579,6 +587,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <example description="Show all modules in all namespaces">zn *</example>
 <example description="Show all modules in namespaces by context">zn sql*</example>
 <parameter name="name" description="Name namespace, * or context name*" />
+<modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
 </command>
 
 	<command name="enable">
@@ -619,10 +628,10 @@ ClassMethod %GetCommandStructure(Output pCommandStructure)
 }
 
 /// @API.Method
-ClassMethod Shell(pCommand As %String, pTerminateOnError As %Boolean = 0, pHaltOnComplete As %Boolean = 0) As %Status
+ClassMethod Shell(pCommand As %String = "", pTerminateOnError As %Boolean = 0, pHaltOnComplete As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
-	Do ..ShellInternal(.pCommand,.tException)
+	Do ..ShellInternal(pCommand,.tException)
 	If $IsObject(tException) {
 		If pTerminateOnError {
 			Do $System.Process.Terminate($Job,1)
@@ -637,20 +646,20 @@ ClassMethod Shell(pCommand As %String, pTerminateOnError As %Boolean = 0, pHaltO
 
 ClassMethod TerminalPrompt() As %String
 {
-	set tp=##class(%SYSTEM.Process).TerminalPrompt()
-	set prompt="zpm:"
-	set del=$$$FormattedLine(..TerminalPromptColor(),">")
-	if ..TerminalPromptColor()=$$$Default set tp=2
-	for i=1:1:$l(tp,",") {
-		if $p(tp,",",i)=1 {	set prompt=prompt_$p($system,":")_del continue}
-		elseif $p(tp,",",i)=2 {	set prompt=prompt_$namespace_del continue}
-		elseif $p(tp,",",i)=3 {	set prompt=prompt_$p($system,":",2)_del continue}
-		elseif $p(tp,",",i)=4 {	set prompt=prompt_$zt(+$p($h,",",2),1)_del continue}
-		elseif $p(tp,",",i)=5 {	set prompt=prompt_$job_del continue}
-        elseif $p(tp,",",i)=8,$tl { set prompt=prompt_"TL"_$tl_del continue}
-        ;for zpm shell 7 do not need to be implemented	
+	Set tp=##class(%SYSTEM.Process).TerminalPrompt()
+	Set prompt="zpm:"
+	Set del=$$$FormattedLine(..TerminalPromptColor(),">")
+	If ..TerminalPromptColor()=$$$Default { Set tp=2 }
+	For i=1:1:$Length(tp,",") {
+		If $Piece(tp,",",i)=1 {	Set prompt=prompt_$Piece($System,":")_del Continue}
+		ElseIf $Piece(tp,",",i)=2 {	Set prompt=prompt_$Namespace_del Continue}
+		ElseIf $Piece(tp,",",i)=3 {	Set prompt=prompt_$Piece($System,":",2)_del Continue}
+		ElseIf $Piece(tp,",",i)=4 {	Set prompt=prompt_$ZTime(+$Piece($Horolog,",",2),1)_del Continue}
+		ElseIf $Piece(tp,",",i)=5 {	Set prompt=prompt_$Job_del Continue}
+    Elseif $Piece(tp,",",i)=8,$Tlevel { Set prompt=prompt_"TL"_$Tlevel_del Continue}
+        // for zpm shell 7 do not need to be implemented	
     }
-	quit prompt
+	Quit prompt
 }
 
 /// For use in unit tests that need to test if a command threw any exceptions.
@@ -708,16 +717,13 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "repo") {
 				Do ..Repository(.tCommandInfo)
 			} ElseIf (tCommandInfo = "load") {
-				#; Do ..InTranStart(.tCommandInfo,.tTLev)
 				Do ..Load(.tCommandInfo)
 			} ElseIf (tCommandInfo = "cos") {
 				Write !
 				Xecute tCommandInfo("parameters","cos")
 			} ElseIf (tCommandInfo = "install") {
-				#; Do ..InTranStart(.tCommandInfo,.tTLev)
 				Do ..Install(.tCommandInfo)
 			} ElseIf (tCommandInfo = "reinstall") {
-        		#; Do ..InTranStart(.tCommandInfo,.tTLev)
 				Do ..Reinstall(.tCommandInfo)
 			} ElseIf (tCommandInfo = "uninstall") {
 				Do ..Uninstall(.tCommandInfo)
@@ -740,7 +746,6 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "config") {
 				Do ..Config(.tCommandInfo)
 			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
-				#; if (tCommandInfo="publish") Do ..InTranStart(.tCommandInfo,.tTLev)
 				Do ..RunOnePhase(.tCommandInfo)
 			} ElseIf (tCommandInfo = "generate") {
 				Do ..GenerateModuleXML(.tCommandInfo)
@@ -754,15 +759,12 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..EnableIPM(.tCommandInfo)
 			}
 		} Catch pException {
-			#; if $TLevel>$GET(tTLev) TROLLBACK 1  write:$GET(tCommandInfo("data","Verbose")) !,"Rollback a transaction",!
-			#dim e As %Exception.AbstractException
 			If (pException.Code = $$$ERCTRLC) {
 				Set pException = $$$NULLOREF
 				Return
 			}
 			Do ..DisplayError(pException.AsStatus())
 		}
-		#; if $TLevel>$GET(tTLev) TCOMMIT  write:$GET(tCommandInfo("data","Verbose")) !,"Completing a transaction",!
 		Set tCommand = ""
 		If tOneCommand {
 			Quit	
@@ -779,109 +781,177 @@ ClassMethod DisplayError(pStatus As %Status)
   }
 }
 
-/// In Transaction 
-ClassMethod InTranStart(ByRef pCommandInfo, ByRef tTLev) [ Internal ]
-{
-	Set name = $Get(pCommandInfo("parameters","module"))
-	Set tVerbose = $GET(pCommandInfo("data","Verbose"))
-	if name'="",name'="zpm" set tTLev=$TLevel  TSTART  write:tVerbose !,"Opening a transaction",!
-	quit $$$OK
-}
-
 /// Show modules in Namespace and to go namespace
 ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 {
-	Set currentns=$Namespace
-	Set name = $Translate($Get(pCommandInfo("parameters","name")),$c(34))
-	Set tDesc=$Get(pCommandInfo("data","Desc"))
-	If name["*" {
-		Do ..GetListNamespace(.namespace)
-		Set ns="",num=0
-		For { set ns=$Order(namespace(ns)) Quit:ns=""
-			Set $Namespace=ns
-			Kill list
-			If ("@"_ns)[("@"_$Zconvert($tr(name,"*"),"U")) {
-				Set num=num+1
-					,num(num)=ns
-				Do ..GetListModules("",.list)
-				If $D(list) {
-					Set module="",write=0
-					For { set module=$Order(list(module)) Quit:module=""
-						Write !
-						,$Select('write:num_".",1:$j("",$L(num)+1))
-						,(ns)_">"_$j("",namespace-$l(ns_">"))
-						," "_$$$FormattedLine($$$Green,module)_$j("",list-$l(module))
-						," "_$LG(list(module),1)
-						If tDesc {
-							Write !?(4+$L(ns_">"_$Justify("",namespace-$Length(ns_">"))))
-							Do ..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_" "_$Listget(list(module),2))
-						}
-						Set write=1
-					}
-				} Else {
-					Write !
-					,num_"."
-					,$$$FormattedLine($$$Magenta,ns)_">"_$Justify("",namespace-$Length(ns_">"))
-					
-				}
-			}
-		}
-		Set $Namespace=currentns
-		Do ##class(%Library.Prompt).GetString("Enter number or name where to go: ", .goto)	
-		If goto'="" try { Set $Namespace=$Select($D(num(goto)):num(goto),1:goto) } catch e {}
-	} Else {
-		Set $Namespace=name
-	}
+  Set name = $Translate($Get(pCommandInfo("parameters","name"),"*"),$Char(34))
+	If name'["*" {
+    Try {
+      Set $Namespace = name
+    } Catch ex {
+      $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to switch to namespace: " _ name))
+    }
+    Quit
+  }
+
+	Set currentns = $Namespace
+  Set showFields = ""
+  If $Get(pCommandInfo("data","Description")) {
+    Set showFields = $ListBuild("Description")
+  }
+
+  Do ..GetListModules(name, , .list, showFields)
+  Do ..DisplayModules(.list, 1, 1)
+
+  Write !
+  Set prompt = "Enter number or name where to go:"
+  Do {
+    Set value = ""
+    Do ##class(%Library.Prompt).GetString(prompt, .value)
+    Quit:value=""
+    Try { 
+      Set $Namespace = $Select($Data(list(value), ns): $ListGet(ns), 1: value)
+    } Catch e {
+      Write $Char(13),*27,"[K",*27,"[A"
+      Continue
+    }
+    Quit
+  } While 1
+  Write $Char(13),*27,"[K",prompt, " ", $Namespace,!
 }
 
 /// Get list Namespace, example do ##class(%IPM.Main).GetListNamespace(.ns)
-ClassMethod GetListNamespace(ByRef namespace)
+ClassMethod GetListNamespace(Output list, pSearch As %String = "")
 {
-	New $Namespace
-	Set $Namespace="%SYS"
-	
-	Set tQuery = "select Nsp from %SYS.Namespace_List(0,0) where Status = 1"
-	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
-	
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-	}
-	While tRes.%Next(.tSC) {
-		$$$ThrowOnError(tSC)
-		Set namespace(tRes.%Get("Nsp"))=""
-		Set:$Get(maxlen)<$Length(tRes.%Get("Nsp")) maxlen=$Length(tRes.%Get("Nsp"))
-	}
-	Set:$Data(namespace) namespace=$G(maxlen)
+  Set list = 0
+  Set width = 0
+  Set tArgs = 0
+  Set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
+  If pSearch'="" {
+    Set tQuery = tQuery _ " WHERE Nsp " _ $Select(pSearch["*": "LIKE", 1: "=") _ " ?"
+    Set tArgs($Increment(tArgs)) = $Translate($$$UPPER(pSearch), "*", "%")
+  }
+  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
+  $$$ThrowSQLIfError(tRes.%SQLCODE, tRes.%Message)
+  While tRes.%Next(.tSC) {
+    $$$ThrowOnError(tSC)
+    Set nsp = tRes.Nsp
+    Set list(nsp) = ""
+  }
 }
 
 /// draw description
 ClassMethod DrawColumn(desc) As %String
 {
-	Set dx=$x
+	Set dx=$X
 	For d=1:1:$Length(desc," ") {
  		Set wd=$Piece(desc," ",d) 
-		If $x+$l(wd)>80 Write !,?dx
+		If $X+$Length(wd)>80 Write !,?dx
 		Write wd," " 
 	}
  	Quit ""
 }
 
-/// Get List Modules
-/// example d ##class(%IPM.Main).GetListModules($$$IPMModuleName,.list)
-ClassMethod GetListModules(StartsWith As %String = "", ByRef pList) [ Internal ]
+ClassMethod SwitchToNamespace(pNamespace As %String = {$Namespace}) As %Status
 {
-	Set tQuery = "select Name,VersionString,Description,ExternalName from %IPM_Storage.ModuleItem"
-	If StartsWith'="" { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery_ " where name %StartsWith ?",StartsWith) }
-	Else { Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)}
+	Set tSC = $$$OK
+	Try {
+    If pNamespace'=$Namespace {
+		  Set $Namespace = pNamespace
+    }
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+/// Get List Modules
+/// example d ##class(%IPM.Main).GetListModules("%SYS","zpm",.list)
+ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %String = "", ByRef list, pExtraFields As %String = "") [ Internal ]
+{
+  Set list = 0
+  If (pNamespace="") || (pNamespace["*") {
+    Do ..GetListNamespace(.listNS, pNamespace)
+    Set list("ns") = pNamespace
+    Set width = 0
+    Set ns = ""
+    For { 
+      Set ns = $Order(listNS(ns)) 
+      Quit:ns=""
+      Kill listModules
+      Do ..GetListModules(ns, pSearch, .listModules, pExtraFields)
+      Continue:(pSearch'="")&&('$Get(listModules))
+      If width < $Length(ns) {
+        Set width = $Length(ns)
+      }
+      Set list = list + 1 
+      Set list(list) = $ListBuild(ns)
+
+      Merge list(list, "modules") = listModules
+    }
+    Merge list("width") = width
+
+    Quit
+  }
+  If pNamespace'=$Namespace {
+    New $Namespace
+    If $$$ISERR(..SwitchToNamespace(pNamespace)) {
+      Quit
+    }
+  }
+  Set tArgs = 0
+	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode FROM %IPM_Storage.ModuleItem"
+  Set pSearch = $ZStrip(pSearch, "<>WC")
+  If pSearch'="" {
+    If pSearch["," {
+      Set tList = $ListFromString(pSearch, ",")
+      Set tParams = ""
+      Set ptr = 0
+      While $ListNext(tList, ptr, tItem) {
+        Set tItem = $ZStrip(tItem, "<>WC")
+        Continue:tItem=""
+        Set tParams = tParams _ $ListBuild("?")
+        Set tArgs($Increment(tArgs)) = tItem
+      }
+      Set tQuery = tQuery _ " WHERE name IN (" _ $ListToString(tParams, ", ") _ ")"
+    } ElseIf pSearch'="*" {
+      Set tQuery = tQuery _ " WHERE name " _ $Select(pSearch["*": "like ?", 1: "= ?")
+      Set tArgs($Increment(tArgs)) = $Translate(pSearch, "*", "%")
+    }
+  }
+  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
+  Set maxWidth = 0
+  Set list = 0
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Set pList(tRes.%Get("Name"))=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("ExternalName"))
-		Set:$G(maxlen)<$L(tRes.%Get("Name")) maxlen=$L(tRes.%Get("Name"))
+    Set name = tRes.Name
+    Set list = list + 1
+		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode)
+		If maxWidth<$Length(name) {
+      Set maxWidth = $Length(name)
+    }
+    Continue:pExtraFields=""
+    Set obj = ##class(%IPM.Storage.Module).NameOpen(name, .tSC)
+    Continue:$$$ISERR(tSC)
+    Set ptr = 0 
+    While $ListNext(pExtraFields, ptr, field) {
+      Continue:field=""
+      Set tObj = obj
+      Set tValue = ""
+      For j=1:1:$Length(field, ".") {
+        Set tField = $Piece(field, ".", j)
+        Set tValue = $Property(tObj, tField)
+        Quit:'$IsObject(tValue)
+        Set tObj = tValue
+      }
+      Continue:tValue=""
+      Set list(list, field) = tValue
+    }
 	}
-	Set:$D(pList) pList=$G(maxlen)
+  Set list("width") = maxWidth
 }
 
 /// generates module.xml
@@ -896,10 +966,6 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 	}
 	Set tPath = ##class(%File).NormalizeDirectory(tPath)
 
-	Set tExp = $$$GetModifier(pCommandInfo,"export")
-	If tExp'="" {
-		Do ##class(%IPM.Storage.ModuleTemplate).ExportResources(tPath,tExp)
-	}	
 	If ($$$HasModifier(pCommandInfo,"template")) {
 		Return ##class(%IPM.Storage.ModuleTemplate).GenerateTemplate(tPath)
 	} 
@@ -957,19 +1023,19 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 
 	// web applications
 	Do ##class(%IPM.Storage.ModuleTemplate).GetCSPApplications(.apps)
-	If ($Listlength(apps)>0 ) {
+	If ($ListLength(apps)>0 ) {
 		Write !!,"Existing Web Applications:"
-		For i=1:1:$Listlength(apps) {
-			Write !,"    "_$Listget(apps,i)
+		For i=1:1:$ListLength(apps) {
+			Write !,"    "_$ListGet(apps,i)
 		}
 		Do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
 
 		Do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps) 
-		For i=1:1:$Listlength(tCSPapps) {
+		For i=1:1:$ListLength(tCSPapps) {
 			Set tCSPPath = ""
-			Do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$Listget(tCSPapps,i)_": ", .tCSPPath)
+			Do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$ListGet(tCSPapps,i)_": ", .tCSPPath)
 			If (tCSPPath'="") {
-				Do tTemplate.SetSourcePathForCSPApp($Listget(tCSPapps,i),tCSPPath)
+				Do tTemplate.SetSourcePathForCSPApp($ListGet(tCSPapps,i),tCSPPath)
 			}
 		}
 	}
@@ -996,7 +1062,7 @@ ClassMethod GetDefaultCommandRegistry()
 	Set $Namespace="%SYS"
 	Set Status=##Class(Config.Startup).Get(.Properties)
 	If Status {
-		Set ServerPort="http://"_$zu(110)_":"_$Get(Properties("WebServerPort"),52773)
+		Set ServerPort="http://"_$ZUtil(110)_":"_$Get(Properties("WebServerPort"),52773)
 		Write !,"Default commands for the registry"
 		Write !,"View all packets in the browser:",!,"  ",ServerPort_"/registry/packages/-/all"
 		Write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
@@ -1008,25 +1074,9 @@ ClassMethod GetDefaultCommandRegistry()
 /// Version client and registry
 ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
-	
-	Do ..GetListModules($$$IPMModuleName,.list)
-	If $Data(list($$$IPMModuleName)) {
-			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_$ListGet(list($$$IPMModuleName),1)
-	}
+  Do ..GetListModules("*", $$$IPMModuleName_","_$$$IPMServerRegistryModuleName, .list)
+  Do ..DisplayModules(.list)
 
-	Kill list
-	Set tRegInstalled = 0
-
-	Do ..GetListModules($$$IPMModuleName,.list)
-	If $Data(list($$$IPMServerRegistryModuleName)) {
-		Set tRegInstalled = 1
-		Write !,$$$FormattedLine($$$Green,$$$IPMServerRegistryModuleName_" ")_$ListGet(list($$$IPMServerRegistryModuleName),1)
-		Do ..GetDefaultCommandRegistry()
-	}
-	
-
-	If 'tRegInstalled Write !," Locally installed zpm-registry not found" 
-	
 	// Get URL current registry
 	Set tRes = ##class(%IPM.Repo.Remote.Definition).ExtentFunc()
 	While tRes.%Next(.tSC) {
@@ -1039,7 +1089,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		Set tInfo = tService.GetInfo()
 		Write !,$$$FormattedLine($$$Blue,tRepository.URL)," - ",tInfo.version
 	}
-	q $$$OK
+	Quit $$$OK
 }
 
 /// @API.Method
@@ -1196,7 +1246,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		Set tConfigureZPM = 'tHasZPM // Default to "yes" if command is missing.
 		
 		Write !
-		Set tHelp = "The 'ZPM' command allows quick command line access to many features of the package manager. Extensive documentation is available via:"_$c(13,10,9)_" zpm ""help""."
+		Set tHelp = "The 'ZPM' command allows quick command line access to many features of the package manager. Extensive documentation is available via:"_$Char(13,10,9)_" zpm ""help""."
 		Set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to enable/update the 'ZPM' command?",.tConfigureZPM,.tHelp)
 		If (tResponse '= $$$SuccessResponse) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
@@ -1235,7 +1285,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		If (tResultSet.%ROWCOUNT > 1) {
 			// if has more than one satisfied subclass, let user choose which server menu extension class to set
 			Set tHelp = "Note: only subclasses of %IPM.ExtensionBase.ServerMenu.Interface are listed."
-			Set tResponse = ##class(%Library.Prompt).GetArray("Which class to set as the server menu extension class?",.tValue, $ListBuild($classname()_":ServerMenuExtensionClasses"),,,.tHelp,$$$InitialDisplayMask)
+			Set tResponse = ##class(%Library.Prompt).GetArray("Which class to set as the server menu extension class?",.tValue, $ListBuild($ClassName()_":ServerMenuExtensionClasses"),,,.tHelp,$$$InitialDisplayMask)
 			If (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
@@ -1272,7 +1322,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		Write !,"Currently configured to use the following extension classes: "
 		Set tPtr = 0
 		While $ListNext(tExtensionClasses,tPtr,tClass) {
-			Write !,$c(9),tClass,$Case(tClass,tPrimaryClass:" (primary)",:"")
+			Write !,$Char(9),tClass,$Case(tClass,tPrimaryClass:" (primary)",:"")
 		}
 	} Else {
 		Write !,"Currently configured with the package manager extension, but no source control class."
@@ -1297,7 +1347,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		} Else {
 			Set tValue = ""
 			Set tHelp = "Note: only subclasses of %IPM.ExtensionBase.SourceControl.Interface are listed."
-			Set tResponse = ##class(%Library.Prompt).GetArray("Which class?",.tValue,$ListBuild($classname()_":SourceControlClasses"),,,.tHelp,$$$InitialDisplayMask)
+			Set tResponse = ##class(%Library.Prompt).GetArray("Which class?",.tValue,$ListBuild($ClassName()_":SourceControlClasses"),,,.tHelp,$$$InitialDisplayMask)
 			If (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
@@ -1413,11 +1463,12 @@ ClassMethod ProcessRunFromFile(ByRef pCommandInfo) [ Internal ]
 ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 {
 	Set tRepo = $Get(pCommandInfo("data","Repo"),0)
-	Set tDesc= $Get(pCommandInfo("data","Description"),0)
+	Set tDesc = $Get(pCommandInfo("data","Description"),0)
+	Set tAllVersions = $Get(pCommandInfo("data","AllVersions"),0)
 	Set tSearchString = $Get(pCommandInfo("parameters","searchString"),"")
 	Set tName = $$$GetModifier(pCommandInfo,"name")
 	If (tName '= "") {
-		Do ..ShowModulesForRepository(tName, tRepo, tDesc, tSearchString)
+		Do ..ShowModulesForRepository(tName, tRepo, tDesc, tSearchString, tAllVersions)
 	} Else {
 		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %IPM_Repo.Definition")
 		If (tRes.%SQLCODE < 0) {
@@ -1425,11 +1476,11 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 		}
 		While tRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			If ($I(tCount) > 1) {
+			If ($Increment(tCount) > 1) {
 				Write !!
 			}
 			Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
-			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo, tDesc, tSearchString)
+			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo, tDesc, tSearchString, tAllVersions)
 		}
 		$$$ThrowOnError(tSC)
 	}
@@ -1476,12 +1527,12 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
   Set serverClassList = ""
   Set t = ""
   For {
-    Set t = $order(types(t), 1, className)
+    Set t = $Order(types(t), 1, className)
     Quit:(t = "")
     If ('($$$HasModifier(pCommandInfo, t)) && (t '= tType)) {
       Kill types(t)
     } 
-    ElseIf '$Listfind(serverClassList, className) {
+    ElseIf '$ListFind(serverClassList, className) {
       Set serverClassList = serverClassList _ $ListBuild(className)
     }
   }
@@ -1497,7 +1548,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 
 			Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
 			$$$ThrowOnError(tSC)
-			If serverClassList = "" || ($ListFind(serverClassList, $Classname(tRepository))) {
+			If serverClassList = "" || ($ListFind(serverClassList, $ClassName(tRepository))) {
 				Do tRepository.Display()
 				Write !
 				Set tDisplayCount = tDisplayCount + 1 
@@ -1589,7 +1640,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Repository "_$$$QUOTE(repoName)_" does not exist so cannot be deleted."))
 		}
 		$$$ThrowOnError(##class(%IPM.Repo.Definition).ServerDefinitionKeyDelete(repoName))
-  } Elseif $$$HasModifier(pCommandInfo,"reset-defaults") {
+  } ElseIf $$$HasModifier(pCommandInfo,"reset-defaults") {
     Merge tModifiers = pCommandInfo("modifiers")
     Set tName = $$$GetModifier(pCommandInfo,"name")
     If (tName = "") {
@@ -1625,6 +1676,14 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			Set tDescList($Increment(tDescList)) = tRepoTypeResult.%Get("Description")
 		}
 		$$$ThrowOnError(tSC)
+
+
+		If (tType = ""),(tName '= ""),##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(tName) {
+			Set tInstance = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName)
+			If $IsObject(tInstance) {
+				Set tType = tInstance.%ClassName(1)
+			}
+		}
 	
     If (tType = "") {
       Set tResponse = ##class(%Library.Prompt).GetMenu("Which sort of repository do you wish to configure?",.tDescIndex,.tDescList,,$$$InitialDisplayMask)
@@ -1650,47 +1709,50 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "") [ Private ]
+ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "", pShowAllVersions As %Boolean = 0) [ Private ]
 {
 	#define gn "^||tmpDesc"
 	Kill @$$$gn
 	Set maxlenname = 0, where = ""
 	If pSearchString["*" {
 		Set where=" WHERE name like ?"
-	} Elseif pSearchString'="" { 
+	} ElseIf pSearchString'="" { 
 		Set where=" WHERE name = ?"
 	}
-	Set tQuery = "SELECT Name,Version,Repository,Description FROM %IPM_Utils.Module_GetModuleList(?) "_where
+	Set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
 	If (pSearchString = "") {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName)
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
 	} Else {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery,pRepoName, $Replace(pSearchString,"*","%"))
+		Set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions, $Replace(pSearchString,"*","%"))
 	}
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
+  Set list = 0
+  Set width = 0
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Set name = tRes.%Get("Name")
-		Set:($Length(name)>maxlenname) maxlenname = $Length(name)
-		Set @$$$gn@(name)=$Listbuild(tRes.%Get("Version"),tRes.%Get("Repository"),tRes.%Get("Description"))
+    If width < $Length(name) {
+      Set width = $Length(name)
+    }
+
+    Set list = list + 1
+    Set list(list) = $ListBuild(name, tRes.Version)
+    Set list(list, "Origin") = tRes.Origin
+    If pShowDesc {
+      Set list(list, "Description") = tRes.Description
+    }
+    If pShowRepo {
+      Set list(list, "Repository") = tRes.Repository
+    }
+    If pShowAllVersions {
+      Set list(list, "AllVersions") = tRes.AllVersions
+    }
 	}
-	Set name=""
-	For { 
-		Set name = $Order(@$$$gn@(name)) 
-		Quit:name=""
-		Write !,$$$FormattedLine($$$Green,name)
-		Write ?(maxlenname+1), $Listget(@$$$gn@(name),1)
-		If ( ($Listget(@$$$gn@(name),3)'="") && (pShowDesc=1) ) {
-			Write ?(maxlenname+7),..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_$Listget(@$$$gn@(name),3))
-		}
-		If ( ($Listget(@$$$gn@(name),3)'="") && ($Listget(@$$$gn@(name),2)'="") && (pShowDesc=1) && (pShowRepo=1) ) {
-			Write !
-		}
-		If ( ($Listget(@$$$gn@(name),2)'="") && (pShowRepo=1) ) {
-			Write ?(maxlenname+7),$$$FormattedLine($$$Blue,"Repository: "_$Listget(@$$$gn@(name),2))
-		}	
-	}
+  Set list("width") = width
+  Write !
+  Do ..DisplayModules(.list)
 }
 
 Query SourceControlClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
@@ -1705,40 +1767,42 @@ Query ServerMenuExtensionClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%Stri
 
 ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 {
-	set slash=$s($zversion(1)=3:"/",1:"\")
-	set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($zu(86))_"mgr"_slash_"Temp"_slash_$tr($zts,".,")_slash)
+	Set slash=$Select($ZVersion(1)=3:"/",1:"\")
+	Set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($ZUtil(86))_"mgr"_slash_"Temp"_slash_$Translate($ZTimestamp,".,")_slash)
 	$$$ThrowOnError(##class(%File).CreateDirectoryChain(TempDir))
-	set:$Extract(tDirectoryName,*)="/" tDirectoryName=$Extract(tDirectoryName,1,*-1)
-	set RepoName=$p($p($p(tDirectoryName,"/",*),".git")," ")
-	set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
-	if $Get(tParams("Branch"))'="" set tCmd=tCmd_" -b "_tParams("Branch")
+	Set:$Extract(tDirectoryName,*)="/" tDirectoryName=$Extract(tDirectoryName,1,*-1)
+	Set RepoName=$Piece($Piece($Piece(tDirectoryName,"/",*),".git")," ")
+	Set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
+	If $Get(tParams("zpm","Branch"))'="" Set tCmd=tCmd_" -b "_tParams("zpm","Branch")
 	$$$ThrowOnError(##class(%IPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr))
-      	set tDirectoryName = TempDir_slash_RepoName
-      	If ($Get(tParams("Verbose"))) {
-			write !,"Create tempory directory "_TempDir
-			write !,tCmd
-        	For i=1:1:$Get(tLog) {
-          		Write tLog(i),!
-        	}
-        	write !,tDirectoryName
-      	}
-       	For i=1:1:$Get(tErr) {
-       		Write tErr(i),!
-       	}
-		hang 2
-		quit tDirectoryName
+  Set tDirectoryName = TempDir_slash_RepoName
+  If ($Get(tParams("Verbose"))) {
+		Write !,"Create tempory directory "_TempDir
+		Write !,tCmd
+    For i=1:1:$Get(tLog) {
+      Write tLog(i),!
+    }
+    Write !,tDirectoryName
+  }
+  For i=1:1:$Get(tErr) {
+    Write tErr(i),!
+  }
+	Hang 2
+	Quit tDirectoryName
 }
 
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
 	Merge tParams = pCommandInfo("data")
+  Set tParams("cmd") = "load"
   if $Extract(tDirectoryName,1,4)="http" {
 		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
+    Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
-	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($PIECE(tDirectoryName, ".", *)) = "tgz" {
+	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($Piece(tDirectoryName, ".", *)) = "tgz" {
 		Set tTargetDirectory = $$$FileTempDirSys
 		Set tSC = ##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory)
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
@@ -1750,14 +1814,14 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	Set tRegistry = ""
 	Set tModuleName = $Get(pCommandInfo("parameters","module"))
 	If (tModuleName["/") {
-		set $lb(tRegistry, tModuleName) = $lfs(tModuleName, "/")
+		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
-  if (tModuleName = "") {
+  If (tModuleName = "") {
     Quit $$$OK
   }
 	If tRegistry = "" {
 		Set tServer = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.tSC)
-		If $isobject(tServer) {
+		If $IsObject(tServer) {
 			Set tRegistry = tServer.Name
 		}
 	}
@@ -1798,9 +1862,19 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 		If (tResult '= "") {
 			Do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
 			Merge tParams = pCommandInfo("data")
+      Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
+			Set tParams("cmd") = "install"
 			Set tParams("Install") = 1
-			$$$ThrowOnError(##class(%IPM.Utils.Module).LoadModuleReference(tResult.ServerName,tResult.Name,tResult.VersionString,.tParams))
-		}
+      If tResult.Deployed {
+        Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
+        Set tResult.PlatformVersion = platformVersion
+        If ('tResult.PlatformVersions.Find(platformVersion)) {
+          $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
+        }
+      }
+			$$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
+    
+    }
 	} Else {
 		Set tPrefix = ""
 		If (tModuleName '= "") {
@@ -1858,8 +1932,9 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 {
 	Set tModName = $Get(pCommandInfo("parameters","module"))
-	Set tPhases = $Listbuild($zcvt(pCommandInfo, "w"))
+	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
+  Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
@@ -1874,7 +1949,7 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 		Set tPtr = 0
 		Set tActualPhases = ""
 		While $ListNext(tPhases,tPtr,tPhase) {
-			Set tActualPhases = tActualPhases_$ListBuild($zcvt(tPhase, "w"))
+			Set tActualPhases = tActualPhases_$ListBuild($ZConvert(tPhase, "w"))
 		}
 		Merge tParams = pCommandInfo("data")
 		$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tActualPhases,tIsComplete,.tParams))
@@ -1923,11 +1998,12 @@ Query ActiveNamespaces() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ Sql
 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
+  Set tSearchString = $Get(pCommandInfo("parameters","searchString"),"")
 	If (''$Data(pCommandInfo("modifiers","tree"))) {
 		// Show tree of dependencies as well.
 		// Modules that are dependencies for no other are shown at the top level.
 		// TODO: deal with cyclic dependencies?
-		quit:'..GetListModule(,.tModMap)	
+		Quit:'..GetListModule(,.tModMap)	
 		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
 			"select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
 			"from %IPM_Storage.ModuleItem_Dependencies")
@@ -1947,61 +2023,50 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		}
 		Do ..PrintTree(.tOrderedTree)
 	} Else {
-		set tDesc=+$g(pCommandInfo("data","Desc"))
-		quit:'..GetListModule(,.tModMap,'tDesc)
-		Set tMod = ""
-		For { 
-			Set tMod = $Order(tModMap(tMod),1,tVersion)
-			Quit:(tMod="")
-			Write !,$$$FormattedLine($$$Green,tMod)," ",tVersion_" "
-			If tDesc,$Data(tModMap(tMod,"L"),Lock) {
-				Set maxlenname=$L(tMod_" "_tVersion_" ")
-				Do ..DrawColumn($$$FormattedLine($$$Yellow,"Description: ")_$ListGet(Lock,2))
-				Set au=3 
-				For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" { 
-					Set au=au+1
-					set audata=$ListGet(Lock,au)
-					Write:audata'="" !
-					,?(maxlenname)
-					,..DrawColumn($$$FormattedLine($$$Magenta,a_": ")_audata)
-				}
-				Write !
-					,?(maxlenname)
-					,..DrawColumn($$$FormattedLine($$$Magenta,"Root: ")_$ListGet(Lock,3))
-				if $Data(tModMap(tMod,"R"),Rem) {
-					write !,$ListGet(Rem,3)
-				}
-			}
-		}
+    Set showFields = ""
+    If +$Get(pCommandInfo("data","Desc")) {
+      Set showFields = $ListBuild(
+        "Description",
+        "Author.CopyrightDate", 
+        "Author.License", 
+        "Author.Notes", 
+        "Author.Organization", 
+        "Author.Person",
+        "Root"
+      )
+    }
+		Set tDesc=+$Get(pCommandInfo("data","Desc"))
+    Do ..GetListModules(,tSearchString, .list, showFields)
 	}
+  Do ..DisplayModules(.list)
 }
 
 /// Get module list in currently namespace
-ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
+ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status [ Deprecated ]
 {
-	new $namespace
-	set $namespace=ns
+	new $Namespace
+	set $Namespace=ns
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
 		"select * from %IPM_Storage.ModuleItem")
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
-	set in=""
+	Set in=""
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Set name=tRes.%Get("DisplayName")
-		set in=in_"'"_name_"',"
-		set list=$lb(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
+		Set in=in_"'"_name_"',"
+		Set list=$ListBuild(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
 		For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
-			Set list=list_$lb(tRes.%Get(a))
+			Set list=list_$ListBuild(tRes.%Get(a))
 		}
 		Set Mod(name) = tRes.%Get("VersionString")
 		Set:'OnlyName Mod(name,"L") = list
 		
 	}
 	$$$ThrowOnError(tSC)
-	quit:in=""||(OnlyName) $$$OK
-	set in=$Extract(in,1,*-1)
+	Quit:in=""||(OnlyName) $$$OK
+	Set in=$Extract(in,1,*-1)
 
 	Set tQuery = "select Name, Version, Repository, Description from %IPM_Utils.Module_GetModuleList('registry') WHERE name in ("_in_")"
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
@@ -2012,9 +2077,9 @@ ClassMethod GetListModule(ns = {$namespace}, ByRef Mod, OnlyName = 1) As %Status
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Set name = tRes.%Get("DisplayName")
-		Set Mod(name,"R")=$Listbuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"))
+		Set Mod(name,"R")=$ListBuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"))
 	}
-	quit $$$OK
+	Quit $$$OK
 }
 
 ClassMethod AccumulateTreeRecursive(pModName As %String, ByRef pModMap, ByRef pTree, pLevel As %Integer = 0) [ Private ]
@@ -2023,7 +2088,7 @@ ClassMethod AccumulateTreeRecursive(pModName As %String, ByRef pModMap, ByRef pT
 		Quit
 	}
 	
-	Set tParentIndex = $i(pTree)
+	Set tParentIndex = $Increment(pTree)
 	Set pTree(tParentIndex) = $ListBuild(pModName_" "_$Get(pModMap(pModName),"[missing]"))
 	Set tDep = ""
 	Set tPrevSibling = ""
@@ -2053,6 +2118,9 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
 	Set tRepos = $ListFromString($Get(pCommandInfo("modifiers","repos")))
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
+  If tModName="" {
+    $$$ThrowStatus($$$ERROR($$$GeneralError,"A module name is required"))
+  }
 	
 	If tTree {
 		New %tree
@@ -2086,7 +2154,7 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
 				If ($Get(tState(i)) = tSub) {
 					Continue
 				} Else {
-					Set tNodeIndex = $i(tDependentTree)
+					Set tNodeIndex = $Increment(tDependentTree)
 			
 					Set tState(i) = tSub
 					For j=i+1:1:tState {
@@ -2148,13 +2216,13 @@ ClassMethod PrintTree(ByRef pTree)
 		Set tFrontPadding = $Get(tPadding(i))
 		
 		If (tNextSibling = "") {
-			Set $Extract(tFrontPadding,*-2) = $c($zh("2514H"))
+			Set $Extract(tFrontPadding,*-2) = $Char($ZHex("2514H"))
 		}
 		If (tFirstChild '= "") {
-			Set $Extract(tFrontPadding,*) = $c($zh("252CH"))
+			Set $Extract(tFrontPadding,*) = $Char($ZHex("252CH"))
 		}
 		
-		Write tFrontPadding,$$$FormattedLine($$$Green,$p(tValue," ",1))," ",$p(tValue," ",2),!
+		Write tFrontPadding,$$$FormattedLine($$$Green,$Piece(tValue," ",1))," ",$Piece(tValue," ",2),!
 		
 		If (tNextSibling '= "") {
 			Set tPadding(tNextSibling) = $Get(tPadding(i))
@@ -2162,9 +2230,9 @@ ClassMethod PrintTree(ByRef pTree)
 		If (tFirstChild '= "") {
 			Set tModPadding = ""
 			If $Get(tPadding(i)) '= "" {
-				Set tModPadding = $Extract(tPadding(i),1,*-3)_$Case(tNextSibling,"":" ",:$c($zh("2502H")))_"  "
+				Set tModPadding = $Extract(tPadding(i),1,*-3)_$Case(tNextSibling,"":" ",:$Char($ZHex("2502H")))_"  "
 			}
-			Set tPadding(tFirstChild) = $Extract(tModPadding,1,*-1)_$c($zh("251CH"),$zh("2500H"),$zh("2500H"))
+			Set tPadding(tFirstChild) = $Extract(tModPadding,1,*-1)_$Char($ZHex("251CH"),$ZHex("2500H"),$ZHex("2500H"))
 		}
 	}
 }
@@ -2339,7 +2407,7 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
         // Generate the lines.
         Set pFound = 1
         For i=1:1:tGenLines {
-          Set tRtnLines($i(tRtnLines)) = tGenLines(i)
+          Set tRtnLines($Increment(tRtnLines)) = tGenLines(i)
         }
       } Else {
         // Before %ZLANGC00 was generated: there's an old version with ZPM defined.
@@ -2347,22 +2415,22 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
         If tIsZPM {
           Set pFound = 1
           Set tEnded = 0
-          Set tRtnLines($i(tRtnLines)) = $$$STARTTAGQ
+          Set tRtnLines($Increment(tRtnLines)) = $$$STARTTAGQ
         }
         If '(tIsZPM || tEnded) {
           If ($ZStrip($Extract(tLine),"*W") '= "") {
-            Set tRtnLines($i(tRtnLines)) = $$$ENDTAGQ
+            Set tRtnLines($Increment(tRtnLines)) = $$$ENDTAGQ
             Set tEnded = 1
           }
         }
-        Set tRtnLines($i(tRtnLines)) = tLine
+        Set tRtnLines($Increment(tRtnLines)) = tLine
       }
     }
     If 'tEnded {
-      Set tRtnLines($i(tRtnLines)) = $$$ENDTAGQ
+      Set tRtnLines($Increment(tRtnLines)) = $$$ENDTAGQ
     } ElseIf 'pFound {
       For i=1:1:tGenLines {
-        Set tRtnLines($i(tRtnLines)) = tGenLines(i)
+        Set tRtnLines($Increment(tRtnLines)) = tGenLines(i)
       }
     }
   } Else {
@@ -2395,25 +2463,25 @@ ClassMethod UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Boo
 		Set tOffset = 0
 		Set tStarted = 0
 		For {
-			Set tLineName = "zUpdateLanguageExtensions"_"+"_$i(tOffset)_"^"_$ZName
+			Set tLineName = "zUpdateLanguageExtensions"_"+"_$Increment(tOffset)_"^"_$ZName
 			Set tExtLine = $Text(@(tLineName))
 			If (tExtLine=$$$STARTTAGQ) {
 				Set tStarted = 1
 			}
 			If (tStarted) {
-				Set tGenLines($i(tGenLines)) = tExtLine
+				Set tGenLines($Increment(tGenLines)) = tExtLine
 			}
 			Quit:(tExtLine=$$$ENDTAGQ)
 			Quit:(tExtLine="")
 		}
 
 		If '$Data(tGenLines) {
-			$$$ThrowStatus($$$ERROR($$$GeneralError,"Could not find %ZLANGC00 routine contents in "_$classname()))
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"Could not find %ZLANGC00 routine contents in "_$Classname()))
 		}
 		Do ..UpdateLanguageExtensionsOne("%ZLANGC00.MAC", pTestOnly,.pFound,.tGenLines)
 		Quit:pTestOnly
 		Set i="" 
-		For { set i=$Order(tGenLines(i),1,tStr) Quit:i=""
+		For { Set i=$Order(tGenLines(i),1,tStr) Quit:i=""
 			If tStr[" Do ##class" Set tGenLines(i)=$Replace($Replace(tStr," Quit","")," Do "," Quit ") Quit
 		}
 		Do ..UpdateLanguageExtensionsOne("%ZLANGF00.MAC", pTestOnly,.pFound,.tGenLines)
@@ -2442,7 +2510,7 @@ $$$ENDTAG
 ClassMethod EnableIPM(ByRef pCommandInfo)
 {
 	Write !, "Version of IPM in current namespace: "
-	Do ..GetListModules($$$IPMModuleName,.list)
+	Do ..GetListModules($Namespace,$$$IPMModuleName,.list)
 	If $Data(list($$$IPMModuleName)) {
 			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_$ListGet(list($$$IPMModuleName),1)
 	}
@@ -2523,8 +2591,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 						Set targetVersion = currentVer
 						Continue
 					}
-					Set semVerTarget = ##class(%ZHSLIB.PackageManager.Core.SemanticVersion).FromString(targetVersion)
-					Set semVerCurrent = ##class(%ZHSLIB.PackageManager.Core.SemanticVersion).FromString(currentVer)
+					Set semVerTarget = ##class(%IPM.General.SemanticVersion).FromString(targetVersion)
+					Set semVerCurrent = ##class(%IPM.General.SemanticVersion).FromString(currentVer)
 					If semVerCurrent.Follows(semVerTarget) {
 						Set targetVersion = currentVer
 					}
@@ -2709,6 +2777,78 @@ ClassMethod ShellScript(pCommand As %String, pOutputLogFile As %String = "", pAp
 		// Set ERRORLEVEL to 1
 		Do $System.Process.Terminate(,1)
 	}
+}
+
+ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespace As %Boolean = 0, pIndent As %Integer = 0)
+{
+  If '$Data(pList) {
+    Quit
+  }
+  Set pWithNamespace = pWithNamespace || $Data(pList("ns"))
+  If pWithNamespace {
+    Set nsWidth = $Get(pList("width")) + 2
+    Set numbersWidth = $Select(pNumbered: $Length(pList) + 3, 1: 0)
+    Set modulesWidth = 0
+    For i=1:1:pList {
+      If $Data(pList(i, "modules", "width"), width), width > modulesWidth {
+        Set modulesWidth = width
+      }
+    }
+
+    For i=1:1:pList {
+      Set $ListBuild(tNS) = pList(i)
+      Write !
+      If pNumbered {
+        Write $Justify(i, numbersWidth - 2), ". "
+      }
+      Write $$$FormattedLinePadRight($$$Magenta, tNS _ "> ", nsWidth)
+      Set tPrefix = $Justify("", numbersWidth) _ tNS 
+      Kill tModulesList 
+      Merge tModulesList = pList(i, "modules")
+      Set tModulesList("width") = modulesWidth
+      Do ..DisplayModules(.tModulesList, 0, 0, $X)
+    }
+    Quit
+  }
+
+  Set extraColumns = $ListBuild(
+    $ListBuild("Description", $$$Yellow),
+    $ListBuild("Root", $$$Magenta),
+    $ListBuild("Author.CopyrightDate", $$$Yellow, "CopyrightDate"),
+    $ListBuild("Author.License", $$$Yellow, "License"),
+    $ListBuild("Author.Notes", $$$Yellow, "Notes"),
+    $ListBuild("Author.Organization", $$$Yellow, "Organization"),
+    $ListBuild("Author.Person", $$$Yellow, "Author"),
+    $ListBuild("Origin", $$$Blue),
+    $ListBuild("AllVersions", $$$Blue, "Versions"),
+    $ListBuild("Repository", $$$Blue)
+  )
+
+  Set width = $Get(pList("width")) + 1
+  Set tIndent = pIndent
+  Set tIndent = $Select(pIndent > 0: pIndent, 1: width)
+  For i=1:1:pList {
+    Set info = pList(i)
+    Set developerMode = 0
+    Set $ListBuild(name, version, externalName, developerMode) = info
+    Write:i>1 !,?pIndent
+    Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Blue, version)
+    If $Get(developerMode) {
+      Write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
+    }
+
+    Set ptr = 0 
+    While $ListNext(extraColumns, ptr, column) {
+      Continue:$Get(column)=""
+      Set colName = ""
+      Set $ListBuild(colValue, color, colName) = column
+      Set colName = $Select($Get(colName)'="": colName, 1: colValue)
+      If $Data(pList(i, colValue), value), value'="" {
+        Write !,?tIndent
+        Do ..DrawColumn($$$FormattedLine(color, colName _ ": ") _ value)
+      }
+    }
+  }
 }
 
 }
