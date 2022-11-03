@@ -111,33 +111,45 @@ Storage Default
 <Value>Root</Value>
 </Value>
 <Value name="3">
-<Value>Name</Value>
-</Value>
-<Value name="4">
-<Value>Description</Value>
-</Value>
-<Value name="5">
-<Value>LastModified</Value>
-</Value>
-<Value name="6">
-<Value>Manifest</Value>
-</Value>
-<Value name="7">
-<Value>Repository</Value>
-</Value>
-<Value name="8">
-<Value>SemVer</Value>
-</Value>
-<Value name="9">
 <Value>SubDirectory</Value>
 </Value>
-<Value name="10">
+<Value name="4">
+<Value>Name</Value>
+</Value>
+<Value name="5">
 <Value>Version</Value>
 </Value>
-<Value name="11">
+<Value name="6">
 <Value>VersionString</Value>
 </Value>
+<Value name="7">
+<Value>LastModified</Value>
+</Value>
+<Value name="8">
+<Value>Manifest</Value>
+</Value>
+<Value name="9">
+<Value>SemVer</Value>
+</Value>
+<Value name="10">
+<Value>Description</Value>
+</Value>
+<Value name="11">
+<Value>Repository</Value>
+</Value>
 <Value name="12">
+<Value>AllVersions</Value>
+</Value>
+<Value name="13">
+<Value>Origin</Value>
+</Value>
+<Value name="14">
+<Value>Deployed</Value>
+</Value>
+<Value name="15">
+<Value>PlatformVersion</Value>
+</Value>
+<Value name="16">
 <Value>DisplayNameInternal</Value>
 </Value>
 </Data>

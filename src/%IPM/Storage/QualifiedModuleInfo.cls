@@ -16,6 +16,8 @@ Method %OnNew(pServerName As %String = "", pResolvedReference As %IPM.Storage.Mo
 	If (pResolvedReference '= "") {
 		Set ..Name = pResolvedReference.Name
 		Set ..Version = pResolvedReference.Version
+		Set ..Deployed = pResolvedReference.Deployed
+		Set ..PlatformVersions = pResolvedReference.PlatformVersions
 	}
 	Quit $$$OK
 }
@@ -27,21 +29,36 @@ Storage Default
 <Value>Name</Value>
 </Value>
 <Value name="2">
-<Value>Description</Value>
-</Value>
-<Value name="3">
 <Value>Version</Value>
 </Value>
-<Value name="4">
+<Value name="3">
 <Value>VersionString</Value>
+</Value>
+<Value name="4">
+<Value>ServerName</Value>
 </Value>
 <Value name="5">
 <Value>Repository</Value>
 </Value>
 <Value name="6">
-<Value>ServerName</Value>
+<Value>Description</Value>
 </Value>
 <Value name="7">
+<Value>AllVersions</Value>
+</Value>
+<Value name="8">
+<Value>Origin</Value>
+</Value>
+<Value name="9">
+<Value>Deployed</Value>
+</Value>
+<Value name="10">
+<Value>PlatformVersion</Value>
+</Value>
+<Value name="11">
+<Value>PlatformVersions</Value>
+</Value>
+<Value name="12">
 <Value>DisplayNameInternal</Value>
 </Value>
 </Data>

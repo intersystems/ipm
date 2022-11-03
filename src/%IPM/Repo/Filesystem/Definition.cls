@@ -342,8 +342,8 @@ ClassMethod ScanDirectory(pRoot As %String, ByRef pFilenameList, pSub As %String
 
 Storage Default
 {
-<Data name="DefinitionDefaultData1">
-<Subscript>"Definition"</Subscript>
+<Data name="FilesystemRepoDefinitionDefaultData">
+<Subscript>"FilesystemRepoDefinition"</Subscript>
 <Value name="1">
 <Value>Root</Value>
 </Value>
@@ -351,7 +351,7 @@ Storage Default
 <Value>Depth</Value>
 </Value>
 </Data>
-<DefaultData>DefinitionDefaultData1</DefaultData>
+<DefaultData>FilesystemRepoDefinitionDefaultData</DefaultData>
 <Type>%Storage.Persistent</Type>
 }
 

@@ -22,24 +22,20 @@ Method Load() As %Status
 			Quit
 		}
 		Set tName = $Piece(..Name,".",1,*-1)
-		Set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tName,,.tSC)
-		If $$$ISERR(tSC) && ($Piece($System.Status.GetErrorCodes(tSC),",") = $$$KeyValueNotFoundOpen) {
+    Set tModule = ##class(%IPM.Storage.Module).NameOpen(tName,,.tSC)
+		If $$$ISOK(tSC) && ($IsObject(tModule)) {
 			Set tSC = $$$OK
-			
-			// Fall back to direct rendering of XML from persistent object
-			Set tModule = ##class(%IPM.Storage.Module).NameOpen(tName,,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
 			
 			Do ..Code.WriteLine("<?xml version=""1.0""?>")
 			Set tSC = tModule.XMLExportToStream(..Code,,"literal,indent")
 			If $$$ISERR(tSC) {
 				Quit
 			}
-		} ElseIf $$$ISERR(tSC) {
-			Quit
 		} Else {
+		  Set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tName,,.tSC)
+			If $$$ISERR(tSC) {
+				Quit
+			}
 			Set tSC = ..Code.CopyFrom(tModStream.Contents)
 		}
 	} Catch e {
@@ -415,6 +411,9 @@ XData ExternalXSL
       <xsl:call-template name="resource" />
     </xsl:element>
   </xsl:template>
+  <xsl:template match="Module/LifecycleClass[text()='Module']"/>
+  <xsl:template match="Module/Packaging[text()='module']"/>
+  <xsl:template match="Module/Deployed[text()='false']"/>
 </xsl:stylesheet>
 }
 

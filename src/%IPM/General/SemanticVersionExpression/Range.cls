@@ -83,12 +83,16 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %IPM.General.Sema
 			// Get part after operator and before build/metadata
 			// Normalize x ranges
 			Set tMajorMinorPatch = $Translate($ZStrip($Piece($Piece(tExpr,"-"),"+"),"<W","<>=^~"),"X*","xx")
+      If tMajorMinorPatch?1"20"2N1"."1N {
+        Set tExpr = tExpr _ ".0"
+        Set tMajorMinorPatch = tMajorMinorPatch _ ".0"
+      }
 			Set tMajor = $Piece(tMajorMinorPatch,".",1)
 			Set tMinor = $Piece(tMajorMinorPatch,".",2)
 			Set tPatch = $Piece(tMajorMinorPatch,".",3)
 			
 			// Detect different expression cases
-			Set tIsXRange = (tMajorMinorPatch [ "x") || (tExpr = "") || (tExpr = "*") || (tMinor = "") || (tPatch = "")
+			Set tIsXRange = (tMajorMinorPatch [ "x") || (tExpr = "*") || (tMinor = "") || (tPatch = "")
 			Set tIsTildeRange = ($Extract(tExpr) = "~")
 			Set tIsCaretRange = ($Extract(tExpr) = "^")
 			
@@ -214,10 +218,10 @@ Storage Default
 {
 <Data name="RangeState">
 <Value name="1">
-<Value>Expression</Value>
+<Value>Comparators</Value>
 </Value>
 <Value name="2">
-<Value>Comparators</Value>
+<Value>Expression</Value>
 </Value>
 </Data>
 <State>RangeState</State>

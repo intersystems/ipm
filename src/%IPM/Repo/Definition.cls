@@ -84,12 +84,12 @@ ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 Method Display()
 {
 	Write !,..Name
-	Write !,$c(9),"Source: ",$c(9),..Details
-	Write !,$c(9),"Enabled?",$c(9),$$$YesNo(..Enabled)
-	Write !,$c(9),"Available?",$c(9),$$$YesNo(..GetPackageService().IsAvailable())
+	Write !,$c(9),"Source: ",$c(9),$c(9),..Details
+	Write !,$c(9),"Enabled?",$c(9),$c(9),$$$YesNo(..Enabled)
+	Write !,$c(9),"Available?",$c(9),$c(9),$$$YesNo(..GetPackageService().IsAvailable())
 	Write !,$c(9),"Use for Snapshots?",$c(9),$$$YesNo(..Snapshots)
 	Write !,$c(9),"Use for Prereleases?",$c(9),$$$YesNo(..Prereleases)
-	Write !,$c(9),"Is Read-Only?",$c(9),$$$YesNo(..ReadOnly)
+	Write !,$c(9),"Is Read-Only?",$c(9),$c(9),$$$YesNo(..ReadOnly)
 }
 
 /// Called from package manager shell to create or update an instance of this class.
@@ -155,6 +155,7 @@ ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pDat
 		$$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
 		
 		$$$ThrowOnError(tInstance.%Save())
+    Do tInstance.Display()
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -212,31 +213,38 @@ ORDER BY %IPM_Repo.Definition_SortOrder(ID) DESC
 
 Storage Default
 {
-<Data name="DefinitionDefaultData">
+<Data name="RepoDefinitionDefaultData">
+<Subscript>"RepoDefinition"</Subscript>
 <Value name="1">
 <Value>%%CLASSNAME</Value>
 </Value>
 <Value name="2">
 <Value>Name</Value>
 </Value>
-<Value name="3">
-<Value>Enabled</Value>
-</Value>
-<Value name="4">
-<Value>Details</Value>
-</Value>
 <Value name="5">
-<Value>Snapshots</Value>
-</Value>
-<Value name="6">
-<Value>Prereleases</Value>
+<Value>Credentials</Value>
 </Value>
 <Value name="7">
+<Value>Enabled</Value>
+</Value>
+<Value name="8">
+<Value>IsLocalCache</Value>
+</Value>
+<Value name="9">
+<Value>Details</Value>
+</Value>
+<Value name="10">
+<Value>Snapshots</Value>
+</Value>
+<Value name="11">
+<Value>Prereleases</Value>
+</Value>
+<Value name="12">
 <Value>ReadOnly</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.DefinitionD</DataLocation>
-<DefaultData>DefinitionDefaultData</DefaultData>
+<DefaultData>RepoDefinitionDefaultData</DefaultData>
 <IdLocation>^IPM.Repo.DefinitionD</IdLocation>
 <IndexLocation>^IPM.Repo.DefinitionI</IndexLocation>
 <StreamLocation>^IPM.Repo.DefinitionS</StreamLocation>

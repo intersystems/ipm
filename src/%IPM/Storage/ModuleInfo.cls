@@ -4,6 +4,8 @@ Class %IPM.Storage.ModuleInfo Extends (%SerialObject, %IPM.General.ModuleInfo) [
 
 Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleInfo";
 
+Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
+
 Storage Default
 {
 <Data name="ModuleInfoState">
@@ -11,18 +13,33 @@ Storage Default
 <Value>Name</Value>
 </Value>
 <Value name="2">
-<Value>Description</Value>
-</Value>
-<Value name="3">
 <Value>Version</Value>
 </Value>
-<Value name="4">
+<Value name="3">
 <Value>VersionString</Value>
+</Value>
+<Value name="4">
+<Value>Description</Value>
 </Value>
 <Value name="5">
 <Value>Repository</Value>
 </Value>
 <Value name="6">
+<Value>AllVersions</Value>
+</Value>
+<Value name="7">
+<Value>Origin</Value>
+</Value>
+<Value name="8">
+<Value>Deployed</Value>
+</Value>
+<Value name="9">
+<Value>PlatformVersion</Value>
+</Value>
+<Value name="10">
+<Value>PlatformVersions</Value>
+</Value>
+<Value name="11">
 <Value>DisplayNameInternal</Value>
 </Value>
 </Data>

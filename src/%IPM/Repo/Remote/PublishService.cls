@@ -8,7 +8,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
 
 Method Publish(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
 {
-  if (..Username="") || (..Password="") {
+  If ((..Username="") || (..Password="")) && (..Token="") {
     $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, authorization required."))
   }
   

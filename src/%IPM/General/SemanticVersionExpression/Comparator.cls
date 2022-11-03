@@ -30,7 +30,12 @@ Method ToString() As %String [ CodeMode = expression ]
 
 Method ToResolvedString() As %String [ CodeMode = expression ]
 {
-..Operator_..Major_"."_..Minor_"."_..Patch_$Case(..Prerelease,"":"",:"-"_..Prerelease)_$Case(..Build,"":"",:"+"_..Build)
+..Operator 
+_ ..Major 
+_ "." _ ..Minor 
+_ $Case(..Patch, "": "", : "." _ ..Patch) 
+_ $Case(..Prerelease, "": "", : "-" _ ..Prerelease) 
+_ $Case(..Build, "": "", : "+" _ ..Build)
 }
 
 ClassMethod FromString(pExpr As %String, Output pComparator As %IPM.General.SemanticVersionExpression.Comparator) As %Status
@@ -78,11 +83,16 @@ ClassMethod FromString(pExpr As %String, Output pComparator As %IPM.General.Sema
 
 Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
-	Set tEquals = (..Operator [ "=") && (pVersion.Major = ..Major) && (pVersion.Minor = ..Minor) && (pVersion.Patch = ..Patch)
-	If ($Extract(..Operator,1) = "=") {
-		// Means direct equality and not <= or >= so compare pre-release as well
-		Set tEquals = tEquals && (pVersion.Prerelease = ..Prerelease)
-	}
+	Set tEquals = (..Operator [ "=")
+  If tEquals {
+    For part = "Major", "Minor", "Patch", "Prerelease" {
+      Set val1 = $Property(pVersion, part)
+      Set val2 = $Property($this, part)
+      Quit:((val1 = "")||(val2 = ""))
+      Quit:((val1 = "*")||(val2 = "*"))
+      Set tEquals = tEquals && (val1 = val2)
+    }
+  }
 	If tEquals || (..Operator = "=") {
 		Quit tEquals
 	}
@@ -114,24 +124,27 @@ Storage Default
 {
 <Data name="ComparatorState">
 <Value name="1">
-<Value>Expression</Value>
-</Value>
-<Value name="2">
 <Value>Operator</Value>
 </Value>
-<Value name="3">
+<Value name="2">
 <Value>Major</Value>
 </Value>
-<Value name="4">
+<Value name="3">
 <Value>Minor</Value>
 </Value>
-<Value name="5">
+<Value name="4">
 <Value>Patch</Value>
 </Value>
+<Value name="5">
+<Value>Metadata</Value>
+</Value>
 <Value name="6">
-<Value>Prerelease</Value>
+<Value>Expression</Value>
 </Value>
 <Value name="7">
+<Value>Prerelease</Value>
+</Value>
+<Value name="8">
 <Value>Build</Value>
 </Value>
 </Data>

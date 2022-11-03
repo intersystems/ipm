@@ -7,9 +7,9 @@ Property Options As list Of %IPM.General.SemanticVersionExpression.Range;
 
 Property Expression As %String(MAXLEN = "");
 
-Method %OnNew(pRangeExpr As %String) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(pRangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
 {
-	Set i%Expression = $Get(pRangeExpr)
+	Set i%Expression = pRangeExpr
 	Quit $$$OK
 }
 
@@ -113,10 +113,10 @@ Storage Default
 {
 <Data name="SemanticVersionExpressionState">
 <Value name="1">
-<Value>Options</Value>
+<Value>Expression</Value>
 </Value>
 <Value name="2">
-<Value>Expression</Value>
+<Value>Options</Value>
 </Value>
 </Data>
 <State>SemanticVersionExpressionState</State>

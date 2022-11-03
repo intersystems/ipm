@@ -19,7 +19,9 @@ Property Username As %String(MAXLEN = "");
 
 Property Password As %String(MAXLEN = "");
 
-Property DeploymentEnabled As %Boolean [ InitialExpression = 1 ];
+Property Token As %String(MAXLEN = "");
+
+Property DeploymentEnabled As %Boolean [ InitialExpression = 0 ];
 
 Index DeploymentServer On DeploymentEnabled [ Unique ];
 
@@ -34,6 +36,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 <modifier name="publish-url" value="true" description="For remote repositories, specifies the URL for package publishing web services."/>
 <modifier name="username" aliases="user" value="true" description="For remote repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For remote repositories, specifies the password to use when connecting." />
+<modifier name="token" value="true" description="For remote repositories, specifies the key to use when connecting." />
 <modifier name="reset-defaults" value="false" description="Reset to default repository" />
 <modifier name="sslconfig" aliases="ssl" value="true" description="For remote repositories, specifies the SSL configuration name to use when connecting." />
 
@@ -85,6 +88,7 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 	Set tClient.Location = ..URL
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
+  Set tClient.Token = ..Token
 	Quit tClient
 }
 
@@ -95,6 +99,7 @@ Method GetPublishService() As %IPM.Repo.IPublishService
 	Set tClient.Location = ..URL
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
+  Set tClient.Token = ..Token
 	Quit tClient
 }
 
@@ -103,11 +108,17 @@ Method GetPublishService() As %IPM.Repo.IPublishService
 Method Display()
 {
 	Do ##super()
+
+  Write !,$c(9),"Deployment Enabled? ",$c(9),$Case(..DeploymentEnabled,1:"Yes",:"No")
+
 	If (..Username '= "") {
-		Write !,$c(9),"Username: ",$c(9),..Username
+		Write !,$c(9),"Username: ",$c(9),$c(9),..Username
 	}
 	If (..Password '= "") {
-		Write !,$c(9),"Password: ",$c(9),$Case(..Password,"":"<unset>",:"<set>")
+		Write !,$c(9),"Password: ",$c(9),$c(9),$Case(..Password,"":"<unset>",:"<set>")
+	}
+	If (..Token '= "") {
+		Write !,$c(9),"Token: ",$c(9),$c(9),$c(9),$Case(..Token,"":"<unset>",:"<set>")
 	}
 }
 
@@ -117,9 +128,9 @@ ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Bool
 	Set tSC = $$$OK
 	Try {
 		Set tUrl = $Get(pModifiers("url"), pInstance.URL)
-    If (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
-      $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server with non-unique URL."))
-    }
+		If (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server with non-unique URL."))
+		}
 		If (pInteractive && (tUrl = "")) {
 			Set tPrompt = ..#URLPromptString
 			Set tResponse = ##class(%Library.Prompt).GetString(tPrompt, .tUrl)
@@ -128,13 +139,28 @@ ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Bool
 			}
 		}
 		
-		Set pInstance.Username = $Get(pModifiers("username"),"")
-		Set pInstance.Password = $Get(pModifiers("password"),"")	
-	
-		Set pInstance.URL = tUrl
-		
-		If ((pInstance.%Id()="")&&..DeploymentServerExists(1)) {
-			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server."_$$$NL_" Use ""repo -r -n registry -url <new url>"" to switch to another server"_$$$NL))
+		If $Data(pModifiers("username"), tUsername) {
+			Set pInstance.Username = tUsername
+		}
+		If $Data(pModifiers("password"), tPassword) {
+			Set pInstance.Password = tPassword
+		}
+		If $Data(pModifiers("token"), tToken) {
+			Set pInstance.Token = tToken
+		}
+
+		If $Data(pModifiers("publish"), tPublish) {
+			Set pInstance.DeploymentEnabled = tPublish
+		}
+		If tUrl'="" {
+			Set pInstance.URL = tUrl
+		}
+		If (pInstance.DeploymentEnabled = 1) {
+			Set tServer = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1)
+			If $Isobject(tServer),tServer.URL'=pInstance.URL {
+				Set tServer.DeploymentEnabled = 0
+				$$$ThrowOnError(tServer.%Save())
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -148,10 +174,25 @@ Method GetSortOrder() As %Integer [ Private ]
 	Quit 2 + $Case(..%Id(),"":1,:..%Id())
 }
 
+Query PublishingServer() As %SQLQuery
+{
+	SELECT 
+		CASE 
+			WHEN DeploymentEnabled = 1 THEN 1
+			WHEN Token IS NOT NULL THEN 2
+			WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
+			ELSE 999 
+		END PublishOrder,
+		ID, Name, URL
+	FROM %IPM_Repo_Remote.Definition 
+	WHERE Enabled = 1
+	ORDER BY PublishOrder, ID
+}
+
 Storage Default
 {
-<Data name="DefinitionDefaultData1">
-<Subscript>"Definition"</Subscript>
+<Data name="RemoteRepoDefinitionDefaultData">
+<Subscript>"RemoteRepoDefinition"</Subscript>
 <Value name="1">
 <Value>URL</Value>
 </Value>
@@ -162,10 +203,16 @@ Storage Default
 <Value>Password</Value>
 </Value>
 <Value name="4">
+<Value>URL</Value>
+</Value>
+<Value name="5">
+<Value>Token</Value>
+</Value>
+<Value name="6">
 <Value>DeploymentEnabled</Value>
 </Value>
 </Data>
-<DefaultData>DefinitionDefaultData1</DefaultData>
+<DefaultData>RemoteRepoDefinitionDefaultData</DefaultData>
 <Type>%Storage.Persistent</Type>
 }
 
