@@ -39,13 +39,6 @@ Method %Activate(ByRef pParams) As %Status
 		Set tSC = ..Configure(.pParams)
 		$$$ThrowOnError(tSC)
 		
-		If '$ListFind(..PhaseList,"Package") {
-			// Code cannot be deployed if it is to be reexported and packaged.
-			Set tSC = ..MakeDeployed(.pParams)
-			$$$ThrowOnError(tSC)
-		}
-		
-		
 		// Create Studio project for package if it is loaded in developer mode and no explicit statement to not create it
 		Set tNoStudioProject = $Get(pParams("NoStudioProject"), 0)
 		If ..Module.DeveloperMode && 'tNoStudioProject {
@@ -69,11 +62,67 @@ Method %Activate(ByRef pParams) As %Status
 	Quit tSC
 }
 
+Method %PrepareDeploy(ByRef pParams) As %Status
+{
+	Set tSC = $$$OK
+	Try {
+		Set tVerbose = $Get(pParams("Verbose"))
+    Merge tParams = pParams
+
+		Set tNSConfig = ..Module.GetNamespaceConfig()
+
+		Set pParams("InitNamespace") = $Namespace
+
+		Set tNSPostfix = "PACKAGE-" _ $Piece($ZHorolog, ".")
+		Set tSC = ##class(%IPM.Utils.Build).InitializeNamespace(tNSPostfix, tVerbose, .tPackageDeployNamespace, tNSConfig)
+		$$$ThrowOnError(tSC)
+		Set pParams("PackageDeployNamespace") = tPackageDeployNamespace
+
+		$$$ThrowOnError(..Module.%Reload())
+
+		Set tSource = tPackageDeployNamespace _ "-CODE"
+
+		Set tKey = ""
+		For {
+			Set tResource = ..Module.Resources.GetNext(.tKey)
+			Quit:(tKey="")
+
+			Set tName = $Piece(tResource.Name, ".", 1, *-1)
+			Set tExtension = $$$ucase($Piece(tResource.Name, ".", *))
+			continue:tExtension=""
+
+			Set tSC = $Case(tExtension,
+				"GBL":##class(%IPM.Utils.Module).AddGlobalMapping(tPackageDeployNamespace, tName, tSource),
+				"INC":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "INC", tSource),
+				"INT":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "INT", tSource),
+				"MAC":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "MAC", tSource),
+				"PKG":##class(%IPM.Utils.Module).AddPackageMapping(tPackageDeployNamespace, tName, tSource),
+				"":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "ALL", tSource))
+			$$$ThrowOnError(tSC)
+
+		}
+		Set $Namespace = tPackageDeployNamespace
+		Write:tVerbose !,"Packaging in namespace: ",$Namespace
+
+	} Catch e {
+		Set tSC = e.AsStatus()
+
+		If $Get(tPackageDeployNamespace)'="" {
+			Do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
+		}
+	}
+	Quit tSC
+}
+
 Method %Package(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
+    if ..Module.HaveToDeploy() {
+      $$$ThrowOnError(..MakeDeployed(.pParams))
+    }
+
 		Set tExportDirectory = $Get(pParams("Path"))
 		If (tExportDirectory'="") && ('##class(%File).DirectoryExists(tExportDirectory)) {
       Set tExportDirectory = ##class(%File).NormalizeDirectory(tExportDirectory)
@@ -122,7 +171,18 @@ Method %Package(ByRef pParams) As %Status
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
-	Quit tSC
+
+  If '$Get(pParams("Package","KeepNamespace")) {
+    Set tPackageDeployNamespace = $Get(pParams("PackageDeployNamespace"))
+    Set tInitNamespace = $Get(pParams("InitNamespace"))
+    If (tInitNamespace '= ""), (tPackageDeployNamespace '= ""), tInitNamespace '= $Namespace {
+      Set $Namespace = tInitNamespace
+      Do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
+      Kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
+    }
+  }
+
+  Quit tSC
 }
 
 }
