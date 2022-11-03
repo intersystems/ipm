@@ -1042,6 +1042,21 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 	q $$$OK
 }
 
+/// @API.Method
+ClassMethod IsAvailable(pModuleName As %String, pNamespace As %String = "", pArgs...) As %Boolean
+{
+	New $NAMESPACE
+	If pNamespace'="" {
+		Set $namespace = pNamespace
+	}
+	Set module = ##class(%IPM.Storage.Module).NameOpen(pModuleName,0,.sc)
+	$$$ThrowOnError(sc)
+	If module.AvailabilityClass ="" {
+		Quit 1
+	}
+	Quit $ClassMethod(module.AvailabilityClass,"IsAvailable",pNamespace,pArgs...)
+}
+
 ClassMethod GetNamespaceDefaultModifiers(Output pDefaultArray) [ Internal ]
 {
 	Kill pDefaultArray

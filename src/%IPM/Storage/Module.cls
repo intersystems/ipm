@@ -52,6 +52,9 @@ Property LifecycleClass As %Dictionary.Classname [ InitialExpression = "%IPM.Lif
 /// Lifecycle class to use for a specific command (may be overridden from command line)
 Property OverrideLifecycleClass As %Dictionary.Classname [ Transient ];
 
+/// Defined class which can report that a module is not available for this instance/namespace
+Property AvailabilityClass As %Dictionary.Classname;
+
 Property InstallerClass As %Dictionary.Classname;
 
 Property Lifecycle As %IPM.Lifecycle.Base(XMLPROJECTION = "NONE") [ Transient ];
@@ -1017,13 +1020,12 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 				Quit
 			}
 		} ElseIf (..LifecycleClass = "") && (..Packaging '= "") {
-      Set ..LifecycleClass = $Case(..Packaging,"application": "Application", : "Module")
+      		Set ..LifecycleClass = $Case(..Packaging,"application": "Application", : "Module")
 		} ElseIf (..Packaging = "") {
 			// Default to "module"
 			Set ..Packaging = "module"
 		}
 
-		
 		// Can have only one NamespaceConfig module setting.
 		Set tNSConfigCount = 0
 		Set tDefaultCount = ..Defaults.Count()
@@ -1429,6 +1431,9 @@ Storage Default
 </Value>
 <Value name="21">
 <Value>DisplayNameInternal</Value>
+</Value>
+<Value name="22">
+<Value>AvailabilityClass</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>

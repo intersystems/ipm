@@ -149,7 +149,7 @@ ClassMethod RunForInvalidReferences(pName As %String, Output pInvalidReferences,
 	Quit tSC
 }
  
-/// Find all references for all resources in module / for the specified item.If pInvalidOnly = 1 (deafult), then only look for invalid references. Else look for all references
+/// Find all references for all resources in module / for the specified item. If pInvalidOnly = 1 (default), then only look for invalid references. Else look for all references
 /// pIsModule: Whether or not we are running for a whole module or for a single item
 /// pName: When pIsModule = 0, specifies the name of the target item. Else, specifies the name of the module
 /// pInvalidOnly: Whether or not only look for invalid references. Default to 1
@@ -826,9 +826,13 @@ ClassMethod ExtractClassReferencesFromLine(pSourceClass As %String, pMethod As %
 			}
 		}
 	}
+	// If we ended with the classname being the last element, for example, <Class A> extends <Class B>
+	If (tInClassname && (tClassName '= "")) {
+		$$$AddReference(tClassName)
+	}
 	
 	// If we ended a table name on the line.
-	If (tInTableName) && (tTableName '= "") {
+	If (tInTableName && (tTableName '= "")) {
 		Set tSC = ..GetClassNameFromTableName(pSourceClass,tTableName,.tClassName)
 		$$$ThrowOnError(tSC)
 		If (tClassName '= "") {
@@ -898,15 +902,10 @@ ClassMethod ExtractReferencesFromIncludeFileLine(pSourceClass As %String, pMetho
 					Set tHasDefineTag = 1
 				}
 			} ElseIf (tType = "Pre-Processor Function") {
-				If (tIgnoreAllStr) {
-					Continue
-				}
 				If (tInMember && (tValue '= "(")) {
 					If tValue = ")" {
-						// get the closing parenthesis, record the class name if it is not in the ignored list
-						If '$ListFind(tIgnoreStrList, tReferencedClassName) {
-							$$$AddReference(tReferencedClassName)
-						}
+						// get the closing parenthesis, record the class name
+						$$$AddReference(tReferencedClassName)
 						Set tInMember = 0
 						Set tReferencedClassName = ""
 					} Else {
@@ -931,6 +930,34 @@ ClassMethod ExtractReferencesFromIncludeFileLine(pSourceClass As %String, pMetho
 			} ElseIf (tType = "White Space") {
 				If (tReferencedIncludeFileName '= "") {
 					Set tReferencedIncludeFileName = tReferencedIncludeFileName_$ZStrip(tValue, "<>WC")
+				}
+			} ElseIf (tType = "String") {
+				// Dynamic class call. Can have classname as a string.
+				If tIgnoreAllStr {
+					Continue
+				}
+				If ($Extract(tValue) = """") {
+					// Quoted classname so remove additional quotes
+					Set tValue = $Extract(tValue,2,*-1)
+					Set tIsValidClassname = ##class(%Dictionary.Classname).IsValid(tValue)
+					If tIsValidClassname {
+						Set tPackageExists = $Data($$$HSPMDependencyNsPackages($Piece(tValue, ".", 1)))
+						Set tIsFullClassname = $Piece(tValue, ".", 2) '= ""
+						If (tPackageExists && tIsFullClassname) {
+							// The package name already exists in the namespace. Can
+							// safely assume no non-existent packages are being referenced.
+							// This check is to prevent red herrings such as simple
+							// strings like "POS" or "Hello" getting flagged as invalid
+							// references.
+							If ($Extract($ZConvert(tValue, "U"), *-3, *) = ".CLS") {
+								// If reference ends in ".cls", strip it so that class's module can be detected
+								Set tValue = $Extract(tValue, 1, *-4)
+							}
+							If '$ListFind(tIgnoreStrList, tValue) {
+								$$$AddReference(tValue)
+							}
+						}
+					}
 				}
 			}
 			Set tPrevValue = tValue
