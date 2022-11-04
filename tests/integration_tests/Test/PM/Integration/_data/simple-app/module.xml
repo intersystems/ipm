@@ -3,7 +3,6 @@
 <Document name="SimpleApp.ZPM"><Module>
   <Name>SimpleApp</Name>
   <Version>0.0.1+snapshot</Version>
-  <Packaging>application</Packaging>
   <Invoke Class="%EnsembleMgr" Method="EnableNamespace" Phase="Compile" When="Before" CheckStatus="true">
     <Arg>${namespace}</Arg>
     <Arg>${verbose}</Arg>
@@ -24,6 +23,5 @@
     <Resource Name="TSL.DebugResourceProcessor.CLS" Preload="true">
     </Resource>
   </Resources>
-  <LifecycleClass>DeployedApplication</LifecycleClass>
 </Module>
 </Document></Export>
