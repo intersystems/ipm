@@ -22,12 +22,14 @@ Property Compile As %Boolean [ InitialExpression = 1 ];
 /// Defaults to the resource's extension (lower-case) if unspecified.
 Property Directory As %String(MAXLEN = "") [ InitialExpression = {$ZConvert(..#EXTENSION,"L")} ];
 
+Property DirectoryDefined As %Boolean [ InitialExpression = 0, Transient ];
+
 /// If true (default is false), the resource is loaded as a directory.
 Property LoadAsDirectory As %Boolean [ InitialExpression = 0 ];
 
 /// Characters in the filename to use as the identifier in $translate when determining the resource's filename on disk
 /// The default behavior is to replace "." with "/" and ignore "%"
-Property FilenameTranslateIdentifier As %String [ InitialExpression = ".%" ];
+Property FilenameTranslateIdentifier As %String [ InitialExpression = "." ];
 
 /// Characters in the filename to use as the associator in $translate when determining the resource's filename on disk
 /// The default behavior is to replace "." with "/" and ignore "%"
@@ -45,6 +47,14 @@ Property Name As %String(MAXLEN = 255) [ Private ];
 /// Extension of the server document(s) represented by this resource
 Property Extension As %String [ Private ];
 
+Method DirectorySet(pValue As %String) As %Status
+{
+	
+  Set i%Directory = pValue	
+  Set ..DirectoryDefined = 1	
+  Quit $$$OK
+}
+
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
@@ -56,12 +66,33 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
 		Set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
 		If ((pPhase = "Reload") && tInScope) || tInCurrentPhase {
-			For tName = tName, $TRANSLATE(tName, "%", "_"), $TRANSLATE(tName, "_", "") {
+	    Set tCatDirectory = ""	
+      Set tCatDirectory = tCatDirectory _ $ListBuild(..Directory)	
+      If ('..DirectoryDefined) {	
+        If (..Directory="mac") {	
+          Set tCatDirectory = tCatDirectory _ $ListBuild("rtn")	
+        }	
+        If (..Directory'="") {	
+          Set tCatDirectory = tCatDirectory _ $ListBuild("")	
+        }	
+      }	
+      Set tListNames = ""	
+      Set tListNames = tListNames _ $ListBuild(tName)	
+      Set tListNames = tListNames _ $ListBuild($Translate(tName, "%", "_"))	
+      Set tListNames = tListNames _ $ListBuild($Translate(tName, "_", ""))	
+      Set ptrn = 0	
+      While $ListNext(tListNames, ptrn, tName) {
 				// Runs in Reload normally, and also in Test for test scope / Verify for verify scope
 				Set tSourcesPrefix = $c($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 				
 				If '$Get(pParams("NoMapping"),0) {
-					$$$ThrowOnError(..OnConfigureMappings(.pParams))
+          // Disabled mapping of resources. It creates more problems than solves. 	
+          // Moreover, the removal of mapping during uninstallation is not implemented.	
+          // $$$ThrowOnError(..OnConfigureMappings(.pParams))	
+          }	
+          If ..ResourceReference.Generated {	
+            Set pResourceHandled = 1	
+          Quit
 				}
 				
 				If '..ResourceReference.Generated {
@@ -70,41 +101,45 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 					If ('##class(%File).DirectoryExists(tResourceDirectory)) {
 						Quit 
 					}
-
-					Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_..Directory_"/")
-					if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
-						Set tResourceDirectory = tResourceCatDirectory
+	        Set ptr = 0
+	        Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory)	
+          While $ListNext(tCatDirectory, ptr, tDirectory) {	
+            Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory _ tDirectory)	
+            If (##class(%File).DirectoryExists(tResourceCatDirectory)) {	
+              Quit
+            }
 					} 
-					ElseIf (..Directory="mac") {
-						Set tResourceCatDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_"rtn/")
-						if (##class(%File).DirectoryExists(tResourceCatDirectory)) {
-							Set tResourceDirectory = tResourceCatDirectory
-						}
-					}
+					Set tResourceDirectory = tResourceCatDirectory
 			
 					If tDeveloperMode && (..Extension '= "") && (tName '= "") {
-						Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix_tResourceDirectory
+						Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix _ tResourceDirectory
 					}
 					
 					If '..ResourceReference.Preload {
 						Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
-						Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $tr(tName,".","/"))_tFileExtension
-						If ($$$lcase(tFileExtension)=".xml")&&('##class(%File).Exists(tResourcePath)) {
-							Set $PIECE(tResourcePath, ".", *) = "cls"
-							Set ..Format = "UDL"
-						} 
-						ElseIf ($$$lcase(tFileExtension)=".cls")&&('##class(%File).Exists(tResourcePath)) {
-							Set $PIECE(tResourcePath, ".", *) = "xml"
-							Set ..Format = "XML"            
-						}
+						Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)) _ tFileExtension
+						If '..LoadAsDirectory {
+              If ($$$lcase(tFileExtension)'=".xml")&&('##class(%File).Exists(tResourcePath)) {
+							  Set tResourcePathXML = tResourcePath
+                Set $PIECE(tResourcePath, ".", *) = "xml"
+                If (##class(%File).Exists(tResourcePathXML)) {	
+                  Set tResourcePath = tResourcePathXML	
+                  Set ..Format = "XML"	
+                }
+						  }
 			
-						If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
-							Set $PIECE(tResourcePath, ".", *) = "rtn"
+						  If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
+	              Set tResourcePathRTN = tResourcePath	
+                Set $Piece(tResourcePathRTN, ".", *) = "rtn"	
+                If (##class(%File).Exists(tResourcePathRTN)) {	
+                  Set tResourcePath = tResourcePathRTN	
+                }	
+              }
 						}
 																		
-						if '##class(%File).Exists(tResourcePath) {
+						If '##class(%File).Exists(tResourcePath) {
 							Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
-							continue
+							Continue
 						}
 
 						$$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList))
@@ -114,6 +149,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 					}
 				}
 				Set pResourceHandled = 1
+        Set tSC = $$$OK
 				Quit
 			}
 		} ElseIf (pPhase = "Compile") {
@@ -133,6 +169,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
+  Set tSC = ..OnExportDeployedItem(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)	
+  If pItemHandled || $$$ISERR(tSC) {	
+    Quit tSC	
+  }
 	Set tSC = $$$OK
   Set tExportFlags = "-d /diffexport"_..ExportFlags
   Set tVerbose = $Get(pParams("Verbose"),0)
@@ -168,6 +208,140 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 	Quit tSC
 }
 
+Method OnExportDeployedItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+{
+	
+  Set tSC = $$$OK	
+  Try {	
+    Set tVerbose = $Get(pParams("Verbose"),0)	
+    Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)	
+    Quit:tDeveloperMode	
+    Quit:'..ResourceReference.Deploy	
+    Set tModuleName = ..ResourceReference.Module.Name	
+    Set fileExt = $$$ucase($Piece(pItemName, ".", *))	
+    Set tName = $Piece(pItemName, ".", 1, * - 1)	
+    Quit:'($ListFind($ListBuild("CLS","MAC","INT"), fileExt))	
+    #; Set tSC = $$$OK	
+    Set tFullExportPath = pFullExportPath	
+    Set tFullExportPath = tFullExportPath _ ".deploy"	
+    Write:tVerbose !,"Exporting Deployed '",pItemName,"' to '",tFullExportPath,"'"	
+    Set list = ""	
+    If fileExt = "CLS" {	
+      Set list = ..ListGlobals4Class(tName)	
+    } Else {	
+      Set list = ..ListGlobals4Routine(tName)	
+    }	
+    Quit:list=""	
+    Set ptr = 0	
+    While $ListNext(list, ptr, item) {	
+      Set list(item _ ".gbl") = ""	
+    }	
+    $$$ThrowOnError(##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullExportPath)))	
+    Set flags = $Select(tVerbose: "d", 1: "-d")	
+    $$$ThrowOnError($System.OBJ.Export(.list, tFullExportPath, flags))	
+    Set pItemHandled = 1	
+  }	Catch e {	
+    Set tSC = e.AsStatus()	
+  }	
+  Quit tSC
+}
+
+Method ListGlobals4Class(pClassName As %String = "") As %String
+{
+	
+  Set list = ""	
+  Set oddDEF = $Name(^oddDEF)	
+  Set oddCOM = $Name(^oddCOM)	
+  Set oddDEP = $Name(^oddDEP)	
+  Set oddEXT = $Name(^oddEXT)	
+  Set oddEXTR = $Name(^oddEXTR)	
+  Set oddMAP = $Name(^oddMAP)	
+  Set oddPROC = $Name(^oddPROC)	
+  Set oddSQL = $Name(^oddSQL)	
+  Set oddTSQL = $Name(^oddTSQL)	
+  Set rINDEX = $Name(^rINDEX)	
+  Set rINDEXSQL = $Name(^rINDEXSQL)	
+  Set rINDEXCLASS = $Name(^rINDEXCLASS)	
+  Set rOBJ = $Name(^rOBJ)	
+  Set rPYC = $Name(^rPYC)	
+  If (pClassName="")||('$Data(@oddCOM@(pClassName))) {	
+    Quit ""	
+  }	
+  Set list = list _ $ListBuild($Name(@oddDEF@(pClassName)))	
+  Set list = list _ $ListBuild($Name(@oddCOM@(pClassName)))	
+  Set list = list _ $ListBuild($Name(@oddDEP@(pClassName)))	
+  If 0 {	
+    Set ind = ""	
+    For {	
+      Set ind = $Order(@oddDEP@(pClassName, ind))	
+      Quit:ind=""	
+      Set dep = ""	
+      For {	
+        Set dep = $Order(@oddDEP@(pClassName, ind, dep))	
+        Quit:dep=""	
+        Set list = list _ $ListBuild($Name(@oddDEP@(0, dep, ind, pClassName)))	
+      }	
+    }	
+  }	
+  Set list = list _ $ListBuild($Name(@rINDEXCLASS@($$$ucase(pClassName))))	
+  Set ind = ""	
+  For {	
+    Set ind = $Order(@oddCOM@(pClassName,50,ind))	
+    Quit:ind=""	
+    Set list = list _ $ListBuild($Name(@rINDEX@(ind)))	
+    Set list = list _ $ListBuild($Name(@rOBJ@(ind)))	
+  }	
+  If $Data(@rPYC@(pClassName)) {	
+    Set list = list _ $ListBuild($Name(@rPYC@(pClassName)))	
+  }	
+  Set $ListBuild(schema, table) = $ListFromString($Get(@oddCOM@(pClassName, 53)), ".")	
+  If schema'="",table'="",$Data(@oddSQL@(schema, table)) {	
+  Set list = list _ $ListBuild($Name(@oddSQL@(schema, table)))	
+  Set list = list _ $ListBuild($Name(@rINDEXSQL@("TABLE", schema, table)))	
+  Set list = list _ $ListBuild($Name(@rINDEXSQL@("rv", $$$ucase(schema), $$$ucase(table))))	
+  #; Set tsqlId = ""	
+  #; For {	
+  #;   Set tsqlId = $Order(@oddSQL@(schema, table, "tsql", 1, tsqlId))	
+  #;   Quit:tsqlId=""	
+  #;   Set list = list _ $ListBuild($Name(@oddTSQL@(tsqlId)))	
+  #; }	
+  }	
+  Set ind = ""	
+  For {
+    Set ind = $Order(@oddCOM@(pClassName, $$$cCLASSprocedures, ind), 1, value)	
+    Quit:ind=""	
+    Set $ListBuild(schema, table) = value	
+    Continue:schema=""	
+    Continue:table=""	
+    Set list = list _ $ListBuild($Name(@oddPROC@($$$ucase(schema), ind)))	
+    Set list = list _ $ListBuild($Name(@oddSQL@(schema, table)))	
+  }	
+  If $Data(@oddEXT@(pClassName _ ".cls")) {	
+    Set list = list _ $ListBuild($Name(@oddEXT@(pClassName _ ".cls")))	
+  }	
+  If $Data(@oddEXTR@(pClassName)) {	
+    Set list = list _ $ListBuild($Name(@oddEXTR@(pClassName)))	
+  }	
+  If $Data(@oddMAP@(pClassName)) {	
+    Set list = list _ $ListBuild($Name(@oddMAP@(pClassName)))	
+  }	
+  Quit list
+}
+
+Method ListGlobals4Routine(pRoutine As %String = "") As %String
+{
+	
+  Set list = ""	
+  Set rINDEX = $Name(^rINDEX)	
+  Set rOBJ = $Name(^rOBJ)	
+  If (pRoutine="")||('$Data(@rOBJ@(pRoutine))) {	
+    Quit ""	
+  }	
+  Set list = list _ $ListBuild($Name(@rINDEX@(pRoutine)))	
+  Set list = list _ $ListBuild($Name(@rOBJ@(pRoutine)))	
+  Quit list
+}
+
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
@@ -179,7 +353,7 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 /// @Argument	pVerbose					1: display output from loading files, 0: do not display output
 /// @Argument	pCompile					1: compile files upon load, 0: do not compile files
 /// @Argument	pLoadedList					Output: comma delimited list of files that have been loaded
-Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %Boolean = 0, Output pLoadedList As %String) As %Status
+Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %Boolean = 0, Output pLoadedList As %String, ByRef pParams As %String) As %Status
 {
 	Set pLoadedList = ""
 	Set tSC = $$$OK
@@ -188,7 +362,7 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
 		Kill ^||%oddDEF
     Set tFlags = $Select(pVerbose:"/display",1:"/nodisplay")_
       $Select(pCompile:"/compile",1:"/nocompile")_
-      $Select($TLevel:"/multicompile=0",1:"")
+      $Select($Tlevel||..ResourceReference.Deploy:"/multicompile=0",1:"")
 
     If ..LoadAsDirectory {
       Set tSC = $System.OBJ.ImportDir(pFullResourcePath, "*", tFlags, , 1, .pLoadedList)
@@ -205,6 +379,7 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
       Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
       $$$ThrowOnError(tSC)
     }
+    $$$ThrowOnError(..OnLoadDeployed(.pParams, .pLoadedList))
     If $Data(tResourceKey)>1 {
       Set tResourceKey = ""
       For {
@@ -226,6 +401,34 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
 	Quit tSC
 }
 
+Method OnLoadDeployed(ByRef pParams, ByRef pLoadedList) As %Status
+{
+	
+  Set tSC = $$$OK	
+  Try {	
+    Set tr = 1	
+    Set tVerbose = $Get(pParams("Verbose"),0)	
+    Set tModuleName = ..ResourceReference.Module.Name	
+    Set tName = ""	
+    For {	
+      Set tName = $Order(pLoadedList(tName))	
+      Quit:tName=""	
+      Continue:($$$ucase($Piece(tName,".",*))'="GBL")	
+      Set tGN = "^" _ $Piece(tName, ".", 1, * - 1)	
+      #; Yep, it's just a workaround for eror with python	
+      #; <OBJECT DISPATCH> *python object not found	
+      If tName["rPYC(" {	
+        Set tValue = $Get(@tGN)	
+        Set @tGN = +tValue	
+      }	
+    }	
+  }	
+  Catch e {	
+    Set tSC = e.AsStatus()	
+  }	
+  Quit tSC
+}
+
 Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set tResourceRefName = pResourceReference.Name
@@ -233,7 +436,7 @@ Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [
 	// Else, get name and extension from resource reference name
 	If $Extract(tResourceRefName) = "/" {
 		Set ..LoadAsDirectory = 1
-		Set ..Directory = tResourceRefName
+    Set i%Directory = tResourceRefName
 		Set tSC = ##super(pResourceReference)
 		If (..Extension = "") {
 			Set ..Extension = $$$lcase(..#EXTENSION)
@@ -242,10 +445,10 @@ Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [
 		Set ..Name = $Piece(tResourceRefName,".",1,*-1)
 		Set ..Extension = $$$lcase($Case(..#EXTENSION,"":$Piece(tResourceRefName,".",*),:..#EXTENSION))
 		Set tSC = ##super(pResourceReference)
-		If (..Directory = "") {
-			Set ..Directory = $ZConvert(..Extension,"L")
-      if $lf($lb("dtl","bpl"),..Directory) {
-        set ..Directory = "cls"
+		If (i%Directory = "") {
+			Set i%Directory = $ZConvert(..Extension,"L")
+      if $lf($lb("dtl","bpl"),i%Directory) {
+        set i%Directory = "cls"
       }
 		}
 	}
@@ -302,7 +505,8 @@ Method OnItemRelativePath(pItemName As %String) As %String
 	If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
 		Set tSourceRoot = tSourceRoot _ "/"
 	}  
-	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_tSourceRoot_..Directory_"/"_$tr($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
+  set directory = $Select(..DirectoryDefined: ..Directory, 1: "")
+	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_tSourceRoot_directory_"/"_$Translate($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 }
 
 Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.ResourceInfo) As %Status
@@ -327,7 +531,6 @@ Method OnGetUniqueName(Output pUniqueName)
 		Set pUniqueName = ..ResourceReference.Module.Name_"@"_..ResourceReference.Name
 	}
 }
-
 
 /// Returns a boolean of whether current file exists in the the routine database of the current namespace exists in current namespace's database
 /// Helper method to be used in derived classes' OnConfigureMappings() to skip creating unnecessary mapping

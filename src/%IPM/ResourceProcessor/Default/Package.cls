@@ -13,10 +13,6 @@ Property Format As %String(VALUELIST = ",UDL,XML");
 
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "cls" ];
 
-Property FilenameTranslateIdentifier As %String [ InitialExpression = ".%" ];
-
-Property FilenameTranslateAssociator As %String [ InitialExpression = "/_" ];
-
 Property LoadAsDirectory As %Boolean [ InitialExpression = 1 ];
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
@@ -67,7 +63,8 @@ Method OnItemRelativePath(pItemName As %String, pIsUnitTest As %Boolean = 0) As 
     Set tSourceRoot = ..Directory
   }
   set fileNameExtension = $$$lcase($Piece(pItemName, ".", *))
-  set directory = fileNameExtension
+  set directory = $Select(..DirectoryDefined: ..Directory, 1: "")
+  #; set directory = fileNameExtension
   set fileName = $tr($Piece(pItemName, ".", 1, *-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator) _ "." _ fileNameExtension
 	Quit $Select(..ResourceReference.Preload:"preload/",1:"") _ tSourceRoot _ directory _ "/" _ fileName
 }
