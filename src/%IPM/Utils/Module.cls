@@ -58,7 +58,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 				Set pParams("Multicompile","ModuleContext",tModuleName) = $ListBuild("Activate")
 				
 				// Invert dependency graph, subscripts (<module>,<depends on>)
-				Set tInvertedDependencyGraph(tModuleName) = $List(tData,2,3)
+				Set tInvertedDependencyGraph(tModuleName) = $List(tData,2,*)
 				
 				Set tDependentKey = ""
 				For {
@@ -112,7 +112,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 			}
 			// If no uninstalled dependencies remain...
 			If 'tHasUninstalledDependency {
-				Set $ListBuild(tServerName,tVersion) = tData
+				Set $ListBuild(tServerName, tVersion, tDeployed, tPlatformVersion) = tData
 				ZKill $$$ZPMTempLoadGraph(tCacheTempIndex,tModuleName)
 				
 				// Missing server name indicates that it's already present locally; nothing to do in that case.
@@ -121,9 +121,9 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 						Write !,"Queuing module load: ",tModuleName," ",tVersion," @ ",tServerName
 					}
 					Set tSC = pWorkQueue.QueueCallback(
-						"##class("_$classname()_").LoadModuleReference",
-						"##class("_$classname()_").LoadCompleted",
-						tServerName,tModuleName,tVersion,.pParams,.pDependencyGraph)
+						"##class("_$ClassName()_").LoadModuleReference",
+						"##class("_$ClassName()_").LoadCompleted",
+						tServerName, tModuleName, tVersion, $Get(tDeployed), $Get(tPlatformVersion), .pParams, .pDependencyGraph)
 					$$$ThrowOnError(tSC)
 				} Else {
 					// Remove this module from dependencies.
@@ -167,7 +167,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 
 /// Intended to be invoked only as a work queue callback (so %status and %workqueue will be defined)
 /// Signature must match <method>LoadModuleReference</method> per work queue manager conventions.
-ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
+ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %String, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
@@ -211,14 +211,14 @@ ClassMethod LoadQualifiedReference(pReference As %IPM.Storage.QualifiedModuleInf
 	Try {
 		#dim tReference As %IPM.Storage.QualifiedModuleInfo
 		Set tReference = pReference.%ConstructClone()
-		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, .pParams, .pDependencyGraph)
+		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
 
-ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
+ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %Boolean, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
@@ -262,6 +262,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
+    Set tModRef.Deployed = pDeployed
 		
 		// Make sure we're not downgrading.
 		If '$Get(pParams("PermitDowngrade")) {
@@ -270,7 +271,10 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				If $$$ISERR(tSC) {
 					Quit
 				}
-				
+        If $Get(pParams("Install")),pModuleName'="zpm",tInstModule.DeveloperMode,'$Get(pParams("DeveloperMode"),0) {
+					Set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
+					Quit
+        }
 				If tInstModule.Version.Follows(tModRef.Version) {
 					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tInstModule.Name,tInstModule.VersionString,pVersion))
 					Quit
@@ -505,6 +509,9 @@ ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE
 	Set tSC = $$$OK
 	Kill pErrorList
 	Set pList = ##class(%Library.ListOfObjects).%New()
+  If $Get(pModuleName)="" {
+    Quit $$$OK
+  }
 	Try {
 		Set tSC = ..BuildAllDependencyGraphs(pRepoNames,.tGraphs,.pErrorList)
 		If $$$ISERR(tSC) {
@@ -541,6 +548,9 @@ ClassMethod GetDependentsList(Output pList As %Library.ListOfObjects(ELEMENTTYPE
 ClassMethod GetDependentsAsTree(Output pTree, Output pErrorList, pModuleName As %String, pModuleVersion As %String = "", pRepoNames As %List = "") As %Status
 {
 	New %DepTree
+  If $Get(pModuleName)="" {
+    Quit $$$OK
+  }
 	Set tSC = $$$OK
 	Kill pErrorList
 	Kill pTree
@@ -877,11 +887,11 @@ ClassMethod GetAvailableModuleNamesClose(ByRef qHandle As %Binary) As %Status [ 
 	Quit $$$OK
 }
 
-Query GetModuleList(pServer As %String) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String") [ SqlProc ]
+Query GetModuleList(pServer As %String, pShowAllVersions As %Boolean) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,Origin:%String,AllVersions:%String") [ SqlProc ]
 {
 }
 
-ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String) As %Status
+ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String, pShowAllVersions As %Boolean = 0) As %Status
 {
 	If (pServer = "") {
 		Set qHandle = ""
@@ -899,10 +909,11 @@ ClassMethod GetModuleListExecute(ByRef qHandle As %Binary, pServer As %String) A
 			Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
 			Set tSearchCriteria.IncludePrerelease = tServer.Prereleases
 			Set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
+      Set tSearchCriteria.AllVersions = pShowAllVersions
 			Set tList = tClient.ListModules(tSearchCriteria)
 			For i=1:1:tList.Count() {
 				Set tMod = tList.GetAt(i)
-				Set qHandle($i(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description)
+				Set qHandle($Increment(qHandle)) = $ListBuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
 			}
 		}
 		
@@ -1151,7 +1162,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
 		
-		If $Data(pParams("DeveloperMode"),tDeveloperMode) {
+		If 'tModule.Deployed,$Data(pParams("DeveloperMode"),tDeveloperMode) {
 			Set tModule.DeveloperMode = tDeveloperMode
 			Set tModule.Root = pDirectory
 			Set tSC = tModule.%Save()
@@ -1353,9 +1364,6 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
 	}
 	Return orderedDependencyList
 }
-
-
-
 
 ClassMethod CheckLicenseKey() As %Boolean
 {
@@ -2054,7 +2062,7 @@ ClassMethod GetInstallerProperties(pClass As %String = "", pExcept As %String = 
 /// Copied from %Net.Remote.Utility:RunCommandViaCPIPE and modified slightly to fit these purposes:
 /// Run a command using $ZF(-1) and an external temporary file to store the command output. <br>
 /// If <var>pDeleteTempFile</var> is 0 (false), the temporary file is not deleted; in this case, it is up to the caller to delete it when done with it.
-ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutput, pTimeout As %Integer = 10, Output pRetCode As %String) As %Status
+ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutput, pTimeout As %Integer = 10, Output pRetCode As %String, pArgs... As %String) As %Status
 {
 	Set tSC = $$$OK
 	Set pRetCode = ""
@@ -2083,6 +2091,106 @@ ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutpu
 	Use IO
 	
 	Quit tSC
+}
+
+/// Run command with $ZF(-100) <br />
+/// <var>pCwd</var> - Working folder<br/ >
+/// <var>pCmd</var> - $ListBuild for command with arguments<br/ >
+/// <var>pLogOutput</var> - Pass filename or stream object, to get all output, empty string to ignore and have output from command in default output<br/ >
+/// <vr>pErrOutput</var> - if not specified, gets the value from pLogOutput<br/ >
+/// <vr>pRetCode</var> - Code returned by OS<br/ >
+ClassMethod RunCommand(pCwd As %String = "", pCmd As %String = "", ByRef pLogOutput As %Stream.Object, ByRef pErrOutput As %Stream.Object, Output pRetCode As %String) As %Status
+{
+  If (pCmd="") || ('$ListValid(pCmd)) || ($ListGet(pCmd) = "") {
+    Quit $$$ERROR($$$GeneralError,"Wrong command.")
+  }
+  If pCwd="", '##class(%File).DirectoryExists(pCwd) {
+    Quit $$$ERROR($$$GeneralError,"Working folder does not exists or inaccessible.")
+  }
+  Set tSC = $$$OK
+  Try {
+    Set currentDirectory = ##class(%SYSTEM.Process).CurrentDirectory(pCwd)
+    Set flags = ""
+    Set cmd = $ListGet(pCmd)
+    Set args = 0
+    For i = 2:1:$ListLength(pCmd) {
+      Set args($Increment(args)) = $ListGet(pCmd, i)
+    }
+    If '$Data(pLogOutput),$Data(pErrOutput) {
+      Set pLogOutput = pErrOutput
+    }
+    Set stdout = ..GetFilename4Output(.pLogOutput, .stdoutTmp)
+    Set stderr = ..GetFilename4Output(.pErrOutput, .stderrTmp)
+    If stdout '= "", stderr = "" {
+      Set stderr = stdout
+    }
+    If stdout '= "" {
+      Set flags = flags _ "/STDOUT=""" _ stdout _ """"
+    }
+    If stderr '= "" {
+      Set flags = flags _ "/STDERR=""" _ stderr _ """"
+    }
+    Set pRetCode = $Zf(-100, flags, cmd, args...)
+    $$$ThrowOnError(..ReadFileToStream(stdout, .pLogOutput, $Get(stdoutTmp)))
+    $$$ThrowOnError(..ReadFileToStream(stderr, .pErrOutput, $Get(stderrTmp)))
+
+    If pRetCode'=0 {
+      $$$ThrowStatus($$$ERROR($$$GeneralError, "Running command returned error."))
+    }
+  } Catch (ex) {
+    If ex.Code = 34 {
+      Set tSC = $$$ERROR($$$GeneralError, "Command " _ $Get(cmd) _ " not found.")
+    } 
+    else {
+      Set tSC = ex.AsStatus()
+    }
+  }
+  If $Get(currentDirectory)'="" {
+    Do ##class(%SYSTEM.Process).CurrentDirectory(currentDirectory)
+  }
+  Quit tSC
+}
+
+ClassMethod GetFilename4Output(pOutput As %Stream.Object, Output pAsTemporary = 0) As %String
+{
+  If '$Data(pOutput) {
+    Quit ""
+  }
+  Set filename = ##class(%Library.Device).GetNullDevice()
+  If $IsObject(pOutput),pOutput.%IsA("%Stream.Object") {
+    Do pOutput.Clear()
+    If pOutput.%IsA("%Stream.FileBinary") {
+      Set filename = pOutput.Filename
+    }
+    Else {
+      Set filename = ##class(%File).TempFilename()
+      Set pAsTemporary = 1
+    }
+  }
+  ElseIf '$IsObject(pOutput),pOutput'="",##class(%File).DirectoryExists(##class(%File).GetDirectory(pOutput)) {
+    Set filename = pOutput
+  }
+  Quit filename
+}
+
+ClassMethod ReadFileToStream(pFileName As %String = "", ByRef pOutput As %Stream.Object, pDeleteAfter As %Boolean = 0) As %Status
+{
+  If (pFileName="") || (pFileName=##class(%Library.Device).GetNullDevice()) {
+    Quit $$$OK
+  }
+  If '$Data(pOutput) || '$IsObject(pOutput) || (pFileName = pOutput) {
+    Quit $$$OK
+  }
+  If pOutput.%IsA("%Stream.FileBinary"), pOutput.Filename = pFileName {
+    Quit $$$OK
+  } 
+  Set tStream = $Select(pOutput.IsCharacter(): ##class(%Stream.FileCharacter).%New(), 1: ##class(%Stream.FileBinary).%New())
+  $$$QuitOnError(tStream.LinkToFile(pFileName))
+  $$$QuitOnError(pOutput.CopyFrom(tStream))
+  If pDeleteAfter {
+    Do ##class(%File).Delete(pFileName)
+  }
+  Quit $$$OK
 }
 
 ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Internal, Private ]
