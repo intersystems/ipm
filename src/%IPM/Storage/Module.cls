@@ -79,6 +79,21 @@ Property Defaults As list Of %IPM.Storage.ModuleSetting(CLASSNAME = 1, STORAGEDE
 
 Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
+Property Deployed As %Boolean(XMLPROJECTION = "Element");
+
+Method HaveToDeploy() As %Boolean
+{
+	Set deploy = 0
+	Set key = ""
+	For {
+		Set ref = ..Resources.GetNext(.key)
+		Quit:key=""
+		Set deploy = +ref.Deploy
+		Quit:deploy
+	}
+	Quit ''deploy
+}
+
 ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 {
 	Set tSC = $$$OK
@@ -213,6 +228,13 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
   
 		If pIsComplete {
 			Set tPhases = tLifecycle.GetCompletePhases(pPhases)
+			If $ListFind(tPhases, "Package"), tModule.HaveToDeploy() {
+				if 'tModule.DeveloperMode {
+					Set tSC = $$$ERROR($$$GeneralError, "Only modules marked as Deployed and installed in Developer Mode are allowed to be packaged for publishing.")
+					$$$ThrowStatus(tSC)
+				}
+				Set tPhases = $ListBuild("PrepareDeploy") _ tPhases
+			}
 		} Else {
 			Set tPhases = pPhases
 		}
@@ -266,7 +288,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			
 			Set tSC = $$$OK
 			Try {
-				Write !,"["_tModule.DisplayName_"]",$c(9),tOnePhase," START"
+				Write !,"["_$Namespace_"|"_tModule.DisplayName_"]",$c(9),tOnePhase," START"
 				// for the reload phase, print root from which module is being loaded
 				If tOnePhase = "Reload" {
 					Write " ("_tModule.Root_")"
@@ -341,7 +363,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			If $$$ISERR(tSC) {
 				Write !,"["_tModule.DisplayName_"]",$c(9),tOnePhase," FAILURE"
 			} else {
-				Write !,"["_tModule.DisplayName_"]",$c(9),tOnePhase," SUCCESS"
+				Write !,"["_$Namespace_"|"_tModule.DisplayName_"]",$c(9),tOnePhase," SUCCESS"
 			}
 			If tTiming {
 				Write " ("_($zh-tStart)_" s)"
@@ -353,6 +375,11 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		}
 	} catch e {
 		set tSC = e.AsStatus()
+	}
+	If $$$ISERR(tSC),$Data(pParams("PackageDeployNamespace"),tPackageDeployNamespace),tPackageDeployNamespace'="" {
+  Set $Namespace = $Get(pParams("InitNamespace"))
+		Do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
+		Kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
 	}
 	quit tSC
 }
@@ -696,7 +723,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					Set tDepth = $Select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
 					
 					If (pPass = $$$EXACT) {	
-						Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth,tQualifiedReference.ServerName,tModule.VersionString)
+						Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth, tQualifiedReference.ServerName, tModule.VersionString, tQualifiedReference.Deployed, tQualifiedReference.PlatformVersion)
 						Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
 						Set pSubModules(tDepth,tDep.Name) = tModule
 						Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
@@ -981,15 +1008,14 @@ Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 		}
 		Set tExternalName = ##class(%Studio.SourceControl.Interface).ExternalName(..Name_".ZPM")
 		If (tExternalName '= "") {
-			Set tDirectory = ##class(%File).GetDirectory(tExternalName,1)
+			Set tDirectory = ##class(%File).GetDirectory(tExternalName, 0)
 			If (tDirectory '= "") {
 				Set ..Root = tDirectory
-				If (..DeveloperMode = "") {
-					// For backward-compatibility
-					Set ..DeveloperMode = 1
-				}
 			}
 		}
+    If ..Deployed,..DeveloperMode {
+      Set ..DeveloperMode = 0
+    }
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -1373,66 +1399,81 @@ Storage Default
 <Value>%%CLASSNAME</Value>
 </Value>
 <Value name="2">
-<Value>GlobalScope</Value>
+<Value>Name</Value>
 </Value>
 <Value name="3">
-<Value>VersionString</Value>
+<Value>Namespace</Value>
 </Value>
 <Value name="4">
-<Value>Version</Value>
+<Value>VersionString</Value>
 </Value>
 <Value name="5">
-<Value>ExternalName</Value>
+<Value>Version</Value>
 </Value>
 <Value name="6">
-<Value>Description</Value>
+<Value>LastModifiedTimestamp</Value>
 </Value>
 <Value name="7">
-<Value>Keywords</Value>
-</Value>
-<Value name="8">
-<Value>Author</Value>
-</Value>
-<Value name="9">
-<Value>Packaging</Value>
-</Value>
-<Value name="10">
 <Value>LifecycleClass</Value>
 </Value>
-<Value name="11">
-<Value>InstallerClass</Value>
-</Value>
-<Value name="12">
+<Value name="8">
 <Value>Hash</Value>
 </Value>
+<Value name="9">
+<Value>Description</Value>
+</Value>
+<Value name="10">
+<Value>ExternalName</Value>
+</Value>
+<Value name="11">
+<Value>Author</Value>
+</Value>
+<Value name="12">
+<Value>InstallerClass</Value>
+</Value>
 <Value name="13">
-<Value>LastModifiedTimestamp</Value>
+<Value>GlobalScope</Value>
 </Value>
 <Value name="14">
 <Value>Root</Value>
 </Value>
 <Value name="15">
-<Value>SourcesRoot</Value>
+<Value>Packaging</Value>
 </Value>
 <Value name="16">
-<Value>SystemRequirements</Value>
+<Value>Keywords</Value>
 </Value>
 <Value name="17">
-<Value>DeveloperMode</Value>
+<Value>SourcesRoot</Value>
 </Value>
 <Value name="18">
-<Value>AfterInstallMessage</Value>
-</Value>
-<Value name="19">
-<Value>Name</Value>
-</Value>
-<Value name="20">
 <Value>Repository</Value>
 </Value>
+<Value name="19">
+<Value>SystemRequirements</Value>
+</Value>
+<Value name="20">
+<Value>DeveloperMode</Value>
+</Value>
 <Value name="21">
-<Value>DisplayNameInternal</Value>
+<Value>AfterInstallMessage</Value>
 </Value>
 <Value name="22">
+<Value>AllVersions</Value>
+</Value>
+<Value name="23">
+<Value>Origin</Value>
+</Value>
+<Value name="24">
+<Value>Deployed</Value>
+</Value>
+<Value name="25">
+<Value>PlatformVersion</Value>
+</Value>
+<Value name="26">
+<Value>DisplayNameInternal</Value>
+</Value>
+<Value name="27">
 <Value>AvailabilityClass</Value>
 </Value>
 </Data>
