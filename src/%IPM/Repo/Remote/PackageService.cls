@@ -9,6 +9,8 @@ Property Username As %String;
 
 Property Password As %String;
 
+Property Token As %String;
+
 Method GetInfo(url As %String) As %DynamicObject
 {
  	Set tRequest = ..GetHttpRequest()

@@ -148,7 +148,7 @@ ClassMethod RunForInvalidReferences(pName As %String, Output pInvalidReferences,
 	}
 	Quit tSC
 }
- 
+
 /// Find all references for all resources in module / for the specified item. If pInvalidOnly = 1 (default), then only look for invalid references. Else look for all references
 /// pIsModule: Whether or not we are running for a whole module or for a single item
 /// pName: When pIsModule = 0, specifies the name of the target item. Else, specifies the name of the module
@@ -377,7 +377,7 @@ ClassMethod FindReferenceHelper(pIsModule As %Boolean, pName As %String = "", pI
 		Do pProgressListener.PushStage("Saving Results.")
 	}
 }
- 
+
 /// Based on multi-dim array, construct and return an ModuleResults object where info of the reference is stored
 /// pModuleName: Name of the module itself / home module for the item
 /// pInvalidOnly: Whether or not only look for invalid references. Default to 1
@@ -485,7 +485,7 @@ ClassMethod AccumulatePackageNamesInCurrentNamespace()
 	Do ..AccumulatePackageNamesInNamespace($Namespace, .packages)
 	Merge $$$ZPMDependencyNsPackages = packages
 }
- 
+
 ClassMethod AccumulatePackageNamesInNamespace(pNamespace As %String, Output pPackages) [ Internal, Private ]
 {
 	Kill pPackages
@@ -521,7 +521,7 @@ ClassMethod ClassExtractionComplete(pSourceClass As %String, pTargetSubscript As
 }
 
 // ////////////////////// Extraction methods called on FILES /////////////////////////////////
- 
+
 /// Called directly by RunforAllReferences() / RunforInvalidReferences() on .inc files
 ClassMethod ExtractIncludeReferencesToName(pSourceClass As %String, pTargetSubscript As %String, pProgressListener = {$$$NULLOREF}, pIgnoredStringRef As %String) As %Status
 {
@@ -530,7 +530,7 @@ ClassMethod ExtractIncludeReferencesToName(pSourceClass As %String, pTargetSubsc
 	Merge $$$ZPMDependencyTempData(pTargetSubscript) = tResults
 	Quit tSC
 }
- 
+
 /// Called directly by RunforAllReferences() / RunforInvalidReferences() on .cls files
 ClassMethod ExtractClassReferencesToName(pSourceClass As %String, pTargetSubscript As %String, pProgressListener = {$$$NULLOREF}, pIgnoredStringRef As %String) As %Status
 {
@@ -539,7 +539,7 @@ ClassMethod ExtractClassReferencesToName(pSourceClass As %String, pTargetSubscri
 	Merge $$$ZPMDependencyTempData(pTargetSubscript) = tResults
 	Quit tSC
 }
- 
+
 /// This method extracts all referenced classes from a give .inc file
 ClassMethod ExtractFileReferencesFromIncludeFile(pSourceIncludeFile As %String, ByRef pRefArray, pIgnoredStringRef As %String) As %Status
 {
@@ -567,7 +567,7 @@ ClassMethod ExtractFileReferencesFromIncludeFile(pSourceIncludeFile As %String, 
 	}
 	Quit tSC
 }
- 
+
 /// This method extracts all referenced classes from a given .cls file
 /// calls ExtractIncludeFileReferencesFromLine() to handle line with include file,
 /// calls ExtractClassReferencesFromLine() to handle other lines
@@ -640,7 +640,7 @@ ClassMethod ExtractFileReferencesFromClass(pSourceClass As %String, ByRef pRefAr
 	}
 	Quit tSC
 }
- 
+
 /// Helper method called by ExtractFileReferencesFromClass().
 /// Handles lines inside a method by calling ExtractClassReferencesFromLine()
 ClassMethod ExtractClassReferencesFromMethod(pSourceClass As %String, pMethod As %String, ByRef pMethodCode, ByRef pMethodMap, ByRef pRefArray, pIgnoredStringRef As %String) As %Status
@@ -675,7 +675,7 @@ ClassMethod ExtractClassReferencesFromMethod(pSourceClass As %String, pMethod As
 	}
 	Quit tSC
 }
- 
+
 /// Helper method called by ExtractFileReferencesFromClass().
 /// Handles lines inside a query by calling ExtractClassReferencesFromLine()
 ClassMethod ExtractClassReferencesFromQuery(pSourceClass As %String, pQuery As %String, ByRef pMethodCode, ByRef pMethodMap, ByRef pRefArray, pIgnoredStringRef As %String) As %Status
@@ -702,11 +702,11 @@ ClassMethod ExtractClassReferencesFromQuery(pSourceClass As %String, pQuery As %
 	}
 	Quit tSC
 }
- 
+
 // ////////////////////// END OF Extraction methods called on FILES /////////////////////////
 
 // ////////////////////// Extraction methods called on LINES ////////////////////////////////
- 
+
 /// Called by ExtractFileReferencesFromClass(), FromMethod() and FromQuery()
 ClassMethod ExtractClassReferencesFromLine(pSourceClass As %String, pMethod As %String, pLine As %Integer, pLineTokenList As %List, ByRef pRefArray, ByRef pMethodCode, pIgnoredStringRef As %String)
 {
@@ -840,7 +840,7 @@ ClassMethod ExtractClassReferencesFromLine(pSourceClass As %String, pMethod As %
 		}
 	}
 }
- 
+
 /// Extracts include file referenced in a class by an Include tag
 /// We assume that this method will only be called with the line starts with "Include"
 ClassMethod ExtractIncludeFileReferencesFromLine(pSourceClass As %String, pMethod As %String, pLine As %Integer, pLineTokenList As %List, ByRef pRefArray, ByRef pMethodCode)
@@ -868,7 +868,7 @@ ClassMethod ExtractIncludeFileReferencesFromLine(pSourceClass As %String, pMetho
 		$$$AddReference(tRoutineName)
 	}
 }
- 
+
 /// Called by ExtractFileReferencesFromIncludeFile, will only process lines in an include file
 ClassMethod ExtractReferencesFromIncludeFileLine(pSourceClass As %String, pMethod As %String, pLine As %Integer, pLineTokenList As %List, ByRef pRefArray, pLineCode As %String, pIgnoredStringRef As %String)
 {
@@ -941,7 +941,7 @@ ClassMethod ExtractReferencesFromIncludeFileLine(pSourceClass As %String, pMetho
 					Set tValue = $Extract(tValue,2,*-1)
 					Set tIsValidClassname = ##class(%Dictionary.Classname).IsValid(tValue)
 					If tIsValidClassname {
-						Set tPackageExists = $Data($$$HSPMDependencyNsPackages($Piece(tValue, ".", 1)))
+						Set tPackageExists = $Data($$$ZPMDependencyNsPackages($Piece(tValue, ".", 1)))
 						Set tIsFullClassname = $Piece(tValue, ".", 2) '= ""
 						If (tPackageExists && tIsFullClassname) {
 							// The package name already exists in the namespace. Can
@@ -970,8 +970,9 @@ ClassMethod ExtractReferencesFromIncludeFileLine(pSourceClass As %String, pMetho
 		$$$AddReference(tReferencedIncludeFileName)
 	}
 }
- 
+
 // ////////////////////// END of Extraction methods called on LINES /////////////////////////
+
 ClassMethod GetClassNameFromTableName(pSourceClass As %String, pFullTableName As %String, Output pClassName) As %Status
 {
 	Set tSC = $$$OK
@@ -1012,7 +1013,6 @@ ClassMethod GetClassNameFromTableName(pSourceClass As %String, pFullTableName As
 	Quit tSC
 }
 
- 
 /// Validate item name is an existing class or include file
 ClassMethod ValidateItemName(pItemName As %String) [ Internal, Private ]
 {
