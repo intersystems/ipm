@@ -8,6 +8,10 @@ Parameter DESCRIPTION As STRING = "Standard resource processor for localized err
 /// The only expected use case at this point is class packages (.PKG, but Extension will be .CLS)
 Parameter EXTENSION = "LOC";
 
+/// Characters in the filename to use as the associator in $translate when determining the resource's filename on disk
+/// The default behavior is to replace "." with "/" and change "%" to "_"
+Property FilenameTranslateAssociator As %String [ InitialExpression = "/_" ];
+
 /// Directory relative to module root containing the exported resource.
 /// Defaults to the resource's extension (lower-case) if unspecified.
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "localize" ];

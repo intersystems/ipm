@@ -29,7 +29,7 @@ Property LoadAsDirectory As %Boolean [ InitialExpression = 0 ];
 
 /// Characters in the filename to use as the identifier in $translate when determining the resource's filename on disk
 /// The default behavior is to replace "." with "/" and ignore "%"
-Property FilenameTranslateIdentifier As %String [ InitialExpression = "." ];
+Property FilenameTranslateIdentifier As %String [ InitialExpression = ".%" ];
 
 /// Characters in the filename to use as the associator in $translate when determining the resource's filename on disk
 /// The default behavior is to replace "." with "/" and ignore "%"
@@ -554,3 +554,4 @@ ClassMethod FileExistsInCurrentNS(pFileName As %String) As %Boolean
 }
 
 }
+

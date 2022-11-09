@@ -13,6 +13,10 @@ Property Format As %String(VALUELIST = ",UDL,XML");
 
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "cls" ];
 
+Property FilenameTranslateIdentifier As %String [ InitialExpression = ".%" ];
+
+Property FilenameTranslateAssociator As %String [ InitialExpression = "/_" ];
+
 Property LoadAsDirectory As %Boolean [ InitialExpression = 1 ];
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
@@ -76,3 +80,4 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 }
 
 }
+
