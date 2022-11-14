@@ -38,6 +38,12 @@ Method %Activate(ByRef pParams) As %Status
 		
 		Set tSC = ..Configure(.pParams)
 		$$$ThrowOnError(tSC)
+
+		If '$ListFind(..PhaseList,"Package") {
+			// Code cannot be deployed if it is to be reexported and packaged.
+			Set tSC = ..MakeDeployed(.pParams)
+			$$$ThrowOnError(tSC)
+		}
 		
 		// Create Studio project for package if it is loaded in developer mode and no explicit statement to not create it
 		Set tNoStudioProject = $Get(pParams("NoStudioProject"), 0)

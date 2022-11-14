@@ -1399,9 +1399,9 @@ Method %MakeDeployed(ByRef pParams) As %Status
 	Try {
 		Set tDev = ..Module.DeveloperMode
 		Set tVerbose = $Get(pParams("Verbose"))
-		// If tDev && tVerbose {
-		  // Write !,"Module is in developer mode; will only report what WOULD be deployed."
-		// }
+		If tDev && tVerbose {
+		  Write !,"Module is in developer mode; will only report what WOULD be deployed."
+		}
 		
 		// Default implementation: see which resources are expicitly flagged with Deploy = true.
 		// Build an array of those, then mark them as deployed.
