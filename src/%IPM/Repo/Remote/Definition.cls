@@ -193,9 +193,6 @@ Storage Default
 {
 <Data name="RemoteRepoDefinitionDefaultData">
 <Subscript>"RemoteRepoDefinition"</Subscript>
-<Value name="1">
-<Value>URL</Value>
-</Value>
 <Value name="2">
 <Value>Username</Value>
 </Value>

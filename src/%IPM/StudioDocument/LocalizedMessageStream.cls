@@ -53,10 +53,10 @@ Storage Default
 <Value>Contents</Value>
 </Value>
 <Value name="4">
-<Value>Hash</Value>
+<Value>LastModifiedTimestamp</Value>
 </Value>
 <Value name="5">
-<Value>LastModifiedTimestamp</Value>
+<Value>Hash</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.StudioDoc.LocalMsgStreamD</DataLocation>

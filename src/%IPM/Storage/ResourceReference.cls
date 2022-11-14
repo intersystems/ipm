@@ -518,7 +518,13 @@ Storage Default
 <Value>Deploy</Value>
 </Value>
 <Value name="8">
+<Value>UniqueName</Value>
+</Value>
+<Value name="9">
 <Value>OverrideName</Value>
+</Value>
+<Value name="10">
+<Value>IsAPI</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Resources")</DataLocation>

@@ -91,16 +91,16 @@ Storage Default
 <Value>Method</Value>
 </Value>
 <Value name="4">
-<Value>Phase</Value>
+<Value>Arg</Value>
 </Value>
 <Value name="5">
-<Value>When</Value>
-</Value>
-<Value name="6">
 <Value>CheckStatus</Value>
 </Value>
+<Value name="6">
+<Value>Phase</Value>
+</Value>
 <Value name="7">
-<Value>Arg</Value>
+<Value>When</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Invokes")</DataLocation>

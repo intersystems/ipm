@@ -60,10 +60,13 @@ Storage Default
 <Value>VersionString</Value>
 </Value>
 <Value name="3">
-<Value>Version</Value>
+<Value>Product</Value>
 </Value>
 <Value name="4">
 <Value>Interoperability</Value>
+</Value>
+<Value name="5">
+<Value>Version</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.SystemRequirementsD</DataLocation>

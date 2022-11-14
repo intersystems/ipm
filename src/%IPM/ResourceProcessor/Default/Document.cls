@@ -29,7 +29,7 @@ Property LoadAsDirectory As %Boolean [ InitialExpression = 0 ];
 
 /// Characters in the filename to use as the identifier in $translate when determining the resource's filename on disk
 /// The default behavior is to replace "." with "/" and ignore "%"
-Property FilenameTranslateIdentifier As %String [ InitialExpression = ".%" ];
+Property FilenameTranslateIdentifier As %String [ InitialExpression = "." ];
 
 /// Characters in the filename to use as the associator in $translate when determining the resource's filename on disk
 /// The default behavior is to replace "." with "/" and ignore "%"
@@ -80,6 +80,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
       Set tListNames = tListNames _ $ListBuild(tName)	
       Set tListNames = tListNames _ $ListBuild($Translate(tName, "%", "_"))	
       Set tListNames = tListNames _ $ListBuild($Translate(tName, "_", ""))	
+      Set tListNames = tListNames _ $ListBuild($Translate(tName, "%", ""))
       Set ptrn = 0	
       While $ListNext(tListNames, ptrn, tName) {
 				// Runs in Reload normally, and also in Test for test scope / Verify for verify scope
@@ -114,7 +115,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 					If tDeveloperMode && (..Extension '= "") && (tName '= "") {
 						Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix _ tResourceDirectory
 					}
-					
+          
 					If '..ResourceReference.Preload {
 						Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
 						Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)) _ tFileExtension
@@ -554,4 +555,3 @@ ClassMethod FileExistsInCurrentNS(pFileName As %String) As %Boolean
 }
 
 }
-
