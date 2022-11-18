@@ -115,7 +115,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 					If tDeveloperMode && (..Extension '= "") && (tName '= "") {
 						Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix _ tResourceDirectory
 					}
-          
+
 					If '..ResourceReference.Preload {
 						Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
 						Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)) _ tFileExtension
@@ -234,7 +234,7 @@ Method OnExportDeployedItem(pFullExportPath As %String, pItemName As %String, By
     }	
     Quit:list=""	
     Set ptr = 0	
-    While $ListNext(list, ptr, item) {	
+    While $ListNext(list, ptr, item) {
       Set list(item _ ".gbl") = ""	
     }	
     $$$ThrowOnError(##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullExportPath)))	
@@ -247,7 +247,7 @@ Method OnExportDeployedItem(pFullExportPath As %String, pItemName As %String, By
   Quit tSC
 }
 
-Method ListGlobals4Class(pClassName As %String = "") As %String
+Method ListGlobals4Class(pClassName As %String = "") As %String [ Private ]
 {
 	
   Set list = ""	
@@ -329,7 +329,7 @@ Method ListGlobals4Class(pClassName As %String = "") As %String
   Quit list
 }
 
-Method ListGlobals4Routine(pRoutine As %String = "") As %String
+Method ListGlobals4Routine(pRoutine As %String = "") As %String [ Private ]
 {
 	
   Set list = ""	
@@ -555,3 +555,4 @@ ClassMethod FileExistsInCurrentNS(pFileName As %String) As %Boolean
 }
 
 }
+

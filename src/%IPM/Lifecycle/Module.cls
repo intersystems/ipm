@@ -41,8 +41,12 @@ Method %Activate(ByRef pParams) As %Status
 
 		If '$ListFind(..PhaseList,"Package") {
 			// Code cannot be deployed if it is to be reexported and packaged.
-			Set tSC = ..MakeDeployed(.pParams)
-			$$$ThrowOnError(tSC)
+      Set tDevMode = $Get(pParams("DeveloperMode"), ..Module.DeveloperMode)
+      Set isKitBuild = $Get(pParams("IsKitBuild"),0)
+      If ('tDevMode && isKitBuild) {
+			  Set tSC = ..MakeDeployed(.pParams)
+			  $$$ThrowOnError(tSC)
+      		}
 		}
 		
 		// Create Studio project for package if it is loaded in developer mode and no explicit statement to not create it
@@ -86,8 +90,7 @@ Method %PrepareDeploy(ByRef pParams) As %Status
 
 		$$$ThrowOnError(..Module.%Reload())
 
-		Set tSource = tPackageDeployNamespace _ "-CODE"
-
+    Set tSource = tPackageDeployNamespace _ "-CODE"
 		Set tKey = ""
 		For {
 			Set tResource = ..Module.Resources.GetNext(.tKey)

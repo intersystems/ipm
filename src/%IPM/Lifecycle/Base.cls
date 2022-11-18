@@ -651,6 +651,7 @@ Method %Compile(ByRef pParams) As %Status
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
 		Set tDevMode = $Get(pParams("DeveloperMode"),+..Module.DeveloperMode)
+		Set isKitBuild = $Get(pParams("IsKitBuild"),0)
 		
 		// Setting $$$BuildFlag (a % variable) turns on storage checking, which will be handled/implemented by %SourceControl
 		// if SourceControlCreate() defines it. (See OnAfterStorage method, which the composite extension passes along
@@ -723,7 +724,9 @@ Method %Compile(ByRef pParams) As %Status
 					For {
 						Set tOneResourceKey = $Order(tOneResourceList(tOneResourceKey))
 						Quit:(tOneResourceKey="")
-            Continue:('tDevMode)&&($Get(tOneResourceList(tOneResourceKey, "Deploy")))
+            			If (('tDevMode) && ($Get(tOneResourceList(tOneResourceKey, "Deploy"))) && ('isKitBuild) && ('..Module.Deployed)) {
+	            			Continue
+            			}
 						Set tCompileFlagMap(tFlags,tResource.Name,tOneResourceKey) = ""
 					}
 				}
@@ -742,7 +745,6 @@ Method %Compile(ByRef pParams) As %Status
 				$$$ThrowStatus(tSC)
 			}
 		}
-		
 		// Compile in multiple passes, grouped by compile flags.
 		Set tCompiledSomething = 0
 		For {
@@ -781,7 +783,6 @@ Method %Compile(ByRef pParams) As %Status
 					$$$ThrowOnError(tSC)
 					Set tNoCompileLock = 1
 				}
-				
 				// Actually do the compile
 				If $Data(tCompileArray)>1 {
 					Set tCompiledSomething = 1
@@ -808,7 +809,8 @@ Method %Compile(ByRef pParams) As %Status
 			}
 			
 			// Cycle detection
-			If 'tCompiledSomething,'..HasDeployedResources {
+
+			If ('tCompiledSomething && '..HasDeployedResources) {
 				Set tFailedResources = ""
 				Set tResource = ""
 				For {
@@ -1181,7 +1183,7 @@ Method %Publish(ByRef pParams) As %Status
 			}
 		}
 		If $$$ISERR(tSC)||'$IsObject(tServer) {
-			$$$ThrowStatus($$$ERROR($$$GeneralError, "Not found server for publishing."))
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "No server found to publish to."))
 		}
 		If tVerbose {
 			Write !,"Publish to: ", tServer.URL
@@ -1400,7 +1402,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		Set tDev = ..Module.DeveloperMode
 		Set tVerbose = $Get(pParams("Verbose"))
 		If tDev && tVerbose {
-		  Write !,"Module is in developer mode; will only report what WOULD be deployed."
+		  Write !,"Module is in developer mode; will only report what WOULD be deployed unless packaging, in which case items WILL be deployed."
 		}
 		
 		// Default implementation: see which resources are expicitly flagged with Deploy = true.
@@ -1414,7 +1416,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 			
 			// Skip file resources - these are handled separately;
 			// "deployment" is the responsibility of resource processor classes.
-			If ($Extract(tResourceKey) = "/") {
+			If ($Extract(tResourceKey) = "/") { 
 				Continue
 			}
 			
@@ -1439,7 +1441,6 @@ Method %MakeDeployed(ByRef pParams) As %Status
 				}
 			}
 		}
-		
 		If $Data(tDeployClassArray) {
 			Set ..HasDeployedResources = 1
 			If (tVerbose) {

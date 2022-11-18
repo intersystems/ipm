@@ -228,7 +228,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
   
 		If pIsComplete {
 			Set tPhases = tLifecycle.GetCompletePhases(pPhases)
-			If $ListFind(tPhases, "Package"), tModule.HaveToDeploy() {
+			If ($ListFind(tPhases, "Package") && tModule.HaveToDeploy()) {
 				if 'tModule.DeveloperMode {
 					Set tSC = $$$ERROR($$$GeneralError, "Only modules marked as Deployed and installed in Developer Mode are allowed to be packaged for publishing.")
 					$$$ThrowStatus(tSC)

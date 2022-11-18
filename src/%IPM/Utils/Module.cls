@@ -271,7 +271,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				If $$$ISERR(tSC) {
 					Quit
 				}
-        If $Get(pParams("Install")),pModuleName'="zpm",tInstModule.DeveloperMode,'$Get(pParams("DeveloperMode"),0) {
+        If $Get(pParams("Install")),pModuleName'=$$$IPMModuleName,tInstModule.DeveloperMode,'$Get(pParams("DeveloperMode"),0) {
 					Set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
 					Quit
         }
@@ -288,7 +288,6 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		If $$$ISERR(tSC) {
 			Quit
 		}
-		
 		If 'tExpression.IsSatisfiedBy(tModRef.Version) {
 			Set tSourceString = $ListToString(tSourceList,"; ")
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Requested version (%1 %2) does not satisfy the requirements of other modules installed in the current namespace (%3).",tModRef.Name,pVersion,tSourceString))
@@ -1291,7 +1290,7 @@ ClassMethod SyncLoadDependencies(pModule As %IPM.Storage.Module, ByRef pParams)
 			// Ignore modules already installed that do not need to be installed again
 			Continue
 		}
-		Set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, .pParams)
+		Set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString,$Get(tDeployed), $Get(tPlatformVersion), .pParams)
 		$$$ThrowOnError(sc)
 	}
 }
@@ -2099,7 +2098,7 @@ ClassMethod RunCommandViaZF(pCmd As %String, Output pLogOutput, Output pErrOutpu
 /// <var>pLogOutput</var> - Pass filename or stream object, to get all output, empty string to ignore and have output from command in default output<br/ >
 /// <vr>pErrOutput</var> - if not specified, gets the value from pLogOutput<br/ >
 /// <vr>pRetCode</var> - Code returned by OS<br/ >
-ClassMethod RunCommand(pCwd As %String = "", pCmd As %String = "", ByRef pLogOutput As %Stream.Object, ByRef pErrOutput As %Stream.Object, Output pRetCode As %String) As %Status
+ClassMethod RunCommand(pCwd As %String = "", pCmd As %List = "", ByRef pLogOutput As %Stream.Object, ByRef pErrOutput As %Stream.Object, Output pRetCode As %String) As %Status
 {
   If (pCmd="") || ('$ListValid(pCmd)) || ($ListGet(pCmd) = "") {
     Quit $$$ERROR($$$GeneralError,"Wrong command.")
