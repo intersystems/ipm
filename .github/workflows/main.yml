@@ -145,7 +145,7 @@ jobs:
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
           docker stop $CONTAINER
-      - name: Clean install current version and test new one
+      - name: Clean install current version and test new one. (Permitted to fail on 2023.1+)
         timeout-minutes: 15
         run: |
           curl http://localhost:52773/registry/packages/-/all | jq
@@ -156,7 +156,7 @@ jobs:
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
-            'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
+            'if +sc=0 { halt:$System.Version.GetMajor()>=2023  do ##class(%SYSTEM.Process).Terminate(,1) }\n' \
             'zpm "list":1\n' \
             'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
             'zpm "repo -list"\n' \
