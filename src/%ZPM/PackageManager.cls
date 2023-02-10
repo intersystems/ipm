@@ -2281,7 +2281,6 @@ ClassMethod %UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Bo
 		Set tOffset = 0
 		Set tStarted = 0
 		For {
-			Set tLineName = "zUpdateLanguageExtensions"_"+"_$Increment(tOffset)_"^"_$ZName
 			Set tLineName = "%UpdateLanguageExtensions"_"+"_$Increment(tOffset)_"^"_$ZName
 			Set tExtLine = $Text(@(tLineName))
 			If (tExtLine=$$$STARTTAGQ) {
