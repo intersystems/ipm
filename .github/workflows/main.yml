@@ -47,6 +47,7 @@ jobs:
     needs: 
       - prepare
     strategy:
+      fail-fast: false
       matrix: 
         image: ${{ fromJson(needs.prepare.outputs.images) }}
     runs-on: ubuntu-latest
