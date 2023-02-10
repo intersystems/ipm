@@ -2273,11 +2273,10 @@ ClassMethod UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Boo
 	Try {
 		Tstart
 		// Get routine lines to generate
-		Set tOffset = 0
 		Set tStarted = 0
-		For {
-			Set tLineName = "zUpdateLanguageExtensions"_"+"_$Increment(tOffset)_"^"_$ZName
-			Set tExtLine = $Text(@(tLineName))
+		For tOffset=0:1 {
+			set label = $select($system.Version.GetMajor()>=2023: "UpdateLanguageExtensions", 1: "zUpdateLanguageExtensions")
+			Set tExtLine = $Text(@label + tOffset)
 			If (tExtLine=$$$STARTTAGQ) {
 				Set tStarted = 1
 			}
