@@ -31,8 +31,8 @@ jobs:
             tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]' | cut -d '-' -f1 | uniq)
             for tag in $tags; do images+='"'${n}:${tag}'",'; done
           done;
-          echo ::set-output name=images::"[${images%?}]"
-          echo ::set-output name=main::${images%%,*}
+          echo images="[${images%?}]" >> $GITHUB_OUTPUT
+          echo main=${images%%,*} >> $GITHUB_OUTPUT
       - name: Setup version
         id: version
         run: |
@@ -41,7 +41,7 @@ jobs:
           [ $GITHUB_EVENT_NAME == 'release' ] && VERSION=${{ github.event.release.tag_name }} && VERSION=${VERSION/v/}
           [ $GITHUB_EVENT_NAME == 'push' ] && VERSION+=-beta && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f4)+1))
           [ $GITHUB_EVENT_NAME == 'pull_request' ] && VERSION+=-dev.${{ github.event.pull_request.number }} && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f5)+1))
-          echo ::set-output name=number::${VERSION}
+          echo number=${VERSION} >> $GITHUB_OUTPUT
   build:
     timeout-minutes: 20
     needs: 
@@ -57,11 +57,11 @@ jobs:
         id: image
         run: |
           IMAGE=containers.intersystems.com/intersystems/${{ matrix.image }}
-          echo ::set-output name=name::${IMAGE}
+          echo name=${IMAGE} >> $GITHUB_OUTPUT
           FLAGS=
           [[ $IMAGE == *:2021.* ]] && FLAGS=' --check-caps false'
           [[ $IMAGE == *:2022.1.* ]] && FLAGS=' --check-caps false'
-          echo ::set-output name=flags::${FLAGS}
+          echo flags=${FLAGS} >> $GITHUB_OUTPUT
       - name: Setup version
         id: version
         env:
@@ -69,9 +69,9 @@ jobs:
         run: |
           sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION}<\/Version>/" module.xml
           cat module.xml
-          echo ::set-output name=number::${VERSION}
+          echo number=${VERSION} >> $GITHUB_OUTPUT
       - name: Build
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v4
         with:
           context: .
           push: false
