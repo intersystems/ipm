@@ -14,6 +14,8 @@
   <Packaging>module</Packaging>
   <SourcesRoot>src</SourcesRoot>
   <Resource Name="%IPM.PKG"/>
+  <Resource Name="%IPM.Common.INC"/>
+  <Resource Name="%IPM.Formatting.INC"/>
   <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test"/>
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
   <Resource Name="%ZLANGC00.MAC" Generated="true"/>
