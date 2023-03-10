@@ -39,9 +39,10 @@ ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
 					$$$ThrowStatus(tSC)
 				}
 				Set pRoot = ##class(%Library.File).NormalizeDirectory(pRoot)
-				
-				Set tCmd = "ROBOCOPY "_tEmptyDir_" "_pRoot_" /MIR"
-				Set tSC = ##class(%IPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr)
+        Set stdout=""
+				Set tCmd = $ListBuild("ROBOCOPY",tEmptyDir,pRoot,"/MIR")
+				Set tSC = ##class(%IPM.Utils.Module).RunCommand(, tCmd,.stdout,,.retCode)
+				if $$$ISERR(tSC),$Get(retCode)<8 set tSC=$$$OK
 			} Catch e {
 				Set tSC = e.AsStatus()
 			}
@@ -97,8 +98,12 @@ ClassMethod CopyDir(pSource As %String, pDest As %String, pDeleteFirst As %Boole
 			}
 			Set pSource = ##class(%Library.File).NormalizeDirectory(pSource)
 			Set pDest = ##class(%Library.File).NormalizeDirectory(pDest)
-			Set tCmd = "ROBOCOPY "_pSource_" "_pDest_" /E"
-			Set tSC = ##class(%IPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr)
+			Set tCmd = $ListBuild("ROBOCOPY", pSource,pDest,"/E")
+	    If ('pVerbose) {
+	        Set stdout = ""
+	    }
+		  Set tSC = ##class(%IPM.Utils.Module).RunCommand(, tCmd,.stdout,,.retCode)
+		  if $$$ISERR(tSC),$Get(retCode)<8 set tSC=$$$OK
       If (pVerbose) {
         For i=1:1:$Get(tLog) {
           Write tLog(i),!
@@ -122,9 +127,9 @@ ClassMethod MakeDirectoryWriteable(pDirectory As %String, Output pCmd, Output pO
 			Set pCmd = $ListBuild("attrib","-r"_##class(%Library.File).NormalizeDirectory(pDirectory)_"*.*","/s")
 			Set stdout = ""
 		} ElseIf $$$isUNIX {
-			Set pCmd = "chmod -R 775 "_##class(%Library.File).NormalizeDirectory(pDirectory)
+			Set pCmd = $ListBuild("chmod","-R","775",##class(%Library.File).NormalizeDirectory(pDirectory))
 		}
-		Set tSC = ##class(%IPM.Utils.Module).RunCommandViaZF(pCmd,.pOutputLog,.pErrLog)
+    Set tSC = ##class(%IPM.Utils.Module).RunCommand(, pCmd,.stdout)
 		$$$ThrowOnError(tSC)
 		if ($get(pErrLog(1))'="") {
 			set error = pErrLog(1)

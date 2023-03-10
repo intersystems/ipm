@@ -50,8 +50,6 @@ ClassMethod RetrieveModulePackage(pQualifiedReference As %IPM.Storage.QualifiedM
 
 ClassMethod GetZPMVersion()
 {
-    New $Namespace
-    Set $Namespace = "%SYS"
     Set module = ##class(%IPM.Storage.Module).NameOpen("zpm")
     If ($IsObject(module)) {
         Return module.VersionString

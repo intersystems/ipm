@@ -67,9 +67,9 @@ ClassMethod AsyncSetup(Args...)
 
 ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
-    If (pRegistry'="") {
-      $$$QuitOnError(##class(%IPM.Main).Shell("repo -t registry -name registry -url "_ pRegistry))
-    }
+    //If (pRegistry'="") {
+    //  $$$QuitOnError(##class(%IPM.Main).Shell("repo -t registry -name registry -url "_ pRegistry))
+    //}
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID))

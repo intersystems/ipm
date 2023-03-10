@@ -8,7 +8,7 @@ Method TestSimpleApp()
     Set tTestRoot = ##class(%File).NormalizeDirectory($Get(^UnitTestRoot))
     
     set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/simple-app/")
-    Set tSC = ##class(%ZPM.PackageManager).Shell("load " _ tModuleDir)
+    Set tSC = ##class(%IPM.Main).Shell("load " _ tModuleDir)
     Do $$$AssertStatusOK(tSC,"Loaded SimpleApp module successfully. " _ tModuleDir)
     
     #; Set tInstallInfo = ##class(%IPM.PackageManager.Core.InstallationInfo).%New()

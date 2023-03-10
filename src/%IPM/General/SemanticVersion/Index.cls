@@ -10,10 +10,10 @@
 /// </code>
 /// You must also define a property with the same name as that index, as follows:
 /// <code>
-/// Property SemVer As %String(MAXLEN = 512) [ SqlComputeCode = {set {*} = ##class(%IPM.PackageManager.Server.Module).SemVerNode({Name},{Version})}, SqlComputed, SqlComputeOnChange = (%%INSERT, %%UPDATE) ];
+/// Property SemVer As %String(MAXLEN = 512) [ SqlComputeCode = {set {*} = ##class(%IPM.Repo.Filesystem.Cache).SemVerNode({Name},{Version})}, SqlComputed, SqlComputeOnChange = (%%INSERT, %%UPDATE) ];
 /// </code>
 /// </p>
-/// <p>For an example, see <class>%IPM.PackageManager.Server.Module</class>.</p>
+/// <p>For an example, see <class>%IPM.Repo.Filesystem.Cache</class>.</p>
 /// <p>To use the generated Find method and the %IPM.General.SemanticVersion.Find (as in the example of %IPM_PackageManager_Server._Module):
 /// <code>
 /// SELECT Name,VersionString FROM %IPM_PackageManager_Server._Module WHERE ID %INSET %IPM_PackageManager_Server.Module_SemVerFind('HS.JSON','0.x','snapshot')

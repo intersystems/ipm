@@ -233,7 +233,7 @@ Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.Res
 	Set pInfo.SourceControlAware = 1
 	Set pInfo.Prefix = $Case(..Package '= "", 1: ..Package_".", : ..Class)
 	Set pInfo.RelativePath = ..ResourceReference.Name
-	Set pInfo.ResourceType = "CLS"
+	Set pInfo.ResourceType = "cls"
 	Quit $$$OK
 }
 

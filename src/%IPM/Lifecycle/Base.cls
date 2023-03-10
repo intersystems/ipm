@@ -574,11 +574,11 @@ Method %Reload(ByRef pParams) As %Status
 		Set tGlobalScope = ..Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
 		Set tAbsolutePrefix = $Char($Parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 		
-		// Ensures, for example, that HS.PM isn't mapped to ^Sources("ZPM","HS.PM")_"HS/module.xml"
+		// Ensures, for example, that HS.PM isn't mapped to ^Sources("MODULE","HS.PM")_"HS/module.xml"
 		If tDeveloperMode {
 			Set ^Sources = $Get(^Sources)
-			Set ^Sources("ZPM","*","NoFolders")=1
-			Set ^Sources("ZPM",..Module.Name) = tAbsolutePrefix_tRoot
+			Set ^Sources("MODULE","*","NoFolders")=1
+			Set ^Sources("MODULE",..Module.Name) = tAbsolutePrefix_tRoot
 		}
 		
 		// Standard resource processing
@@ -724,7 +724,7 @@ Method %Compile(ByRef pParams) As %Status
 					For {
 						Set tOneResourceKey = $Order(tOneResourceList(tOneResourceKey))
 						Quit:(tOneResourceKey="")
-            			If (('tDevMode) && ($Get(tOneResourceList(tOneResourceKey, "Deploy"))) && ('isKitBuild) && ('..Module.Deployed)) {
+            			If (('tDevMode) && ($Get(tOneResourceList(tOneResourceKey, "Deploy"))) && ('isKitBuild) && (..Module.Deployed)) {
 	            			Continue
             			}
 						Set tCompileFlagMap(tFlags,tResource.Name,tOneResourceKey) = ""
@@ -775,7 +775,7 @@ Method %Compile(ByRef pParams) As %Status
 						Kill tCompilableMap(tResourceKey)
 					}
 				}
-				
+
 				Set tNoCompileLock = '$Get(pParams("NoLock"))
 				If $$$IsISCWorker && 'tNoCompileLock {
 					// Customized locking - takes out shared locks on dependencies to avoid conflicts between parallel module loads.
@@ -783,6 +783,7 @@ Method %Compile(ByRef pParams) As %Status
 					$$$ThrowOnError(tSC)
 					Set tNoCompileLock = 1
 				}
+
 				// Actually do the compile
 				If $Data(tCompileArray)>1 {
 					Set tCompiledSomething = 1
@@ -809,7 +810,6 @@ Method %Compile(ByRef pParams) As %Status
 			}
 			
 			// Cycle detection
-
 			If ('tCompiledSomething && '..HasDeployedResources) {
 				Set tFailedResources = ""
 				Set tResource = ""
@@ -1610,3 +1610,4 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 }
 
 }
+

@@ -29,7 +29,7 @@ Property LoadAsDirectory As %Boolean [ InitialExpression = 0 ];
 
 /// Characters in the filename to use as the identifier in $translate when determining the resource's filename on disk
 /// The default behavior is to replace "." with "/" and ignore "%"
-Property FilenameTranslateIdentifier As %String [ InitialExpression = "." ];
+Property FilenameTranslateIdentifier As %String [ InitialExpression = ".%" ];
 
 /// Characters in the filename to use as the associator in $translate when determining the resource's filename on disk
 /// The default behavior is to replace "." with "/" and ignore "%"
@@ -65,6 +65,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
 		Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
 		Set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
+    If (..Directory'="") {		
+      Set ..DirectoryDefined = 1
+    }	
 		If ((pPhase = "Reload") && tInScope) || tInCurrentPhase {
 	    Set tCatDirectory = ""	
       Set tCatDirectory = tCatDirectory _ $ListBuild(..Directory)	
@@ -507,7 +510,7 @@ Method OnItemRelativePath(pItemName As %String) As %String
 		Set tSourceRoot = tSourceRoot _ "/"
 	}  
   set directory = $Select(..DirectoryDefined: ..Directory, 1: "")
-	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_tSourceRoot_directory_"/"_$Translate($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
+	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_directory_"/"_$Translate($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 }
 
 Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.ResourceInfo) As %Status

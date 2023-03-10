@@ -47,7 +47,8 @@ ClassMethod RunForAllModules() As %Status
 /// pProgressListener: Dependency analyzer socket for running deps
 /// pRunID: ID of ModuleResults persistent class
 /// pIgnoredStringRef: comma-separated string of string references that will be ignored. If set to $char(0), then will ignore all string references including classes.
-ClassMethod RunForAllReferences(pName As %String, Output pReferences, pVerbose As %Boolean = 1, pSave As %Boolean = 1, pProgressListener = {$$$NULLOREF}, Output pRunID As %String, pIgnoredStringRef As %String = "") As %Status
+/// pDirectDepsOnly: Include only direct dependencies rather than transitive ones as well.
+ClassMethod RunForAllReferences(pName As %String, Output pReferences, pVerbose As %Boolean = 1, pSave As %Boolean = 1, pProgressListener = {$$$NULLOREF}, Output pRunID As %String, pIgnoredStringRef As %String = "", pDirectDepsOnly As %Boolean = 0) As %Status
 {
 	Set pRunID = ""
 	Set tSC = $$$OK
@@ -70,7 +71,7 @@ ClassMethod RunForAllReferences(pName As %String, Output pReferences, pVerbose A
 		}
 		
 		// Find references for target item
-		Do ..FindReferenceHelper(tIsModule, pName, 0, pProgressListener,pIgnoredStringRef, .pReferences)
+		Do ..FindReferenceHelper(tIsModule, pName, 0, pProgressListener, pIgnoredStringRef, pDirectDepsOnly, .pReferences)
 		
 		// Represent results as objects
 		Set tRun = ..PresentReferenceAsObject(tModuleName, 0, .pReferences)
@@ -104,7 +105,8 @@ ClassMethod RunForAllReferences(pName As %String, Output pReferences, pVerbose A
 /// pProgressListener: Dependency analyzer socket for running deps
 /// pRunID: ID of ModuleResults persistent class
 /// pIgnoredStringRef: comma-separated string of string references that will be ignored. If set to $char(0), then will ignore all string references including classes.
-ClassMethod RunForInvalidReferences(pName As %String, Output pInvalidReferences, pVerbose As %Boolean = 1, pSave As %Boolean = 1, pProgressListener = {$$$NULLOREF}, Output pRunID As %String, pIgnoredStringRef As %String = "") As %Status
+/// pDirectDepsOnly: Include only direct dependencies rather than transitive ones as well.
+ClassMethod RunForInvalidReferences(pName As %String, Output pInvalidReferences, pVerbose As %Boolean = 1, pSave As %Boolean = 1, pProgressListener = {$$$NULLOREF}, Output pRunID As %String, pIgnoredStringRef As %String = "", pDirectDepsOnly As %Boolean = 0) As %Status
 {
 	Set pRunID = ""
 	Set tSC = $$$OK
@@ -123,7 +125,7 @@ ClassMethod RunForInvalidReferences(pName As %String, Output pInvalidReferences,
 		}
  
 		// Find references for target module / item
-		Do ..FindReferenceHelper(tIsModule, pName, 1, pProgressListener, pIgnoredStringRef, .pInvalidReferences)
+		Do ..FindReferenceHelper(tIsModule, pName, 1, pProgressListener, pIgnoredStringRef, pDirectDepsOnly, .pInvalidReferences)
 		
 		// Represent results as objects
 		Set tRun = ..PresentReferenceAsObject(tModuleName, 1, .pInvalidReferences)
@@ -154,9 +156,11 @@ ClassMethod RunForInvalidReferences(pName As %String, Output pInvalidReferences,
 /// pName: When pIsModule = 0, specifies the name of the target item. Else, specifies the name of the module
 /// pInvalidOnly: Whether or not only look for invalid references. Default to 1
 /// pIgnoredStringRef: Comma-separated string of string references that will be ignored. If set to $char(0), then will ignore all string references including classes.
+/// pDirectDepsOnly: Include only direct dependencies rather than transitive ones as well.
 /// pReferences: Output multidim references
-ClassMethod FindReferenceHelper(pIsModule As %Boolean, pName As %String = "", pInvalidOnly As %Boolean = 1, pProgressListener = {$$$NULLOREF}, pIgnoredStringRef As %String, Output pReferences) [ Internal ]
+ClassMethod FindReferenceHelper(pIsModule As %Boolean, pName As %String = "", pInvalidOnly As %Boolean = 1, pProgressListener = {$$$NULLOREF}, pIgnoredStringRef As %String, pDirectDepsOnly As %Boolean = 0, Output pReferences) [ Internal ]
 {
+  #dim tModule As %IPM.Storage.Module
 	Set tModuleName = pName
 	// tModule will only be used when running for a module, or running to find invalid references
 	If 'pIsModule {
@@ -178,17 +182,15 @@ ClassMethod FindReferenceHelper(pIsModule As %Boolean, pName As %String = "", pI
 	// so that we can test if resources are coming from a dependent module.
 	If pInvalidOnly {
 		If $IsObject(pProgressListener) {
-			Do pProgressListener.PushStage("Building dependency graph")
+			Do pProgressListener.PushStage("Collecting Dependencies")
 		}
-		Set tSC = tModule.BuildDependencyGraph(.tGraph)
-		$$$ThrowOnError(tSC)
-		// Include this module in the graph
-		Set tGraph(tModuleName) = ""
-	}
-	
-	If $IsObject(pProgressListener) {
-		Do pProgressListener.PopStage()
-	}
+    Do ..GetDependenciesForModule(tModule, pDirectDepsOnly, .tDependencies)
+		// Include this module in the list
+		Set tDependencies(tModuleName) = ""
+		If $IsObject(pProgressListener) {
+			Do pProgressListener.PopStage()
+	  }
+  }
 	
 	// Get packages in %SYS
 	Do ..GetSysPackageNames(.tSYSPackages)
@@ -347,8 +349,8 @@ ClassMethod FindReferenceHelper(pIsModule As %Boolean, pName As %String = "", pI
 		Set tHomeModule = ##class(%IPM.ExtensionBase.Utils).FindHomeModule(tRawFileName_tFileType)
 			
 		// Skipping files whose home module is presented in the module dependency graph.
-		// If looking for all references, tGraph will only contain nothing so will not skip any reference
-		If $IsObject(tHomeModule) && $Data(tGraph(tHomeModule.Name)) {
+		// If looking for all references, tDependencies will only contain nothing so will not skip any reference
+		If $IsObject(tHomeModule) && $Data(tDependencies(tHomeModule.Name)) {
 			Continue
 		}
  
@@ -358,7 +360,7 @@ ClassMethod FindReferenceHelper(pIsModule As %Boolean, pName As %String = "", pI
 			Set tGeneratedBy = $$$comClassKeyGet(tRawFileName,$$$cCLASSgeneratedby)
 			If (tGeneratedBy '= "") && ($$$comClassKeyGet(tRawFileName,$$$cCLASSdeployed) = 2) {
 				Set tHomeModule = ##class(%IPM.ExtensionBase.Utils).FindHomeModule(tGeneratedBy)
-				If $IsObject(tHomeModule) && $Data(tGraph(tHomeModule.Name)) {
+				If $IsObject(tHomeModule) && $Data(tDependencies(tHomeModule.Name)) {
 					Continue
 				}
 			}
@@ -375,6 +377,24 @@ ClassMethod FindReferenceHelper(pIsModule As %Boolean, pName As %String = "", pI
 	If $IsObject(pProgressListener) {
 		Do pProgressListener.PopStage()
 		Do pProgressListener.PushStage("Saving Results.")
+	}
+}
+
+ClassMethod GetDependenciesForModule(pModule As %IPM.Storage.Module, pDirectDepsOnly As %Boolean, Output pDependencies) [ Internal, Private ]
+{
+  Kill pDependencies
+	If (pDirectDepsOnly) {
+		For i = 1:1:pModule.Dependencies.Count() {
+			#dim dep As %IPM.Storage.ModuleReference
+			Set dep = pModule.Dependencies.GetAt(i)
+			Set pDependencies(dep.Name) = ""
+		}
+	} Else {
+		Set dependencyList = ##class(%IPM.Storage.Module).GetKnownDependencies(pModule.Name)
+		Set ptr = 0
+		While $ListNext(dependencyList,ptr,dep) {
+			Set pDependencies(dep) = ""
+		}
 	}
 }
 

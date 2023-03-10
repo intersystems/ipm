@@ -600,7 +600,7 @@ ClassMethod GetDependentsAsTree(Output pTree, Output pErrorList, pModuleName As 
 
 ClassMethod InvertDependencies(pNodeName As %String, ByRef pGraph, Output pTree) [ Private ]
 {
-	Kill pTree
+	Set pTree=""
 	Set tSource = ""
 	If ($ListGet(pGraph,2) = pNodeName) {
 		Set tKey = $ListBuild(pNodeName,$ListGet(pGraph,3),$ListGet(pGraph,1))
@@ -609,6 +609,7 @@ ClassMethod InvertDependencies(pNodeName As %String, ByRef pGraph, Output pTree)
 		Set tKey = $ListBuild(pNodeName,$ListGet(pGraph(pNodeName),3),$ListGet(pGraph(pNodeName),2))
 		For {
 			Set tSource = $Order(pGraph(pNodeName,tSource))
+      Set pTree(tKey) = ""
 			Quit:(tSource="")
 			
 			Do ..InvertDependencies($Piece(tSource," "),.pGraph,.tTree)
@@ -1205,19 +1206,14 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 				// Temporary custom loading of dependencies in a synchronous
 				// manner to prevent lock timeouts until lifecycle rework
 				// is complete (HSIEO-4450)
-				Do ..SyncLoadDependencies(tModule, .pParams)
+        Do ..SyncLoadDependencies(tModule, .pParams)
 			}
 		}
 		
 		Set tPath = pDirectory_"preload"
 		If ##class(%File).DirectoryExists(tPath) {
-			New $Namespace
-			Set tInitNamespace = $Namespace
-			// Ensure we load "preload" resources into the correct code database (the namespace default one), since this is before mappings are set up.
-			Set $Namespace = "^^"_##class(%IPM.Utils.Module).GetRoutineDatabaseDir($Namespace)
-			Set tSC = $system.OBJ.LoadDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($TLevel:"/multicompile=0",1:""),,1)
+      Set tSC = $system.OBJ.ImportDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($TLevel:"/multicompile=0",1:""),,1)
 			$$$ThrowOnError(tSC)
-			Set $Namespace = tInitNamespace
 		} Else {
 			Write:tVerbose !,"Skipping preload - directory does not exist."
 		}

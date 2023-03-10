@@ -532,8 +532,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
     <parameter name="moduleOrItem" required="true" description="Name of module / item to inspect" />
 	<!-- Modifiers -->
 	<modifier name="invalid-only" value="true" description="Will only be applied when the input is an item name. Default to 1, i.e default to show invalid references only. If specified to 0, will show all references to the item." />
-    <modifier name="ignore-str" value="true" description="If specified, ignore specific string references provided as a comma-separated string, including class names" />
+  <modifier name="ignore-str" value="true" description="If specified, ignore specific string references provided as a comma-separated string, including class names" />
 	<modifier name="ignore-str-all" description="If specified, ignore all string references, including class names" />
+  <modifier name="direct-deps-only" description="If specified, flag references based on direct dependencies only instead of allowing for transitive dependencies" />
     <!-- Examples -->
     <example description="Runs the dependency analyzer on the module MyModuleName to find invalid references, and ignore string references MyClassName1 and MyClassName2.">
         deps MyModuleName -ignore-str MyClassName1,MyClassName2
@@ -1968,6 +1969,7 @@ ClassMethod RunDependencyAnalyzer(ByRef pCommandInfo)
 	Set ignoredStringRef = $$$GetModifier(pCommandInfo,"ignore-str")
 	Set ignoreAll = $$$HasModifier(pCommandInfo,"ignore-str-all")
 	Set invalidOnly = $$$GetModifier(pCommandInfo,"invalid-only")
+  Set directDepsOnly = $$$HasModifier(pCommandInfo,"direct-deps-only")
 	If (ignoreAll) {
 		Set ignoredStringRef = $char(0)
 	}
@@ -1978,12 +1980,12 @@ ClassMethod RunDependencyAnalyzer(ByRef pCommandInfo)
 	Write !, "Running dependency analyzer...", !, !
 	// Status can be ignored as it is written to the current device
 	If (invalidOnly = 0)  {
-		Do ##class(%IPM.DependencyAnalyzer).RunForAllReferences(moduleOrItemName, .allReferences, 1,,,,ignoredStringRef)
+		Do ##class(%IPM.DependencyAnalyzer).RunForAllReferences(moduleOrItemName, .allReferences, 1,,,,ignoredStringRef, directDepsOnly)
 		If '$Data(allReferences) {
 			Write !, "No references found!"
 		}
 	} Else {
-		Do ##class(%IPM.DependencyAnalyzer).RunForInvalidReferences(moduleOrItemName, .invalidReferences, 1,,,,ignoredStringRef)
+		Do ##class(%IPM.DependencyAnalyzer).RunForInvalidReferences(moduleOrItemName, .invalidReferences, 1,,,,ignoredStringRef, directDepsOnly)
 		If '$Data(invalidReferences) {
 			Write !, "No invalid references found!"
 		}
@@ -2462,8 +2464,9 @@ ClassMethod UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Boo
 		// Get routine lines to generate
 		Set tOffset = 0
 		Set tStarted = 0
+		Set labelPrefix = $Select($System.Version.GetMajor() >= 2023: "",1: "z")
 		For {
-			Set tLineName = "zUpdateLanguageExtensions"_"+"_$Increment(tOffset)_"^"_$ZName
+			Set tLineName = labelPrefix_"UpdateLanguageExtensions"_"+"_$i(tOffset)_"^"_$ZName
 			Set tExtLine = $Text(@(tLineName))
 			If (tExtLine=$$$STARTTAGQ) {
 				Set tStarted = 1
