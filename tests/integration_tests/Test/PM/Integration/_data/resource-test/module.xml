@@ -12,6 +12,8 @@
     <Resource Name="hl7_2.5.LUT">
       <Attribute Name="Directory">misc</Attribute>
     </Resource>
+    <Resource Name="TestLookupTable_wide_system.lut"/>
+    <Resource Name="TestLookupTable_short_atelier.lut"/>
     <Resource Name="ResourceTest.APackage.PKG">
       <Attribute Name="CompileAfter">ResourceTest.MAC</Attribute>
       <Attribute Name="Flags">ck /multi=0</Attribute>

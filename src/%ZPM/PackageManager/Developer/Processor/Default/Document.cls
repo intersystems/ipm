@@ -399,8 +399,31 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
       Set pLoadedList = ""
       Set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$Select(pVerbose:"d",1:"-d"))
     } Else {
-      Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
-      $$$ThrowOnError(tSC)
+      Set tProcessed = 0
+      if ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
+        try {
+          set stream = ##class(%Stream.FileCharacter).%New()
+          $$$ThrowOnError(stream.LinkToFile(pFullResourcePath))
+          $$$ThrowOnError(##class(%XML.XPATH.Document).CreateFromStream(stream, .tDocument))
+          $$$ThrowOnError(tDocument.EvaluateExpression("/Export/Document", "text()", .tRes))
+          if $IsObject(tRes),'tRes.Size  {
+            Set tProcessed = 1
+            set routineMgr = ##class(%RoutineMgr).%OpenId(..ResourceReference.Name)
+            do routineMgr.Code.Rewind()
+            if $$$ISOK(sc) {
+              do routineMgr.Code.CopyFrom(stream)
+              $$$ThrowOnError(routineMgr.%Save())
+            }
+          }
+        } catch ex {
+          #; Default way
+        }
+      }
+      If 'tProcessed {
+        Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
+        $$$ThrowOnError(tSC)
+      }
+
     }
     $$$ThrowOnError(..OnLoadDeployed(.pParams, .pLoadedList))
     If $Data(tResourceKey)>1 {
