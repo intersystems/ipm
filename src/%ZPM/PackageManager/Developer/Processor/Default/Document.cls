@@ -144,7 +144,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             Continue
           }
 
-          $$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList))
+          $$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList,.pParams))
           
           Set tSC = ##class(%ZPM.PackageManager.Developer.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
           $$$ThrowOnError(tSC)
@@ -379,6 +379,7 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %Boolean = 0, Output pLoadedList As %String, ByRef pParams As %String) As %Status
 {
 	Set pLoadedList = ""
+  Set tVerbose = $Get(pParams("Verbose"),0)
 	Set tSC = $$$OK
 	Try {
 		// Workaround: need to clean up after other UDL import/export operations
@@ -400,20 +401,30 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
       Set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$Select(pVerbose:"d",1:"-d"))
     } Else {
       Set tProcessed = 0
-      if ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
+      set fileExt = $$$UPPER($Piece(pFullResourcePath, ".", *))
+      if '$LISTFIND($LB("CLS", "MAC"), fileExt), ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
         try {
           set stream = ##class(%Stream.FileCharacter).%New()
           $$$ThrowOnError(stream.LinkToFile(pFullResourcePath))
-          $$$ThrowOnError(##class(%XML.XPATH.Document).CreateFromStream(stream, .tDocument))
-          $$$ThrowOnError(tDocument.EvaluateExpression("/Export/Document", "text()", .tRes))
-          if $IsObject(tRes),'tRes.Size  {
-            Set tProcessed = 1
-            set routineMgr = ##class(%RoutineMgr).%OpenId(..ResourceReference.Name)
-            do routineMgr.Code.Rewind()
-            if $$$ISOK(sc) {
+          try {
+            Quit:'##class(%XML.XPATH.Document).CreateFromStream(stream, .tDocument)
+            Quit:'$ISOBJECT(tDocument)
+            Quit:'tDocument.EvaluateExpression("/Export/Document", "text()", .tRes)
+            if $IsObject(tRes),tRes.Size  {
+              Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
+              Set tProcessed = 1
+            }
+          } catch ex { }
+          if 'tProcessed {
+            try {
+              Write:tVerbose !,"Loading file " _ pFullResourcePath _ " as " _ docclass
+              set routineMgr = ##class(%RoutineMgr).%OpenId(..ResourceReference.Name)
+              do routineMgr.Code.Rewind()
               do routineMgr.Code.CopyFrom(stream)
               $$$ThrowOnError(routineMgr.%Save())
-            }
+              Write:tVerbose !,"Imported document: ", ..ResourceReference.Name, !, "Load finished successfully.", !
+              Set tProcessed = 1
+            } catch ex { }
           }
         } catch ex {
           #; Default way
@@ -423,7 +434,6 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
         Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
         $$$ThrowOnError(tSC)
       }
-
     }
     $$$ThrowOnError(..OnLoadDeployed(.pParams, .pLoadedList))
     If $Data(tResourceKey)>1 {
