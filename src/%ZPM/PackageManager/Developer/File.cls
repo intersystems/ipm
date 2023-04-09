@@ -183,7 +183,7 @@ ClassMethod FindFiles(pPath As %String, pWildcards As %String = "", Output pList
 }
 
 /// Check if file exists but case insensetive
-ClassMethod Exists(pFilename, Output pReturn) As %Boolean
+ClassMethod Exists(ByRef pFilename, Output pReturn) As %Boolean
 {
 	If ##class(%File).Exists(pFilename) {
 		Return 1
@@ -197,6 +197,7 @@ ClassMethod Exists(pFilename, Output pReturn) As %Boolean
 	Set tFileExt = $Piece(tName, ".", *)
 	for tExt = $$$LOWER(tFileExt), $$$UPPER(tFileExt) {
 		If ##class(%File).Exists(tDirectory _ tFileName _ "." _ tExt) {
+			Set pFilename = tDirectory _ tFileName _ "." _ tExt
 			Return 1
 		}
 	}
@@ -205,6 +206,7 @@ ClassMethod Exists(pFilename, Output pReturn) As %Boolean
 	While rs.%Next() {
 		set tItemNameLower = $$$LOWER(rs.ItemName)
 		If tItemNameLower = tNameLower {
+			Set pFilename = tDirectory _ rs.ItemName
 			Return 1
 		}
 	}

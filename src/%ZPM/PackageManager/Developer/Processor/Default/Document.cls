@@ -126,7 +126,11 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             Set tItemFileExtension = $$$lcase("." _ $Piece(..ResourceReference.Name, ".", *))
             Set tFileExtension =  $$$lcase("." _ ..FilenameExtension)
             For tFileExtension = tFileExtension,tItemFileExtension {
-              Quit:##class(%ZPM.PackageManager.Developer.File).Exists(tResourcePath _ tFileExtension)
+              Set temp = tResourcePath _ tFileExtension
+              If ##class(%ZPM.PackageManager.Developer.File).Exists(.temp) {
+                Set tFileExtension = "." _ $Piece(temp, ".", *)
+                Quit
+              }
             } 
             
             Set tResourcePath = tResourcePath _ tFileExtension
@@ -148,7 +152,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             }
           }
 
-          If '##class(%File).Exists(tResourcePath) {
+          If '##class(%ZPM.PackageManager.Developer.File).Exists(.tResourcePath) {
             Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
             Continue
           }
