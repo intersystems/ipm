@@ -49,58 +49,53 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
 {
-    Set tSC = $$$OK
-    Set pResourceHandled = 0
-    Try {
-        Set tVerbose = $Get(pParams("Verbose"),0)
-        Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
-        Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-        Set tRoot = ..ResourceReference.Module.Root
+  Set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
+  If (..ResourceReference.Name '[ "*") || '(((pPhase = "Reload") && tInScope) || tInCurrentPhase) || ..ResourceReference.Generated || ..ResourceReference.Preload {
+    Quit ##super(pPhase, .pParams, .pResourceHandled)
+  }
 
-        If (pPhase = "Reload") {
-            If '..ResourceReference.Generated,'..ResourceReference.Preload { 
-                Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
-                Set tResourceDirectory = tRoot_"/"_tSubDirectory
-                
-                Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-                If tSourceRoot'="","\/"'[$Extract(tSourceRoot, *) {
-                    Set tSourceRoot = tSourceRoot _ "/"
-                }
+  Set tVerbose = $Get(pParams("Verbose"), 0)
+  Set tSC = $$$OK
+  Set pResourceHandled = 0
+  try {
+    Set tNameExt = "." _ $$$lcase($Piece(..ResourceReference.Name, ".", *))
+    Set tName = $Piece(..ResourceReference.Name, ".", 1, *-1)
+    Set tName = $Translate(tName, "*"_..FilenameTranslateIdentifier, "*"_..FilenameTranslateAssociator)
+    Set tRoot = ..ResourceReference.Module.Root
 
-                Set tDirectory = ..Directory
-                If tDirectory'="","\/"'[$Extract(tDirectory, *) {
-                    Set tDirectory = tDirectory _ "/"
-                } Else {
-                    Set tDirectory = "dfi/"
-                }
+    Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
+    Set tResourceDirectory = tRoot _ "/" _ tSubDirectory
 
-                Set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
+    Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+    If tSourceRoot'="","\/"'[$Extract(tSourceRoot, *) {
+      Set tSourceRoot = tSourceRoot _ "/"
+    }
 
-                If (tName [ "*") {
-                  Set tName = $Translate(tName, "*"_..FilenameTranslateIdentifier, "*"_..FilenameTranslateAssociator)
-                  Set tWildcards = tName_".xml"
-                  If $$$isUNIX Set tWildcards = $$$ucase(tWildcards)_";"_$$$lcase(tWildcards)
-                  Do ##class(%ZPM.PackageManager.Developer.File).FindFiles(tResourceDirectory, tWildcards, .tList)
-                } Else {
-                  Set tName = $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator) _ ".xml"
-                  Set tList($Increment(tList)) = $ListBuild(tName, tResourceDirectory _ tName) 
-                }
+    Set tDirectory = ..Directory
+    If tDirectory'="","\/"'[$Extract(tDirectory, *) {
+      Set tDirectory = tDirectory _ "/"
+    } Else {
+      Set tDirectory = "dfi/"
+    }
 
-                For i=1:1:tList {
-  								Set $ListBuild(tDocName, tResourcePath) = tList(i)
+    Set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
 
-                  Set tSC = $System.OBJ.Load(tResourcePath,$Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile")
-                  If $$$ISERR(tSC) {
-                    Quit
-                  }
-                }
-              }
-        }
+    Set tFileExt = ".xml"
+    Set tWildcards = tName _ tFileExt _ ";" _ tName _ tNameExt
+    If $$$isUNIX {
+      Set tWildcards = tWildcards _ tName _ $$$ucase(tFileExt) _ ";" _ tName _ $$$ucase(tNameExt)
+    }
+    Do ##class(%ZPM.PackageManager.Developer.File).FindFiles(tResourceDirectory, tWildcards, .tList)
+    For i=1:1:tList {
+      Set $ListBuild(tDocName, tResourcePath) = tList(i)
 
-    } Catch e {
-		    Set tSC = e.AsStatus()
-	  }
-	  Quit tSC
+      $$$ThrowOnError(..OnLoad(tResourcePath, tVerbose, tInCurrentPhase, .tLoadedList, .pParams))
+    }
+  } 
+  catch ex {
+    Set tSC = e.AsStatus()
+  }
+  Quit tSC
 }
 
 Method OnResolveChildren(ByRef pResourceArray) As %Status
