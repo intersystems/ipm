@@ -82,6 +82,7 @@ ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary
 		"LUT":"Interoperability",
 		"X12":"Interoperability",
 		"ESD":"Interoperability",
+		"HL7":"Interoperability",
 		"DTL":"Class",
 		"BPL":"Class",
 		:"Document")
