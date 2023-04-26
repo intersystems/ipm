@@ -1676,15 +1676,24 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowOnError(tSC)
 		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
 		If (isEnabled) {
+            Set tResult = 0
 			If ($$$lcase(tVersion)="all") {
 				Write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
-				Write !, "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")? [y,n] "
+                Set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                Set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
 			} Else {
 				Write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
-				Write !,"Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")? [y,n] "
+                Set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+				Set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
 			}
-			Read x
-			If ($$$lcase(x) = "y") {
+
+		    Set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+
+            If (tResponse '= $$$SuccessResponse) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+            }
+
+			If (tResult) {
 				$$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
 				Write !!,"Package deleted"
 			}

@@ -42,12 +42,11 @@ Method CheckUnpublishEnabled(packageName As %String, packageVersion As %String) 
     }
     Set tRequest = ..GetHttpRequest()
     $$$ThrowOnError(tRequest.Send("OPTIONS",tRequest.Location_"packages/"_packageName_"/"_packageVersion))
-    If (tRequest.HttpResponse.StatusCode '= 200) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Unpublishing module, something went wrong ("_tRequest.HttpResponse.StatusCode_")."))
-    }
-    Set allow = $$$ucase(tRequest.HttpResponse.GetHeader("allow"))
-    If ( allow["DELETE" ) {
-        Return 1
+    If (tRequest.HttpResponse.StatusCode = 200) {
+        Set allow = $$$ucase(tRequest.HttpResponse.GetHeader("allow"))
+        If ( allow["DELETE" ) {
+            Return 1
+        }
     }
     Return 0
 }
