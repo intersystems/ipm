@@ -4,12 +4,12 @@ Class %ZPM.PackageManager.Client.PublishManager Extends %ZPM.PackageManager.Core
 Parameter NAMESPACESCOPE As BOOLEAN = 1;
 
 /// Avoids constantly reinstantiating the package service objects, which may be expensive.
-Property ServiceCache As array Of %ZPM.PackageManager.Core.IPackageService;
+Property ServiceCache As array Of %ZPM.PackageManager.Core.IPublishService;
 
 /// Keeps track of which repositories are unavailable (by name - the keys are important, values don't matter)
 Property UnavailableNames As array Of %String;
 
-Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boolean) As %ZPM.PackageManager.Core.IPackageService
+Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boolean) As %ZPM.PackageManager.Core.IPublishService
 {
 	Set pAvailable = 0
 	If ..UnavailableNames.IsDefined(pRepositoryName) {
