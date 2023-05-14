@@ -1420,6 +1420,8 @@ Method %Evaluate(pAttrValue, ByRef pParams) As %String [ Internal ]
 	Set:lAttrValue["bindir" tAttrValue = ..%RegExReplace(tAttrValue, "bindir", $System.Util.BinaryDirectory())
 	Set:lAttrValue["libdir" tAttrValue = ..%RegExReplace(tAttrValue, "libdir", ##class(%File).NormalizeDirectory("lib", ##class(%File).GetDirectory($zu(86))))
 	Set:lAttrValue["verbose" tAttrValue = ..%RegExReplace(tAttrValue, "verbose", +$Get(pParams("Verbose")))
+	Set:lAttrValue["packagename" tAttrValue = ..%RegExReplace(tAttrValue, "packagename", ..Name)
+	Set:lAttrValue["version" tAttrValue = ..%RegExReplace(tAttrValue, "version", ..VersionString)
 	if lAttrValue["webroot" {
 		Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)	
 		Set tAttrValue = ..%RegExReplace(tAttrValue, "webroot",   urlRoot)
