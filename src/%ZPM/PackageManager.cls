@@ -129,6 +129,19 @@ This command is an alias for `module-action module-name publish`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
+<command name="unpublish">
+<description>
+Delete package from registry
+</description>
+<example description="Delete all versions of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName all</example>
+<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName 1.0.0</example>
+<parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
+<parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
+
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 <command name="config">
 <description>Update ZPM settings. Setting is a key-value pair.</description>
 <example description="Disable collecting analytics data">config set analytics 0</example>
@@ -368,7 +381,7 @@ default-modifiers -delete
 <description>Prints the currently-installed package manager and registry version (excluding +snapshot or other build information)</description>
 </command>
 
-<command name="generate" aliases="gen"> 
+<command name="generate" aliases="gen">
 <description>Generates module.xml</description>
 <example description="Generates module.xml for your module in interactive mode ">generate</example>
 <example description="Generates template in the specified folder /my/path">generate -t /my/path</example>
@@ -397,7 +410,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <example description="Shows a description of all modules in the name of which there is a context">find -d *tools*</example>
 </command>
 
-<command name="namespace" aliases="zn"> 
+<command name="namespace" aliases="zn">
 <description>See list modules in namespace and go to the namespace</description>
 <example description="Show all modules in all namespaces">zn *</example>
 <example description="Show all modules in namespaces by context">zn sql*</example>
@@ -450,7 +463,7 @@ ClassMethod TerminalPrompt() As %String
 		ElseIf $Piece(tp,",",i)=4 {	Set prompt=prompt_$ZTime(+$Piece($Horolog,",",2),1)_del Continue}
 		ElseIf $Piece(tp,",",i)=5 {	Set prompt=prompt_$Job_del Continue}
     ElseIf $Piece(tp,",",i)=8,$Tlevel { Set prompt=prompt_"TL"_$Tlevel_del Continue}
-        ;for zpm shell 7 do not need to be implemented	
+        ;for zpm shell 7 do not need to be implemented
   }
 	Quit prompt
 }
@@ -471,34 +484,34 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	Set tInShell = 0
 	For {
 		Try {
-			
+
 			// Have intro message just for first entrance to shell
 			// Ensure not displayed if its just one command
 			If 'tInShell && 'tOneCommand {
 				Do ..DrawBorder(introMessageList, ..TerminalPromptColor())
 				Set tInShell = 1
 			}
-			
+
 			If (tCommand = "") {
 				Write ..TerminalPrompt()
 				Read tCommand
 				Write !
 			}
-			
+
 			If (tCommand = "") {
 				#; Do ..%Help()
 				Quit
 			}
-			
+
 			Kill tCommandInfo
 			// Parse command
 			$$$ThrowOnError(..%ParseCommandInput(tCommand,.tParsedCommandInfo))
-			
+
 			// Merge defaults first so they can be overwritten by commands
 			Do ..GetNamespaceDefaultModifiers(.tDefaultArray)
 			Merge tCommandInfo("data") = tDefaultArray
 			Merge tCommandInfo = tParsedCommandInfo
-			
+
 			If (tCommandInfo = "quit") {
 				Return
 			} ElseIf (tCommandInfo = "help") {
@@ -541,6 +554,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..ProcessRunFromFile(.tCommandInfo)
 			} ElseIf (tCommandInfo = "config") {
 				Do ..Config(.tCommandInfo)
+			} ElseIf (tCommandInfo = "unpublish") {
+				Do ..Unpublish(.tCommandInfo)
 			} ElseIf ($ListFind(..#STANDARDPHASES,tCommandInfo)) {
 				Do ..RunOnePhase(.tCommandInfo)
 			} ElseIf (tCommandInfo = "generate") {
@@ -590,17 +605,17 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
   If $Get(pCommandInfo("data","Description")) {
     Set showFields = $ListBuild("Description")
   }
-  
+
   Do ..GetListModules(name, , .list, showFields)
   Do ..DisplayModules(.list, 1, 1)
-  
+
   Write !
   Set prompt = "Enter number or name where to go:"
   Do {
     Set value = ""
     Do ##class(%Library.Prompt).GetString(prompt, .value)
     Quit:value=""
-    Try { 
+    Try {
       Set $Namespace = $Select($Data(list(value), ns): $ListGet(ns), 1: value)
     } Catch e {
       Write $Char(13),*27,"[K",*27,"[A"
@@ -636,9 +651,9 @@ ClassMethod DrawColumn(desc) As %String
 {
 	Set dx=$X
 	For d=1:1:$Length(desc," ") {
- 		Set wd=$Piece(desc," ",d) 
+ 		Set wd=$Piece(desc," ",d)
 		If $X+$Length(wd)>80 Write !,?dx
-		Write wd," " 
+		Write wd," "
 	}
  	Quit ""
 }
@@ -666,8 +681,8 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Set list("ns") = pNamespace
     Set width = 0
     Set ns = ""
-    For { 
-      Set ns = $Order(listNS(ns)) 
+    For {
+      Set ns = $Order(listNS(ns))
       Quit:ns=""
       Kill listModules
       Do ..GetListModules(ns, pSearch, .listModules, pExtraFields)
@@ -675,7 +690,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
       If width < $Length(ns) {
         Set width = $Length(ns)
       }
-      Set list = list + 1 
+      Set list = list + 1
       Set list(list) = $ListBuild(ns)
 
       Merge list(list, "modules") = listModules
@@ -727,7 +742,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Continue:pExtraFields=""
     Set obj = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(name, .tSC)
     Continue:$$$ISERR(tSC)
-    Set ptr = 0 
+    Set ptr = 0
     While $ListNext(pExtraFields, ptr, field) {
       Continue:field=""
       Set tObj = obj
@@ -759,18 +774,18 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 
 	If ($$$HasModifier(pCommandInfo,"template")) {
 		Return ##class(%ZPM.PackageManager.Developer.ModuleTemplate).GenerateTemplate(tPath)
-	} 
+	}
 	While (1) {
 		Set tHelp(1) = "Enter module name"
 		Set tHelp(2) = "Enter "" null string to quit"
 		Do ##class(%Library.Prompt).GetString("Enter module name:", .tName, , ,.tHelp)
 		Return:(tName="") $$$OK
 		If ('##class(%ZPM.PackageManager.Developer.ModuleTemplate).NameIsValid(tName)) {
-			Write !,"Module name """_tName_""" is invalid" 
+			Write !,"Module name """_tName_""" is invalid"
 			Set tName=""
-			Continue 
+			Continue
 		}
-		Quit 
+		Quit
 	}
 
 	While (1) {
@@ -778,23 +793,23 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 		Do ##class(%Library.Prompt).GetString("Enter module version:", .tVersion)
 		Return:(tVersion="") $$$OK
 		If ('##class(%ZPM.PackageManager.Core.SemanticVersion).IsValid(tVersion)) {
-			Write !,"Module version """_tVersion_""" is invalid" 
+			Write !,"Module version """_tVersion_""" is invalid"
 			Set tVersion=""
-			Continue 
+			Continue
 		}
 		Quit
 	}
 
 	Do ##class(%Library.Prompt).GetString("Enter module description:", .tDescription)
 
-	Do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)	
+	Do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)
 
 	Set tTemplate = ##class(%ZPM.PackageManager.Developer.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
-	Return:'$IsObject(tTemplate) 
+	Return:'$IsObject(tTemplate)
 
 	If ($$$HasModifier(pCommandInfo,"author")) {
 		Write !,"Author:"
-		Do ##class(%Library.Prompt).GetString("    Enter Author name:", .tAuthorPerson)	
+		Do ##class(%Library.Prompt).GetString("    Enter Author name:", .tAuthorPerson)
 		Do ##class(%Library.Prompt).GetString("    Enter Organization name:", .tAuthorOrg)
 		Do ##class(%Library.Prompt).GetString("    Enter License:", .tAuthorLicense)
 		Do ##class(%Library.Prompt).GetString("    Enter Copyright Date:", .tAuthorCopy)
@@ -802,9 +817,9 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 		Do tTemplate.SetAuthorProps(tAuthorPerson, tAuthorOrg, tAuthorLicense, tAuthorCopy, tAuthorNotes)
 		Write !
 	}
-	
+
 	Set tSrc = "src"
-	Do ##class(%Library.Prompt).GetString("Enter module source folder:", .tSrc)	
+	Do ##class(%Library.Prompt).GetString("Enter module source folder:", .tSrc)
 	Set tExp = $$$GetModifier(pCommandInfo,"export")
 	If tExp'="" {
 		Set tPathSrc=##class(%File).NormalizeDirectory(tPath_"\"_tSrc)
@@ -821,7 +836,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 		}
 		Do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
 
-		Do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps) 
+		Do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps)
 		For i=1:1:$ListLength(tCSPapps) {
 			Set tCSPPath = ""
 			Do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$ListGet(tCSPapps,i)_": ", .tCSPPath)
@@ -857,7 +872,7 @@ ClassMethod GetDefaultCommandRegistry()
 		Write !,"Default commands for the registry"
 		Write !,"View all packets in the browser:",!,"  ",ServerPort_"/registry/packages/-/all"
 		Write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
-		
+
 	}
 }
 
@@ -867,7 +882,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
   Do ..GetListModules("*", "zpm,zpm-registry", .list)
   Do ..DisplayModules(.list)
-	
+
 	// Get URL current registry
 	Set tRes = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).ExtentFunc()
 	While tRes.%Next(.tSC) {
@@ -959,7 +974,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 {
 	// In quiet mode, no prompts should be shown.
 	Set tQuiet = $$$HasModifier(pCommandInfo,"noprompt")
-	
+
 	// Local artifact cache
 	$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).InitializeLocalCache(.tCreated))
 	If (tCreated) {
@@ -967,14 +982,14 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	} Else {
 		Write !,"Local cache already exists."
 	}
-	
+
 	// Reindex tables with semantic version indices
 	For tClass = "%ZPM.PackageManager.Server.Module","%ZPM.PackageManager.Server.Application","%ZPM.PackageManager.Client.Filesystem.Cache" {
 		Write !,"Reindexing ",tClass,"... "
 		$$$ThrowOnError($ClassMethod(tClass,"%BuildIndices",,1,1))
 		Write "done."
 	}
-	
+
 	// Package Manager Settings
 	If tQuiet {
 		Set tResult = 0
@@ -996,7 +1011,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		Set tLastSource = ""
 		While tRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			
+
 			Set tSource = tRes.%Get("Source")
 			If (tSource '= tLastSource) {
 				Set tLastSource = tSource
@@ -1006,13 +1021,13 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 			Set tSetting = tRes.%Get("Name")
 			Set tSettingDesc = tRes.%Get("Description")
 			Set tSettingValue = tRes.%Get("Value")
-			
+
 			Write !,tSetting,": ",tSettingDesc
 			Set tResponse = ##class(%Library.Prompt).GetString("Value:",.tSettingValue,,,tSettingDesc)
 			If (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
-			
+
 			If (tSettingValue '= tRes.%Get("Value")) {
 				$$$ThrowOnError($ClassMethod(tSource,"SetSettingValue",tSetting,tSettingValue))
 				Write !,tSetting," updated."
@@ -1020,15 +1035,15 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		}
 		$$$ThrowOnError(tSC)
 	}
-	
-	
+
+
 	If tQuiet {
 		Set tConfigureZPM = $$$HasModifier(pCommandInfo,"zpm")
 	} Else {
 		// Update of language extension - see if one is already configured.
 		$$$ThrowOnError(..UpdateLanguageExtensions(0,1,.tHasZPM))
 		Set tConfigureZPM = 'tHasZPM // Default to "yes" if command is missing.
-		
+
 		Write !
 		Set tHelp = "The 'ZPM' command allows quick command line access to many features of the package manager. Extensive documentation is available via:"_$Char(13,10,9)_" zpm ""help""."
 		Set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to enable/update the 'ZPM' command?",.tConfigureZPM,.tHelp)
@@ -1039,30 +1054,30 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	If tConfigureZPM {
 		$$$ThrowOnError(..UpdateLanguageExtensions())
 	}
-	
+
 	// Source Control settings
 	Write !
 	Set tSCClassChanged = 0
-	
+
 	Set tPrimaryClass = ""
 	Set tCompositeSCClass = "%ZPM.PackageManager.Developer.Extension.Composite"
 	Set tPackageMgrSCClass = "%ZPM.PackageManager.Developer.Extension.PackageManager"
 	Set tSCInterface = "%ZPM.PackageManager.Developer.Extension.SourceControl.Interface"
 	Set tOldSourceControlClass = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
-	
+
 	If (tOldSourceControlClass '= "") && '$$$comClassDefined(tOldSourceControlClass) {
 		Write !,"Source control class ",tOldSourceControlClass," does not exist - disabling it."
 		$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet())
 		Set tOldSourceControlClass = ""
 	}
-	
+
 	If (tOldSourceControlClass '= "") && (tOldSourceControlClass '= tCompositeSCClass) && (tOldSourceControlClass '= tPackageMgrSCClass) {
 		Write !,"Enabling package manager extension... "
 		$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Extension.Composite).SetExtensionClasses(tOldSourceControlClass,$ListBuild(tPackageMgrSCClass)))
 		Write "done."
 		Set tOldSourceControlClass = tCompositeSCClass
 	}
-	
+
 	If (tOldSourceControlClass = "") {
 		Write !,"No Studio extension is currently configured for this namespace."
 	} ElseIf (tOldSourceControlClass = tCompositeSCClass) {
@@ -1076,7 +1091,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 	} Else {
 		Write !,"Currently configured with the package manager extension, but no source control class."
 	}
-	
+
 	If tQuiet {
 		Set tResult = $$$HasModifier(pCommandInfo,"extension")
 	} Else {
@@ -1088,7 +1103,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 		}
 	}
-	
+
 	If (tResult) {
 		// Provide list of options for source control classes to overlay.
 		If tQuiet {
@@ -1101,7 +1116,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
 		}
-		
+
 		If (tValue = "") {
 			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tPackageMgrSCClass))
 			Write !,!,"Removed source control class. Package manager extension still enabled."
@@ -1112,7 +1127,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 			Set tSecondaryExtension = $ListBuild("%ZPM.PackageManager.Developer.Extension.PackageManager")
 			$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Extension.Composite).SetExtensionClasses(tValue,tSecondaryExtension))
 			Write " done."
-			
+
 			// To see if it changed, compare to primary class (if found earlier) or old source control class (if we weren't combining extensions before)
 			If (tValue '= tPrimaryClass) {
 				Set tSCClassChanged = 1
@@ -1123,7 +1138,7 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tPackageMgrSCClass))
 		Write !,!,"Enabled package manager extension."
 	}
-	
+
 	// If we're not just using the package manager, check for configuration method on primary source control class
 	// (by seeing if it implements the additional package manager source control interface)
 	If (##class(%Studio.SourceControl.Interface).SourceControlClassGet() = tCompositeSCClass) {
@@ -1148,16 +1163,16 @@ ClassMethod ProcessRunFromFile(ByRef pCommandInfo) [ Internal ]
 {
 	Set filename = $Get(pCommandInfo("parameters","file"))
 	Set dryRun = $$$HasModifier(pCommandInfo,"dry-run")
-	
+
 	If '##class(%Library.File).Exists(filename) {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Provided file does not exist"))
 	}
 	Set fileStream = ##class(%Stream.FileCharacter).%New()
 	$$$ThrowOnError(fileStream.LinkToFile(filename))
-	
+
 	// Accumulate list of commands to execute
 	Set commandList = ""
-	
+
 	Set extension = $Piece(filename, ".", *)
 	If (extension = "txt") {
 		// Read line by line, adding each line to command list
@@ -1191,12 +1206,12 @@ ClassMethod ProcessRunFromFile(ByRef pCommandInfo) [ Internal ]
 	} Else {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Unsupported file extension: "_extension))
 	}
-	
+
 	Set message = $Case(dryRun,
 		1: "The following commands will be run in the shell if the -dry-run flag is not used:",
 		: "Running commands found in file:"
 	)
-	Write !, message, !	
+	Write !, message, !
 	Set ptr = 0
 	While $ListNext(commandList,ptr,command) {
     Write !,..TerminalPrompt()
@@ -1241,8 +1256,8 @@ ClassMethod Config(ByRef pCommandInfo) [ Internal ]
 	Set key = $Get(pCommandInfo("parameters","key"))
 	Set value = $Get(pCommandInfo("parameters","value"))
 
-	If (action="") { 
-		Set action = "list"	
+	If (action="") {
+		Set action = "list"
 	}
 	If (action="list") {
 		Do ##class(%ZPM.PackageManager.Client.Settings).PrintList()
@@ -1250,7 +1265,7 @@ ClassMethod Config(ByRef pCommandInfo) [ Internal ]
 		If ( (key = "") || (value="") ) {
 			Write "Key and Value required. Use config set <key> <value>",!
 			Quit
-		} 
+		}
 		Do ##class(%ZPM.PackageManager.Client.Settings).UpdateOne(key,value)
 	} ElseIf (action="get") {
 		If (key = "") {
@@ -1280,7 +1295,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
     Quit:(t = "")
     If ('($$$HasModifier(pCommandInfo, t)) && (t '= tType)) {
       Kill types(t)
-    } 
+    }
     ElseIf '$ListFind(serverClassList, className) {
       Set serverClassList = serverClassList _ $ListBuild(className)
     }
@@ -1300,7 +1315,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 			If serverClassList = "" || ($ListFind(serverClassList, $ClassName(tRepository))) {
 				Do tRepository.Display()
 				Write !
-				Set tDisplayCount = tDisplayCount + 1 
+				Set tDisplayCount = tDisplayCount + 1
 			}
     }
 		$$$ThrowOnError(tSC)
@@ -1350,7 +1365,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	} Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
 		Set tType = $ListGet(serverClassList)
-		
+
 		#dim tRepoTypeResult As %SQL.StatementResult
 		Set tStatement = ##class(%SQL.Statement).%New()
 		Set tSC = tStatement.%PrepareClassQuery("%ZPM.PackageManager.Client.ServerDefinition","Catalog")
@@ -1373,25 +1388,25 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 				Set tType = tInstance.%ClassName(1)
 			}
 		}
-	
+
     If (tType = "") {
       Set tResponse = ##class(%Library.Prompt).GetMenu("Which sort of repository do you wish to configure?",.tDescIndex,.tDescList,,$$$InitialDisplayMask)
       If (tResponse '= $$$SuccessResponse) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
       }
-    
+
       If (tDescIndex = "") {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"A repository type must be specified."))
       }
-      
+
       Set tType = tClassList(tDescIndex)
     }
-		
+
 		Set tBaseClass = "%ZPM.PackageManager.Client.ServerDefinition"
 		If '$ClassMethod(tType,"%Extends",tBaseClass) {
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid type '%1' - must extend %2",tType,tBaseClass))
 		}
-		
+
 		Merge tModifiers = pCommandInfo("modifiers")
 		Merge tData = pCommandInfo("data")
 		$$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData,tType))
@@ -1405,7 +1420,7 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	Set maxlenname = 0, where = ""
 	If pSearchString["*" {
 		Set where=" WHERE name like ?"
-	} ElseIf pSearchString'="" { 
+	} ElseIf pSearchString'="" {
 		Set where=" WHERE name = ?"
 	}
 	Set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %ZPM_PackageManager_Developer.Utils_GetModuleList(?,?) "_where
@@ -1417,31 +1432,31 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
-  Set list = 0
-  Set width = 0
+	Set list = 0
+	Set width = 0
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Set name = tRes.%Get("Name")
-    If width < $Length(name) {
-      Set width = $Length(name)
-    }
+		If width < $Length(name) {
+			Set width = $Length(name)
+		}
 
-    Set list = list + 1
-    Set list(list) = $ListBuild(name, tRes.Version)
-    Set list(list, "Origin") = tRes.Origin
-    If pShowDesc {
-      Set list(list, "Description") = tRes.Description
-    }
-    If pShowRepo {
-      Set list(list, "Repository") = tRes.Repository
-    }
-    If pShowAllVersions {
-      Set list(list, "AllVersions") = tRes.AllVersions
-    }
+		Set list = list + 1
+		Set list(list) = $ListBuild(name, tRes.Version)
+		Set list(list, "Origin") = tRes.Origin
+		If pShowDesc {
+			Set list(list, "Description") = tRes.Description
+		}
+		If pShowRepo {
+			Set list(list, "Repository") = tRes.Repository
+		}
+		If pShowAllVersions {
+			Set list(list, "AllVersions") = tRes.AllVersions
+		}
 	}
-  Set list("width") = width
-  Write !
-  Do ..DisplayModules(.list)
+	Set list("width") = width
+	Write !
+	Do ..DisplayModules(.list)
 }
 
 Query SourceControlClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
@@ -1516,14 +1531,14 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
-	
+
 	Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
 	Set tSearchCriteria.Registry = tRegistry
 	Set tSearchCriteria.Name = tModuleName
 	Set tSearchCriteria.VersionExpression = tVersion
 	Set tSearchCriteria.Keywords = tKeywords
 	$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
-	
+
 	If (tResults.Count() > 0) {
 		Set tResult = ""
 		#dim tResult As %ZPM.PackageManager.Core.QualifiedModuleReference
@@ -1535,18 +1550,18 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 				Set tResultInfo = tResults.GetAt(i)
 				Set tOptArray(i) = tResultInfo.Name_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
 			}
-			
+
 			Set tValue = ""
       Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
       If (tResponse '= $$$SuccessResponse) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
       }
-			
+
 			If (tValue '= "") {
 				Set tResult = tResults.GetAt(tValue)
 			}
 		}
-		
+
 		If (tResult '= "") {
 			Do ##class(%ZPM.PackageManager.Developer.Lifecycle.Abstract).GetDefaultParameters(.tParams)
 			Merge tParams = pCommandInfo("data")
@@ -1583,11 +1598,11 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 	// Overriding defaults in the "data" array:
 	// For now this is just the "UpdateSnapshots" flag but it could be more eventually.
 	Set tData("UpdateSnapshots") = 1
-	
+
 	// Note that pCommandInfo("data") may override the default of UpdateSnapshots=1.
 	Merge tData = pCommandInfo("data")
 	Merge pCommandInfo("data") = tData
-	
+
 	// Find  the currently-installed version of the module
 	Set tModuleName = $Get(pCommandInfo("parameters","module"))
 	Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleName,,.tSC)
@@ -1595,7 +1610,7 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module '%1' is not currently installed.",tModuleName)))
 	}
 	$$$ThrowOnError(tSC)
-	
+
 	Set tVersionString = tModule.Version.ToString()
 	Write !,"Reinstalling ",tModuleName," ",tVersionString
 	Set pCommandInfo("parameters","version") = tVersionString
@@ -1607,7 +1622,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
   If ($Get(pCommandInfo("parameters","module"))="") {
     Set tCommandInfo("parameters","command") = "uninstall"
     Do ..%Help(.tCommandInfo)
-    Quit 
+    Quit
   }
 	Merge tParams = pCommandInfo("data")
 	Set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
@@ -1629,6 +1644,67 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
+}
+
+ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
+{
+  	If ( ($Get(pCommandInfo("parameters","module"))="") || ($Get(pCommandInfo("parameters","version"))="") ) {
+    	Set tCommandInfo("parameters","command") = "unpublish"
+    	Do ..%Help(.tCommandInfo)
+    	Quit
+  	}
+
+	Set tRegistry = ""
+	Set tModuleName = $ZConvert($Get(pCommandInfo("parameters","module")), "L")
+	If ( tModuleName["/" ) {
+		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
+	}
+	If ( tRegistry = "" ) {
+		Set tRS = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).PublishingServerFunc()
+		If (tRS.%SQLCODE = 0) && tRS.%Next() {
+			Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).%OpenId(tRS.ID)
+		}
+	} Else {
+		Set tServer = ##class(%ZPM.PackageManager.Client.ServerDefinition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
+	}
+	If ('$Isobject(tServer)) {
+		Write "Registry not found: "_tRegistry,!
+		Return $$$ERROR(5001, "Registry not found: "_tRegistry)
+	}
+	Set tVersion = $Get(pCommandInfo("parameters","version"))
+
+	Try {
+		Set tManager = ##class(%ZPM.PackageManager.Client.PublishManager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+		If (isEnabled) {
+            Set tResult = 0
+			If ($$$lcase(tVersion)="all") {
+				Write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
+                Set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                Set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+			} Else {
+				Write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
+                Set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+				Set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+			}
+
+		    Set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+
+            If (tResponse '= $$$SuccessResponse) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+            }
+
+			If (tResult) {
+				$$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
+				Write !!,"Package deleted"
+			}
+		} Else {
+			Write !,"The package could not be deleted (the registry denied the request)",!
+		}
+	} Catch ex {
+		Write !!,$$$FormattedLine($$$Red, "ERROR! "), ex.DisplayString()
+	}
 }
 
 ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
@@ -1672,13 +1748,13 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 	} Else {
 		// TODO: see if there is anything installed in this namespace.
 	}
-	
+
 	Set tNSMenu($Increment(tNSMenu)) = "Install an application"
 	Set tNSMenu($Increment(tNSMenu)) = "Upgrade/repair an application"
 	Set tNSMenu($Increment(tNSMenu)) = "Uninstall an application"
 	Set tNSMenu($Increment(tNSMenu)) = "Switch namespace"
 	Set tNSMenu($Increment(tNSMenu)) = "Quit"
-	
+
 	For {
 		Set tValue = ""
 		Write !,"Namespace: ",$Namespace
@@ -1686,7 +1762,7 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 		If (tResponse '= $$$SuccessResponse) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 		}
-		
+
 		If (tValue '= 1) && (tValue '= 5) {
 			While (tNamespace = "") {
 				Set tNSValue = ""
@@ -1696,14 +1772,14 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 				}
 				Set tNamespace = tNSValue
 			}
-			
+
 			Set $Namespace = tNamespace
 		}
-		
+
 		If (tValue = 1) {
 			// Construct an instance of %ZPM.PackageManager.Core.InstallationInfo
 			Set tInfo = ##class(%ZPM.PackageManager.Core.InstallationInfo).%New()
-			
+
 			Set tNamespace = ""
 			While (tNamespace = "") {
 				Set tResponse = ##class(%Library.Prompt).GetString("Namespace:",.tNamespace)
@@ -1716,26 +1792,26 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 				}
 			}
 			Set tInfo.Namespace = tNamespace
-			
+
 			Set tModName = ""
 			Set tResponse = ##class(%Library.Prompt).GetString("Application name:",.tModName)
 			If (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
-			
+
 			Set tModVersion = ""
 			Set tResponse = ##class(%Library.Prompt).GetString("Application version/range:",.tModVersion)
 			If (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
-			
+
 			Set tSearchCriteria = ##class(%ZPM.PackageManager.Core.SearchCriteria).%New()
 			Set tSearchCriteria.Name = tModName
 			Set tSearchCriteria.VersionExpression = tModVersion
 			Set tSearchCriteria.IncludeSnapshots = 1
 			Set tSearchCriteria.IncludePrerelease = 1
 			$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).SearchRepositoriesForApplication(tSearchCriteria,.tResults))
-			
+
 			If (tResults.Count() > 0) {
 				#dim tResult As %ZPM.PackageManager.Core.QualifiedModuleReference
 				If (tResults.Count() = 1) {
@@ -1745,33 +1821,33 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 						Set tResult = tResults.GetAt(i)
 						Set tOptArray(i) = tResult.Name_" "_tResult.VersionString_" @ "_tResult.ServerName
 					}
-					
+
 					Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask)
 					If (tResponse '= $$$SuccessResponse) {
 						$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 					}
-					
+
 					Set tInfo.ModuleReference = tResults.GetAt(tValue)
 				}
 			} Else {
 				Write !,tModName_" "_tModVersion_" not found in any repository."
 				Continue
 			}
-			
+
 			// TODO: Parameters
-			
+
 			$$$ThrowOnError(##class(%ZPM.PackageManager.Client.Utils).InstallApplication(tInfo))
-			
+
 			Set $Namespace = tNamespace
 		} ElseIf (tValue = 2) {
 			// TODO: Implement, based on things installed in the current namespace.
 			Write !,"This feature is not yet implemented."
 		} ElseIf (tValue = 3) {
 			// List installed modules with application packaging.
-			
+
 			Kill tModuleList
 			Set tModuleList = 0
-			
+
 			#dim tRes As %SQL.StatementResult
 			Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name,LifecycleClass from %ZPM_PackageManager_Developer.""Module""")
 			If (tRes.%SQLCODE < 0) {
@@ -1788,7 +1864,7 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 				}
 			}
 			$$$ThrowOnError(tSC)
-			
+
 			Set tUninstallAppIdx = ""
 			While (tUninstallAppIdx = "") {
 				Set tResponse = ##class(%Library.Prompt).GetMenu("Which application?",.tUninstallAppIdx,.tModuleList,,$$$InitialDisplayMask)
@@ -1796,7 +1872,7 @@ ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
 					$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 				}
 			}
-			
+
 			// Construct an instance of %ZPM.PackageManager.Core.InstallationInfo
 			Set tInfo = ##class(%ZPM.PackageManager.Core.InstallationInfo).%New()
 			Set tInfo.Namespace = $Namespace
@@ -1817,7 +1893,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		// Show tree of dependencies as well.
 		// Modules that are dependencies for no other are shown at the top level.
 		// TODO: deal with cyclic dependencies?
-		Quit:'..GetListModule(,.tModMap)	
+		Quit:'..GetListModule(,.tModMap)
 		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
 			"select ""Module""->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
 			"from %ZPM_PackageManager_Developer.Module_Dependencies")
@@ -1828,7 +1904,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 			Set tVisitedMap(tDepRes.%Get("DepName")) = 1
 		}
 		$$$ThrowOnError(tSC)
-		
+
 		Set tMod = ""
 		For {
 			Set tMod = $Order(tModMap(tMod),1,tVersion)
@@ -1841,10 +1917,10 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
     If +$Get(pCommandInfo("data","Desc")) {
       Set showFields = $ListBuild(
         "Description",
-        "Author.CopyrightDate", 
-        "Author.License", 
-        "Author.Notes", 
-        "Author.Organization", 
+        "Author.CopyrightDate",
+        "Author.License",
+        "Author.Notes",
+        "Author.Organization",
         "Author.Person",
         "Root"
       )
@@ -1876,7 +1952,7 @@ ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status
 		}
 		Set Mod(name) = tRes.%Get("VersionString")
 		Set:'OnlyName Mod(name,"L") = list
-		
+
 	}
 	$$$ThrowOnError(tSC)
 	Quit:in=""||(OnlyName) $$$OK
@@ -1884,7 +1960,7 @@ ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status
 
 	Set tQuery = "select Name, Version, Repository, Description from %ZPM_PackageManager_Developer.Utils_GetModuleList('registry') WHERE name in ("_in_")"
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
-	
+
 	If (tRes.%SQLCODE < 0) {
 		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
@@ -1900,7 +1976,7 @@ ClassMethod AccumulateTreeRecursive(pModName As %String, ByRef pModMap, ByRef pT
 	If (pLevel = 0) && $Data(pVisitedMap(pModName)) {
 		Quit
 	}
-	
+
 	Set tParentIndex = $Increment(pTree)
 	Set pTree(tParentIndex) = $ListBuild(pModName_" "_$Get(pModMap(pModName),"[missing]"))
 	Set tDep = ""
@@ -1908,19 +1984,19 @@ ClassMethod AccumulateTreeRecursive(pModName As %String, ByRef pModMap, ByRef pT
 	For {
 		Set tDep = $Order(pModMap(pModName,tDep),1,tDepVerExpr)
 		Quit:(tDep="")
-		
+
 		// Set first child for parent node to this index (if there is no first child yet)
 		Set tSiblingIndex = pTree + 1
 		If ($ListGet(pTree(tParentIndex),2) = "") {
 			Set $List(pTree(tParentIndex),2) = tSiblingIndex
 		}
-		
+
 		// Set next sibling for previous node to this index.
 		If (tPrevSibling '= "") {
 			Set $List(pTree(tPrevSibling),3) = tSiblingIndex
 		}
 		Set tPrevSibling = tSiblingIndex
-		
+
 		Do ..AccumulateTreeRecursive(tDep,.pModMap,.pTree,pLevel+1)
 	}
 }
@@ -1934,7 +2010,7 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
   If tModName="" {
     $$$ThrowStatus($$$ERROR($$$GeneralError,"A module name is required"))
   }
-	
+
 	If tTree {
 		New %tree
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).GetDependentsAsTree(.%tree,.tErrorList,tModName,tVersion,tRepos)
@@ -1943,7 +2019,7 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
 		Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).GetDependentsList(.tList,.tErrorList,tModName,tVersion,tRepos)
 		$$$ThrowOnError(tSC)
 	}
-	
+
 	If $Data(tErrorList) {
 		Write !,"Warning: some errors occurred."
 		For i=1:1:tErrorList {
@@ -1953,54 +2029,54 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
 		}
 		Write !
 	}
-	
+
 	If tTree {
 		Set tRef = "%tree"
 		Set tState = 0
-		
+
 		For {
 			Set tRef = $Query(@tRef)
 			Quit:tRef=""
-			
+
 			For i=1:1:$QLength(tRef) {
 				Set tSub = $QSubscript(tRef,i)
 				If ($Get(tState(i)) = tSub) {
 					Continue
 				} Else {
 					Set tNodeIndex = $Increment(tDependentTree)
-			
+
 					Set tState(i) = tSub
 					For j=i+1:1:tState {
 						Kill tState(j)
 						Kill tPreviousNode
 					}
 					If $Data(tState(i,"node"),tPreviousNode)
-					
+
 					Set tState = i
 					Set tState(i,"node") = tNodeIndex
-					
+
 					Set $ListBuild(tModName,tVersion,tServer) = tSub
 					Set tServer = $Case(tServer,"":" (installed)",:" @ "_tServer)
-					
+
 					Set tValue = tModName_" "_tVersion_tServer
-					
+
 					Set tDependentTree(tNodeIndex) = $ListBuild(tValue)
-					
+
 					// Set first child
 					If $Data(tState(i-1,"node"),tParent) && ($ListGet(tDependentTree(tParent),2) = "") {
 						Set $List(tDependentTree(tParent),2) = tNodeIndex
 					}
-					
+
 					// Set next sibling of previous node
 					If $Data(tPreviousNode,tPreviousNode) && (tPreviousNode '= $Get(tParent)) {
 						Set $List(tDependentTree(tPreviousNode),3) = tNodeIndex
 					}
-					
+
 					Set tPreviousNode = tNodeIndex
 				}
 			}
 		}
-		
+
 		Do ..PrintTree(.tDependentTree)
 	} Else {
 		For i=1:1:tList.Count() {
@@ -2025,18 +2101,18 @@ ClassMethod PrintTree(ByRef pTree)
 		Set tFirstChild = ""
 		Set tNextSibling = ""
 		Set $ListBuild(tValue, tFirstChild, tNextSibling) = pTree(i)
-		
+
 		Set tFrontPadding = $Get(tPadding(i))
-		
+
 		If (tNextSibling = "") {
 			Set $Extract(tFrontPadding,*-2) = $Char($ZHex("2514H"))
 		}
 		If (tFirstChild '= "") {
 			Set $Extract(tFrontPadding,*) = $Char($ZHex("252CH"))
 		}
-		
+
 		Write tFrontPadding,$$$FormattedLine($$$Green,$Piece(tValue," ",1))," ",$Piece(tValue," ",2),!
-		
+
 		If (tNextSibling '= "") {
 			Set tPadding(tNextSibling) = $Get(tPadding(i))
 		}
@@ -2071,7 +2147,7 @@ ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 		Set tSC = $$$ERROR($$$GeneralError,"Invalid command - must specify '-all' or a module name.")
 	}
 	$$$ThrowOnError(tSC)
-	
+
 	Try {
 		If (tAll) {
 			Set tResult = ##class(%SQL.Statement).%ExecDirect(,
@@ -2089,7 +2165,7 @@ ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 				}
 				Set tModuleName = tResult.%Get("Name")
 			}
-			
+
 			Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen(tModuleName,,.tSC)
 			$$$ThrowOnError(tSC)
 			Set tSC = ##class(%ZPM.PackageManager.Developer.API).ExportDocumentForObject(tModule,.tSourceControlOutput)
@@ -2097,7 +2173,7 @@ ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 			For tLine=1:1:$Get(tSourceControlOutput) {
 				Write tSourceControlOutput(tLine),!
 			}
-			
+
 			If 'tAll {
 				Quit
 			}
@@ -2114,18 +2190,18 @@ ClassMethod Import(ByRef pCommandInfo)
   Set tSource = $Get(pCommandInfo("parameters","source"))
   If (tSource = "") {
     $$$ThrowStatus($$$ERROR($$$GeneralError,"A source for import must be specified"))
-  } 
+  }
 	Try {
 		Set tRecurse = '$$$HasModifier(pCommandInfo,"norecurse")
 		Set tCompile = '$$$HasModifier(pCommandInfo,"nocompile")
 		Set tVerbose = $$$HasModifier(pCommandInfo,"verbose")
 		Set tQuiet = $$$HasModifier(pCommandInfo,"quiet")
-		
+
 		#dim %SourceControl As %Studio.SourceControl.ISC
 		New %SourceControl
 		Set tSC = ##class(%Studio.SourceControl.Interface).SourceControlCreate()
 		$$$ThrowOnError(tSC)
-		
+
 		Set tSourceDir = ##class(%Library.File).NormalizeDirectory(tSource)
 		Set tSourceFile = ##class(%Library.File).NormalizeFilename(tSource)
 		Set tLoadFlags = $Select(tCompile:"c",1:"")_$Select(tQuiet:"-d",tVerbose:"d",1:"")_"k"
@@ -2140,7 +2216,7 @@ ClassMethod Import(ByRef pCommandInfo)
 						Write !,"Loading "_tSourceDir
 					}
 					Set tSC = $System.OBJ.ImportDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly)
-					
+
 					// Build $ListBuild list of loaded items
 					Set tLoadedKey = ""
 					For {
@@ -2148,7 +2224,7 @@ ClassMethod Import(ByRef pCommandInfo)
 						If (tLoadedKey = "") {
 							Quit
 						}
-						
+
 						Set tLoadedList = tLoadedList_$ListBuild(tLoadedKey)
 					}
 				} Else {
@@ -2164,7 +2240,7 @@ ClassMethod Import(ByRef pCommandInfo)
 			$$$ThrowOnError(tSC)
 
       Continue:'$IsObject(%SourceControl)
-			
+
 			If tListOnly {
 				// Trigger source control class's user action 6 (simulating a load into Studio)
 				// This happens first to avoid warnings about the file being modified outside of Studio.
@@ -2175,12 +2251,12 @@ ClassMethod Import(ByRef pCommandInfo)
 					Write !,$ListLength(tLoadedList)," item(s) loaded."
 					Write !,"Exporting modified files."
 				}
-				
+
 				Set tPointer = 0
 				Set tSC = $$$OK
 				While $ListNext(tLoadedList,tPointer,tLoadedItem) {
 					Set tLoadedItem = ##class(%Studio.SourceControl.Interface).normalizeName(tLoadedItem)
-					
+
 					// Avoid comparison with file timestamp in Perforce workspace, since that's irrelevant; we have loaded a new version, likely from elsewhere.
 					// If a file has previously been exported to the Perforce workspace but not actually marked for add, GetStatus will report that the file is
 					// in source control. This case is handled later after revert is attempted and fails because the file is not known to Perforce.
@@ -2216,7 +2292,7 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
       If (tLine = $$$STARTTAGQ) {
         // Read through the ending tag.
         While ('tRtn.AtEnd) && (tRtn.ReadLine() '= $$$ENDTAGQ) {}
-        
+
         // Generate the lines.
         Set pFound = 1
         For i=1:1:tGenLines {
@@ -2298,7 +2374,7 @@ ClassMethod %UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Bo
 		}
 		Do ..UpdateLanguageExtensionsOne("%ZLANGC00.MAC", pTestOnly,.pFound,.tGenLines)
 		Quit:pTestOnly
-		Set i="" 
+		Set i=""
 		For { Set i=$Order(tGenLines(i),1,tStr) Quit:i=""
 			If tStr[" Do ##class" Set tGenLines(i)=$Replace($Replace(tStr," Quit","")," Do "," Quit ") Quit
 		}
@@ -2347,12 +2423,12 @@ ClassMethod ShellScript(pCommand As %String, pOutputLogFile As %String = "", pAp
 		Set tSC = e.AsStatus()
 		Do e.Log()
 	}
-	
+
 	Write !
 	If tFileOpen {
 		Close pOutputLogFile
 	}
-	
+
 	If $$$ISERR(tSC) {
 		// Set ERRORLEVEL to 1
 		Do $System.Process.Terminate(,1)
@@ -2382,8 +2458,8 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
         Write $Justify(i, numbersWidth - 2), ". "
       }
       Write $$$FormattedLinePadRight($$$Magenta, tNS _ "> ", nsWidth)
-      Set tPrefix = $Justify("", numbersWidth) _ tNS 
-      Kill tModulesList 
+      Set tPrefix = $Justify("", numbersWidth) _ tNS
+      Kill tModulesList
       Merge tModulesList = pList(i, "modules")
       Set tModulesList("width") = modulesWidth
       Do ..DisplayModules(.tModulesList, 0, 0, $X)
@@ -2416,8 +2492,8 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     If $Get(developerMode) {
       Write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
     }
-    
-    Set ptr = 0 
+
+    Set ptr = 0
     While $ListNext(extraColumns, ptr, column) {
       Continue:$Get(column)=""
       Set colName = ""

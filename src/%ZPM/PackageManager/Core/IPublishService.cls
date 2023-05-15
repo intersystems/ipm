@@ -15,4 +15,13 @@ Method IsAvailable() As %Boolean
 	Quit 1
 }
 
+Method Unpublish(packageName As %String, packageVersion As %String) As %Status [ Abstract ]
+{
+}
+
+Method CheckUnpublishEnabled(packageName As %String, packageVersion As %String) As %Boolean
+{
+    Return 0
+}
+
 }
