@@ -542,7 +542,7 @@ Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
 	Quit tSC
 }
 
-Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pForceSnapshotReload As %Boolean = 0, ByRef qstruct, pPhases As %String = "", ByRef pSubModules, pPass As %Integer = 1, pModulePath As %List = {$ListBuild(..Name)}, pIgnoreInstalledModules As %Boolean = 0, pKnownDependencies As %List = {..GetKnownDependencies(..Name)}, pPermitDowngrade As %Boolean = 0, pCheckNestedScoped As %Boolean = 0) As %Status
+Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pForceSnapshotReload As %Boolean = 0, ByRef qstruct, pPhases As %String = "", ByRef pSubModules, pPass As %Integer = 1, pModulePath As %List = {$ListBuild(..Name)}, pIgnoreInstalledModules As %Boolean = 0, pKnownDependencies As %List = {..GetKnownDependencies(..Name)}, pPermitDowngrade As %Boolean = 0, pCheckNestedScoped As %Boolean = 0, ByRef pSearchList) As %Status
 {
 	#define EXACT 1
 	#define FUZZY 2
@@ -680,11 +680,40 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 			}
 			
 			Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-			Set tSearchCriteria.Name = tDep.Name
-			Set tSearchCriteria.VersionExpression = tSearchExpr.ToString()
-			Set tSC = tRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
-			If $$$ISERR(tSC) {
-				Quit
+			Set searchExprStr = tSearchExpr.ToString()
+			Set tSearchCriteria.VersionExpression = searchExprStr
+			// If the dependencyname has not been visited, actually do the search;
+			// otherwise, see if the stored search expression contains the current search expression or the other way
+			// If former, then use the stored qualifiedref; if latter, then need to do new search
+			
+			If ($Data(pSearchList(tDep.Name)) '= 10) {
+				Set tSC = tRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
+				If $$$ISERR(tSC) {
+					Quit
+				}
+				Set pSearchList(tDep.Name, tSearchExpr) = tQualifiedReferences
+				Set pSearchList(tDep.Name, tSearchExpr, "SearchString") = searchExprStr
+			} Else {
+				Set key = ""
+				While 1 {
+					Set key = $Order(pSearchList(tDep.Name, key))
+					If (key = "") {
+						Quit
+					}
+					If (pSearchList(tDep.Name, key, "SearchString") = searchExprStr) {
+						Set tQualifiedReferences = pSearchList(tDep.Name, key)
+						Quit
+					}
+				}
+				If (key = "") {
+					// no satisfied searchExpr found
+					Set tSC = tRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
+					If $$$ISERR(tSC) {
+						Quit
+					}
+					Set pSearchList(tDep.Name, tSearchExpr) = tQualifiedReferences
+					Set pSearchList(tDep.Name, tSearchExpr, "SearchString") = searchExprStr
+				}
 			}
 			If (tQualifiedReferences.Count() = 0) {
 				Set tMsg = $$$FormatText("Could not find satisfactory version of %1 in any repositories. Required by: %2",tDep.Name,$ListToString(tConstraintList,"; "))
@@ -729,7 +758,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 						Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
 				
 						// If we have an exact match, attempt to resolve exact dependencies recursively.
-						Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade)
+						Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList)
 						
 						// Failure to resolve any of these dependencies is an immediate failure, and can be descriptive.
 						If $$$ISERR(tSC) {
@@ -748,7 +777,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					
 						// For fuzzy version matching, preview the next graph step; move to the next version if it would lead to failure.
 						// If not, update.
-						Set tPossibleSC = tModule.BuildDependencyGraph(.tDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.tSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade)
+						Set tPossibleSC = tModule.BuildDependencyGraph(.tDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.tSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList)
 						If $$$ISOK(tPossibleSC) {
 							// We have a match - let's go with it. Actually dependency resolution will be done later, breadth-first.
 							// TODO: Caching of results to avoid duplicate web service calls.
@@ -777,7 +806,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 		
 		If (pPass = $$$EXACT) {	
 			// Call for second pass (fuzzy version matching)
-			Set tSC = ..BuildDependencyGraph(.pDependencyGraph,pDepth,pForceSnapshotReload,.qstruct,pPhases,.pSubModules,$$$FUZZY,pModulePath,pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade)
+			Set tSC = ..BuildDependencyGraph(.pDependencyGraph,pDepth,pForceSnapshotReload,.qstruct,pPhases,.pSubModules,$$$FUZZY,pModulePath,pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -792,7 +821,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					Set tModName = $Order(pSubModules(pDepth,tModName),1,tModule)
 					Quit:tModName=""
 					Set tModulePath = $Case(pSubModules(pDepth,tModName,$$$SCOPE),"":pModulePath,:"")
-					Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tModName),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade)
+					Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tModName),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList)
 					If $$$ISERR(tSC) {
 						Quit
 					}

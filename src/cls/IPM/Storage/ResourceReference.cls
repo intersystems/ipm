@@ -117,7 +117,7 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 				}
 				While tCacheResult.%Next(.tSC) {
 					$$$ThrowOnError(tSC)
-					Set tResourceCache(tCacheResult.%Get("UniqueName")) = ""
+					Set tResourceCache($$$lcase(tCacheResult.%Get("UniqueName"))) = ""
 				}
 			}
 			// include hidden files by temporarily enable showHidden global for Studio search
@@ -150,12 +150,12 @@ ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheck
 				
 				If pCheckModuleOwnership {
 					// Skip resources owned by other modules (using cache).
-					If $Data(tResourceCache(tCheckName)) {
+					If $Data(tResourceCache($$$lcase(tCheckName))) {
 						Continue
 					}
 					Set tFoundInPackage = 0
 					For tSegment = $Length(tCheckName,".")-2:-1:1 {
-						If $Data(tResourceCache($Piece(tCheckName,".",1,tSegment)_".PKG")) {
+						If $Data(tResourceCache($$$lcase($Piece(tCheckName,".",1,tSegment)_".PKG"))) {
 							Set tFoundInPackage = 1
 							Quit
 						}

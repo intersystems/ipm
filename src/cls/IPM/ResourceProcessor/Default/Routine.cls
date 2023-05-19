@@ -9,10 +9,10 @@ Parameter EXTENSION = "MAC";
 
 /// Directory relative to module root containing the exported resource.
 /// Defaults to the resource's extension (lower-case) if unspecified.
-Property Directory As %String(MAXLEN = "") [ InitialExpression = "mac" ];
+Property Directory As %String(MAXLEN = "") [ InitialExpression = "rtn" ];
 
 /// Extension for individual filename(s) that comprise this resource
-Property FilenameExtension As %String [ InitialExpression = "mac" ];
+Property FilenameExtension As %String [ InitialExpression = "rtn" ];
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status

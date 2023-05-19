@@ -526,7 +526,7 @@ Method %Reload(ByRef pParams) As %Status
 			
 			Set tSC = $Case(tExtension,
 				"GBL":##class(%IPM.Utils.Module).AddGlobalMapping($Namespace,tName,tSource),
-				"INC":##class(%IPM.Utils.Module).AddRoutineMapping($Namespace,tName,"INC",tSource),
+				"INC":##class(%IPM.Utils.Module).AddRoutineMapping($Namespace,tName,,tSource),
 				"MAC":##class(%IPM.Utils.Module).AddRoutineMapping($Namespace,tName,"MAC",tSource),
 				"PKG":##class(%IPM.Utils.Module).AddPackageMapping($Namespace,tName,tSource),
 				"":##class(%IPM.Utils.Module).AddRoutineMapping($Namespace,tName,"ALL",tSource))
@@ -919,10 +919,6 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			If '$Data(tResourceArray(tFullResourceName,"RelativePath"),tRelativePath) {
 				Set tRelativePath = ..GetResourceRelativePath(tName,tExt)
 			}
-
-			If $Get(tResourceArray(tFullResourceName,"Preload")) {
-				Set tRelativePath = "preload/"_tRelativePath
-			}
 			
 			If (tExt = "ZPM") && (tName '= ..Module.Name) {
 				Set tRelativePath = pDependencyGraph(tName,"Location")_tRelativePath
@@ -1015,10 +1011,10 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			$$$ThrowOnError(tSC)
 		}
     /// Always keep these files
-    Set staticFiles = $ListBuild(
-      "readme.md",
-      "license",
-      "requirements.txt",
+     Set staticFiles = $ListBuild(
+    //   "readme.md",
+    //   "license",
+    //   "requirements.txt",
     )
     Set tRes = ##class(%File).FileSetFunc(..Module.Root)
     While tRes.%Next() {
@@ -1543,7 +1539,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		"ZPM":"",
 		"LOC":"localize/",
 		"INC":"inc/",
-		"MAC":"mac/",
+		"MAC":"rtn/",
 		"CLS":"cls/",
 		"GBL":"gbl/",
 		"X12":"i14y/",
@@ -1558,7 +1554,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		"ZPM":"module.xml",
 		"LOC":$Translate(tName,".%","/")_".xml",
 		"INC":$Translate(tName,".%","/_")_".inc",
-		"MAC":$Translate(tName,".%","/_")_".mac",
+		"MAC":$Translate(tName,".%","/_")_".rtn",
 		"CLS":$Translate(tName,".%","/")_".cls",
 		"DTL":$Translate(tName,".%","/")_".cls",
 		"BPL":$Translate(tName,".%","/")_".cls",

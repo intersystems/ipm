@@ -509,8 +509,8 @@ Method OnItemRelativePath(pItemName As %String) As %String
 	If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
 		Set tSourceRoot = tSourceRoot _ "/"
 	}  
-  set directory = $Select(..DirectoryDefined: ..Directory, 1: "")
-	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_directory_"/"_$Translate($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
+  set directory = ..Directory
+	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_ tSourceRoot _ directory_"/"_$Translate($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 }
 
 Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.ResourceInfo) As %Status

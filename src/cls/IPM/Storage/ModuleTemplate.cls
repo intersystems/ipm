@@ -331,7 +331,7 @@ ClassMethod NewTemplate(pPath, pName, pVersion, pDescription = "", pKeywords = "
     Return tTemplate
 }
 
-Method ReadResorces(pFolder) As %Status
+Method ReadResources(pFolder) As %Status
 {
     Set exts = $Listbuild("cls","mac","inc","int")
     If (($Extract(pFolder,1)="/") || ($Extract(pFolder,1)="\")) {

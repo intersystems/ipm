@@ -1020,7 +1020,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 		set tPathSrc=##class(%File).NormalizeDirectory(tPath_"\"_tSrc)
 		Do ##class(%IPM.Storage.ModuleTemplate).ExportResources(tPathSrc,tExp)
 	}
-	Do tTemplate.ReadResorces(tSrc)
+	Do tTemplate.ReadResources(tSrc)
 
 	// web applications
 	Do ##class(%IPM.Storage.ModuleTemplate).GetCSPApplications(.apps)

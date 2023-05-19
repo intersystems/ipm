@@ -21,10 +21,11 @@ XData PM [ XMLNamespace = INSTALLER ]
 <Namespace Name="${CURNS}" Code="${CURNSRoutineDB}" Data="${CURNSGlobalDB}" Create="no" Ensemble="0">
   <Configuration>
       <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
+      <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" /> 
   </Configuration>
 
   <Import File="${SRCDIR}" Recurse="1"/>
-  
+
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/> 

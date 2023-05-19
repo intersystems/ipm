@@ -371,7 +371,10 @@ ClassMethod FindReferenceHelper(pIsModule As %Boolean, pName As %String = "", pI
 		If $IsObject(tHomeModule) {
 			Set tHomeModuleName = tHomeModule.Name
 		}
-		Merge pReferences(tHomeModuleName,tRawFileName, tFileType) = $$$ZPMDependencyTempData(tNextCounter,tReferenceKey)
+		If 'pIsModule && ($ZConvert(tRawFileName_tFileType,"U") '= $ZConvert(pName,"U")) {
+			// For non modules, need to ensure references to class itself aren't output
+			Merge pReferences(tHomeModuleName,tRawFileName,tFileType) = $$$ZPMDependencyTempData(tNextCounter,tReferenceKey)
+		}
 	}
  
 	If $IsObject(pProgressListener) {
