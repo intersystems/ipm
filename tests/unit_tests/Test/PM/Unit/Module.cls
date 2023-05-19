@@ -15,7 +15,9 @@ Method TestEvaluateAttribute()
     "${root}","{$root}",
     "${bindir}","{$bindir}",
     "${libdir}","{$libdir}",
-    "${verbose}","{$verbose}"
+    "${verbose}","{$verbose}",
+    "${packagename}","{$packagename}",
+    "${version}","{$version}"
   )
   For i=1:1:$ListLength(tests) {
     Set test = $ListGet(tests, i)

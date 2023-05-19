@@ -3,7 +3,7 @@ Class Test.PM.Integration.Resources Extends %UnitTest.TestCase
 
 Method TestResourceTypes()
 {
-  If ('##class(%EnsembleMgr).IsHealthShareInstalled()) {
+  If ('$ListFind($system.Version.GetISCComponents(), "Health")) {
     Quit $$$OK
   }
 

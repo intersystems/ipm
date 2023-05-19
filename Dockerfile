@@ -1,4 +1,4 @@
-ARG BASE=containers.intersystems.com/intersystems/irishealth-community:2022.2.0.368.0
+ARG BASE=containers.intersystems.com/intersystems/irishealth-community:2023.1.0.229.0
 FROM ${BASE}
 
 ARG REGISTRY=https://pm.community.intersystems.com

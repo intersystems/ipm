@@ -123,7 +123,7 @@ Method AssertSatisfied(pVersionExpression As %String, pVersion As %String) As %B
 			Do $$$AssertStatusOK(tSC,"Error evaluating expression: '"_pVersionExpression_"'")
 			Quit
 		}
-  Set tSatisfied = $$$AssertTrue(tVersion.Satisfies(tVersionExpression),"'"_pVersion_"' satisfies expression '"_ tVersionExpression.ToResolvedString() _"'")
+		Set tSatisfied = $$$AssertTrue(tVersion.Satisfies(tVersionExpression),"'"_pVersion_"' satisfies expression '"_ tVersionExpression.ToResolvedString() _"'")
 	} Catch e {
 		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
 	}

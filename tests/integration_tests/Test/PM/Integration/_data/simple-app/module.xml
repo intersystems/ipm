@@ -23,5 +23,6 @@
     <Resource Name="TSL.DebugResourceProcessor.CLS" Preload="true">
     </Resource>
   </Resources>
+  <InstallerClass>TSL.TestInstaller</InstallerClass>
 </Module>
 </Document></Export>

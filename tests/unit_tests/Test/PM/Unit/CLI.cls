@@ -43,6 +43,7 @@ Method TestParser()
 	Set tResults(tCommands,"parameters","module")="ZPM"
 	Set tResults(tCommands,"data","DeveloperMode")=1
 	Set tResults(tCommands,"data","UIFW","force")=1
+	Set tResults(tCommands,"data","zpm","Something")="quoted"" value"
 	Set tResults(tCommands,"data","Something")="quoted"" value"
 	
 	Set tCommands($i(tCommands)) = "module-action isc-dev publish"
