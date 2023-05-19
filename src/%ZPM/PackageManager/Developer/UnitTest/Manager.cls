@@ -1,3 +1,5 @@
+Include %ZPM.Formatting
+
 Class %ZPM.PackageManager.Developer.UnitTest.Manager Extends %UnitTest.Manager
 {
 
@@ -78,6 +80,49 @@ ClassMethod GetLastStatus(Output pFailureCount As %Integer) As %Status
 		} Else {
 			Set tSC = $$$ERROR($$$GeneralError,"No unit test results recorded.")
 		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+ClassMethod OutputFailures()
+{
+	Set tSC = $$$OK
+	Try {
+		If '$Data(^||%UnitTest.Manager.LastResult,tLogIndex)#2 {
+			Set tLogIndex = $Order(^UnitTest.Result(""),-1)
+		}
+		Kill ^||%UnitTest.Manager.LastResult // Clean up
+		If 'tLogIndex {
+			Quit
+		}
+		Set tLogGN = $Name(^UnitTest.Result(tLogIndex))
+		Set tRoot = ""
+		For {
+			Set tRoot = $Order(@tLogGN@(tRoot))
+			Quit:tRoot=""
+			Set tSuite = ""
+			For {
+				Set tSuite = $Order(@tLogGN@(tRoot, tSuite))
+				Quit:tSuite=""
+				Set tMethod = ""
+				For {
+					Set tMethod = $Order(@tLogGN@(tRoot, tSuite, tMethod))
+					Quit:tMethod=""
+					
+					Set tAssert = ""
+					For {
+						Set tAssert = $Order(@tLogGN@(tRoot, tSuite, tMethod, tAssert), 1, tAssertInfo)
+						Quit:tAssert=""
+						Set $lb(status, type, text) = tAssertInfo
+						Continue:status
+						Write !,$$$FormattedLine($$$Red, "FAILED " _ tSuite _ ":" _ tMethod), ": " _ type _ " - " _ text
+					}
+				}
+			}
+		}
+
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
