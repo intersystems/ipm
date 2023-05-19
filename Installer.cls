@@ -1,4 +1,4 @@
-Class %ZPM.Installer Extends %Projection.AbstractProjection
+Class IPM.Installer Extends %Projection.AbstractProjection
 {
 
 Projection Reference As Installer;
@@ -13,23 +13,28 @@ Parameter FILESCOUNT = 0;
 XData PM [ XMLNamespace = INSTALLER ]
 {
 <Manifest>
-<Default Name="MODDIR" Dir="${MGRDIR}zpm" />
+<Default Name="MODDIR" Dir="${MGRDIR}" />
 <Default Name="SRCDIR" Dir="${MODDIR}src" />
 <Default Name="REGISTRY" Value="https://pm.community.intersystems.com" />
 <Default Name="TRACKINGID" Value="UA-126752118-1" />
 
-<Namespace Name="%SYS">
+<Namespace Name="${CURNS}" Code="${CURNSRoutineDB}" Data="${CURNSGlobalDB}" Create="no" Ensemble="0">
+  <Configuration>
+      <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
+      <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" /> 
+  </Configuration>
+
   <Import File="${SRCDIR}" Recurse="1"/>
-  
-  <Invoke Class="%ZPM.PackageManager" Method="UpdateLanguageExtensions" CheckStatus="true" />
-  <Invoke Class="%ZPM.Installer" Method="ZPMInit" CheckStatus="true">
+
+  <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
+  <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/> 
     <Arg Value="${TRACKINGID}"/>
   </Invoke>
-  <Invoke Class="%ZPM.Installer" Method="ZPMLoad" CheckStatus="true">
+  <Invoke Class="IPM.Installer" Method="ZPMLoad" CheckStatus="true">
     <Arg Value="${MODDIR}"/>
   </Invoke>
-  <Invoke Class="%ZPM.Installer" Method="ZPMCompile" CheckStatus="true" />
+  <Invoke Class="IPM.Installer" Method="ZPMCompile" CheckStatus="true" />
 </Namespace>
 
 </Manifest>
@@ -40,6 +45,14 @@ ClassMethod setup(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.I
 {
   #; Let our XGL document generate code for this method. 
   Do %code.WriteLine(" If $Data(pVars, path)#10,path'="""" Set pVars(""MODDIR"")=path")
+  Do %code.WriteLine(" Set pVars(""CURNS"")=$namespace")
+  Do %code.WriteLine(" Set prevNS = $namespace")
+  Do %code.WriteLine(" New $Namespace")
+  Do %code.WriteLine(" Set $Namespace = ""%SYS"" ")
+  Do %code.WriteLine(" Kill properties")
+  Do %code.WriteLine(" Set sc = ##class(Config.Namespaces).Get(prevNS, .properties)")
+  Do %code.WriteLine(" Set pVars(""CURNSRoutineDB"")=$Get(properties(""Routines""))")
+  Do %code.WriteLine(" Set pVars(""CURNSGlobalDB"")=$Get(properties(""Globals""))")
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "PM")
 }
 
@@ -55,24 +68,24 @@ ClassMethod AsyncSetup(Args...)
 
 ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
-    If (pRegistry'="") {
-      $$$QuitOnError(##class(%ZPM.PackageManager).Shell("repo -t registry -name registry -url "_ pRegistry))
-    }
-    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetDefaultRegistry(pRegistry))
-    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1))
-    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
-    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetValue("ColorScheme",""))
+    //If (pRegistry'="") {
+    //  $$$QuitOnError(##class(%IPM.Main).Shell("repo -t registry -name registry -url "_ pRegistry))
+    //}
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme",""))
     Quit $$$OK
 }
 
 ClassMethod ZPMLoad(pDirectoryName)
 {
-  Quit ##class(%ZPM.PackageManager).Shell("load -nodev "_pDirectoryName)
+  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName)
 }
 
 ClassMethod ZPMCompile()
 {
-  Quit ##class(%ZPM.PackageManager).Shell("ZPM compile")
+  Quit ##class(%IPM.Main).Shell("ZPM compile")
 }
 
 ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, modified As %String, qstruct) As %Status
@@ -81,7 +94,7 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
   If (..#FILESCOUNT'>0)||(..#VERSION="") QUIT $$$OK
 
   #; This flag used in development
-  if $DATA(^%ZPM("skipinstall")) QUIT $$$OK
+  if $DATA(^%IPM("skipinstall")) QUIT $$$OK
   
   #; Installed version newer
   if '..NeedInstall() QUIT $$$OK
@@ -123,12 +136,12 @@ ClassMethod CreateProjection(classname As %String, ByRef parameters As %String, 
 ClassMethod NeedInstall(Output version As %String)
 {
   try {
-    set module = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
+    set module = ##class(%IPM.Storage.Module).NameOpen("zpm")
     if '$ISOBJECT(module) {
       RETURN 1
     }
 
-    set version = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(..#VERSION)
+    set version = ##class(%IPM.General.SemanticVersion).FromString(..#VERSION)
     if $isobject(version) {
       RETURN version.Follows(module.Version)
     }
@@ -154,10 +167,10 @@ ClassMethod Make(pPackage As %Stream.Object, ByRef pStream As %Stream.TmpCharact
 {
   Set tSC = $$$OK
   try {
-		Set tModule = ##class(%ZPM.PackageManager.Developer.Module).NameOpen("zpm")
+		Set tModule = ##class(%IPM.Storage.Module).NameOpen("zpm")
 
     Set tmpDir = ##class(%File).NormalizeDirectory($$$FileTempDir)
-    $$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Archive).Extract(pPackage, tmpDir))
+    $$$ThrowOnError(##class(%IPM.General.Archive).Extract(pPackage, tmpDir))
 
     Do ..CollectPackage(tmpDir, .tList, tmpDir)
 

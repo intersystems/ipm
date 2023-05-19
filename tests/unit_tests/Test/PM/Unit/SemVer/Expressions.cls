@@ -87,14 +87,14 @@ Method AssertEquivalent(pVersionExpression1 As %String, pVersionExpression2 As %
 	Set tEquivalent = 0
 	Try {
 		Do:pVerbose $$$LogMessage("First expression: "_pVersionExpression1)
-		Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(pVersionExpression1,.tExpr1)
+		Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pVersionExpression1,.tExpr1)
 		If $$$ISERR(tSC) {
 			Do:'pVerbose $$$LogMessage("Error parsing expression: "_pVersionExpression1)
 			Do $$$AssertStatusOK(tSC)
 			Quit
 		}
 		Do:pVerbose $$$LogMessage("Second expression: "_pVersionExpression2)
-		Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(pVersionExpression2,.tExpr2)
+		Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pVersionExpression2,.tExpr2)
 		If $$$ISERR(tSC) {
 			Do:'pVerbose $$$LogMessage("Problem expression: "_pVersionExpression2)
 			Do $$$AssertStatusOK(tSC)
@@ -117,8 +117,8 @@ Method AssertSatisfied(pVersionExpression As %String, pVersion As %String) As %B
 {
 	Set tSatisfied = 0
 	Try {
-		Set tVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(pVersion)
-		Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(pVersionExpression,.tVersionExpression)
+		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(pVersion)
+		Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pVersionExpression,.tVersionExpression)
 		If $$$ISERR(tSC) {
 			Do $$$AssertStatusOK(tSC,"Error evaluating expression: '"_pVersionExpression_"'")
 			Quit
@@ -134,8 +134,8 @@ Method AssertNotSatisfied(pVersionExpression As %String, pVersion As %String) As
 {
 	Set tUnsatisfied = 0
 	Try {
-		Set tVersion = ##class(%ZPM.PackageManager.Core.SemanticVersion).FromString(pVersion)
-		Set tSC = ##class(%ZPM.PackageManager.Core.SemanticVersionExpression).FromString(pVersionExpression,.tVersionExpression)
+		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(pVersion)
+		Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pVersionExpression,.tVersionExpression)
 		If $$$ISERR(tSC) {
 			Do $$$AssertStatusOK(tSC,"Error evaluating expression: '"_pVersionExpression_"'")
 			Quit
