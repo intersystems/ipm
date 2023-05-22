@@ -186,6 +186,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 			
 			// By default, detect and report unit test failures as an error from this phase
 			If $Get(pParams("UnitTest","FailuresAreFatal"),1) {
+        Do ##class(%IPM.Test.Manager).OutputFailures()
 				Set tSC = ##class(%IPM.Test.Manager).GetLastStatus()
 				$$$ThrowOnError(tSC)
 			}
