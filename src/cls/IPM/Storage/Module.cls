@@ -1296,6 +1296,11 @@ Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Bo
 					Continue
 				}
 			}
+
+			If $IsObject(tResource.Processor) {
+				Do tResource.Processor.OnGetStudioProject(pProject,.handled)
+				Continue:handled
+			}
 			
 			Kill tResourceArray
 			$$$ThrowOnError(tResource.ResolveChildren(.tResourceArray))

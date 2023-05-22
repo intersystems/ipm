@@ -448,4 +448,11 @@ Method OnItemRelativePath(pItemName As %String) As %String
 	Quit ..ResourceReference.Name_$Piece(pItemName,..Url,2)
 }
 
+Method OnGetStudioProject(pProject As %Studio.Project, Output pHandled As %Boolean = 0)
+{
+	// IMPORTANT: Remove leading *and* trailing slash.
+	do pProject.AddItem($Extract(..Url,2,*-1),"DIR")
+	set pHandled = 1
+}
+
 }
