@@ -1406,6 +1406,8 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 		Set root = ##class(%Library.File).NormalizeDirectory(root)
 	}
 	Set customParams("root") = root
+  Set customParams("packagename") = ..Name
+  Set customParams("version") = ..VersionString
 	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
 	
