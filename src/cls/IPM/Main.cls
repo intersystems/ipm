@@ -577,7 +577,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <example description="Shows all modules in current registry">search -r</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
 <modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
-<modifier name="versions" dataAlias="AllVersions" dataValue="1" description="Shows all versions for each module." />
+<modifier name="versions" aliases="v" dataAlias="Versions" dataValue="1" description="Shows all versions for each module." />
 
 <parameter name="searchString" description="Search string, * can be used" />
 <example description="Shows a description of all modules in the name of which there is a context">find -d *tools*</example>
