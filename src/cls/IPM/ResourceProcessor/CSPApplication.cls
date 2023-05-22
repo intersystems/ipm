@@ -63,6 +63,9 @@ Property CookiePath As %String(MAXLEN = 256);
 /// Physical path for CSP files
 Property Directory As %String(ATTRIBUTEREQUIRED = 0, MAXLEN = 1024) [ Required ];
 
+/// PermittedClasses default
+Property PermittedClasses As %String(MAXLEN = 32767);
+
 Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set tSC = ##super(pResourceReference)
