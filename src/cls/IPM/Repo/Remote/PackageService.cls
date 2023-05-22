@@ -312,8 +312,13 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
     }
     // basic auth
 		If (..Username '= "") && (..Password '= "") {
-      Set tRequest.Username = ..Username
-      Set tRequest.Password = ..Password
+      If (..Username = "_apikey") {
+        // key auth
+        Do tRequest.SetHeader("apikey",..Password)
+      } Else {
+        // basic auth
+        Set tRequest.Username = ..Username
+        Set tRequest.Password = ..Password
 		}
     Set proxy=$System.Util.GetEnviron("https_proxy")
     If proxy'="" {

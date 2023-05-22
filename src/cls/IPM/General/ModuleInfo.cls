@@ -21,6 +21,8 @@ Property Origin As %String;
 
 Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLNAME = "Version") [ Required ];
 
+Property AllVersions As %String(%JSONINCLUDE = "NONE", MAXLEN = "", XMLPROJECTION = "NONE") [ Transient ];
+
 Property Deployed As %Boolean(%JSONFIELDNAME = "deployed", XMLNAME = "Deployed");
 
 /// Version of IRIS for Deployed modules

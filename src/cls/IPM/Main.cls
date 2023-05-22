@@ -1724,11 +1724,11 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "", pShowAllVersions As %Boolean = 0) [ Private ]
+ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pShowAllVersions As %Boolean = 0, pSearchString As %String = "", pShowAllVersions As %Boolean = 0) [ Private ]
 {
 	#define gn "^||tmpDesc"
 	Kill @$$$gn
-	Set maxlenname = 0, where = ""
+	Set (maxlenname,maxlenver) = 0, where = ""
 	If pSearchString["*" {
 		Set where=" WHERE name like ?"
 	} ElseIf pSearchString'="" { 
@@ -2084,7 +2084,7 @@ ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status
 	Quit:in=""||(OnlyName) $$$OK
 	Set in=$Extract(in,1,*-1)
 
-	Set tQuery = "select Name, Version, Repository, Description from %IPM_Utils.Module_GetModuleList('registry') WHERE name in ("_in_")"
+	Set tQuery = "select Name, Version, Repository, Description, AllVersions from %IPM_Utils.Module_GetModuleList('registry') WHERE name in ("_in_")"
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
 	
 	If (tRes.%SQLCODE < 0) {
@@ -2093,7 +2093,7 @@ ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Set name = tRes.%Get("DisplayName")
-		Set Mod(name,"R")=$ListBuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"))
+		Set Mod(name,"R")=$ListBuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"),tRes.%Get("AllVersions"))
 	}
 	Quit $$$OK
 }
