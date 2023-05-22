@@ -339,7 +339,7 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
       }
       Set tRequest.ProxyPort=pr("port")
       Set tRequest.ProxyServer=pr("host")
-      If pr("username")'="",pr("password")'="" {
+      If $Get(pr("username"))'="",$Get(pr("password"))'="" {
         Set tRequest.ProxyAuthorization="Basic "_$system.Encryption.Base64Encode(pr("username")_":"_pr("password"))
       }
     }
