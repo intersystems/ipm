@@ -87,6 +87,7 @@ ClassMethod GetDefaultResourceProcessor(pResourceName As %String) As %Dictionary
 		"LUT":"Interoperability",
 		"X12":"Interoperability",
 		"ESD":"Interoperability",
+    "HL7":"Interoperability",
 		"DTL":"Class",
 		"BPL":"Class",
 		:"Document")
@@ -1543,6 +1544,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		"CLS":"cls/",
 		"GBL":"gbl/",
 		"X12":"i14y/",
+    "HL7":"i14y/",
 		"LUT":"i14y/",
 		"ESD":"i14y/",
 		"DTL":"cls/",

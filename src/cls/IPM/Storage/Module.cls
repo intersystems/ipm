@@ -680,6 +680,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 			}
 			
 			Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+			Set tSearchCriteria.Name = tDep.Name
 			Set searchExprStr = tSearchExpr.ToString()
 			Set tSearchCriteria.VersionExpression = searchExprStr
 			// If the dependencyname has not been visited, actually do the search;
@@ -1296,6 +1297,11 @@ Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Bo
 					Continue
 				}
 			}
+
+			If $IsObject(tResource.Processor) {
+				Do tResource.Processor.OnGetStudioProject(pProject,.handled)
+				Continue:handled
+			}
 			
 			Kill tResourceArray
 			$$$ThrowOnError(tResource.ResolveChildren(.tResourceArray))
@@ -1401,6 +1407,8 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 		Set root = ##class(%Library.File).NormalizeDirectory(root)
 	}
 	Set customParams("root") = root
+  Set customParams("packagename") = ..Name
+  Set customParams("version") = ..VersionString
 	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
 	

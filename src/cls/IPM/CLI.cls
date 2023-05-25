@@ -688,17 +688,21 @@ ClassMethod %GetCommandStructure(Output pCommandStructure)
 }
 
 /// Utility method for setting multiple subscripts based on .-delimited <var>pDataName</var>
-ClassMethod SetData(pTargetArray, pDataName, pDataValue, pCustomParam = 0) [ Private ]
+ClassMethod SetData(pTargetArray, pDataName, pDataValue, pCustomParam = 0) [ Private, PublicList = pTargetArray ]
 {
-	Set tPieces = $ListFromString(pDataName,".")
-	Set tValue = pDataValue
-	For i=$ListLength(tPieces):-1:1 {
-		Kill tData
-		Merge tData($ListGet(tPieces,i)) = tValue
-		Kill tValue
-		Merge tValue = tData
+	If (pCustomParam && (pDataName'[".")) {
+		// dubplicate param without prefix zpm for compatibility
+		Do ..SetData(.pTargetArray, "." _ pDataName, pDataValue, pCustomParam)
+		Set pDataName = "zpm."_pDataName
 	}
-	Merge pTargetArray("data") = tValue
+	Set tPieces = $ListFromString(pDataName,".")
+	Set tData = $Name(pTargetArray("data"))
+	Set tPtr = 0
+	While $ListNext(tPieces, tPtr, tValue) {
+		continue:tValue=""
+		Set tData = $Name(@tData@(tValue))
+	}
+	Set @tData = pDataValue
 }
 
 /// Draw a border around a list of strings. Optionally provide a text format for the strings. <br />

@@ -156,6 +156,19 @@ This command is an alias for `module-action module-name publish`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
+<command name="unpublish">
+<description>
+Delete package from registry
+</description>
+<example description="Delete all versions of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName all</example>
+<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName 1.0.0</example>
+<parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
+<parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
+
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 <command name="config">
 <description>Update ZPM settings. Setting is a key-value pair.</description>
 <example description="Disable collecting analytics data">config set analytics 0</example>
@@ -673,7 +686,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Set tOneCommand = 1
 	}
 	Set introMessageList = $ListBuild(
-		"Welcome to the Package Manager Shell (ZPM).",
+		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
 		"Enter q/quit to exit the shell. Enter ?/help to view available commands"
 	)
 	Set tInShell = 0
@@ -746,6 +759,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..RunDependencyAnalyzer(.tCommandInfo)
 			} ElseIf (tCommandInfo = "config") {
 				Do ..Config(.tCommandInfo)
+			} ElseIf (tCommandInfo = "unpublish") {
+				Do ..Unpublish(.tCommandInfo)
 			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
 				Do ..RunOnePhase(.tCommandInfo)
 			} ElseIf (tCommandInfo = "generate") {
@@ -1069,6 +1084,18 @@ ClassMethod GetDefaultCommandRegistry()
 		Write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
 		
 	}
+}
+
+/// Get Version Module
+ClassMethod GetVersionModule(name, namespace = {$namespace})
+{
+	New $Namespace
+	Set $Namespace=namespace
+	Do ..GetListModules(name,.list)
+	If $Data(list(name)) {
+			quit $ListGet(list(name),1)
+	}
+	quit ""
 }
 
 /// @API.Method
@@ -1658,6 +1685,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
     Set tModifiers("username") = "", tModifiers("password") = ""
     Set tType = "%IPM.Repo.Remote.Definition"
     $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
+    Do ..Shell("repo -list")
 	} Else {
 		Set tName = $$$GetModifier(pCommandInfo,"name")
 		Set tType = $ListGet(serverClassList)
@@ -1707,14 +1735,15 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		Merge tModifiers = pCommandInfo("modifiers")
 		Merge tData = pCommandInfo("data")
 		$$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData,tType))
+    Do ..Shell("repo -list")
 	}
 }
 
 ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "", pShowAllVersions As %Boolean = 0) [ Private ]
 {
-	#define gn "^||tmpDesc"
+  #define gn "^||tmpDesc"
 	Kill @$$$gn
-	Set maxlenname = 0, where = ""
+	Set (maxlenname,maxlenver) = 0, where = ""
 	If pSearchString["*" {
 		Set where=" WHERE name like ?"
 	} ElseIf pSearchString'="" { 
@@ -1940,6 +1969,67 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
 
+ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
+{
+  	If ( ($Get(pCommandInfo("parameters","module"))="") || ($Get(pCommandInfo("parameters","version"))="") ) {
+    	Set tCommandInfo("parameters","command") = "unpublish"
+    	Do ..%Help(.tCommandInfo)
+    	Quit
+  	}
+
+	Set tRegistry = ""
+	Set tModuleName = $ZConvert($Get(pCommandInfo("parameters","module")), "L")
+	If ( tModuleName["/" ) {
+		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
+	}
+	If ( tRegistry = "" ) {
+		Set tRS = ##class(%IPM.Repo.Remote.Definition).PublishingServerFunc()
+		If (tRS.%SQLCODE = 0) && tRS.%Next() {
+			Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
+		}
+	} Else {
+		Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
+	}
+	If ('$Isobject(tServer)) {
+		Write "Registry not found: "_tRegistry,!
+		Return $$$ERROR(5001, "Registry not found: "_tRegistry)
+	}
+	Set tVersion = $Get(pCommandInfo("parameters","version"))
+
+	Try {
+		Set tManager = ##class(%IPM.Repo.Remote.PublishManager).%Get(.tSC)
+		$$$ThrowOnError(tSC)
+		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+		If (isEnabled) {
+            Set tResult = 0
+			If ($$$lcase(tVersion)="all") {
+				Write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
+                Set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                Set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+			} Else {
+				Write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
+                Set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+				Set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+			}
+
+		    Set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+
+            If (tResponse '= $$$SuccessResponse) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+            }
+
+			If (tResult) {
+				$$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
+				Write !!,"Package deleted"
+			}
+		} Else {
+			Write !,"The package could not be deleted (the registry denied the request)",!
+		}
+	} Catch ex {
+		Write !!,$$$FormattedLine($$$Red, "ERROR! "), ex.DisplayString()
+	}
+}
+
 ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 {
 	Set tModName = $Get(pCommandInfo("parameters","module"))
@@ -2070,7 +2160,7 @@ ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status
 	Quit:in=""||(OnlyName) $$$OK
 	Set in=$Extract(in,1,*-1)
 
-	Set tQuery = "select Name, Version, Repository, Description from %IPM_Utils.Module_GetModuleList('registry') WHERE name in ("_in_")"
+	Set tQuery = "select Name, Version, Repository, Description, AllVersions from %IPM_Utils.Module_GetModuleList('registry') WHERE name in ("_in_")"
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
 	
 	If (tRes.%SQLCODE < 0) {
@@ -2079,7 +2169,7 @@ ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status
 	While tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 		Set name = tRes.%Get("DisplayName")
-		Set Mod(name,"R")=$ListBuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"))
+		Set Mod(name,"R")=$ListBuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"),tRes.%Get("AllVersions"))
 	}
 	Quit $$$OK
 }

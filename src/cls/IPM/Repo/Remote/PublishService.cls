@@ -24,10 +24,45 @@ Method Publish(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
     If tRequest.HttpResponse.StatusCode = 401 {
       $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, authorization required."))
     } Else {
-      $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, something went wrong."))
+      Set tMessage = "Publishing module, server responded with status code "_tRequest.HttpResponse.StatusCode_"."
+      $$$ThrowStatus($$$ERROR($$$GeneralError, tMessage))
     }
   }
-  Quit 1
+  Return 1
+}
+
+Method CheckUnpublishEnabled(packageName As %String, packageVersion As %String) As %Boolean
+{
+    If ((..Username="") || (..Password="")) && (..Token="") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Unpublishing module, authorization required."))
+    }
+    Set tRequest = ..GetHttpRequest()
+    $$$ThrowOnError(tRequest.Send("OPTIONS",tRequest.Location_"packages/"_packageName_"/"_packageVersion))
+    If (tRequest.HttpResponse.StatusCode = 200) {
+        Set allow = $$$ucase(tRequest.HttpResponse.GetHeader("allow"))
+        If ( allow["DELETE" ) {
+            Return 1
+        }
+    }
+    Return 0
+}
+
+Method Unpublish(packageName As %String, packageVersion As %String) As %Status
+{
+    If ((..Username="") || (..Password="")) && (..Token="") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Unpublishing module, authorization required."))
+    }
+    Set tRequest = ..GetHttpRequest()
+    $$$ThrowOnError(tRequest.Send("DELETE",tRequest.Location_"packages/"_packageName_"/"_packageVersion))
+    If (tRequest.HttpResponse.StatusCode '= 200) {
+        set errMsg = ""
+        try {
+            set errMsg = $piece({}.%FromJSON(tRequest.HttpResponse.Data).summary,":",2,*)
+            if (errMsg'="") {set errMsg = ";"_errMsg}
+        } catch {}
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Unpublishing module, something went wrong (HTTP response status code: "_tRequest.HttpResponse.StatusCode_errMsg_")."))
+    }
+    Return $$$OK
 }
 
 }

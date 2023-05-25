@@ -1193,7 +1193,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		Merge $$$ZPMHandledModules($Namespace) = pParams("Multicompile","ModuleContext")
 
     $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
-		
+  
 		#dim tInstallContext As %IPM.General.InstallContext
 		Set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
@@ -1217,7 +1217,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		} Else {
 			Write:tVerbose !,"Skipping preload - directory does not exist."
 		}
-		
+  
 		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
 		$$$ThrowOnError(tSC)
 		Set tSC = tModule.%Reload()

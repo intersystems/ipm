@@ -63,6 +63,9 @@ Property CookiePath As %String(MAXLEN = 256);
 /// Physical path for CSP files
 Property Directory As %String(ATTRIBUTEREQUIRED = 0, MAXLEN = 1024) [ Required ];
 
+/// PermittedClasses default
+Property PermittedClasses As %String(MAXLEN = 32767);
+
 Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set tSC = ##super(pResourceReference)
@@ -443,6 +446,13 @@ Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.Res
 Method OnItemRelativePath(pItemName As %String) As %String
 {
 	Quit ..ResourceReference.Name_$Piece(pItemName,..Url,2)
+}
+
+Method OnGetStudioProject(pProject As %Studio.Project, Output pHandled As %Boolean = 0)
+{
+	// IMPORTANT: Remove leading *and* trailing slash.
+	do pProject.AddItem($Extract(..Url,2,*-1),"DIR")
+	set pHandled = 1
 }
 
 }

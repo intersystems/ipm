@@ -15,7 +15,7 @@ Property When As %String(MAXLEN = 255, VALUELIST = ",Before,After", XMLPROJECTIO
 
 Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = 0 ];
 
-Property Arg As list Of %String(XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
+Property Arg As list Of %String(MAXLEN = 255, XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
 
 Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes ];
 
@@ -28,7 +28,7 @@ Method GetArgsArray(pParams, Output args) As %Status
   }
   
   /// Add custom parameters support for Invoke args
-  Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..Module)
+  Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..Module,.pParams)
   Do ##class(%IPM.Storage.ModuleSetting.Default).EvaluateArgs(.args,.customParams)
   /// Perform a second pass to manage embeded vars, ex:
   /// <Default Name="MyDir" Value="${mgrdir}MySubDir"></Default>

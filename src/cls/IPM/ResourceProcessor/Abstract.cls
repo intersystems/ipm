@@ -269,4 +269,9 @@ ClassMethod GetDescription(pClassName As %String) As %String [ SqlProc ]
 	Quit $Parameter(pClassName,"DESCRIPTION")
 }
 
+/// Subclasses may override to customize the studio project. (e.g., things that use web applications will do this.)
+Method OnGetStudioProject(pProject As %Studio.Project, Output pHandled As %Boolean = 0)
+{
+}
+
 }
