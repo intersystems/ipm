@@ -1739,7 +1739,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pShowAllVersions As %Boolean = 0, pSearchString As %String = "", pShowAllVersions As %Boolean = 0) [ Private ]
+ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "", pShowAllVersions As %Boolean = 0) [ Private ]
 {
   #define gn "^||tmpDesc"
 	Kill @$$$gn

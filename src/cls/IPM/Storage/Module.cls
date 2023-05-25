@@ -680,6 +680,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 			}
 			
 			Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+			Set tSearchCriteria.Name = tDep.Name
 			Set searchExprStr = tSearchExpr.ToString()
 			Set tSearchCriteria.VersionExpression = searchExprStr
 			// If the dependencyname has not been visited, actually do the search;

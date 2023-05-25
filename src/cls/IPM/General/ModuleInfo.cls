@@ -15,8 +15,6 @@ Property Description As %String(%JSONFIELDNAME = "description", MAXLEN = 1000);
 
 Property Version As %IPM.General.SemanticVersion(%JSONINCLUDE = "NONE", XMLPROJECTION = "NONE") [ Required ];
 
-Property AllVersions As %String;
-
 Property Origin As %String;
 
 Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100, XMLNAME = "Version") [ Required ];
