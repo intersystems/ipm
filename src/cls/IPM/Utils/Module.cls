@@ -1367,7 +1367,7 @@ ClassMethod CheckLicenseKey() As %Boolean
 	Set tValidLicense = ($System.License.GetKeyStatus() '= "Invalid")
 	While ('tValidLicense) && $$$InProgrammerMode && ('$$$IsISCWorker) && ($Increment(tTries) <= $$$MaxTries) {
 		Write !!,"Your system has no (valid) license key present"
-		Write !,"Copy a valid license key into "_$System.Util.InstallDirectory()_"mgr"
+		Write !,"Copy a valid license key into "_$System.Util.ManagerDirectory()
 		Write !,"and then enter 'y' to activate it. Enter 'n' to continue without a license key, "
 		Write !,"or 'q' to quit."
 		Set tValue = 1
@@ -1513,7 +1513,7 @@ ClassMethod AddGlobalMapping(pNamespace As %String, pMapping As %String, pFrom A
 		If '##Class(Config.MapGlobals).Exists(pNamespace,pMapping) {
 			Set tProps("Database") = pFrom
 			If pSetCollation {
-				Set tDB=##class(SYS.Database).%OpenId($ZU(12)_pFrom)
+				Set tDB=##class(SYS.Database).%OpenId(##class(%Library.File).NormalizeDirectory($System.Util.InstallDirectory()_"mgr")_pFrom)
 				If $IsObject(tDB) {
 					Set tProps("Collation") = tDB.NewGlobalCollation
 				}
