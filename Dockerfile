@@ -7,4 +7,5 @@ RUN --mount=type=bind,src=.,dst=/home/irisowner/zpm/ \
   iris start iris && \
   iris session iris "##class(%SYSTEM.OBJ).Load(\"/home/irisowner/zpm/Installer.cls\",\"ck\")" && \
   iris session iris "##class(%ZPM.Installer).setup(\"/home/irisowner/zpm/\",3)" && \
+  iris session iris "##class(%ZPM.PackageManager).Shell(\"install vscode-per-namespace-settings\")" && \
   iris stop iris quietly
