@@ -524,7 +524,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Repository(.tCommandInfo)
 			} ElseIf (tCommandInfo = "load") {
 				Do ..Load(.tCommandInfo)
-			} ElseIf (tCommandInfo = "cos") {
+			} ElseIf (tCommandInfo = "exec") {
 				Write !
 				Xecute tCommandInfo("parameters","cos")
 			} ElseIf (tCommandInfo = "install") {
