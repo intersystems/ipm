@@ -445,6 +445,7 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			// Only propagate selected settings that should apply to dependencies.
 			Set tParams("DeveloperMode") = $Get(pOverrideDeveloperMode,0)
 			Set tParams("Verbose") = tVerbose
+			Set tParams("cmd") = "install"
 			Merge tParams("NoLock") = pParams("NoLock")
 			Merge tParams("NoMapping") = pParams("NoMapping")
 			Merge tParams("NoTransaction") = pParams("NoTransaction")
