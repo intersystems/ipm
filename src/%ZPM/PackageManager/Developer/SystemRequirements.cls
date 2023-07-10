@@ -41,8 +41,7 @@ Method CheckVersion() As %Status
 
 Method CheckInteroperability() As %Status
 {
- 
-	If ( (..Interoperability="enabled") && '##class(%EnsembleMgr).IsEnsembleNamespace($Namespace) ) {
+	If (..Interoperability="enabled") && (('##class(%EnsembleMgr).IsEnsembleNamespace($Namespace)) || ('##class(%EnsembleMgr).validateNamespace($Namespace, 1))) {
 		Return $$$ERROR($$$GeneralError, "The module requires Interoperability Production Enabled. Namespace <"_$Namespace_"> doesn't support Interoperability Production")
 	}
 	Return $$$OK
