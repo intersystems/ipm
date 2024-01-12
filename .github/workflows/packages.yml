@@ -15,6 +15,7 @@ jobs:
     needs: job1
     runs-on: ubuntu-latest
     strategy:
-      matrix: ${{fromJson(needs.job1.outputs.matrix)}}
+      matrix:
+        package: ${{fromJson(needs.job1.outputs.matrix)}}
     steps:
     - run: echo test
