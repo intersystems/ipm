@@ -9,7 +9,7 @@ jobs:
     - id: set-matrix
       run: |
         matrix=`curl https://pm.community.intersystems.com/packages/-/all  | jq '.[].name' | jq -s`
-        echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+        echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
   job2:
     needs: job1
     runs-on: ubuntu-latest
