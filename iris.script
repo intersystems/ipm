@@ -1,6 +1,6 @@
-  zn "%SYS"
-  do ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/Installer.cls","ck")
-  do ##class(%ZPM.Installer).setup("/home/irisowner/zpm/",3)
-  do ##class(%ZPM.PackageManager).Shell("install vscode-per-namespace-settings")
+  zn "USER"
+  do $System.OBJ.Load("/home/irisowner/zpm/Installer.cls","ck")
+  do ##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
+  do ##class(%IPM.Main).Shell("install vscode-per-namespace-settings")
   set ^UnitTestRoot="/usr/irissys/.vscode/%SYS/UnitTestRoot"
   halt

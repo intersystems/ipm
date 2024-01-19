@@ -678,7 +678,7 @@ ClassMethod TerminalPrompt() As %String
 
 /// @API.Method
 /// Get Version modules and current registry
-/// example do ##class(%ZPM.PackageManager).GetVersion("zpm,zpm-registry",.out,.list)
+/// example do ##class(%IPM.Main).GetVersion("zpm,zpm-registry",.out,.list)
 ClassMethod GetVersion(ModuleName, ByRef out, list)
 {
 	Do ..GetListModules("*", ModuleName, .list)
@@ -689,7 +689,7 @@ ClassMethod GetVersion(ModuleName, ByRef out, list)
 	 	}
 	}
 	set sc=$$$OK
-	set sql="select URL from %ZPM_PackageManager_Client.RemoteServerDefinition where Enabled = 1"
+	set sql="select URL from %IPM_Repo_Remote.Definition where Enabled = 1"
 		,rs=##class(%ResultSet).%New()
 		,sc=rs.Prepare(sql)
 	Set:sc sc=rs.Execute("")
@@ -709,7 +709,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	If (tCommand '= "") {
 		Set tOneCommand = 1
 	}
-	do ##class(%ZPM.PackageManager).GetVersion("zpm",.out)	
+	do ##class(%IPM.Main).GetVersion("zpm",.out)	
 	Set introMessageList = $ListBuild(
 		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
 		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
