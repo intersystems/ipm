@@ -1090,6 +1090,8 @@ Method %Verify(ByRef pParams) As %Status
 				// Create a new namespace and load the module in it.
 				#dim tNSConfig As %IPM.Storage.ModuleSetting.NamespaceConfig
 				Set tNSConfig = ..Module.GetNamespaceConfig()
+        Set tSysReqs = ..Module.SystemRequirements
+        If $IsObject(tSysReqs), tSysReqs.Interoperability = "enabled" Set tNSConfig.EnableEnsemble = 1
 				
 				// Create namespace in which to run tests and switch to it.
 				$$$ThrowOnError(##class(%IPM.Utils.Build).InitializeNamespace("VERIFY",tVerbose,.tNewNamespace,tNSConfig))

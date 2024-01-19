@@ -419,6 +419,7 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			// Only propagate selected settings that should apply to dependencies.
 			Set tParams("DeveloperMode") = $Get(pOverrideDeveloperMode,0)
 			Set tParams("Verbose") = tVerbose
+			Set tParams("cmd") = "install"
 			Merge tParams("NoLock") = pParams("NoLock")
 			Merge tParams("NoMapping") = pParams("NoMapping")
 			Merge tParams("NoTransaction") = pParams("NoTransaction")
@@ -1130,15 +1131,14 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		$$$ThrowOnError(tSC)
 		
 		Set tFirstLoaded = $Order(tLoadedList(""))
-		
-    
 		If (tFirstLoaded = "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
 		}
 		If ($Order(tLoadedList(tFirstLoaded)) '= "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"module.xml contains multiple documents."))
 		}
-		If ($$$lcase($Piece(tFirstLoaded,".",*)) '= "zpm") {
+		Set tFirstLoaded = $$$lcase(tFirstLoaded)
+		If ($Piece(tFirstLoaded,".",*) '= "zpm") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
 		}
 

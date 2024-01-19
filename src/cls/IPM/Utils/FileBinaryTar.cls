@@ -316,14 +316,19 @@ ClassMethod ConstructTar(Path As %String, RelativeTo As %String, archive As %Str
   set blockSize = ..#BLOCKSIZE
   if ##class(%File).DirectoryExists(Path) {
     set Path = ##class(%File).NormalizeDirectory(Path)
+    set prefix = ##class(%File).GetDirectory($Extract(Path,1,*-1))
+    set prefix = $PIECE(Path, RelativeTo, 2, *)
     set flag = 5 // Directory
     set size = 0
+    set name = ##class(%File).GetFilename($Extract(Path,1,*-1))
   } else {
     set Path = ##class(%File).NormalizeFilename(Path)
+    set prefix = ##class(%File).GetDirectory(Path)
+    set prefix = $PIECE(prefix, RelativeTo, 2, *)
     set flag = 0 // Ordinary File
     set size = ##class(%File).GetFileSize(Path)
+    set name = ##class(%File).GetFilename(Path)
   }
-  set name = $PIECE(Path, RelativeTo, 2, *)
 
   set mtime = ##class(%File).GetFileDateModified(Path, 1)
   set mtime = $ZDATETIME(mtime, -2)
@@ -334,6 +339,7 @@ ClassMethod ConstructTar(Path As %String, RelativeTo As %String, archive As %Str
   if name'="" {
     set obj = ..%New()
     set obj.name = name
+    set obj.prefix = prefix
     set obj.size = size
     set obj.mode = mode
     set obj.mtime = mtime

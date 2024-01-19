@@ -676,6 +676,30 @@ ClassMethod TerminalPrompt() As %String
 	Quit prompt
 }
 
+/// @API.Method
+/// Get Version modules and current registry
+/// example do ##class(%ZPM.PackageManager).GetVersion("zpm,zpm-registry",.out,.list)
+ClassMethod GetVersion(ModuleName, ByRef out, list)
+{
+	Do ..GetListModules("*", ModuleName, .list)
+	for i=1:1 { quit:'$d(list(i),ns)
+	 	set ns=$lg(ns,1)
+	 	for ii=1:1 { quit:'$d(list(i,"modules",ii),module)
+	 		set out($lg(module,1))=$lb(ns,$lg(module,2))
+	 	}
+	}
+	set sc=$$$OK
+	set sql="select URL from %ZPM_PackageManager_Client.RemoteServerDefinition where Enabled = 1"
+		,rs=##class(%ResultSet).%New()
+		,sc=rs.Prepare(sql)
+	Set:sc sc=rs.Execute("")
+	If sc {
+		Quit:'rs.%Next()  
+		set out=rs.Get("URL")
+	}
+	Quit sc
+}
+
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
@@ -685,9 +709,11 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	If (tCommand '= "") {
 		Set tOneCommand = 1
 	}
+	do ##class(%ZPM.PackageManager).GetVersion("zpm",.out)	
 	Set introMessageList = $ListBuild(
 		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
-		"Enter q/quit to exit the shell. Enter ?/help to view available commands"
+		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
+		"Current registry "_$$$FormattedLine($$$Cyan,$g(out))
 	)
 	Set tInShell = 0
 	For {
@@ -732,7 +758,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Repository(.tCommandInfo)
 			} ElseIf (tCommandInfo = "load") {
 				Do ..Load(.tCommandInfo)
-			} ElseIf (tCommandInfo = "cos") {
+			} ElseIf (tCommandInfo = "exec") {
 				Write !
 				Xecute tCommandInfo("parameters","cos")
 			} ElseIf (tCommandInfo = "install") {
@@ -2945,3 +2971,4 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
 }
 
 }
+
