@@ -1162,7 +1162,9 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		$$$ThrowOnError(tSC)
 		Set tModule.Repository = pRepository
 		
-		If 'tModule.Deployed,$Data(pParams("DeveloperMode"),tDeveloperMode) {
+		If $Data(pParams("DeveloperMode"),tDeveloperMode) {
+      // Mark module as not deployed if installing with dev mode
+      Set tModule.Deployed = 0
 			Set tModule.DeveloperMode = tDeveloperMode
 			Set tModule.Root = pDirectory
 			Set tSC = tModule.%Save()
@@ -1259,8 +1261,9 @@ ClassMethod SyncLoadDependencies(pModule As %IPM.Storage.Module, ByRef pParams)
 
 	Set reloadSnapshots = +$Get(pParams("UpdateSnapshots"))
 	Set permitDowngrade = +$Get(pParams("PermitDowngrade"))
+	Set ignoreInstalled = +$Get(pParams("IgnoreInstalled"))
 	Write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-	Set sc = pModule.BuildDependencyGraph(.depdendencyGraph,,reloadSnapshots,,"",,,,,,permitDowngrade)
+	Set sc = pModule.BuildDependencyGraph(.depdendencyGraph,,reloadSnapshots,,"",,,,ignoreInstalled,,permitDowngrade)
 	$$$ThrowOnError(sc)
 	Write "Done."
 

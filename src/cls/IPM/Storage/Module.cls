@@ -542,7 +542,7 @@ Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
 	Quit tSC
 }
 
-Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pForceSnapshotReload As %Boolean = 0, ByRef qstruct, pPhases As %String = "", ByRef pSubModules, pPass As %Integer = 1, pModulePath As %List = {$ListBuild(..Name)}, pIgnoreInstalledModules As %Boolean = 0, pKnownDependencies As %List = {..GetKnownDependencies(..Name)}, pPermitDowngrade As %Boolean = 0, pCheckNestedScoped As %Boolean = 0, ByRef pSearchList) As %Status
+Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pForceSnapshotReload As %Boolean = 0, ByRef qstruct, pPhases As %String = "", ByRef pSubModules, pPass As %Integer = 1, pModulePath As %List = {$ListBuild(..Name)}, pIgnoreInstalledModules As %Boolean = 0, pKnownDependencies As %List = {..GetKnownDependencies(..Name)}, pPermitDowngrade As %Boolean = 0, pCheckNestedScoped As %Boolean = 0, ByRef pSearchList, pIncludeDisplayName As %Boolean = 0) As %Status
 {
 	#define EXACT 1
 	#define FUZZY 2
@@ -663,6 +663,9 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					Set tLocalMod = 1
 					Set tDepth = $Select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
 					Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth,"",tLocalObj.VersionString)
+					If (pIncludeDisplayName) {
+						Set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$ListBuild(tDep.DisplayName)
+					}
 					Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
 					Set pSubModules(tDepth,tDep.Name) = tLocalObj
 					Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
@@ -754,12 +757,15 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					
 					If (pPass = $$$EXACT) {	
 						Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth, tQualifiedReference.ServerName, tModule.VersionString, tQualifiedReference.Deployed, tQualifiedReference.PlatformVersion)
+						If (pIncludeDisplayName) {
+							Set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$ListBuild(tDep.DisplayName)
+						}
 						Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
 						Set pSubModules(tDepth,tDep.Name) = tModule
 						Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
 				
 						// If we have an exact match, attempt to resolve exact dependencies recursively.
-						Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList)
+						Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
 						
 						// Failure to resolve any of these dependencies is an immediate failure, and can be descriptive.
 						If $$$ISERR(tSC) {
@@ -772,13 +778,16 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					
 					If (pPass = $$$FUZZY) {	
 						Set tDependencyGraph(tDep.Name) = $ListBuild(tDepth,tQualifiedReference.ServerName,tModule.VersionString)
+						If (pIncludeDisplayName) {
+							Set tDependencyGraph(tDep.Name) = tDependencyGraph(tDep.Name)_$ListBuild(tDep.DisplayName)
+						}
 						Set tDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
 				
 						Set tSubModules(tDepth,tDep.Name) = tModule
 					
 						// For fuzzy version matching, preview the next graph step; move to the next version if it would lead to failure.
 						// If not, update.
-						Set tPossibleSC = tModule.BuildDependencyGraph(.tDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.tSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList)
+						Set tPossibleSC = tModule.BuildDependencyGraph(.tDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.tSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
 						If $$$ISOK(tPossibleSC) {
 							// We have a match - let's go with it. Actually dependency resolution will be done later, breadth-first.
 							// TODO: Caching of results to avoid duplicate web service calls.
@@ -795,6 +804,9 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					// We don't actually care if a valid result was found.
 					// There will always be something in here, it just might lead to a descriptive error later on in the case of fuzzy matching with no valid option.
 					Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth,tQualifiedReference.ServerName,tModule.VersionString)
+					If (pIncludeDisplayName) {
+						Set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$ListBuild(tDep.DisplayName)
+					}
 					Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
 					Set pSubModules(tDepth,tDep.Name) = tModule
 					Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
@@ -807,7 +819,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 		
 		If (pPass = $$$EXACT) {	
 			// Call for second pass (fuzzy version matching)
-			Set tSC = ..BuildDependencyGraph(.pDependencyGraph,pDepth,pForceSnapshotReload,.qstruct,pPhases,.pSubModules,$$$FUZZY,pModulePath,pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList)
+			Set tSC = ..BuildDependencyGraph(.pDependencyGraph,pDepth,pForceSnapshotReload,.qstruct,pPhases,.pSubModules,$$$FUZZY,pModulePath,pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -822,7 +834,7 @@ Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pFor
 					Set tModName = $Order(pSubModules(pDepth,tModName),1,tModule)
 					Quit:tModName=""
 					Set tModulePath = $Case(pSubModules(pDepth,tModName,$$$SCOPE),"":pModulePath,:"")
-					Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tModName),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList)
+					Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tModName),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
 					If $$$ISERR(tSC) {
 						Quit
 					}
@@ -1264,7 +1276,7 @@ Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Bo
 {
 	Set tSC = $$$OK
 	Try {
-		Set tProjectName = $Replace(..Name,".","_")_$Case(pProjectSuffix,"":"",:"_"_pProjectSuffix)
+		Set tProjectName = $Replace(..DisplayName,".","_")_$Case(pProjectSuffix,"":"",:"_"_pProjectSuffix)
 		If ##class(%Studio.Project).%ExistsId(tProjectName) {
 			Set pProject = ##class(%Studio.Project).%OpenId(tProjectName,,.tSC)
 			$$$ThrowOnError(tSC)
@@ -1508,7 +1520,7 @@ Storage Default
 <Value>PlatformVersion</Value>
 </Value>
 <Value name="26">
-<Value>DisplayNameInternal</Value>
+<Value>DisplayName</Value>
 </Value>
 <Value name="27">
 <Value>AvailabilityClass</Value>
@@ -1523,3 +1535,4 @@ Storage Default
 }
 
 }
+

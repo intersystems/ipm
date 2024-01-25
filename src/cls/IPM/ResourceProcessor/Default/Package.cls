@@ -15,6 +15,9 @@ Property Directory As %String(MAXLEN = "") [ InitialExpression = "cls" ];
 
 Property LoadAsDirectory As %Boolean [ InitialExpression = 1 ];
 
+/// Extension for individual filename(s) that comprise this resource
+Property FilenameExtension As %String [ InitialExpression = "" ];
+
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
@@ -61,7 +64,7 @@ Method OnItemRelativePath(pItemName As %String, pIsUnitTest As %Boolean = 0) As 
       Set tSourceRoot = tSourceRoot _ "/"
     }
   }
-  set fileNameExtension = $$$lcase($Piece(pItemName, ".", *))
+  set fileNameExtension = $Select(..FilenameExtension = "": $$$lcase($Piece(pItemName, ".", *)), 1: ..FilenameExtension)
   set directory = ..Directory
   #; set directory = fileNameExtension
   set fileName = $tr($Piece(pItemName, ".", 1, *-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator) _ "." _ fileNameExtension
@@ -70,9 +73,8 @@ Method OnItemRelativePath(pItemName As %String, pIsUnitTest As %Boolean = 0) As 
 
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
-  set ..Format = "UDL"
+	Set ..Format = $Case($$$lcase(..FilenameExtension),"xml":"XML",:"UDL")
 	Quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
 }
 
 }
-

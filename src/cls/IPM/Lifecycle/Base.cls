@@ -1494,7 +1494,7 @@ Method OnDetermineResourceDeployability(ByRef pParams, ByRef pResourceInfo, Outp
 	Set tSC = $$$OK
 	Try {
 		If $Data(pParams("Deploy","Parameter"),tDeployParameter)#2 && (tDeployParameter '= "") {
-			If ($Piece(pResourceInfo("Name"),".",*) = "CLS") {
+			If ($ZCVT($Piece(pResourceInfo("Name"),".",*), "U") = "CLS") {
 				Set tClass = $Piece(pResourceInfo("Name"),".",1,*-1)
 				If $$$comClassDefined(tClass) && $$$defMemberDefined(tClass,$$$cCLASSparameter,tDeployParameter) {
 					// e.g., HSDEPLOY, HSAADEPLOY
@@ -1610,4 +1610,3 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 }
 
 }
-

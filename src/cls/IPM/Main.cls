@@ -1153,12 +1153,14 @@ ClassMethod IsAvailable(pModuleName As %String, pNamespace As %String = "", pArg
 	If pNamespace'="" {
 		Set $namespace = pNamespace
 	}
-	Set module = ##class(%IPM.Storage.Module).NameOpen(pModuleName,0,.sc)
-	$$$ThrowOnError(sc)
-	If module.AvailabilityClass ="" {
-		Quit 1
+	If '##class(%IPM.Storage.Module).NameExists(pModuleName,.id) {
+		Return 0
 	}
-	Quit $ClassMethod(module.AvailabilityClass,"IsAvailable",pNamespace,pArgs...)
+	Set availabilityClass = ##class(%IPM.Storage.Module).AvailabilityClassGetStored(id)
+	If availabilityClass = "" {
+		Return 1
+	}
+	Quit $ClassMethod(availabilityClass,"IsAvailable",pNamespace,pArgs...)
 }
 
 ClassMethod GetNamespaceDefaultModifiers(Output pDefaultArray) [ Internal ]
