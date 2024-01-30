@@ -26,6 +26,7 @@ jobs:
       - uses: actions/checkout@master
       - run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
       - name: Images list
+        if: ${{ !env.ACT }}
         id: set-matrix
         run: |
           images=""
@@ -51,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: 
-        image: ${{ fromJson(needs.prepare.outputs.images) }}
+        image: ${{ fromJson(github.event.inputs.IMAGE || needs.prepare.outputs.images) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
