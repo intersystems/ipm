@@ -1,19 +1,68 @@
-name: Test all packages
+name: Test major packages
 on: workflow_dispatch
+
 jobs:
-  job1:
+  matrix-setup:
     runs-on: ubuntu-latest
+    env:
+      PM_URL: https://pm.community.intersystems.com/packages/-/all?allVersions=1
+      JQ_SCRIPT: reduce .[] as $item ([]; if $item.allVersions | length >= 65 then . + [$item.name] else . end)
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
-    - id: set-matrix
-      run: |
-        matrix=`curl https://pm.community.intersystems.com/packages/-/all  | jq '.[].name' | jq -s`
-        echo "::set-output name=matrix::$matrix"
-  job2:
-    needs: job1
+      - id: set-matrix
+        run: |
+          matrix=$(curl -L "$PM_URL" | jq -cr "$JQ_SCRIPT")
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+
+  run-builds:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
+    needs: matrix-setup
     strategy:
-      matrix: ${{fromJson(needs.job1.outputs.matrix)}}
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
+    env:
+      IMAGE: containers.intersystems.com/intersystems/iris-community:latest-em
     steps:
-    - run: echo test
+      - uses: actions/checkout@master
+      - name: Build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false
+          load: true
+          tags: zpm
+          build-args: Base=${{ env.IMAGE }}
+      - name: Container Setup
+        id: setup-zpm
+        timeout-minutes: 15
+        run: |
+          # Don't specify the container name because `act` will run multiple jobs in parallel and cause name conflicts
+          CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
+          echo "CONTAINER=$CONTAINER" >> $GITHUB_OUTPUT
+          docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker exec -i $CONTAINER iris session IRIS -U%SYS << EOF
+              zpm "list":1
+              zpm "test zpm -v -only":1
+              zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
+              halt
+          EOF
+      - name: Test ${{ matrix.package }}
+        timeout-minutes: 15
+        env:
+          CONTAINER: ${{ steps.setup-zpm.outputs.CONTAINER }}
+          test-flags: >-
+            -verbose -DUnitTest.ManagerClass=UnitTest.Manager -DUnitTest.JUnitOutput=/test-reports/junit.xml
+            -DUnitTest.FailuresAreFatal=1 -DUnitTest.Manager=UnitTest.Manager
+        run: |
+          docker exec -i ${{ env.CONTAINER }} iris session IRIS -U%SYS << EOF
+              zpm "install ${{ matrix.package }}":1
+              zpm "${{ matrix.package }} test -only ${{ env.test-flags }}":1:1
+          EOF || echo -e "'\nExit code: $?'
+      - name: Stop Container
+        run: |
+          # To ensure a clean state after using `act` locally
+          docker stop -t 5 ${{ steps.setup-zpm.outputs.CONTAINER }}
+          docker ps
