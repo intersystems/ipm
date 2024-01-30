@@ -941,6 +941,10 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
       Quit
     }
   }
+  If '$$$comClassDefined("%IPM.Storage.ModuleItem") {
+    // Don't error in namespaces without IPM enabled
+    Quit
+  }
   Set tArgs = 0
 	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode FROM %IPM_Storage.ModuleItem"
   Set pSearch = $ZStrip(pSearch, "<>WC")
@@ -2973,4 +2977,3 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
 }
 
 }
-

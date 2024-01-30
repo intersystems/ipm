@@ -113,8 +113,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             If (##class(%File).DirectoryExists(tResourceCatDirectory)) {	
               Quit
             }
-					} 
-					Set tResourceDirectory = tResourceCatDirectory
+					}
+					If ##class(%File).DirectoryExists(tResourceCatDirectory) {
+					  Set tResourceDirectory = tResourceCatDirectory
+					}
 			
 					If tDeveloperMode && (..Extension '= "") && (tName '= "") {
 						Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix _ tResourceDirectory

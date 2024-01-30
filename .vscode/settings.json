@@ -5,7 +5,7 @@
     "host": "localhost",
     "username": "_system",
     "password": "SYS",
-    "ns": "%SYS"
+    "ns": "USER"
   },
   "intersystems.testingManager.client.relativeTestRoot": "tests/unit_tests"
 }
