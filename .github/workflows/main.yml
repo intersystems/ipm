@@ -105,6 +105,7 @@ jobs:
             'zpm "verify zpm -v -only":1' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker logs $CONTAINER
           docker stop $CONTAINER
       - name: Restart temporary registry
         timeout-minutes: 15
@@ -139,6 +140,7 @@ jobs:
             'zpm "search":1' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker logs $CONTAINER
           docker stop $CONTAINER
       # - name: Clean install current version and test new one. (Permitted to fail on 2023.1+)
       #   timeout-minutes: 15
@@ -180,12 +182,14 @@ jobs:
             'zpm "list":1\n' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker logs $CONTAINER
           docker stop $CONTAINER
       - name: Prepare XML Installer
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O zpm-${{ needs.prepare.outputs.version }}.xml
       - name: Stop temporary registry
+        if: always()
         run: |
           docker stop registry
           docker network rm zpm
