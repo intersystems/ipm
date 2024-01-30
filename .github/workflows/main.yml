@@ -11,31 +11,21 @@ on:
   release:
     types:
       - released
-env:
-  name: |
-    irishealth-community
-    iris-community
+
 jobs:
+  images:
+    uses: ./.github/workflows/images.yml
+  
   prepare:
     runs-on: ubuntu-latest
+    needs: images
     outputs:
-      images: ${{ steps.set-matrix.outputs.images }}
-      main: ${{ steps.set-matrix.outputs.main }}
+      images: ${{ needs.images.outputs.images }}
+      main: ${{ needs.images.outputs.main }}
       version: ${{ steps.version.outputs.number }}
     steps:
       - uses: actions/checkout@master
       - run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-      - name: Images list
-        if: ${{ !env.ACT }}
-        id: set-matrix
-        run: |
-          images=""
-          for n in $name; do
-            tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]' | cut -d '-' -f1 | uniq)
-            for tag in $tags; do images+='"'${n}:${tag}'",'; done
-          done;
-          echo images="[${images%?}]" >> $GITHUB_OUTPUT
-          echo main=${images%%,*} >> $GITHUB_OUTPUT
       - name: Setup version
         id: version
         run: |
@@ -45,6 +35,7 @@ jobs:
           [ $GITHUB_EVENT_NAME == 'push' ] && VERSION+=-beta && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f4)+1))
           [ $GITHUB_EVENT_NAME == 'pull_request' ] && VERSION+=-dev.${{ github.event.pull_request.number }} && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f5)+1))
           echo number=${VERSION} >> $GITHUB_OUTPUT
+  
   build:
     timeout-minutes: 20
     needs: 
@@ -203,6 +194,7 @@ jobs:
         with:
           name: zpm-${{ needs.prepare.outputs.version }}
           path: zpm-${{ needs.prepare.outputs.version }}.xml
+  
   release:
     runs-on: ubuntu-latest
     if: github.event.repository.fork == false
