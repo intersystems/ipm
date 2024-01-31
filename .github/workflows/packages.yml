@@ -86,7 +86,7 @@ jobs:
           docker exec -i ${{ env.CONTAINER }} iris session IRIS -U%SYS << EOF
               zpm "install ${{ matrix.package }}":1
               zpm "${{ matrix.package }} test -only ${{ env.test-flags }}":1:1
-          EOF || echo -e "'\nExit code: $?'
+          EOF
       - name: Stop Container
         run: |
           # To ensure a clean state after using `act` locally
