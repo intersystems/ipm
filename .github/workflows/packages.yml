@@ -1,12 +1,19 @@
 name: Test major packages
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      minVersionCount:
+        description: "Minimum number of versions a package must have to be tested"
+        required: true
+        type: number
+        default: 10
 
 jobs:
   matrix-setup:
     runs-on: ubuntu-latest
     env:
       PM_URL: https://pm.community.intersystems.com/packages/-/all?allVersions=1
-      JQ_SCRIPT: reduce .[] as $item ([]; if $item.allVersions | length >= 65 then . + [$item.name] else . end)
+      JQ_SCRIPT: reduce .[] as $item ([]; if $item.allVersions | length >= ${{ inputs.minVersionCount }} then . + [$item.name] else . end)
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -33,6 +40,14 @@ jobs:
           tags: zpm:latest
           build-args: Base=${{ env.IMAGE }}
           outputs: type=docker,dest=/tmp/zpmimage.tar
+      - name: Test Image
+        run: |
+          CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
+          docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker exec -i $CONTAINER iris session IRIS -U%SYS << EOF
+              zpm "list":1
+              zpm "test zpm -v -only":1:1
+          EOF
       - name: Upload Image
         uses: actions/upload-artifact@v2
         with:
@@ -70,8 +85,6 @@ jobs:
           echo "CONTAINER=$CONTAINER" >> $GITHUB_OUTPUT
           docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session IRIS -U%SYS << EOF
-              zpm "list":1
-              zpm "test zpm -v -only":1
               zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
               halt
           EOF
