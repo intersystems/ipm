@@ -72,4 +72,3 @@ jobs:
           'halt\n' \
         | docker exec -i $CONTAINER iris session iris -U ${NAMESPACE}
         docker stop $CONTAINER
-
