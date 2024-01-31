@@ -49,9 +49,10 @@ jobs:
       matrix:
         package: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
     steps:
+      - uses: actions/checkout@master
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
-      - name: Download artifact
+      - name: Download Artifact
         uses: actions/download-artifact@v2
         with:
           name: zpmimage
