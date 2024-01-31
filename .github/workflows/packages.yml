@@ -15,26 +15,51 @@ jobs:
           matrix=$(curl -L "$PM_URL" | jq -cr "$JQ_SCRIPT")
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
 
-  run-builds:
+  prepare-image:
     timeout-minutes: 20
     runs-on: ubuntu-latest
-    needs: matrix-setup
-    strategy:
-      fail-fast: false
-      matrix:
-        package: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
     env:
       IMAGE: containers.intersystems.com/intersystems/iris-community:latest-em
     steps:
       - uses: actions/checkout@master
-      - name: Build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build Image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: false
           load: true
-          tags: zpm
+          tags: zpm:latest
           build-args: Base=${{ env.IMAGE }}
+          outputs: type=docker,dest=/tmp/zpmimage.tar
+      - name: Upload Image
+        uses: actions/upload-artifact@v2
+        with:
+          name: zpmimage
+          path: /tmp/zpmimage.tar
+
+  run-tests:
+    needs:
+      - matrix-setup
+      - prepare-image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: zpmimage
+          path: /tmp
+      - name: Load Image
+        run: |
+          docker load -i /tmp/zpmimage.tar
+          docker image ls
       - name: Container Setup
         id: setup-zpm
         timeout-minutes: 15
