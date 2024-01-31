@@ -42,6 +42,8 @@ jobs:
           outputs: type=docker,dest=/tmp/zpmimage.tar
       - name: Test Image
         run: |
+          docker load -i /tmp/zpmimage.tar
+          docker image ls
           CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
           docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session IRIS -U%SYS << EOF
