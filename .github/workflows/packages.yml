@@ -48,6 +48,7 @@ jobs:
           docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session IRIS << EOF
               zpm "list":1
+              zn "%SYS"
               zpm "test zpm -v -only":1:1
           EOF
       - name: Upload Image
