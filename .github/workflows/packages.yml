@@ -46,7 +46,7 @@ jobs:
           docker image ls
           CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
           docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          docker exec -i $CONTAINER iris session IRIS -U%SYS << EOF
+          docker exec -i $CONTAINER iris session IRIS << EOF
               zpm "list":1
               zpm "test zpm -v -only":1:1
           EOF
@@ -86,7 +86,7 @@ jobs:
           CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
           echo "CONTAINER=$CONTAINER" >> $GITHUB_OUTPUT
           docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          docker exec -i $CONTAINER iris session IRIS -U%SYS << EOF
+          docker exec -i $CONTAINER iris session IRIS << EOF
               zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
               halt
           EOF
@@ -98,7 +98,7 @@ jobs:
             -verbose -DUnitTest.ManagerClass=UnitTest.Manager -DUnitTest.JUnitOutput=/test-reports/junit.xml
             -DUnitTest.FailuresAreFatal=1 -DUnitTest.Manager=UnitTest.Manager
         run: |
-          docker exec -i ${{ env.CONTAINER }} iris session IRIS -U%SYS << EOF
+          docker exec -i ${{ env.CONTAINER }} iris session IRIS << EOF
               zpm "install ${{ matrix.package }}":1
               zpm "${{ matrix.package }} test -only ${{ env.test-flags }}":1:1
           EOF
