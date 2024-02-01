@@ -95,8 +95,8 @@ jobs:
         env:
           CONTAINER: ${{ steps.setup-zpm.outputs.CONTAINER }}
           test-flags: >-
-            -verbose -DUnitTest.ManagerClass=UnitTest.Manager -DUnitTest.JUnitOutput=/test-reports/junit.xml
-            -DUnitTest.FailuresAreFatal=1 -DUnitTest.Manager=UnitTest.Manager
+            -verbose -DUnitTest.ManagerClass=%UnitTest.Manager -DUnitTest.JUnitOutput=/test-reports/junit.xml
+            -DUnitTest.FailuresAreFatal=1 -DUnitTest.Manager=%UnitTest.Manager
         run: |
           docker exec -i ${{ env.CONTAINER }} iris session IRIS -U%SYS << EOF
               zpm "install ${{ matrix.package }}":1
