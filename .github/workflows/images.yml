@@ -5,7 +5,7 @@ on:
       images:
         description: "The full list of images to use, as a JSON array of imagename:tag"
         value: ${{ jobs.images.outputs.images }}
-      secondword:
+      main:
         description: "The main image to use (earliest relevant version) to generate the installer XML file"
         value: ${{ jobs.images.outputs.main }}
 
