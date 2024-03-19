@@ -14,7 +14,7 @@ Property Name As %String(MAXLEN = 255, XMLPROJECTION = "attribute") [ Required ]
 /// Name index is unique per namespace.
 Index ResourceName On UniqueName [ Unique ];
 
-Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Resources ];
+Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Resources, SqlFieldName = _MODULE ];
 
 /// Restrict the scope in which this resource is included. Default is "all scopes"
 Property Scope As %String(VALUELIST = ",test,verify", XMLPROJECTION = "ATTRIBUTE");
@@ -437,7 +437,7 @@ Trigger OnChange [ Event = INSERT/UPDATE, Foreach = row/object, Time = AFTER ]
 		If $Data($$$ZPMDeferModifyResources) {
 			Quit
 		}
-		Set tModule = ##class(%IPM.Storage.Module).%OpenId({Module},,.tSC)
+		Set tModule = ##class(%IPM.Storage.Module).%OpenId({_Module},,.tSC)
 		If $$$ISERR(tSC) {
 			Quit
 		}
