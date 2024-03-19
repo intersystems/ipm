@@ -208,7 +208,7 @@ ClassMethod CreateDatabase(pDBName As %String, pInitFile As %String = "", pOverw
 		// Create database
 		Set tExists = 0
 		If '##class(SYS.Database).%ExistsId(tPath) {
-			Set tSC = ##class(SYS.Database).CreateDatabase(tPath,,,tRoleResourceName)
+			Set tSC = ##class(SYS.Database).CreateDatabase(tPath,,,,tRoleResourceName)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -704,3 +704,4 @@ ClassMethod Backup() As %Status [ Internal ]
 }
 
 }
+

@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - HSIEO-9484: Add additional argument to buildDepsGraph to allow putting in an additional list element of dependency's DisplayName
 - HSIEO-9484: Add additional property DisplayName to %IPM.Storage.ModuleReference
+- HSIEO-10274: Separate DependencyAnalyzer out from IPM
 
 ### Fixed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
@@ -32,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-9269, HSIEO-9280: Load unittest code during module install
 - HSIEO-9430: Module definition should not expose DisplayName + deprecate DisplayNameInternal as it will not be used anymore
 - HSIEO-9924: RunDev needs to do complete installation of component and dependencies via ignoreInstalled, so adding ignoreInstalledModules checker in syncLoadDependencies
+- HSIEO-10267: Bug Fix - Resource name should be the fifth argument of CreateDatabase
 
 ### Security
 -

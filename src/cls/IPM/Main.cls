@@ -2088,6 +2088,9 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 /// Run Dependency Analyzer for the given module
 ClassMethod RunDependencyAnalyzer(ByRef pCommandInfo)
 {
+	If '$$$comClassDefined("%pkg.isc.dependencyAnalyzer.Utils") {
+		$$$ThrowStatus($$$ERROR($$$GeneralError, "Dependency Analyzer package must be installed before running the dependency analyzer."))
+	}
 	Set ignoredStringRef = $$$GetModifier(pCommandInfo,"ignore-str")
 	Set ignoreAll = $$$HasModifier(pCommandInfo,"ignore-str-all")
 	Set invalidOnly = $$$GetModifier(pCommandInfo,"invalid-only")
@@ -2977,3 +2980,4 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
 }
 
 }
+
