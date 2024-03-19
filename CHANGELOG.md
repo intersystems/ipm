@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-9430: Module definition should not expose DisplayName + deprecate DisplayNameInternal as it will not be used anymore
 - HSIEO-9924: RunDev needs to do complete installation of component and dependencies via ignoreInstalled, so adding ignoreInstalledModules checker in syncLoadDependencies
 - HSIEO-10267: Bug Fix - Resource name should be the fifth argument of CreateDatabase
+- #440: IPM works with delimited identifiers disabled
 
 ### Security
 -

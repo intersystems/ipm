@@ -11,13 +11,13 @@ Property Method As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ Required
 
 Property Phase As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "Configure" ];
 
-Property When As %String(MAXLEN = 255, VALUELIST = ",Before,After", XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "After" ];
+Property When As %String(MAXLEN = 255, VALUELIST = ",Before,After", XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "After", SqlFieldName = _WHEN ];
 
 Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = 0 ];
 
 Property Arg As list Of %String(MAXLEN = 255, XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
 
-Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes ];
+Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes, SqlFieldName = _MODULE ];
 
 Method GetArgsArray(pParams, Output args) As %Status
 {

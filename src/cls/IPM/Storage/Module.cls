@@ -1390,10 +1390,10 @@ Method Lock() As %Status
 
 Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List = "") As %SQLQuery [ SqlProc ]
 {
-	select distinct %exact Dependencies_VersionString "Version",%DLIST("ModuleItem"->Name) "Names"
+	select distinct %exact Dependencies_VersionString As Version,%DLIST(ModuleItem->Name) As ModuleNames
 	from %IPM_Storage.ModuleItem_Dependencies
 	where Dependencies_Name = :pOfModuleName and
-		(:pExcludeModuleNames is null or "ModuleItem"->Name not %INLIST :pExcludeModuleNames)
+		(:pExcludeModuleNames is null or ModuleItem->Name not %INLIST :pExcludeModuleNames)
 	group by Dependencies_VersionString
 }
 
@@ -1413,14 +1413,15 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 		Return tAttrValue
 	}
 	Merge tParams = pParams
-	Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, ..NameOpen(..Name), .tParams)
+	Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, $this, .tParams)
 	Set root = ..Root
 	If (root '= "") {
 		Set root = ##class(%Library.File).NormalizeDirectory(root)
 	}
 	Set customParams("root") = root
-  Set customParams("packagename") = ..Name
-  Set customParams("version") = ..VersionString
+	Set customParams("packagename") = ..Name
+	Set customParams("version") = ..VersionString
+	Set customParams("verbose") = +$Get(pParams("Verbose"))
 	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
 	
