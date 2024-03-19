@@ -941,7 +941,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
       Quit
     }
   }
-  If '$$$comClassDefined("%IPM.Storage.ModuleItem") {
+  If '$$$comClassDefined("%IPM.Storage.Module") {
     // Don't error in namespaces without IPM enabled
     Quit
   }
