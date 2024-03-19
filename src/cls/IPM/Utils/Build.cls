@@ -208,7 +208,7 @@ ClassMethod CreateDatabase(pDBName As %String, pInitFile As %String = "", pOverw
 		// Create database
 		Set tExists = 0
 		If '##class(SYS.Database).%ExistsId(tPath) {
-			Set tSC = ##class(SYS.Database).CreateDatabase(tPath,,,tRoleResourceName)
+			Set tSC = ##class(SYS.Database).CreateDatabase(tPath,,,,tRoleResourceName)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -319,6 +319,7 @@ ClassMethod DeleteDatabase(pDBName As %String, pIsLibraryDatabase As %Boolean = 
 
 ClassMethod CreateNamespace(pNSName As %String, pCodeDBName As %String, pDataDBName As %String, pVerbose As %Boolean = 1, pNSConfig As %IPM.Storage.ModuleSetting.NamespaceConfig) As %Status
 {
+	Set prevNS = $Namespace
 	New $Namespace
 	Set tSC = $$$OK
 	Try {
@@ -377,10 +378,13 @@ ClassMethod CreateNamespace(pNSName As %String, pCodeDBName As %String, pDataDBN
 		}
 		
 		// Always add mapping for ^%IPM.Dev.* to the CODE database (for modules)
+		// Switch back from %SYS to previous namespace as %SYS does not contain IPM classes
+		Set $Namespace = prevNS
 		Set tSC = ##class(%IPM.Utils.Module).AddGlobalMapping(pNSName,"HS.PM.Dev.*",pCodeDBName)
 		If $$$ISERR(tSC) {
 			Quit
 		}
+		Set $Namespace = "%SYS"
 
 		If pNSConfig.EnableHealthShare {
 			// Create default web application
@@ -700,3 +704,4 @@ ClassMethod Backup() As %Status [ Internal ]
 }
 
 }
+

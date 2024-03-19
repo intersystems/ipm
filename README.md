@@ -10,6 +10,13 @@ Helps to install ObjectScript classes and routines, globals, Embedded Python mod
 
 ## Installing ObjectScript Package Manager Client:
 
+0. Use one-liner in terminal call or programmatically:
+```
+s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/latest/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
+```
+
+OR:
+
 1. Download the  [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
 2. Import the zpm.xml into IRIS and compile via any desired way (Management Portal, Studio or Terminal)
  

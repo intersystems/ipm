@@ -61,8 +61,8 @@ Method SearchRepositoriesForModule(pSearchCriteria As %IPM.Repo.SearchCriteria, 
 			If $$$ISERR(tSC) {
 				Quit
 			}
-			
-			Set tServer = ##class(%IPM.Repo.Definition).%OpenId(tRes.%Get("ID"),,.tSC)
+			Set repoID = tRes.%Get("ID")
+			Set tServer = ##class(%IPM.Repo.Definition).%OpenId(repoID,,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -93,34 +93,39 @@ Method SearchRepositoriesForModule(pSearchCriteria As %IPM.Repo.SearchCriteria, 
 			For i=1:1:tServerResults.Count() {
         Set item = tServerResults.GetAt(i)
         #; Sorting versions
-        Set versions(tServer.Name, +item.Version.Major, +item.Version.Minor, +item.Version.Patch, " "_item.Version.Patch_"_"_item.Version.Prerelease) = item
+        Set versions(+item.Version.Major, +item.Version.Minor, +item.Version.Patch, " "_item.Version.Patch_"_"_item.Version.Prerelease, repoID, tServer.Name) = item
 			}
 		}
-    Set name = ""
-    For {
-      Set name = $Order(versions(name))
-      Quit:name=""
-      Set major = ""
-      For {
-        Set major = $Order(versions(name, major), -1)
-        Quit:major=""
-        Set minor = ""
-        For  {
-          Set minor = $Order(versions(name, major, minor), -1)
+	Set major = ""
+	For {
+		Set major = $Order(versions(major), -1)
+		Quit:major=""
+		Set minor = ""
+		For  {
+          Set minor = $Order(versions(major, minor), -1)
           Quit:minor=""
           Set patch = ""
           For  {
-            Set patch = $Order(versions(name, major, minor, patch), -1)
+            Set patch = $Order(versions(major, minor, patch), -1)
             Quit:patch=""
             Set sub = ""
             For  {
-              Set sub = $Order(versions(name, major, minor, patch, sub), 1, item)
+              Set sub = $Order(versions(major, minor, patch, sub), 1)
               Quit:sub=""
-              Do pResults.Insert(##class(%IPM.Storage.QualifiedModuleInfo).%New(name, item))
+              Set repoOrder = ""
+              For {
+	              Set repoOrder = $Order(versions(major, minor, patch, sub, repoOrder), 1)
+	              Quit:repoOrder=""
+	              Set name = ""
+	              For {
+		              Set name = $Order(versions(major, minor, patch, sub, repoOrder, name), 1, item)
+		              Quit:name=""
+		              Do pResults.Insert(##class(%IPM.Storage.QualifiedModuleInfo).%New(name, item))
+	              }
+              }
             }
           }
         }
-      }
     }
 	} Catch e {
 		If (e.Name["ZSOAP") && $Data(%objlasterror) {

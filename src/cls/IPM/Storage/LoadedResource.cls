@@ -32,7 +32,14 @@ ClassMethod TrackResourceNames(pModuleName As %String, pResourceName As %String,
 			"where Namespace = ? and ModuleName = ? and ResourceUniqueName = ?",
 			pNamespace,pModuleName,pResourceName)
 		If (tResult.%SQLCODE < 0) {
-			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE,tResult.%Message)
+			// Purge cached query and retry
+			Do $SYSTEM.SQL.PurgeCQClass("%sqlcq."_pNamespace_".cls1")
+			Set tNewResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %IPM_Storage.LoadedResource "_
+			"where Namespace = ? and ModuleName = ? and ResourceUniqueName = ?",
+			pNamespace,pModuleName,pResourceName)
+			If (tNewResult.%SQLCODE < 0) {
+				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tNewResult.%SQLCODE,tNewResult.%Message)
+			}
 		}
 		
 		Set tResourceList = $ListFromString(pResourceList)

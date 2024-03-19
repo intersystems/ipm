@@ -150,7 +150,7 @@ Storage Default
 <Value>PlatformVersion</Value>
 </Value>
 <Value name="16">
-<Value>DisplayNameInternal</Value>
+<Value>DisplayName</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.Filesystem.CacheD</DataLocation>
