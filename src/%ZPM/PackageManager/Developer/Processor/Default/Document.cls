@@ -82,6 +82,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
       Set tListNames = tListNames _ $ListBuild(tName)
       Set tListNames = tListNames _ $ListBuild($Translate(tName, "%", "_"))
       Set tListNames = tListNames _ $ListBuild($Translate(tName, "_", ""))
+      Set tListNames = tListNames _ $ListBuild($Translate(tName, "%", ""))
 
       Set ptrn = 0
       While $ListNext(tListNames, ptrn, tName) {
@@ -603,3 +604,4 @@ Method OnGetUniqueName(Output pUniqueName)
 }
 
 }
+
