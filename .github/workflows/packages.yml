@@ -100,6 +100,7 @@ jobs:
             -DUnitTest.FailuresAreFatal=1 -DUnitTest.Manager=%UnitTest.Manager
         run: |
           docker exec -i ${{ env.CONTAINER }} iris session IRIS << EOF
+              zpm "config set analytics 0":1
               zpm "install ${{ matrix.package }}":1
               zpm "${{ matrix.package }} test -only ${{ env.test-flags }}":1:1
           EOF
