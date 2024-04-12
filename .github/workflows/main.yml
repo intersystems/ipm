@@ -169,8 +169,7 @@ jobs:
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }} \
-            --log-driver=none -a stdin -a stdout -a stderr
+          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
           CONTAINER=`docker ps -lq`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \

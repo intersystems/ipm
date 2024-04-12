@@ -6,6 +6,9 @@ Parameter DEFAULTGLOBAL = "^IPM.ExtensionBase.UniSettings";
 /// A string to show in the grouping of settings for this class.
 Parameter DESCRIPTION = "Universal source control options";
 
+/// Other classes may reasonably also map to this global, so don't complain about it.
+Parameter MANAGEDEXTENT As INTEGER [ Constraint = "0,1", Flags = ENUM ] = 0;
+
 /// An inherited IDKey index on this property means that the default value is
 /// used as a subscript under <DataLocation> in the storage definition.
 Property Key As %String [ InitialExpression = {$classname()}, ReadOnly ];
