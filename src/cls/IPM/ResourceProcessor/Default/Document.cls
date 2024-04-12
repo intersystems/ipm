@@ -90,10 +90,11 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 				Set tSourcesPrefix = $c($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 				
 				If '$Get(pParams("NoMapping"),0) {
-          // Disabled mapping of resources. It creates more problems than solves. 	
-          // Moreover, the removal of mapping during uninstallation is not implemented.	
-          // $$$ThrowOnError(..OnConfigureMappings(.pParams))	
-          }	
+          // Currently, still need mapping creation, since if a module is installed with a resource 
+          // already presented in another namespace and have a upperlevel mapping to another namespace,
+          // then it should have a package mapping of this specific resource to its namespace database
+          $$$ThrowOnError(..OnConfigureMappings(.pParams))	
+        }	
           If ..ResourceReference.Generated {	
             Set pResourceHandled = 1	
           Quit
@@ -112,8 +113,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             If (##class(%File).DirectoryExists(tResourceCatDirectory)) {	
               Quit
             }
-					} 
-					Set tResourceDirectory = tResourceCatDirectory
+					}
+					If ##class(%File).DirectoryExists(tResourceCatDirectory) {
+					  Set tResourceDirectory = tResourceCatDirectory
+					}
 			
 					If tDeveloperMode && (..Extension '= "") && (tName '= "") {
 						Set ^Sources(..Extension,tName_..#NAMEPOSTFIX) = tSourcesPrefix _ tResourceDirectory
@@ -173,7 +176,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
-  Set tSC = ..OnExportDeployedItem(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)	
+  // Resolve the issue in HSIEO-9235 before enabling deployed item export
+  // Set tSC = ..OnExportDeployedItem(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
+  Set tSC = $$$OK	
   If pItemHandled || $$$ISERR(tSC) {	
     Quit tSC	
   }
@@ -370,12 +375,18 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
       $Select($Tlevel||..ResourceReference.Deploy:"/multicompile=0",1:"")
 
     If ..LoadAsDirectory {
-      Set tSC = $System.OBJ.ImportDir(pFullResourcePath, "*", tFlags, , 1, .pLoadedList)
-      $$$ThrowOnError(tSC)
-      If $Data(pLoadedList)>1 {
-        Merge tResult = pLoadedList
-        Set pLoadedList = ""
-      }
+      Set tSC = $System.OBJ.ImportDir(pFullResourcePath, "*"_..FilenameExtension, tFlags, , 1, .pLoadedList)
+			$$$ThrowOnError(tSC)
+			Set pLoadedList = "" // ImportDir returns as an array and clears the top node
+			Set tResourceKey = ""
+			For {
+				Set tResourceKey = $Order(pLoadedList(tResourceKey))
+				If (tResourceKey = "") {
+					Quit
+				}
+				Set pLoadedList = pLoadedList_$ListBuild(tResourceKey)
+			}
+			Set pLoadedList = $ListToString(pLoadedList)
     } ElseIf (..Format = "%RO") {
       // This tolerates some unusual %RO header formats that $System.OBJ.Load does not respect.
       Set pLoadedList = ""
@@ -591,4 +602,3 @@ ClassMethod FileExistsInCurrentNS(pFileName As %String) As %Boolean
 }
 
 }
-

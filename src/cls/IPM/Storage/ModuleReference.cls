@@ -17,6 +17,8 @@ Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version") [ Required 
 /// Restrict the scope in which this reference is relevant. Default is "all scopes"
 Property Scope As %String(VALUELIST = ",test,verify", XMLPROJECTION = "ATTRIBUTE");
 
+Property DisplayName As %String(MAXLEN = 255) [ Internal ];
+
 Method VersionStringSet(tValue) As %Status
 {
 	Set i%VersionString = tValue
@@ -29,7 +31,8 @@ Method VersionStringSet(tValue) As %Status
 
 Method NameSet(val As %RawString) As %Status
 {
-	set i%Name = $$$lcase(val)
+	Set i%DisplayName = val
+	Set i%Name = $$$lcase(val)
 	QUIT $$$OK
 }
 
@@ -48,6 +51,9 @@ Storage Default
 <Value name="4">
 <Value>Scope</Value>
 </Value>
+<Value name="5">
+<Value>DisplayName</Value>
+</Value>
 </Data>
 <State>ModuleReferenceState</State>
 <StreamLocation>^IPM.Storage.ModuleReferenceS</StreamLocation>
@@ -55,3 +61,4 @@ Storage Default
 }
 
 }
+

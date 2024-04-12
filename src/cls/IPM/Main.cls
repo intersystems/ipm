@@ -676,6 +676,30 @@ ClassMethod TerminalPrompt() As %String
 	Quit prompt
 }
 
+/// @API.Method
+/// Get Version modules and current registry
+/// example do ##class(%IPM.Main).GetVersion("zpm,zpm-registry",.out,.list)
+ClassMethod GetVersion(ModuleName, ByRef out, list)
+{
+	Do ..GetListModules("*", ModuleName, .list)
+	for i=1:1 { quit:'$d(list(i),ns)
+	 	set ns=$lg(ns,1)
+	 	for ii=1:1 { quit:'$d(list(i,"modules",ii),module)
+	 		set out($lg(module,1))=$lb(ns,$lg(module,2))
+	 	}
+	}
+	set sc=$$$OK
+	set sql="select URL from %IPM_Repo_Remote.Definition where Enabled = 1"
+		,rs=##class(%ResultSet).%New()
+		,sc=rs.Prepare(sql)
+	Set:sc sc=rs.Execute("")
+	If sc {
+		Quit:'rs.%Next()  
+		set out=rs.Get("URL")
+	}
+	Quit sc
+}
+
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
@@ -685,9 +709,11 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	If (tCommand '= "") {
 		Set tOneCommand = 1
 	}
+	do ##class(%IPM.Main).GetVersion("zpm",.out)	
 	Set introMessageList = $ListBuild(
 		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
-		"Enter q/quit to exit the shell. Enter ?/help to view available commands"
+		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
+		"Current registry "_$$$FormattedLine($$$Cyan,$g(out))
 	)
 	Set tInShell = 0
 	For {
@@ -732,7 +758,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Repository(.tCommandInfo)
 			} ElseIf (tCommandInfo = "load") {
 				Do ..Load(.tCommandInfo)
-			} ElseIf (tCommandInfo = "cos") {
+			} ElseIf (tCommandInfo = "exec") {
 				Write !
 				Xecute tCommandInfo("parameters","cos")
 			} ElseIf (tCommandInfo = "install") {
@@ -914,6 +940,10 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     If $$$ISERR(..SwitchToNamespace(pNamespace)) {
       Quit
     }
+  }
+  If '$$$comClassDefined("%IPM.Storage.Module") {
+    // Don't error in namespaces without IPM enabled
+    Quit
   }
   Set tArgs = 0
 	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode FROM %IPM_Storage.ModuleItem"
@@ -1127,12 +1157,14 @@ ClassMethod IsAvailable(pModuleName As %String, pNamespace As %String = "", pArg
 	If pNamespace'="" {
 		Set $namespace = pNamespace
 	}
-	Set module = ##class(%IPM.Storage.Module).NameOpen(pModuleName,0,.sc)
-	$$$ThrowOnError(sc)
-	If module.AvailabilityClass ="" {
-		Quit 1
+	If '##class(%IPM.Storage.Module).NameExists(pModuleName,.id) {
+		Return 0
 	}
-	Quit $ClassMethod(module.AvailabilityClass,"IsAvailable",pNamespace,pArgs...)
+	Set availabilityClass = ##class(%IPM.Storage.Module).AvailabilityClassGetStored(id)
+	If availabilityClass = "" {
+		Return 1
+	}
+	Quit $ClassMethod(availabilityClass,"IsAvailable",pNamespace,pArgs...)
 }
 
 ClassMethod GetNamespaceDefaultModifiers(Output pDefaultArray) [ Internal ]
@@ -2056,6 +2088,9 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 /// Run Dependency Analyzer for the given module
 ClassMethod RunDependencyAnalyzer(ByRef pCommandInfo)
 {
+	If '$$$comClassDefined("%pkg.isc.dependencyAnalyzer.Utils") {
+		$$$ThrowStatus($$$ERROR($$$GeneralError, "Dependency Analyzer package must be installed before running the dependency analyzer."))
+	}
 	Set ignoredStringRef = $$$GetModifier(pCommandInfo,"ignore-str")
 	Set ignoreAll = $$$HasModifier(pCommandInfo,"ignore-str-all")
 	Set invalidOnly = $$$GetModifier(pCommandInfo,"invalid-only")
@@ -2945,3 +2980,4 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
 }
 
 }
+

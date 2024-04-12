@@ -40,7 +40,7 @@ Storage Default
 <Value>PlatformVersions</Value>
 </Value>
 <Value name="11">
-<Value>DisplayNameInternal</Value>
+<Value>DisplayName</Value>
 </Value>
 </Data>
 <State>ModuleInfoState</State>
@@ -49,3 +49,4 @@ Storage Default
 }
 
 }
+

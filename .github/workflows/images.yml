@@ -1,0 +1,33 @@
+name: Images List
+on:
+  workflow_call:
+    outputs:
+      images:
+        description: "The full list of images to use, as a JSON array of imagename:tag"
+        value: ${{ jobs.images.outputs.images }}
+      main:
+        description: "The main image to use (earliest relevant version) to generate the installer XML file"
+        value: ${{ jobs.images.outputs.main }}
+
+env:
+  name: |
+    irishealth-community
+    iris-community
+ 
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.set-matrix.outputs.images }}
+      main: ${{ steps.set-matrix.outputs.main }}
+    steps:
+      - name: Images list
+        id: set-matrix
+        run: |
+          images=""
+          for n in $name; do
+            tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]' | awk '!/(-linux)|([1-4]-preview)/' | awk '!/\.[1-4]\.0\./' | uniq)
+            for tag in $tags; do images+='"'${n}:${tag}'",'; done
+          done;
+          echo images="[${images%?}]" >> $GITHUB_OUTPUT
+          echo main=${images%%,*} >> $GITHUB_OUTPUT

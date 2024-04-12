@@ -59,10 +59,11 @@ Storage Default
 <Value>PlatformVersions</Value>
 </Value>
 <Value name="12">
-<Value>DisplayNameInternal</Value>
+<Value>DisplayName</Value>
 </Value>
 </Data>
 <Type>%Storage.Serial</Type>
 }
 
 }
+

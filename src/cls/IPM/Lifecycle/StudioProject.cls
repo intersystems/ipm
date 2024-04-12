@@ -33,12 +33,12 @@ Method %Package(ByRef pParams) As %Status
 		
 		// Possibly, include package manager in package and install it if needed.
 		If tIncludePackageManager {
-			If ##class(%IPM.Storage.Module).NameExists("ZHSLIB") {
-				Set tZPMModule = ##class(%IPM.Storage.Module).NameOpen("ZHSLIB",,.tSC)
+			If ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName) {
+				Set tIPMModule = ##class(%IPM.Storage.Module).NameOpen($$$IPMModuleName,,.tSC)
 				$$$ThrowOnError(tSC)
-				Do ..PackageOneModule(tZPMModule,tTarget,.pParams,.tModuleLocations,.tRtn)
+				Do ..PackageOneModule(tIPMModule,tTarget,.pParams,.tModuleLocations,.tRtn)
 			} Else {
-				$$$ThrowStatus($$$ERROR($$$GeneralError,"Attempted to include package manager, but ZHSLIB module not defined in this namespace."))
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Attempted to include package manager, but module not defined in this namespace."))
 			}
 		}
 		
@@ -80,12 +80,12 @@ Method %Package(ByRef pParams) As %Status
 		Set tRtn($i(tRtn)) = "MAIN"
 		For tIndex = 1:1:tModuleLocations {
 			Set tModuleName = tModuleLocations(tIndex)
-			Set tIsPackageManager = (tModuleName = "ZHSLIB") && (..Module.Name '= "ZHSLIB")
+			Set tIsPackageManager = (tModuleName = $$$IPMModuleName) && (..Module.Name '= $$$IPMModuleName)
 			If tIsPackageManager {
 				Set tRtn($i(tRtn)) = " If '$$$comClassDefined(""%IPM.Main"") {"
 			}
 			If tIncludePackageManager {
-				If (tModuleName = "ZHSLIB") {
+				If (tModuleName = $$$IPMModuleName) {
 					// No-op - handled in PackageOneModule.
 				} Else {
 					Set tUndeployableItems(tModuleName_".ZPM") = ""
@@ -129,7 +129,7 @@ Method PackageOneModule(pModule As %IPM.Storage.Module, pTargetGlobal As %String
 	Set tVerbose = $Get(pParams("Verbose"),0)
 	Set tDeployDefault = $Get(pParams("Package","Deploy"),0)
 	Set tIncludePackageManager = $Get(pParams("Package","Manager"),0)
-	Set tIsPackageManager = (pModule.Name = "ZHSLIB")
+	Set tIsPackageManager = (pModule.Name = $$$IPMModuleName)
 	Set tKeepGenerated = $Get(pParams("Package","KeepGenerated"),0)
 	
 	Set pModuleLocations(0,pModule.Name) = $Increment(pModuleLocations)
@@ -144,9 +144,9 @@ Method PackageOneModule(pModule As %IPM.Storage.Module, pTargetGlobal As %String
 	$$$ThrowOnError(pModule.GetStudioProject(.tProject,1,tDeployDefault,"object"))
 	
 	If tIsPackageManager {
-		Set tPackedZHSLIBClass = "zTemp.PackageManager.Container.ZHSLIB"
-		$$$ThrowOnError(##class(%IPM.Lifecycle.StudioProject.ContainerClass).Create(tPackedZHSLIBClass,"ZHSLIB.ZPM",tVerbose))
-		Do tProject.AddItem(tPackedZHSLIBClass_".CLS")
+		Set tPackedIPMClass = "zTemp.PackageManager.Container."_$$$IPMModuleName
+		$$$ThrowOnError(##class(%IPM.Lifecycle.StudioProject.ContainerClass).Create(tPackedIPMClass,$$$IPMModuleName_".ZPM",tVerbose))
+		Do tProject.AddItem(tPackedIPMClass_".CLS")
 	}
 	$$$ThrowOnError(tProject.DeployToGbl($Name(@pTargetGlobal@(pModuleLocations,"object")),$Select(tVerbose:"d-k",1:"-d-k"),1))
 	
@@ -202,6 +202,21 @@ Method PackageOneModule(pModule As %IPM.Storage.Module, pTargetGlobal As %String
 	
 	$$$ThrowOnError(tSourceProject.DeployToGbl($Name(@pTargetGlobal@(pModuleLocations,"source")),$Select(tVerbose:"d",1:"-d")_$Select(tKeepGenerated:"k",1:"-k")))
 	
+	// Map %IPM to current routine database
+	If tIsPackageManager {
+		Set pInstallerCode($i(pInstallerCode)) = " Set currentNS = $Namespace"
+		Set pInstallerCode($i(pInstallerCode)) = " Set mapping = ""%IPM"""
+		Set pInstallerCode($i(pInstallerCode)) = " New $Namespace "
+		Set pInstallerCode($i(pInstallerCode)) = " Set $Namespace = ""%SYS"""
+		Set pInstallerCode($i(pInstallerCode)) = " If '##class(Config.MapPackages).Exists(currentNS, mapping) {"
+		Set pInstallerCode($i(pInstallerCode)) = " Kill NSprops"
+		Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(Config.Namespaces).Get(currentNS, .NSprops))"
+		Set pInstallerCode($i(pInstallerCode)) = " Kill tProps"
+		Set pInstallerCode($i(pInstallerCode)) = " Set tProps(""Database"") = $Get(NSprops(""Routines""))"
+		Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(Config.MapPackages).Create(currentNS, mapping, .tProps))"
+		Set pInstallerCode($i(pInstallerCode)) = " }"
+		Set pInstallerCode($i(pInstallerCode)) = " Set $Namespace = currentNS"
+	}	
 	Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(%Studio.Project).InstallFromGbl("_$$$QUOTE($Name(@pTargetGlobal@(pModuleLocations,"object")))_",""-d"",0))"
 	Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(%Studio.Project).InstallFromGbl("_$$$QUOTE($Name(@pTargetGlobal@(pModuleLocations,"source")))_",""-d"",0))"
 	
@@ -210,8 +225,8 @@ Method PackageOneModule(pModule As %IPM.Storage.Module, pTargetGlobal As %String
 	$$$ThrowOnError(tArchive.GenerateInstallerCode("tExtractDirectory",.pInstallerCode))
 	
 	If tIsPackageManager {
-		// Note: only unpack ZHSLIB module manifest if ZHSLIB module was installed.
-		Set pInstallerCode($i(pInstallerCode)) = " Do ##class("_tPackedZHSLIBClass_").Unpack()"
+		// Note: only unpack package manager module manifest if module was installed.
+		Set pInstallerCode($i(pInstallerCode)) = " Do ##class("_tPackedIPMClass_").Unpack()"
 	}
 	
 	// TODO: Support CSP/other files
@@ -265,3 +280,4 @@ Method OnInstallFromPayload(ByRef pParams) As %Status
 }
 
 }
+

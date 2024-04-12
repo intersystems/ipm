@@ -9,7 +9,7 @@ Parameter XMLIGNOREINVALIDTAG = 1;
 Parameter XMLIGNOREINVALIDATTRIBUTE = 1;
 
 /// lowercase storage name of the module
-Property Name As %IPM.DataType.ModuleName(%JSONFIELDNAME = "name") [ Required ];
+Property Name As %IPM.DataType.ModuleName(%JSONINCLUDE = "NONE", XMLPROJECTION = "NONE") [ Required ];
 
 Property Description As %String(%JSONFIELDNAME = "description", MAXLEN = 1000);
 
@@ -31,14 +31,24 @@ Property PlatformVersion As %String(%JSONFIELDNAME = "platform_version", MAXLEN 
 Property Repository As %String(MAXLEN = "", XMLPROJECTION = "NONE");
 
 /// Case-sensitive display name of the module as it appears in the module manifest
-Property DisplayNameInternal As %IPM.DataType.ModuleName(%JSONINCLUDE = "NONE") [ Internal ];
+Property DisplayName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "name", XMLNAME = "Name");
 
-Property DisplayName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "displayName") [ Calculated, SqlComputeCode = { Set {*} = $Case({DisplayNameInternal}, "": {Name}, : {DisplayNameInternal})}, SqlComputed ];
-
-Method NameSet(val As %RawString) As %Status
+Method NameSet(val As %String) As %Status
 {
 	Set i%Name = $$$lcase(val)
-	Set i%DisplayNameInternal = val
+	Set i%DisplayName = val
+	Return $$$OK
+}
+
+Method DisplayNameSet(val As %String) As %Status
+{
+	If (i%Name '= "") {
+    If (i%Name '= $$$lcase(val)) {
+		  Return $$$ERROR($$$GeneralError, "DisplayName needs to be case sensitive form of module name: "_i%Name)
+    }
+  }
+  Set i%DisplayName = val
+	Set i%Name = $$$lcase(val)
 	Return $$$OK
 }
 
