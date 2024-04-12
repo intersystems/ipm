@@ -8,6 +8,7 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
 	New $Namespace
 	Set tSC = $$$OK
 	Try {
+		Set oldNamespace = $Namespace
 		Set $Namespace = "%SYS"
 		Set tLowerName = $ZCVT(pNSName,"L")
 
@@ -51,10 +52,10 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
 		Set tNSProps("Globals") = pNSName
 		Set tNSProps("Routines") = pNSName
 		
-    Set tNSProps("Library") = "IRISLIB"
-    Set tNSProps("SysGlobals") = "IRISSYS"
-    Set tNSProps("SysRoutines") = "IRISSYS"
-    Set tNSProps("TempGlobals") = "IRISTEMP"
+		Set tNSProps("Library") = "IRISLIB"
+		Set tNSProps("SysGlobals") = "IRISSYS"
+		Set tNSProps("SysRoutines") = "IRISSYS"
+		Set tNSProps("TempGlobals") = "IRISTEMP"
 
 		Set tSC = ##class(Config.Namespaces).Create(pNSName,.tNSProps)
 		If $$$ISERR(tSC) {
@@ -80,6 +81,9 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
 		If $$$ISERR(tSC) {
 			Quit
 		}
+
+		Set $Namespace = oldNamespace
+		$$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",oldNamespace,pNSName))
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -89,6 +93,7 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
 ClassMethod DeleteNamespace(pNSName As %String) As %Status
 {
 	New $Namespace
+	Set oldNamespace = $Namespace
 	Set tFinalStatus = $$$OK
 	Try {
 		Set $Namespace = "%SYS"
@@ -138,6 +143,7 @@ ClassMethod DeleteNamespace(pNSName As %String) As %Status
 		Set tFinalStatus = $$$ADDSC(tFinalStatus,tSC)
 
 		// Delete directories
+		Set $Namespace = oldNamespace
 		Set tDirRemoved = ##class(%IPM.Utils.File).RemoveDirectoryTree(tPath)
 		If 'tDirRemoved {
 			Set tFinalStatus = $$$ADDSC(tFinalStatus,$$$ERROR($$$GeneralError,"Error removing directory '"_tPath_"'"))

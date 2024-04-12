@@ -45,8 +45,8 @@ Method Setup() As %Status
 	
 			Set ..RegistryAdded = 1
 
-      /// Clear any packages on remote registry for debug purposes
-      Do tServerDefn.GetPackageService().ResetRegistry()
+			/// Clear any packages on remote registry for debug purposes
+			Do tServerDefn.GetPackageService().ResetRegistry()
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()

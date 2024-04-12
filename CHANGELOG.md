@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-10267: Bug Fix - Resource name should be the fifth argument of CreateDatabase
 - #440: IPM works with delimited identifiers disabled
 - #451: (CI) Run on fewer versions to minimize overhead and Community Edition expiration issues
+- #451, #428: Fixes "Verify" phase to work properly after %IPM rename
 - #451: Avoid compliation errors due to storage location conflict on IRIS for Health prior to 2024.1
 
 ### Security
