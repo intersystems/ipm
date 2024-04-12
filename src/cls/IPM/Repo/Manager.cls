@@ -52,7 +52,11 @@ Method SearchRepositoriesForModule(pSearchCriteria As %IPM.Repo.SearchCriteria, 
 	Try {
     Set registry = pSearchCriteria.Registry
 	Set pSearchCriteria.Name = $$$lcase(pSearchCriteria.Name)
-    Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select ID from %IPM_Repo.Definition where Enabled = 1 and (:registry is null or Name = :registry) order by %IPM_Repo.Definition_SortOrder(ID)")
+    Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+		"select ID from %IPM_Repo.Definition "_
+		"where Enabled = 1 "_
+		"and (? is null or Name = ?) order by %IPM_Repo.Definition_SortOrder(ID)",
+		registry,registry)
 		If (tRes.%SQLCODE < 0) {
 			Set tSC = $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
 			Quit

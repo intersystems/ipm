@@ -1881,12 +1881,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
   If (tModuleName = "") {
     Quit $$$OK
   }
-	If tRegistry = "" {
-		Set tServer = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.tSC)
-		If $IsObject(tServer) {
-			Set tRegistry = tServer.Name
-		}
-	}
 
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")

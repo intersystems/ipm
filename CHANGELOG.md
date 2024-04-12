@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-9484: Add additional argument to buildDepsGraph to allow putting in an additional list element of dependency's DisplayName
 - HSIEO-9484: Add additional property DisplayName to %IPM.Storage.ModuleReference
 - HSIEO-10274: Separate DependencyAnalyzer out from IPM
+- #261: We no longer default to using only the deployment registry for zpm "install" if there are multiple registries configured and a registry is not specified as a package prefix.
 
 ### Fixed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
