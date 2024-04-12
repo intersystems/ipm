@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-10267: Bug Fix - Resource name should be the fifth argument of CreateDatabase
 - #451: (CI) Run on fewer versions to minimize overhead and Community Edition expiration issues
 - #451: Avoid compliation errors due to storage location conflict on IRIS for Health prior to 2024.1
+- #455: Upgrade from %ZPM classes updates language extensions correctly to use %IPM
+- #373: Cleaner cross-version approach used in language extension routine generation
 
 ### Security
 -
