@@ -17,7 +17,7 @@ Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpressio
 
 Property Arg As list Of %String(MAXLEN = 255, XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
 
-Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes, SqlFieldName = _MODULE ];
+Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes, SqlFieldName = ModuleItem ];
 
 Method GetArgsArray(pParams, Output args) As %Status
 {
