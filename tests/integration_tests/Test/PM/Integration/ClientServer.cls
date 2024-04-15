@@ -8,7 +8,7 @@ Method TestEverything()
 	New $Namespace
 	Set tOrigNS = $Namespace
 	Try {
-		If '$$$AssertStatusOK(..Setup()) {
+		If '$$$AssertStatusOK(..Setup()) || ..SkipTest {
 			Quit
 		}
 

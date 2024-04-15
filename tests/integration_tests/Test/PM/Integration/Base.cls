@@ -28,7 +28,7 @@ Method Setup() As %Status
 		Set $Namespace = ..#CLIENTNS
 		
 		if ($system.Util.GetEnviron("TEST_REGISTRY")="") {
-			Do $$$AssertFailure("Registry Server not defined")
+			Do $$$AssertSkipped("Registry Server not defined")
 			Quit
 		}
 		if ('..RegistryAdded) {

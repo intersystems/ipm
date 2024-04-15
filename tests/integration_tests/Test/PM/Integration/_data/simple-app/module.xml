@@ -10,6 +10,8 @@
   <Resources>
     <Resource Name="TSL.SimpleAppInclude.INC" Preload="true">
     </Resource>
+    <Resource Name="TSL.TestInstaller.CLS" Preload="true">
+    </Resource>
     <Resource Name="SimpleApp.Routine.MAC" Deploy="true">
     </Resource>
     <Resource Name="TSL.SqlCompute.PKG">
