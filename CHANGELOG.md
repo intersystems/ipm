@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 -
 
 ### Removed
-- 
+- Removed duplicate flags in iris.script for building Docker containers
 
 ### Deprecated
 -
