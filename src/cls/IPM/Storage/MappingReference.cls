@@ -10,7 +10,7 @@ Property Name As %String(MAXLEN = 2048, XMLPROJECTION = "attribute") [ Required 
 /// Name index is unique per namespace.
 Index ResourceName On (Name, Source);
 
-Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Mappings ];
+Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Mappings, SqlFieldName = ModuleItem ];
 
 /// Database from which it is mapped or copied
 Property Source As %String(MAXLEN = 64, XMLPROJECTION = "ATTRIBUTE");

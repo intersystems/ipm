@@ -489,7 +489,7 @@ ClassMethod GetRequiredVersionExpression(pModuleName As %String, pExcludeModules
 			Set tVersion = tResult.%Get("Version")
 			$$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(tVersion,.tVersionExpr))
 			Set pExpression = pExpression.And(tVersionExpr)
-			Set pSourceList = pSourceList_$ListBuild($ListToString(tResult.%Get("Names"),", ")_": "_tVersion)
+			Set pSourceList = pSourceList_$ListBuild($ListToString(tResult.%Get("ModuleNames"),", ")_": "_tVersion)
 		}
 		$$$ThrowOnError(tSC)
 	} Catch e {

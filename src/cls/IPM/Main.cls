@@ -1819,12 +1819,12 @@ ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean
 
 Query SourceControlClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
 {
-	select Name as "ID",Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.SourceControl.Interface')
+	select Name as ID,Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.SourceControl.Interface')
 }
 
 Query ServerMenuExtensionClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
 {
-	select Name as "ID",Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.ServerMenu.Interface')
+	select Name as ID,Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.ServerMenu.Interface')
 }
 
 ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
