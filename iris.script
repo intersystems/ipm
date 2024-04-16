@@ -1,7 +1,7 @@
   zn "USER"
   do $System.OBJ.Load("/home/irisowner/zpm/Installer.cls","ck")
   do ##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
-  zpm "repo -n registry -url repo -r -name registry -url https://pm.community.intersystems.com/"
+  zpm "repo -r -name registry -url https://pm.community.intersystems.com/"
   halt
 
   // Currently broken for %IPM due to differing default behavior for packages starting with % - vscode-per-namespace-settings passes through as-is, IPM expects to strip %.
