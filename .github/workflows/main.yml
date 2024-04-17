@@ -28,8 +28,16 @@ jobs:
         run: |
           images=""
           for n in $name; do
-            tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]' | cut -d '-' -f1 | uniq)
-            for tag in $tags; do images+='"'${n}:${tag}'",'; done
+            tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]' | awk '!/(-linux)|([1-4]-preview)|(-em)|(-cd)/' | awk '!/\.[1-4]\./' | sort | uniq)
+            for tag in $tags
+            do
+              # Skip irishealth-community due to bad interaction with ZPM document type
+              if test "$n" = "irishealth-community" && test "$tag" = "2023.3"
+                then
+                  continue
+              fi
+              images+='"'${n}:${tag}'",';
+            done
           done;
           echo images="[${images%?}]" >> $GITHUB_OUTPUT
           echo main=${images%%,*} >> $GITHUB_OUTPUT
