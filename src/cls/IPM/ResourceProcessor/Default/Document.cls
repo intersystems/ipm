@@ -123,9 +123,17 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 					}
 
 					If '..ResourceReference.Preload {
-						Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
-						Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)) _ tFileExtension
-						If '..LoadAsDirectory {
+            Set tFileExtension = ""
+            Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator))
+            If '..LoadAsDirectory {
+              Set tItemFileExtension = $$$lcase("." _ $Piece(..ResourceReference.Name, ".", *))
+              Set tFileExtension =  $$$lcase("." _ ..FilenameExtension)
+              For tFileExtension = tFileExtension,tItemFileExtension {
+                Quit:##class(%IPM.Utils.File).Exists(tResourcePath _ tFileExtension)
+              } 
+
+              Set tResourcePath = tResourcePath _ tFileExtension
+
               If ($$$lcase(tFileExtension)'=".xml")&&('##class(%File).Exists(tResourcePath)) {
 							  Set tResourcePathXML = tResourcePath
                 Set $PIECE(tResourcePath, ".", *) = "xml"

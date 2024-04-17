@@ -1,15 +1,26 @@
-Class Test.PM.Integration.Resources Extends %UnitTest.TestCase
+Class Test.PM.Integration.Resources Extends Test.PM.Integration.Base
 {
+
+Parameter NEEDSREGISTRY = 0;
 
 Method TestResourceTypes()
 {
-  If ('$ListFind($system.Version.GetISCComponents(), "Health")) {
-    Quit $$$OK
-  }
+	New $Namespace
+	Set oldNamespace = $Namespace
+
+	If ('$ListFind($system.Version.GetISCComponents(), "Health")) {
+		Do $$$AssertSkipped("This test only runs on IRIS for Health, which has all resource types available.")
+		Quit $$$OK
+	}
 
 	Set tSC = $$$OK
 	Try {
 		Set tTestRoot = $Get(^UnitTestRoot)
+
+		If '$$$AssertStatusOK(..Setup()) {
+			Quit
+		}
+		Set $Namespace = ..#CLIENTNS
 		
 		// Uninstall. This might fail; if it does that's fine.
 		Do ##class(%IPM.Storage.Module).Uninstall("ResourceTest",1,1)
@@ -37,6 +48,9 @@ Method TestResourceTypes()
 	} Catch e {
 		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
 	}
+
+	Set $Namespace = oldNamespace
+	Do ..TearDown()
 }
 
 }
