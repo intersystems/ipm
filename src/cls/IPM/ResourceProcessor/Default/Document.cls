@@ -402,7 +402,7 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
     } Else {
       Set tProcessed = 0
       set fileExt = $$$UPPER($Piece(pFullResourcePath, ".", *))
-      if '$LISTFIND($LB("CLS", "MAC", "XML"), fileExt), ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
+      if '$LISTFIND($LB("CLS", "MAC"), fileExt), ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
         try {
           set stream = ##class(%Stream.FileCharacter).%New()
           $$$ThrowOnError(stream.LinkToFile(pFullResourcePath))
