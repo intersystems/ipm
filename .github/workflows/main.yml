@@ -142,29 +142,51 @@ jobs:
           | docker exec -i $CONTAINER iris session iris -UUSER
           docker logs $CONTAINER
           docker stop $CONTAINER
-      # - name: Clean install current version and test new one. (Permitted to fail on 2023.1+)
-      #   timeout-minutes: 15
-      #   run: |
-      #     curl http://localhost:52773/registry/packages/-/all | jq
-      #     curl http://localhost:52773/registry/packages/zpm/ | jq
-      #     wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
-      #     docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
-      #     CONTAINER=`docker ps -lq`
-      #     sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-      #     /bin/echo -e '' \
-      #       'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
-      #       'if +sc=0 { halt:$System.Version.GetMajor()>=2023  do ##class(%SYSTEM.Process).Terminate(,1) }\n' \
-      #       'zpm "list":1\n' \
-      #       'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
-      #       'zpm "repo -list"\n' \
-      #       'zpm "search":1\n' \
-      #       'zpm "install sslclient":1\n' \
-      #       'zpm "install zpm -v":1\n' \
-      #       'zpm "list":1\n' \
-      #       'zpm "version":1\n' \
-      #       'halt\n' \
-      #     | docker exec -i $CONTAINER iris session iris -UUSER
-      #     docker stop $CONTAINER
+      - name: Clean install current version and test new one.
+        timeout-minutes: 15
+        run: |
+          curl http://localhost:52773/registry/packages/-/all | jq
+          curl http://localhost:52773/registry/packages/zpm/ | jq
+          wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
+          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
+          CONTAINER=`docker ps -lq`
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          /bin/echo -e '' \
+            'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
+            'zpm "list":1\n' \
+            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
+            'zpm "repo -list"\n' \
+            'zpm "search":1\n' \
+            'zpm "install sslclient":1\n' \
+            'zpm "install zpm -v":1\n' \
+            'zpm "list":1\n' \
+            'zpm "version":1\n' \
+            'halt\n' \
+          | docker exec -i $CONTAINER iris session iris -UUSER
+          docker stop $CONTAINER
+      - name: Clean install v0.7.x and test installation of IPM.
+        timeout-minutes: 15
+        run: |
+          curl http://localhost:52773/registry/packages/-/all | jq
+          curl http://localhost:52773/registry/packages/zpm/ | jq
+          # TODO: Update this URL
+          wget https://github.com/intersystems/ipm/releases/download/v0.7.1-beta.2/zpm-0.7.1-beta.2.xml -O /tmp/zpm.xml
+          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
+          CONTAINER=`docker ps -lq`
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          /bin/echo -e '' \
+            'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
+            'zpm "list":1\n' \
+            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
+            'zpm "repo -list"\n' \
+            'zpm "search":1\n' \
+            'zpm "install sslclient":1\n' \
+            'zpm "install zpm -v":1\n' \
+            'zpm "list":1\n' \
+            'zpm "version":1\n' \
+            'halt\n' \
+          | docker exec -i $CONTAINER iris session iris -UUSER
+          docker stop $CONTAINER
       - name: Clean install and test
         timeout-minutes: 15
         run: |
