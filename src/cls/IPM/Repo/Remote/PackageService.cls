@@ -11,17 +11,20 @@ Property Password As %String;
 
 Property Token As %String;
 
-Method GetInfo(url As %String) As %DynamicObject
+Method GetInfo() As %IPM.Repo.Remote.Info
 {
  	Set tRequest = ..GetHttpRequest()
+  Set tRequest.Timeout = 2 // Short timeout in case it's unavailable
  	Set tSC = tRequest.Get()
+  Set info = ##class(%IPM.Repo.Remote.Info).%New()
 
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode=200 {
-    Set tRes = {}.%FromJSON(tRequest.HttpResponse.Data)
-    Return tRes
+    $$$ThrowOnError(info.%JSONImport(tRequest.HttpResponse.Data))
+  } Else {
+    Set info.available = 0
   }
-
-	$$$ThrowStatus($$$ERROR($$$GeneralError,"Registry server not available."))
+  
+  Return info
 }
 
 Method GetLatestModuleVersion(pModuleName As %String) As %String
