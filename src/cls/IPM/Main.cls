@@ -1145,7 +1145,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowOnError(tSC)
 		Set tService = tRepository.GetPackageService()
 		Set tInfo = tService.GetInfo()
-		Write !,$$$FormattedLine($$$Blue,tRepository.URL)," - ",tInfo.version
+		Write !,$$$FormattedLine($$$Blue,tRepository.URL)," - ",tInfo.ToString()
 	}
 	Quit $$$OK
 }
