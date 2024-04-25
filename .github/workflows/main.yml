@@ -164,15 +164,20 @@ jobs:
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -UUSER
           docker stop $CONTAINER
-      - name: Clean install v0.7.x and test installation of IPM.
+      - name: Clean install v0.7.x and test migration to latest.
         timeout-minutes: 15
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           curl http://localhost:52773/registry/packages/-/all | jq
           curl http://localhost:52773/registry/packages/zpm/ | jq
-          # TODO: Update this URL
-          wget https://github.com/intersystems/ipm/releases/download/v0.7.1-beta.2/zpm-0.7.1-beta.2.xml -O /tmp/zpm.xml
-          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
+          ASSET_NAME='zpm-0.7.1-beta.3.xml'
+          ASSET_URL=`wget --header "Authorization: token ${GITHUB_TOKEN}" -qO- https://api.github.com/repos/intersystems/ipm/releases | jq -r ".[].assets[] | select(.name == \"${ASSET_NAME}\") | .browser_download_url"`
+          wget $ASSET_URL -O /tmp/zpm.xml
+          docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
           CONTAINER=`docker ps -lq`
+          docker cp /tmp/zpm.xml $CONTAINER:/home/irisowner/zpm.xml
+          docker cp tests/migration/v0.7-to-v0.9/ $CONTAINER:/tmp/test-package/
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
@@ -182,8 +187,8 @@ jobs:
             'zpm "search":1\n' \
             'zpm "install sslclient":1\n' \
             'zpm "install zpm -v":1\n' \
-            'zpm "list":1\n' \
-            'zpm "version":1\n' \
+            'zpm "load -dev /tmp/test-package/":1\n' \
+            'zpm "test ipm-migration-v0.7-to-v0.9 -only":1\n' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -UUSER
           docker stop $CONTAINER

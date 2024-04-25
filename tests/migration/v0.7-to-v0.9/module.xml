@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Document name="ipm-migration-v0.7-to-v0.9.ZPM"><Module>
+  <Name>ipm-migration-v0.7-to-v0.9</Name>
+  <Version>0.1.0-SNAPSHOT</Version>
+  <Author>
+    <Organization>InterSystems Corporation</Organization>
+  </Author>
+  <Packaging>module</Packaging>
+  <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Migration" Phase="test"/>
+</Module>
+</Document></Export>
