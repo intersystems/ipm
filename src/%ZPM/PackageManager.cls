@@ -1544,10 +1544,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
   If (tModuleName = "") {
     Quit $$$OK
   }
-  If (tModuleName = "zpm") {
-    New $Namespace
-    Set $Namespace="%SYS"
-  }
 	If tRegistry = "" {
 		Set tServer = ##class(%ZPM.PackageManager.Client.RemoteServerDefinition).DeploymentServerOpen(1,,.tSC)
 		If $IsObject(tServer) {
@@ -1601,6 +1597,11 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
           $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
         }
       }
+			If (tModuleName = "zpm") && (tResult.VersionString < 0.9) {
+				// Pre-%IPM, install zpm in %SYS.
+				New $Namespace
+				Set $Namespace="%SYS"
+			}
 			$$$ThrowOnError(##class(%ZPM.PackageManager.Developer.Utils).LoadQualifiedReference(tResult, .tParams))
 		}
 	} Else {
@@ -2534,4 +2535,3 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
 }
 
 }
-
