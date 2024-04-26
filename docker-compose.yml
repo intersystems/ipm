@@ -25,9 +25,9 @@ services:
       - IRISUSERNAME=admin
       - IRISNAMESPACE=REGISTRY
     volumes:
-      - ./setup-registry.sh:/docker-entrypoint-initdb.d/setup-registry.sh
+      - ./scripts/setup-registry.sh:/docker-entrypoint-initdb.d/setup-registry.sh
   sandbox:
-    image: intersystems/iris-community:preview
+    build: ./tests/sandbox/
     restart: always
     ports: 
       - 52776:52773
@@ -35,3 +35,6 @@ services:
       - IRISPASSWORD=SYS
       - IRISUSERNAME=admin
       - IRISNAMESPACE=USER
+    volumes:
+      - ./:/home/irisowner/zpm/
+      - ./tests/sandbox/:/home/irisowner/sandbox/

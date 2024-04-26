@@ -1,5 +1,5 @@
   zn "USER"
-  do $System.OBJ.Load("/home/irisowner/zpm/Installer.cls","ck")
+  do $System.OBJ.Load("/home/irisowner/zpm/preload/cls/IPM/Installer.cls","ck")
   do ##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
   zpm "repo -r -name registry -url https://pm.community.intersystems.com/"
   halt

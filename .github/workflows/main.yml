@@ -142,6 +142,7 @@ jobs:
           | docker exec -i $CONTAINER iris session iris -UUSER
           docker logs $CONTAINER
           docker stop $CONTAINER
+      # NOTE: commented out until 0.7.1 is released.
       # - name: Clean install current version and test new one.
       #   timeout-minutes: 15
       #   run: |
@@ -171,13 +172,13 @@ jobs:
         run: |
           curl http://localhost:52773/registry/packages/-/all | jq
           curl http://localhost:52773/registry/packages/zpm/ | jq
-          ASSET_NAME='zpm-0.7.1-beta.3.xml'
+          ASSET_NAME='zpm-0.7.1-beta.4.xml'
           ASSET_URL=`wget --header "Authorization: token ${GITHUB_TOKEN}" -qO- https://api.github.com/repos/intersystems/ipm/releases | jq -r ".[].assets[] | select(.name == \"${ASSET_NAME}\") | .browser_download_url"`
           wget $ASSET_URL -O /tmp/zpm.xml
           docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
           CONTAINER=`docker ps -lq`
           docker cp /tmp/zpm.xml $CONTAINER:/home/irisowner/zpm.xml
-          docker cp tests/migration/v0.7-to-v0.9/ $CONTAINER:/tmp/test-package/
+          docker cp tests/migration/v0.7-to-v0.9/. $CONTAINER:/tmp/test-package/
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
@@ -196,8 +197,9 @@ jobs:
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
+          docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
           CONTAINER=`docker ps -lq`
+          docker cp /tmp/zpm.xml $CONTAINER:/home/irisowner/zpm.xml
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           /bin/echo -e '' \
             'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
