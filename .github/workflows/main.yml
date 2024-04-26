@@ -189,7 +189,7 @@ jobs:
             'zpm "install sslclient":1\n' \
             'zpm "install zpm -v":1\n' \
             'zpm "load -dev /tmp/test-package/":1\n' \
-            'zpm "test ipm-migration-v0.7-to-v0.9 -only":1\n' \
+            'zpm "test ipm-migration-v0.7-to-v0.9 -only -verbose":1\n' \
             'halt\n' \
           | docker exec -i $CONTAINER iris session iris -UUSER
           docker stop $CONTAINER
