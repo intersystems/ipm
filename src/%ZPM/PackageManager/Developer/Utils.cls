@@ -1044,7 +1044,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			Set tInitNamespace = $Namespace
 			// Ensure we load "preload" resources into the correct code database (the namespace default one), since this is before mappings are set up.
 			Set $Namespace = "^^"_##class(%ZPM.PackageManager.Developer.Utils).GetRoutineDatabaseDir($Namespace)
-			Set tSC = $System.OBJ.LoadDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($Tlevel:"/multicompile=0",1:""),,1)
+			Set tSC = $System.OBJ.ImportDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($Tlevel:"/multicompile=0",1:""),,1)
 			$$$ThrowOnError(tSC)
 			Set $Namespace = tInitNamespace
 		} Else {
