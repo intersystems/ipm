@@ -19,6 +19,8 @@ Method VersionStringSet(tValue) As %Status
 
 Property Interoperability As %String(VALUELIST = ",enabled,disabled", XMLPROJECTION = "ATTRIBUTE");
 
+Property Health As %String(VALUELIST = ",true,false", XMLPROJECTION = "ATTRIBUTE");
+
 Method CheckRequirements() As %Status
 {
 	Set tSC1 = ..CheckVersion()
@@ -41,10 +43,21 @@ Method CheckVersion() As %Status
 	}
 }
 
+/// Checks if Interoperability specification is satisfied. Health="true" implies Interoperability="enabled"
 Method CheckInteroperability() As %Status
 {
-	If (..Interoperability="enabled") && (('##class(%EnsembleMgr).IsEnsembleNamespace($Namespace)) || ('##class(%EnsembleMgr).validateNamespace($Namespace, 1))) {
-		Return $$$ERROR($$$GeneralError, "The module requires Interoperability Production Enabled. Namespace <"_$Namespace_"> doesn't support Interoperability Production")
+	if ..Interoperability = "enabled" {
+		Set tInteroperabilityRequired = 1
+	} elseif ..Interoperability = "disabled" {
+		Set tInteroperabilityRequired = 0
+	}  elseif ..Health = "true" {
+		Set tInteroperabilityRequired = 1
+	} else {
+		Set tInteroperabilityRequired = 0
+	}
+	set tInteroperabilityEnabled = ##class(%EnsembleMgr).IsEnsembleNamespace($namespace) && ##class(%EnsembleMgr).validateNamespace($namespace, 1)
+	If tInteroperabilityRequired && ('tInteroperabilityEnabled) {
+		Return $$$ERROR($$$GeneralError, "The module requires Interoperability Production Enabled. Namespace <"_$NAMESPACE_"> doesn't support Interoperability Production")
 	}
 	Return $$$OK
 }
@@ -66,6 +79,9 @@ Storage Default
 </Value>
 <Value name="5">
 <Value>Version</Value>
+</Value>
+<Value name="6">
+<Value>Health</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.SystemRequirementsD</DataLocation>
