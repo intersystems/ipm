@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased - 0.9.0+snapshot]
 
 ### Added
--
+- Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
 
 ### Changed
 - HSIEO-9484: Add additional argument to buildDepsGraph to allow putting in an additional list element of dependency's DisplayName
