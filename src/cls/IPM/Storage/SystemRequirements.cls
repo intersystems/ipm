@@ -23,14 +23,16 @@ Property Health As %String(VALUELIST = ",true,false", XMLPROJECTION = "ATTRIBUTE
 
 Method CheckRequirements() As %Status
 {
-	Set tSC1 = ..CheckVersion()
-	Set tSC2 = ..CheckInteroperability()
-	Return $$$ADDSC(tSC1, tSC2)
+	Set tSC = $$$OK
+	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckVersion())
+	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckInteroperability())
+	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckHealth())
+	Return tSC
 }
 
 Method CheckVersion() As %Status
 {
-  Set tSystemVersion = +$System.Version.GetMajor() _ "." _ +$System.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
+  Set tSystemVersion = +$SYSTEM.Version.GetMajor() _ "." _ +$SYSTEM.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
 	If (..VersionString = "") { Return $$$OK } 
 	Try {
 		Set CurrentSystemVersion = ##class(%IPM.General.SemanticVersion).FromString(tSystemVersion)
@@ -46,18 +48,27 @@ Method CheckVersion() As %Status
 /// Checks if Interoperability specification is satisfied. Health="true" implies Interoperability="enabled"
 Method CheckInteroperability() As %Status
 {
-	if ..Interoperability = "enabled" {
+	If ..Interoperability = "enabled" {
 		Set tInteroperabilityRequired = 1
-	} elseif ..Interoperability = "disabled" {
+	} ElseIf ..Interoperability = "disabled" {
 		Set tInteroperabilityRequired = 0
-	}  elseif ..Health = "true" {
+	}  ElseIf ..Health = "true" {
 		Set tInteroperabilityRequired = 1
-	} else {
+	} Else {
 		Set tInteroperabilityRequired = 0
 	}
-	set tInteroperabilityEnabled = ##class(%EnsembleMgr).IsEnsembleNamespace($namespace) && ##class(%EnsembleMgr).validateNamespace($namespace, 1)
+	Set tInteroperabilityEnabled = ##class(%EnsembleMgr).IsEnsembleNamespace($NAMESPACE) && ##class(%EnsembleMgr).validateNamespace($NAMESPACE, 1)
 	If tInteroperabilityRequired && ('tInteroperabilityEnabled) {
 		Return $$$ERROR($$$GeneralError, "The module requires Interoperability Production Enabled. Namespace <"_$NAMESPACE_"> doesn't support Interoperability Production")
+	}
+	Return $$$OK
+}
+
+Method CheckHealth() As %Status
+{
+	If ..Health = "true" && '$LISTFIND($SYSTEM.Version.GetISCComponents(), "Health") {
+		Set msg = "The module requires IRIS-for-Health, HealthConnect, or HealthShare. Current system doesn't satisfy this requirement."
+		Return $$$ERROR($$$GeneralError, msg)
 	}
 	Return $$$OK
 }
