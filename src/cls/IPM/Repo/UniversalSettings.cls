@@ -106,8 +106,11 @@ ClassMethod GetDefaultValue(indx As %String = "") As %String
     Return $Get(^IPM.settings(indx,"default"))
 }
 
-ClassMethod SetValue(indx As %String = "", val As %String = "") As %Status
+ClassMethod SetValue(indx As %String = "", val As %String = "", overwrite As %Boolean = 1) As %Status
 {
+    if ('$GET(overwrite, 1)) && ..GetValue(indx)'="" {
+        Return $$$OK
+    }
     Return:(indx="") ""
     New $Namespace   
     Set $Namespace = "%SYS"
@@ -123,9 +126,9 @@ ClassMethod GetDefaultRegistry() As %String
     Return ..GetValue(..#registry)
 }
 
-ClassMethod SetDefaultRegistry(val As %String) As %String
+ClassMethod SetDefaultRegistry(val As %String, overwrite As %Boolean = 1) As %String
 {
-    Return ..SetValue(..#registry, val)
+    Return ..SetValue(..#registry, val, overwrite)
 }
 
 ClassMethod GetAnalyticsTrackingId() As %String
@@ -133,9 +136,9 @@ ClassMethod GetAnalyticsTrackingId() As %String
     Return ..GetValue(..#trackingId)
 }
 
-ClassMethod SetAnalyticsTrackingId(val As %String) As %String
+ClassMethod SetAnalyticsTrackingId(val As %String, overwrite As %Boolean = 1) As %String
 {
-    Return ..SetValue(..#trackingId, val)
+    Return ..SetValue(..#trackingId, val, overwrite)
 }
 
 ClassMethod GetAnalyticsAvailable() As %Boolean
@@ -143,9 +146,9 @@ ClassMethod GetAnalyticsAvailable() As %Boolean
     Return ..GetValue(..#analytics)
 }
 
-ClassMethod SetAnalyticsAvailable(val As %String) As %Boolean
+ClassMethod SetAnalyticsAvailable(val As %String, overwrite As %Boolean = 1) As %Boolean
 {
-    Return ..SetValue(..#analytics, +val)
+    Return ..SetValue(..#analytics, +val, overwrite)
 }
 
 }
