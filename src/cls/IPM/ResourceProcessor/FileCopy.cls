@@ -39,7 +39,7 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 		}
 
 		If (pPhase = "Activate") && (..InstallDirectory '= "") && ('..Defer) {
-      Set tSource = $Case(..SourceDirectory, "": ..ResourceReference.Module.Root _ ..ResourceReference.Name,: ..SourceDirectory)
+      Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
       Set tTarget = ..InstallDirectory
       Set tSC = ..DoCopy(tSource, tTarget, .pParams)
       If $$$ISERR(tSC) {
@@ -65,7 +65,7 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 		}
 
 		If (pPhase = "Activate") && (..InstallDirectory '= "") && (..Defer) {
-      Set tSource = $Case(..SourceDirectory, "": ..ResourceReference.Module.Root _..ResourceReference.Name,: ..SourceDirectory)
+      Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
       Set tTarget = ..InstallDirectory
       Set tSC = ..DoCopy(tSource, tTarget, .pParams)
       If $$$ISERR(tSC) {
@@ -138,7 +138,7 @@ Method DoCopy(tSource, tTarget, pParams)
     Write:tVerbose !,"Copying ",tSource," to ",tTarget
     If (copyAsFile) {
       If '##class(%File).Exists(tSource) {
-        Set tSC = $$$ERROR($$$GeneralError, "Source file does not exists: "_tSource)
+        Set tSC = $$$ERROR($$$GeneralError, "Source file does not exist: "_tSource)
         Quit
       }
       If '##class(%File).CopyFile(tSource, tTarget, 1, .return) {

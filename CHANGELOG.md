@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #451: Avoid compliation errors due to storage location conflict on IRIS for Health prior to 2024.1
 - #455: Upgrade from %ZPM classes updates language extensions correctly to use %IPM
 - #373: Cleaner cross-version approach used in language extension routine generation
+- #459: zpm "version" behaves better without internet access
 
 ### Security
 -
