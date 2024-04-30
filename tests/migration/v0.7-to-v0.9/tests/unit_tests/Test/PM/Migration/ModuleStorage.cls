@@ -19,4 +19,15 @@ Method TestZPM()
     Do $$$AssertTrue(##class(%IPM.StudioDocument.Module).Exists("zpm.ZPM"))
 }
 
+Method TestRepos()
+{
+    Set repo = ##class(%IPM.Repo.Remote.Definition).ServerDefinitionKeyOpen("registry")
+    If $$$AssertTrue($IsObject(repo)) {
+        Do $$$AssertEquals(repo.Enabled,1)
+        Do $$$AssertEquals(repo.URL,"http://registry:52773/registry/")
+        Do $$$AssertEquals(repo.Username,"admin")
+        Do $$$AssertEquals(repo.Password,"SYS")
+    }
+}
+
 }

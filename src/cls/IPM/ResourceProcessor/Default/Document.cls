@@ -126,6 +126,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             Set tFileExtension = ""
             Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator))
             If '..LoadAsDirectory {
+              // For user document types (generally), dynamilly support both the resource and filename extension
+              // e.g., for lookup tables, both .xml and .lut are supported regardless of configuration in module.xml.
+              // Generally, FilenameExtension SHOULD be specified (for the sake of embedded source control integration if nothing else),
+              // but this makes IPM less picky about reasonable things users might do.
               Set tItemFileExtension = $$$lcase("." _ $Piece(..ResourceReference.Name, ".", *))
               Set tFileExtension =  $$$lcase("." _ ..FilenameExtension)
               For tFileExtension = tFileExtension,tItemFileExtension {
