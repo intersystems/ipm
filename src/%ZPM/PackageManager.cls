@@ -591,14 +591,15 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "version") {
 				Do ..Version(.tCommandInfo)
 			} ElseIf (tCommandInfo = "namespace") {
-				Do ..Namespace(.tCommandInfo)			}
-			} Catch pException {
-				If (pException.Code = $$$ERCTRLC) {
-					Set pException = $$$NULLOREF
-					Return
-				}
-        Do ..DisplayError(pException.AsStatus())
+				Do ..Namespace(.tCommandInfo)
 			}
+		} Catch pException {
+			If (pException.Code = $$$ERCTRLC) {
+				Set pException = $$$NULLOREF
+				Return
+			}
+			Do ..DisplayError(pException.AsStatus())
+		}
 		Set tCommand = ""
 		Quit:tOneCommand
 		Write !
