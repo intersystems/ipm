@@ -19,7 +19,7 @@ Method VersionStringSet(tValue) As %Status
 
 Property Interoperability As %String(VALUELIST = ",enabled,disabled", XMLPROJECTION = "ATTRIBUTE");
 
-Property Health As %String(VALUELIST = ",true,false", XMLPROJECTION = "ATTRIBUTE");
+Property Health As %Boolean(VALUELIST = ",true,false", XMLPROJECTION = "ATTRIBUTE");
 
 Method CheckRequirements() As %Status
 {
@@ -48,7 +48,7 @@ Method CheckVersion() As %Status
 /// Checks if Interoperability specification is satisfied. Health="true" implies Interoperability="enabled"
 Method CheckInteroperability() As %Status
 {
-	Set tInteroperabilityRequired = $Case(..Interoperability, "enabled":1, :0) || (..Health = "true")
+	Set tInteroperabilityRequired = $Case(..Interoperability, "enabled":1, :0) || ..Health
 	Set tInteroperabilityEnabled = ..IsInteroperabilityEnabled()
 	If tInteroperabilityRequired && ('tInteroperabilityEnabled) {
 		Return $$$ERROR($$$GeneralError, "This module requires an interoperability-enabled namespace. "_$Namespace_" is not interoperability-enabled.")
@@ -59,10 +59,10 @@ Method CheckInteroperability() As %Status
 Method CheckHealth() As %Status
 {
 	set tIsHealthInstance = ..IsHealthInstance()
-	If ..Health = "true" && 'tIsHealthInstance {
+	If ..Health && 'tIsHealthInstance {
 		Set msg = "The module requires InterSystems IRIS for Health, HealthConnect, or HealthShare. Current system is not compatible."
 		Return $$$ERROR($$$GeneralError, msg)
-	} ElseIf ..Health = "false" && tIsHealthInstance {
+	} ElseIf ..Health = 0 && tIsHealthInstance {
 		Set msg = "The module cannot be installed on InterSystems IRIS for Health, HealthConnect, or HealthShare. Current system is not compatible."
 		Return $$$ERROR($$$GeneralError, msg)
 	}
@@ -71,7 +71,8 @@ Method CheckHealth() As %Status
 
 ClassMethod IsHealthInstance() As %Boolean
 {
-  Return ''$LISTFIND($SYSTEM.Version.GetISCComponents(), "Health")
+  set cls = "%ZHSLIB.HealthShareMgr", mthd = "IsHealthShareInstance"
+  return $ListFind($System.Version.GetISCComponents(), "Health") || ($System.CLS.IsMthd(cls, mthd) && $ClassMethod(cls, mthd))
 }
 
 ClassMethod IsInteroperabilityEnabled() As %Boolean
