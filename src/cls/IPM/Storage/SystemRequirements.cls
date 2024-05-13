@@ -32,7 +32,7 @@ Method CheckRequirements() As %Status
 
 Method CheckVersion() As %Status
 {
-  Set tSystemVersion = +$SYSTEM.Version.GetMajor() _ "." _ +$SYSTEM.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
+  Set tSystemVersion = +$System.Version.GetMajor() _ "." _ +$System.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
 	If (..VersionString = "") { Return $$$OK } 
 	Try {
 		Set CurrentSystemVersion = ##class(%IPM.General.SemanticVersion).FromString(tSystemVersion)
@@ -48,29 +48,35 @@ Method CheckVersion() As %Status
 /// Checks if Interoperability specification is satisfied. Health="true" implies Interoperability="enabled"
 Method CheckInteroperability() As %Status
 {
-	If ..Interoperability = "enabled" {
-		Set tInteroperabilityRequired = 1
-	} ElseIf ..Interoperability = "disabled" {
-		Set tInteroperabilityRequired = 0
-	}  ElseIf ..Health = "true" {
-		Set tInteroperabilityRequired = 1
-	} Else {
-		Set tInteroperabilityRequired = 0
-	}
-	Set tInteroperabilityEnabled = ##class(%EnsembleMgr).IsEnsembleNamespace($NAMESPACE) && ##class(%EnsembleMgr).validateNamespace($NAMESPACE, 1)
+	Set tInteroperabilityRequired = $Case(..Interoperability, "enabled":1, :0) || (..Health = "true")
+	Set tInteroperabilityEnabled = ..IsInteroperabilityEnabled()
 	If tInteroperabilityRequired && ('tInteroperabilityEnabled) {
-		Return $$$ERROR($$$GeneralError, "The module requires Interoperability Production Enabled. Namespace <"_$NAMESPACE_"> doesn't support Interoperability Production")
+		Return $$$ERROR($$$GeneralError, "This module requires an interoperability-enabled namespace. "_$Namespace_" is not interoperability-enabled.")
 	}
 	Return $$$OK
 }
 
 Method CheckHealth() As %Status
 {
-	If ..Health = "true" && '$LISTFIND($SYSTEM.Version.GetISCComponents(), "Health") {
-		Set msg = "The module requires IRIS-for-Health, HealthConnect, or HealthShare. Current system doesn't satisfy this requirement."
+	set tIsHealthInstance = ..IsHealthInstance()
+	If ..Health = "true" && 'tIsHealthInstance {
+		Set msg = "The module requires InterSystems IRIS for Health, HealthConnect, or HealthShare. Current system is not compatible."
+		Return $$$ERROR($$$GeneralError, msg)
+	} ElseIf ..Health = "false" && tIsHealthInstance {
+		Set msg = "The module cannot be installed on InterSystems IRIS for Health, HealthConnect, or HealthShare. Current system is not compatible."
 		Return $$$ERROR($$$GeneralError, msg)
 	}
 	Return $$$OK
+}
+
+ClassMethod IsHealthInstance() As %Boolean
+{
+  Return ''$LISTFIND($SYSTEM.Version.GetISCComponents(), "Health")
+}
+
+ClassMethod IsInteroperabilityEnabled() As %Boolean
+{
+  Return ##class(%EnsembleMgr).IsEnsembleNamespace($NAMESPACE) && ##class(%EnsembleMgr).validateNamespace($NAMESPACE, 1)
 }
 
 Storage Default

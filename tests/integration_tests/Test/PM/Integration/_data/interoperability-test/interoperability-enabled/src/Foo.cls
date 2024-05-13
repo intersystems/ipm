@@ -1,4 +1,0 @@
-Class IntergrationTest.Foo
-{
-
-}

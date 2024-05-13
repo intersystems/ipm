@@ -108,7 +108,7 @@ ClassMethod GetDefaultValue(indx As %String = "") As %String
 
 ClassMethod SetValue(indx As %String = "", val As %String = "", overwrite As %Boolean = 1) As %Status
 {
-    if ('$GET(overwrite, 1)) && ..GetValue(indx)'="" {
+    if '$GET(overwrite, 1) && (..GetValue(indx) '= "") {
         Return $$$OK
     }
     Return:(indx="") ""

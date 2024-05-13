@@ -1,43 +1,35 @@
 Class Test.PM.Integration.Health Extends Test.PM.Integration.Base
 {
 
+Parameter CommonPathPrefix As STRING = "health-test";
+
 Method TestHealthTrue()
 {
-  If '..IsHealthInstance() {
-    do $$$AssertSkipped("Health instance not found. Skipping test.")
-    Return $$$OK
-  }
-  set tModuleDir = ..GetModuleDir("health-true")
+  set tModuleDir = ..GetModuleDir(..#CommonPathPrefix, "health-true")
   set tSC = ##class(%IPM.Main).Shell("load "_tModuleDir)
-  do $$$AssertStatusOK(tSC,"Loaded module successfully (health-true)")
+  if ##class(%IPM.Storage.SystemRequirements).IsHealthInstance() {
+    do $$$AssertStatusOK(tSC,"Loaded module successfully (health-true)")
+  } else {
+    do $$$AssertStatusNotOK(tSC, "Load module failed as expected (health-true)")
+  }
 }
 
 Method TestHealthFalse()
 {
-  set tModuleDir = ..GetModuleDir("health-false")
+  set tModuleDir = ..GetModuleDir(..#CommonPathPrefix, "health-false")
   set tSC = ##class(%IPM.Main).Shell("load "_tModuleDir)
-  do $$$AssertStatusOK(tSC,"Loaded module successfully (health-false)")
+  if ##class(%IPM.Storage.SystemRequirements).IsHealthInstance() {
+    do $$$AssertStatusNotOK(tSC, "Load module failed as expected (health-false)")
+  } else {
+    do $$$AssertStatusOK(tSC,"Loaded module successfully (health-false)")
+  }
 }
 
 Method TestHealthOmitted()
 {
-  set tModuleDir = ..GetModuleDir("health-omitted")
+  set tModuleDir = ..GetModuleDir(..#CommonPathPrefix, "health-omitted")
   set tSC = ##class(%IPM.Main).Shell("load "_tModuleDir)
   do $$$AssertStatusOK(tSC,"Loaded module successfully (health-omitted)")
-}
-
-ClassMethod GetModuleDir(subfolder As %String) As %String
-{
-  Set tTestRoot = ##class(%File).NormalizeDirectory($GET(^UnitTestRoot))
-  Set tTestRoot = ##class(%File).GetDirectory(tTestRoot)
-  Set tModuleDir = ##class(%File).Construct(tTestRoot, "_data", "health-test", subfolder)
-  Set tModuleDir = ##class(%File).NormalizeDirectory(tModuleDir)
-  Quit tModuleDir
-}
-
-ClassMethod IsHealthInstance() As %Boolean
-{
-  Return ''$LISTFIND($SYSTEM.Version.GetISCComponents(), "Health")
 }
 
 }
