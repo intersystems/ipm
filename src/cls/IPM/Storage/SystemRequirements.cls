@@ -19,7 +19,7 @@ Method VersionStringSet(tValue) As %Status
 
 Property Interoperability As %String(VALUELIST = ",enabled,disabled", XMLPROJECTION = "ATTRIBUTE");
 
-Property Health As %Boolean(VALUELIST = ",true,false", XMLPROJECTION = "ATTRIBUTE");
+Property Health As %Boolean(XMLPROJECTION = "ATTRIBUTE");
 
 Method CheckRequirements() As %Status
 {
