@@ -116,4 +116,13 @@ ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName A
 	Quit tStatus
 }
 
+ClassMethod GetModuleDir(subfolders... As %String) As %String
+{
+  Set tTestRoot = ##class(%File).NormalizeDirectory($GET(^UnitTestRoot))
+  Set tTestRoot = ##class(%File).GetDirectory(tTestRoot)
+  Set tModuleDir = ##class(%File).Construct(tTestRoot, "_data", subfolders...)
+  Set tModuleDir = ##class(%File).NormalizeDirectory(tModuleDir)
+  Quit tModuleDir
+}
+
 }

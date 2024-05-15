@@ -1,0 +1,4 @@
+Class IntergrationTest.Foo
+{
+
+}

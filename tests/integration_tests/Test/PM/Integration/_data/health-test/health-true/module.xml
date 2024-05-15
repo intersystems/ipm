@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="iris-for-health.ZPM">
+    <Module>
+      <Name>iris-for-health</Name>
+      <Version>0.0.1+snapshot</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <SystemRequirements Version=">=2020.1" Health="true" />
+    </Module>
+  </Document>
+</Export>

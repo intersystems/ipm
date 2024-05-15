@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased - 0.9.0+snapshot]
 
 ### Added
--
+- #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.
@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #455: Upgrade from %ZPM classes updates language extensions correctly to use %IPM
 - #373: Cleaner cross-version approach used in language extension routine generation
 - #459: zpm "version" behaves better without internet access
+- #224: When updating zpm, existing configuration won't be reset
 
 ### Security
 -
