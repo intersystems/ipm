@@ -13,6 +13,18 @@ Method TestSSLClient()
     }
 }
 
+Method TestDSW()
+{
+    Do $$$AssertTrue(##class(%IPM.StudioDocument.Module).Exists("dsw.ZPM"))
+    Do $$$AssertTrue(##class(%IPM.StudioDocument.Module).Exists("dsw.ZPM"))
+    If $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("dsw")) {
+        Set module = ##class(%IPM.Storage.Module).NameOpen("dsw",,.sc)
+        $$$ThrowOnError(sc)
+        Do $$$AssertEquals(module.Dependencies.Count(),1)
+        Do $$$AssertEquals(module.Dependencies.GetAt(1).Name,"mdx2json")
+    }
+}
+
 Method TestZPM()
 {
     Do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("zpm"))

@@ -1,3 +1,5 @@
+Include %occInclude
+
 Class %IPM.Utils.Migration
 {
 
@@ -27,6 +29,12 @@ ClassMethod MigrateZPMToIPM(verbose As %Boolean = 1)
     // Intentionally runs for current namespace only
     Try {
         // ^ZPM.Dev.ModuleD -> ^IPM.Storage.ModuleD
+        For lockName = $Name(^ZPM.Dev.ModuleD),$Name(^IPM.Storage.ModuleD) {
+            Set locks(lockName) = $System.AutoLock.Lock(lockName,,2)
+            If locks(lockName) = $$$NULLOREF {
+                $$$ThrowStatus($$$ERROR($$$LockFailedExtent,lockName))
+            }
+        }
         Set oldId = ""
         For {
             Set oldId = $order(^ZPM.Dev.ModuleD(oldId),1,moduleData)
@@ -41,17 +49,23 @@ ClassMethod MigrateZPMToIPM(verbose As %Boolean = 1)
             Set sc = $$$ADDSC(sc,oneSC)
         }
 
-        $$$ThrowOnError(##class(%IPM.Storage.Module).%BuildIndices(,1,1))
-        $$$ThrowOnError(..MigrateRepoDefinitions())
+        Set sc = $$$ADDSC(sc,##class(%IPM.Storage.Module).%BuildIndices(,1,1))
+        Set sc = $$$ADDSC(sc,..MigrateRepoDefinitions())
         $$$ThrowOnError(sc)
 
-        Write:verbose !,"Migrated successfully: ",$ListToString(successPackageList)
+        If verbose && (successPackageList '= "") {
+            Write !,"Migrated successfully: ",!,$ListToString(successPackageList,$c(13,10))
+        }
     } Catch e {
         Set sc = e.AsStatus()
         // Show these messages even in verbose mode.
         Write !,"IPM data migration was not fully successful. You may be able to reinstall the impacted packages to correct the issues."
-        Write !,"Migrated successfully: ",$ListToString(successPackageList)
-        Write !,"Failed to migrate: ",$ListToString(failedPackageList)
+        If (successPackageList '= "") {
+            Write !,"Migrated successfully: ",!,$ListToString(successPackageList,$c(13,10))
+        }
+        If (failedPackageList '= "") {
+            Write !,"Failed to migrate: ",!,$ListToString(failedPackageList,$c(13,10))
+        }
         Write !,$System.Status.GetErrorText(sc)
     }
     Write:verbose !
@@ -99,11 +113,9 @@ ClassMethod MigrateOnePackageToIPM(oldId As %Integer, name As %String, verbose A
         // Migrate %ZPM.PackageManager.Developer.Document.ModuleStream to %IPM.StudioDocument.ModuleStream
         // ^ZPM.Dev.ModuleDocD -> ^IPM.StudioDoc.ModuleStreamD
         // Uses objects for the actual data migration to more cleanly handle the stream.
-        Do {
-            If ##class(%IPM.StudioDocument.ModuleStream).NameExists(name) {
-                Write:verbose !,"Document already found in new storage: ",name
-                Quit
-            }
+        If ##class(%IPM.StudioDocument.ModuleStream).NameExists(name) {
+            Write:verbose !,"Document already found in new storage: ",name
+        } Else {
             Set oldObj = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(name,,.sc)
             $$$ThrowOnError(sc)
             Set newObj = ##class(%IPM.StudioDocument.ModuleStream).%New()
@@ -114,7 +126,7 @@ ClassMethod MigrateOnePackageToIPM(oldId As %Integer, name As %String, verbose A
             $$$ThrowOnError(newObj.%Save())
 
             Write:verbose !,"Migrated document stream - "_newObj.Name_".ZPM"
-        } While 0
+        }
 
         TCOMMIT
     } Catch e {
@@ -130,6 +142,13 @@ ClassMethod MigrateRepoDefinitions(verbose As %Boolean = 1) As %Status
 {
     Set initTLevel = $TLevel
     Try {
+        For lockName = $Name(^%ZPM.Client.ServerDefD),$Name(^IPM.Repo.DefinitionD) {
+            Set locks(lockName) = $System.AutoLock.Lock(lockName,,2)
+            If locks(lockName) = $$$NULLOREF {
+                $$$ThrowStatus($$$ERROR($$$LockFailedExtent,lockName))
+            }
+        }
+
         TSTART
         Set key = ""
         For {

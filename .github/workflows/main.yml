@@ -179,6 +179,7 @@ jobs:
           docker exec -i $CONTAINER iris session iris -UUSER << EOF 
             set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")
             zpm "list":1
+            zpm "install dsw":1
             zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1
             zpm "repo -list"
             zpm "search":1
