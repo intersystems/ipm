@@ -5,6 +5,8 @@ Parameter REGISTRYNAME = "test_registry";
 
 Parameter CLIENTNS As STRING = "UTCLIENT";
 
+Parameter NEEDSREGISTRY As BOOLEAN = 1;
+
 Property UserCreated As %Boolean [ InitialExpression = 0 ];
 
 Property ClientNSCreated As %Boolean [ InitialExpression = 0 ];
@@ -25,28 +27,31 @@ Method Setup() As %Status
 		Set ..ClientNSCreated = 1
 		
 		// Client namespace setup
-		Set $Namespace = ..#CLIENTNS
-		
-		if ($system.Util.GetEnviron("TEST_REGISTRY")="") {
-			Do $$$AssertFailure("Registry Server not defined")
-			Quit
-		}
-		if ('..RegistryAdded) {
-			Set tServerDefn = ##class(%IPM.Repo.Remote.Definition).%New()
-			Set tServerDefn.Name = ..#REGISTRYNAME
-			Set tServerDefn.Enabled = 1
-			Set tServerDefn.URL = $system.Util.GetEnviron("TEST_REGISTRY")
-			Set tServerDefn.DeploymentEnabled = 1
-			Set tServerDefn.Username = $system.Util.GetEnviron("TEST_REGISTRY_USER")
-			Set tServerDefn.Password = $system.Util.GetEnviron("TEST_REGISTRY_PASSWORD")
-			Set tServerDefn.Prereleases = 1
-			Set tServerDefn.Snapshots = 1
-			Do $$$AssertStatusOK(tServerDefn.%Save(),"Remote server definition saved.")
-	
-			Set ..RegistryAdded = 1
+		if ..#NEEDSREGISTRY {
+			if ($system.Util.GetEnviron("TEST_REGISTRY")="") {
+				Do $$$AssertSkipped("Registry Server not defined")
+				Quit
+			}
+			if ('..RegistryAdded) {
+				for namespace = $Namespace,..#CLIENTNS {
+					set $Namespace = namespace
+					Set tServerDefn = ##class(%IPM.Repo.Remote.Definition).%New()
+					Set tServerDefn.Name = ..#REGISTRYNAME
+					Set tServerDefn.Enabled = 1
+					Set tServerDefn.URL = $system.Util.GetEnviron("TEST_REGISTRY")
+					Set tServerDefn.DeploymentEnabled = 1
+					Set tServerDefn.Username = $system.Util.GetEnviron("TEST_REGISTRY_USER")
+					Set tServerDefn.Password = $system.Util.GetEnviron("TEST_REGISTRY_PASSWORD")
+					Set tServerDefn.Prereleases = 1
+					Set tServerDefn.Snapshots = 1
+					Do $$$AssertStatusOK(tServerDefn.%Save(),"Remote server definition saved.")
+			
+					Set ..RegistryAdded = 1
 
-      /// Clear any packages on remote registry for debug purposes
-      Do tServerDefn.GetPackageService().ResetRegistry()
+					/// Clear any packages on remote registry for debug purposes
+					Do tServerDefn.GetPackageService().ResetRegistry()
+				}
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()

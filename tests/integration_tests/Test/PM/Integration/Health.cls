@@ -3,6 +3,11 @@ Class Test.PM.Integration.Health Extends Test.PM.Integration.Base
 
 Parameter CommonPathPrefix As STRING = "health-test";
 
+Method OnBeforeAllTests() As %Status
+{
+  Quit ##class(%Library.EnsembleMgr).EnableNamespace($Namespace)
+}
+
 Method TestHealthTrue()
 {
   set tModuleDir = ..GetModuleDir(..#CommonPathPrefix, "health-true")

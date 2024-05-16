@@ -507,6 +507,7 @@ ClassMethod MapPackageEquivalently(pPackageName As %String, pSourceNamespace As 
 	Set tSC = $$$OK
 	Try {
 		New $Namespace
+		Set oldNamespace = $Namespace
 		Set tSourceDB = ##class(%SYS.Namespace).GetPackageDest(pSourceNamespace,pPackageName)
 		Set $Namespace = "%SYS"
 		// In tSourceDB:
@@ -520,6 +521,7 @@ ClassMethod MapPackageEquivalently(pPackageName As %String, pSourceNamespace As 
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Could not find database name for '%1'",tDBDir)))
 		}
 		$$$ThrowOnError(tSC)
+		Set $Namespace = oldNamespace
 		Set tSC = ##class(%IPM.Utils.Module).AddPackageMapping(pMappedToNamespace, pPackageName, $ListGet(tDBList))
 		$$$ThrowOnError(tSC)
 	} Catch e {
@@ -534,6 +536,7 @@ ClassMethod MapRoutineEquivalently(pRoutineName As %String, pSourceNamespace As 
 	Set tSC = $$$OK
 	Try {
 		New $Namespace
+		Set oldNamespace = $Namespace
 		Set tSourceDB = ##class(%SYS.Namespace).GetRoutineDest(pSourceNamespace,pRoutineName,pType)
 		Set $Namespace = "%SYS"
 		// In tSourceDB:
@@ -547,6 +550,7 @@ ClassMethod MapRoutineEquivalently(pRoutineName As %String, pSourceNamespace As 
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Could not find database name for '%1'",tDBDir)))
 		}
 		$$$ThrowOnError(tSC)
+		Set $Namespace = oldNamespace
 		Set tSC = ##class(%IPM.Utils.Module).AddRoutineMapping(pMappedToNamespace, pRoutineName, pType, $ListGet(tDBList))
 		$$$ThrowOnError(tSC)
 	} Catch e {
@@ -561,6 +565,7 @@ ClassMethod MapGlobalEquivalently(pGlobalName As %String, pSourceNamespace As %S
 	Set tSC = $$$OK
 	Try {
 		New $Namespace
+		Set oldNamespace = $Namespace
 		Set tSourceDB = ##class(%SYS.Namespace).GetGlobalDest(pSourceNamespace,pGlobalName)
 		Set $Namespace = "%SYS"
 		// In tSourceDB:
@@ -574,6 +579,7 @@ ClassMethod MapGlobalEquivalently(pGlobalName As %String, pSourceNamespace As %S
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Could not find database name for '%1'",tDBDir)))
 		}
 		$$$ThrowOnError(tSC)
+		Set $Namespace = oldNamespace
 		Set tSC = ##class(%IPM.Utils.Module).AddGlobalMapping(pMappedToNamespace, pGlobalName, $ListGet(tDBList))
 		$$$ThrowOnError(tSC)
 	} Catch e {

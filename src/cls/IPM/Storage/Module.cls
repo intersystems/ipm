@@ -1076,7 +1076,8 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 		// This validation only runs if the lifecycle class exists.
 		If (..LifecycleClass '= "") && $$$comClassDefined(..LifecycleClass) {
 			Set tBaseClass = "%IPM.Lifecycle.Base"
-			If '$ClassMethod(..LifecycleClass,"%Extends",tBaseClass) {
+			Set legacyBaseClass = "%ZPM.PackageManager.Developer.Lifecycle.Base"
+			If '$ClassMethod(..LifecycleClass,"%Extends",tBaseClass) && '$ClassMethod(..LifecycleClass,"%Extends",legacyBaseClass) {
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid lifecycle class '%1' - must extend %2",..LifecycleClass,tBaseClass))
 				Quit
 			}
@@ -1536,4 +1537,3 @@ Storage Default
 }
 
 }
-

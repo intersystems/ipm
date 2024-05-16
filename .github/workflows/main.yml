@@ -78,34 +78,32 @@ jobs:
           echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
           docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
           docker network create zpm
-          docker run --rm -d \
+          REGISTRY=$(docker run --rm -d \
             --network zpm \
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
             docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
-            -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
-          REGISTRY=`docker ps -lq`
+            -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker logs $REGISTRY
       - name: Test and Verify
         timeout-minutes: 15
         run: |
-          docker run --network zpm -d --rm \
+          CONTAINER=$(docker run --network zpm -d --rm \
             -e TEST_REGISTRY=http://registry:52773/registry/ \
             -e TEST_REGISTRY_USER=admin \
             -e TEST_REGISTRY_PASSWORD=SYS \
-            zpm ${{ steps.image.outputs.flags }}
-          CONTAINER=`docker ps -lq`
+            zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
           echo `docker exec -i --workdir /home/irisowner/zpm/ $CONTAINER ls -rtl`
-          /bin/echo -e '' \
-            'zpm "list":1\n' \
-            'zpm "test zpm -v -only"\n' \
-            'zpm "verify zpm -v -only"\n' \
-            'halt\n' \
-          | docker exec -i $CONTAINER iris session iris -UUSER
+          docker exec -i $CONTAINER iris session iris -UUSER << EOF
+            zpm "list":1
+            zpm "test zpm -v -only":1
+            zpm "verify zpm -v -only":1
+            halt
+          EOF
           docker stop $CONTAINER
       - name: Restart temporary registry
         timeout-minutes: 15
@@ -124,25 +122,25 @@ jobs:
       - name: Test and publish to temporary registry
         timeout-minutes: 15
         run: |
-          docker run --network zpm -d --rm zpm ${{ steps.image.outputs.flags }}
-          CONTAINER=`docker ps -lq`
+          CONTAINER=$(docker run --network zpm -d --rm zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
-          /bin/echo -e '' \
-            'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
-            'zpm "repo -list":1\n' \
-            'zpm "install dsw":1\n' \
-            'zpm "install sslclient":1\n' \
-            'zpm "list":1\n' \
-            'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
-            'zpm "publish zpm -v":1' \
-            'zpm "publish sslclient -v":1' \
-            'zpm "search":1' \
-            'halt\n' \
-          | docker exec -i $CONTAINER iris session iris -UUSER
+          docker exec -i $CONTAINER iris session iris -UUSER << EOF
+            zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
+            zpm "repo -list":1
+            zpm "install dsw":1
+            zpm "install sslclient":1
+            zpm "list":1
+            zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1
+            zpm "publish zpm -v":1
+            zpm "publish sslclient -v":1
+            zpm "search":1
+            halt
+          EOF
           docker logs $CONTAINER
           docker stop $CONTAINER
-      # - name: Clean install current version and test new one. (Permitted to fail on 2023.1+)
+      # NOTE: commented out until 0.7.1 is released.
+      # - name: Clean install current version and test new one.
       #   timeout-minutes: 15
       #   run: |
       #     curl http://localhost:52773/registry/packages/-/all | jq
@@ -153,7 +151,6 @@ jobs:
       #     sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
       #     /bin/echo -e '' \
       #       'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
-      #       'if +sc=0 { halt:$System.Version.GetMajor()>=2023  do ##class(%SYSTEM.Process).Terminate(,1) }\n' \
       #       'zpm "list":1\n' \
       #       'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
       #       'zpm "repo -list"\n' \
@@ -165,22 +162,51 @@ jobs:
       #       'halt\n' \
       #     | docker exec -i $CONTAINER iris session iris -UUSER
       #     docker stop $CONTAINER
+      - name: Clean install v0.7.x and test migration to latest.
+        timeout-minutes: 15
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl http://localhost:52773/registry/packages/-/all | jq
+          curl http://localhost:52773/registry/packages/zpm/ | jq
+          ASSET_NAME='zpm-0.7.1-beta.4.xml'
+          ASSET_URL=`wget --header "Authorization: token ${GITHUB_TOKEN}" -qO- https://api.github.com/repos/intersystems/ipm/releases | jq -r ".[].assets[] | select(.name == \"${ASSET_NAME}\") | .browser_download_url"`
+          wget $ASSET_URL -O /tmp/zpm.xml
+          CONTAINER=$(docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
+          docker cp /tmp/zpm.xml $CONTAINER:/home/irisowner/zpm.xml
+          docker cp tests/migration/v0.7-to-v0.9/. $CONTAINER:/tmp/test-package/
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker exec -i $CONTAINER iris session iris -UUSER << EOF 
+            set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")
+            zpm "list":1
+            zpm "install dsw":1
+            zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1
+            zpm "repo -list"
+            zpm "search":1
+            zpm "install sslclient":1
+            zpm "install zpm -v":1
+            zpm "load -dev /tmp/test-package/":1
+            zpm "test ipm-migration-v0.7-to-v0.9 -only -verbose":1
+            halt
+          EOF
+          docker logs $CONTAINER
+          docker stop $CONTAINER
       - name: Clean install and test
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
-          docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
-          CONTAINER=`docker ps -lq`
+          CONTAINER=$(docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
+          docker cp /tmp/zpm.xml $CONTAINER:/home/irisowner/zpm.xml
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          /bin/echo -e '' \
-            'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
-            'if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)\n' \
-            'zpm "list":1\n' \
-            'zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1\n' \
-            'zpm "install dsw":1\n' \
-            'zpm "list":1\n' \
-            'halt\n' \
-          | docker exec -i $CONTAINER iris session iris -U%SYS
+          docker exec -i $CONTAINER iris session iris -U%SYS << EOF
+            set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")
+            if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)
+            zpm "list":1
+            zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
+            zpm "install dsw":1
+            zpm "list":1
+            halt
+          EOF
           docker logs $CONTAINER
           docker stop $CONTAINER
       - name: Prepare XML Installer
@@ -241,16 +267,15 @@ jobs:
         run: |
           sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION}<\/Version>/" module.xml
           cat module.xml
-          docker run -d --rm -v $(pwd):/home/irisowner/zpm/ containers.intersystems.com/intersystems/${{ needs.prepare.outputs.main }} --check-caps false
-          CONTAINER=`docker ps -lq`
+          CONTAINER=$(docker run -d --rm -v $(pwd):/home/irisowner/zpm/ containers.intersystems.com/intersystems/${{ needs.prepare.outputs.main }} --check-caps false)
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          /bin/echo -e '' \
-            'set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/Installer.cls","ck")' \
-            'set sc=##class(IPM.Installer).setup("/home/irisowner/zpm/",3)' \
-            'zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1\n' \
-            'zpm "publish zpm -v":1' \
-            'halt\n' \
-          | docker exec -i $CONTAINER iris session iris -UUSER
+          docker exec -i $CONTAINER iris session iris -UUSER << EOF
+            set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/Installer.cls","ck")
+            set sc=##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
+            zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1
+            zpm "publish zpm -v":1
+            halt
+          EOF
           docker stop $CONTAINER
       - name: Upload Public Release Asset
         uses: actions/upload-release-asset@v1

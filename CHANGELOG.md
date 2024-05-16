@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
 
 ### Changed
+- IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.
 - HSIEO-9484: Add additional argument to buildDepsGraph to allow putting in an additional list element of dependency's DisplayName
 - HSIEO-9484: Add additional property DisplayName to %IPM.Storage.ModuleReference
 - HSIEO-10274: Separate DependencyAnalyzer out from IPM
 - #261: IPM now truly supports using multiple registries for installation / discovery of packages (without needing to prefix the package with the registry name on "install", although it is still possible and now effective to use the prefix).
+- #454: IPM 0.9.x+ uses different globals for storage vs. 0.7.0 and previous. Installation will automatically migrate data from the old globals to the new ones. The old globals are left around in case the user decides to revert to an earlier version.
 
 ### Fixed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
@@ -36,7 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-9924: RunDev needs to do complete installation of component and dependencies via ignoreInstalled, so adding ignoreInstalledModules checker in syncLoadDependencies
 - HSIEO-10267: Bug Fix - Resource name should be the fifth argument of CreateDatabase
 - #440: IPM works with delimited identifiers disabled
-- #451: (CI) Run on fewer versions to minimize overhead and Community Edition expiration issues
+- #451: CI runs on fewer versions to minimize overhead and Community Edition expiration issues
+- #451, #428: Fixes "Verify" phase to work properly after %IPM rename
 - #451: Avoid compliation errors due to storage location conflict on IRIS for Health prior to 2024.1
 - #455: Upgrade from %ZPM classes updates language extensions correctly to use %IPM
 - #373: Cleaner cross-version approach used in language extension routine generation

@@ -123,9 +123,21 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 					}
 
 					If '..ResourceReference.Preload {
-						Set tFileExtension = $Select(..LoadAsDirectory:"",1:"."_..FilenameExtension)
-						Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)) _ tFileExtension
-						If '..LoadAsDirectory {
+            Set tFileExtension = ""
+            Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator))
+            If '..LoadAsDirectory {
+              // For user document types (generally), dynamilly support both the resource and filename extension
+              // e.g., for lookup tables, both .xml and .lut are supported regardless of configuration in module.xml.
+              // Generally, FilenameExtension SHOULD be specified (for the sake of embedded source control integration if nothing else),
+              // but this makes IPM less picky about reasonable things users might do.
+              Set tItemFileExtension = $$$lcase("." _ $Piece(..ResourceReference.Name, ".", *))
+              Set tFileExtension =  $$$lcase("." _ ..FilenameExtension)
+              For tFileExtension = tFileExtension,tItemFileExtension {
+                Quit:##class(%IPM.Utils.File).Exists(tResourcePath _ tFileExtension)
+              } 
+
+              Set tResourcePath = tResourcePath _ tFileExtension
+
               If ($$$lcase(tFileExtension)'=".xml")&&('##class(%File).Exists(tResourcePath)) {
 							  Set tResourcePathXML = tResourcePath
                 Set $PIECE(tResourcePath, ".", *) = "xml"
@@ -394,7 +406,7 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
     } Else {
       Set tProcessed = 0
       set fileExt = $$$UPPER($Piece(pFullResourcePath, ".", *))
-      if '$LISTFIND($LB("CLS", "MAC", "XML"), fileExt), ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
+      if '$LISTFIND($LB("CLS", "MAC"), fileExt), ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
         try {
           set stream = ##class(%Stream.FileCharacter).%New()
           $$$ThrowOnError(stream.LinkToFile(pFullResourcePath))
