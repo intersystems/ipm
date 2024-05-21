@@ -93,6 +93,10 @@ Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
       Set tEquals = tEquals && (val1 = val2)
     }
   }
+	If ($Extract(..Operator,1) = "=") {
+		// Means direct equality and not <= or >= so compare pre-release as well
+		Set tEquals = tEquals && (pVersion.Prerelease = ..Prerelease)
+	}
 	If tEquals || (..Operator = "=") {
 		Quit tEquals
 	}
