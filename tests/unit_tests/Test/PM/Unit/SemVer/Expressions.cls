@@ -27,6 +27,22 @@ Method TestEvaluate()
 	Do ..AssertNotSatisfied(tExpression,"2.0.0")
 }
 
+Method TestPrerelease()
+{
+	Do ..AssertSatisfied("1.0.0-beta.1","1.0.0-beta.1")
+	Do ..AssertSatisfied("=1.0.0-beta.1","1.0.0-beta.1")
+	Do ..AssertSatisfied(">=1.0.0-beta.1","1.0.0-beta.1")
+	Do ..AssertSatisfied(">=1.0.0-beta.1","1.0.0-beta.2")
+	Do ..AssertSatisfied(">=1.0.0-alpha.1","1.0.0-beta.1")
+	Do ..AssertSatisfied("^1.0.0","1.0.0-1.m1")
+	Do ..AssertNotSatisfied(">=1.0.0-beta.2","1.0.0-beta.1")
+	Do ..AssertNotSatisfied(">=1.0.0-beta.1","1.0.0-alpha.1")
+	
+	// This is the problematic case without HSIEO-10520
+	Do ..AssertNotSatisfied("1.0.0-1.m1","1.0.0") 
+	Do ..AssertNotSatisfied("=1.0.0-1.m1","1.0.0")
+}
+
 Method TestEquivalenceHyphenRanges()
 {
 	Do ..AssertEquivalent("1.2.3 - 2.3.4", ">=1.2.3 <=2.3.4")
