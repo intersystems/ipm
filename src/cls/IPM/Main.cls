@@ -611,11 +611,16 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<!-- Modifiers -->
 		<modifier name="version" aliases="v" value="true" description="A special version of IPM can be provided. If not specified, the latest version from the registry will be installed (hence is not required if quiet flag is set)."/>
 		<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM needs to be enabled."/>
-		<modifier name="globally" description="Will install IPM in all non-%SYS explicit namespaces that currently do not have IPM installed. By default, this modifier is not set and will not install globally."/>
+		<modifier name="globally" aliases="g" description="Will install IPM in all non-%SYS explicit namespaces that currently do not have IPM installed. By default, this modifier is not set and will not install globally."/>
 		<modifier name="local-only" description="If specified, only local artifacts will be used for installation. By default, this modifier is not set and will not limit to local artifacts." />
 		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By deafult, this modifier is not ste and will not allow upgrade." />
+		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy. Can be used with -globally to add a %ALL namespace mapping." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
+		<modifier name="preview" aliases="p" description="Preview only - for -map option, shows the namespaces that would be enabled." />
 		<!-- Examples -->
+		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database to the %ALL psuedo-namespace. Namespace-specific installation will override this.">
+			enable -map -globally
+		</example>
 		<example description="Install IPM version 0.3.4 in quiet mode in namespaces: NS1, NS2, NS3.">
 			enable -v 0.3.4 -q -ns NS1,NS2,NS3
 		</example>
@@ -1132,8 +1137,9 @@ ClassMethod GetVersionModule(name, namespace = {$namespace})
 /// Version client and registry
 ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
-  Do ..GetListModules("*", $$$IPMModuleName_","_$$$IPMServerRegistryModuleName, .list)
-  Do ..DisplayModules(.list)
+	Do ..GetListModules("*", $$$IPMModuleName_","_$$$IPMServerRegistryModuleName, .list)
+	Do ..AddIPMMappedNamespaces(.list)
+	Do ..DisplayModules(.list)
 
 	// Get URL current registry
 	Set tRes = ##class(%IPM.Repo.Remote.Definition).ExtentFunc()
@@ -1148,6 +1154,38 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		Write !,$$$FormattedLine($$$Blue,tRepository.URL)," - ",tInfo.ToString()
 	}
 	Quit $$$OK
+}
+
+ClassMethod AddIPMMappedNamespaces(ByRef list) [ Private ]
+{
+	Do ..GetListNamespace(.allNS,"*")
+	For i=1:1:+$Get(list) {
+		Set namespace = $ListGet(list(i))
+		If (namespace '= "") {
+			Kill allNS(namespace)
+		}
+		Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
+		Set mappedFrom(sourceDB) = namespace
+		Merge mappedFrom(sourceDB,"info") = list(i)
+	}
+
+	Set namespace = ""
+	For {
+		Set namespace = $Order(allNS(namespace))
+		Quit:namespace=""
+
+		Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
+		If $Data(mappedFrom(sourceDB),sourceNamespace) {
+			Kill info
+			Merge info = mappedFrom(sourceDB,"info")
+			Set info = $lb(namespace)
+			Set info("modules",1,"Installed In") = sourceNamespace
+			Merge list($i(list)) = info
+			If $Length(namespace) > +$Get(list("width")) {
+				Set list("width") = $Length(namespace)
+			}
+		}
+	}
 }
 
 /// @API.Method
@@ -2602,14 +2640,18 @@ ZPM(pArgs...)
 
 ClassMethod EnableIPM(ByRef pCommandInfo)
 {
-	Write !, "Version of IPM in current namespace: "
-	Do ..GetListModules($Namespace,$$$IPMModuleName,.list)
-	If $Data(list($$$IPMModuleName)) {
-			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_$ListGet(list($$$IPMModuleName),1)
+	New $Namespace
+	Set initNamespace = $Namespace
+	If ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName,.ipmModuleId) {
+		Set modDef = ##class(%IPM.Storage.Module).%OpenId(ipmModuleId,,.sc)
+		$$$ThrowOnError(sc)
+		Write !, "Version of IPM in current namespace: "
+		Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_modDef.VersionString
 	}
-	Kill list
 
 	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	Set preview = $$$HasModifier(pCommandInfo,"preview")
+	Set map = $$$HasModifier(pCommandInfo,"map")
 	Set globally = $$$HasModifier(pCommandInfo, "globally")
 	Set localOnly = $$$HasModifier(pCommandInfo, "local-only")
 	Set version = $$$GetModifier(pCommandInfo, "version")
@@ -2626,6 +2668,59 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	}
 	If ((namespaces '= "") && globally) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global installation flag at the same time."))
+	}
+	If (version '= "") && (globally && map) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify version when mapping the currently-installed version globally."))
+	}
+	If map && 'globally && (namespaces = "") {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"If mapping from the current namespace's routine database with -map, must specify either -globally or a list of namespaces with -ns"))
+	}
+
+	If map {
+		If globally {
+			Set namespaces = ""
+			Do ..GetListNamespace(.list)
+			Kill list("%ALL")
+			Set key = ""
+			For {
+				Set key = $Order(list(key))
+				Quit:key=""
+				Set namespaces = namespaces _ $ListBuild(key)
+			}
+		} Else {
+			Set namespaces = $ListFromString(namespaces)
+		}
+		Set pointer = 0
+		While $ListNext(namespaces,pointer,namespace) {
+			Set $Namespace = namespace
+			If $$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName) {
+				If 'quiet || preview {
+					Write !,"Skipping "_namespace_" - IPM already installed."
+				}
+				Continue
+			}
+			Set $Namespace = initNamespace
+			If preview {
+				Write !,"Would add IPM mappings to "_namespace
+				Continue
+			}
+			If 'quiet {
+				Write !,"Mapping %IPM package in "_namespace_" equivalently to "_initNamespace
+			}
+			$$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace))
+			If 'quiet {
+				Write !,"Mapping %IPM.* routines in "_namespace_" equivalently to "_initNamespace
+			}
+			$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
+		}
+		Set $Namespace = initNamespace
+		If preview {
+			Write !,"Preview mode; no configuration changes were made."
+		} ElseIf 'quiet {
+			Write !,"Done.",!
+			Do ..Version()
+		}
+		Return
 	}
 
 	New $Namespace
@@ -2914,7 +3009,8 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     $ListBuild("Author.Person", $$$Yellow, "Author"),
     $ListBuild("Origin", $$$Blue),
     $ListBuild("AllVersions", $$$Blue, "Versions"),
-    $ListBuild("Repository", $$$Blue)
+    $ListBuild("Repository", $$$Blue),
+    $ListBuild("Installed In", $$$Blue)
   )
 
   Set width = $Get(pList("width")) + 1

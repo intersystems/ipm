@@ -35,6 +35,7 @@ XData PM [ XMLNamespace = INSTALLER ]
     <Arg Value="${MODDIR}"/>
   </Invoke>
   <Invoke Class="IPM.Installer" Method="ZPMCompile" CheckStatus="true" />
+  <Invoke Class="IPM.Installer" Method="MapIfLegacy" CheckStatus="true" />
 </Namespace>
 
 </Manifest>
@@ -43,10 +44,10 @@ XData PM [ XMLNamespace = INSTALLER ]
 XData MapOnly [ XMLNamespace = INSTALLER ]
 {
 <Manifest>
-  <Namespace Name="${CURNS}" Code="${CURNSRoutineDB}" Data="${CURNSGlobalDB}" Create="no" Ensemble="0">
+  <Namespace Name="${CURNS}" Code="${CURNSRoutineDB}" Data="${CURNSGlobalDB}" Create="overwrite" Ensemble="0">
     <Configuration>
         <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
-        <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" /> 
+        <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}"/> 
     </Configuration>
   </Namespace>
 </Manifest>
@@ -79,7 +80,6 @@ ClassMethod Map(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.Ins
   Do %code.WriteLine(" Set sc = ##class(Config.Namespaces).Get(prevNS, .properties)")
   Do %code.WriteLine(" Set pVars(""CURNSRoutineDB"")=$Get(properties(""Routines""))")
   Do %code.WriteLine(" Set pVars(""CURNSGlobalDB"")=$Get(properties(""Globals""))")
-  Do %code.WriteLine(" If ##class(Config.MapPackages).Exists(prevNS,""%IPM"") { Quit $$$OK }")
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "MapOnly")
 }
 
@@ -113,6 +113,14 @@ ClassMethod ZPMLoad(pDirectoryName)
 ClassMethod ZPMCompile()
 {
   Quit ##class(%IPM.Main).Shell("ZPM compile")
+}
+
+ClassMethod MapIfLegacy()
+{
+  If ##class(%IPM.Utils.Migration).HasLegacyZPMPackage() {
+    Quit ##class(%IPM.Main).Shell("enable -globally -map")
+  }
+  Quit $$$OK
 }
 
 ClassMethod EndCompile(qstruct) As %Status
