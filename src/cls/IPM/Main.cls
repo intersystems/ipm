@@ -1859,7 +1859,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	Merge tParams = pCommandInfo("data")
 	Set tParams("cmd") = "load"
 	Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
-	if $G(tComponents("scheme")) {
+	If $G(tComponents("scheme")) [ "http" {
 		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {

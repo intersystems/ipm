@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #373: Cleaner cross-version approach used in language extension routine generation
 - #459: zpm "version" behaves better without internet access
 - #224: When updating zpm, existing configuration won't be reset
+- #487: When loading a package, relative paths staring with prefix "http" won't be mistaken for git repo
 
 ### Security
 -
