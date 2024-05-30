@@ -1857,12 +1857,13 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
 	Merge tParams = pCommandInfo("data")
-  Set tParams("cmd") = "load"
-  if $Extract(tDirectoryName,1,4)="http" {
+	Set tParams("cmd") = "load"
+	Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
+	If $G(tComponents("scheme")) [ "http" {
 		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
-    Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
+		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($Piece(tDirectoryName, ".", *)) = "tgz" {
 		Set tTargetDirectory = $$$FileTempDirSys
