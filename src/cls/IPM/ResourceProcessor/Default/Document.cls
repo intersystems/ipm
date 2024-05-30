@@ -188,8 +188,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
-  // Resolve the issue in HSIEO-9235 before enabling deployed item export
-  // Set tSC = ..OnExportDeployedItem(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
+  Set tSC = ..OnExportDeployedItem(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
   Set tSC = $$$OK	
   If pItemHandled || $$$ISERR(tSC) {	
     Quit tSC	
@@ -231,18 +230,19 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 
 Method OnExportDeployedItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
 {
-	
   Set tSC = $$$OK	
   Try {	
     Set tVerbose = $Get(pParams("Verbose"),0)	
-    Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)	
-    Quit:tDeveloperMode	
-    Quit:'..ResourceReference.Deploy	
+    Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
+    If (tDeveloperMode || ('..ResourceReference.Deploy) || ('$ListLength(..ResourceReference.Module.Lifecycle.PhaseList))) {
+      // Only export deployed items if we say to, are in a non-developer-mode context, and are currently executing module lifecycle phases.
+      // OnExportItem may also be called from a source control extension context, and in this case PhaseList will be empty.
+      Quit
+    }
     Set tModuleName = ..ResourceReference.Module.Name	
     Set fileExt = $$$ucase($Piece(pItemName, ".", *))	
     Set tName = $Piece(pItemName, ".", 1, * - 1)	
-    Quit:'($ListFind($ListBuild("CLS","MAC","INT"), fileExt))	
-    #; Set tSC = $$$OK	
+    Quit:'($ListFind($ListBuild("CLS","MAC","INT"), fileExt))
     Set tFullExportPath = pFullExportPath	
     Set tFullExportPath = tFullExportPath _ ".deploy"	
     Write:tVerbose !,"Exporting Deployed '",pItemName,"' to '",tFullExportPath,"'"	

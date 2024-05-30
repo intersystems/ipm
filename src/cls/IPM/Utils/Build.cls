@@ -41,6 +41,8 @@ ClassMethod InitializeNamespace(pPostfix As %String, pVerbose As %Boolean = 1, O
 			}
 		}
 		$$$ThrowOnError(..CreateNamespace(pNewNamespace, tBuildDBName, tDataDBName, pVerbose, pNSConfig))
+
+		$$$ThrowOnError(..MapPackageEquivalently("%IPM",$Namespace,pNewNamespace))
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -710,4 +712,3 @@ ClassMethod Backup() As %Status [ Internal ]
 }
 
 }
-
