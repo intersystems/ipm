@@ -31,6 +31,7 @@
     <Resource Name="ResourceTest.TestBPL.bpl"/>
     <Resource Name="ResourceTest.INC">
     </Resource>
+    <Resource Name="ResourceTest.APackage.AnotherIncludeFile.INC" />
     <Resource Name="ResourceTest.MAC">
     </Resource>
     <Resource Name="ResourceTest.GBL">
