@@ -15,6 +15,7 @@ ClassMethod InitializeBuildNamespace(pVerbose As %Boolean = 1, pNSConfig As %IPM
 ClassMethod InitializeNamespace(pPostfix As %String, pVerbose As %Boolean = 1, Output pNewNamespace, pNSConfig As %IPM.Storage.ModuleSetting.NamespaceConfig) As %Status
 {
 	// TODO: Support custom mappings and additional databases.
+	New $Namespace
 	Set tSC = $$$OK
 	Set pNewNamespace = ""
 	Try {
@@ -41,6 +42,14 @@ ClassMethod InitializeNamespace(pPostfix As %String, pVerbose As %Boolean = 1, O
 			}
 		}
 		$$$ThrowOnError(..CreateNamespace(pNewNamespace, tBuildDBName, tDataDBName, pVerbose, pNSConfig))
+
+		$$$ThrowOnError(..MapPackageEquivalently("%IPM",$Namespace,pNewNamespace))
+
+		Set oldNamespace = $Namespace
+		Set $Namespace = pNewNamespace
+
+		// Copy over registries from the source namespace as well
+		$$$ThrowOnError(##class(%IPM.Main).Shell("repo -copy-from "_oldNamespace))
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
@@ -710,4 +719,3 @@ ClassMethod Backup() As %Status [ Internal ]
 }
 
 }
-

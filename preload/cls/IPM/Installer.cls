@@ -126,10 +126,10 @@ ClassMethod EndCompile(qstruct) As %Status
   #; Installed version newer
   if '..NeedInstall() QUIT $$$OK
 
-  Write !,"Extract package"
+  Write !,"Extracting package"
   $$$QuitOnError(..ExtractPackage(.tModDir))
   
-  Write !,"Install ZPM"
+  Write !,"Installing ZPM"
 
   set ts = $ZHOROLOG
   set logFile=##class(%File).TempFilename()

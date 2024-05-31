@@ -332,7 +332,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
         Set tKey = ""
         For {
           Set tInvoke = tModule.Invokes.GetNext(.tKey)
-          Quit:(tKey = "")
+          If (tKey = "") || '$IsObject(tInvoke) {
+            Quit // '$IsObject can happen reasonably after namespace changes
+          }
           Set tSC = tInvoke.OnAfterPhase(tOnePhase,.pParams)
           Quit:$$$ISERR(tSC)
         }
