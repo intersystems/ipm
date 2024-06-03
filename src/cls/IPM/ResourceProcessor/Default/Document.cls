@@ -128,7 +128,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
               Set identifiers = ..FilenameTranslateIdentifier
               Set associators = ..FilenameTranslateAssociator
               If allowPercentSymbol {
-                set pos = $Find(identifiers, "%")
+                set pos = $Find(identifiers, "%") - 1
                 If pos {
                   set $EXTRACT(identifiers, pos) = ""
                   set $EXTRACT(associators, pos) = ""
