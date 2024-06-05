@@ -126,43 +126,56 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 					}
 
 					If '..ResourceReference.Preload {
-            Set tFileExtension = ""
-            Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator))
-            If '..LoadAsDirectory {
-              // For user document types (generally), dynamilly support both the resource and filename extension
-              // e.g., for lookup tables, both .xml and .lut are supported regardless of configuration in module.xml.
-              // Generally, FilenameExtension SHOULD be specified (for the sake of embedded source control integration if nothing else),
-              // but this makes IPM less picky about reasonable things users might do.
-              Set tItemFileExtension = $$$lcase("." _ $Piece(..ResourceReference.Name, ".", *))
-              Set tFileExtension =  $$$lcase("." _ ..FilenameExtension)
-              For tFileExtension = tFileExtension,tItemFileExtension {
-                Quit:##class(%IPM.Utils.File).Exists(tResourcePath _ tFileExtension)
-              } 
-
-              Set tResourcePath = tResourcePath _ tFileExtension
-
-              If ($$$lcase(tFileExtension)'=".xml")&&('##class(%File).Exists(tResourcePath)) {
-							  Set tResourcePathXML = tResourcePath
-                Set $PIECE(tResourcePath, ".", *) = "xml"
-                If (##class(%File).Exists(tResourcePathXML)) {	
-                  Set tResourcePath = tResourcePathXML	
-                  Set ..Format = "XML"	
+            For allowPercentSymbol = 0, 1 {
+              Set tFileExtension = ""
+              Set identifiers = ..FilenameTranslateIdentifier
+              Set associators = ..FilenameTranslateAssociator
+              If allowPercentSymbol {
+                set pos = $Find(identifiers, "%") - 1
+                If pos {
+                  set $EXTRACT(identifiers, pos) = ""
+                  set $EXTRACT(associators, pos) = ""
                 }
-						  }
-			
-						  If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
-	              Set tResourcePathRTN = tResourcePath	
-                Set $Piece(tResourcePathRTN, ".", *) = "rtn"	
-                If (##class(%File).Exists(tResourcePathRTN)) {	
-                  Set tResourcePath = tResourcePathRTN	
-                }	
               }
-						}
-																		
-						If '##class(%IPM.Utils.File).Exists(.tResourcePath) {
-							Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
-							Continue
-						}
+              Set tResourcePath = ##class(%File).NormalizeFilename(tResourceDirectory _ tSubDirectory _ $Translate(tName, identifiers, associators))
+              If '..LoadAsDirectory {
+                // For user document types (generally), dynamilly support both the resource and filename extension
+                // e.g., for lookup tables, both .xml and .lut are supported regardless of configuration in module.xml.
+                // Generally, FilenameExtension SHOULD be specified (for the sake of embedded source control integration if nothing else),
+                // but this makes IPM less picky about reasonable things users might do.
+                Set tItemFileExtension = $$$lcase("." _ $Piece(..ResourceReference.Name, ".", *))
+                Set tFileExtension =  $$$lcase("." _ ..FilenameExtension)
+                For tFileExtension = tFileExtension,tItemFileExtension {
+                  Quit:##class(%IPM.Utils.File).Exists(tResourcePath _ tFileExtension)
+                } 
+
+                Set tResourcePath = tResourcePath _ tFileExtension
+
+                If ($$$lcase(tFileExtension)'=".xml")&&('##class(%File).Exists(tResourcePath)) {
+                  Set tResourcePathXML = tResourcePath
+                  Set $PIECE(tResourcePath, ".", *) = "xml"
+                  If (##class(%File).Exists(tResourcePathXML)) {	
+                    Set tResourcePath = tResourcePathXML	
+                    Set ..Format = "XML"	
+                  }
+                }
+        
+                If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
+                  Set tResourcePathRTN = tResourcePath	
+                  Set $Piece(tResourcePathRTN, ".", *) = "rtn"	
+                  If (##class(%File).Exists(tResourcePathRTN)) {	
+                    Set tResourcePath = tResourcePathRTN	
+                  }	
+                }
+              }
+              If ##class(%IPM.Utils.File).Exists(.tResourcePath) {
+                Set tSC = $$$OK
+                Quit
+              }
+              Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
+            }
+            If $$$ISERR(tSC) Continue
+
 						$$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList,.pParams))
 						
 						Set tSC = ##class(%IPM.Storage.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
