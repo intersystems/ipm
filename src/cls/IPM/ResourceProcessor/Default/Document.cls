@@ -71,6 +71,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 		If ((pPhase = "Reload") && tInScope) || tInCurrentPhase {
 	    Set tCatDirectory = ""	
       Set tCatDirectory = tCatDirectory _ $ListBuild(..Directory)	
+      If (..Directory="rtn") {	// Ensure backward compatibility. In v0.7.0 and earlier, the default directory was "mac" for routines
+        Set tCatDirectory = tCatDirectory _ $ListBuild("mac")
+      }
       If ('..DirectoryDefined) {	
         If (..Directory="mac") {	
           Set tCatDirectory = tCatDirectory _ $ListBuild("rtn")	
@@ -172,6 +175,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
               Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
             }
             If $$$ISERR(tSC) Continue
+
 						$$$ThrowOnError(..OnLoad(tResourcePath,tVerbose,tInCurrentPhase,.tLoadedList,.pParams))
 						
 						Set tSC = ##class(%IPM.Storage.LoadedResource).TrackResourceNames(..ResourceReference.Module.Name,..ResourceReference.UniqueName,tLoadedList)
