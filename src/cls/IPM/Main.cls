@@ -760,7 +760,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Load(.tCommandInfo)
 			} ElseIf (tCommandInfo = "exec") {
 				Write !
-				Xecute tCommandInfo("parameters","cos")
+				Xecute tCommandInfo("parameters","expression")
 			} ElseIf (tCommandInfo = "install") {
 				Do ..Install(.tCommandInfo)
 			} ElseIf (tCommandInfo = "reinstall") {
