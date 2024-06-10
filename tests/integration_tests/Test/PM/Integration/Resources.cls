@@ -45,6 +45,17 @@ Method TestResourceTypes()
 		Do $$$AssertEquals($Get(^ResourceTest),"Hello World","^ResourceTest was imported properly.")
 		
 		Do $$$AssertEquals($$MyFunction^ResourceTest(),42,"ResourceTest routine exists and was compiled (and, by extension, ResourceTest.inc as well).")
+
+		// Assert that ownership of .INC files is appropriate
+		&sql(select ID into :rrID from %IPM_Storage.ResourceReference where ModuleItem->Name = 'ResourceTest' and Name = 'ResourceTest.APackage.PKG')
+		$$$ThrowSQLIfError(SQLCODE,%message)
+		Set rr = ##class(%IPM.Storage.ResourceReference).%OpenId(rrID,,.sc)
+		$$$ThrowOnError(sc)
+		Do $$$AssertStatusOK(rr.ResolveChildren(.res))
+		If $$$AssertTrue($Data(res("ResourceTest.APackage.IncludeFile.inc"))) {
+			Do $$$AssertEquals(res("ResourceTest.APackage.IncludeFile.inc","RelativePath"),"cls/ResourceTest/APackage/IncludeFile.inc")
+		}
+		Do $$$AssertNotTrue($Data(res("ResourceTest.APackage.AnotherIncludeFile.inc")))
 	} Catch e {
 		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
 	}
