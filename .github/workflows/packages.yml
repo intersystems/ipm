@@ -2,11 +2,16 @@ name: Test major packages
 on:
   workflow_dispatch:
     inputs:
+      nJobs:
+        description: "Number of jobs to run in parallel"
+        required: true
+        type: number
+        default: 64
       minVersionCount:
         description: "Minimum number of versions a package must have to be tested"
         required: true
         type: number
-        default: 10
+        default: 1
 
 jobs:
   matrix-setup:
@@ -17,9 +22,11 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       - id: set-matrix
         run: |
-          matrix=$(curl -L "$PM_URL" | jq -cr "$JQ_SCRIPT")
+          matrix=$(curl -L "$PM_URL" | jq -cr "$JQ_SCRIPT" | python3 .github/scripts/batcher.py ${{ inputs.nJobs }} | jq -cr .)
           echo "matrix=$matrix" >> $GITHUB_OUTPUT
 
   prepare-image:
@@ -43,7 +50,6 @@ jobs:
       - name: Test Image
         run: |
           docker load -i /tmp/zpmimage.tar
-          docker image ls
           CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
           docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session IRIS << EOF
@@ -51,6 +57,7 @@ jobs:
               zn "%SYS"
               zpm "test zpm -v -only":1:1
           EOF
+          docker container stop $CONTAINER
       - name: Upload Image
         uses: actions/upload-artifact@v2
         with:
@@ -65,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
+        packages: ${{ fromJson(needs.matrix-setup.outputs.matrix) }}
     steps:
       - uses: actions/checkout@master
       - name: Set up Docker Buildx
@@ -78,34 +85,47 @@ jobs:
       - name: Load Image
         run: |
           docker load -i /tmp/zpmimage.tar
-          docker image ls
-      - name: Container Setup
-        id: setup-zpm
-        timeout-minutes: 15
-        run: |
-          # Don't specify the container name because `act` will run multiple jobs in parallel and cause name conflicts
-          CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
-          echo "CONTAINER=$CONTAINER" >> $GITHUB_OUTPUT
-          docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          docker exec -i $CONTAINER iris session IRIS << EOF
-              zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
-              halt
-          EOF
-      - name: Test ${{ matrix.package }}
-        timeout-minutes: 15
+      - name: Run tests sequentially
         env:
-          CONTAINER: ${{ steps.setup-zpm.outputs.CONTAINER }}
           test-flags: >-
             -verbose -DUnitTest.ManagerClass=%UnitTest.Manager -DUnitTest.JUnitOutput=/test-reports/junit.xml
             -DUnitTest.FailuresAreFatal=1 -DUnitTest.Manager=%UnitTest.Manager
         run: |
-          docker exec -i ${{ env.CONTAINER }} iris session IRIS << EOF
+          # Don't specify the container name because `act` will run multiple jobs in parallel and cause name conflicts
+          echo "starting sequential tests ..."
+          packages=${{ matrix.packages }}
+          IFS=','
+
+          # The EOF of the following heredocs are intentially unindented
+          # because <<-EOF doesn't like spaces while yaml only allows spaces
+          # A potential solution is to use a script file instead of a block
+          for package in $packages; do
+            echo "setting up container for package $package"
+            CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
+            docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+            docker exec -i $CONTAINER iris session IRIS <<- EOF
               zpm "config set analytics 0":1
-              zpm "install ${{ matrix.package }}":1
-              zpm "${{ matrix.package }} test -only ${{ env.test-flags }}":1:1
+              zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
+              halt
           EOF
-      - name: Stop Container
-        run: |
-          # To ensure a clean state after using `act` locally
-          docker stop -t 5 ${{ steps.setup-zpm.outputs.CONTAINER }}
-          docker ps
+          
+            echo "Testing package $package"
+            set +e
+            docker exec -i $CONTAINER iris session IRIS <<- EOF
+                  zpm "install $package":1
+                zpm "$package test -only ${{ env.test-flags }}":1:1
+          EOF
+
+            if [ $? -ne 0 ]; then
+              echo -e "\nTest for package $package failed" >&2
+            else
+              echo -e "\nTest for package $package passed"
+            fi
+          
+            echo "Cleaning up container for package $package"
+            # To ensure a clean state after using `act` locally
+            docker stop -t 5 $CONTAINER
+          done
+
+          IFS=' '
+          echo "ending sequential tests ..."
