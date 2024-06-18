@@ -92,15 +92,17 @@ jobs:
             -DUnitTest.FailuresAreFatal=1 -DUnitTest.Manager=%UnitTest.Manager
         run: |
           # Don't specify the container name because `act` will run multiple jobs in parallel and cause name conflicts
-          echo "starting sequential tests ..."
           packages=${{ matrix.packages }}
           IFS=','
+          RED='\033[0;31m'
+          GREEN='\033[0;32m'
+          NC='\033[0m'
 
           # The EOF of the following heredocs are intentially unindented
           # because <<-EOF doesn't like spaces while yaml only allows spaces
           # A potential solution is to use a script file instead of a block
           for package in $packages; do
-            echo "setting up container for package $package"
+            echo "::group::Set up container for package $package"
             CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
             docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
             docker exec -i $CONTAINER iris session IRIS <<- EOF
@@ -108,8 +110,9 @@ jobs:
               zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
               halt
           EOF
+            echo "::endgroup::"
           
-            echo "Testing package $package"
+            echo "::group::Test package $package"
             set +e
             docker exec -i $CONTAINER iris session IRIS <<- EOF
                   zpm "install $package":1
@@ -117,15 +120,16 @@ jobs:
           EOF
 
             if [ $? -ne 0 ]; then
-              echo -e "\nTest for package $package failed" >&2
+              echo -e "\n${RED}Test for package $package failed${NC}" >&2
             else
-              echo -e "\nTest for package $package passed"
+              echo -e "\n${GREEN}Test for package $package passed${NC}"
             fi
-          
-            echo "Cleaning up container for package $package"
+            echo "::endgroup::"
+
+            echo "::group::Clean up container for $package"
             # To ensure a clean state after using `act` locally
             docker stop -t 5 $CONTAINER
+            echo "::endgroup::"
           done
 
           IFS=' '
-          echo "ending sequential tests ..."
