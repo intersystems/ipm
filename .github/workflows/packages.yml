@@ -120,8 +120,10 @@ jobs:
           EOF
 
             if [ $? -ne 0 ]; then
+              # ATTENTION: Don't change the format of the following echo without updating the regex in the summarize.py script
               echo -e "\n${RED}Test for package $package failed${NC}" >&2
             else
+              # ATTENTION: Don't change the format of the following echo without updating the regex in the summarize.py script
               echo -e "\n${GREEN}Test for package $package passed${NC}"
             fi
             echo "::endgroup::"
@@ -133,3 +135,13 @@ jobs:
           done
 
           IFS=' '
+
+  summarize:
+    needs:
+      - run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call package-summary workflow
+        uses: ./.github/workflows/packages-summary.yml
+        with:
+          runId: ${{ github.run_id }}
