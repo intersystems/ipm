@@ -339,7 +339,15 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				Set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams)
 			} Else {
 				// Old format (TODO: officially deprecate): try loading a .xml file
-				Set tSC = $System.OBJ.Load(tTmpStream.Filename,.qstruct)
+
+				// Load without compiling -> Update legacy superclasses -> Compile
+				If $Data(qstruct) \ 2 = 1 {
+					Set qstruct = $Translate(qstruct,"c","")
+				} ElseIf $Data(qstruct("/compile")) {
+					Kill qstruct("/compile")	
+				}
+				Set tSC = $System.OBJ.Load(tTmpStream.Filename,.qstruct, , .tLoaded)
+				Set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoaded, .qstruct))
 			}
       Set errorMsg = "", success = 0
       If $$$ISOK(tSC) {

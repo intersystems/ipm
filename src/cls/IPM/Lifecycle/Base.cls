@@ -789,7 +789,7 @@ Method %Compile(ByRef pParams) As %Status
 				If $Data(tCompileArray)>1 {
 					Set tCompiledSomething = 1
 					Set tStruct = $Select(tVerbose:"d",1:"-d")_$Select(tNoCompileLock:"-l",1:"")_tFlags
-					Set tSC = $System.OBJ.CompileList(.tCompileArray,.tStruct)
+					Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tCompileArray, .tStruct)
 					$$$ThrowOnError(tSC)
 				}
 				

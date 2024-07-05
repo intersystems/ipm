@@ -4,7 +4,7 @@ Class %IPM.Utils.LegacyCompat
 {
 
 /// This method updates the superclasses of a list of classes that have been loaded but not compiled.
-ClassMethod UpdateSuperclassAndCompile(ByRef tClasses) As %Status
+ClassMethod UpdateSuperclassAndCompile(ByRef tClasses, ByRef qSpec = "") As %Status
 {
     Set tName = "" 
     Set tToCompile = ""
@@ -28,8 +28,7 @@ ClassMethod UpdateSuperclassAndCompile(ByRef tClasses) As %Status
             Write tName _ " extends the deprecated class " _ tOldLifecycle _ ". It has been updated to " _ tNewLifecycle _ " before compiled.", !
         }
     }
-    Set sc = $System.OBJ.Compile(.tToCompile)
-    Quit sc
+    Quit $System.OBJ.Compile(.tToCompile, .qSpec)
 }
 
 }

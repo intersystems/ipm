@@ -196,7 +196,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			} ElseIf $$$comClassDefined($$$DefaultLifecyclePackageDot_tLifecycle) {
 				Set tModule.OverrideLifecycleClass = $$$DefaultLifecyclePackageDot_tLifecycle
 			} ElseIf ##class(%Library.File).Exists(tLifecycle) {
-				Set tSC = $System.OBJ.Load(tLifecycle,"ck"_$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+				Set tSC = $System.OBJ.Load(tLifecycle,"k"_$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+				$$$ThrowOnError(tSC)
+				Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoadedList)
 				$$$ThrowOnError(tSC)
 				Set tLoadedList = $ListFromString(tLoadedList)
 				Set tLifecycleClassFound = 0
