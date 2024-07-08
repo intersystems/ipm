@@ -27,8 +27,10 @@ for fn in glob.glob(f"{sys.argv[1]}/*.txt"):
             if m:
                 failed.add(m.group(1))
 
-passed.remove("$package")
-failed.remove("$package")
+if "$package" in passed:
+    passed.remove("$package")
+if "$package" in failed:
+    failed.remove("$package")
 
 print(f"A total of {len(passed)} packages passed:", sorted(passed))
 print(f"A total of {len(failed)} packages failed:", sorted(failed))
