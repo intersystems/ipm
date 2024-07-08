@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: debug
-        run:
+        run: |
           pwd
           ls -R
       - name: Call package-summary workflow
