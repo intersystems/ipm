@@ -24,11 +24,11 @@ jobs:
           curl -L -o logs.zip "${{ env.BASE_URL }}/${{ inputs.runId }}/logs" -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}'
       - name: Unzip logs
         run: |
-          unzip logs.zip -d logs/
+          unzip logs.zip -d /tmp/logs/
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Summarize logs
         run: |
           # Could also use awk script, but python is easier to read and debug
-          python3 .github/scripts/summarize_logs.py logs/
+          python3 .github/scripts/summarize_logs.py /tmp/logs/
 
