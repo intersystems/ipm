@@ -144,7 +144,8 @@ jobs:
       - name: debug
         run: |
           pwd
-          ls -R
+          ls -R .
+          ls -R ..
       - name: Call package-summary workflow
         uses: ./.github/workflows/packages-summary.yml
         with:
