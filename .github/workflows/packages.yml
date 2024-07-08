@@ -143,11 +143,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: debug
-        run: |
-          pwd
-          ls -R .
-          ls -R ..
+      - name: debug pwd
+        run: pwd
+      - name: debug ls -aR .
+        run: ls -aR .
+      - name: debug ls -aR ..
+        run: ls -aR ..
       - name: Call package-summary workflow
         uses: ./.github/workflows/packages-summary.yml
         with:
