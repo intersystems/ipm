@@ -139,6 +139,13 @@ jobs:
   summarize:
     needs:
       - run-tests
-    uses: ./.github/workflows/packages-summary.yml
-    with:
-      runId: ${{ github.run_id }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: debug
+        run:
+          pwd
+          ls -R
+      - name: Call package-summary workflow
+        uses: ./.github/workflows/packages-summary.yml
+        with:
+          runId: ${{ github.run_id }}
