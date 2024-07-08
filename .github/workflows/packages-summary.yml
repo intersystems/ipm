@@ -25,10 +25,6 @@ jobs:
       - name: Unzip logs
         run: |
           unzip logs.zip -d /tmp/logs/
-      - name: Debug1
-        run: |
-          echo "Current directory: $(pwd)"
-          ls -R
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Summarize logs
