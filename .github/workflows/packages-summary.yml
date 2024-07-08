@@ -25,8 +25,16 @@ jobs:
       - name: Unzip logs
         run: |
           unzip logs.zip -d logs/
+      - name: Debug1
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -R
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Debug2
+        run: |
+          echo "Current directory: $(pwd)"
+          ls -R
       - name: Summarize logs
         run: |
           # Could also use awk script, but python is easier to read and debug
