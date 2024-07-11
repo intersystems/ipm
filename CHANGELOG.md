@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
+- #518 Added ability to show source file location when running `list-installed`. E.g., `zpm "list-installed -showsource"`.
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.

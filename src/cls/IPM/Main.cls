@@ -466,6 +466,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <!-- Modifiers -->
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
 <modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
+<modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
 
 </command>
 
@@ -946,7 +947,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Quit
   }
   Set tArgs = 0
-	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode FROM %IPM_Storage.ModuleItem"
+	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root FROM %IPM_Storage.ModuleItem"
   Set pSearch = $ZStrip(pSearch, "<>WC")
   If pSearch'="" {
     If pSearch["," {
@@ -975,7 +976,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
 		$$$ThrowOnError(tSC)
     Set name = tRes.Name
     Set list = list + 1
-		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode)
+		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
 		If maxWidth<$Length(name) {
       Set maxWidth = $Length(name)
     }
@@ -2160,7 +2161,8 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		Set tDesc=+$Get(pCommandInfo("data","Desc"))
     Do ..GetListModules(,tSearchString, .list, showFields)
 	}
-  Do ..DisplayModules(.list)
+  Merge tModifiers = pCommandInfo("modifiers")
+  Do ..DisplayModules(.list,,,, .tModifiers)
 }
 
 /// Get module list in currently namespace
@@ -2873,7 +2875,7 @@ ClassMethod ShellScript(pCommand As %String, pOutputLogFile As %String = "", pAp
 	}
 }
 
-ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespace As %Boolean = 0, pIndent As %Integer = 0)
+ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespace As %Boolean = 0, pIndent As %Integer = 0, ByRef pModifiers)
 {
   If '$Data(pList) {
     Quit
@@ -2924,11 +2926,15 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
   For i=1:1:pList {
     Set info = pList(i)
     Set developerMode = 0
-    Set $ListBuild(name, version, externalName, developerMode) = info
+    Set root = ""
+    Set $ListBuild(name, version, externalName, developerMode, root) = info
     Write:i>1 !,?pIndent
     Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Blue, version)
     If $Get(developerMode) {
       Write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
+    }
+    If $Data(pModifiers("showsource")) {
+      Write " ", $$$FormattedLine($$$Magenta, root)
     }
 
     Set ptr = 0 
