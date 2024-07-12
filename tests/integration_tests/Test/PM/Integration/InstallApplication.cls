@@ -29,4 +29,17 @@ Method TestSimpleApp()
   }
 }
 
+Method TestWSGIApp()
+{
+  Set tSC = $$$OK
+  Try {
+    Set tTestRoot = ##class(%File).NormalizeDirectory($Get(^UnitTestRoot))
+    set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/wsgi-app/")
+    Set tSC = ##class(%ZPM.PackageManager).Shell("load " _ tModuleDir)
+    Do $$$AssertStatusOK(tSC,"Loaded WSGI Application successfully. " _ tModuleDir)
+  } Catch e {
+    Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+  }
+}
+
 }
