@@ -521,9 +521,14 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     Do ..Log("requirements.txt START")
     Write:tVerbose !
 
-	set command = $lb("install", "-r", ..Module.Root _ "requirements.txt")
-	Set tSuccess = ..RunPipCommand($System.Python.ToList(command), tVerbose)
-	Set tSC = $Select(tSuccess: $$$OK, 1: $$$ERROR($$$GeneralError, "Failed to install python requirements"))
+    Set target = ##class(%File).NormalizeDirectory("python", $System.Util.ManagerDirectory())
+    Set command = $ListBuild("pip", "install", "-r", "requirements.txt", "-t", target)
+    Set pip = $Select($$$isWINDOWS: ##class(%File).NormalizeFilename("irispip.exe", $System.Util.BinaryDirectory()), 1: "pip")
+    Set command = $ListBuild(pip, "install", "-r", "requirements.txt", "-t", target)
+    If 'tVerbose {
+      Set stdout = ""
+    }
+    Set tSC = ##class(%ZPM.PackageManager.Developer.Utils).RunCommand(pRoot, command,.stdout)
     $$$ThrowOnError(tSC)
 
     Do ..Log("requirements.txt SUCCESS")
@@ -533,32 +538,6 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     Do ..Log("requirements.txt FAILURE")
   }
   Quit tSC
-}
-
-ClassMethod RunPipCommand(cmd, verbose) As %Boolean [ Language = python ]
-{
-	# Call pip inside a python runtime to avoid conflicts with whichever `pip` is first on $PATH.
-	# For some Unix systems, the `pip` command may be missing. See e.g. https://launchpad.net/ubuntu/focal/+package/python-is-python3.
-	# This is necessary although not recommended because IRIS python runtime is isolated from the system python.
-	# See https://pip.pypa.io/en/stable/user_guide/#using-pip-from-your-program for why this is not recommended.
-	# Nonetheless, we still have to go with this approach because pip/pip3 lately installed by Homebrew raises an "externally-managed-environment".
-	# Because of the way embedded python is implemented, `sys.executable` returns `<IRIS_ROOT>/bin/irisdb`, which is not a python interpreter .
-	# Therefore, the recommended way of creating a subprocess and then call `[sys.executable, "-m", "pip", ...]` does not work.
-
-	import sys
-	import traceback
-	import pip
-	import contextlib
-
-	fd = sys.stdout if verbose else None
-
-	try:
-		with contextlib.redirect_stdout(fd):
-			print("Running pip command: ", cmd)
-			return pip.main(cmd) == 0
-	except:
-		traceback.print_stack()
-		return False
 }
 
 Method %Validate(ByRef pParams) As %Status
