@@ -33,6 +33,11 @@ Method TestWSGIApp()
 {
   Set tSC = $$$OK
   Try {
+    Set tVersion = $Piece($ZVersion," ",9)
+    If $Piece(tVersion, ".", 1) < 2024 {
+      Do $$$AssertSkipped("WSGI applications are only supported in 2024+. Current version: "_tVersion)
+      Return
+    }
     Set tTestRoot = ##class(%File).NormalizeDirectory($Get(^UnitTestRoot))
     set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/wsgi-app/")
     Set tSC = ##class(%ZPM.PackageManager).Shell("load " _ tModuleDir)
