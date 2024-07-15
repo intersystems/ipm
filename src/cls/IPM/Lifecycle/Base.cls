@@ -546,10 +546,10 @@ Method %Reload(ByRef pParams) As %Status
 		
 		Set tPreloadRoot = tRoot_"preload"
 		If ##class(%File).DirectoryExists(tPreloadRoot) {
-						Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_"/compile" _ $Select($Tlevel:"/multicompile=0", 1: ""), , 1)
-			If $$$ISERR(tSC) {
-				Quit
-			}
+			Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+			If $$$ISERR(tSC) { Quit }
+			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
+			If $$$ISERR(tSC) { Quit }
 		} ElseIf tVerbose {
 			Write !,"Skipping preload - directory does not exist."
 		}
@@ -789,7 +789,7 @@ Method %Compile(ByRef pParams) As %Status
 				If $Data(tCompileArray)>1 {
 					Set tCompiledSomething = 1
 					Set tStruct = $Select(tVerbose:"d",1:"-d")_$Select(tNoCompileLock:"-l",1:"")_tFlags
-					Set tSC = $System.OBJ.CompileList(.tCompileArray,.tStruct)
+					Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tCompileArray, .tStruct)
 					$$$ThrowOnError(tSC)
 				}
 				

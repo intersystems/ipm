@@ -339,7 +339,15 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				Set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams)
 			} Else {
 				// Old format (TODO: officially deprecate): try loading a .xml file
-				Set tSC = $System.OBJ.Load(tTmpStream.Filename,.qstruct)
+
+				// Load without compiling -> Update legacy superclasses -> Compile
+				If $Data(qstruct) \ 2 = 1 {
+					Set qstruct = $Translate(qstruct,"c","")
+				} ElseIf $Data(qstruct("/compile")) {
+					Kill qstruct("/compile")	
+				}
+				Set tSC = $System.OBJ.Load(tTmpStream.Filename,.qstruct, , .tLoaded)
+				Set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoaded, .qstruct))
 			}
       Set errorMsg = "", success = 0
       If $$$ISOK(tSC) {
@@ -1214,7 +1222,10 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		
 		Set tPath = pDirectory_"preload"
 		If ##class(%File).DirectoryExists(tPath) {
-      Set tSC = $system.OBJ.ImportDir(tPath,,$Select(tVerbose:"d",1:"-d")_"/compile"_$Select($TLevel:"/multicompile=0",1:""),,1)
+			// Load first, update legacy superclasses, then compile
+			Set tSC = $system.OBJ.ImportDir(tPath,,$Select(tVerbose:"d",1:"-d")_$Select($TLevel:"/multicompile=0",1:""),,1,.tImported)
+			$$$ThrowOnError(tSC)
+			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
 			$$$ThrowOnError(tSC)
 		} Else {
 			Write:tVerbose !,"Skipping preload - directory does not exist."
