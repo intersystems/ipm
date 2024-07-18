@@ -336,7 +336,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			Do tTmpStream.CopyFromAndSave(tPayload)
 			
 			If (tAsArchive) {
-				Set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams)
+				Set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName)
 			} Else {
 				// Old format (TODO: officially deprecate): try loading a .xml file
 
@@ -373,7 +373,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 	Quit tSC
 }
 
-ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %String, pArchiveStream As %Stream.Object, ByRef pParams) As %Status
+ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %String, pArchiveStream As %Stream.Object, ByRef pParams, pRepository As %String = "") As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -402,7 +402,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 			Write:tVerbose !,tOutput(i)
 		}
 		
-		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams)
+		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository)
 		If $$$ISERR(tSC) {
 			Quit
 		}
