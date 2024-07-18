@@ -467,6 +467,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
 <modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
 <modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
+<modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 
 </command>
 
@@ -910,7 +911,7 @@ ClassMethod SwitchToNamespace(pNamespace As %String = {$Namespace}) As %Status
 
 /// Get List Modules
 /// example d ##class(%IPM.Main).GetListModules("%SYS","zpm",.list)
-ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %String = "", ByRef list, pExtraFields As %String = "") [ Internal ]
+ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %String = "", ByRef list, pExtraFields As %String = "", pRepository As %String = "") [ Internal ]
 {
   Set list = 0
   If (pNamespace="") || (pNamespace["*") {
@@ -922,7 +923,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
       Set ns = $Order(listNS(ns)) 
       Quit:ns=""
       Kill listModules
-      Do ..GetListModules(ns, pSearch, .listModules, pExtraFields)
+      Do ..GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
       Continue:(pSearch'="")&&('$Get(listModules))
       If width < $Length(ns) {
         Set width = $Length(ns)
@@ -947,7 +948,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Quit
   }
   Set tArgs = 0
-	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root FROM %IPM_Storage.ModuleItem"
+	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root FROM %IPM_Storage.ModuleItem WHERE 1=1 "
   Set pSearch = $ZStrip(pSearch, "<>WC")
   If pSearch'="" {
     If pSearch["," {
@@ -960,11 +961,15 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
         Set tParams = tParams _ $ListBuild("?")
         Set tArgs($Increment(tArgs)) = tItem
       }
-      Set tQuery = tQuery _ " WHERE name IN (" _ $ListToString(tParams, ", ") _ ")"
+      Set tQuery = tQuery _ " AND name IN (" _ $ListToString(tParams, ", ") _ ")"
     } ElseIf pSearch'="*" {
-      Set tQuery = tQuery _ " WHERE name " _ $Select(pSearch["*": "like ?", 1: "= ?")
+      Set tQuery = tQuery _ " AND name " _ $Select(pSearch["*": "like ?", 1: "= ?")
       Set tArgs($Increment(tArgs)) = $Translate(pSearch, "*", "%")
     }
+  }
+  If pRepository'="" {
+	Set tQuery = tQuery _ " AND Repository = ?"
+	Set tArgs($Increment(tArgs)) = pRepository
   }
   Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
 	If (tRes.%SQLCODE < 0) {
@@ -2159,7 +2164,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
       )
     }
 		Set tDesc=+$Get(pCommandInfo("data","Desc"))
-    Do ..GetListModules(,tSearchString, .list, showFields)
+    Do ..GetListModules(,tSearchString, .list, showFields, $Get(pCommandInfo("modifiers", "repository")))
 	}
   Merge tModifiers = pCommandInfo("modifiers")
   Do ..DisplayModules(.list,,,, .tModifiers)
