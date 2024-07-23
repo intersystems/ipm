@@ -1172,15 +1172,24 @@ Method %Publish(ByRef pParams) As %Status
 		Set tPublishTo = $Get(pParams("PublishTo"),$Get(pParams("zpm","PublishTo"),""))
 		Set tNewVersion = $Get(pParams("NewVersion"),$Get(pParams("zpm","NewVersion"),""))
 
+		// Determine which server/registry to publish to
 		Set tServer =  ""
 		If tPublishTo '= "" {
 			Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tPublishTo,,.tSC)
-		} Else {
+		}
+
+		If '$IsObject(tServer) {
 			Set tRS = ##class(%IPM.Repo.Remote.Definition).PublishingServerFunc()
 			If (tRS.%SQLCODE = 0) && tRS.%Next() {
-				Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
+				Set type = tRS.Type
+				If type = 1 {
+					Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
+				} ElseIf type = 2 {
+					Set tServer = ##class(%IPM.Repo.Oras.Definition).%OpenId(tRS.ID)
+				}
 			}
 		}
+
 		If $$$ISERR(tSC)||'$IsObject(tServer) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError, "No server found to publish to."))
 		}

@@ -154,6 +154,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
 </command>
 
 <command name="unpublish">
@@ -1991,7 +1992,7 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
-  Set tParams("cmd") = pCommandInfo
+  	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
@@ -2012,7 +2013,12 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 	If ( tRegistry = "" ) {
 		Set tRS = ##class(%IPM.Repo.Remote.Definition).PublishingServerFunc()
 		If (tRS.%SQLCODE = 0) && tRS.%Next() {
-			Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
+			Set type = tRS.Type
+			If type = 1 {
+				Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
+			} ElseIf type = 2 {
+				Set tServer = ##class(%IPM.Repo.Oras.Definition).%OpenId(tRS.ID)
+			}
 		}
 	} Else {
 		Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
@@ -2026,7 +2032,13 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 	Try {
 		Set tManager = ##class(%IPM.Repo.Remote.PublishManager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
-		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+		If $CLASSNAME(tServer) = "%IPM.Repo.Oras.Definition" {
+			#; TODO: don't assume always available
+			Set isEnabled = 1
+		} else {
+			$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+		}
+
 		If (isEnabled) {
             Set tResult = 0
 			If ($$$lcase(tVersion)="all") {
@@ -2046,7 +2058,14 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
             }
 
 			If (tResult) {
-				$$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
+				If $CLASSNAME(tServer) = "%IPM.Repo.Oras.Definition" {
+					Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
+					$$$ThrowOnError(tSC)
+					Set tClient = tRepository.GetPublishService()
+					$$$ThrowOnError(tClient.Unpublish(tModuleName, tVersion))
+				} else {
+					$$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
+				}
 				Write !!,"Package deleted"
 			}
 		} Else {

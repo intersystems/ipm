@@ -88,7 +88,7 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 	Set tClient.Location = ..URL
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
-  Set tClient.Token = ..Token
+	Set tClient.Token = ..Token
 	Quit tClient
 }
 
@@ -99,7 +99,7 @@ Method GetPublishService() As %IPM.Repo.IPublishService
 	Set tClient.Location = ..URL
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
-  Set tClient.Token = ..Token
+	Set tClient.Token = ..Token
 	Quit tClient
 }
 
@@ -183,8 +183,19 @@ Query PublishingServer() As %SQLQuery
 			WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
 			ELSE 999 
 		END PublishOrder,
-		ID, Name, URL
+		ID, Name, URL, 1 AS Type
 	FROM %IPM_Repo_Remote.Definition 
+	WHERE Enabled = 1
+	UNION
+	SELECT 
+		CASE 
+			WHEN DeploymentEnabled = 1 THEN 1
+			WHEN Token IS NOT NULL THEN 2
+			WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
+			ELSE 999 
+		END PublishOrder,
+		ID, Name, URL, 2 AS Type
+	FROM %IPM_Repo_Oras.Definition 
 	WHERE Enabled = 1
 	ORDER BY PublishOrder, ID
 }
