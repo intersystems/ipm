@@ -968,8 +968,8 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     }
   }
   If pRepository'="" {
-	Set tQuery = tQuery _ " AND Repository = ?"
-	Set tArgs($Increment(tArgs)) = pRepository
+    Set tQuery = tQuery _ " AND Repository = ?"
+    Set tArgs($Increment(tArgs)) = pRepository
   }
   Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
 	If (tRes.%SQLCODE < 0) {
