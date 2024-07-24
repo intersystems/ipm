@@ -17,6 +17,10 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 	Set tCommand = $Get(pCommandInfo("parameters","command"))
 	Set tVerbose = ''$Data(pCommandInfo("modifiers","verbose"))
 	Set tMarkdown = ''$Data(pCommandInfo("modifiers","markdown"))
+	If (tMarkdown) {
+		// Force verbose for markdown because summary mode not supported
+		Set tVerbose = 1
+	}
 	Do ..%GetCommandStructure(.tCommandStruct)
 	
 	If (tCommand '= "") && '$Data(tCommandStruct(tCommand)) {
@@ -50,7 +54,6 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 		// List commands
 		If 'tMarkdown {
 			Write !, $$$FormattedLine($$$Underlined, "Available commands:")
-			Write !, "NOTE: [] around a parameter indicates it is optional"
 			Write !
 		}
 		Set tCommand = ""
@@ -66,7 +69,7 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 			
 			Kill tOneCommandStruct
 			Merge tOneCommandStruct = tCommandStruct(tCommand)
-			Do ..%HelpForCommand(tCommand,.tOneCommandStruct,tVerbose,tMarkdown)
+			Do ..%HelpForCommand(tCommand,.tOneCommandStruct,tVerbose,tMarkdown,$Get(tCommandStruct(-1, "maxLength"),0))
 			
 			Write !
 		}
@@ -78,25 +81,28 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 	Write !
 }
 
-ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDetailed As %Boolean = 0, pMarkdownFormat As %Boolean = 0)
+ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDetailed As %Boolean = 0, pMarkdownFormat As %Boolean = 0, pMaxLength As %Integer = 0)
 {
+	/// Section separator in Markdown
+	#define SectionSeparator $Case(pMarkdownFormat, 1: "-----", : "")
 	// Macro to escape if in markdown
 	#define Escape(%string) $Select(pMarkdownFormat:$Replace(%string,"[","\["),1:%string)
 	// Macro to format strings if printing to terminal and to escape if in markdown
 	#define EscapeOrFormat(%string, %format) $Case(pMarkdownFormat, 1:$Replace(%string, "[", "\["), :$$$FormattedLine(%format, %string))
 	// Bullet point if in Terminal
-	#define BulletPoint $Case(pMarkdownFormat, 1: "", :$Char(8729)_" ")
+	#define BulletPoint $Case(pMarkdownFormat, 1: "", :$Char(9675)_" ")
 	// Black square if in Terminal
 	#define BlackSquare $Case(pMarkdownFormat, 1: "", :$Char(9632)_" ")
 
   	#define DefaultGroup "-"
 	
-  	#define Indent 2
+  	#define Indent 4
 	
 	Set tIsAlias = $Data(pCommandStruct)<10
 	If pMarkdownFormat && tIsAlias {
 		Write !, "----", !, "h2. ", pCommandName
 		Write !, "_Alias for [", pCommandStruct, "|#", pCommandStruct, "]_"
+		Write !, $$$SectionSeparator
 	}
 	
 	// Don't show full documentation for aliases 
@@ -104,6 +110,26 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 		Return
 	}
 	
+	If ('pDetailed) {
+		Set tIndent = 10
+		If (pMaxLength > tIndent) {
+			// Do twice max length to account for aliases (which are usually shorter so this should be sufficient)
+			Set tIndent = 2 * pMaxLength + 2
+		}
+		// Command name and aliases
+		Write pCommandName
+		If $Data(pCommandStruct("aliases"), tAliases) {
+			Write ", "_$Replace(tAliases, ",", ", ")
+		}
+		// Summary
+		If $Data(pCommandStruct("summary"), tSummary) {
+			Write ?tIndent, $ZStrip(tSummary, "<>CW")
+		} ElseIf $Data(pCommandStruct("description"), tDescription) {
+			Write ?tIndent, $ZStrip(tDescription, "<>CW")
+		}
+		Quit
+	}
+
 	Write !, $Select(pMarkdownFormat:"----",1:""), !
 	If pMarkdownFormat {
 		Write "h2. "
@@ -157,10 +183,7 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
 	If $Data(pCommandStruct("description"), tDescription) {
 		Write !, ?$$$Indent, $$$BlackSquare_"Description: "_tDescription
 	}
-	
-	If (pDetailed) {
     Do ..%HelpForCommandDetails(.pCommandStruct, pMarkdownFormat)
-	}
 }
 
 ClassMethod %HelpForCommandDetails(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
