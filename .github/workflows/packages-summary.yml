@@ -22,6 +22,7 @@ jobs:
       - name: Donwload log zip
         run: |
           curl -L -o logs.zip "${{ env.BASE_URL }}/${{ inputs.runId }}/logs" -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}'
+          ls -al
       - name: Unzip logs
         run: |
           unzip logs.zip -d /tmp/logs/
