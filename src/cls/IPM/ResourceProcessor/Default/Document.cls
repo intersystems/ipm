@@ -151,19 +151,19 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
                 Set tResourcePath = tResourcePath _ tFileExtension
 
-                If ($$$lcase(tFileExtension)'=".xml")&&('##class(%File).Exists(tResourcePath)) {
+                If ($$$lcase(tFileExtension)'=".xml")&&('##class(%IPM.Utils.File).Exists(tResourcePath)) {
                   Set tResourcePathXML = tResourcePath
                   Set $PIECE(tResourcePath, ".", *) = "xml"
-                  If (##class(%File).Exists(tResourcePathXML)) {	
+                  If (##class(%IPM.Utils.File).Exists(tResourcePathXML)) {
                     Set tResourcePath = tResourcePathXML	
                     Set ..Format = "XML"	
                   }
                 }
         
-                If ($$$lcase(tFileExtension)=".mac")&&('##class(%File).Exists(tResourcePath)) {
+                If ($$$lcase(tFileExtension)=".mac")&&('##class(%IPM.Utils.File).Exists(tResourcePath)) {
                   Set tResourcePathRTN = tResourcePath	
                   Set $Piece(tResourcePathRTN, ".", *) = "rtn"	
-                  If (##class(%File).Exists(tResourcePathRTN)) {	
+                  If (##class(%IPM.Utils.File).Exists(tResourcePathRTN)) {
                     Set tResourcePath = tResourcePathRTN	
                   }	
                 }
