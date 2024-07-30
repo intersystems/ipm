@@ -102,6 +102,10 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
+    Set tPipPathKey = ##class(%IPM.Repo.UniversalSettings).#PipPath
+    // Consider detecting whether pip or pip3 is available, and where it is located
+    Set tPipPathValue = $Select($$$isWINDOWS: ##class(%File).NormalizeFilename("irispip.exe", $System.Util.BinaryDirectory()), 1: "pip3")
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(tPipPathKey, tPipPathValue, 0))
     Quit $$$OK
 }
 

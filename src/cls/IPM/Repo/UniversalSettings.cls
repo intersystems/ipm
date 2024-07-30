@@ -22,7 +22,9 @@ Parameter TerminalPrompt = "TerminalPrompt";
 
 Parameter PublishTimeout = "publish_timeout";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout";
+Parameter PipPath = "PipPath";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipPath";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
