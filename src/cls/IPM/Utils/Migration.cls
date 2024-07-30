@@ -14,10 +14,15 @@ ClassMethod RunAll(verbose As %Boolean = 1) As %Status
     Quit sc
 }
 
-ClassMethod MigrateZPMToIPM(verbose As %Boolean = 1)
+ClassMethod HasLegacyZPMPackage()
 {
     Set oldTopPackage = "%ZPM.PackageManager."
-    If $Order(^oddCOM(oldTopPackage)) '[ oldTopPackage {
+    Quit $Order(^oddCOM(oldTopPackage)) [ oldTopPackage
+}
+
+ClassMethod MigrateZPMToIPM(verbose As %Boolean = 1)
+{
+    If '..HasLegacyZPMPackage() {
         Write:verbose !,"Older IPM version not found; nothing to migrate.",!
         Quit
     }
