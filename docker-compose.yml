@@ -1,4 +1,3 @@
-version: '3'
 services:
   iris:
     build: .
@@ -38,3 +37,7 @@ services:
     volumes:
       - ./:/home/irisowner/zpm/
       - ./tests/sandbox/:/home/irisowner/sandbox/
+      - ./tests/sandbox/fhirpro/:/fhirpro/
+    command:
+      - -a 
+      - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
