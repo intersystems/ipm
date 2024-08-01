@@ -44,7 +44,7 @@ ClassMethod PrintList()
     For {
         Set k = $Order(confArr(k))
         Quit:(k="")
-        Write k_": "_confArr(k),! 
+        Write k_": "_..PrettyFormat(confArr(k)),! 
     }
 }
 
@@ -55,7 +55,35 @@ ClassMethod PrintOne(key As %String)
         Write "Config key = """_key_""" not found",!
         Quit
     }
-    Write key_":"_..GetValue($Parameter(..%ClassName(1),key)),!
+    Write key_":"_..PrettyFormat(..GetValue($Parameter(..%ClassName(1),key))),!
+}
+
+/// A helper method to format string/number/$lb() recursively
+ClassMethod PrettyFormat(input As %String) As %String
+{
+    If $Data(input) # 2 = 0 { Return "" }
+    If input = $lb() { Return "$lb()" }
+    If input = "" { Return """""" }
+    Try {
+        Set ptr = 0
+        Set output = ""
+        While $ListNext(input, ptr, value) {
+            If output = "" {
+                Set output = "$lb(" _ ..PrettyFormat(value)
+            } Else {
+                Set output = output _ ", " _ ..PrettyFormat(value)
+            }
+        }
+        Set output = output _ ")"
+        Return output
+    } Catch ex {
+        If input = +input {
+            Return input
+        }
+        Return """" _ input _ """"
+    }
+
+    Return "Failed to Format input: " _ input
 }
 
 ClassMethod ResetToDefault(key As %String) As %Status
