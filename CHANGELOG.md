@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
 - #518 Added ability to show source file location when running `list-installed`. E.g., `zpm "list-installed -showsource"`.
 - #538 Added ability to customize caller to `pip`. By default will be `<IRIS-ROOT>/bin/irispip.exe`, `python3 -m pip`, or `python -m pip`, whichever is found first.
+- Added support for `%List` to `config list` and `config get <key>`.
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-10274: Separate DependencyAnalyzer out from IPM
 - #261: IPM now truly supports using multiple registries for installation / discovery of packages (without needing to prefix the package with the registry name on "install", although it is still possible and now effective to use the prefix).
 - #454: IPM 0.9.x+ uses different globals for storage vs. 0.7.0 and previous. Installation will automatically migrate data from the old globals to the new ones. The old globals are left around in case the user decides to revert to an earlier version.
+- Enclose output of `config list` and `config get <key>` with quotes.
 
 ### Fixed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
