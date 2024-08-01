@@ -22,9 +22,9 @@ Parameter TerminalPrompt = "TerminalPrompt";
 
 Parameter PublishTimeout = "publish_timeout";
 
-Parameter PyPath = "PyPath";
+Parameter PipCaller = "PipCaller";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PyPath";
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status

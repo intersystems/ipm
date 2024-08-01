@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
 - #518 Added ability to show source file location when running `list-installed`. E.g., `zpm "list-installed -showsource"`.
-- #538 Added ability to customize path to `python`/`python3` through `config set PyPath` command.
+- #538 Added ability to customize caller to `pip`. By default will be `<IRIS-ROOT>/bin/irispip.exe`, `python3 -m pip`, or `python -m pip`, whichever is found first.
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.

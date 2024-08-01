@@ -621,9 +621,9 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     Write:tVerbose !
 
     Set target = ##class(%File).NormalizeDirectory("python", $System.Util.ManagerDirectory())
-	Set tPyPathKey = ##class(%IPM.Repo.UniversalSettings).#PyPath
-    Set python = ##class(%IPM.Repo.UniversalSettings).GetValue(tPyPathKey)
-    Set command = $ListBuild(python, "-m", "pip", "install", "-r", "requirements.txt", "-t", target)
+	Set tPipCallerKey = ##class(%IPM.Repo.UniversalSettings).#PipCaller
+    Set tPipCallerValue = ##class(%IPM.Repo.UniversalSettings).GetValue(tPipCallerKey)
+    Set command = tPipCallerValue _ $ListBuild("install", "-r", "requirements.txt", "-t", target)
     If 'tVerbose {
       Set stdout = ""
     }
