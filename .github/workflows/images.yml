@@ -31,7 +31,7 @@ jobs:
             do
               # Skip irishealth-community due to bad interaction with ZPM document type
               # Also skip 2023.2 because the license has expired
-              if [ "$n" = "irishealth-community" -a test "$tag" = "2023.3" -o "$tag" = "2023.2" ];
+              if [ "$n" = "irishealth-community" -a "$tag" = "2023.3" -o "$tag" = "2023.2" ];
                 then
                   continue
               fi
