@@ -102,11 +102,37 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
-    Set tPipPathKey = ##class(%IPM.Repo.UniversalSettings).#PipPath
-    // Consider detecting whether pip or pip3 is available, and where it is located
-    Set tPipPathValue = $Select($$$isWINDOWS: ##class(%File).NormalizeFilename("irispip.exe", $System.Util.BinaryDirectory()), 1: "pip3")
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(tPipPathKey, tPipPathValue, 0))
+    Set tPyPathKey = ##class(%IPM.Repo.UniversalSettings).#PyPath
+    Set tPyPathValue = ..DetectPython()
+    If tPyPathValue = "" {
+      Write !, "WARNING: Failed to detect path to Python interpreter. You can set it manually using `config set PyPath <path>`"
+    }
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(tPyPathKey, tPyPathValue, 0))
     Quit $$$OK
+}
+
+/// Detect whether python or python3 is available on $PATH
+/// When both are available, use python3
+/// Most of the time, it's equivalent to $Select($$$isWINDOWS:"python", 1:"python3")
+ClassMethod DetectPython() As %String
+{
+  If $$$isWINDOWS {
+    Set tPythons = $lb("python3.exe", "python3", "python.exe", "python")
+  } Else {
+    Set tPythons = $lb("python3", "python")
+  }
+
+  Set ptr = 0
+  While $ListNext(tPythons, ptr, tPy) {
+    Set flags = "/SHELL/LOGCMD/STDOUT=""DetectPython.log""/STDERR=""DetectPython.err"""
+    Set retCode = $ZF(-100, flags, tPy, "--version")  
+    If retCode=0 {
+      // TODO resolve absolute path with `python -c "import sys; print(sys.executable)"`
+      Return tPy
+    }
+  }
+
+  Return ""
 }
 
 ClassMethod ZPMLoad(pDirectoryName)
