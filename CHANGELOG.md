@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-10274: Separate DependencyAnalyzer out from IPM
 - #261: IPM now truly supports using multiple registries for installation / discovery of packages (without needing to prefix the package with the registry name on "install", although it is still possible and now effective to use the prefix).
 - #454: IPM 0.9.x+ uses different globals for storage vs. 0.7.0 and previous. Installation will automatically migrate data from the old globals to the new ones. The old globals are left around in case the user decides to revert to an earlier version.
+- #527: IPM 0.9.x+ ignores the casing of resources when matching files on disk even on case-sensitive filesystems
 
 ### Fixed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
