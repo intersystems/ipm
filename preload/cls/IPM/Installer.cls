@@ -118,9 +118,15 @@ ClassMethod DetectPipCaller() As %String
 {
   Write !, "Detecting pip caller"
   If $$$isWINDOWS {
+    If $System.CLS.IsMthd("%SYS.Python","GetPythonInfo") {
+      do ##class(%SYS.Python).GetPythonInfo(.info)
+      If $Data(info("CPF_PythonRuntimeLibrary"), tPyDylib) {
+        set tInterpreter = ##class(%File).GetDirectory(tPyDylib, 1)_"python.exe"
+        set tFlexiblePython = $lb($lb(tInterpreter, "-m", "pip"))
+      }
+    }
     set irispip = ##class(%File).NormalizeFilename("irispip.exe", $System.Util.BinaryDirectory())
-    // irispip.exe is the first one we try
-    Set tPipCallers = $lb($lb(irispip), $lb("python3.exe", "-m", "pip"), $lb("python.exe","-m", "pip"))
+    Set tPipCallers = $lb($lb(irispip))_$Get(tFlexiblePython)_$lb($lb("python3.exe", "-m", "pip"), $lb("python.exe","-m", "pip"))
   } Else {
     Set tPipCallers = $lb($lb("python3", "-m", "pip"), $lb("python", "-m", "pip"))
   }
