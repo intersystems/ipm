@@ -120,7 +120,7 @@ ClassMethod DetectPipCaller() As %String
   If $$$isWINDOWS {
     If $System.CLS.IsMthd("%SYS.Python","GetPythonInfo") {
       do ##class(%SYS.Python).GetPythonInfo(.info)
-      If $Data(info("CPF_PythonRuntimeLibrary"), tPyDylib) {
+      If $Data(info("CPF_PythonRuntimeLibrary"), tPyDylib) && tPyDylib {
         set tInterpreter = ##class(%File).GetDirectory(tPyDylib, 1)_"python.exe"
         set tFlexiblePython = $lb($lb(tInterpreter, "-m", "pip"))
       }
