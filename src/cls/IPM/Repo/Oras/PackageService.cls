@@ -1,6 +1,6 @@
 Include %IPM.Common
 
-Class %IPM.Repo.Oras.PackageService Extends (%RegisteredObject, %IPM.Repo.IPackageService)
+Class %IPM.Repo.Oras.PackageService Extends %IPM.Repo.Http.PackageService
 {
 
 /// The base URL for this repo, e.g. https://irepo.intersystems.com
@@ -134,25 +134,29 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 // ** ORAS FUNCTIONS **
 
 /// Returns an authenticated ORAS client
-ClassMethod GetClient(registry, username = "", password = "", token = "") [ Language = python ]
+ClassMethod GetClient(registry, username = "", password = "", token = "")
 {
-	import oras.provider
-
-	# assume everything not specified is using https
-	insecure = "http://" in registry
+	Set orasProvider = ##class(%SYS.Python).Import("oras.provider")
 	
-	client = oras.provider.Registry(hostname=registry, insecure=insecure)
-	if username != "" and password != "":
-		client.set_basic_auth(username, password)
-	elif token != "":
-		if "amazonaws" in registry:
-			# AWS tokens are essentially username:password in one string
-			client._basic_auth = token
-			client.reset_basic_auth()
-		else:
-			# Bearer token
-			client.set_token_auth(token)
-	return client
+	Set args = {}
+	Set args.hostname = registry
+	#; assume everything not specified is using https
+	Set args.insecure = registry [ "http://"
+	Set client = orasProvider.Registry(args...)
+
+	If username '= "", password '= "" {
+		Do client."set_basic_auth"(username, password)
+	} Elseif token '= "" {
+		If registry [ "amazonaws" {
+			#; AWS tokens are essentially username:password in one string
+			Set client."_basic_auth" = token
+			Do client."reset_basic_auth"()
+		} Else {
+			#; Bearer token
+			Do client."set_token_auth"(token)
+		}
+	}
+	Return client
 }
 
 /// Pulls the specified module to disk and returns the module in tgz form as %Stream.FileBinary
@@ -178,7 +182,7 @@ ClassMethod Pull(registry, repository, namespace, username, password, token, ByR
 		}
 
 		#; Pull the module using ORAS
-		Do ..PullPy(registry, repository, "", username, password, token, tempDirectory)
+		Do ..PullOras(registry, repository, "", username, password, token, tempDirectory)
 
 		#; Find only the tgz file
 		Set result=##class(%ResultSet).%New("%File:FileSet")
@@ -213,14 +217,20 @@ ClassMethod Pull(registry, repository, namespace, username, password, token, ByR
 }
 
 /// Pulls the package using ORAS
-ClassMethod PullPy(registry, repository, namespace, username, password, token, path) [ Language = python ]
+ClassMethod PullOras(registry, repository, namespace, username, password, token, path)
 {
-	import iris
+	Set repoTag = ..GetRepoVersionPy(registry, repository, 1)
+	Set repo = $PIECE(repoTag, ",", 1)
+	Set tag = $PIECE(repoTag, ",", 2)
+
+	Set target = ..GetAPITarget(registry, repo, namespace) _ ":" _ tag
+	Set client = ..GetClient(registry, username, password, token)
 	
-	repo, tag = iris.cls("%IPM.Repo.Oras.PackageService").GetRepoVersionPy(registry, repository)
-	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repo, namespace) + ":" + tag
-	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token)
-	res = client.pull(target=target, outdir=path)
+	#; set up for python call
+	Set args = {}
+	Set args.target = target
+	Set args.outdir = path
+	Set res = client.pull(args...)
 }
 
 /// Returns the contents of the module.xml for the given repository
@@ -279,7 +289,7 @@ ClassMethod GetRepoVersionPy(registry, repository, asString = 0) [ Language = py
 		repo, tag = repository.split(":", 1)
 	else:
 		repo = repository
-		tag = iris.cls("%IPM.Repo.Oras.PackageService").GetLatestTagPy(registry, repo)
+		tag = iris.cls("%IPM.Repo.Oras.PackageService").GetLatestTagPy(registry, repo, "", "", "", "")
 	if asString:
 		return repo + "," + tag
 	else:
@@ -288,8 +298,9 @@ ClassMethod GetRepoVersionPy(registry, repository, asString = 0) [ Language = py
 
 /// Lists all of the modules and their latest versions in the repository
 /// Returns the tag for the highest numbered version
-ClassMethod GetLatestTagPy(registry, repository, username, password, token) [ Language = python ]
+ClassMethod GetLatestTagPy(registry, repository, namespace, username, password, token) [ Language = python ]
 {
+	import iris
 	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
 	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token)
 	tags = client.get_tags(target)
@@ -323,15 +334,14 @@ ClassMethod GetAllTagsPy(registry, repository, namespace, client) [ Language = p
 /// Returns whether the given repository is in the registry
 ClassMethod HasModulePy(registry, repository, namespace, client) As %Boolean [ Language = python ]
 {
+	import iris
 	# Attempt to get the tags of the specified repository
 	# If tags are not found, then the repository does not exist
 	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
 
-	try:
-		tags = client.get_tags(target, 1)
-	except:
-		return False
-	return True
+	tags = client.get_tags(target, 1)
+	# check if tags is [] through boolean coercion
+	return not not tags
 }
 
 // ** UTILITY FUNCTIONS **
@@ -375,7 +385,6 @@ ClassMethod VerifyModuleHashAndSizePy(registry, repository, namespace, username,
 		# parse the manifest
 		for layer in manifest['layers']:
 			if layer["mediaType"] != "application/vnd.oci.image.layer.v1.tar":
-				print("mediaType: ", layer["mediaType"])
 				continue
 			# check size and hash
 			manifest_size = layer["size"]
@@ -385,79 +394,6 @@ ClassMethod VerifyModuleHashAndSizePy(registry, repository, namespace, username,
 	except Exception as ex:
 		print("Exception: %s" % str(ex))
 	return False
-}
-
-ClassMethod GetSSLConfiguration(host) As %String
-{
-	New $NAMESPACE
-	Set $NAMESPACE = "%SYS"
-	
-	If '##class(Security.SSLConfigs).Exists(host) {
-		Do ##class(Security.SSLConfigs).Create(host)
-	}
-	Quit host
-}
-
-Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
-{
-	Set tRequest = ##class(%Net.HttpRequest).%New()
-
-	Set tRequest.FollowRedirect = 1
-
-	Set tLocation = $$$URLDECODE(tLocation)
-	If ($piece(tLocation, "://")'["http") {
-		Set tLocation = "http://" _ tLocation
-	}
-	
-	Do ##class(%Net.URLParser).Parse(tLocation,.tComponents)
-
-	If ($$$lcase(tComponents("scheme")) [ "http") {
-		If ($Data(tComponents("host"))#2) {
-			Set tRequest.Server = tComponents("host")
-		}
-		If ($Data(tComponents("port"))#2) {
-			Set tRequest.Port = tComponents("port")
-		}
-		If ($$$lcase(tComponents("scheme")) = "https") {
-			Set tRequest.Https = 1
-		}
-		If ($Get(tComponents("path"))'="") {
-			Set path = tComponents("path")
-			If ($Extract(path,1,1)="/") {
-				Set path = $Extract(path,2,*)	
-			}
-			Set tRequest.Location = path
-		}
-		If $Extract(tRequest.Location, *) '= "/" {
-			Set tRequest.Location = tRequest.Location _ "/"
-		}
-		#; in case of redirection
-		Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
-
-		If (..Token '= "") {
-			// aws token auth
-			Do tRequest.SetHeader("Authorization","Basic " _ ..Token)
-		}
-		If (..Username '= "") && (..Password '= "") {
-			// basic auth
-			Set tRequest.Username = ..Username
-			Set tRequest.Password = ..Password
-		}
-		Set proxy=$System.Util.GetEnviron("https_proxy")
-		If proxy'="" {
-			Do ##class(%Net.URLParser).Parse(proxy,.pr)
-			If (tRequest.Https) {
-				Set tRequest.ProxyHTTPS=1
-				Set tRequest.ProxyTunnel=1
-			}
-			Set tRequest.ProxyPort=pr("port")
-			Set tRequest.ProxyServer=pr("host")
-			If $Get(pr("username"))'="",$Get(pr("password"))'="" {
-				Set tRequest.ProxyAuthorization="Basic "_$system.Encryption.Base64Encode(pr("username")_":"_pr("password"))
-			}
-		}
-	}
-	Return tRequest
 }
 
 }

@@ -1733,6 +1733,9 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		}
 		While tRepoTypeResult.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
+			If tRepoTypeResult.%Get("Moniker") = "http" {
+				Continue
+			}
 			Set tMonikers($ZConvert(tRepoTypeResult.%Get("Moniker"),"L")) = tRepoTypeResult.%Get("Classname")
 			Set tClassList($Increment(tClassList)) = tRepoTypeResult.%Get("Classname")
 			Set tDescList($Increment(tDescList)) = tRepoTypeResult.%Get("Description")
@@ -2011,7 +2014,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
 	If ( tRegistry = "" ) {
-		Set tRS = ##class(%IPM.Repo.Remote.Definition).PublishingServerFunc()
+		Set tRS = ##class(%IPM.Repo.Definition).PublishingServerFunc()
 		If (tRS.%SQLCODE = 0) && tRS.%Next() {
 			Set type = tRS.Type
 			If type = 1 {
@@ -2030,14 +2033,13 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 
 	Try {
-		Set tManager = ##class(%IPM.Repo.Remote.PublishManager).%Get(.tSC)
-		$$$ThrowOnError(tSC)
 		If $CLASSNAME(tServer) = "%IPM.Repo.Oras.Definition" {
-			#; TODO: don't assume always available
-			Set isEnabled = 1
+			Set tManager = ##class(%IPM.Repo.Oras.PublishManager).%Get(.tSC)
 		} else {
-			$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+			Set tManager = ##class(%IPM.Repo.Remote.PublishManager).%Get(.tSC)
 		}
+		$$$ThrowOnError(tSC)
+		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
 
 		If (isEnabled) {
             Set tResult = 0

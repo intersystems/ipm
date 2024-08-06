@@ -19,7 +19,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
     #; Create temp directory
     Set tCreated = ##class(%File).CreateDirectoryChain(tempDirectory,.tReturnValue)
     If 'tCreated {
-		$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tempDirectory,tReturnValue)))
+		$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Error creating directory %1: %2", tempDirectory, tReturnValue)))
     }
 
     #; Create tgz file in temp directory
@@ -30,7 +30,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
     #; Convert module.xml into string
     Set moduleXML = ""
     While (pModule.Manifest.AtEnd = 0) {
-        Set moduleXML = moduleXML _ pModule.Manifest.ReadLine(,.status)
+        Set moduleXML = moduleXML _ pModule.Manifest.ReadLine(, .status)
         $$$ThrowOnError(status)
     }
 
@@ -64,7 +64,7 @@ Method CheckUnpublishEnabled(packageName As %String, packageVersion As %String) 
 Method Unpublish(packageName As %String, packageVersion As %String) As %Status
 {
 	If packageVersion = "all" {
-		Do ..DeleteModulePy(..Location, packageName, ..Namespace, ..Username, ..Password, ..Token)
+		Do ..DeleteModule(..Location, packageName, ..Namespace, ..Username, ..Password, ..Token)
 	} Else {
 		Do ..DeleteTagsPy(..Location, packageName, ..Namespace, packageVersion, ..Username, ..Password, ..Token)
 	}
@@ -92,7 +92,7 @@ ClassMethod Push(registry As %String, repository As %String, namespace As %Strin
 	Try {
 		Do ..PushPy(registry, repo, namespace, tags, path, metadata, username, password, token)
 	} Catch sc {
-		$$$ThrowStatus($$$ERROR($$$GeneralError,"Unable to push."))
+		$$$ThrowStatus($$$ERROR($$$GeneralError,"Unable to push: " _ sc.DisplayString()))
 	}
     Return $$$OK
 }
@@ -150,19 +150,16 @@ ClassMethod DeleteTagsPy(registry As %String, repository As %String, namespace A
 }
 
 /// Deletes the module by deleting all tags
-ClassMethod DeleteModulePy(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String) [ Language = python ]
+ClassMethod DeleteModule(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String)
 {
-	import iris
-	
-	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
-	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token)
-	try:
-		tags = client.get_tags(target)
-	except:
-		print("Error: Module not found")
-		return
-	
-	iris.cls("%IPM.Repo.Oras.PublishService").DeleteTagsPy(registry, repository, namespace, tags, username, password, token)
+	set target = ##class(%IPM.Repo.Oras.PackageService).GetAPITarget(registry, repository, namespace)
+	set client = ##class(%IPM.Repo.Oras.PackageService).GetClient(registry, username, password, token)
+	try {
+		set tags = client."get_tags"(target)
+		do ..DeleteTagsPy(registry, repository, namespace, tags, username, password, token)
+	} Catch sc {
+		$$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to delete: " _ sc.DisplayString()))
+	}
 }
 
 }

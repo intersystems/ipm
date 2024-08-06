@@ -1179,7 +1179,7 @@ Method %Publish(ByRef pParams) As %Status
 		}
 
 		If '$IsObject(tServer) {
-			Set tRS = ##class(%IPM.Repo.Remote.Definition).PublishingServerFunc()
+			Set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
 			If (tRS.%SQLCODE = 0) && tRS.%Next() {
 				Set type = tRS.Type
 				If type = 1 {
