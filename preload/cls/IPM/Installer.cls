@@ -102,49 +102,9 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
-    Set tPipCallerKey = ##class(%IPM.Repo.UniversalSettings).#PipCaller
-    Set tPipCallerValue = ..DetectPipCaller()
-    If tPipCallerValue = "" {
-      Write !, "WARNING: Failed to detect proper way of calling pip."
-      Write "You can set it manually using `config set PipCaller $lb(""<python-path>"", ""-m"", ""pip"")`" 
-    }
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(tPipCallerKey, tPipCallerValue, 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("PipCaller", "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("UseStandalonePip", "", 0))
     Quit $$$OK
-}
-
-/// Detect the proper call to `pip`. Possible options are `python3 -m pip`, `python -m pip`, `irispip.exe` (for Windows IRIS <= 2024.1).
-/// We prefer `python3 -m pip` over `python -m pip` because on certain legacy systems, `python` might be Python 2.
-ClassMethod DetectPipCaller() As %String
-{
-  Write !, "Detecting pip caller"
-  If $$$isWINDOWS {
-    If $System.CLS.IsMthd("%SYS.Python","GetPythonInfo") {
-      do ##class(%SYS.Python).GetPythonInfo(.info)
-      If $Data(info("CPF_PythonRuntimeLibrary"), tPyDylib) && tPyDylib {
-        set tInterpreter = ##class(%File).GetDirectory(tPyDylib, 1)_"python.exe"
-        set tFlexiblePython = $lb($lb(tInterpreter, "-m", "pip"))
-      }
-    }
-    set irispip = ##class(%File).NormalizeFilename("irispip.exe", $System.Util.BinaryDirectory())
-    Set tPipCallers = $lb($lb(irispip))_$Get(tFlexiblePython)_$lb($lb("python3.exe", "-m", "pip"), $lb("python.exe","-m", "pip"))
-  } Else {
-    Set tPipCallers = $lb($lb("python3", "-m", "pip"), $lb("python", "-m", "pip"))
-  }
-
-  Set ptr = 0
-  Set flags = "/SHELL/LOGCMD/STDOUT=""DetectPipCaller.log""/STDERR=""DetectPipCaller.err"""
-  While $ListNext(tPipCallers, ptr, cmd) {
-    Write !, "Checking """, $LISTTOSTRING(cmd, " "), """"
-    Set program = $List(cmd)
-    Do ..ListToMultiDimensional($List(cmd, 2, *), .args)
-    Set retCode = $ZF(-100, flags, program, .args)
-    If retCode = 0 {
-      Write !, "Success!"
-      Return cmd
-    }
-  }
-
-  Return ""
 }
 
 ClassMethod ListToMultiDimensional(pList As %List, Output pOutput)

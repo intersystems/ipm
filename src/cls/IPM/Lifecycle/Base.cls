@@ -621,9 +621,7 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     Write:tVerbose !
 
     Set target = ##class(%File).NormalizeDirectory("python", $System.Util.ManagerDirectory())
-	Set tPipCallerKey = ##class(%IPM.Repo.UniversalSettings).#PipCaller
-    Set tPipCallerValue = ##class(%IPM.Repo.UniversalSettings).GetValue(tPipCallerKey)
-    Set command = tPipCallerValue _ $ListBuild("install", "-r", "requirements.txt", "-t", target)
+    Set command = ..ResolvePipCaller() _ $ListBuild("install", "-r", "requirements.txt", "-t", target)
     If 'tVerbose {
       Set stdout = ""
     }
@@ -637,6 +635,98 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     Do ..Log("requirements.txt FAILURE")
   }
   Quit tSC
+}
+
+Method ResolvePipCaller(ByRef pParams) As %List
+{
+	Set tUseStandalonePip = ##class(%IPM.Repo.UniversalSettings).GetValue("UseStandalonePip")
+	Set tPipCaller = ##class(%IPM.Repo.UniversalSettings).GetValue("PipCaller")
+
+	If tPipCaller '= "" {	
+		If tUseStandalonePip = 1 {
+			Return $lb(tPipCaller)
+		} ElseIf tUseStandalonePip = 0 {
+			Return $lb(tPipCaller, "-m", "pip")
+		} Else {
+			Set msg = "Detected PipCaller=""" _ tPipCaller _ """ but UseStandalonePip is not properly set." _ $Char(13, 10)
+			Set msg = msg _ "Please set UseStandalonePip to 1 (if using a pip executable) or 0 (if using a python executable)." _ $Char(13, 10)
+			Set msg = msg _ "Example: zpm ""config set UseStandalonePip 1"""
+			Throw ##class(%Exception.General).%New(msg)
+		}
+	}
+	Return DetectPipCaller(tUseStandalonePip, $Get(pParams("Verbose"), 0))
+}
+
+Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
+{
+	Write:pVerbose !,"Detecting pip caller"
+
+	// First try to detect flexible python (in 2024.2 and later)
+	// This is a hack that doesn't always work because the python interpreter may not be in the same directory as the so/dylib/dll.
+	If $System.CLS.IsMthd("%SYS.Python","GetPythonInfo") {
+		Write:pVerbose !, "Attempting to find flexible python... "
+		Do ##class(%SYS.Python).GetPythonInfo(.info)
+		If $Data(info("CPF_PythonRuntimeLibrary"), tPyDylib) && tPyDylib {
+			// TODO: try `../bin/python3` or `../bin/python` in case the .so is in subfolder `lib`
+			// TODO: try to find `pip3` or `pip` if pUseStandalonePip is 1
+			For filename = "python3", "python" {
+				Set tInterpreter = ##class(%File).GetDirectory(tPyDylib, 1) _ filename
+				If $$$isWINDOWS {
+					Set tInterpreter = tInterpreter_".exe"
+				}
+				If ##class(%File).Exists(tInterpreter) {
+					Write:pVerbose "Success!"
+					Return $lb(tInterpreter, "-m", "pip")
+				}
+				Write:pVerbose "Not Found"
+			}
+		}
+    }
+
+	// For windows, try to find irispip.exe (in 2024.1 and earlier)
+	If $$$isWINDOWS {
+		Write:pVerbose !, "Attempting to find irispip.exe..."
+		Set irispip = ##class(%File).NormalizeFilename("irispip.exe", $System.Util.BinaryDirectory())
+		If ##class(%File).Exists(irispip) {
+			Write:pVerbose "Success!"
+			Return $lb(tInterpreter, "-m", "pip")
+		}
+		Write:pVerbose "Not Found"
+	}
+
+  	Set flags = "/SHELL/LOGCMD/STDOUT=""DetectPipCaller.log""/STDERR=""DetectPipCaller.err"""
+	// Unless UseStandalonePip is set to 1, try to find python3 or python
+	If pUseStandalonePip '= 1 {
+		Write:pVerbose !, "Attempting to find python3 or python..."
+		For cmd = "python3", "python" {
+			If $$$isWINDOWS { Set cmd = cmd _ ".exe" }
+			Kill args
+			Set args($I(args)) = "-m"
+			Set args($I(args)) = "pip"
+			Set retCode = $ZF(-100, flags, cmd, .args)
+			If retCode = 0 {
+				Write:pVerbose !, "Success!"
+				Return $lb(cmd, "-m", "pip")
+			}
+			Write:pVerbose "Not Found"
+		}
+	}
+
+	// Unless UseStandalonePip is set to 0, try to find pip3 or pip
+	If pUseStandalonePip '= 0 {
+		Write:pVerbose !, "Attempting to find pip3 or pip..."
+		For cmd = "pip3", "pip" {
+			If $$$isWINDOWS { Set cmd = cmd _ ".exe" }
+			Set retCode = $ZF(-100, flags, cmd)
+			If retCode = 0 {
+				Write !, "Success!"
+				Return $lb(cmd)
+			}
+			Write:pVerbose "Not Found"
+		}
+	}
+
+	Throw ##class(%Exception.General).%New("Could not find a suitable pip caller. Consider setting UseStandalonePip and PipCaller")
 }
 
 Method %Validate(ByRef pParams) As %Status
