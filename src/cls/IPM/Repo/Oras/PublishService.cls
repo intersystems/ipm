@@ -35,21 +35,20 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
     }
 
 	#; Set metadata
-	#; see https://github.com/opencontainers/image-spec/blob/main/annotations.md
-	Set metadata = {}
-	Do metadata.%Set("org.opencontainers.image.title", pModule.Name)
-	Do metadata.%Set("org.opencontainers.image.description", pModule.Description)
-	Do metadata.%Set("org.opencontainers.image.version", pModule.VersionString)
-	Do metadata.%Set("org.opencontainers.image.source", pModule.Repository)
-	Do metadata.%Set("org.opencontainers.image.created", $zdt($now(),3,2))
-	Do metadata.%Set("com.intersystems.ipm.allVersions", pModule.AllVersions)
-	Do metadata.%Set("com.intersystems.ipm.origin", pModule.Origin)
-	Do metadata.%Set("com.intersystems.ipm.deployed", pModule.Deployed)
-	Do metadata.%Set("com.intersystems.ipm.module.v1+xml", moduleXML)
-	Set metadata = metadata.toString()
+	Set metadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+	Set metadata."org-opencontainers-image-title" = pModule.Name
+	Set metadata."org-opencontainers-image-description" = pModule.Description
+	Set metadata."org-opencontainers-image-version" = pModule.VersionString
+	Set metadata."org-opencontainers-image-source" = pModule.Repository
+	Set metadata."org-opencontainers-image-created" = $zdt($now(),3,2)
+	Set metadata."com-intersystems-ipm-allVersions" = pModule.AllVersions
+	Set metadata."com-intersystems-ipm-origin" = pModule.Origin
+	Set metadata."com-intersystems-ipm-deployed" = pModule.Deployed
+	Set metadata."com-intersystems-ipm-module-v1+xml" = moduleXML
+	Do metadata.%JSONExportToString(.metaDataString)
 
     #; Push file
-	Set status = ..Push(..Location, repo, ..Namespace, tempDirectory, tag, metadata, ..Username, ..Password, ..Token)
+	Set status = ..Push(..Location, repo, ..Namespace, tempDirectory, tag, metaDataString, ..Username, ..Password, ..Token)
 	$$$ThrowOnError(status)
 
     Return 1

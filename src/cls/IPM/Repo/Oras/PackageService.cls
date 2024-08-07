@@ -104,14 +104,15 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 
 			#; get metadata from annotations
 			Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
-			Set metadata = ##class(%DynamicAbstractObject).%FromJSON(metadata)
+			set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+			Do artifactMetadata.%JSONImport(metadata)
 
 			Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-			Set tModRef.Name = metadata."org.opencontainers.image.title"
-			Set tModRef.Repository = metadata."org.opencontainers.image.source"
-			Set tModRef.VersionString = metadata."org.opencontainers.image.version"
-			Set tModRef.Description = metadata."org.opencontainers.image.description"
-			Set tModRef.Deployed = metadata."com.intersystems.image.deployed"
+			Set tModRef.Name = artifactMetadata."org-opencontainers-image-title"
+			Set tModRef.Repository = artifactMetadata."org-opencontainers-image-source"
+			Set tModRef.VersionString = artifactMetadata."org-opencontainers-image-version"
+			Set tModRef.Description = artifactMetadata."org-opencontainers-image-description"
+			Set tModRef.Deployed = artifactMetadata."com-intersystems-ipm-deployed"
 			#; If $IsObject(item."platform_versions") {
 			#;   Set tIterPVer = item."platform_versions".%GetIterator() 
 			#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
@@ -119,7 +120,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			#;   }
 			#; }
 			Set tModRef.AllVersions = allTagsString
-			Set tModRef.Origin = metadata."com.intersystems.image.origin"
+			Set tModRef.Origin = artifactMetadata."com-intersystems-ipm-origin"
 			Do tList.Insert(tModRef)
 			
 			#; If not all versions are requested, return the latest one
