@@ -107,15 +107,6 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     Quit $$$OK
 }
 
-ClassMethod ListToMultiDimensional(pList As %List, Output pOutput)
-{
-  Set ptr = 0
-  Kill pOutput
-  While $ListNext(pList, ptr, tItem) {
-    Set pOutput($Increment(pOutput)) = tItem
-  }
-}
-
 ClassMethod ZPMLoad(pDirectoryName)
 {
   Quit ##class(%IPM.Main).Shell("load "_pDirectoryName)
