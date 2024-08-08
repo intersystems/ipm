@@ -654,7 +654,7 @@ Method ResolvePipCaller(ByRef pParams) As %List
 			Throw ##class(%Exception.General).%New(msg)
 		}
 	}
-	Return DetectPipCaller(tUseStandalonePip, $Get(pParams("Verbose"), 0))
+	Return ..DetectPipCaller(tUseStandalonePip, $Get(pParams("Verbose"), 0))
 }
 
 Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
