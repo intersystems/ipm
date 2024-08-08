@@ -621,7 +621,7 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     Write:tVerbose !
 
     Set target = ##class(%File).NormalizeDirectory("python", $System.Util.ManagerDirectory())
-    Set command = ..ResolvePipCaller() _ $ListBuild("install", "-r", "requirements.txt", "-t", target)
+    Set command = ..ResolvePipCaller(.pParams) _ $ListBuild("install", "-r", "requirements.txt", "-t", target)
     If 'tVerbose {
       Set stdout = ""
     }
