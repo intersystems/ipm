@@ -89,7 +89,7 @@ ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Bool
 			Set pInstance.URL = tUrl
 		}
 		If (pInstance.DeploymentEnabled = 1) {
-			Set tServer = ##class(%IPM.Repo.Oras.Definition).DeploymentServerOrasOpen(1)
+			Set tServer = ##class(%IPM.Repo.Oras.Definition).DeploymentServerOpen(1)
 			If $Isobject(tServer),tServer.URL'=pInstance.URL {
 				Set tServer.DeploymentEnabled = 0
 				$$$ThrowOnError(tServer.%Save())
@@ -114,8 +114,13 @@ Query PublishingServer() As %SQLQuery
 			ELSE 999 
 		END PublishOrder,
 		ID, Name, URL
-	FROM %IPM_Repo_Remote.Definition 
+	FROM %IPM_Repo_Oras.Definition 
 	WHERE Enabled = 1
+}
+
+Method GetPublishingManager(ByRef status)
+{
+	Return ##class(%IPM.Repo.Oras.PublishManager).%Get(.status)
 }
 
 Storage Default

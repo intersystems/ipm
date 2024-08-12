@@ -1181,12 +1181,7 @@ Method %Publish(ByRef pParams) As %Status
 		If '$IsObject(tServer) {
 			Set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
 			If (tRS.%SQLCODE = 0) && tRS.%Next() {
-				Set type = tRS.Type
-				If type = 1 {
-					Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
-				} ElseIf type = 2 {
-					Set tServer = ##class(%IPM.Repo.Oras.Definition).%OpenId(tRS.ID)
-				}
+				Set tServer = $ClassMethod(tRS.Class,"%OpenId", tRS.ID)
 			}
 		}
 

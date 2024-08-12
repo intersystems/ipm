@@ -8,7 +8,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
 
     #; Use a temp directory
     Set tempFile = ""
-    Set tempDirectory = ##class(%File).NormalizeDirectory("/tmp/" _ repo _ "/" _ tag _ "/")
+    Set tempDirectory = ##class(%File).NormalizeDirectory($$$FileTempDir _ "/" _ repo _ "/" _ tag _ "/")
 
     #; Empty temp directory first
     If ##class(%File).DirectoryExists(tempDirectory) {
@@ -24,7 +24,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
 
     #; Create tgz file in temp directory
     Set tFileBinStream = ##class(%Stream.FileBinary).%New()
-    Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz", "/tmp/" _ repo _ "/" _ tag _ "/", .return)
+    Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz", tempDirectory, .return)
     Do tFileBinStream.CopyFromAndSave(pModule.Payload)
 
     #; Convert module.xml into string

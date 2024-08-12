@@ -174,7 +174,7 @@ ClassMethod Pull(registry, repository, namespace, username, password, token, ByR
 	Try {
 		#; Pull into temp directory
 		Set tempFile = ""
-		Set tempDirectory = "/tmp/" _ repo _ "/" _ tag
+		Set tempDirectory = $$$FileTempDir _ "/" _ repo _ "/" _ tag
 
 		#; Empty temp directory first
 		If ##class(%File).DirectoryExists(tempDirectory) {

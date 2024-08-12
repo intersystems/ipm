@@ -2014,14 +2014,9 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
 	If ( tRegistry = "" ) {
-		Set tRS = ##class(%IPM.Repo.Definition).PublishingServerFunc()
+		Set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
 		If (tRS.%SQLCODE = 0) && tRS.%Next() {
-			Set type = tRS.Type
-			If type = 1 {
-				Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
-			} ElseIf type = 2 {
-				Set tServer = ##class(%IPM.Repo.Oras.Definition).%OpenId(tRS.ID)
-			}
+			Set tServer = $ClassMethod(tRS.Class, "%OpenId", tRS.ID)
 		}
 	} Else {
 		Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
@@ -2033,11 +2028,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 
 	Try {
-		If $CLASSNAME(tServer) = "%IPM.Repo.Oras.Definition" {
-			Set tManager = ##class(%IPM.Repo.Oras.PublishManager).%Get(.tSC)
-		} else {
-			Set tManager = ##class(%IPM.Repo.Remote.PublishManager).%Get(.tSC)
-		}
+		Set tManager = tServer.GetPublishingManager(.tSC)
 		$$$ThrowOnError(tSC)
 		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
 
@@ -2060,14 +2051,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
             }
 
 			If (tResult) {
-				If $CLASSNAME(tServer) = "%IPM.Repo.Oras.Definition" {
-					Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
-					$$$ThrowOnError(tSC)
-					Set tClient = tRepository.GetPublishService()
-					$$$ThrowOnError(tClient.Unpublish(tModuleName, tVersion))
-				} else {
-					$$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
-				}
+				$$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
 				Write !!,"Package deleted"
 			}
 		} Else {

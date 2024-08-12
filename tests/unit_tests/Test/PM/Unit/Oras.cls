@@ -44,6 +44,12 @@ Method TestOras()
 
     // Delete from OCI registry
     Do publishService.DeleteModule(Registry, Name, "", "", "", "")
+
+    // Set as default registry
+    Do ..RunCommand("repo -publish 1 -n oci")
+
+    // Install from default
+    Do ..AssertNoException("install " _ Name)
 }
 
 Method RunCommand(pCommand As %String)

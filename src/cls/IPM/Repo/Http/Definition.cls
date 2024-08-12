@@ -88,31 +88,52 @@ Method GetSortOrder() As %Integer [ Private ]
 	Quit 2 + $Case(..%Id(),"":1,:..%Id())
 }
 
-Query PublishingServer() As %SQLQuery
+Query PublishingServer() As %Query(ROWSPEC = "Name:%String,ID:%Integer,Url:%String,Class:%String") [ SqlProc ]
 {
-	--TODO: dynamically handle subclasses
-	SELECT 
-		CASE 
-			WHEN DeploymentEnabled = 1 THEN 1
-			WHEN Token IS NOT NULL THEN 2
-			WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
-			ELSE 999 
-		END PublishOrder,
-		ID, Name, URL, 1 AS Type
-	FROM %IPM_Repo_Remote.Definition 
-	WHERE Enabled = 1
-	UNION
-	SELECT 
-		CASE 
-			WHEN DeploymentEnabled = 1 THEN 1
-			WHEN Token IS NOT NULL THEN 2
-			WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
-			ELSE 999 
-		END PublishOrder,
-		ID, Name, URL, 2 AS Type
-	FROM %IPM_Repo_Oras.Definition 
-	WHERE Enabled = 1
-	ORDER BY PublishOrder, ID
+}
+
+ClassMethod PublishingServerExecute(ByRef qHandle As %Binary) As %Status
+{
+	Set tSC = $$$OK
+	Set rs = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
+
+	Try {
+		While rs.%Next() {
+			Set classname = rs.Name
+			Set tRS = $ClassMethod(classname,"PublishingServerFunc")
+			If (tRS.%SQLCODE = 0) && tRS.%Next() {
+				#; Order by publish order and then name
+				Set qHandle(tRS.PublishOrder _ "/" _ tRS.Name) = $LB(tRS.ID, tRS.URL, classname)
+			}
+		}
+	} Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
+}
+
+ClassMethod PublishingServerFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = PublishingServerExecute ]
+{
+	Set orderName = $Order(qHandle($Get(qHandle)))
+	If (orderName = "") {
+		Set AtEnd = 1
+	} Else {
+		#; publish order is an integer while name is a string that could contain a "/"
+		Set order = $PIECE(orderName, "/", 1)
+		Set name = $PIECE(orderName, "/", 2, *)
+		Set Row = $lb(name) _ qHandle(orderName)
+		Set qHandle = orderName
+	}
+	Quit $$$OK
+}
+
+ClassMethod PublishingServerClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = PublishingServerFetch ]
+{
+	Quit $$$OK
+}
+
+Method GetPublishingManager(ByRef status) [ Abstract ]
+{
 }
 
 Storage Default

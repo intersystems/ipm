@@ -114,6 +114,11 @@ Query PublishingServer() As %SQLQuery
 	WHERE Enabled = 1
 }
 
+Method GetPublishingManager(ByRef status)
+{
+	Return ##class(%IPM.Repo.Remote.PublishManager).%Get(.status)
+}
+
 Storage Default
 {
 <Data name="RemoteRepoDefinitionDefaultData">
