@@ -560,14 +560,18 @@ Method ResolvePipCaller(ByRef pParams) As %List
 
 Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
 {
-	Write:pVerbose !,"Detecting pip caller"
+	If pVerbose {
+		Write !,"Detecting pip caller"
+	}
 
 	// First try to detect flexible python (in 2024.2 and later)
 	// This is a hack that doesn't always work because the python interpreter may not be in the same directory as the so/dylib/dll.
 	// In fact, the python interpreter executable, in theory, may not even exist at all!
 	// What IRIS does it #include <Python.h> and then link against the dynamic library. This is independent of the python interpreter.
 	If $System.CLS.IsMthd("%SYS.Python","GetPythonInfo") {
-		Write:pVerbose !, "Attempting to find flexible python... "
+		If pVerbose {
+			Write !, "Attempting to find flexible python... "
+		}
 		Do ##class(%SYS.Python).GetPythonInfo(.info)
 		If $Data(info("CPF_PythonRuntimeLibrary"), tPyDylib) && tPyDylib {
 			// TODO: try `../bin/python3` or `../bin/python` in case the .so is in subfolder `lib`
@@ -578,54 +582,78 @@ Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) 
 					Set tInterpreter = tInterpreter_".exe"
 				}
 				If ##class(%File).Exists(tInterpreter) {
-					Write:pVerbose "Success!"
+					If pVerbose {
+						Write "Success!"
+					}
 					Return $lb(tInterpreter, "-m", "pip")
 				}
-				Write:pVerbose "Not Found"
+				If pVerbose {
+					Write "Not Found"
+				}
 			}
 		}
-    }
+	}
 
 	// For windows, try to find irispip.exe (in 2024.1 and earlier)
 	If $$$isWINDOWS {
-		Write:pVerbose !, "Attempting to find irispip.exe..."
+		If pVerbose {
+			Write !, "Attempting to find irispip.exe..."
+		}
 		Set irispip = ##class(%File).NormalizeFilename("irispip.exe", $System.Util.BinaryDirectory())
 		If ##class(%File).Exists(irispip) {
-			Write:pVerbose "Success!"
+			If pVerbose {
+				Write "Success!"
+			}
 			Return $lb(tInterpreter, "-m", "pip")
 		}
-		Write:pVerbose "Not Found"
+		If pVerbose {
+			Write "Not Found"
+		}
 	}
 
 	Set flags = "/SHELL/LOGCMD/STDOUT=""DetectPipCaller.log""/STDERR=""DetectPipCaller.err"""
 	// Unless UseStandalonePip is set to 1, try to find python3 or python
 	If pUseStandalonePip '= 1 {
-		Write:pVerbose !, "Attempting to find python3 or python..."
+		If pVerbose {
+			Write !, "Attempting to find python3 or python..."
+		}
 		For cmd = "python3", "python" {
-			If $$$isWINDOWS { Set cmd = cmd _ ".exe" }
+			If $$$isWINDOWS {
+				Set cmd = cmd _ ".exe"
+			}
 			Kill args
 			Set args($I(args)) = "-m"
 			Set args($I(args)) = "pip"
 			Set retCode = $ZF(-100, flags, cmd, .args)
 			If retCode = 0 {
-				Write:pVerbose !, "Success!"
+				If pVerbose {
+					Write "Success!"
+				}
 				Return $lb(cmd, "-m", "pip")
 			}
-			Write:pVerbose "Not Found"
+			If pVerbose {
+				Write "Not Found"
+			}
 		}
 	}
 
 	// Unless UseStandalonePip is set to 0, try to find pip3 or pip
 	If pUseStandalonePip '= 0 {
-		Write:pVerbose !, "Attempting to find pip3 or pip..."
+		If pVerbose {
+			Write !, "Attempting to find pip3 or pip..."
+		}
 		For cmd = "pip3", "pip" {
-			If $$$isWINDOWS { Set cmd = cmd _ ".exe" }
+			If $$$isWINDOWS { 
+				Set cmd = cmd _ ".exe" 
+			}
 			Set retCode = $ZF(-100, flags, cmd)
 			If retCode = 0 {
-				Write !, "Success!"
+				Write "Success!"
 				Return $lb(cmd)
 			}
-			Write:pVerbose "Not Found"
+			If pVerbose {
+				Write "Not Found"
+			}
 		}
 	}
 
