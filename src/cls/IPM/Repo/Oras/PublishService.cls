@@ -48,8 +48,12 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
 	Do metadata.%JSONExportToString(.metaDataString)
 
     #; Push file
-	Set status = ..Push(..Location, repo, ..Namespace, tempDirectory, tag, metaDataString, ..Username, ..Password, ..Token)
+	Set client = ##class(%IPM.Repo.Oras.PackageService).GetClient(..Location, ..Username, ..Password, ..Token)
+	Set status = ..Push(..Location, repo, ..Namespace, tempDirectory, tag, metaDataString, client)
 	$$$ThrowOnError(status)
+	
+	#; Sign the package
+	Do ..SignPackage(..Location, repo, ..Namespace, tag, tFileBinStream.Filename, client)
 
     Return 1
 }
@@ -75,7 +79,7 @@ Method Unpublish(packageName As %String, packageVersion As %String) As %Status
 /// Params:
 /// 	repository - string name of repository to push to, e.g. test-artifact
 /// 	tags       - comma separated strings of tags, e.g. "1.0.0,latest"
-ClassMethod Push(registry As %String, repository As %String, namespace As %String, path As %String, tags As %String, metadata As %String, username As %String, password As %String, token As %String)
+ClassMethod Push(registry As %String, repository As %String, namespace As %String, path As %String, tags As %String, metadata As %String, client)
 {
 	#; Remove the tag from the repository name if it exists and add it to tags
 	Set repo = $piece(repository, ":", 1)
@@ -89,7 +93,7 @@ ClassMethod Push(registry As %String, repository As %String, namespace As %Strin
 	Set tags = $zstrip(tags,"*W")
 
 	Try {
-		Do ..PushPy(registry, repo, namespace, tags, path, metadata, username, password, token)
+		Do ..PushPy(registry, repo, namespace, tags, path, metadata, client)
 	} Catch sc {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Unable to push: " _ sc.DisplayString()))
 	}
@@ -97,18 +101,17 @@ ClassMethod Push(registry As %String, repository As %String, namespace As %Strin
 }
 
 /// Publishes/pushes the package using ORAS
-ClassMethod PushPy(registry As %String, repository As %String, namespace As %String, tags As %String, directoryPath As %String, metadata As %String, username As %String, password As %String, token As %String) [ Language = python ]
+ClassMethod PushPy(registry As %String, repository As %String, namespace As %String, tags As %String, directoryPath As %String, metadata As %String, client) [ Language = python ]
 {
 	import iris
-	import os, sys
+	import os
+	import sys
 	import json
 
 	# Get all files in the directory and fully specify path
 	files = os.listdir(directoryPath)
 	result = map(lambda x: directoryPath + x, files)
 	file_paths = list(result)
-
-	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token)
 
 	# Push once for each tag
 	for tag in tags.split(","):
@@ -151,14 +154,99 @@ ClassMethod DeleteTagsPy(registry As %String, repository As %String, namespace A
 /// Deletes the module by deleting all tags
 ClassMethod DeleteModule(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String)
 {
-	set target = ##class(%IPM.Repo.Oras.PackageService).GetAPITarget(registry, repository, namespace)
-	set client = ##class(%IPM.Repo.Oras.PackageService).GetClient(registry, username, password, token)
-	try {
-		set tags = client."get_tags"(target)
-		do ..DeleteTagsPy(registry, repository, namespace, tags, username, password, token)
+	Set target = ##class(%IPM.Repo.Oras.PackageService).GetAPITarget(registry, repository, namespace)
+	Set client = ##class(%IPM.Repo.Oras.PackageService).GetClient(registry, username, password, token)
+	Try {
+		Set tags = client."get_tags"(target)
+		Do ..DeleteTagsPy(registry, repository, namespace, tags, username, password, token)
 	} Catch sc {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to delete: " _ sc.DisplayString()))
 	}
+}
+
+ClassMethod SignPackage(registry, repository, namespace, tag, filePath, client)
+{
+	#; Generate signature
+	Set signature = ..SignFileWithCert(filePath)
+
+	#; Save signature in temp directory
+    Set tFileStream = ##class(%Stream.FileCharacter).%New()
+    Set tFileStream.Filename = ##class(%File).TempFilename("signature", $$$FileTempDir, .return)
+    Do tFileStream.Write(signature)
+	Do tFileStream.%Save()
+
+	#; Attach to repo
+	Set target = ##class(%IPM.Repo.Oras.PackageService).GetAPITarget(registry, repository, namespace)
+	Do ..Attach(target, tag, tFileStream.Filename, client)
+}
+
+/// Signs the given file with the given private key (and certificate)
+/// Returns string of the signed file and certificate intended for IPM use only
+/// Params:
+/// 	certKeyFile - a PEM file with a certificate and private key
+ClassMethod SignFileWithCert(filePath, certKeyFile = "/tmp/cert_and_key.pem") [ Language = python ]
+{
+	from cryptography.hazmat.primitives import serialization, hashes
+	from cryptography.hazmat.primitives.asymmetric import padding
+
+	with open(certKeyFile, "rb") as cert_file:
+		cert_contents = cert_file.read()
+		private_key = serialization.load_pem_private_key(
+			cert_contents,
+			password=None,
+		)
+	with open(certKeyFile, "r") as cert_file:
+		cert_contents = cert_file.read()
+		start = cert_contents.find('-----BEGIN CERTIFICATE-----\n')
+		end = cert_contents.find('\n-----END CERTIFICATE-----')
+		certificate = cert_contents[start + len('-----BEGIN CERTIFICATE-----\n'):end]
+	public_key = private_key.public_key()
+
+	# read contents of file and sign
+	with open(filePath, "rb") as package_file:
+		contents = package_file.read()
+
+	signature = private_key.sign(
+		contents,
+		padding.PSS(
+			mgf=padding.MGF1(hashes.SHA256()),
+			salt_length=padding.PSS.MAX_LENGTH
+		),
+		hashes.SHA256()
+	)
+	
+	#; write out contents of the signed package and certificate (containing the public key)
+	output = 'signature:\n'
+	output += signature.hex()
+	output += '\ncertificate:\n'
+	output += certificate
+	return output
+}
+
+ClassMethod Attach(target, tag, filePath, client) [ Language = python ]
+{
+	import oras
+	import os
+	import sys
+
+	# attach module.xml
+	try:
+		manifest = client.get_manifest(target + ":" + tag)
+		subject = oras.oci.Subject.from_manifest(manifest)
+		
+		# todo figure out how to make a tagless attachment
+		module_xml_target = target + ":" + tag + "-signature"
+
+        # Suppress console output
+		sys.stdout = open(os.devnull, "w")
+
+		client.push(files=[filePath], target=module_xml_target, subject=subject, disable_path_validation=True)
+		
+		# Reenable console output
+		sys.stdout = sys.__stdout__
+	except Exception as e:
+		print("Error: ", repr(e))
+		raise e
 }
 
 }
