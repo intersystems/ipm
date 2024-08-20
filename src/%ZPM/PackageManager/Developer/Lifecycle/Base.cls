@@ -522,14 +522,14 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     Write:tVerbose !
 
     Set target = ##class(%File).NormalizeDirectory("python", $System.Util.ManagerDirectory())
-	If '$System.CLS.IsMthd("%SYS.Python", "Import") {
-		Throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
-	}
-	Set tSysModule = ##class(%SYS.Python).Import("sys")
-	Set tPyMajor = tSysModule."version_info".major
-	Set tPyMinor = tSysModule."version_info".minor
-	Set tPyMicro = tSysModule."version_info".micro
-	Set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
+    If '$System.CLS.IsMthd("%SYS.Python", "Import") {
+        Throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
+    }
+    Set tSysModule = ##class(%SYS.Python).Import("sys")
+    Set tPyMajor = tSysModule."version_info".major
+    Set tPyMinor = tSysModule."version_info".minor
+    Set tPyMicro = tSysModule."version_info".micro
+    Set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
     Set command = ..ResolvePipCaller(.pParams) _ $ListBuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:")
     If 'tVerbose {
       Set stdout = ""
