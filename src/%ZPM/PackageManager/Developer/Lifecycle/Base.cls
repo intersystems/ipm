@@ -612,7 +612,7 @@ Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) 
 			If pVerbose {
 				Write "Success!"
 			}
-			Return $lb(tInterpreter, "-m", "pip")
+			Return $lb(irispip)
 		}
 		If pVerbose {
 			Write "Not Found"
