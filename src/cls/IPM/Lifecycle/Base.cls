@@ -630,7 +630,11 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
 	Set tPyMicro = tSysModule."version_info".micro
 	Set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
     Set command = ..ResolvePipCaller(.pParams) _ $ListBuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:")
-    If 'tVerbose {
+    If tVerbose {
+        Write !, "Running "
+        Zwrite command
+    }
+    Else{
       Set stdout = ""
     }
     Set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
@@ -716,7 +720,6 @@ Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) 
 		}
 	}
 
-  	Set flags = "/SHELL/LOGCMD/STDOUT=""DetectPipCaller.log""/STDERR=""DetectPipCaller.err"""
 	// Unless UseStandalonePip is set to 1, try to find python3 or python
 	If pUseStandalonePip '= 1 {
 		If pVerbose {
@@ -726,15 +729,14 @@ Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) 
 			If $$$isWINDOWS {
 				Set cmd = cmd _ ".exe"
 			}
-			Kill args
-			Set args($I(args)) = "-m"
-			Set args($I(args)) = "pip"
-			Set retCode = $ZF(-100, flags, cmd, .args)
-			If retCode = 0 {
+			set cmd = $lb(cmd, "-m", "pip")
+			Set cwd = ##class(%SYSTEM.Util).InstallDirectory()
+			Set tSC = ##class(%IPM.Utils.Module).RunCommand(cwd, cmd, "")
+			If $$$ISOK(tSC) {
 				If pVerbose {
 					Write "Success!"
 				}
-				Return $lb(cmd, "-m", "pip")
+				Return cmd
 			}
 			If pVerbose {
 				Write "Not Found"
@@ -751,10 +753,14 @@ Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) 
 			If $$$isWINDOWS {
 				Set cmd = cmd _ ".exe"
 			}
-			Set retCode = $ZF(-100, flags, cmd)
-			If retCode = 0 {
-				Write "Success!"
-				Return $lb(cmd)
+			Set cmd = $lb(cmd)
+			Set cwd = ##class(%SYSTEM.Util).InstallDirectory()
+			Set tSC = ##class(%IPM.Utils.Module).RunCommand(cwd, cmd, "")
+			If $$$ISOK(tSC) {
+				If pVerbose {
+					Write "Success!"
+				}
+				Return cmd
 			}
 			If pVerbose {
 				Write "Not Found"
