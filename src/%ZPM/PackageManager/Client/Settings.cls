@@ -22,7 +22,19 @@ Parameter TerminalPrompt = "TerminalPrompt";
 
 Parameter PublishTimeout = "publish_timeout";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout";
+/// A path pointing either to a python executable or a pip executable, controlled by <parameter>UseStandalonePip</parameter>
+/// In the special case where the path is empty, the script tries to resolve the path in the following order:
+/// 1. Where available (typically 2024.2+) - Use PythonRuntimeLibrary in iris.cpf to find the directory containing the python executable
+/// 2. On Windows, try to find <iris-root>/bin/irispip.exe
+/// 3. Unless <parameter>UseStandalonePip</parameter> is explicitly set to 1, try to find whichever python3/python is first available in $PATH
+/// 4. Unless <parameter>UseStandalonePip</parameter> is explicitly set to 0, try to find whichever pip3/pip is first available in $PATH
+Parameter PipCaller = "PipCaller";
+
+/// Possible values: "", 0, 1
+/// Indicates whether <parameter>PipCaller</parameter> is a pip executable instead of python
+Parameter UseStandalonePip = "UseStandalonePip";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status

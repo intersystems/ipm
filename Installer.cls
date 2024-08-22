@@ -62,6 +62,8 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsAvailable(1))
     $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetAnalyticsTrackingId(pAnalyticsTrackingID))
     $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetValue("ColorScheme",""))
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetValue("PipCaller",""))
+    $$$QuitOnError(##class(%ZPM.PackageManager.Client.Settings).SetValue("UseStandalonePip",""))
     Quit $$$OK
 }
 
