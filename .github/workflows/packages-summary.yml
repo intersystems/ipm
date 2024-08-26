@@ -1,17 +1,9 @@
 name: Summarize package test results
 on:
-  workflow_call:
-    inputs:
-      runId:
-        type: number
-        required: true
-        description: "Id of the workflow run to summarize"
-  workflow_dispatch:
-    inputs:
-      runId:
-        type: number
-        required: true
-        description: "Id of the workflow run to summarize"
+  workflow_run:
+    workflows: ["Test major packages"]
+    types:
+      - completed
 
 jobs:
   summarize:
@@ -21,7 +13,7 @@ jobs:
     steps:
       - name: Donwload log zip
         run: |
-          curl -L -o logs.zip "${{ env.BASE_URL }}/${{ inputs.runId }}/logs" -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}'
+          curl -L -o logs.zip "${{ env.BASE_URL }}/${{ github.event.workflow_run.id }}/logs" -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}'
       - name: Unzip logs
         run: |
           unzip logs.zip -d /tmp/logs/
