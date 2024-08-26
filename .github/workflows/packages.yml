@@ -135,13 +135,3 @@ jobs:
           done
 
           IFS=' '
-
-  summarize:
-    needs:
-      - run-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call package-summary workflow
-        uses: ./.github/workflows/packages-summary.yml
-        with:
-          runId: ${{ github.run_id }}
