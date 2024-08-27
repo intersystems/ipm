@@ -496,6 +496,11 @@ XData InternalXSL
       <xsl:copy-of select="." />
     </xsl:element>
   </xsl:template>
+  <xsl:template match="Module/Mapping">
+    <xsl:element name="Mappings">
+      <xsl:copy-of select="." />
+    </xsl:element>
+  </xsl:template>
   <xsl:template match="Module/Default|Module/Parameter">
     <xsl:element name="Defaults">
       <xsl:element name="Default">
@@ -507,8 +512,8 @@ XData InternalXSL
     <xsl:call-template name="resource">
       <xsl:with-param name="name" select="'Name'" />
     </xsl:call-template>
-	</xsl:template>
-	<xsl:template match="Module" mode="pass2">
+  </xsl:template>
+  <xsl:template match="Module" mode="pass2">
     <xsl:copy>
       <xsl:apply-templates select="./@*" mode="pass2" />
       <xsl:apply-templates mode="pass2" />
