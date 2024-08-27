@@ -1,5 +1,6 @@
-ARG BASE=containers.intersystems.com/intersystems/irishealth-community:2024.1
+ARG BASE=containers.intersystems.com/intersystems/iris-community:2024.1
 FROM ${BASE}
+ARG IPM_VERSION=zpm-0.7.2.xml
 
 USER root
 
@@ -11,5 +12,5 @@ USER irisowner
 
 RUN --mount=type=bind,src=.,dst=/home/irisowner/sandbox/ \
   iris start iris && \
-  sh /home/irisowner/sandbox/install-artifact.sh zpm-0.7.1.xml \
+  sh /home/irisowner/sandbox/install-artifact.sh $IPM_VERSION \
   iris stop iris quietly
