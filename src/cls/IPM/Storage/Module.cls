@@ -1434,7 +1434,24 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Set name = ..Name
 	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
 
+	Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", tAttrValue)
+	While regex.Locate() {
+		Set expr = regex.Group(1)
+		Set value = ..%EvaluateExpression(expr)
+		Set $Extract(attrValue, regex.Start, regex.End - 1) = value
+		Set regex.Text = attrValue
+	}
+
 	Return attrValue
+}
+
+Method %EvaluateExpression(pExpr) As %String [ Internal ]
+{
+  Try {
+    return @pExpr
+  } Catch ex {
+  }
+  Return ""
 }
 
 Storage Default
@@ -1541,3 +1558,4 @@ Storage Default
 }
 
 }
+
