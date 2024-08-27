@@ -1,0 +1,26 @@
+name: Summarize package test results
+on:
+  workflow_run:
+    workflows: ["Test major packages"]
+    types:
+      - completed
+
+jobs:
+  summarize:
+    runs-on: ubuntu-latest
+    env:
+      BASE_URL: https://api.github.com/repos/intersystems/ipm/actions/runs
+    steps:
+      - name: Donwload log zip
+        run: |
+          curl -L -o logs.zip "${{ env.BASE_URL }}/${{ github.event.workflow_run.id }}/logs" -H 'Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}'
+      - name: Unzip logs
+        run: |
+          unzip logs.zip -d /tmp/logs/
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Summarize logs
+        run: |
+          # Could also use awk script, but python is easier to read and debug
+          python3 .github/scripts/summarize_logs.py /tmp/logs/
+

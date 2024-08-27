@@ -102,6 +102,8 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("PipCaller", "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("UseStandalonePip", "", 0))
     Quit $$$OK
 }
 
@@ -196,7 +198,7 @@ ClassMethod Make(pPackage As %Stream.Object, ByRef pStream As %Stream.TmpCharact
   try {
 		Set tModule = ##class(%IPM.Storage.Module).NameOpen("zpm")
 
-    Set tmpDir = ##class(%File).NormalizeDirectory($$$FileTempDir)
+    Set tmpDir = ..CreateTempDir()
     $$$ThrowOnError(##class(%IPM.General.Archive).Extract(pPackage, tmpDir))
 
     Do ..CollectPackage(tmpDir, .tList, tmpDir)
@@ -275,7 +277,7 @@ ClassMethod CompactPackage(ByRef pList) As %Status
 
 ClassMethod ExtractPackage(Output pFolder As %String) As %String
 {
-  Set pFolder = ##class(%File).NormalizeDirectory($$$FileTempDir)
+  Set pFolder = ..CreateTempDir()
 
   For i=1:1:..#FILESCOUNT {
     Set xdata = ##class(%Dictionary.XDataDefinition).%OpenId($CLASSNAME()_"||Data"_i)
@@ -316,6 +318,18 @@ ClassMethod ExtractPackage(Output pFolder As %String) As %String
     do ##class(%File).Delete(tmpFile)
   }
   Quit $$$OK
+}
+
+ClassMethod CreateTempDir() As %String
+{
+  Set tDir = $$$FileTempDir
+
+  /// In some cases, the $zu(140, 17) will return a negated error code. 
+  /// For example, it can return -28, where 28 is Unix errno for "no space left on device".
+  If tDir = ("-" _ -tDir) {
+    Throw ##class(%Exception.General).%New("Failed to create temporary directory. Error code: " _ -tDir)
+  }
+  Return ##class(%File).NormalizeDirectory(tDir)
 }
 
 }
