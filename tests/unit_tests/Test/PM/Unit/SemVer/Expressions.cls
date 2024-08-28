@@ -34,13 +34,25 @@ Method TestPrerelease()
 	Do ..AssertSatisfied(">=1.0.0-beta.1","1.0.0-beta.1")
 	Do ..AssertSatisfied(">=1.0.0-beta.1","1.0.0-beta.2")
 	Do ..AssertSatisfied(">=1.0.0-alpha.1","1.0.0-beta.1")
-	Do ..AssertSatisfied("^1.0.0","1.0.0-1.m1")
+	Do ..AssertNotSatisfied("^1.0.0","1.0.0-1.m1") // This shouldn't be satisfied because 1.0.0-1.m1 is a prerelease
 	Do ..AssertNotSatisfied(">=1.0.0-beta.2","1.0.0-beta.1")
 	Do ..AssertNotSatisfied(">=1.0.0-beta.1","1.0.0-alpha.1")
 	
 	// This is the problematic case without HSIEO-10520
 	Do ..AssertNotSatisfied("1.0.0-1.m1","1.0.0") 
 	Do ..AssertNotSatisfied("=1.0.0-1.m1","1.0.0")
+
+	// Issue #557: snapshots/prereleases shouldn't be considered as a lower version number
+	// Even though 1.5.0-beta.1 is technically within the 1.x range, it's a prerelease and should not be considered satisfiable.
+	// Similarly 1.1.5-beta.1 does not satisify 1.1.x. See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags
+	Do ..AssertNotSatisfied("1.x", "1.5.0-beta.1") 
+	Do ..AssertNotSatisfied("1.x", "2.0.0-0")
+	Do ..AssertNotSatisfied("1.x", "2.0.0-SNAPSHOT")
+	Do ..AssertNotSatisfied("1.x", "2.0.0-alpha")
+	Do ..AssertNotSatisfied("1.1.x", "1.1.5-beta.1")
+	Do ..AssertNotSatisfied("1.1.x", "1.2.0-0")
+	Do ..AssertNotSatisfied("1.1.x", "1.2.0-SNAPSHOT")
+	Do ..AssertNotSatisfied("1.1.x", "1.2.0-alpha")
 }
 
 Method TestEquivalenceHyphenRanges()
@@ -53,38 +65,38 @@ Method TestEquivalenceHyphenRanges()
 
 Method TestEquivalenceXRanges()
 {
-	Do ..AssertEquivalent("*", ">=0.0.0")
-	Do ..AssertEquivalent("", ">=0.0.0")
-	Do ..AssertEquivalent("1", ">=1.0.0 <2.0.0")
-	Do ..AssertEquivalent("1.x", ">=1.0.0 <2.0.0")
-	Do ..AssertEquivalent("1.2", ">=1.2.0 <1.3.0")
-	Do ..AssertEquivalent("1.2.*", ">=1.2.0 <1.3.0")
-	Do ..AssertEquivalent("1.2.X", ">=1.2.0 <1.3.0")
+	Do ..AssertEquivalent("*", ">=0.0.0") // Do we want to allow pre-release versions?
+	Do ..AssertEquivalent("", ">=0.0.0")  // Do we want to allow pre-release versions?
+	Do ..AssertEquivalent("1", ">=1.0.0 <2.0.0-0")
+	Do ..AssertEquivalent("1.x", ">=1.0.0 <2.0.0-0")
+	Do ..AssertEquivalent("1.2", ">=1.2.0 <1.3.0-0")
+	Do ..AssertEquivalent("1.2.*", ">=1.2.0 <1.3.0-0")
+	Do ..AssertEquivalent("1.2.X", ">=1.2.0 <1.3.0-0")
 }
 
 Method TestEquivalenceTildeRanges()
 {
-	Do ..AssertEquivalent("~1.2.3", ">=1.2.3 <1.3.0")
-	Do ..AssertEquivalent("~1.2", ">=1.2.0 <1.3.0")
-	Do ..AssertEquivalent("~1", ">=1.0.0 <2.0.0")
-	Do ..AssertEquivalent("~0.2.3", ">=0.2.3 <0.3.0")
-	Do ..AssertEquivalent("~0.2", ">=0.2.0 <0.3.0")
-	Do ..AssertEquivalent("~0", ">=0.0.0 <1.0.0")
-	Do ..AssertEquivalent("~1.2.3-beta.2", ">=1.2.3-beta.2 <1.3.0")
+	Do ..AssertEquivalent("~1.2.3", ">=1.2.3 <1.3.0-0")
+	Do ..AssertEquivalent("~1.2", ">=1.2.0 <1.3.0-0")
+	Do ..AssertEquivalent("~1", ">=1.0.0 <2.0.0-0")
+	Do ..AssertEquivalent("~0.2.3", ">=0.2.3 <0.3.0-0")
+	Do ..AssertEquivalent("~0.2", ">=0.2.0 <0.3.0-0")
+	Do ..AssertEquivalent("~0", ">=0.0.0 <1.0.0-0")
+	Do ..AssertEquivalent("~1.2.3-beta.2", ">=1.2.3-beta.2 <1.3.0-0")
 }
 
 Method TestEquivalenceCaretRanges()
 {
-	Do ..AssertEquivalent("^1.2.3", ">=1.2.3 <2.0.0")
-	Do ..AssertEquivalent("^0.2.3", ">=0.2.3 <0.3.0")
-	Do ..AssertEquivalent("^0.0.3", ">=0.0.3 <0.0.4")
-	Do ..AssertEquivalent("^1.2.3-beta.2", ">=1.2.3-beta.2 <2.0.0")
-	Do ..AssertEquivalent("^0.0.3-beta", ">=0.0.3-beta <0.0.4")
-	Do ..AssertEquivalent("^1.2.x", ">=1.2.0 <2.0.0")
-	Do ..AssertEquivalent("^0.0.x", ">=0.0.0 <0.1.0")
-	Do ..AssertEquivalent("^0.0", ">=0.0.0 <0.1.0")
-	Do ..AssertEquivalent("^1.x", ">=1.0.0 <2.0.0")
-	Do ..AssertEquivalent("^0.x", ">=0.0.0 <1.0.0")
+	Do ..AssertEquivalent("^1.2.3", ">=1.2.3 <2.0.0-0")
+	Do ..AssertEquivalent("^0.2.3", ">=0.2.3 <0.3.0-0")
+	Do ..AssertEquivalent("^0.0.3", ">=0.0.3 <0.0.4-0")
+	Do ..AssertEquivalent("^1.2.3-beta.2", ">=1.2.3-beta.2 <2.0.0-0")
+	Do ..AssertEquivalent("^0.0.3-beta", ">=0.0.3-beta <0.0.4-0")
+	Do ..AssertEquivalent("^1.2.x", ">=1.2.0 <2.0.0-0")
+	Do ..AssertEquivalent("^0.0.x", ">=0.0.0 <0.1.0-0")
+	Do ..AssertEquivalent("^0.0", ">=0.0.0 <0.1.0-0")
+	Do ..AssertEquivalent("^1.x", ">=1.0.0 <2.0.0-0")
+	Do ..AssertEquivalent("^0.x", ">=0.0.0 <1.0.0-0")
 }
 
 Method TestIRISVersions()
