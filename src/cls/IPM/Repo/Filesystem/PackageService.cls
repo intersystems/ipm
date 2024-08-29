@@ -12,6 +12,7 @@ Method %OnNew(pRoot As %String) As %Status [ Private, ServerOnly = 1 ]
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")
 {
 	Set tList = ##class(%Library.ListOfObjects).%New()
+	// TODO: filter by pSearchCriteria.IncludeSnapshots and pSearchCriteria.IncludePrerelease
 	Set tQuery = "select Name,VersionString from %IPM_Repo_Filesystem.Cache_OrderedMatches(?,?,?,?) m"
 	Set tArgs($i(tArgs)) = ..Root
 	Quit ##class(%IPM.Repo.Utils).moduleSqlToList(tQuery,.pSearchCriteria,.tArgs)
