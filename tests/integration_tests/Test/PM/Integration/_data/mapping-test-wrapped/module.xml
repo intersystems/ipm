@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Document name="MappingTestWrapped.ZPM"><Module>
+  <Name>MappingTestWrapped</Name>
+  <Version>0.0.1+snapshot</Version>
+  <Packaging>module</Packaging>
+  <Resources>
+    <Resource Name="MappingTestWrapped.PKG" />
+  </Resources>
+  <Mappings>
+    <Mapping Name="MappingTestWrapped.Foo.PKG" Source="USER" />
+  </Mappings>
+  <LifecycleClass>Module</LifecycleClass>
+</Module>
+</Document></Export>
