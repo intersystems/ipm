@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #224: When updating zpm, existing configuration won't be reset
 - #482: Reenabled deployed code support without impact on embedded source control (reworks HSIEO-9277)
 - #487: When loading a package, relative paths staring with prefix "http" won't be mistaken for git repo
+- #557: When comparing semver against semver expressions, exclude prereleases and snapshots from the range maximum.
 
 ### Security
 -
