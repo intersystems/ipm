@@ -13,7 +13,15 @@ Property Patch As %Integer(MINVAL = 0) [ Required ];
 
 Property Prerelease As %IPM.DataType.RegExString(MAXLEN = 100, REGEX = "([0-9A-Za-z-])+(\.([0-9A-Za-z-])+)*");
 
+/// This is an alias for Prerelease. It is used for code readability when SemVerPostRelease is enabled.
+Property Postrelease As %IPM.DataType.RegExString(MAXLEN = 100, REGEX = "([0-9A-Za-z-])+(\.([0-9A-Za-z-])+)*") [ Calculated, SqlComputeCode = { Set {*} = Prerelease }, SqlComputed, Transient ];
+
 Property Build As %IPM.DataType.RegExString(MAXLEN = 100, REGEX = "([0-9A-Za-z-])+(\.([0-9A-Za-z-])+)*");
+
+Method PostreleaseGet() As %IPM.DataType.RegExString
+{
+	Quit ..Prerelease
+}
 
 Method ToString() As %String [ CodeMode = expression ]
 {
@@ -116,6 +124,25 @@ Method Follows(pVersion As %IPM.General.SemanticVersion) As %Boolean
 		((..Major = pVersion.Major) && (..Minor > pVersion.Minor)) ||
 		((..Major = pVersion.Major) && (..Minor = pVersion.Minor) && (..Patch > pVersion.Patch))
 	
+	// Handle post-releases if enabled. With this, post-releases are considered as higher version numbers.
+	If ##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease") {
+		If tFollows {
+			Return 1
+		} 
+		If (..Major < pVersion.Major) || (..Minor < pVersion.Minor) || (..Patch < pVersion.Patch) {
+			Return 0
+		} 
+		// If it reaches here, major, minor, and patch are equal. We need to check post-releases.
+		If (..Postrelease = "") {
+			Return 0
+		} ElseIf (pVersion.Postrelease = "") {
+			Return 1
+		} 	
+		// If it reaches here, major, minor, and patch are equal. Both post-releases are non-empty. Compare them.
+		Return ..CompareDotSepartedStrings(..Postrelease, pVersion.Postrelease)
+
+	}
+	
 	// Handle prereleases - messy!!
 	Set tEquals = (..Major = pVersion.Major) && (..Minor = pVersion.Minor) && (..Patch = pVersion.Patch)
 	If (..Prerelease '= "") || (pVersion.Prerelease '= "") {
@@ -135,44 +162,43 @@ Method Follows(pVersion As %IPM.General.SemanticVersion) As %Boolean
 			// We are comparing equal versions where the earlier has a prerelease.
 			Quit 1
 		} Else{
-			// Both have a prerelease, and they're different.
-			// Compare dot-separated parts of the prerelease.
-			Set tFollows = 1
-			Set tThisParts = $ListFromString(..Prerelease,".")
-			Set tOtherParts = $ListFromString(pVersion.Prerelease,".")
-			
-			Set tOtherHasData = 1
-			Set tThisPointer = 0
-			Set tOtherPointer = 0
-			While $ListNext(tThisParts,tThisPointer,tThisPart) {
-				Set tOtherHasData = $ListNext(tOtherParts,tOtherPointer,tOtherPart)
-				If 'tOtherHasData {
-					// The prerelease version has more parts for this one.
-					Return 1
-				}
-				If (tOtherPart = tThisPart) {
-					// Keep looking through dot-separated parts.
-					Continue
-				}
-				
-				// "Collates after" operator works nicely here.
-				// e.g., the following are true: "beta" ]] 11, 11 ]] 2, 2 ]] 1
-				If (tThisPart ]] tOtherPart) {
-					Return 1
-				} Else {
-					Return 0
-				}
-			}
-			If tFollows && tOtherHasData && $ListNext(tOtherParts,tOtherPointer,tOtherPart) {
-				// If there are still dot-separated parts left in the prerelease of the version we are comparing to,
-				// it has more than this version, and therefore this version does not follow it.
-				Quit 0
-			}
+			Quit ..CompareDotSepartedStrings(..Prerelease, pVersion.Prerelease)
 		}
 	} ElseIf tEquals {
 		Quit (pVersion.IsSnapshot() && '..IsSnapshot())
 	}
 	Quit tFollows
+}
+
+/// Compare two dot-separated strings (usually prerelease or postrelease identifiers).
+Method CompareDotSepartedStrings(pThis As %String, pOther As %String) As %Boolean
+{
+	Set tThisParts = $ListFromString(pThis,".")
+	Set tOtherParts = $ListFromString(pOther,".")
+	
+	Set tOtherHasData = 1
+	Set tThisPointer = 0
+	Set tOtherPointer = 0
+	While $ListNext(tThisParts,tThisPointer,tThisPart) {
+		Set tOtherHasData = $ListNext(tOtherParts,tOtherPointer,tOtherPart)
+		If 'tOtherHasData {
+			// The prerelease version has more parts for this one.
+			Return 1
+		}
+		If (tOtherPart = tThisPart) {
+			// Keep looking through dot-separated parts.
+			Continue
+		}
+		
+		// "Collates after" operator works nicely here.
+		// e.g., the following are true: "beta" ]] 11, 11 ]] 2, 2 ]] 1
+		If (tThisPart ]] tOtherPart) {
+			Return 1
+		} Else {
+			Return 0
+		}
+	}
+	Return 0
 }
 
 Method Satisfies(pExpression As %IPM.General.SemanticVersionExpression) As %Boolean
