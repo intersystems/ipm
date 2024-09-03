@@ -93,7 +93,7 @@ Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
       Set tEquals = tEquals && (val1 = val2)
     }
   }
-	If (##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease") = 0) || ($Extract(..Operator,1) = "=")  {
+	If (+##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease") = 0) || ($Extract(..Operator,1) = "=")  {
 		// If SemVerPostRelease is disabled, then we should not consider post-release versions as equal to the base version
 		// ..Operator = "=" means direct equality and not <= or >= so compare pre-release as well
 		Set tEquals = tEquals && (pVersion.Prerelease = ..Prerelease)
