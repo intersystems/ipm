@@ -37,6 +37,8 @@ Method ListModules(pSearchCriteria As %ZPM.PackageManager.Core.SearchCriteria) A
     Set tURL = tRequest.Location_"packages/" _ name
   }
   Do tRequest.SetParam("allVersions", pSearchCriteria.AllVersions)
+  Do tRequest.SetParam("includePrerelease", pSearchCriteria.IncludePrerelease)
+  Do tRequest.SetParam("includeSnapshots", pSearchCriteria.IncludeSnapshots)
 
   Set tSC = tRequest.Get($$$URLENCODE(tURL))
   
