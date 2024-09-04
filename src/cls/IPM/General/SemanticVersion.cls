@@ -139,7 +139,7 @@ Method Follows(pVersion As %IPM.General.SemanticVersion) As %Boolean
 			Return 1
 		} 	
 		// If it reaches here, major, minor, and patch are equal. Both post-releases are non-empty. Compare them.
-		Return ..CompareDotSepartedStrings(..Postrelease, pVersion.Postrelease)
+		Return ..CompareDotSeparatedStrings(..Postrelease, pVersion.Postrelease)
 
 	}
 	
@@ -162,7 +162,7 @@ Method Follows(pVersion As %IPM.General.SemanticVersion) As %Boolean
 			// We are comparing equal versions where the earlier has a prerelease.
 			Quit 1
 		} Else{
-			Quit ..CompareDotSepartedStrings(..Prerelease, pVersion.Prerelease)
+			Quit ..CompareDotSeparatedStrings(..Prerelease, pVersion.Prerelease)
 		}
 	} ElseIf tEquals {
 		Quit (pVersion.IsSnapshot() && '..IsSnapshot())
@@ -171,7 +171,7 @@ Method Follows(pVersion As %IPM.General.SemanticVersion) As %Boolean
 }
 
 /// Compare two dot-separated strings (usually prerelease or postrelease identifiers).
-Method CompareDotSepartedStrings(pThis As %String, pOther As %String) As %Boolean
+Method CompareDotSeparatedStrings(pThis As %String, pOther As %String) As %Boolean
 {
 	Set tThisParts = $ListFromString(pThis,".")
 	Set tOtherParts = $ListFromString(pOther,".")
