@@ -113,8 +113,8 @@ Method SearchRepositoriesForModule(pSearchCriteria As %IPM.Repo.SearchCriteria, 
             Set patch = $Order(versions(major, minor, patch), -1)
             Quit:patch=""
             Set sub = ""
+            Set subDirection = $SELECT(+##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease"): -1, 1: 1)
             For  {
-			  Set subDirection = $SELECT(+##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease"): -1, 1: 1)
               Set sub = $Order(versions(major, minor, patch, sub), subDirection)
               Quit:sub=""
               Set repoOrder = ""
