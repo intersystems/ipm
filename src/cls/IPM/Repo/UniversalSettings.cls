@@ -34,7 +34,12 @@ Parameter PipCaller = "PipCaller";
 /// Indicates whether <parameter>PipCaller</parameter> is a pip executable instead of python
 Parameter UseStandalonePip = "UseStandalonePip";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip";
+/// Possible values: 0, 1
+/// Indicates whether the SemVer comparison treats the version 1.0.0-1.m1 as a post-release of 1.0.0, hence 1.0.0-1.m1 > 1.0.0
+/// Default value is 0, where 1.0.0-anystring is considered a pre-release of 1.0.0, hence 1.0.0-anystring < 1.0.0
+Parameter SemVerPostRelease = "SemVerPostRelease";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status

@@ -1,4 +1,4 @@
-Class Test.PM.Unit.SemVer.Expressions Extends %UnitTest.TestCase
+Class Test.PM.Unit.SemVer.Expressions Extends Test.PM.Unit.SemVer.Abstract
 {
 
 Method TestEvaluate()
@@ -29,12 +29,13 @@ Method TestEvaluate()
 
 Method TestPrerelease()
 {
+	Do ..AssertNotSatisfied(">=1.0.0", "1.0.0-1.m1")
 	Do ..AssertSatisfied("1.0.0-beta.1","1.0.0-beta.1")
 	Do ..AssertSatisfied("=1.0.0-beta.1","1.0.0-beta.1")
 	Do ..AssertSatisfied(">=1.0.0-beta.1","1.0.0-beta.1")
 	Do ..AssertSatisfied(">=1.0.0-beta.1","1.0.0-beta.2")
 	Do ..AssertSatisfied(">=1.0.0-alpha.1","1.0.0-beta.1")
-	Do ..AssertNotSatisfied("^1.0.0","1.0.0-1.m1") // This shouldn't be satisfied because 1.0.0-1.m1 is a prerelease
+	Do ..AssertNotSatisfied("^1.0.0","1.0.0-1.m1") 
 	Do ..AssertNotSatisfied(">=1.0.0-beta.2","1.0.0-beta.1")
 	Do ..AssertNotSatisfied(">=1.0.0-beta.1","1.0.0-alpha.1")
 	
@@ -50,6 +51,37 @@ Method TestPrerelease()
 	Do ..AssertNotSatisfied("1.x", "2.0.0-SNAPSHOT")
 	Do ..AssertNotSatisfied("1.x", "2.0.0-alpha")
 	Do ..AssertNotSatisfied("1.1.x", "1.1.5-beta.1")
+	Do ..AssertNotSatisfied("1.1.x", "1.2.0-0")
+	Do ..AssertNotSatisfied("1.1.x", "1.2.0-SNAPSHOT")
+	Do ..AssertNotSatisfied("1.1.x", "1.2.0-alpha")
+}
+
+Method TestPostRelease()
+{
+	// With SemVerPostRelease enabled, post-release versions should be considered as a higher version number
+	Set tSC = ##class(%IPM.Repo.UniversalSettings).SetValue("SemVerPostRelease", 1)
+	Do ..AssertSatisfied(">=1.0.0", "1.0.0-1.m1")
+	Do ..AssertSatisfied("1.0.0-beta.1","1.0.0-beta.1")
+	Do ..AssertSatisfied("=1.0.0-beta.1","1.0.0-beta.1")
+	Do ..AssertSatisfied(">=1.0.0-beta.1","1.0.0-beta.1")
+	Do ..AssertSatisfied(">=1.0.0-beta.1","1.0.0-beta.2")
+	Do ..AssertSatisfied(">=1.0.0-alpha.1","1.0.0-beta.1")
+
+	Do ..AssertSatisfied("^1.0.0","1.0.0-1.m1") 
+	Do ..AssertNotSatisfied(">=1.0.0-beta.2","1.0.0-beta.1")
+	Do ..AssertNotSatisfied(">=1.0.0-beta.1","1.0.0-alpha.1")
+	
+	// This is the problematic case without HSIEO-10520
+	Do ..AssertNotSatisfied("1.0.0-1.m1","1.0.0") 
+	Do ..AssertNotSatisfied("=1.0.0-1.m1","1.0.0")
+
+	// With SemVerPostRelease enabled, 1.5.0-beta.1 is within the 1.x range, because it's a post-release of 1.5.0.
+	// Similarly, 1.1.5-beta.1 satisifies 1.1.x.
+	Do ..AssertSatisfied("1.x", "1.5.0-beta.1") 
+	Do ..AssertNotSatisfied("1.x", "2.0.0-0")
+	Do ..AssertNotSatisfied("1.x", "2.0.0-SNAPSHOT")
+	Do ..AssertNotSatisfied("1.x", "2.0.0-alpha")
+	Do ..AssertSatisfied("1.1.x", "1.1.5-beta.1")
 	Do ..AssertNotSatisfied("1.1.x", "1.2.0-0")
 	Do ..AssertNotSatisfied("1.1.x", "1.2.0-SNAPSHOT")
 	Do ..AssertNotSatisfied("1.1.x", "1.2.0-alpha")
