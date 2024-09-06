@@ -58,6 +58,18 @@ Method ReplaceMatchRoles(matchRoles As %String, dbDir As %String) As %String
     Return matchRoles
 }
 
+Method ReplaceNameSpace(expression As %String, namespace As %String) As %String
+{
+    Set templates = $Listbuild("{$ns}", "${ns}")
+    Set ptr = 0
+    While $LISTNEXT(templates, ptr, template) {
+        If expression[template {
+            Set expression = $REPLACE(expression, template, namespace)
+        }
+    }
+    Return expression
+}
+
 /// Called as phase <var>pPhase</var> is executed for the resource. If <var>pResourceHandled</var> is set to true,
 /// then the default behavior for that resource will be bypassed in the current phase.
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
@@ -121,12 +133,19 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
     // TODO: Make mirror-safe.
+    Set tOriginalNS = $namespace
     New $namespace
     Set $namespace = "%SYS"
     
     Merge properties = ..SecurityProperties
     If $D(properties("MatchRoles"), tMatchRoles) # 2 {
         Set properties("MatchRoles") = ..ReplaceMatchRoles(tMatchRoles, $$$defdir)
+    }
+    If $D(properties("NameSpace"), tNameSpace) {
+        Set properties("NameSpace") = ..ReplaceNameSpace(tNameSpace, tOriginalNS)
+    } Else {
+        // Does WSGI application need a namespace?
+        Set properties("NameSpace") = tOriginalNS
     }
 
     If ##class(Security.Applications).Exists(..Name) {
