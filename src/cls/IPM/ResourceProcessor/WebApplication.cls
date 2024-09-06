@@ -23,7 +23,7 @@ Property SecurityProperties As %RawString [ MultiDimensional ];
 
 Method CopyAttributes() [ Private ]
 {
-	/*
+    /*
      * Overridden to avoid needing a property in this class to correspond to each
      * attribute as the attribute list is just all non-private/transient properties 
      * in Security.Applications.
@@ -43,19 +43,19 @@ Method ReplaceMatchRoles(matchRoles As %String, dbDir As %String) As %String
 {
     New $NAMESPACE 
     Set $NAMESPACE = "%SYS"
-	Set templates = $Listbuild("{$dbrole}", "${dbrole}")
-	For i=1:1:$Listlength(templates) {
-		Set template = $Listget(templates, i)
-		If matchRoles[template {
-			Set dbRole = "%DB_DEFAULT"
-			Set db = ##class(SYS.Database).%OpenId(dbDir)
-			If $Isobject(db) {
-				Set dbRole = db.ResourceName
-			}
-			Set matchRoles = $Replace(matchRoles, template, dbRole)
-		}
-	}
-	Return matchRoles
+    Set templates = $Listbuild("{$dbrole}", "${dbrole}")
+    For i=1:1:$Listlength(templates) {
+        Set template = $Listget(templates, i)
+        If matchRoles[template {
+            Set dbRole = "%DB_DEFAULT"
+            Set db = ##class(SYS.Database).%OpenId(dbDir)
+            If $Isobject(db) {
+                Set dbRole = db.ResourceName
+            }
+            Set matchRoles = $Replace(matchRoles, template, dbRole)
+        }
+    }
+    Return matchRoles
 }
 
 /// Called as phase <var>pPhase</var> is executed for the resource. If <var>pResourceHandled</var> is set to true,
@@ -86,7 +86,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
     } Catch (ex) {
         Set sc = ex.AsStatus()
     }
-	Return sc
+    Return sc
 }
 
 Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
@@ -95,36 +95,36 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
      * NOTE: Web app creation is done in OnBeforePhase so it happens before other
      * resource processors such as FileCopy run.
      */
-	Set sc = $$$OK
-	Try {
-		$$$ThrowOnError(##super(pPhase,.pParams))
-		
-		Set tVerbose = $Get(pParams("Verbose"))
-		#; Set tIsApplication = ..ResourceReference.Module.Lifecycle.%IsA(##class(%ZHSLIB.PackageManager.Developer.Lifecycle.Application).%ClassName(1))
+    Set sc = $$$OK
+    Try {
+        $$$ThrowOnError(##super(pPhase,.pParams))
+        
+        Set tVerbose = $Get(pParams("Verbose"))
+        #; Set tIsApplication = ..ResourceReference.Module.Lifecycle.%IsA(##class(%ZHSLIB.PackageManager.Developer.Lifecycle.Application).%ClassName(1))
         Set tIsApplication = ..ResourceReference.Module.Lifecycle.%IsA(##class(%IPM.Lifecycle.DeployedModule).%ClassName(1))
-		
-		// TODO: Make mirror-safe?
-		// Would require moving mirror-safe APIs to the package manager - at which point, why not just have the package manager manage the whole federation?
-		If ((pPhase = "Configure") || ((pPhase = "Activate") && tIsApplication)) {
-			// Create web application
-			Do ..CreateOrUpdateWebApp(tVerbose)
-		} ElseIf ((pPhase = "Unconfigure") || ((pPhase = "Clean") && tIsApplication)) {
-			// Remove web application
-			Do ..DeleteWebApp(tVerbose)
-		}
-	} Catch e {
-		Set sc = e.AsStatus()
-	}
-	Quit sc
+        
+        // TODO: Make mirror-safe?
+        // Would require moving mirror-safe APIs to the package manager - at which point, why not just have the package manager manage the whole federation?
+        If ((pPhase = "Configure") || ((pPhase = "Activate") && tIsApplication)) {
+            // Create web application
+            Do ..CreateOrUpdateWebApp(tVerbose)
+        } ElseIf ((pPhase = "Unconfigure") || ((pPhase = "Clean") && tIsApplication)) {
+            // Remove web application
+            Do ..DeleteWebApp(tVerbose)
+        }
+    } Catch e {
+        Set sc = e.AsStatus()
+    }
+    Quit sc
 }
 
 Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
-	// TODO: Make mirror-safe.
+    // TODO: Make mirror-safe.
     New $namespace
     Set $namespace = "%SYS"
     
-	Merge properties = ..SecurityProperties
+    Merge properties = ..SecurityProperties
     If $D(properties("MatchRoles"), tMatchRoles) # 2 {
         Set properties("MatchRoles") = ..ReplaceMatchRoles(tMatchRoles, $$$defdir)
     }
@@ -182,8 +182,8 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 /// This removes an existing CSP application
 Method DeleteWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
-	// TODO: Make mirror-safe.
-	
+    // TODO: Make mirror-safe.
+    
     // Only try to purge files if the directory exists.
     Set sc = ##class(%Library.EnsembleMgr).deletePortal(..Name,"",pVerbose)
     Set errorCodes = $System.Status.GetErrorCodes(sc)
@@ -199,28 +199,28 @@ Method DeleteWebApp(pVerbose As %Boolean = 0) [ Internal ]
 /// An empty string indicates guaranteed uniqueness (useful for folders relative to module root)
 Method OnGetUniqueName(Output pUniqueName)
 {
-	If (..Name '= "") {
-		Set pUniqueName = ..Name
-	}
+    If (..Name '= "") {
+        Set pUniqueName = ..Name
+    }
 }
 
 Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.ResourceInfo) As %Status
 {
-	Set pInfo = ##class(%IPM.ExtensionBase.SourceControl.ResourceInfo).%New()
-	If (..Name '= "") {
-		Set pInfo.SourceControlAware = 1
-		Set pInfo.ResourceType = "/CSP/"
-		Set pInfo.Prefix = ..Name
-		Set pInfo.RelativePath = ..ResourceReference.Name
-		Set pInfo.IsDirectory = ($Piece(..ResourceReference.Name,"/",*) '[ ".")
-	}
-	Quit $$$OK
+    Set pInfo = ##class(%IPM.ExtensionBase.SourceControl.ResourceInfo).%New()
+    If (..Name '= "") {
+        Set pInfo.SourceControlAware = 1
+        Set pInfo.ResourceType = "/CSP/"
+        Set pInfo.Prefix = ..Name
+        Set pInfo.RelativePath = ..ResourceReference.Name
+        Set pInfo.IsDirectory = ($Piece(..ResourceReference.Name,"/",*) '[ ".")
+    }
+    Quit $$$OK
 }
 
 /// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
 Method OnItemRelativePath(pItemName As %String) As %String
 {
-	Quit ..ResourceReference.Name_$Piece(pItemName,..Name,2)
+    Quit ..ResourceReference.Name_$Piece(pItemName,..Name,2)
 }
 
 /// Check if the provided properties exist in Security.Applications.
