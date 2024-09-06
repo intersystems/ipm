@@ -134,12 +134,13 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
     // TODO: Make mirror-safe.
     Set tOriginalNS = $namespace
+	Set dbDir = $$$defdir
     New $namespace
     Set $namespace = "%SYS"
     
     Merge properties = ..SecurityProperties
     If $D(properties("MatchRoles"), tMatchRoles) # 2 {
-        Set properties("MatchRoles") = ..ReplaceMatchRoles(tMatchRoles, $$$defdir)
+        Set properties("MatchRoles") = ..ReplaceMatchRoles(tMatchRoles, dbDir)
     }
     If $D(properties("NameSpace"), tNameSpace) {
         Set properties("NameSpace") = ..ReplaceNameSpace(tNameSpace, tOriginalNS)
