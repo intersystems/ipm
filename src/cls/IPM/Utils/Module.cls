@@ -2308,7 +2308,7 @@ ClassMethod GetDatabaseRole()
 	New $NAMESPACE
 	Set $NAMESPACE = "%SYS"
 
-    Set db = ##class(SYS.Database).%OpenId(dbDir)
+	Set db = ##class(SYS.Database).%OpenId(dbDir)
 	Return $SELECT($IsObject(db): db.ResourceName, 1: "%DB_DEFAULT")
 }
 
