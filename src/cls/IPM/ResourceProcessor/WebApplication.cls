@@ -81,15 +81,11 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
         $$$ThrowOnError(##super(pPhase,.pParams))
         
         Set tVerbose = $Get(pParams("Verbose"))
-        #; Set tIsApplication = ..ResourceReference.Module.Lifecycle.%IsA(##class(%ZHSLIB.PackageManager.Developer.Lifecycle.Application).%ClassName(1))
-        Set tIsApplication = ..ResourceReference.Module.Lifecycle.%IsA(##class(%IPM.Lifecycle.DeployedModule).%ClassName(1))
         
-        // TODO: Make mirror-safe?
-        // Would require moving mirror-safe APIs to the package manager - at which point, why not just have the package manager manage the whole federation?
-        If ((pPhase = "Configure") || ((pPhase = "Activate") && tIsApplication)) {
+        If ((pPhase = "Configure") || (pPhase = "Activate")) {
             // Create web application
             Do ..CreateOrUpdateWebApp(tVerbose)
-        } ElseIf ((pPhase = "Unconfigure") || ((pPhase = "Clean") && tIsApplication)) {
+        } ElseIf ((pPhase = "Unconfigure") || (pPhase = "Clean")) {
             // Remove web application
             Do ..DeleteWebApp(tVerbose)
         }
