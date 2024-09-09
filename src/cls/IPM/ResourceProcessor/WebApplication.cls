@@ -11,11 +11,11 @@ Property Name As %String [ Calculated ];
 
 Method NameGet() As %String
 {
-    Set tName = $Get(..SecurityProperties("Name"), $Get(..SecurityProperties("Url"), ""))
-    If tName = "" {
-        Throw $$$ERROR($$$GeneralError, "Name is required for web applications")
+    Set name = $Get(..SecurityProperties("Name"), $Get(..SecurityProperties("Url"), ""))
+    If name = "" {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Name is required for web applications"))
     }
-    Return tName
+    Return name
 }
 
 /// Keeps track of all application properties
