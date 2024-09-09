@@ -2303,13 +2303,8 @@ ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pPropertie
 
 ClassMethod GetDatabaseRole()
 {
-	Set dbDir = $$$defdir
-
-	New $NAMESPACE
-	Set $NAMESPACE = "%SYS"
-
-	Set db = ##class(SYS.Database).%OpenId(dbDir)
-	Return $SELECT($IsObject(db): db.ResourceName, 1: "%DB_DEFAULT")
+	Do ##class(%SYS.Namespace).GetNSInfo($NAMESPACE, .nsInfo)
+	Return $Get(nsInfo("Resource"), "%DB_DEFAULT")
 }
 
 ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %String) As %String [ Internal ]
