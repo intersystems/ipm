@@ -144,7 +144,7 @@ ClassMethod HttpGet(pPath As %String = "/") As %Status
 		Quit tSC
 	}
 	If (request.HttpResponse.StatusCode '= 200) {
-		Quit $$$ERROR($$$GeneralError, "HTTP Status: "_request.HttpResponse.StatusCode)
+		Quit $$$ERROR($$$GeneralError, "HTTP Status: "_request.HttpResponse.StatusCode_$char(13,10)_request.HttpResponse.Data.Read())
 	}
 	Quit $$$OK
 }
