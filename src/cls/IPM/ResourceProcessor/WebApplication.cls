@@ -39,37 +39,6 @@ Method CopyAttributes() [ Private ]
     }
 }
 
-Method ReplaceMatchRoles(matchRoles As %String, dbDir As %String) As %String
-{
-    New $NAMESPACE 
-    Set $NAMESPACE = "%SYS"
-    Set templates = $Listbuild("{$dbrole}", "${dbrole}")
-    For i=1:1:$Listlength(templates) {
-        Set template = $Listget(templates, i)
-        If matchRoles[template {
-            Set dbRole = "%DB_DEFAULT"
-            Set db = ##class(SYS.Database).%OpenId(dbDir)
-            If $Isobject(db) {
-                Set dbRole = db.ResourceName
-            }
-            Set matchRoles = $Replace(matchRoles, template, dbRole)
-        }
-    }
-    Return matchRoles
-}
-
-Method ReplaceNameSpace(expression As %String, namespace As %String) As %String
-{
-    Set templates = $Listbuild("{$ns}", "${ns}")
-    Set ptr = 0
-    While $LISTNEXT(templates, ptr, template) {
-        If expression[template {
-            Set expression = $REPLACE(expression, template, namespace)
-        }
-    }
-    Return expression
-}
-
 /// Called as phase <var>pPhase</var> is executed for the resource. If <var>pResourceHandled</var> is set to true,
 /// then the default behavior for that resource will be bypassed in the current phase.
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
@@ -133,20 +102,22 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
     // TODO: Make mirror-safe.
-    Set tOriginalNS = $namespace
-    Set dbDir = $$$defdir
     New $namespace
     Set $namespace = "%SYS"
-    
+
     Merge properties = ..SecurityProperties
-    If $D(properties("MatchRoles"), tMatchRoles) # 2 {
-        Set properties("MatchRoles") = ..ReplaceMatchRoles(tMatchRoles, dbDir)
+    If $Get(properties("AutheEnabled")) = "" {
+        Set properties("AutheEnabled") = (
+            ($Get(properties("PasswordAuthEnabled")) * $$$AutheCache) +
+            ($Get(properties("UnauthenticatedEnabled")) * $$$AutheUnauthenticated) +
+            ($Get(properties("DelegatedAuthEnabled")) * $$$AutheDelegated) +
+            ($Get(properties("KerberosAuthEnabled")) * $$$AutheK5API) +
+            ($Get(properties("LoginTokenEnabled")) * $$$AutheLoginToken)
+        )
     }
-    If $D(properties("NameSpace"), tNameSpace) {
-        Set properties("NameSpace") = ..ReplaceNameSpace(tNameSpace, tOriginalNS)
-    } Else {
-        // Does WSGI application need a namespace?
-        Set properties("NameSpace") = tOriginalNS
+
+    If properties("AutheEnabled") = 0 {
+        kill properties("AutheEnabled")
     }
 
     If ##class(Security.Applications).Exists(..Name) {
