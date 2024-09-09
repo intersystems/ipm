@@ -42,6 +42,7 @@ Method TestWSGIApp()
     set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/wsgi-app/")
     Set tSC = ##class(%IPM.Main).Shell("load " _ tModuleDir)
     Do $$$AssertStatusOK(tSC,"Loaded WSGI Application successfully. " _ tModuleDir)
+    Do $$$AssertStatusOK(..HttpGet("my/flask/demo/"))
   } Catch e {
     Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
   }
@@ -55,6 +56,7 @@ Method TestRestApp()
     set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/rest-app/")
     Set tSC = ##class(%IPM.Main).Shell("load " _ tModuleDir)
     Do $$$AssertStatusOK(tSC,"Loaded REST Application successfully. " _ tModuleDir)
+    Do $$$AssertStatusOK(..HttpGet("restdemo/"))
   } Catch e {
     Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
   }
