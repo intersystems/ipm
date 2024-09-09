@@ -1,8 +1,11 @@
 {
   "objectscript.conn": {
     "active": true,
-    "ns": "USER",
-    "server": "ipm09"
+    "port": 52774,
+    "host": "localhost",
+    "username": "_system",
+    "password": "SYS",
+    "ns": "USER"
   },
   "intersystems.testingManager.client.relativeTestRoot": "tests/unit_tests"
 }
