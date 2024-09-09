@@ -4,8 +4,8 @@
     <Module>
       <Name>rest-demo</Name>
       <Version>1.0.0</Version>
-      <Description>This is a demo of a flask application</Description>
-      <Keywords>flask</Keywords>
+      <Description>This is a demo of a rest application</Description>
+      <Keywords>rest</Keywords>
       <Author>
         <Person>Shuheng Liu</Person>
         <Organization>InterSystems</Organization>
@@ -16,8 +16,10 @@
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
 
+      <Resource Name="Test.Rest.Demo.CLS"/>
       <WebApplication 
         Name="/restdemo"
+        NameSpace="{$namespace}"
         Path="/src"
         Recurse="1"
         Directory="{$cspdir}/restdemo" 
