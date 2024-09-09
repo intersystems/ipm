@@ -168,14 +168,11 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 /// This removes an existing CSP application
 Method DeleteWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
-    // Only try to purge files if the directory exists.
-    Set sc = ##class(%Library.EnsembleMgr).deletePortal(..Name,"",pVerbose)
-    Set errorCodes = $System.Status.GetErrorCodes(sc)
-    If ((errorCodes [ $$$ApplicationDoesNotExist) || (errorCodes [ $$$DeleteObjectNotFound)) {
-        // Not actually a problem - allow Clean/Uninstall to continue if it fails while trying to remove something that doesn't exist.
-        Set sc = $$$OK
+    New $Namespace
+    Set $Namespace = "%SYS"
+    If ##class(Security.Applications).Exists(..Name) {
+        $$$ThrowOnError(##class(Security.Applications).Delete(..Name))
     }
-    $$$ThrowOnError(sc)
 }
 
 /// Returns a unique name for this resource.
