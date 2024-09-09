@@ -97,7 +97,6 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 
 Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
-    // TODO: Make mirror-safe.
     New $namespace
     Set $namespace = "%SYS"
 
@@ -169,8 +168,6 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 /// This removes an existing CSP application
 Method DeleteWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
-    // TODO: Make mirror-safe.
-    
     // Only try to purge files if the directory exists.
     Set sc = ##class(%Library.EnsembleMgr).deletePortal(..Name,"",pVerbose)
     Set errorCodes = $System.Status.GetErrorCodes(sc)
