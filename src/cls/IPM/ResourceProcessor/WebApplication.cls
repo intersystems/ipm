@@ -134,7 +134,7 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
     // TODO: Make mirror-safe.
     Set tOriginalNS = $namespace
-	Set dbDir = $$$defdir
+    Set dbDir = $$$defdir
     New $namespace
     Set $namespace = "%SYS"
     
