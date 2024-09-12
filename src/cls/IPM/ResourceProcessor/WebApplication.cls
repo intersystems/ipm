@@ -193,7 +193,7 @@ Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.Res
         Set pInfo.ResourceType = "/CSP/"
         Set pInfo.Prefix = ..Name
         Set pInfo.RelativePath = ..ResourceReference.Name
-        Set pInfo.IsDirectory = ($Piece(..ResourceReference.Name,"/",*) '[ ".")
+        Set pInfo.IsDirectory = 1
     }
     Quit $$$OK
 }
