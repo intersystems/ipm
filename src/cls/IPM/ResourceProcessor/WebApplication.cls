@@ -88,7 +88,6 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
         } ElseIf ((pPhase = "Unconfigure") || (pPhase = "Clean")) {
             // Remove web application
             Do ..DeleteWebApp(tVerbose)
-            Do ..DeleteCodeReadRole($Get(..SecurityProperties("NameSpace")), tVerbose)
         }
     } Catch e {
         Set sc = e.AsStatus()
@@ -123,11 +122,6 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
     Set properties("AutheEnabled") = ..ComputeAutheNumber($Get(properties("AutheEnabled")))
     If +$Get(properties("AutheEnabled")) = 0 {
         kill properties("AutheEnabled")
-    }
-
-    // Replace ${codeReadRole} with a role (potentially to be created) with read permission to routine database
-    If ($Data(properties("NameSpace"), ns) # 2) && ($Data(properties("MatchRoles"), mr) # 2) {
-        Set properties("MatchRoles") = ..ReplaceCodeReadRole(mr, ns, pVerbose)
     }
 
     If ##class(Security.Applications).Exists(..Name) {
@@ -234,107 +228,6 @@ ClassMethod DoPropertiesExist(pPropList As %Library.List) As %Library.List [ Int
         }
     }
     Return badList
-}
-
-ClassMethod ConstructRoleName(pDbResource As %String) As %String [ Internal, Private ]
-{
-    Return $ListToString($lb("IPM", "readonly", pDbResource), ".")
-}
-
-ClassMethod ReplaceCodeReadRole(pMatchRoles As %String, pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
-{
-    Set templateLists = $Listbuild("{$codeReadRole}", "${codeReadRole}")
-    Set role = "", ptr = 0 // We don't create the role unless ${codeReadRole} is explicitly in the MatchRoles
-    While $ListNext(templateLists, ptr, template) {
-        If pMatchRoles [ template {
-            Set role = $Select(role="": ..CreateCodeReadRole(pNamespace, pVerbose), 1: role)
-            Set pMatchRoles = $Replace(pMatchRoles, template, role)
-        }
-    }
-    Return pMatchRoles
-}
-
-ClassMethod GetDbResource(pNamespace As %String) As %String [ Internal, Private ]
-{
-    New $Namespace
-    Set $Namespace = "%SYS"
-
-    // Find the namespace-default routine DB
-    $$$ThrowOnError(##class(Config.Namespaces).Get(pNamespace,.nsProps))
-    Set defaultDB = nsProps("Routines")
-    $$$ThrowOnError(##class(Config.Databases).Get(defaultDB,.dbProps))
-    Set db=##Class(SYS.Database).%OpenId(dbProps("Directory"),,.sc)
-    $$$ThrowOnError(sc)
-    Return db.ResourceName
-}
-
-/// Grant read permissions to the routine database. This is necessary because 
-/// Adapted from https://github.com/intersystems/isc-perf-ui/blob/main/cls/pkg/isc/perf/ui/Installer.cls
-ClassMethod CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %String [ Internal, Private ]
-{
-    New $Namespace
-    Set $Namespace = "%SYS"
-
-    set dbResource = ..GetDbResource(pNamespace)
-    If pVerbose {
-        Write !, "DB Resoure: ", dbResource
-    }
-
-    // Is there public READ permission on the namespace-default routine DB?
-    $$$ThrowOnError(##class(Security.Resources).Get(dbResource,.resourceProps))
-    If (resourceProps("PublicPermission")#2) {
-        // No need to do anything else if there's public R permission
-        If pVerbose {
-            Write !, "Public Read permission already exists on ", dbResource, !, "Skipping"
-        }
-        Return ""
-    }
-
-    // Create role granting R permission on namespace-default routine DB resource
-    // This is the least-access means to be able to use the REST handler class
-    // in unauthenticated mode
-    Set roleName = ..ConstructRoleName(dbResource)
-    Set roleProps("Description") = "Role created by %IPM that grants only R permission on "_dbResource
-    Set roleProps("Resources") = dbResource_":R"
-    Set roleProps("GrantedRoles") = ""
-    If ##class(Security.Roles).Exists(roleName) {
-        If pVerbose {
-            Write !,"Updating role: ", roleName, " with properties: ", !
-            Zwrite roleProps
-        }
-        $$$ThrowOnError(##class(Security.Roles).Modify(roleName,.roleProps))
-    } Else {
-        If pVerbose {
-            Write !,"Creating role: ", roleName, " with properties: ", !
-            Zwrite roleProps
-        }
-        $$$ThrowOnError(##class(Security.Roles).Create(roleName,roleProps("Description"),roleProps("Resources"),roleProps("GrantedRoles")))
-    }
-    Return roleName
-}
-
-ClassMethod DeleteCodeReadRole(pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
-{
-    New $Namespace
-    Set $Namespace = "%SYS"
-
-    Set dbResource = ..GetDbResource(pNamespace)
-    If pVerbose {
-        Write !, "DB Resoure: ", dbResource
-    }
-    Set roleName = ..ConstructRoleName(dbResource)
-    If pVerbose {
-        Write !, "Role to delete: ", roleName
-    }
-
-    If ##class(Security.Roles).Exists(roleName) {
-        $$$ThrowOnError(##class(Security.Roles).Delete(roleName))
-        If pVerbose {
-            Write !, "Deleted succesfully"
-        }
-    } ElseIf pVerbose {
-        Write !, "Skipped because role does not exist"
-    }
 }
 
 }
