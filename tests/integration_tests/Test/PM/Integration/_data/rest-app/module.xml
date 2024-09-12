@@ -24,7 +24,7 @@
         Recurse="1"
         Directory="{$cspdir}/restdemo" 
         MatchRoles=":${dbrole}:%SQL:${codeReadRole}:%Developer,%All:%Manager"
-        AutheEnabled="6,5"
+        AutheEnabled="#{${authPassword} + ${authUnauthenticated}}"
         DispatchClass="Test.Rest.Demo"
         ServeFiles="1"
         CookiePath="/restdemo"

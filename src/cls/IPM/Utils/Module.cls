@@ -2289,6 +2289,15 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	Set dbRole = ..GetDatabaseRole()
 	Set result = ..%RegExReplace(result, "dbrole", dbRole)
 
+	Set result = ..%RegExReplace(result, "authK5API", $$$AutheK5API)
+	Set result = ..%RegExReplace(result, "authPassword", $$$AuthePassword)
+	Set result = ..%RegExReplace(result, "authUnauthenticated", $$$AutheUnauthenticated)
+	Set result = ..%RegExReplace(result, "authLDAP", $$$AutheLDAP)
+	Set result = ..%RegExReplace(result, "authDelegated", $$$AutheDelegated)
+	Set result = ..%RegExReplace(result, "authLoginToken", $$$AutheLoginToken)
+	Set result = ..%RegExReplace(result, "authTwoFactorSMS", $$$AutheTwoFactorSMS)
+	Set result = ..%RegExReplace(result, "authTwoFactorPW", $$$AutheTwoFactorPW)
+
 	Return result
 }
 

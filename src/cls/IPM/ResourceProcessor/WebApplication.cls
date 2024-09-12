@@ -96,22 +96,31 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
     Quit sc
 }
 
+Method ComputeAutheNumber(pAuth As %String) As %String
+{
+    Set pAuth = $ZSTRIP(pAuth, "<>W")
+    If ($Extract(pAuth, 1, 2) = "#{") && ($Extract(pAuth, *) = "}") {
+        Set output = 0
+        Set pAuth = $Extract(pAuth, 3, *-1)
+        Set pAuth = $ListFromString(pAuth, "+")
+        Set ptr = 0
+        While $LISTNEXT(pAuth, ptr, component) {
+            Set component = $ZSTRIP(component, "<>W")
+            Set output = output + component
+        }
+        Return output
+    } Else {
+        Return pAuth
+    }
+}
+
 Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
     New $namespace
     Set $namespace = "%SYS"
 
     Merge properties = ..SecurityProperties
-    If $Data(properties("AutheEnabled"), authString) # 2 {
-        Set authList = $ListFromString(authString, ",")
-        Set ptr = 0, authNumber = 0
-        While $ListNext(authList, ptr, authBit) {
-            Set authBit = $ZSTRIP(authBit, "<>W")
-            Set authNumber = authNumber + (2 ** authBit)
-        }
-        Set properties("AutheEnabled") = authNumber
-    }
-
+    Set properties("AutheEnabled") = ..ComputeAutheNumber($Get(properties("AutheEnabled")))
     If +$Get(properties("AutheEnabled")) = 0 {
         kill properties("AutheEnabled")
     }
