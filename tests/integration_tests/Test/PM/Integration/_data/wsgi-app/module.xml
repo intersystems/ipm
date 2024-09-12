@@ -20,9 +20,9 @@
 
       <WebApplication
         Url="/my/flask/demo"
-        UnauthenticatedEnabled="1"
+        AutheEnabled="6,5"
         Description="Sample WSGI application using Flask"
-        MatchRoles=":${dbrole}"
+        MatchRoles=":${dbrole}:%SQL:%Developer,%All:%Manager"
         NameSpace="${ns}"
         WSGIAppLocation="${libdir}flask-demo/flaskapp/"
         WSGIAppName="app"

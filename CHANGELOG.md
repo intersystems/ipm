@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
 - #518 Added ability to show source file location when running `list-installed`. E.g., `zpm "list-installed -showsource"`.
 - #538 Added ability to customize caller to PipCaller and UseStandalonePip through `config set`, which are empty by default and can be used to override the auto-detection of pip.
+- #562 Added a generic resource processpor `WebApplication`, which handles creating and removal of all Security.Applications resources
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.

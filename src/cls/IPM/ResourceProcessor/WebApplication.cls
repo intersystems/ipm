@@ -101,17 +101,17 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
     Set $namespace = "%SYS"
 
     Merge properties = ..SecurityProperties
-    If $Get(properties("AutheEnabled")) = "" {
-        Set properties("AutheEnabled") = (
-            ($Get(properties("PasswordAuthEnabled")) * $$$AutheCache) +
-            ($Get(properties("UnauthenticatedEnabled")) * $$$AutheUnauthenticated) +
-            ($Get(properties("DelegatedAuthEnabled")) * $$$AutheDelegated) +
-            ($Get(properties("KerberosAuthEnabled")) * $$$AutheK5API) +
-            ($Get(properties("LoginTokenEnabled")) * $$$AutheLoginToken)
-        )
+    If $Data(properties("AutheEnabled"), authString) # 2 {
+        Set authList = $ListFromString(authString, ",")
+        Set ptr = 0, authNumber = 0
+        While $ListNext(authList, ptr, authBit) {
+            Set authBit = $ZSTRIP(authBit, "<>W")
+            Set authNumber = authNumber + (2 ** authBit)
+        }
+        Set properties("AutheEnabled") = authNumber
     }
 
-    If properties("AutheEnabled") = 0 {
+    If +$Get(properties("AutheEnabled")) = 0 {
         kill properties("AutheEnabled")
     }
 
