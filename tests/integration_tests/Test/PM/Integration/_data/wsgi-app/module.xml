@@ -22,7 +22,7 @@
         Url="/my/flask/demo"
         AutheEnabled="6,5"
         Description="Sample WSGI application using Flask"
-        MatchRoles=":${dbrole}"
+        MatchRoles=":${dbrole}:%SQL:%Developer,%All:%Manager"
         NameSpace="${ns}"
         WSGIAppLocation="${libdir}flask-demo/flaskapp/"
         WSGIAppName="app"
