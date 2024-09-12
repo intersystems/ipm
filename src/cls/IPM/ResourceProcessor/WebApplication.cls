@@ -221,4 +221,58 @@ ClassMethod DoPropertiesExist(pPropList As %Library.List) As %Library.List [ Int
     Return badList
 }
 
+/// Grant read permissions to the routine database. This is necessary because 
+/// Adapted from https://github.com/intersystems/isc-perf-ui/blob/main/cls/pkg/isc/perf/ui/Installer.cls
+Method CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
+{
+    New $Namespace
+    Set $Namespace = "%SYS"
+
+    // Find the namespace-default routine DB
+    $$$ThrowOnError(##class(Config.Namespaces).Get(pNamespace,.nsProps))
+    Set defaultDB = nsProps("Routines")
+    If pVerbose {
+        Write !, "Routines DB: ", defaultDB
+    }
+    $$$ThrowOnError(##class(Config.Databases).Get(defaultDB,.dbProps))
+    Set db=##Class(SYS.Database).%OpenId(dbProps("Directory"),,.sc)
+    $$$ThrowOnError(sc)
+    Set dbResource = db.ResourceName
+    If pVerbose {
+        Write !, "DB Resoure: ", dbResource
+    }
+
+    // Is there public READ permission on the namespace-default routine DB?
+    $$$ThrowOnError(##class(Security.Resources).Get(dbResource,.resourceProps))
+    If (resourceProps("PublicPermission")#2) {
+        // No need to do anything else if there's public R permission
+        If pVerbose {
+            Write !, "Public Read permission already exists on ", dbResource, !, "Skipping"
+        }
+        Quit
+    }
+
+    // Create role granting R permission on namespace-default routine DB resource
+    // This is the least-access means to be able to use the REST handler class
+    // in unauthenticated mode
+    Set roleName = $ListToString($lb("ipm", "db", dbResource, "read"), ".")
+    Set roleProps("Description") = "Role created by %IPM that grants only R permission on "_dbResource
+    Set roleProps("Resources") = dbResource_":R"
+    Set roleProps("GrantedRoles") = ""
+    If ##class(Security.Roles).Exists(roleName) {
+        If pVerbose {
+            Write !,"Updating role: ", roleName, " with properties: "
+            Zwrite roleProps
+        }
+        $$$ThrowOnError(##class(Security.Roles).Modify(roleName,.roleProps))
+    } Else {
+        If pVerbose {
+            Write !,"Creating role: ", roleName, " with properties: "
+            Zwrite roleProps
+        }
+        $$$ThrowOnError(##class(Security.Roles).Create(roleName,roleProps("Description"),roleProps("Resources"),roleProps("GrantedRoles")))
+    }
+    return roleName
+}
+
 }
