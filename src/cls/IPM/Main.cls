@@ -241,6 +241,7 @@ repositories configured with the 'repo' command.
 <example description="Loads the module described in C:\module\root\path\module.xml">
 load C:\module\root\path\
 load C:\module\root\path\module-0.0.1.tgz
+load C:\module\root\path\module-0.0.1.tar.gz
 </example>
 <example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
 load -dev -verbose C:\module\root\path\
@@ -1871,7 +1872,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
-	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($Piece(tDirectoryName, ".", *)) = "tgz" {
+	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
 		Set tSC = ##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory)
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
