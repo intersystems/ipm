@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
 - #518 Added ability to show source file location when running `list-installed`. E.g., `zpm "list-installed -showsource"`.
+- #474 Added compatibility to load ".tar.gz" archives in addition to ".tgz"
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.
@@ -49,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #224: When updating zpm, existing configuration won't be reset
 - #482: Reenabled deployed code support without impact on embedded source control (reworks HSIEO-9277)
 - #487: When loading a package, relative paths staring with prefix "http" won't be mistaken for git repo
+- #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
 
 ### Security
 -
