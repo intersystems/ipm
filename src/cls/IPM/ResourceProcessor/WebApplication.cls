@@ -277,7 +277,7 @@ ClassMethod CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %
 
     set dbResource = ..GetDbResource(pNamespace)
     If pVerbose {
-        Write !, "DB Resoure: ", dbResource
+        Write !, "DB Resource: ", dbResource
     }
 
     // Is there public READ permission on the namespace-default routine DB?
@@ -294,7 +294,7 @@ ClassMethod CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %
     // This is the least-access means to be able to use the REST handler class
     // in unauthenticated mode
     Set roleName = ..ConstructRoleName(dbResource)
-    Set roleProps("Description") = "Role created by %IPM that grants only R permission on "_dbResource
+    Set roleProps("Description") = "Role created by IPM that grants only R permission on "_dbResource
     Set roleProps("Resources") = dbResource_":R"
     Set roleProps("GrantedRoles") = ""
     If ##class(Security.Roles).Exists(roleName) {
@@ -320,7 +320,7 @@ ClassMethod DeleteCodeReadRole(pNamespace As %String, pVerbose As %Boolean) [ In
 
     Set dbResource = ..GetDbResource(pNamespace)
     If pVerbose {
-        Write !, "DB Resoure: ", dbResource
+        Write !, "DB Resource: ", dbResource
     }
     Set roleName = ..ConstructRoleName(dbResource)
     If pVerbose {
