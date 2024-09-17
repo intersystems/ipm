@@ -164,6 +164,33 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 	Return isEqual
 }
 
+/// Returns a list of custom phases defined by the module's invokes.
+/// Custom phases do not have corresponding %method implementation in the lifecycle class.
+Method GetCustomPhases() As %List
+{
+    Set tree = ""
+    Set tKey = ""
+    For {
+        Set tInvoke = ..Invokes.GetNext(.tKey)
+        Quit:(tKey = "")
+        If (tInvoke.CustomPhase '= "") {
+            Set tree(tInvoke.CustomPhase) = ""
+        }
+    }
+
+    // Deduplicate
+    Set output = ""
+    Set phase = ""
+    For {
+        Set phase = $Order(tree(phase), 1)
+        If phase = "" {
+            Quit
+        }
+        Set output = output _ $lb(phase)
+    }
+    Quit output
+}
+
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
 /// Example: $ListBuild("Clean","Test") or $ListBuild("Test","Install")
 /// @API.Method
@@ -273,7 +300,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tLifecycle.PhaseList = tPhases
 		Set tPointer = 0
 		Set tFullStart = $zh
+        Set tCustomPhases = tModule.GetCustomPhases()
 		While $ListNext(tPhases,tPointer,tOnePhase) {
+            Set tIsCustomPhase = $ListFind(tCustomPhases, tOnePhase)
 			Set tStart = $zh
 			If tOnePhase="*" {
 				Kill tModule,tLifecycle
@@ -324,12 +353,14 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
           Quit:$$$ISERR(tSC)
         }
         Quit:$$$ISERR(tSC)
-				
-				// Lifecycle before / (phase) / after
-				$$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
-				$$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
-				$$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
-				
+
+        If 'tIsCustomPhase {
+            // Lifecycle before / (phase) / after
+            $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
+            $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
+            $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
+        }
+
         #; Call Invoke Methods After Phase	
         Set tKey = ""
         For {
