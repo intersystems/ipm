@@ -2245,6 +2245,7 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 /// 	<li>{$binDir} - the instance's bin directory.</li>
 /// 	<li>{$libDir} - the instance's lib directory.</li>
 /// 	<li>{$webroot} - the instance's constructed url with host and port (e.g. http://123.45.678.90:52773/) </li>
+/// 	<li>{$dbrole} - the current namespace's database role</li>
 /// </ul>
 /// For backward compatibility, supporting both ${var} and {$var}
 ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal ]
@@ -2285,6 +2286,18 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
 	Set result = ..%RegExReplace(result, "webroot", urlRoot)
 
+	Set dbRole = ..GetDatabaseRole()
+	Set result = ..%RegExReplace(result, "dbrole", dbRole)
+
+	Set result = ..%RegExReplace(result, "authK5API", $$$AutheK5API)
+	Set result = ..%RegExReplace(result, "authPassword", $$$AutheCache)
+	Set result = ..%RegExReplace(result, "authUnauthenticated", $$$AutheUnauthenticated)
+	Set result = ..%RegExReplace(result, "authLDAP", $$$AutheLDAP)
+	Set result = ..%RegExReplace(result, "authDelegated", $$$AutheDelegated)
+	Set result = ..%RegExReplace(result, "authLoginToken", $$$AutheLoginToken)
+	Set result = ..%RegExReplace(result, "authTwoFactorSMS", $$$AutheTwoFactorSMS)
+	Set result = ..%RegExReplace(result, "authTwoFactorPW", $$$AutheTwoFactorPW)
+
 	Return result
 }
 
@@ -2295,6 +2308,12 @@ ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pPropertie
 	New $Namespace
 	Set $Namespace = "%SYS"
 	Set sc = $ClassMethod("Config.Namespaces", "Get", pNamespace, .pProperties)
+}
+
+ClassMethod GetDatabaseRole()
+{
+	Do ##class(%SYS.Namespace).GetNSInfo($NAMESPACE, .nsInfo)
+	Return $Get(nsInfo("Resource"), "%DB_DEFAULT")
 }
 
 ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %String) As %String [ Internal ]

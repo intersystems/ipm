@@ -125,4 +125,28 @@ ClassMethod GetModuleDir(subfolders... As %String) As %String
   Quit tModuleDir
 }
 
+ClassMethod HttpGet(pPath As %String = "/") As %Status
+{
+	New $Namespace
+	Set $Namespace = "%SYS"
+
+	Set tSC = ##class(Config.Startup).Get(.props)
+	If $$$ISERR(tSC) {
+		Quit tSC
+	}
+
+	Set request = ##class(%Net.HttpRequest).%New()
+	Set request.Server = "127.0.0.1"
+	Set request.Port = props("WebServerPort")
+	Set path = props("WebServerURLPrefix") _ "/" _ pPath
+	Set tSC = request.Get(path)
+	If $$$ISERR(tSC) {
+		Quit tSC
+	}
+	If (request.HttpResponse.StatusCode '= 200) {
+		Quit $$$ERROR($$$GeneralError, "HTTP Status: "_request.HttpResponse.StatusCode_$char(13,10)_request.HttpResponse.Data.Read())
+	}
+	Quit $$$OK
+}
+
 }

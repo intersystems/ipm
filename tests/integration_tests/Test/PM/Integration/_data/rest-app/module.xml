@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="rest-demo.ZPM">
+    <Module>
+      <Name>rest-demo</Name>
+      <Version>1.0.0</Version>
+      <Description>This is a demo of a rest application</Description>
+      <Keywords>rest</Keywords>
+      <Author>
+        <Person>Shuheng Liu</Person>
+        <Organization>InterSystems</Organization>
+        <CopyrightDate>2024</CopyrightDate>
+        <License>MIT</License>
+        <Notes>notes</Notes>
+      </Author>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+
+      <Resource Name="Test.Rest.Demo.CLS"/>
+      <WebApplication 
+        Name="/restdemo"
+        NameSpace="{$namespace}"
+        Path="/src"
+        Recurse="1"
+        Directory="{$cspdir}/restdemo" 
+        MatchRoles=":${dbrole}:%SQL:${codeReadRole}:%Developer,%All:%Manager"
+        AutheEnabled="#{${authPassword} + ${authUnauthenticated}}"
+        DispatchClass="Test.Rest.Demo"
+        ServeFiles="1"
+        CookiePath="/restdemo"
+        UseCookies="2"
+       />
+    <AfterInstallMessage>Module installed successfully!</AfterInstallMessage>     
+    </Module>    
+  </Document>
+</Export>

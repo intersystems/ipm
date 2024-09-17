@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="flask-demo.ZPM">
+    <Module>
+      <Name>flask-demo</Name>
+      <Version>1.0.0</Version>
+      <Description>This is a demo of a flask application</Description>
+      <Keywords>flask</Keywords>
+      <Author>
+        <Person>Shuheng Liu</Person>
+        <Organization>InterSystems</Organization>
+        <CopyrightDate>2024</CopyrightDate>
+        <License>MIT</License>
+        <Notes>notes</Notes>
+      </Author>
+      <Packaging>module</Packaging>
+      <SystemRequirements Version=">=2024.1" />
+      <SourcesRoot>src</SourcesRoot>
+      <FileCopy Name="src/python/flaskapp/" Target="${libdir}flask-demo/flaskapp/"/>
+
+      <WebApplication
+        Url="/my/flask/demo"
+        AutheEnabled="#{ 32 + ${authUnauthenticated} }"
+        Description="Sample WSGI application using Flask"
+        MatchRoles=":${dbrole}:%SQL:%Developer,%All:%Manager"
+        NameSpace="${ns}"
+        WSGIAppLocation="${libdir}flask-demo/flaskapp/"
+        WSGIAppName="app"
+        WSGICallable="app"
+        DispatchClass="%SYS.Python.WSGI"
+      />
+    <AfterInstallMessage>Module installed successfully!</AfterInstallMessage>     
+    </Module>    
+  </Document>
+</Export>

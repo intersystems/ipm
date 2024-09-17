@@ -1434,7 +1434,7 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Set name = ..Name
 	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
 
-	Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", tAttrValue)
+	Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", attrValue)
 	While regex.Locate() {
 		Set expr = regex.Group(1)
 		Set value = ..%EvaluateExpression(expr)
@@ -1448,6 +1448,8 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 Method %EvaluateExpression(pExpr) As %String [ Internal ]
 {
   Try {
+	// Remove leading whitespace because there can only be 1 whitespace between "return" and its argument
+	set pExpr = $Zstrip(pExpr, "<W") 
     return @pExpr
   } Catch ex {
   }
