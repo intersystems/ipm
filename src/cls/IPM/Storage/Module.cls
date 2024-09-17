@@ -1448,6 +1448,8 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 Method %EvaluateExpression(pExpr) As %String [ Internal ]
 {
   Try {
+	// Remove leading whitespace because there can only be 1 whitespace between "return" and its argument
+	set pExpr = $Zstrip(pExpr, "<W") 
     return @pExpr
   } Catch ex {
   }
