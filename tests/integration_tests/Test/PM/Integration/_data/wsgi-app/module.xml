@@ -20,7 +20,7 @@
 
       <WebApplication
         Url="/my/flask/demo"
-        AutheEnabled="#{ 32 This is a comment + ${authUnauthenticated} }"
+        AutheEnabled="#{ 32 + ${authUnauthenticated} }"
         Description="Sample WSGI application using Flask"
         MatchRoles=":${dbrole}:%SQL:%Developer,%All:%Manager"
         NameSpace="${ns}"
