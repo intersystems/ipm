@@ -118,7 +118,7 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %IPM.General.Sema
 					Set tMajor = $Piece(tExpr,".",1)
 					Set tMinor = $Piece(tExpr,".",2)
 					
-					Set tComparators = tComparators_$ListBuild("<"_tMajor_"."_(tMinor+1)_".0")
+					Set tComparators = tComparators_$ListBuild("<"_tMajor_"."_(tMinor+1)_".0-0")
 				}
 			} ElseIf tIsCaretRange {
 				// Caret ranges:
@@ -134,7 +134,7 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %IPM.General.Sema
 				Set tPatch = $Piece(tMajorMinorPatch,".",3)
 				If (tDotLength < 3) {
 					If (tMajor '= 0) && 'tIsXRange {
-						Set tComparators = tComparators_$ListBuild(">="_$Replace(tExpr,".x",".0"),"<"_(tMajor+1)_".0.0")
+						Set tComparators = tComparators_$ListBuild(">="_$Replace(tExpr,".x",".0"),"<"_(tMajor+1)_".0.0-0")
 						Set tIsXRange = 0
 					} Else {
 						// Detected and properly handled by X-range.
@@ -146,12 +146,12 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %IPM.General.Sema
 					Set tMax = ""
 					If (+tMajor = 0) && (tMinor '= "x") {
 						If (+tMinor = 0) && (tPatch '= "x") {
-							Set tMax = "0.0."_(tPatch+1)
+							Set tMax = "0.0."_(tPatch+1)_"-0"
 						} Else {
-							Set tMax = "0."_(tMinor+1)_".0"
+							Set tMax = "0."_(tMinor+1)_".0-0"
 						}
 					} Else {
-						Set tMax = (tMajor+1)_".0.0"
+						Set tMax = (tMajor+1)_".0.0-0"
 					}
 					
 					// Maximum
@@ -174,9 +174,9 @@ ClassMethod FromString(pRangeExpr As %String, Output pRange As %IPM.General.Sema
 					// Accept anything!
 					Set tComparators = tComparators_$ListBuild(">=0.0.0")
 				} ElseIf (tMinor = "") || (tMinor = "x") {
-					Set tComparators = tComparators_$ListBuild(">="_tMajor_".0.0","<"_(tMajor+1)_".0.0")
+					Set tComparators = tComparators_$ListBuild(">="_tMajor_".0.0","<"_(tMajor+1)_".0.0-0")
 				} ElseIf (tPatch = "") || (tPatch = "x") {
-					Set tComparators = tComparators_$ListBuild(">="_tMajor_"."_tMinor_".0","<"_tMajor_"."_(tMinor+1)_".0")
+					Set tComparators = tComparators_$ListBuild(">="_tMajor_"."_tMinor_".0","<"_tMajor_"."_(tMinor+1)_".0-0")
 				}
 			}
 		}

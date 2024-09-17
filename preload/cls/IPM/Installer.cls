@@ -104,6 +104,7 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("PipCaller", "", 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("UseStandalonePip", "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("SemVerPostRelease", 0, 0))
     Quit $$$OK
 }
 
