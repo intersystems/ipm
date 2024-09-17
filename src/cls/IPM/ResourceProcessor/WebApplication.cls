@@ -236,12 +236,14 @@ ClassMethod DoPropertiesExist(pPropList As %Library.List) As %Library.List [ Int
     Return badList
 }
 
-ClassMethod ConstructRoleName(pDbResource As %String) As %String [ Internal, Private ]
+Method ConstructRoleName(pDbResource As %String) As %String [ Internal, Private ]
 {
-    Return $ListToString($lb("IPM", "readonly", pDbResource), ".")
+    // Include the module name in the role name to avoid conflicts
+    // This role should only be managed by IPM itself
+    Return $ListToString($lb("IPM", "readonly", ..ResourceReference.Module.Name, pDbResource), ".")
 }
 
-ClassMethod ReplaceCodeReadRole(pMatchRoles As %String, pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
+Method ReplaceCodeReadRole(pMatchRoles As %String, pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
 {
     Set templateLists = $Listbuild("{$codeReadRole}", "${codeReadRole}")
     Set role = "", ptr = 0 // We don't create the role unless ${codeReadRole} is explicitly in the MatchRoles
@@ -270,7 +272,7 @@ ClassMethod GetDbResource(pNamespace As %String) As %String [ Internal, Private 
 
 /// Grant read permissions to the routine database. This is necessary because 
 /// Adapted from https://github.com/intersystems/isc-perf-ui/blob/main/cls/pkg/isc/perf/ui/Installer.cls
-ClassMethod CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %String [ Internal, Private ]
+Method CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %String [ Internal, Private ]
 {
     New $Namespace
     Set $Namespace = "%SYS"
@@ -294,7 +296,7 @@ ClassMethod CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %
     // This is the least-access means to be able to use the REST handler class
     // in unauthenticated mode
     Set roleName = ..ConstructRoleName(dbResource)
-    Set roleProps("Description") = "Role created by IPM that grants only R permission on "_dbResource
+    Set roleProps("Description") = "Role created by IPM that grants only R permission on "_dbResource _ ". This role should only be managed by IPM."
     Set roleProps("Resources") = dbResource_":R"
     Set roleProps("GrantedRoles") = ""
     If ##class(Security.Roles).Exists(roleName) {
@@ -313,7 +315,7 @@ ClassMethod CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %
     Return roleName
 }
 
-ClassMethod DeleteCodeReadRole(pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
+Method DeleteCodeReadRole(pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
 {
     New $Namespace
     Set $Namespace = "%SYS"
