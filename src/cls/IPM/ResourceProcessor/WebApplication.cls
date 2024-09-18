@@ -221,7 +221,7 @@ Method ConstructRoleName(pDbResource As %String) As %String [ Internal, Private 
     Return $ListToString($lb("IPM", "readonly", ..ResourceReference.Module.Name, pDbResource), ".")
 }
 
-Method ReplaceCodeReadRole(pMatchRoles As %String, pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
+Method ReplaceCodeReadRole(pMatchRoles As %String, pNamespace As %String, pVerbose As %Boolean) As %String [ Internal, Private ]
 {
     Set templateLists = $Listbuild("{$codeDbReadRole}", "${codeDbReadRole}")
     Set role = "", ptr = 0 // We don't create the role unless ${codeDbReadRole} is explicitly in the MatchRoles
@@ -248,7 +248,7 @@ ClassMethod GetDbResource(pNamespace As %String) As %String [ Internal, Private 
     Return db.ResourceName
 }
 
-/// Grant read permissions to the routine database. This is necessary because 
+/// Grant read permissions to the routine database. This is necessary because routines and globals can have different DBs.
 /// Adapted from https://github.com/intersystems/isc-perf-ui/blob/main/cls/pkg/isc/perf/ui/Installer.cls
 Method CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %String [ Internal, Private ]
 {
