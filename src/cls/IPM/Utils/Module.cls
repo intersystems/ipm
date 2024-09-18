@@ -2299,14 +2299,14 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	Set result = ..%RegExReplace(result, "dbrole", dbRole)
 
 	// Authentication bits used by Security.Applications
-	Set result = ..%RegExReplace(result, "authK5API", $$$AutheK5API)
-	Set result = ..%RegExReplace(result, "authPassword", $$$AutheCache)
-	Set result = ..%RegExReplace(result, "authUnauthenticated", $$$AutheUnauthenticated)
-	Set result = ..%RegExReplace(result, "authLDAP", $$$AutheLDAP)
-	Set result = ..%RegExReplace(result, "authDelegated", $$$AutheDelegated)
-	Set result = ..%RegExReplace(result, "authLoginToken", $$$AutheLoginToken)
-	Set result = ..%RegExReplace(result, "authTwoFactorSMS", $$$AutheTwoFactorSMS)
-	Set result = ..%RegExReplace(result, "authTwoFactorPW", $$$AutheTwoFactorPW)
+	Set result = ..%RegExReplace(result, "authK5API", 2**2)
+	Set result = ..%RegExReplace(result, "authPassword", 2**5)
+	Set result = ..%RegExReplace(result, "authUnauthenticated", 2**6)
+	Set result = ..%RegExReplace(result, "authLDAP", 2**11)
+	Set result = ..%RegExReplace(result, "authDelegated", 2**13)
+	Set result = ..%RegExReplace(result, "authLoginToken", 2**14)
+	Set result = ..%RegExReplace(result, "authTwoFactorSMS", 2**20)
+	Set result = ..%RegExReplace(result, "authTwoFactorPW", 2**21)
 
 	Return result
 }
