@@ -216,9 +216,17 @@ ClassMethod DoPropertiesExist(pPropList As %Library.List) As %Library.List [ Int
 
 Method ConstructRoleName(pDbResource As %String) As %String [ Internal, Private ]
 {
-    // Include the module name in the role name to avoid conflicts
+    // Include the module name in the role name to avoid conflicts, using hash because role name can't be longer than 64 characters
     // This role should only be managed by IPM itself
-    Return $ListToString($lb("IPM", "readonly", ..ResourceReference.Module.Name, pDbResource), ".")
+    Set hashBytes = $System.Encryption.MD5Hash(..ResourceReference.Module.Name) // 128 bits
+    Set hashHexString = $System.Encryption.Base32HexEncode(hashBytes, 1) // 26 characters, without '=' padding
+    // As long as pDbResource is shorter than 33 characters, the role name will be shorter than 64 characters
+    Set roleName = $ListToString($ListBuild("IPM", pDbResource, hashHexString), ".")
+    If $Length(roleName) > 64 { 
+        // In the rare case where the hash is too long, we truncate the hash first
+        Set roleName = $Extract(roleName, 1, 64)
+    }
+    Return roleName
 }
 
 Method ReplaceCodeReadRole(pMatchRoles As %String, pNamespace As %String, pVerbose As %Boolean) As %String [ Internal, Private ]
@@ -274,7 +282,7 @@ Method CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %Strin
     // This is the least-access means to be able to use the REST handler class
     // in unauthenticated mode
     Set roleName = ..ConstructRoleName(dbResource)
-    Set roleProps("Description") = "Role created by IPM that grants only R permission on "_dbResource _ ". This role should only be managed by IPM."
+    Set roleProps("Description") = "Role created by IPM for package "_ ..ResourceReference.Module.Name _" that grants only R permission on "_dbResource _ ". This role should only be managed by IPM."
     Set roleProps("Resources") = dbResource_":R"
     Set roleProps("GrantedRoles") = ""
     If ##class(Security.Roles).Exists(roleName) {
