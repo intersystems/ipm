@@ -169,7 +169,7 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 /// Custom phases do not have corresponding %method implementation in the lifecycle class.
 Method GetCustomPhases(Output pPhases)
 {
-	Kill pPhases
+    Kill pPhases
     Set pPhases = ""
     Set key = ""
     For {
