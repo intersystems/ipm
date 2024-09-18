@@ -21,12 +21,15 @@ Property Interoperability As %String(VALUELIST = ",enabled,disabled", XMLPROJECT
 
 Property Health As %Boolean(XMLPROJECTION = "ATTRIBUTE");
 
+Property IPMVersion As %String(MAXLEN = 256, XMLPROJECTION = "ATTRIBUTE");
+
 Method CheckRequirements() As %Status
 {
 	Set tSC = $$$OK
 	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckVersion())
 	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckInteroperability())
 	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckHealth())
+	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckIPMVersion())
 	Return tSC
 }
 
@@ -69,6 +72,20 @@ Method CheckHealth() As %Status
 	Return $$$OK
 }
 
+Method CheckIPMVersion() As %Status
+{
+	If ..IPMVersion = "" {
+		Return $$$OK
+	}
+	Do ##class(%IPM.Main).GetVersion("zpm",.out)	
+	Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($ListGet(out("zpm"), 2))
+	$$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(..IPMVersion,.tExpression))
+	If tVersion.Satisfies(tExpression) {
+		Return $$$OK
+	}
+	Return $$$ERROR($$$GeneralError, "The module requires IPM version "_..IPMVersion_". Current IPM version is "_tVersion.ToString())
+}
+
 ClassMethod IsHealthInstance() As %Boolean
 {
   set cls = "%ZHSLIB.HealthShareMgr", mthd = "IsHealthShareInstance"
@@ -100,6 +117,9 @@ Storage Default
 </Value>
 <Value name="6">
 <Value>Health</Value>
+</Value>
+<Value name="7">
+<Value>IPMVersion</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.SystemRequirementsD</DataLocation>
