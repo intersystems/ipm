@@ -1,10 +1,9 @@
 Class CustomPhaseWithoutLifecycle.Manager
 {
 
-ClassMethod SayHello() As %Status
+ClassMethod SayHello()
 {
     Write !, "Hello from CustomPhaseWithoutLifecycle.Manager"
-    Quit $$$OK
 }
 
 ClassMethod ReturnError() As %Status

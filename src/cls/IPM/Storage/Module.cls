@@ -164,31 +164,20 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 	Return isEqual
 }
 
-/// Returns a list of custom phases defined by the module's invokes.
+/// Returns a multidimensional array of custom phases defined by the module's invokes,
+/// where the keys are the custom phase names and the values are empty strings.
 /// Custom phases do not have corresponding %method implementation in the lifecycle class.
-Method GetCustomPhases() As %List
+Method GetCustomPhases(Output pPhases)
 {
-    Set tree = ""
-    Set tKey = ""
+    Set pPhases = ""
+    Set key = ""
     For {
-        Set tInvoke = ..Invokes.GetNext(.tKey)
-        Quit:(tKey = "")
+        Set tInvoke = ..Invokes.GetNext(.key)
+        Quit:(key = "")
         If (tInvoke.CustomPhase '= "") {
-            Set tree(tInvoke.CustomPhase) = ""
+            Set pPhases(tInvoke.CustomPhase) = ""
         }
     }
-
-    // Deduplicate
-    Set output = ""
-    Set phase = ""
-    For {
-        Set phase = $Order(tree(phase), 1)
-        If phase = "" {
-            Quit
-        }
-        Set output = output _ $lb(phase)
-    }
-    Quit output
 }
 
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
@@ -300,9 +289,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tLifecycle.PhaseList = tPhases
 		Set tPointer = 0
 		Set tFullStart = $zh
-        Set tCustomPhases = tModule.GetCustomPhases()
+		Do tModule.GetCustomPhases(.tCustomPhases)
 		While $ListNext(tPhases,tPointer,tOnePhase) {
-            Set tIsCustomPhase = $ListFind(tCustomPhases, tOnePhase)
+            Set tIsCustomPhase = $Data(tCustomPhases(tOnePhase)) # 2
 			Set tStart = $zh
 			If tOnePhase="*" {
 				Kill tModule,tLifecycle
