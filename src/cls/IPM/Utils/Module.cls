@@ -2245,7 +2245,15 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 /// 	<li>{$binDir} - the instance's bin directory.</li>
 /// 	<li>{$libDir} - the instance's lib directory.</li>
 /// 	<li>{$webroot} - the instance's constructed url with host and port (e.g. http://123.45.678.90:52773/) </li>
-/// 	<li>{$dbrole} - the current namespace's database role</li>
+/// 	<li>{$dbrole} - the current namespace's globals database role</li>
+/// 	<li>{$codeDbRole} - the current namespace's routine database role (will be created if needed)</li>
+/// 	<li>{$authK5API} - the authentication macro $$$AutheK5API used for Security.Applications. Its value is equal to 4 (2^2).</li>
+/// 	<li>{$authPassword} - the authentication macro $$$AutheCache used for Security.Applications. Its value is equal to 32 (2^5).</li>
+/// 	<li>{$authLDAP} - the authentication macro $$$AutheLDAP used for Security.Applications. Its value is equal to 2048 (2^11).</li>
+/// 	<li>{$authDelegated} - the authentication macro $$$AutheDelegated used for Security.Applications. Its value is equal to 8192 (2^13).</li>
+/// 	<li>{$authLoginToken} - the authentication macro $$$AutheLogintToken used for Security.Applications. Its value is equal to 16384 (2^14).</li>
+/// 	<li>{$authTwoFactorSMS} - the authentication macro $$$AutheTwoFactorSMS used for Security.Applications. Its value is equal to 1048576 (2^20).</li>
+/// 	<li>{$authTwoFactorPW} - the authentication macro $$$AutheTwoFactorPW used for Security.Applications. Its value is equal to 2097152 (2^21).</li>
 /// </ul>
 /// For backward compatibility, supporting both ${var} and {$var}
 ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal ]
@@ -2289,6 +2297,7 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	Set dbRole = ..GetDatabaseRole()
 	Set result = ..%RegExReplace(result, "dbrole", dbRole)
 
+	// Authentication bits used by Security.Applications
 	Set result = ..%RegExReplace(result, "authK5API", $$$AutheK5API)
 	Set result = ..%RegExReplace(result, "authPassword", $$$AutheCache)
 	Set result = ..%RegExReplace(result, "authUnauthenticated", $$$AutheUnauthenticated)
