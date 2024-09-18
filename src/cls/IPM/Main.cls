@@ -1890,9 +1890,14 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 			Set tModuleFilePath = $ListGet(tList(tCount), *)
 			Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
 			If $Get(pCommandInfo("data", "Verbose")) {
-				Write !,"Found "_tCount_" results. They are: ", !
-				Zwrite tList
-				Write "Using module.xml file at ", tModuleFilePath
+				Write !,"Found "_tCount_" results. They are: "
+				Set idx = ""
+				For {
+					Set idx = $Order(tList(idx))
+					Quit:(idx="")
+					Write !, $Char(9), $List(tList(idx), *)
+				}
+				Write !, "Using module.xml file at ", tModuleFilePath
 			}
 		}
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
