@@ -2245,8 +2245,9 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 /// 	<li>{$binDir} - the instance's bin directory.</li>
 /// 	<li>{$libDir} - the instance's lib directory.</li>
 /// 	<li>{$webroot} - the instance's constructed url with host and port (e.g. http://123.45.678.90:52773/) </li>
-/// 	<li>{$dbrole} - the current namespace's globals database role</li>
-/// 	<li>{$codeDbRole} - the current namespace's routine database role (will be created if needed)</li>
+/// 	<li>{$dbrole} - (deprecated in favor of {$globalsDbRole}) the current namespace's globals database role</li>
+/// 	<li>{$globalsDbRole} - the current namespace's globals database role, functionally equivalent to {$dbrole} in legacy packages.</li>
+/// 	<li>{$codeDbReadRole} - the current namespace's routine database role (will be created if needed)</li>
 /// 	<li>{$authK5API} - the authentication macro $$$AutheK5API used for Security.Applications. Its value is equal to 4 (2^2).</li>
 /// 	<li>{$authPassword} - the authentication macro $$$AutheCache used for Security.Applications. Its value is equal to 32 (2^5).</li>
 /// 	<li>{$authLDAP} - the authentication macro $$$AutheLDAP used for Security.Applications. Its value is equal to 2048 (2^11).</li>

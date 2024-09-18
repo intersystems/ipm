@@ -103,7 +103,7 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 
     Merge properties = ..SecurityProperties
 
-    // Replace ${codeReadRole} with a role (potentially to be created) with read permission to routine database
+    // Replace ${codeDbReadRole} with a role (potentially to be created) with read permission to routine database
     If ($Data(properties("NameSpace"), ns) # 2) && ($Data(properties("MatchRoles"), mr) # 2) {
         Set properties("MatchRoles") = ..ReplaceCodeReadRole(mr, ns, pVerbose)
     }
@@ -223,8 +223,8 @@ Method ConstructRoleName(pDbResource As %String) As %String [ Internal, Private 
 
 Method ReplaceCodeReadRole(pMatchRoles As %String, pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
 {
-    Set templateLists = $Listbuild("{$codeReadRole}", "${codeReadRole}")
-    Set role = "", ptr = 0 // We don't create the role unless ${codeReadRole} is explicitly in the MatchRoles
+    Set templateLists = $Listbuild("{$codeDbReadRole}", "${codeDbReadRole}")
+    Set role = "", ptr = 0 // We don't create the role unless ${codeDbReadRole} is explicitly in the MatchRoles
     While $ListNext(templateLists, ptr, template) {
         If pMatchRoles [ template {
             Set role = $Select(role="": ..CreateCodeReadRole(pNamespace, pVerbose), 1: role)

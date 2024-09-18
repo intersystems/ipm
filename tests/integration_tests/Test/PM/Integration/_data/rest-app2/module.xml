@@ -23,7 +23,7 @@
         Path="/src"
         Recurse="1"
         Directory="{$cspdir}/restdemo2" 
-        MatchRoles=":${dbrole}:%SQL:${codeReadRole}:%Developer,%All:%Manager"
+        MatchRoles=":${dbrole}:%SQL:${codeDbReadRole}:%Developer,%All:%Manager"
         AutheEnabled="#{${authPassword} + ${authUnauthenticated}}"
         DispatchClass="Test.Rest.Demo2"
         ServeFiles="1"

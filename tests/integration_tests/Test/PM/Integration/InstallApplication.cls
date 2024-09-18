@@ -60,7 +60,7 @@ Method TestRestApp()
     Do $$$AssertStatusOK(..HttpGet("restdemo/"))
 
     // Install another REST application of the same database
-    // Uninstalling this module shouldn't affect the first one (beacuse ${codeReadRole} is unique for each module)
+    // Uninstalling this module shouldn't affect the first one (beacuse ${codeDbReadRole} is unique for each module)
     Set tModuleDir2 = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/rest-app2/")
     Set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir2)
     Do $$$AssertStatusOK(tSC,"Loaded REST Application ""restdemo2/"" successfully. " _ tModuleDir2)
