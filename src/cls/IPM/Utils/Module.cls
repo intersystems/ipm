@@ -2297,6 +2297,7 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 
 	Set dbRole = ..GetDatabaseRole()
 	Set result = ..%RegExReplace(result, "dbrole", dbRole)
+	Set result = ..%RegExReplace(result, "globalsDbRole", dbRole)
 
 	// Authentication bits used by Security.Applications
 	Set result = ..%RegExReplace(result, "authK5API", 2**2)
