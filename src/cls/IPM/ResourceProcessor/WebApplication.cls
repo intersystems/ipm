@@ -88,7 +88,6 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
         } ElseIf ((pPhase = "Unconfigure") || (pPhase = "Clean")) {
             // Remove web application
             Do ..DeleteWebApp(tVerbose)
-            Do ..DeleteCodeReadRole($Get(..SecurityProperties("NameSpace")), tVerbose)
         }
     } Catch e {
         Set sc = e.AsStatus()
@@ -216,17 +215,7 @@ ClassMethod DoPropertiesExist(pPropList As %Library.List) As %Library.List [ Int
 
 Method ConstructRoleName(pDbResource As %String) As %String [ Internal, Private ]
 {
-    // Include the module name in the role name to avoid conflicts, using hash because role name can't be longer than 64 characters
-    // This role should only be managed by IPM itself
-    Set hashBytes = $System.Encryption.MD5Hash(..ResourceReference.Module.Name) // 128 bits
-    Set hashHexString = $System.Encryption.Base32HexEncode(hashBytes, 1) // 26 characters, without '=' padding
-    // As long as pDbResource is shorter than 33 characters, the role name will be shorter than 64 characters
-    Set roleName = $ListToString($ListBuild("IPM", pDbResource, hashHexString), ".")
-    If $Length(roleName) > 64 { 
-        // In the rare case where the hash is too long, we truncate the hash first
-        Set roleName = $Extract(roleName, 1, 64)
-    }
-    Return roleName
+    Return $ListToString($ListBuild("%DB", pDbResource, "READ"), "_")
 }
 
 Method ReplaceCodeReadRole(pMatchRoles As %String, pNamespace As %String, pVerbose As %Boolean) As %String [ Internal, Private ]
@@ -299,30 +288,6 @@ Method CreateCodeReadRole(pNamespace As %String, pVerbose As %Boolean) As %Strin
         $$$ThrowOnError(##class(Security.Roles).Create(roleName,roleProps("Description"),roleProps("Resources"),roleProps("GrantedRoles")))
     }
     Return roleName
-}
-
-Method DeleteCodeReadRole(pNamespace As %String, pVerbose As %Boolean) [ Internal, Private ]
-{
-    New $Namespace
-    Set $Namespace = "%SYS"
-
-    Set dbResource = ..GetDbResource(pNamespace)
-    If pVerbose {
-        Write !, "DB Resource: ", dbResource
-    }
-    Set roleName = ..ConstructRoleName(dbResource)
-    If pVerbose {
-        Write !, "Role to delete: ", roleName
-    }
-
-    If ##class(Security.Roles).Exists(roleName) {
-        $$$ThrowOnError(##class(Security.Roles).Delete(roleName))
-        If pVerbose {
-            Write !, "Deleted succesfully"
-        }
-    } ElseIf pVerbose {
-        Write !, "Skipped because role does not exist"
-    }
 }
 
 }
