@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="version-req-too-low.ZPM">
+    <Module>
+      <Name>version-req-too-low</Name>
+      <Version>0.0.1+snapshot</Version>
+      <Packaging>module</Packaging>
+      <SystemRequirements IPMVersion="&lt;0.0.1"/>
+    </Module>
+  </Document>
+</Export>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="custom-phase-without-lifecycle.ZPM">
+    <Module>
+      <Name>custom-phase-without-lifecycle</Name>
+      <Version>0.0.1-snapshot</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="CustomPhaseWithoutLifecycle.Manager.CLS"/>
+      <!-- CustomPhase invoke should work without a corresponding lifecycle method -->
+      <Invoke Class="CustomPhaseWithoutLifecycle.Manager" Method="SayHello" CustomPhase="Greeting" When="Before"/>
+      <!-- CustomPhase invoke shouldn't be called during load/install -->
+      <Invoke Class="CustomPhaseWithoutLifecycle.Manager" Method="ReturnError" CustomPhase="Error" CheckStatus="true"/>
+    </Module>
+  </Document>
+</Export>

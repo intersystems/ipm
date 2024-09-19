@@ -125,4 +125,20 @@ ClassMethod GetModuleDir(subfolders... As %String) As %String
   Quit tModuleDir
 }
 
+/// Returns whether a substring is found in any element of a multi-dimensional array
+ClassMethod FindStringInMultiDimArray(pString As %String, ByRef pArray) As %Boolean
+{
+	set sub = ""
+	For {
+		Set sub = $Order(pArray(sub), 1, element)
+		If sub = "" {
+			Quit
+		}
+		If element [ pString {
+			Return 1
+		}
+	}
+	Return 0
+}
+
 }
