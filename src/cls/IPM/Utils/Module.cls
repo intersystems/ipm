@@ -2247,13 +2247,7 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 /// 	<li>{$webroot} - the instance's constructed url with host and port (e.g. http://123.45.678.90:52773/) </li>
 /// 	<li>{$dbrole} - (deprecated in favor of {$globalsDbRole}) the current namespace's globals database role</li>
 /// 	<li>{$globalsDbRole} - the current namespace's globals database role, functionally equivalent to {$dbrole} in legacy packages.</li>
-/// 	<li>{$authK5API} - the authentication macro $$$AutheK5API used for Security.Applications. Its value is equal to 4 (2^2).</li>
-/// 	<li>{$authPassword} - the authentication macro $$$AutheCache used for Security.Applications. Its value is equal to 32 (2^5).</li>
-/// 	<li>{$authLDAP} - the authentication macro $$$AutheLDAP used for Security.Applications. Its value is equal to 2048 (2^11).</li>
-/// 	<li>{$authDelegated} - the authentication macro $$$AutheDelegated used for Security.Applications. Its value is equal to 8192 (2^13).</li>
-/// 	<li>{$authLoginToken} - the authentication macro $$$AutheLogintToken used for Security.Applications. Its value is equal to 16384 (2^14).</li>
-/// 	<li>{$authTwoFactorSMS} - the authentication macro $$$AutheTwoFactorSMS used for Security.Applications. Its value is equal to 1048576 (2^20).</li>
-/// 	<li>{$authTwoFactorPW} - the authentication macro $$$AutheTwoFactorPW used for Security.Applications. Its value is equal to 2097152 (2^21).</li>
+/// 	<li>$$$macros - triple dollars ($$$) followed immediately by alphanumeric string will be substituted with corresponding macro value. If the macro is undefined on the instance, will return null ("") </li>
 /// </ul>
 /// For backward compatibility, supporting both ${var} and {$var}
 ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal ]
