@@ -1427,6 +1427,7 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Set customParams("packagename") = ..Name
 	Set customParams("version") = ..VersionString
 	Set customParams("verbose") = +$Get(pParams("Verbose"))
+	Set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
 	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
 	

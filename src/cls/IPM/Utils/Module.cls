@@ -2311,6 +2311,42 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	Return result
 }
 
+ClassMethod %EvaluateMacro(pString As %String) As %String [ Internal ]
+{
+	Set tString = pString
+	Set tPattern = "\$\$\$[a-zA-Z0-9]+"
+	Set tMatch = ##class(%Regex.Matcher).%New(tPattern, tString)
+	While tMatch.Locate() {
+		Set group = tMatch.Group
+		Set macroVal = ..EvaluateMacroHelper($Extract(group, 4, *))
+		set tString = $Replace(tString, group, macroVal)
+	}
+	Return tString
+}
+
+/// Helper metohd to evaluate macro at runtime. 
+ClassMethod EvaluateMacroHelper(pMacro As %String) As %String [ Internal, Private ]
+{
+    Set stream = ##class(%Stream.TmpCharacter).%New()
+    Do stream.WriteLine("Class %IPM.Generated.MacroEval")
+    Do stream.WriteLine("{")
+    Do stream.WriteLine("ClassMethod EvalMacro() [ CodeMode = objectgenerator ]")
+    Do stream.WriteLine("{")
+    Do stream.WriteLine("  Do %code.WriteLine(""#IfDef "_ pMacro _""")")
+    Do stream.WriteLine("  Do %code.WriteLine("" Quit $$$"_pMacro_""")")
+    Do stream.WriteLine("  Do %code.WriteLine(""#Else "")")
+    Do stream.WriteLine("  Do %code.WriteLine("" Quit """""""" "")")
+    Do stream.WriteLine("  Do %code.WriteLine(""#EndIf "")")
+    Do stream.WriteLine("  Quit $$$OK") 
+    Do stream.WriteLine("}")
+    Do stream.WriteLine("}")
+
+    Do $system.OBJ.LoadStream(stream, "ck-d")
+    Set value = $ClassMethod("%IPM.Generated.MacroEval", "EvalMacro")
+    Do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d")
+    Return value
+}
+
 /// Wrapper around Config.Namespaces:Get()
 ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pProperties) [ Internal ]
 {
