@@ -2297,6 +2297,9 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 
 ClassMethod %EvaluateMacro(pString As %String) As %String [ Internal ]
 {
+	If pString '[ "$$$" {
+		Return pString // Return early for efficiency
+	}
 	Set tString = pString
 	Set tPattern = "\$\$\$[a-zA-Z0-9]+"
 	Set tMatch = ##class(%Regex.Matcher).%New(tPattern, tString)
@@ -2325,7 +2328,9 @@ ClassMethod EvaluateMacroHelper(pMacro As %String) As %String [ Internal, Privat
     Do stream.WriteLine("}")
     Do stream.WriteLine("}")
 
-    Do $system.OBJ.LoadStream(stream, "ck-d")
+    // If it reaches here, pMacro is a valid expression (although may be undefined). 
+	// We should throw an error instead of failing silently.
+    $$$ThrowOnError($system.OBJ.LoadStream(stream, "ck-d"))
     Set value = $ClassMethod("%IPM.Generated.MacroEval", "EvalMacro")
     Do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d")
     Return value
