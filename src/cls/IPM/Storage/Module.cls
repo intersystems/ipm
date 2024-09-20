@@ -164,6 +164,23 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 	Return isEqual
 }
 
+/// Returns a multidimensional array of custom phases defined by the module's invokes,
+/// where the keys are the custom phase names and the values are empty strings.
+/// Custom phases do not have corresponding %method implementation in the lifecycle class.
+Method GetCustomPhases(Output pPhases)
+{
+    Kill pPhases
+    Set pPhases = ""
+    Set key = ""
+    For {
+        Set tInvoke = ..Invokes.GetNext(.key)
+        Quit:(key = "")
+        If (tInvoke.CustomPhase '= "") {
+            Set pPhases(tInvoke.CustomPhase) = ""
+        }
+    }
+}
+
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
 /// Example: $ListBuild("Clean","Test") or $ListBuild("Test","Install")
 /// @API.Method
@@ -273,7 +290,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tLifecycle.PhaseList = tPhases
 		Set tPointer = 0
 		Set tFullStart = $zh
+		Do tModule.GetCustomPhases(.tCustomPhases)
 		While $ListNext(tPhases,tPointer,tOnePhase) {
+            Set tIsCustomPhase = $Data(tCustomPhases(tOnePhase)) # 2
 			Set tStart = $zh
 			If tOnePhase="*" {
 				Kill tModule,tLifecycle
@@ -324,12 +343,14 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
           Quit:$$$ISERR(tSC)
         }
         Quit:$$$ISERR(tSC)
-				
-				// Lifecycle before / (phase) / after
-				$$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
-				$$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
-				$$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
-				
+
+        If 'tIsCustomPhase {
+            // Lifecycle before / (phase) / after
+            $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
+            $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
+            $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
+        }
+
         #; Call Invoke Methods After Phase	
         Set tKey = ""
         For {
