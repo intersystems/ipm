@@ -252,6 +252,7 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
 	If (tAttrValue '[ "{") {
 		Return tAttrValue
 	}
+	Set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
 	Set root = ..ResourceReference.Module.Root
 	If (root '= "") {
