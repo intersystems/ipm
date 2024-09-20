@@ -1,4 +1,4 @@
-Class IPM.General.History Extends %Persistent
+Class %IPM.General.History Extends %Persistent
 {
 
 Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
@@ -13,17 +13,80 @@ Property SourceMoniker As %String(MAXLEN = 100);
 
 Property SourceDetails As %String(MAXLEN = "");
 
-Property TimeStamp As %TimeStamp [ Required ];
+Property TimeStart As %TimeStamp [ Required ];
+
+Property TimeEnd As %TimeStamp [ Required ];
 
 Property NameSpace As %String [ InitialExpression = {$NAMESPACE}, Required ];
 
 Property UserName As %String [ InitialExpression = {$USERNAME}, Required ];
 
-Property Success As %Status [ Required ];
+Property Success As %Status [ InitialExpression = 0, Required ];
 
-Property Committed As %Boolean [ Required ];
+Property Committed As %Boolean [ InitialExpression = 0, Required ];
 
 Property CommandString As %String(MAXLEN = 8192) [ Required ];
+
+ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History [ Private ]
+{
+    Set log = ..%New()
+    Set log.TimeStart = $ZDateTime($Now(), 3)
+    Set log.TimeEnd = $ZDateTime($Now(), 3) // Default to now so can call %Save(), will be updated in Finalize
+    Set log.Action = Action
+    Set log.Package = Package
+    Set log.CommandString = Command
+    Set log.NameSpace = $Namespace
+    Set log.UserName = $Username
+    $$$ThrowOnError(log.SetVersion()) // Set the version to placeholder 0.0.0-0, Will be updated before finalizing
+    $$$ThrowOnError(log.%Save()) // Save it now in case Finalize isn't called
+    Quit log
+}
+
+ClassMethod InstallInit(Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History
+{
+    Quit ..Init("install", Package, Command)
+}
+
+ClassMethod LoadInit(Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History
+{
+    Quit ..Init("load", Package, Command)
+}
+
+ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History
+{
+    Quit ..Init("uninstall", Package, Command)
+}
+
+Method SetSource(pInfo As %IPM.Storage.QualifiedModuleInfo) As %Status
+{
+    $$$ThrowOnError(..%Reload())
+    Set ..SourceName = pInfo.ServerName
+    Set ..SourceMoniker = pInfo.ServerMoniker
+    Set ..SourceDetails = pInfo.ServerDetails
+    Quit ..%Save()
+}
+
+Method SetVersion(pVersion As %IPM.General.SemanticVersion) As %Status
+{
+    If ..%Id() '= "" {
+        $$$ThrowOnError(..%Reload())
+    }
+    If $Get(pVersion) = "" {
+        Set pVersion = "0.0.0-0"
+    }
+    Set ..Version = $Select($IsObject(pVersion): pVersion, 1: ##class(%IPM.General.SemanticVersion).FromString(pVersion))
+    Quit ..%Save()
+}
+
+Method Finalize(status As %Status) As %Status
+{
+    $$$ThrowOnError(..%Reload())
+    Set ..Success = status
+    // TODO what does committed mean?
+    Set ..Committed = 1
+    Set ..TimeEnd = $ZDateTime($Now(), 3)
+    Return ..%Save()
+}
 
 Storage Default
 {
@@ -32,10 +95,10 @@ Storage Default
 <Value>%%CLASSNAME</Value>
 </Value>
 <Value name="2">
-<Value>Package</Value>
+<Value>Action</Value>
 </Value>
 <Value name="3">
-<Value>Action</Value>
+<Value>Package</Value>
 </Value>
 <Value name="4">
 <Value>Version</Value>
@@ -50,29 +113,32 @@ Storage Default
 <Value>SourceDetails</Value>
 </Value>
 <Value name="8">
-<Value>TimeStamp</Value>
+<Value>TimeStart</Value>
 </Value>
 <Value name="9">
-<Value>NameSpace</Value>
+<Value>TimeEnd</Value>
 </Value>
 <Value name="10">
-<Value>UserName</Value>
+<Value>NameSpace</Value>
 </Value>
 <Value name="11">
-<Value>Success</Value>
+<Value>UserName</Value>
 </Value>
 <Value name="12">
-<Value>Committed</Value>
+<Value>Success</Value>
 </Value>
 <Value name="13">
+<Value>Committed</Value>
+</Value>
+<Value name="14">
 <Value>CommandString</Value>
 </Value>
 </Data>
-<DataLocation>^IPM.General.HistoryD</DataLocation>
+<DataLocation>^%IPM.General.HistoryD</DataLocation>
 <DefaultData>HistoryDefaultData</DefaultData>
-<IdLocation>^IPM.General.HistoryD</IdLocation>
-<IndexLocation>^IPM.General.HistoryI</IndexLocation>
-<StreamLocation>^IPM.General.HistoryS</StreamLocation>
+<IdLocation>^%IPM.General.HistoryD</IdLocation>
+<IndexLocation>^%IPM.General.HistoryI</IndexLocation>
+<StreamLocation>^%IPM.General.HistoryS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

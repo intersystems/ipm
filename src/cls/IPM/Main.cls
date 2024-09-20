@@ -632,6 +632,13 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		</example>
 	</command>
 
+<command name="history" aliases="log" dataPrefix="D">
+<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall.</description>
+<example description="Show history of package &quot;my-package&quot;">history find -Dname=my-package</example>
+<example description="Delete history of package &quot;my-package&quot;">history delete -Dname=my-package</example>
+<parameter name="action" required="false" description="One of history actions: find, delete" />
+</command>
+
 </commands>
 }
 
