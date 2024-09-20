@@ -1156,6 +1156,20 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 	Quit $$$OK
 }
 
+/// Argument `list` is a multidimensional array where `list` contains the a numeric value `n`, indicating the length of the list
+/// Each subnode `list(i)` where 1 <= i <= n contains a $ListBuild of a single namespace
+/// Each subnote `list(i,"modules")` contains the number of modules in the namespace
+/// For 1 <= j <= `list(i,"modules")`, each subnode `list(i,"modules",j)` contains a $ListBuild of the module name, version, external name, and whether the module is installed in developer mode
+/// Additional nodes are also accepted, although they are not used in this method
+/// For example:
+/// list=1
+/// list(1)=$lb("USER")
+/// list(1,"modules")=2
+/// list(1,"modules",1)=$lb("zpm","0.9.0-SNAPSHOT","Package Management System",1)
+/// list(1,"modules",2)=$lb("zpm-registry","1.3.2","ZPM Registry",0)
+/// list(1,"modules","width")=12
+/// list("ns")="*"
+/// list("width")=4
 ClassMethod AddIPMMappedNamespaces(ByRef list) [ Private ]
 {
 	Do ..GetListNamespace(.allNS,"*")
@@ -1172,7 +1186,9 @@ ClassMethod AddIPMMappedNamespaces(ByRef list) [ Private ]
 	Set namespace = ""
 	For {
 		Set namespace = $Order(allNS(namespace))
-		Quit:namespace=""
+		If namespace = "" {
+			Quit
+		}
 
 		Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
 		If $Data(mappedFrom(sourceDB),sourceNamespace) {
@@ -2680,11 +2696,14 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		If globally {
 			Set namespaces = ""
 			Do ..GetListNamespace(.list)
+			// Namespace-specific mappings aren't allowed to override %ALL mappings. See https://github.com/intersystems/ipm/pull/485
 			Kill list("%ALL")
 			Set key = ""
 			For {
 				Set key = $Order(list(key))
-				Quit:key=""
+				If key = "" {
+					Quit
+				}
 				Set namespaces = namespaces _ $ListBuild(key)
 			}
 		} Else {
@@ -2692,8 +2711,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		}
 		Set pointer = 0
 		While $ListNext(namespaces,pointer,namespace) {
-			Set $Namespace = namespace
-			If $$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName) {
+			Set $Namespace = $Zstrip(namespace, "<>WC")
+			If ..IPMInstalled() {
 				If 'quiet || preview {
 					Write !,"Skipping "_namespace_" - IPM already installed."
 				}
@@ -2924,6 +2943,11 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			$$$ThrowOnError(tOverallSC)
 		}
 	}
+}
+
+ClassMethod IPMInstalled() As %Boolean [ CodeMode = expression ]
+{
+$$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName)
 }
 
 /// Runs package manager commands in a way that is friendly to the OS-level shell.
