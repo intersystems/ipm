@@ -614,11 +614,11 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<modifier name="globally" aliases="g" description="Will install IPM in all non-%SYS explicit namespaces that currently do not have IPM installed. By default, this modifier is not set and will not install globally."/>
 		<modifier name="local-only" description="If specified, only local artifacts will be used for installation. By default, this modifier is not set and will not limit to local artifacts." />
 		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By deafult, this modifier is not ste and will not allow upgrade." />
-		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy. Can be used with -globally to add a %ALL namespace mapping." />
+		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 		<modifier name="preview" aliases="p" description="Preview only - for -map option, shows the namespaces that would be enabled." />
 		<!-- Examples -->
-		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database to the %ALL psuedo-namespace. Namespace-specific installation will override this.">
+		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database. Namespace-specific installation will override this.">
 			enable -map -globally
 		</example>
 		<example description="Install IPM version 0.3.4 in quiet mode in namespaces: NS1, NS2, NS3.">
