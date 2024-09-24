@@ -2648,8 +2648,25 @@ ZPM(pArgs...)
  If $System.CLS.IsMthd("%IPM.Main", "Shell") { 
  	Do ##class(%IPM.Main).Shell(pArgs...) Quit
  } Else {
-	// TODO: Decide what to do here; definitely needs to support enabling IPM from here as well,
-	// but need to decide what level of customization to provide
+	// TODO: Needs to support enabling IPM from here, also need to decide what level of customization to provide
+	Write !, "IPM is not enabled in this namespace."
+	&sql(SELECT %DLIST(Nsp) INTO :namespaces FROM %SYS.Namespace_List())
+	If SQLCODE '= 0 {
+		Write !, "Error getting namespace name. SQLCODE =", SQLCODE
+	} Else {
+		New $Namespace
+		Set ptr = 0
+		While $ListNext(namespaces, ptr, ns) {
+			Set $Namespace = $Zstrip(ns, "<>WC")
+			If $System.CLS.IsMthd("%IPM.Main", "Shell") {
+				Write !, "Change namepace to one of the following to run the ""zpm"" command"
+				Do ##class(%IPM.Main).Shell("version")
+				Return ""
+			}
+		}
+		// Shouldn't happen since %ZLANGC00.mac and %ZLANGF00.mac are present
+		Write "No namespace found with IPM enabled."
+	}
 	Quit ""
  }
 }
