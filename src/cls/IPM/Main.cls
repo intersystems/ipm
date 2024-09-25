@@ -635,6 +635,21 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		</example>
 	</command>
 
+<command name="unmap">
+	<summary>
+		Unmap %IPM package and rountines in specified namespaces. Will Skip non-mapped namespaces.
+	</summary>
+	<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM mapping needs to be deleted."/>
+	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed. By default, this modifier is not set and will not install globally."/>
+	<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
+	<example description="Unmap IPM from namespaces NS1, NS2, NS3.">
+		unmap -ns NS1,NS2,NS3
+	</example>
+	<example description="Unmap IPM from all namespaces">
+		unmap -g
+	</example>
+</command>
+
 </commands>
 }
 
@@ -804,6 +819,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Namespace(.tCommandInfo)			
 			} ElseIf (tCommandInfo = "enable") {
 				Do ..EnableIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "unmap") {
+				Do ..UnmapIPM(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -1925,31 +1942,22 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod CheckModuleNamespace(pModuleName As %String) As %Status
+ClassMethod CheckModuleNamespace() As %Status
 {
-	// ZPM can be mapped from another namespace. If so, we need to perform upgrade in the source namespace.
-	Do ..GetListModules("*", pModuleName, .list)
-	Do ..AddIPMMappedNamespaces(.list)
-	Set found = 0
-	Set affectedNamespace = ""
-	For i = 1:1:list {
-		If list(i) = $ListBuild($Namespace) {
-			Set found = 1
-			If $Data(list(i, "modules", 1, "Installed In"), mappedFrom) # 2 {
-				Write "Module "_pModuleName_" is mapped from namespace "_mappedFrom_" and must be managed from there.",!
-				Return $$$ERROR($$$GeneralError, $$$FormatText("Cannot manage '%1' in this namespace", pModuleName))
+	Do ..GetMapInfo(.tIsMappedFrom, .tIsMappedTo)
+	If $Data(tIsMappedFrom($Namespace), sourceNS) # 2 {
+		Quit $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' in namespace '%2' because it is mapped from namespace '%3'.", $$$IPMModuleName, $Namespace, sourceNS))
+	}
+	If $Data(tIsMappedTo($Namespace)) / 2 {
+		Write !, "Will affect the following namespaces:", $NAMESPACE
+		Set ns = ""
+		For {
+			Set ns = $Order(tIsMappedTo($Namespace, ns))
+			If ns = "" {
+				Quit
 			}
-		} ElseIf $Get(list(i, "modules", 1, "Installed In")) = $Namespace {
-			Set affectedNamespace = affectedNamespace _ list(i)
+			Write ", ", ns
 		}
-	}
-	If 'found {
-		// This shouldn't happen, but worth checking for.
-		$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Could not find namespace for '%1'", pModuleName)))
-	}
-	If affectedNamespace '= "" {
-		Set affectedNamespace = $ListBuild($Namespace) _ affectedNamespace
-		Write !, "The following namespaces fill be affected: ", $LISTTOSTRING(affectedNamespace, ", ")
 	}
 	Quit $$$OK
 }
@@ -1966,7 +1974,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	}
 
 	If tModuleName = $$$IPMModuleName {
-		$$$ThrowOnError(..CheckModuleNamespace(tModuleName))
+		$$$ThrowOnError(..CheckModuleNamespace())
 	}
 
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
@@ -2053,7 +2061,7 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 	$$$ThrowOnError(tSC)
 
 	If tModuleName = $$$IPMModuleName {
-		$$$ThrowOnError(..CheckModuleNamespace(tModuleName))
+		$$$ThrowOnError(..CheckModuleNamespace())
 	}
 	
 	Set tVersionString = tModule.Version.ToString()
@@ -2072,7 +2080,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 	} Else {
 		Set tModuleName = pCommandInfo("parameters","module")
 		If tModuleName = $$$IPMModuleName {
-			$$$ThrowOnError(..CheckModuleNamespace(tModuleName))
+			$$$ThrowOnError(..CheckModuleNamespace())
 		}	
 		Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
 		$$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
@@ -2998,6 +3006,73 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		If $$$ISERR(tOverallSC) {
 			Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
 			$$$ThrowOnError(tOverallSC)
+		}
+	}
+}
+
+ClassMethod UnmapIPM(ByRef pCommandInfo)
+{
+	Set globally = $$$HasModifier(pCommandInfo,"globally")
+	Set namespaces = $ListFromString($$$GetModifier(pCommandInfo,"namespaces"), ",")
+	Set verbose = '$$$HasModifier(pCommandInfo,"quiet")
+	// Sanity check
+	If (globally && (namespaces '= "")) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global unmap flag at the same time."))
+	}
+	If ('globally && (namespaces = "")) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Must specify either -globally or a list of namespaces with -ns"))
+	}
+	// populate namespaces if globally is set
+	If globally {
+		Do ..GetListNamespace(.nsTree)
+		Set ns = ""
+		For {
+			Set ns = $Order(nsTree(ns))
+			If ns = "" {
+				Quit
+			}
+			Set namespaces = namespaces_$ListBuild(ns)
+		}
+	}
+	If verbose {
+		Write !,"Will attempt to unmap %IPM package and routines from: "_ $ListToString(namespaces, ", ")
+	}
+
+	// Gather namespaces where %IPM is mapped into
+	Do ..GetMapInfo(.tIsMappedFrom)
+	
+	Set ptr = 0
+	While $ListNext(namespaces, ptr, ns) {
+		Set src = $Get(tIsMappedFrom(ns))
+		If (src = "") {
+			If verbose {
+				Write !,"No mapping found for "_ns_". Skipping."
+			}
+			Continue
+		} 
+		If verbose {
+			Write !,"Unmapping %IPM package and routines from "_ns_" (mapped from "_src_")"
+		}
+		$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
+		$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+	}
+}
+
+/// Get the mapping relationship for %IPM package. Format: 
+/// <ul>
+/// <li>pIsMappedFrom(destinationNamespace) = sourceNamespace</li>
+/// <li>pIsMappedTo(sourceNamespace, destinationNamespace) = ""</li>
+/// </ul>
+ClassMethod GetMapInfo(Output pIsMappedFrom, Output pIsMappedTo)
+{
+	Kill pIsMappedFrom, pIsMappedTo 
+	Do ..GetListModules("*", $$$IPMModuleName, .list)	
+	Do ..AddIPMMappedNamespaces(.list)
+	For i = 1:1:list {
+		Set destNS = $ListGet(list(i))
+		If $Data(list(i,  "modules", 1, "Installed In"), srcNS) # 2 {
+			Set pIsMappedFrom(destNS) = srcNS
+			Set pIsMappedTo(srcNS, destNS) = ""
 		}
 	}
 }
