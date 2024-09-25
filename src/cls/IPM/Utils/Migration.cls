@@ -7,7 +7,17 @@ ClassMethod RunAll(verbose As %Boolean = 1) As %Status
 {
     Set sc = $$$OK
     Try {
-        Do ..MigrateZPMToIPM(verbose)
+        New $Namespace
+        Do ##class(%IPM.Main).GetListNamespace(.list)
+        set ns = ""
+        For {
+            Set ns = $Order(list(ns))
+            If ns = "" {
+                Quit
+            }
+            Set $Namespace = $Zstrip(ns,"<>WC")
+            Do ..MigrateZPMToIPM(verbose)
+        }
     } Catch e {
         Set sc = e.AsStatus()
     }
@@ -22,6 +32,9 @@ ClassMethod HasLegacyZPMPackage()
 
 ClassMethod MigrateZPMToIPM(verbose As %Boolean = 1)
 {
+    If verbose {
+        Write !, "Migrating ZPM data to IPM... in namespace ", $Namespace
+    }
     If '..HasLegacyZPMPackage() {
         Write:verbose !,"Older IPM version not found; nothing to migrate.",!
         Quit
