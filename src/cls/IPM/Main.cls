@@ -1925,6 +1925,35 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
+ClassMethod CheckModuleNamespace(pModuleName As %String) As %Status
+{
+	// ZPM can be mapped from another namespace. If so, we need to perform upgrade in the source namespace.
+	Do ..GetListModules("*", pModuleName, .list)
+	Do ..AddIPMMappedNamespaces(.list)
+	Set found = 0
+	Set affectedNamespace = ""
+	For i = 1:1:list {
+		If list(i) = $ListBuild($Namespace) {
+			Set found = 1
+			If $Data(list(i, "modules", 1, "Installed In"), mappedFrom) # 2 {
+				Write "Module "_pModuleName_" is mapped from namespace "_mappedFrom_" and must be managed from there.",!
+				Return $$$ERROR($$$GeneralError, $$$FormatText("Cannot manage '%1' in this namespace", pModuleName))
+			}
+		} ElseIf $Get(list(i, "modules", 1, "Installed In")) = $Namespace {
+			Set affectedNamespace = affectedNamespace _ list(i)
+		}
+	}
+	If 'found {
+		// This shouldn't happen, but worth checking for.
+		$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Could not find namespace for '%1'", pModuleName)))
+	}
+	If affectedNamespace '= "" {
+		Set affectedNamespace = $ListBuild($Namespace) _ affectedNamespace
+		Write !, "The following namespaces fill be affected: ", $LISTTOSTRING(affectedNamespace, ", ")
+	}
+	Quit $$$OK
+}
+
 ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 {
 	Set tRegistry = ""
@@ -1932,9 +1961,13 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	If (tModuleName["/") {
 		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
-  If (tModuleName = "") {
-    Quit $$$OK
-  }
+	If (tModuleName = "") {
+		Quit $$$OK
+	}
+
+	If tModuleName = $$$IPMModuleName {
+		$$$ThrowOnError(..CheckModuleNamespace(tModuleName))
+	}
 
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
@@ -2018,6 +2051,10 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module '%1' is not currently installed.",tModuleName)))
 	}
 	$$$ThrowOnError(tSC)
+
+	If tModuleName = $$$IPMModuleName {
+		$$$ThrowOnError(..CheckModuleNamespace(tModuleName))
+	}
 	
 	Set tVersionString = tModule.Version.ToString()
 	Write !,"Reinstalling ",tModuleName," ",tVersionString
@@ -2034,6 +2071,9 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
     Return
 	} Else {
 		Set tModuleName = pCommandInfo("parameters","module")
+		If tModuleName = $$$IPMModuleName {
+			$$$ThrowOnError(..CheckModuleNamespace(tModuleName))
+		}	
 		Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
 		$$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
 	}
