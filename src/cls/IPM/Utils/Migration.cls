@@ -5,21 +5,21 @@ Class %IPM.Utils.Migration
 
 ClassMethod RunAll(verbose As %Boolean = 1) As %Status
 {
+    New $Namespace
     Set sc = $$$OK
-    Try {
-        New $Namespace
-        Do ##class(%IPM.Main).GetListNamespace(.list)
-        set ns = ""
-        For {
-            Set ns = $Order(list(ns))
-            If ns = "" {
-                Quit
-            }
+    Do ##class(%IPM.Main).GetListNamespace(.list)
+    Set ns = ""
+    For {
+        Set ns = $Order(list(ns))
+        If ns = "" {
+            Quit
+        }
+        Try {
             Set $Namespace = $Zstrip(ns,"<>WC")
             Do ..MigrateZPMToIPM(verbose)
+        } Catch e {
+            Set sc = $$$ADDSC(sc, e.AsStatus())
         }
-    } Catch e {
-        Set sc = e.AsStatus()
     }
     Quit sc
 }
