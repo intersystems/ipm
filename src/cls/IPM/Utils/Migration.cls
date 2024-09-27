@@ -5,12 +5,20 @@ Class %IPM.Utils.Migration
 
 ClassMethod RunAll(verbose As %Boolean = 1) As %Status
 {
+    Set tOriginalNS = $Namespace
     New $Namespace
-    Set sc = $$$OK
+    Set $Namespace = "%SYS"
+    Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(tOriginalNS, "%IPM")
+
     Do ##class(%IPM.Main).GetListNamespace(.list)
     Set ns = ""
+    Set sc = $$$OK
     For {
         Set ns = $Order(list(ns))
+        // Perform migration for namespaces to which %IPM is mapped from the current namespace's default routine database
+        If ##class(%SYS.Namespace).GetPackageDest(ns, "%IPM") '= sourceDB {
+            Continue
+        }
         If ns = "" {
             Quit
         }
