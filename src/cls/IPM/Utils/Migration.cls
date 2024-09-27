@@ -223,7 +223,7 @@ ClassMethod MigrateOneRepo(oldId As %String, name As %String, verbose As %Boolea
     Merge ^IPM.Repo.DefinitionD(newId) = data
 
     // Make sure loading/saving the object works
-    Set newObj = ##class(%IPM.Storage.Module).%OpenId(newId,,.sc)
+    Set newObj = ##class(%IPM.Repo.Definition).%OpenId(newId,,.sc)
     $$$ThrowOnError(sc)
 
     // Save object to validate
