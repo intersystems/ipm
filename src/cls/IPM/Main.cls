@@ -640,7 +640,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		Unmap %IPM package and rountines in specified namespaces. Will Skip non-mapped namespaces.
 	</summary>
 	<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM mapping needs to be deleted."/>
-	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed. By default, this modifier is not set and will not install globally."/>
+	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed."/>
 	<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 	<example description="Unmap IPM from namespaces NS1, NS2, NS3.">
 		unmap -ns NS1,NS2,NS3
