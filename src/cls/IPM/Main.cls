@@ -2697,6 +2697,8 @@ ZPM(pArgs...)
  	Do ##class(%IPM.Main).Shell(pArgs...) Quit
  } Else {
 	// TODO: Needs to support enabling IPM from here, also need to decide what level of customization to provide
+	Set tQuitOnError = $Get(pArgs(2))
+	Set tHaltOnComplete = $Get(pArgs(3))
 	Write !, "IPM is not enabled in this namespace."
 	&sql(SELECT %DLIST(Nsp) INTO :namespaces FROM %SYS.Namespace_List())
 	If SQLCODE '= 0 {
@@ -2704,18 +2706,32 @@ ZPM(pArgs...)
 	} Else {
 		New $Namespace
 		Set ptr = 0
+		Set found = 0	
 		While $ListNext(namespaces, ptr, ns) {
 			Set $Namespace = $Zstrip(ns, "<>WC")
 			If $System.CLS.IsMthd("%IPM.Main", "Shell") {
 				Write !, "Change namepace to one of the following to run the ""zpm"" command"
 				Do ##class(%IPM.Main).Shell("version")
-				Return ""
+				Set found = 1
+				Quit
 			}
 		}
 		// Shouldn't happen since %ZLANGC00.mac and %ZLANGF00.mac are present
-		Write "No namespace found with IPM enabled."
+		If 'found {
+			Write !, "No namespace found with IPM enabled."
+		}
 	}
-	Quit ""
+
+	If tQuitOnError {
+		Write ! // Add a newline before quitting, otherwise the shell prompt will be on the same line as the error message
+		Do $System.Process.Terminate($Job, 1)
+	}
+	If tHaltOnComplete {
+		Write ! // Add a newline before halting
+		Halt
+	}
+	// The $$$ERROR macro is not available for use in language extension
+	Return $$Error^%apiOBJ(5001,"IPM is not enabled in this namespace.")
  }
 }
 
