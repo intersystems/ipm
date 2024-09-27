@@ -6,11 +6,11 @@ Class %IPM.Utils.Migration
 ClassMethod RunAll(verbose As %Boolean = 1) As %Status
 {
     Set tOriginalNS = $Namespace
+    Do ##class(%IPM.Main).GetListNamespace(.list)
     New $Namespace
     Set $Namespace = "%SYS"
     Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(tOriginalNS, "%IPM")
 
-    Do ##class(%IPM.Main).GetListNamespace(.list)
     Set ns = ""
     Set sc = $$$OK
     For {
