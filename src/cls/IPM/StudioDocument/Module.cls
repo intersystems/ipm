@@ -22,7 +22,7 @@ Method Load() As %Status
 			Quit
 		}
 		Set tName = $Piece(..Name,".",1,*-1)
-    Set tModule = ##class(%IPM.Storage.Module).NameOpen(tName,,.tSC)
+		Set tModule = ##class(%IPM.Storage.Module).NameOpen(tName,,.tSC)
 		If $$$ISOK(tSC) && ($IsObject(tModule)) {
 			Set tSC = $$$OK
 			
@@ -89,7 +89,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %IPM.StudioDocument.ModuleStre
 			Do pModule.Resources.Clear()
 			Do pModule.Defaults.Clear()
 			Do pModule.Mappings.Clear()
-      Do pModule.Invokes.Clear()
+			Do pModule.Invokes.Clear()
 			
 			If (pModule.%Id() '= "") {
 				// Save to prevent unique index violations on re-insert of things that weren't actually removed.
@@ -422,7 +422,7 @@ XData InternalXSL
 <xsl:stylesheet version="1.0" xmlns:ext="http://exslt.org/common" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
   <xsl:output omit-xml-declaration="yes" method="xml" encoding="utf-8" indent="yes" />
   <xsl:strip-space elements="*" />
-	
+
   <xsl:variable name="vrtfPass1">
     <xsl:apply-templates />
   </xsl:variable>
@@ -453,12 +453,12 @@ XData InternalXSL
   </xsl:template>
   <xsl:template name="resource">
     <xsl:param name="name" />
-		<xsl:element name="Resource">
-			<xsl:copy-of select="@*"/>
-			<xsl:if test="not(name()='Resource')">
-				<xsl:attribute name="ProcessorClass">
-					<xsl:value-of select="name()" />
-				</xsl:attribute>
+    <xsl:element name="Resource">
+      <xsl:copy-of select="@*"/>
+      <xsl:if test="not(name()='Resource')">
+        <xsl:attribute name="ProcessorClass">
+          <xsl:value-of select="name()" />
+        </xsl:attribute>
       </xsl:if>
       <xsl:attribute name="Name">
         <xsl:value-of select="@*[name()=$name]" />
@@ -507,8 +507,8 @@ XData InternalXSL
     <xsl:call-template name="resource">
       <xsl:with-param name="name" select="'Name'" />
     </xsl:call-template>
-	</xsl:template>
-	<xsl:template match="Module" mode="pass2">
+  </xsl:template>
+  <xsl:template match="Module" mode="pass2">
     <xsl:copy>
       <xsl:apply-templates select="./@*" mode="pass2" />
       <xsl:apply-templates mode="pass2" />
