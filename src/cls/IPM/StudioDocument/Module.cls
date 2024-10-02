@@ -11,39 +11,6 @@ Parameter INFOGLOBAL = "^IPM.StuDoc.Module";
 
 Parameter STREAMCLASS = "%IPM.StudioDocument.ModuleStream";
 
-/// Load the module definition <property>Name</property> into the stream <property>Code</property>
-Method Load() As %Status
-{
-	$$$SuspendErrorCount
-	Set tSC = $$$OK
-	Try {
-		Set tSC = ..%ValidateName(..Name)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set tName = $Piece(..Name,".",1,*-1)
-    Set tModule = ##class(%IPM.Storage.Module).NameOpen(tName,,.tSC)
-		If $$$ISOK(tSC) && ($IsObject(tModule)) {
-			Set tSC = $$$OK
-			
-			Do ..Code.WriteLine("<?xml version=""1.0""?>")
-			Set tSC = tModule.XMLExportToStream(..Code,,"literal,indent")
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		} Else {
-		  Set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tName,,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			Set tSC = ..Code.CopyFrom(tModStream.Contents)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
-
 /// Save the module definition document.
 Method Save() As %Status
 {
@@ -79,7 +46,16 @@ ClassMethod UpdatePersistentFromStream(pStream As %IPM.StudioDocument.ModuleStre
 		} Else {
 			Set tReader = ##class(%XML.Reader).%New()
 			Do pStream.Contents.Rewind()
-			Set tSC = tReader.OpenStream(pStream.Contents)
+			// Preprocess the pStream contents to apply InternalXSL
+			Set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
+			Set tTransformedStream = ##class(%Stream.GlobalCharacter).%New()
+			Set tTransformedStream.LineTerminator = $Char(10)
+			Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(pStream.Contents, tXSL, .tTransformedStream)
+			If $$$ISERR(tSC) {
+				Quit
+			}
+
+			Set tSC = tReader.OpenStream(tTransformedStream)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -89,7 +65,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %IPM.StudioDocument.ModuleStre
 			Do pModule.Resources.Clear()
 			Do pModule.Defaults.Clear()
 			Do pModule.Mappings.Clear()
-      Do pModule.Invokes.Clear()
+			Do pModule.Invokes.Clear()
 			
 			If (pModule.%Id() '= "") {
 				// Save to prevent unique index violations on re-insert of things that weren't actually removed.
@@ -102,7 +78,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %IPM.StudioDocument.ModuleStre
 			
 			Set $$$ZPMStudioDocumentModule = pModule //Stash for use in %IPM.Storage.Module:XMLNew
 			Do tReader.Correlate("Module","%IPM.Storage.Module")
-			Do tReader.Next(.tModule,.tSC)
+			Do tReader.Next(.pModule,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -359,21 +335,12 @@ Method ExportToXML(flags As %String) As %Status
 /// Import from the stream in XML format
 Method ImportFromXML(stream As %RegisteredObject, flags As %String) As %Status
 {
-  if ('stream.Size) {
-    quit $$$OK
-  }
-	Set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
-
-  Set tOutput = ##class(%Stream.GlobalCharacter).%New()
-  Set tOutput.LineTerminator = $Char(10)
-	Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(stream, tXSL, .tOutput)
-	If $$$ISERR(tSC) Quit tSC
-  #; while 'tOutput.AtEnd { Write !,tOutput.ReadLine() }
-	
+	if ('stream.Size) {
+		quit $$$OK
+	}
 	Do ..Code.Clear()
-	#; Do ..Code.WriteLine("<?xml version=""1.0""?>") //add XML header
-	Do ..Code.CopyFrom(tOutput)
-
+	Do ..Code.Write("<?xml version=""1.0""?>")
+	Do ..Code.CopyFrom(stream)
 	Quit $$$OK
 }
 
@@ -422,7 +389,7 @@ XData InternalXSL
 <xsl:stylesheet version="1.0" xmlns:ext="http://exslt.org/common" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
   <xsl:output omit-xml-declaration="yes" method="xml" encoding="utf-8" indent="yes" />
   <xsl:strip-space elements="*" />
-	
+
   <xsl:variable name="vrtfPass1">
     <xsl:apply-templates />
   </xsl:variable>
@@ -453,12 +420,12 @@ XData InternalXSL
   </xsl:template>
   <xsl:template name="resource">
     <xsl:param name="name" />
-		<xsl:element name="Resource">
-			<xsl:copy-of select="@*"/>
-			<xsl:if test="not(name()='Resource')">
-				<xsl:attribute name="ProcessorClass">
-					<xsl:value-of select="name()" />
-				</xsl:attribute>
+    <xsl:element name="Resource">
+      <xsl:copy-of select="@*"/>
+      <xsl:if test="not(name()='Resource')">
+        <xsl:attribute name="ProcessorClass">
+          <xsl:value-of select="name()" />
+        </xsl:attribute>
       </xsl:if>
       <xsl:attribute name="Name">
         <xsl:value-of select="@*[name()=$name]" />
@@ -507,8 +474,8 @@ XData InternalXSL
     <xsl:call-template name="resource">
       <xsl:with-param name="name" select="'Name'" />
     </xsl:call-template>
-	</xsl:template>
-	<xsl:template match="Module" mode="pass2">
+  </xsl:template>
+  <xsl:template match="Module" mode="pass2">
     <xsl:copy>
       <xsl:apply-templates select="./@*" mode="pass2" />
       <xsl:apply-templates mode="pass2" />
