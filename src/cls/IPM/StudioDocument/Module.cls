@@ -79,6 +79,15 @@ ClassMethod UpdatePersistentFromStream(pStream As %IPM.StudioDocument.ModuleStre
 		} Else {
 			Set tReader = ##class(%XML.Reader).%New()
 			Do pStream.Contents.Rewind()
+			// Preprocess the pStream contents to apply InternalXSL
+			Set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
+			Set tTransformedStream = ##class(%Stream.GlobalCharacter).%New()
+			Set tTransformedStream.LineTerminator = $Char(10)
+			Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(pStream.Contents, tXSL, .tTransformedStream)
+			If $$$ISERR(tSC) {
+				Quit
+			}
+
 			Set tSC = tReader.OpenStream(pStream.Contents)
 			If $$$ISERR(tSC) {
 				Quit
@@ -359,21 +368,11 @@ Method ExportToXML(flags As %String) As %Status
 /// Import from the stream in XML format
 Method ImportFromXML(stream As %RegisteredObject, flags As %String) As %Status
 {
-  if ('stream.Size) {
-    quit $$$OK
-  }
-	Set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
-
-  Set tOutput = ##class(%Stream.GlobalCharacter).%New()
-  Set tOutput.LineTerminator = $Char(10)
-	Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(stream, tXSL, .tOutput)
-	If $$$ISERR(tSC) Quit tSC
-  #; while 'tOutput.AtEnd { Write !,tOutput.ReadLine() }
-	
+	if ('stream.Size) {
+		quit $$$OK
+	}
 	Do ..Code.Clear()
-	#; Do ..Code.WriteLine("<?xml version=""1.0""?>") //add XML header
-	Do ..Code.CopyFrom(tOutput)
-
+	Do ..Code.CopyFrom(stream)
 	Quit $$$OK
 }
 
