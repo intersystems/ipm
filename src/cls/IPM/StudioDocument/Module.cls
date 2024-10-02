@@ -102,7 +102,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %IPM.StudioDocument.ModuleStre
 			
 			Set $$$ZPMStudioDocumentModule = pModule //Stash for use in %IPM.Storage.Module:XMLNew
 			Do tReader.Correlate("Module","%IPM.Storage.Module")
-			Do tReader.Next(.tModule,.tSC)
+			Do tReader.Next(.pModule,.tSC)
 			If $$$ISERR(tSC) {
 				Quit
 			}
