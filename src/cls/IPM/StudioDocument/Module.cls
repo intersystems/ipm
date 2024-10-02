@@ -55,7 +55,7 @@ ClassMethod UpdatePersistentFromStream(pStream As %IPM.StudioDocument.ModuleStre
 				Quit
 			}
 
-			Set tSC = tReader.OpenStream(pStream.Contents)
+			Set tSC = tReader.OpenStream(tTransformedStream)
 			If $$$ISERR(tSC) {
 				Quit
 			}
