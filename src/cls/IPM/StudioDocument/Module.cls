@@ -11,39 +11,6 @@ Parameter INFOGLOBAL = "^IPM.StuDoc.Module";
 
 Parameter STREAMCLASS = "%IPM.StudioDocument.ModuleStream";
 
-/// Load the module definition <property>Name</property> into the stream <property>Code</property>
-Method Load() As %Status
-{
-	$$$SuspendErrorCount
-	Set tSC = $$$OK
-	Try {
-		Set tSC = ..%ValidateName(..Name)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set tName = $Piece(..Name,".",1,*-1)
-		Set tModule = ##class(%IPM.Storage.Module).NameOpen(tName,,.tSC)
-		If $$$ISOK(tSC) && ($IsObject(tModule)) {
-			Set tSC = $$$OK
-			
-			Do ..Code.WriteLine("<?xml version=""1.0""?>")
-			Set tSC = tModule.XMLExportToStream(..Code,,"literal,indent")
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		} Else {
-		  Set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tName,,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			Set tSC = ..Code.CopyFrom(tModStream.Contents)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
-}
-
 /// Save the module definition document.
 Method Save() As %Status
 {
@@ -372,6 +339,7 @@ Method ImportFromXML(stream As %RegisteredObject, flags As %String) As %Status
 		quit $$$OK
 	}
 	Do ..Code.Clear()
+	Do ..Code.Write("<?xml version=""1.0""?>")
 	Do ..Code.CopyFrom(stream)
 	Quit $$$OK
 }
