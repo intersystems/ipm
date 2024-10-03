@@ -241,6 +241,7 @@ repositories configured with the 'repo' command.
 <example description="Loads the module described in C:\module\root\path\module.xml">
 load C:\module\root\path\
 load C:\module\root\path\module-0.0.1.tgz
+load C:\module\root\path\module-0.0.1.tar.gz
 </example>
 <example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
 load -dev -verbose C:\module\root\path\
@@ -1879,9 +1880,34 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
-	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($Piece(tDirectoryName, ".", *)) = "tgz" {
+	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
-		Set tSC = ##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory)
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Extracting archive to ",tTargetDirectory
+		}
+		$$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
+		// Try to locate the top-level module.xml file
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Trying to locate module.xml file in ", tTargetDirectory
+		}
+		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
+		If (tCount = 0) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
+		} Else {
+			// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+			Set tModuleFilePath = $ListGet(tList(tCount), *)
+			Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+			If $Get(pCommandInfo("data", "Verbose")) {
+				Write !,"Found "_tCount_" results. They are: "
+				Set idx = ""
+				For {
+					Set idx = $Order(tList(idx))
+					Quit:(idx="")
+					Write !, $Char(9), $List(tList(idx), *)
+				}
+				Write !, "Using module.xml file at ", tModuleFilePath
+			}
+		}
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
 	}
 }
