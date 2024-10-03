@@ -1870,6 +1870,18 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
+	Set log = ##class(%IPM.General.History).LoadInit($Get(pCommandInfo("CommandString")))
+	Try {
+		Do ..LoadInternal(.pCommandInfo, log)
+	} Catch Ex {
+		$$$ThrowOnError(log.Finalize(Ex.AsStatus()))
+		Throw Ex
+	}
+	$$$ThrowOnError(log.Finalize($$$OK))
+}
+
+ClassMethod LoadInternal(ByRef pCommandInfo, pLog As %IPM.General.History) [ Internal ]
+{
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
 	Merge tParams = pCommandInfo("data")
 	Set tParams("cmd") = "load"
@@ -1879,7 +1891,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
+		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams, , , pLog))
 	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
 		If $Get(pCommandInfo("data", "Verbose")) {
@@ -1908,7 +1920,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 				Write !, "Using module.xml file at ", tModuleFilePath
 			}
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
+		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , , pLog))
 	}
 }
 

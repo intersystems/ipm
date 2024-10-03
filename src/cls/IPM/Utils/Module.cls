@@ -373,7 +373,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 	Quit tSC
 }
 
-ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %String, pArchiveStream As %Stream.Object, ByRef pParams, pRepository As %String = "") As %Status
+ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %String, pArchiveStream As %Stream.Object, ByRef pParams, pRepository As %String = "", pLog As %IPM.General.History) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -402,7 +402,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 			Write:tVerbose !,tOutput(i)
 		}
 		
-		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository)
+		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository, pLog)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -412,7 +412,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 	Quit tSC
 }
 
-ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverrideDeveloperMode As %Boolean = 0, pRepository As %String = "") As %Status
+ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverrideDeveloperMode As %Boolean = 0, pRepository As %String = "", pLog As %IPM.General.History) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -439,7 +439,7 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			Merge tParams("Artifactory") = pParams("Artifactory")
 			Merge tParams("AngularArtifact") = pParams("AngularArtifact")
 		}
-		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository)
+		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository, , pLog)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -1097,8 +1097,12 @@ ClassMethod ExportDocumentForObject(pSourceModule As %IPM.Storage.Module, Output
 	Quit tSC
 }
 
-ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %String = "", pSynchronous As %Boolean = 0) As %Status
+ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %String = "", pSynchronous As %Boolean = 0, pLog As %IPM.General.History) As %Status
 {
+	break
+	If $Data(pLog) # 2 = 0 {
+		Set pLog = ""
+	}
 	Set tSC = $$$OK
 	Set tInitTLevel = $TLevel
 	Try {
@@ -1168,6 +1172,10 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 
 		Set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 		$$$ThrowOnError(tSC)
+		If $IsObject(pLog) {
+			$$$ThrowOnError(pLog.SetName(tModuleName))
+			$$$ThrowOnError(pLog.SetVersion(tModule.VersionString))
+		}
 		Set tModule.Repository = pRepository
 		
 		If $Data(pParams("DeveloperMode"),tDeveloperMode) {

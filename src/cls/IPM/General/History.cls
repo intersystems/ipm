@@ -47,9 +47,10 @@ ClassMethod InstallInit(Package As %IPM.DataType.ModuleName, Command As %String)
     Quit ..Init("install", Package, Command)
 }
 
-ClassMethod LoadInit(Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History
+ClassMethod LoadInit(Command As %String) As %IPM.General.History
 {
-    Quit ..Init("load", Package, Command)
+    // Package name is not known at this point, so use a placeholder
+    Quit ..Init("load", "<unset>", Command)
 }
 
 ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History
@@ -75,6 +76,13 @@ Method SetVersion(pVersion As %IPM.General.SemanticVersion) As %Status
         Set pVersion = "0.0.0-0"
     }
     Set ..Version = $Select($IsObject(pVersion): pVersion, 1: ##class(%IPM.General.SemanticVersion).FromString(pVersion))
+    Quit ..%Save()
+}
+
+Method SetName(pName As %String) As %Status
+{
+    $$$ThrowOnError(..%Reload())
+    Set ..Package = pName
     Quit ..%Save()
 }
 
