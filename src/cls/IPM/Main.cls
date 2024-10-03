@@ -754,6 +754,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			Do ..GetNamespaceDefaultModifiers(.tDefaultArray)
 			Merge tCommandInfo("data") = tDefaultArray
 			Merge tCommandInfo = tParsedCommandInfo
+			Set tCommandInfo("CommandString") = tCommand
 			
 			If (tCommandInfo = "quit") {
 				Return
@@ -1892,73 +1893,83 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	If (tModuleName["/") {
 		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
-  If (tModuleName = "") {
-    Quit $$$OK
-  }
+	If (tModuleName = "") {
+		Quit $$$OK
+	}
 
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
+
+	#dim log As %IPM.General.History
+	Set log = ##class(%IPM.General.History).InstallInit(tModuleName, $Get(pCommandInfo("CommandString")))
 	
-	Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-	Set tSearchCriteria.Registry = tRegistry
-	Set tSearchCriteria.Name = $$$lcase(tModuleName)
-	Set tSearchCriteria.VersionExpression = tVersion
-	Set tSearchCriteria.Keywords = tKeywords
-	$$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
-	
-	If (tResults.Count() > 0) {
-		Set tResult = ""
-		#dim tResult As %IPM.Storage.QualifiedModuleInfo
-		// Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
-		If ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
-			Set tResult = tResults.GetAt(1)
-		} ElseIf (tResults.Count() > 0) {
-			For i=1:1:tResults.Count() {
-				Set tResultInfo = tResults.GetAt(i)
-				Set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
-			}
-			
-			Set tValue = ""
-      		Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
-      		If (tResponse '= $$$SuccessResponse) {
-        		$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-      		}
-			
-			If (tValue '= "") {
-				Set tResult = tResults.GetAt(tValue)
-			}
-		}
+	Try {
+		Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+		Set tSearchCriteria.Registry = tRegistry
+		Set tSearchCriteria.Name = $$$lcase(tModuleName)
+		Set tSearchCriteria.VersionExpression = tVersion
+		Set tSearchCriteria.Keywords = tKeywords
+		$$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
 		
-		If (tResult '= "") {
-			Do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
-			Merge tParams = pCommandInfo("data")
-      Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
-			Set tParams("cmd") = "install"
-			Set tParams("Install") = 1
-      If tResult.Deployed {
-        Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
-        Set tResult.PlatformVersion = platformVersion
-        If ('tResult.PlatformVersions.Find(platformVersion)) {
-          $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
-        }
-      }
-			$$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
-    
-    }
-	} Else {
-		Set tPrefix = ""
-		If (tModuleName '= "") {
-			If (tVersion '= "") {
-				$$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
-			} Else {
-				$$$ThrowStatus($$$ERROR($$$GeneralError, "'"_tModuleName_"' not found in any repository."))
+		If (tResults.Count() > 0) {
+			Set tResult = ""
+			#dim tResult As %IPM.Storage.QualifiedModuleInfo
+			// Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
+			If ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
+				Set tResult = tResults.GetAt(1)
+			} ElseIf (tResults.Count() > 0) {
+				For i=1:1:tResults.Count() {
+					Set tResultInfo = tResults.GetAt(i)
+					Set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
+				}
+				
+				Set tValue = ""
+				Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
+				If (tResponse '= $$$SuccessResponse) {
+					$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+				}
+				
+				If (tValue '= "") {
+					Set tResult = tResults.GetAt(tValue)
+				}
 			}
-		} ElseIf (tKeywords '= "") {
-			$$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
+			
+			If (tResult '= "") {
+				Do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
+				Merge tParams = pCommandInfo("data")
+				Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
+				Set tParams("cmd") = "install"
+				Set tParams("Install") = 1
+				If tResult.Deployed {
+					Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
+					Set tResult.PlatformVersion = platformVersion
+					If ('tResult.PlatformVersions.Find(platformVersion)) {
+						$$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
+					}
+				}
+				$$$ThrowOnError(log.SetSource(tResult))
+				$$$ThrowOnError(log.SetVersion(tResult.Version))
+				$$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
+			}
 		} Else {
-			Write !,"No modules found. Are there any repositories configured in the current namespace?"
+			Set tPrefix = ""
+			If (tModuleName '= "") {
+				If (tVersion '= "") {
+					$$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
+				} Else {
+					$$$ThrowStatus($$$ERROR($$$GeneralError, "'"_tModuleName_"' not found in any repository."))
+				}
+			} ElseIf (tKeywords '= "") {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
+			} Else {
+				Write !,"No modules found. Are there any repositories configured in the current namespace?"
+			}
 		}
+	} Catch ex {
+		$$$ThrowOnError(log.Finalize(ex.AsStatus()))
+		Throw ex
 	}
+	$$$ThrowOnError(log.Finalize($$$OK))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
