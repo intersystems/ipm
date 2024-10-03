@@ -2000,9 +2000,12 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 {
 	Merge tParams = pCommandInfo("data")
 	Set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
+
+	// Stashed for %IPM.Storage.Module:UninstallAll to create %IPM.General.History logs
+	Set $$$ZPMUninstallCommand = pCommandInfo("CommandString")
+
 	If $$$HasModifier(pCommandInfo,"all") {
 		$$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
-    Return
 	} Else {
 		Set tModuleName = pCommandInfo("parameters","module")
 		Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies

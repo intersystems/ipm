@@ -417,6 +417,12 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 ClassMethod Uninstall(pModuleName As %String, pForce As %Boolean = 0, pRecurse As %Boolean = 0, ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
+	Set log = ##class(%IPM.General.History).UninstallInit(pModuleName, $Get($$$ZPMUninstallCommand))
+	Set module = ..NameOpen(pModuleName,,.tSC)
+	If $IsObject(module) {
+		$$$ThrowOnError(log.SetVersion(module.Version))
+	}
+
 	Try {
 		Merge tParams = pParams
 		Set tParams("Clean","Level") = 1 // Simulate clean of module as dependency.
@@ -426,6 +432,7 @@ ClassMethod Uninstall(pModuleName As %String, pForce As %Boolean = 0, pRecurse A
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
+	Set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
 	Quit tSC
 }
 

@@ -11,6 +11,10 @@ ROUTINE %IPM.Common [Type=INC]
 #; Local % Variable to indicate that ^Sources update trigger should not be run for modifications to individual resources
 #define ZPMDeferModifyResources %IPMDeferModifyResources
 
+#; Local % Variable to memorize the command string used to uninstall a module
+#; Useful for creating %IPM.General.History logs when uninstall packages, because a package can be uninstalled by either `uninstall module` or `uninstall -all`.
+#define ZPMUninstallCommand %IPMUninstallCommand
+
 #; Default packages for package manager, module lifecycle classes and resource processors
 #define ZPMRootPackage "%IPM"
 
