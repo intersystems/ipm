@@ -616,7 +616,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By default, this modifier is not ste and will not allow upgrade." />
 		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
-		<modifier name="preview" aliases="p" description="Preview only - for -map option, shows the namespaces that would be enabled." />
+		<modifier name="preview" aliases="p" description="Preview what will be changed without actually making the changes." />
 		<!-- Examples -->
 		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database. Namespace-specific installation will override this.">
 			enable -map -globally
@@ -2995,6 +2995,10 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 					Quit
 				}
 				Set $Namespace = currentNS
+				If preview {
+					Write !, $$$FormatText("Would install IPM version %1 from registry in namespace %2", targetVersion, currentNS)
+					Continue
+				}
 				Do $SYSTEM.OBJ.LoadStream(manifest, loadFlag)
 				Write !, "IPM enabled for namespace "_currentNS
 			}
@@ -3009,6 +3013,11 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		Set tOverallSC = $$$OK
 		While (currentNS '="") {
 			Set $Namespace = currentNS
+			If preview {
+				Set filePath = ##class(%File).NormalizeFilename(targetIPMFileName, XMLDir)
+				Write !, $$$FormatText("Would install IPM using file at %1 in namespace %2", filePath, currentNS)
+				Continue
+			}
 			Set tSC = $SYSTEM.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag)
 			If $$$ISOK(tSC) {
 				Set enabledNSList = enabledNSList_$ListBuild(currentNS)
@@ -3018,11 +3027,17 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Set currentNS = $ORDER(targetNamespaces(currentNS))
 			Set tOverallSC = $$$ADDSC(tOverallSC,tSC)
 		}
-		Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
-		If $$$ISERR(tOverallSC) {
-			Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
-			$$$ThrowOnError(tOverallSC)
+		If 'preview {
+			Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
+			If $$$ISERR(tOverallSC) {
+				Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
+				$$$ThrowOnError(tOverallSC)
+			}
 		}
+	}
+
+	If preview {
+		Write !,"Preview mode; no configuration changes were made."
 	}
 }
 
