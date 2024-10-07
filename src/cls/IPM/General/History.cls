@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.General.History Extends %Persistent
 {
 
@@ -27,14 +29,14 @@ Property Committed As %Boolean [ InitialExpression = 0, Required ];
 
 Property CommandString As %String(MAXLEN = 8192) [ Required ];
 
-ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History [ Private ]
+ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName) As %IPM.General.History [ Private ]
 {
     Set log = ..%New()
     Set log.TimeStart = $ZDateTime($Now(), 3)
     Set log.TimeEnd = $ZDateTime($Now(), 3) // Default to now so can call %Save(), will be updated in Finalize
     Set log.Action = Action
     Set log.Package = Package
-    Set log.CommandString = Command
+    Set log.CommandString = $Get($$$ZPMCommandToLog)
     Set log.NameSpace = $Namespace
     Set log.UserName = $Username
     $$$ThrowOnError(log.SetVersion()) // Set the version to placeholder 0.0.0-0, Will be updated before finalizing
@@ -42,20 +44,20 @@ ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName, Command
     Quit log
 }
 
-ClassMethod InstallInit(Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History
+ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
 {
-    Quit ..Init("install", Package, Command)
+    Quit ..Init("install", Package)
 }
 
-ClassMethod LoadInit(Command As %String) As %IPM.General.History
+ClassMethod LoadInit() As %IPM.General.History
 {
     // Package name is not known at this point, so use a placeholder
-    Quit ..Init("load", "<unset>", Command)
+    Quit ..Init("load", "<unset>")
 }
 
-ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName, Command As %String) As %IPM.General.History
+ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
 {
-    Quit ..Init("uninstall", Package, Command)
+    Quit ..Init("uninstall", Package)
 }
 
 Method SetSource(pInfo As %IPM.Storage.QualifiedModuleInfo) As %Status
@@ -142,7 +144,6 @@ ClassMethod GetHistoryGlobally(ByRef filter) As %Library.ArrayOfObjects
     Return array
 }
 
-/// @API.Method
 ClassMethod DisplayQueryResult(rs As %SQL.StatementResult)
 {
     // TODO improve the display output

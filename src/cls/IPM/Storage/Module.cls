@@ -417,7 +417,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 ClassMethod Uninstall(pModuleName As %String, pForce As %Boolean = 0, pRecurse As %Boolean = 0, ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
-	Set log = ##class(%IPM.General.History).UninstallInit(pModuleName, $Get($$$ZPMUninstallCommand))
+	Set log = ##class(%IPM.General.History).UninstallInit(pModuleName)
 	Set module = ..NameOpen(pModuleName,,.tSC)
 	If $IsObject(module) {
 		$$$ThrowOnError(log.SetVersion(module.Version))

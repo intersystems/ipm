@@ -758,7 +758,9 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			Do ..GetNamespaceDefaultModifiers(.tDefaultArray)
 			Merge tCommandInfo("data") = tDefaultArray
 			Merge tCommandInfo = tParsedCommandInfo
-			Set tCommandInfo("CommandString") = tCommand
+
+			// Stashed for use in %IPM.General.History:Init
+			Set $$$ZPMCommandToLog = tCommand
 			
 			If (tCommandInfo = "quit") {
 				Return
@@ -1875,7 +1877,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
-	Set log = ##class(%IPM.General.History).LoadInit($Get(pCommandInfo("CommandString")))
+	Set log = ##class(%IPM.General.History).LoadInit()
 	Try {
 		Do ..LoadInternal(.pCommandInfo, log)
 	} Catch Ex {
@@ -1944,7 +1946,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
 
 	#dim log As %IPM.General.History
-	Set log = ##class(%IPM.General.History).InstallInit(tModuleName, $Get(pCommandInfo("CommandString")))
+	Set log = ##class(%IPM.General.History).InstallInit(tModuleName)
 	
 	Try {
 		Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
@@ -2043,9 +2045,6 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 {
 	Merge tParams = pCommandInfo("data")
 	Set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
-
-	// Stashed for %IPM.Storage.Module:UninstallAll to create %IPM.General.History logs
-	Set $$$ZPMUninstallCommand = pCommandInfo("CommandString")
 
 	If $$$HasModifier(pCommandInfo,"all") {
 		$$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
