@@ -109,7 +109,20 @@ ClassMethod GetHistory(ByRef filter, namespace As %String) As %SQL.StatementResu
     If $$$comClassDefined("IPM.General.History") {
         Quit $$$NULLOREF
     }
-    Quit ##class(%SQL.Statement).%ExecDirect(, "SELECT * FROM %IPM_General.History")
+    Kill varargs
+    Set query = "SELECT * FROM %IPM_General.History WHERE 1 = 1 "
+    Set col = ""
+    For {
+        // TODO: consider the case where value starts with > or <. For now we assume it's an exact match
+        Set col = $Order(filter(col), 1, value)
+        If (col = "") || ($Data(value) # 2 = 0) || (col '? 1A.AN){
+            Quit
+        }
+        // col is safe from SQL injection because we ensured it's alphanumeric above
+        Set query = query _ " AND " _ col _ " = ?"
+        Set varargs($Increment(varargs)) = value
+    }
+    Quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
 }
 
 /// @API.Method
