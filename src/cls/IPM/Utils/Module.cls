@@ -402,7 +402,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 			Write:tVerbose !,tOutput(i)
 		}
 		
-		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository, pLog)
+		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository, .pLog)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -439,7 +439,7 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			Merge tParams("Artifactory") = pParams("Artifactory")
 			Merge tParams("AngularArtifact") = pParams("AngularArtifact")
 		}
-		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository, , pLog)
+		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository, , .pLog)
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -1099,7 +1099,6 @@ ClassMethod ExportDocumentForObject(pSourceModule As %IPM.Storage.Module, Output
 
 ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %String = "", pSynchronous As %Boolean = 0, pLog As %IPM.General.History) As %Status
 {
-	break
 	If $Data(pLog) # 2 = 0 {
 		Set pLog = ""
 	}
