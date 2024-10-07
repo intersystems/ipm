@@ -2700,15 +2700,14 @@ ZPM(pArgs...)
 	Set quitOnError = $Get(pArgs(2))
 	Set haltOnComplete = $Get(pArgs(3))
 	Write !, "IPM is not enabled in this namespace."
-	&sql(SELECT %DLIST(Nsp) INTO :namespaces FROM %SYS.Namespace_List())
-	If SQLCODE '= 0 {
-		Write !, "Error getting namespace name. SQLCODE =", SQLCODE
+	Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Nsp FROM %SYS.Namespace_List()")
+	If rs.%SQLCODE '= 0 {
+		Write !, "Error getting namespace name. SQLCODE =", rs.%SQLCODE
 	} Else {
 		New $Namespace
-		Set ptr = 0
 		Set found = 0	
-		While $ListNext(namespaces, ptr, ns) {
-			Set $Namespace = $Zstrip(ns, "<>WC")
+		While rs.%Next() {
+			Set $Namespace = $Zstrip(rs.%Get("Nsp"), "<>WC")
 			If $System.CLS.IsMthd("%IPM.Main", "Shell") {
 				Write !, "Change namepace to one of the following to run the ""zpm"" command"
 				Do ##class(%IPM.Main).Shell("version")
