@@ -96,6 +96,59 @@ Method Finalize(status As %Status) As %Status
     Return ..%Save()
 }
 
+/// @API.Method
+/// Get the history of all installations, uninstalls, and loads in given namespace
+/// The filter argument is a multidimensional array with structure 
+/// filter(columnName) = value
+ClassMethod GetHistory(ByRef filter, namespace As %String) As %SQL.StatementResult
+{
+    New $namespace
+    If $Data(namespace) # 2 {
+        Set $namespace = $ZStrip(namespace, "<>WC")
+    }
+    If $$$comClassDefined("IPM.General.History") {
+        Quit $$$NULLOREF
+    }
+    Quit ##class(%SQL.Statement).%ExecDirect(, "SELECT * FROM %IPM_General.History")
+}
+
+/// @API.Method
+/// Get the history of all installations, uninstalls, and loads in all namespaces
+/// See GetHistory() for the `filter` argument
+ClassMethod GetHistoryInAllNamespaces(ByRef filter) As %Library.ArrayOfObjects
+{
+    New $namespace
+    Set $namespace = "%SYS"
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    Set array = ##class(%Library.ArrayOfObjects).%New()
+    While rs.%Next() {
+        Set ns = rs.%Get("Nsp")
+        Do array.SetAt(..GetHistory(.filter, ns), ns)
+    }
+    Return array
+}
+
+/// @API.Method
+ClassMethod DisplayQueryResult(rs As %SQL.StatementResult)
+{
+    // TODO improve the display output
+    Do rs.%Display()
+}
+
+ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
+{
+    Set ns = ""
+    For {
+        Set rs = array.GetNext(.ns)
+        If rs = "" {
+            Quit
+        }
+        Write !, "Namespace: ", ns, !
+        Do ..DisplayQueryResult(rs)
+    }
+}
+
 Storage Default
 {
 <Data name="HistoryDefaultData">

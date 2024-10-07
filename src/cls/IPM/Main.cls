@@ -634,10 +634,11 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</command>
 
 <command name="history" aliases="log" dataPrefix="D">
-<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall.</description>
-<example description="Show history of package &quot;my-package&quot;">history find -Dname=my-package</example>
-<example description="Delete history of package &quot;my-package&quot;">history delete -Dname=my-package</example>
-<parameter name="action" required="false" description="One of history actions: find, delete" />
+	<summary>Manage history of package installation/uninstallation.</summary>
+	<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall.</description>
+	<!-- TODO: allow filters, such as package name, start time, end time, namespace, etc. -->
+	<parameter name="action" required="true" description="One of history actions: find, delete" />
+	<example description="Show history of all packages">history find </example>
 </command>
 
 </commands>
@@ -810,6 +811,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Namespace(.tCommandInfo)			
 			} ElseIf (tCommandInfo = "enable") {
 				Do ..EnableIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "history") {
+				Do ..History(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -2895,6 +2898,19 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
 			$$$ThrowOnError(tOverallSC)
 		}
+	}
+}
+
+ClassMethod History(ByRef pCommandInfo)
+{
+	Set action = $Get(pCommandInfo("parameters", "action"))
+	If action = "find" {
+		Set rs = ##class(%IPM.General.History).GetHistory()
+		Do ##class(%IPM.General.History).DisplayQueryResult(rs)
+	} ElseIf action = "delete" {
+		Do ##class(%IPM.General.History).%KillExtent()
+	} Else {
+		$$$ThrowStatus($$$ERROR($$$GeneralError,"Invalid action specified. Use `help history` to see available actions."))
 	}
 }
 
