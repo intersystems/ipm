@@ -613,7 +613,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM needs to be enabled."/>
 		<modifier name="globally" aliases="g" description="Will install IPM in all explicit namespaces that currently do not have IPM installed. Unless using it together with the -map option, will not include %SYS. By default, this modifier is not set and will not install globally."/>
 		<modifier name="local-only" description="If specified, only local artifacts will be used for installation. By default, this modifier is not set and will not limit to local artifacts." />
-		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By deafult, this modifier is not ste and will not allow upgrade." />
+		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By default, this modifier is not ste and will not allow upgrade." />
 		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 		<modifier name="preview" aliases="p" description="Preview only - for -map option, shows the namespaces that would be enabled." />
@@ -637,7 +637,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 
 <command name="unmap">
 	<summary>
-		Unmap %IPM package and rountines in specified namespaces. Will Skip non-mapped namespaces.
+		Unmap %IPM package and routines in specified namespaces. Will Skip non-mapped namespaces.
 	</summary>
 	<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM mapping needs to be deleted."/>
 	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed."/>
@@ -2697,8 +2697,8 @@ ZPM(pArgs...)
  	Do ##class(%IPM.Main).Shell(pArgs...) Quit
  } Else {
 	// TODO: Needs to support enabling IPM from here, also need to decide what level of customization to provide
-	Set tQuitOnError = $Get(pArgs(2))
-	Set tHaltOnComplete = $Get(pArgs(3))
+	Set quitOnError = $Get(pArgs(2))
+	Set haltOnComplete = $Get(pArgs(3))
 	Write !, "IPM is not enabled in this namespace."
 	&sql(SELECT %DLIST(Nsp) INTO :namespaces FROM %SYS.Namespace_List())
 	If SQLCODE '= 0 {
@@ -2722,16 +2722,16 @@ ZPM(pArgs...)
 		}
 	}
 
-	If tQuitOnError {
+	If quitOnError {
 		Write ! // Add a newline before quitting, otherwise the shell prompt will be on the same line as the error message
 		Do $System.Process.Terminate($Job, 1)
 	}
-	If tHaltOnComplete {
+	If haltOnComplete {
 		Write ! // Add a newline before halting
 		Halt
 	}
 	// The $$$ERROR macro is not available for use in language extension
-	Return $$Error^%apiOBJ(5001,"IPM is not enabled in this namespace.")
+	Return $System.Status.Error(5001, "IPM is not enabled in this namespace.")
  }
 }
 
