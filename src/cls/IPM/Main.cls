@@ -636,9 +636,11 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <command name="history" aliases="log" dataPrefix="D">
 	<summary>Manage history of package installation/uninstallation.</summary>
 	<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall. By default, all entries will be affected. To specify filters, use the -Dcol=val syntax. See examples for more.</description>
+	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
 	<parameter name="action" required="true" description="One of history actions: find, delete" />
 	<example description="Show history of all packages in the current namespace">history find </example>
 	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
+	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
 </command>
 
 </commands>
@@ -2904,10 +2906,13 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 ClassMethod History(ByRef pCommandInfo)
 {
 	Set action = $Get(pCommandInfo("parameters", "action"))
+	Set globally = $$$HasModifier(pCommandInfo, "globally")
 	If action = "find" {
 		Merge filter = pCommandInfo("data", "zpm")
-		Set rs = ##class(%IPM.General.History).GetHistory(.filter)
-		Do ##class(%IPM.General.History).DisplayQueryResult(rs)
+		Set mthd = $Select(globally: "GetHistoryGlobally", 1: "GetHistory")
+		Set rs = $Classmethod("%IPM.General.History", mthd, .filter)
+		Set mthd = $Select(globally: "DisplayArray", 1: "DisplayQueryResult")
+		Do $Classmethod("%IPM.General.History", mthd, rs)
 	} ElseIf action = "delete" {
 		Do ##class(%IPM.General.History).%KillExtent()
 	} Else {

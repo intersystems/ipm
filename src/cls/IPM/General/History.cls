@@ -128,7 +128,7 @@ ClassMethod GetHistory(ByRef filter, namespace As %String) As %SQL.StatementResu
 /// @API.Method
 /// Get the history of all installations, uninstalls, and loads in all namespaces
 /// See GetHistory() for the `filter` argument
-ClassMethod GetHistoryInAllNamespaces(ByRef filter) As %Library.ArrayOfObjects
+ClassMethod GetHistoryGlobally(ByRef filter) As %Library.ArrayOfObjects
 {
     New $namespace
     Set $namespace = "%SYS"
