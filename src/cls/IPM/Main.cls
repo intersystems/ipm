@@ -637,7 +637,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<summary>Manage history of package installation/uninstallation.</summary>
 	<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall. By default, all entries will be affected. To specify filters, use the -Dcol=val syntax. See examples for more.</description>
 	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
-	<parameter name="action" required="true" description="One of history actions: find, delete" />
+	<parameter name="action" required="true" description="One of history actions: find (default), delete" />
 	<example description="Show history of all packages in the current namespace">history find </example>
 	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
@@ -2907,7 +2907,8 @@ ClassMethod History(ByRef pCommandInfo)
 {
 	Set action = $Get(pCommandInfo("parameters", "action"))
 	Set globally = $$$HasModifier(pCommandInfo, "globally")
-	If action = "find" {
+
+	If (action = "find") || (action = "") {
 		Merge filter = pCommandInfo("data", "zpm")
 		Set mthd = $Select(globally: "GetHistoryGlobally", 1: "GetHistory")
 		Set rs = $Classmethod("%IPM.General.History", mthd, .filter)
