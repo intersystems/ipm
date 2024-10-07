@@ -2739,7 +2739,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 {
 	New $Namespace
 	Set initNamespace = $Namespace
-	If ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName,.ipmModuleId) {
+	If ..IPMInstalled(.ipmModuleId){
 		Set modDef = ##class(%IPM.Storage.Module).%OpenId(ipmModuleId,,.sc)
 		$$$ThrowOnError(sc)
 		Write !, "Version of IPM in current namespace: "
@@ -3093,9 +3093,9 @@ ClassMethod GetMapInfo(Output pIsMappedFrom, Output pIsMappedTo)
 	}
 }
 
-ClassMethod IPMInstalled() As %Boolean [ CodeMode = expression ]
+ClassMethod IPMInstalled(ByRef ipmModuleId) As %Boolean [ CodeMode = expression ]
 {
-$$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName)
+$$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .ipmModuleId)
 }
 
 /// Runs package manager commands in a way that is friendly to the OS-level shell.
