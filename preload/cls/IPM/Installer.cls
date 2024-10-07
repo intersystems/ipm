@@ -35,7 +35,6 @@ XData PM [ XMLNamespace = INSTALLER ]
     <Arg Value="${MODDIR}"/>
   </Invoke>
   <Invoke Class="IPM.Installer" Method="ZPMCompile" CheckStatus="true" />
-  <Invoke Class="IPM.Installer" Method="MapIfLegacy" CheckStatus="true" />
 </Namespace>
 
 </Manifest>
