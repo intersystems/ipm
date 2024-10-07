@@ -636,9 +636,9 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</command>
 
 <command name="unmap">
-	<summary>
+	<description>
 		Unmap %IPM package and routines in specified namespaces. Will Skip non-mapped namespaces.
-	</summary>
+	</description>
 	<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM mapping needs to be deleted."/>
 	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed."/>
 	<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
@@ -2792,7 +2792,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		}
 		Set pointer = 0
 		While $ListNext(namespaces,pointer,namespace) {
-			Set $Namespace = $Zstrip(namespace, "<>WC")
+			Set namespace = $Zstrip(namespace, "<>WC")
+			Set $Namespace = namespace
 			If ..IPMInstalled() {
 				If 'quiet || preview {
 					Write !,"Skipping "_namespace_" - IPM already installed."
