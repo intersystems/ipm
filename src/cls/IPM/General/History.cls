@@ -62,12 +62,16 @@ ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.H
     Quit ..Init("uninstall", Package)
 }
 
-Method SetSource(pInfo As %IPM.Storage.QualifiedModuleInfo) As %Status
+Method SetSource(ServerName As %String) As %Status
 {
     $$$ThrowOnError(..%Reload())
-    Set ..SourceName = pInfo.ServerName
-    Set ..SourceMoniker = pInfo.ServerMoniker
-    Set ..SourceDetails = pInfo.ServerDetails
+    Set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(ServerName)
+    If '$IsObject(server) {
+        Quit $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is not defined.", ServerName))
+    }
+    Set ..SourceName = ServerName
+    Set ..SourceMoniker = server.#MONIKER
+    Set ..SourceDetails = server.Details
     Quit ..%Save()
 }
 

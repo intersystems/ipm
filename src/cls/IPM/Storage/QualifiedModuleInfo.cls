@@ -8,22 +8,10 @@ Parameter DEFAULTGLOBAL = "^IPM.Storage.QualifyModInfo";
 /// The name of the repository the module is in (The Name property in <class>%IPM.Repo.Definition</class>. <br />
 Property ServerName As %String(MAXLEN = 100);
 
-/// The server details of the repository the module is in (The Details property in <class>%IPM.Repo.Definition</class>. <br />
-Property ServerDetails As %String(MAXLEN = "");
-
-/// The moniker of the server the module is in (The Moniker property in <class>%IPM.Repo.Definition</class>. <br />
-Property ServerMoniker As %String(MAXLEN = "");
-
 Method %OnNew(pServerName As %String = "", pResolvedReference As %IPM.Storage.ModuleInfo = "") As %Status [ Private, ServerOnly = 1 ]
 {
 	If (pServerName '= "") {
 		Set ..ServerName = pServerName
-		Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
-		If '$IsObject(tServer) {
-			Quit $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is not defined.",pServerName))
-		}
-		Set ..ServerDetails = tServer.Details
-		Set ..ServerMoniker = tServer.#MONIKER
 	}
 	If (pResolvedReference '= "") {
 		Set ..Name = pResolvedReference.Name

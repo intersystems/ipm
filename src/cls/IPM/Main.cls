@@ -1992,7 +1992,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 						$$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
 					}
 				}
-				$$$ThrowOnError(log.SetSource(tResult))
+				$$$ThrowOnError(log.SetSource(tResult.ServerName))
 				$$$ThrowOnError(log.SetVersion(tResult.Version))
 				$$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
 			}
