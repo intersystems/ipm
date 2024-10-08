@@ -5,7 +5,9 @@ Class %IPM.General.History Extends %Persistent
 
 Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
 
-Property Package As %IPM.DataType.ModuleName [ Required ];
+Property Package As %IPM.DataType.ModuleName;
+
+// This can be empty, for example, when loading a nonexsistent module
 
 Property Version As %IPM.General.SemanticVersion [ Required ];
 
@@ -52,7 +54,7 @@ ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.His
 ClassMethod LoadInit() As %IPM.General.History
 {
     // Package name is not known at this point, so use a placeholder
-    Quit ..Init("load", "<unset>")
+    Quit ..Init("load", "")
 }
 
 ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
@@ -95,6 +97,9 @@ Method Finalize(status As %Status) As %Status
     // TODO what does committed mean?
     Set ..Committed = 1
     Set ..TimeEnd = $ZDateTime($Now(), 3)
+    If ..Package = "" {
+        Return $$$ERROR($$$GeneralError, "Package name not set")
+    }
     Return ..%Save()
 }
 
