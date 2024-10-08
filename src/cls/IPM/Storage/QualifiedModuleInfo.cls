@@ -61,12 +61,6 @@ Storage Default
 <Value name="12">
 <Value>DisplayName</Value>
 </Value>
-<Value name="13">
-<Value>ServerDetails</Value>
-</Value>
-<Value name="14">
-<Value>ServerMoniker</Value>
-</Value>
 </Data>
 <Type>%Storage.Serial</Type>
 }
