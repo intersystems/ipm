@@ -120,11 +120,8 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 					If ($TLevel = 0) && ($Get(pParams("Multicompile","Verbose"),$Get(pParams("Verbose"),0))) {
 						Write !,"Queuing module load: ",tModuleName," ",tVersion," @ ",tServerName
 					}
-					Set log = ##class(%IPM.General.History).InstallInit(tModuleName)
-					$$$ThrowOnError(log.SetSource(tServerName))
-					$$$ThrowOnError(log.SetVersion(tVersion))
 					Merge tParams = pParams
-					Set tParams("HistoryLogId") = log.%Id() // Save log ID for use in spawned processes
+					Set tParams("CommandToLog") = $$$ZPMCommandToLog
 					Set tSC = pWorkQueue.QueueCallback(
 						"##class("_$ClassName()_").LoadModuleReference",
 						"##class("_$ClassName()_").LoadCompleted",
@@ -234,7 +231,14 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		If $Data(pParams) = 1 {
 			Set qstruct = pParams
 		}
-		
+		// If spawned from a work queue, $$$ZPMCommandToLog will be undefined in the spawned process.
+		If $Data(pParams("CommandToLog"), command) # 2 {
+			Set $$$ZPMCommandToLog = command
+		}
+		Set log = ##class(%IPM.General.History).InstallInit(pModuleName)
+		$$$ThrowOnError(log.SetSource(pServerName))
+		$$$ThrowOnError(log.SetVersion(pVersion))
+
 		Set tVerbose = $Get(pParams("Verbose"))
 		
 		If '$Data(pParams("qstruct")) {
@@ -376,8 +380,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		}
 	}
 
-	If $Data(pParams("HistoryLogId"), logId) # 2 {
-		Set log = ##class(%IPM.General.History).%OpenId(logId)
+	If $IsObject($Get(log)) {
 		Set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
 	}
 	Quit tSC

@@ -35,7 +35,7 @@ ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName) As %IPM
     Set log.TimeStart = $ZDateTime($Now(), 3)
     Set log.Action = Action
     Set log.Package = Package
-    Set log.CommandString = $Get($$$ZPMCommandToLog)
+    Set log.CommandString = $Get($$$ZPMCommandToLog, "<unset>")
     Set log.NameSpace = $Namespace
     Set log.UserName = $Username
     $$$ThrowOnError(log.SetVersion()) // Set the version to placeholder 0.0.0-0, Will be updated before finalizing
