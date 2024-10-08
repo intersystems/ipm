@@ -7,8 +7,6 @@ Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
 
 Property Package As %IPM.DataType.ModuleName;
 
-// This can be empty, for example, when loading a nonexsistent module
-
 Property Version As %IPM.General.SemanticVersion [ Required ];
 
 Property SourceName As %String(MAXLEN = 100);
@@ -19,7 +17,7 @@ Property SourceDetails As %String(MAXLEN = "");
 
 Property TimeStart As %TimeStamp [ Required ];
 
-Property TimeEnd As %TimeStamp [ Required ];
+Property TimeEnd As %TimeStamp;
 
 Property NameSpace As %String [ InitialExpression = {$NAMESPACE}, Required ];
 
@@ -35,7 +33,6 @@ ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName) As %IPM
 {
     Set log = ..%New()
     Set log.TimeStart = $ZDateTime($Now(), 3)
-    Set log.TimeEnd = $ZDateTime($Now(), 3) // Default to now so can call %Save(), will be updated in Finalize
     Set log.Action = Action
     Set log.Package = Package
     Set log.CommandString = $Get($$$ZPMCommandToLog)
