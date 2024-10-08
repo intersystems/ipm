@@ -114,7 +114,7 @@ ClassMethod GetHistory(ByRef filter, namespace As %String) As %SQL.StatementResu
     If $Data(namespace) # 2 {
         Set $namespace = $ZStrip(namespace, "<>WC")
     }
-    If $$$comClassDefined("IPM.General.History") {
+    If '$$$comClassDefined("%IPM.General.History") {
         Quit $$$NULLOREF
     }
     Kill varargs
@@ -153,7 +153,11 @@ ClassMethod GetHistoryGlobally(ByRef filter) As %Library.ArrayOfObjects
 ClassMethod DisplayQueryResult(rs As %SQL.StatementResult)
 {
     // TODO improve the display output
-    Do rs.%Display()
+    If $IsObject(rs) {
+        Do rs.%Display()
+    } Else {
+        Write !, "No results found"
+    }
 }
 
 ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
