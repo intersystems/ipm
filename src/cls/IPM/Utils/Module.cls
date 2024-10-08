@@ -120,10 +120,15 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 					If ($TLevel = 0) && ($Get(pParams("Multicompile","Verbose"),$Get(pParams("Verbose"),0))) {
 						Write !,"Queuing module load: ",tModuleName," ",tVersion," @ ",tServerName
 					}
+					Set log = ##class(%IPM.General.History).InstallInit(tModuleName)
+					$$$ThrowOnError(log.SetSource(tServerName))
+					$$$ThrowOnError(log.SetVersion(tVersion))
+					Merge tParams = pParams
+					Set tParams("HistoryLogId") = log.%Id() // Save log ID for use in spawned processes
 					Set tSC = pWorkQueue.QueueCallback(
 						"##class("_$ClassName()_").LoadModuleReference",
 						"##class("_$ClassName()_").LoadCompleted",
-						tServerName, tModuleName, tVersion, $Get(tDeployed), $Get(tPlatformVersion), .pParams, .pDependencyGraph)
+						tServerName, tModuleName, tVersion, $Get(tDeployed), $Get(tPlatformVersion), .tParams, .pDependencyGraph)
 					$$$ThrowOnError(tSC)
 				} Else {
 					// Remove this module from dependencies.
@@ -369,6 +374,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		} Else {
 			Set tSC = e.AsStatus()
 		}
+	}
+
+	If $Data(pParams("HistoryLogId"), logId) # 2 {
+		Set log = ##class(%IPM.General.History).%OpenId(logId)
+		Set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
 	}
 	Quit tSC
 }
