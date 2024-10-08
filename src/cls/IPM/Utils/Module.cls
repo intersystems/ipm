@@ -262,7 +262,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
-    Set tModRef.Deployed = pDeployed
+		Set tModRef.Deployed = pDeployed
 		
 		// Make sure we're not downgrading.
 		If '$Get(pParams("PermitDowngrade")) {
@@ -271,17 +271,17 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				If $$$ISERR(tSC) {
 					Quit
 				}
-        If $Get(pParams("Install")),pModuleName'=$$$IPMModuleName,tInstModule.DeveloperMode,'$Get(pParams("DeveloperMode"),0) {
+				If $Get(pParams("Install")),pModuleName'=$$$IPMModuleName,tInstModule.DeveloperMode,'$Get(pParams("DeveloperMode"),0) {
 					Set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
 					Quit
-        }
+				}
 				If tInstModule.Version.Follows(tModRef.Version) {
 					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tInstModule.Name,tInstModule.VersionString,pVersion))
 					Quit
 				}
 			}
 		}
-		
+
 		// Ensure requested versions match those required by other modules in the namespace, excluding versions currently being installed
 		// (the requirements of such modules are already known to be satisfied)
 		Set tSC = ..GetRequiredVersionExpression(pModuleName,%installcontext.GetPendingModuleList(),.tExpression,.tSourceList)
@@ -1178,8 +1178,8 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		Set tModule.Repository = pRepository
 		
 		If $Data(pParams("DeveloperMode"),tDeveloperMode) {
-      // Mark module as not deployed if installing with dev mode
-      Set tModule.Deployed = 0
+			// Mark module as not deployed if installing with dev mode
+			Set tModule.Deployed = 0
 			Set tModule.DeveloperMode = tDeveloperMode
 			Set tModule.Root = pDirectory
 			Set tSC = tModule.%Save()
@@ -1187,7 +1187,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		} Else {
 			Set tDeveloperMode = +tModule.DeveloperMode
 		}
-		
+
 		If (tDeveloperMode && tUseTransactions) {
 			// In developer mode, save the module manifest so we can fix it even if errors occur afterward.
 			TCOMMIT
@@ -1209,7 +1209,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		}
 		Merge $$$ZPMHandledModules($Namespace) = pParams("Multicompile","ModuleContext")
 
-    $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
+		$$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
   
 		#dim tInstallContext As %IPM.General.InstallContext
 		Set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
@@ -1223,7 +1223,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 				// Temporary custom loading of dependencies in a synchronous
 				// manner to prevent lock timeouts until lifecycle rework
 				// is complete (HSIEO-4450)
-        Do ..SyncLoadDependencies(tModule, .pParams)
+				Do ..SyncLoadDependencies(tModule, .pParams)
 			}
 		}
 		
