@@ -118,6 +118,14 @@ ClassMethod ZPMCompile()
   Quit ##class(%IPM.Main).Shell("ZPM compile")
 }
 
+ClassMethod MapIfLegacy()
+{
+  If ##class(%IPM.Utils.Migration).HasLegacyZPMPackage() {
+    Quit ##class(%IPM.Main).Shell("enable -globally -map")
+  }
+  Quit $$$OK
+}
+
 ClassMethod EndCompile(qstruct) As %Status
 {
   #; Behave as simple installer

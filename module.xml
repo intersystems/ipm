@@ -19,6 +19,7 @@
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
   <Resource Name="/doc/README.txt"/>
   <Invoke Class="IPM.Installer" Method="Map" Phase="Reload" When="Before" />
+  <Invoke Class="IPM.Installer" Method="MapIfLegacy" Phase="Compile" When="After" />
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" />
   <Invoke Class="%IPM.Utils.Migration" Method="RunAll">
     <Arg>${verbose}</Arg>

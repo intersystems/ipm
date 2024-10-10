@@ -5,19 +5,45 @@ Class %IPM.Utils.Migration
 
 ClassMethod RunAll(verbose As %Boolean = 1) As %Status
 {
+    Set tOriginalNS = $Namespace
+    Do ##class(%IPM.Main).GetListNamespace(.list)
+    New $Namespace
+    Set $Namespace = "%SYS"
+    Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(tOriginalNS, "%IPM")
+
+    Set ns = ""
     Set sc = $$$OK
-    Try {
-        Do ..MigrateZPMToIPM(verbose)
-    } Catch e {
-        Set sc = e.AsStatus()
+    For {
+        Set ns = $Order(list(ns))
+        // Perform migration for namespaces to which %IPM is mapped from the current namespace's default routine database
+        If ##class(%SYS.Namespace).GetPackageDest(ns, "%IPM") '= sourceDB {
+            Continue
+        }
+        If ns = "" {
+            Quit
+        }
+        Try {
+            Set $Namespace = $Zstrip(ns,"<>WC")
+            Do ..MigrateZPMToIPM(verbose)
+        } Catch e {
+            Set sc = $$$ADDSC(sc, e.AsStatus())
+        }
     }
     Quit sc
 }
 
-ClassMethod MigrateZPMToIPM(verbose As %Boolean = 1)
+ClassMethod HasLegacyZPMPackage()
 {
     Set oldTopPackage = "%ZPM.PackageManager."
-    If $Order(^oddCOM(oldTopPackage)) '[ oldTopPackage {
+    Quit $Order(^oddCOM(oldTopPackage)) [ oldTopPackage
+}
+
+ClassMethod MigrateZPMToIPM(verbose As %Boolean = 1)
+{
+    If verbose {
+        Write !, "Migrating ZPM data to IPM... in namespace ", $Namespace
+    }
+    If '..HasLegacyZPMPackage() {
         Write:verbose !,"Older IPM version not found; nothing to migrate.",!
         Quit
     }
@@ -197,7 +223,7 @@ ClassMethod MigrateOneRepo(oldId As %String, name As %String, verbose As %Boolea
     Merge ^IPM.Repo.DefinitionD(newId) = data
 
     // Make sure loading/saving the object works
-    Set newObj = ##class(%IPM.Storage.Module).%OpenId(newId,,.sc)
+    Set newObj = ##class(%IPM.Repo.Definition).%OpenId(newId,,.sc)
     $$$ThrowOnError(sc)
 
     // Save object to validate
