@@ -197,6 +197,9 @@ ClassMethod ShowColumns(rs As %SQL.StatementResult, detail As %Boolean = 0) As %
         } Else {
             Set value = rs.%Get(column)
         }
+        Set value = $Replace(value, $Char(13), $$$FormattedLine($$$Dim, "<CR>"))
+        Set value = $Replace(value, $Char(10), $$$FormattedLine($$$Dim, "<LF>"))
+        Set value = $Replace(value, $Char(9), $$$FormattedLine($$$Dim, "<TAB>"))
         Set value = $$$FormattedLine(style, value)
         If detail {
             Write $$$FormattedLine($$$Dim, column), ": ", value, !
@@ -279,13 +282,7 @@ ClassMethod SuccessToString(rs As %SQL.StatementResult, detail As %Boolean = 0) 
     If detail {
         Quit success
     }
-    If $$$ISOK(success) {
-        Quit "Success"
-    } 
-    Set output = $System.Status.GetErrorText(success)
-    Set output = $Replace(output, $Char(13), $$$FormattedLine($$$Dim, "<CR>"))
-    Set output = $Replace(output, $Char(10), $$$FormattedLine($$$Dim, "<LF>"))
-    Quit output
+    Quit $Select($$$ISOK(success): "Success", 1:$System.Status.GetErrorText(success))
 }
 
 ClassMethod CommittedToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
