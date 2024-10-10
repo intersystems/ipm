@@ -91,12 +91,11 @@ Method SetName(pName As %String) As %Status
     Quit ..%Save()
 }
 
-Method Finalize(status As %Status) As %Status
+Method Finalize(status As %Status, dev As %Boolean = 0) As %Status
 {
     $$$ThrowOnError(..%Reload())
     Set ..Success = status
-    // TODO what does committed mean?
-    Set ..Committed = 1
+    Set ..Committed = (dev = 1) || $$$ISOK(status)
     Set ..TimeEnd = $ZDateTime($Now(), 3)
     If ..Package = "" {
         Return $$$ERROR($$$GeneralError, "Package name not set")

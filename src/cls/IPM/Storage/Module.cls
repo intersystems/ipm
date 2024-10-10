@@ -432,7 +432,8 @@ ClassMethod Uninstall(pModuleName As %String, pForce As %Boolean = 0, pRecurse A
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
-	Set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
+	Set devMode = $Get(pParams("DeveloperMode", 0))
+	Set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
 	Quit tSC
 }
 

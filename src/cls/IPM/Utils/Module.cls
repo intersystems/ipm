@@ -381,7 +381,12 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 	}
 
 	If $IsObject($Get(log)) {
-		Set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
+		If $Data(tDeveloperMode) # 2 {
+			Set devMode = $Get(tDeveloperMode, 0)
+		} Else {
+			Set devMode = $Get(pParams("DeveloperMode"), 0)
+		}
+		Set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
 	}
 	Quit tSC
 }

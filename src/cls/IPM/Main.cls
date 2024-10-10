@@ -1881,14 +1881,15 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
+	Set devMode = $Get(pCommandInfo("data", "DeveloperMode"), 1)
 	Set log = ##class(%IPM.General.History).LoadInit()
 	Try {
 		Do ..LoadInternal(.pCommandInfo, log)
 	} Catch Ex {
-		$$$ThrowOnError(log.Finalize(Ex.AsStatus()))
+		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
 		Throw Ex
 	}
-	$$$ThrowOnError(log.Finalize($$$OK))
+	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod LoadInternal(ByRef pCommandInfo, pLog As %IPM.General.History) [ Internal ]
@@ -1951,6 +1952,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 
 	#dim log As %IPM.General.History
 	Set log = ##class(%IPM.General.History).InstallInit(tModuleName)
+	Set devMode = $Get(tParams("DeveloperMode"), 0)
 	
 	Try {
 		Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
@@ -1986,7 +1988,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 			If (tResult '= "") {
 				Do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
 				Merge tParams = pCommandInfo("data")
-				Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
+				Set tParams("DeveloperMode") = devMode
 				Set tParams("cmd") = "install"
 				Set tParams("Install") = 1
 				If tResult.Deployed {
@@ -2015,10 +2017,10 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 			}
 		}
 	} Catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus()))
+		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
 		Throw ex
 	}
-	$$$ThrowOnError(log.Finalize($$$OK))
+	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
