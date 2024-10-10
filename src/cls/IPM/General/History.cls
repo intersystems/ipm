@@ -107,7 +107,7 @@ Method Finalize(status As %Status, dev As %Boolean = 0) As %Status
 /// Get the history of all installations, uninstalls, and loads in given namespace
 /// The filter argument is a multidimensional array with structure 
 /// filter(columnName) = value
-ClassMethod GetHistory(ByRef filter, namespace As %String) As %SQL.StatementResult
+ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0, namespace As %String) As %SQL.StatementResult
 {
     New $namespace
     If $Data(namespace) # 2 {
@@ -117,7 +117,8 @@ ClassMethod GetHistory(ByRef filter, namespace As %String) As %SQL.StatementResu
         Quit $$$NULLOREF
     }
     Kill varargs
-    Set query = "SELECT * FROM %IPM_General.History WHERE 1 = 1 "
+    Set limit = +limit // Coerce to number to prevent SQL injection
+    Set query = "SELECT " _ $SELECT(limit>0: "TOP " _limit, 1: "") _  " * FROM %IPM_General.History WHERE 1 = 1 "
     Set col = ""
     For {
         // TODO: consider the case where value starts with > or <. For now we assume it's an exact match
@@ -129,13 +130,18 @@ ClassMethod GetHistory(ByRef filter, namespace As %String) As %SQL.StatementResu
         Set query = query _ " AND " _ col _ " = ?"
         Set varargs($Increment(varargs)) = value
     }
+    If ascend {
+        set query = query _ " ORDER BY ID ASC"
+    } Else {
+        set query = query _ " ORDER BY ID DESC"
+    }
     Quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
 }
 
 /// @API.Method
 /// Get the history of all installations, uninstalls, and loads in all namespaces
 /// See GetHistory() for the `filter` argument
-ClassMethod GetHistoryGlobally(ByRef filter) As %Library.ArrayOfObjects
+ClassMethod GetHistoryGlobally(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0) As %Library.ArrayOfObjects
 {
     New $namespace
     Set $namespace = "%SYS"
@@ -144,7 +150,7 @@ ClassMethod GetHistoryGlobally(ByRef filter) As %Library.ArrayOfObjects
     Set array = ##class(%Library.ArrayOfObjects).%New()
     While rs.%Next() {
         Set ns = rs.%Get("Nsp")
-        Set historyRS = ..GetHistory(.filter, ns)
+        Set historyRS = ..GetHistory(.filter, ascend, limit, ns)
         If historyRS = $$$NULLOREF {
             Continue
         }

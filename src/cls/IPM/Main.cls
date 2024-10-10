@@ -637,9 +637,12 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<summary>Manage history of package installation/uninstallation.</summary>
 	<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall. By default, all entries will be affected. To specify filters, use the -Dcol=val syntax. See examples for more.</description>
 	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
+	<modifier name="ascend" aliases="asc" value="false" description="If specified, will list the history logs in ascending order. Default behaviour is to list in descending order."/>
+	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. By default, all logs will be printed. "/>
 	<parameter name="action" required="true" description="One of history actions: find (default), details, delete, schema" />
 	<parameter name="argument" required="false" description="Argument for `details` command" />
-	<example description="Show history of all packages in the current namespace">history find </example>
+	<example description="Show history of all packages in the current namespace in descending order">history find </example>
+	<example description="Show 5 history records in the current namespace in ascending order">history find -ascend -limit 5</example>
 	<example description="Show column names that the table can be filtered by">history schema</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
@@ -2915,8 +2918,10 @@ ClassMethod History(ByRef pCommandInfo)
 
 	If (action = "find") || (action = "") {
 		Merge filter = pCommandInfo("data", "zpm")
+		Set ascend = $$$HasModifier(pCommandInfo, "ascend")
+		Set limit = $$$GetModifier(pCommandInfo, "limit")
 		Set mthd = $Select(globally: "GetHistoryGlobally", 1: "GetHistory")
-		Set rs = $Classmethod("%IPM.General.History", mthd, .filter)
+		Set rs = $Classmethod("%IPM.General.History", mthd, .filter, ascend, limit)
 		Set mthd = $Select(globally: "DisplayArray", 1: "DisplayQueryResult")
 		Do $Classmethod("%IPM.General.History", mthd, rs)
 	} ElseIf action = "details" {
