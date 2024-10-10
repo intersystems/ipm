@@ -280,7 +280,13 @@ ClassMethod SuccessToString(rs As %SQL.StatementResult, detail As %Boolean = 0) 
     If detail {
         Quit success
     }
-    Quit $Select($$$ISOK(success): "Success", 1:$System.Status.GetErrorText(success))
+    If $$$ISOK(success) {
+        Quit "Success"
+    } 
+    Set output = $System.Status.GetErrorText(success)
+    Set output = $Replace(output, $Char(13), $$$FormattedLine($$$Dim, "<CR>"))
+    Set output = $Replace(output, $Char(10), $$$FormattedLine($$$Dim, "<LF>"))
+    Quit output
 }
 
 ClassMethod CommittedToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
