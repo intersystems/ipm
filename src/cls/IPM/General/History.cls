@@ -107,6 +107,7 @@ Method Finalize(status As %Status, dev As %Boolean = 0) As %Status
 /// Get the history of all installations, uninstalls, and loads in given namespace
 /// The filter argument is a multidimensional array with structure 
 /// filter(columnName) = value
+/// Where value can optionally start with >, >=, <, <=, =, <> or contain * to indicate a wildcard
 ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0, namespace As %String) As %SQL.StatementResult
 {
     New $namespace
@@ -121,20 +122,26 @@ ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer =
     Set query = "SELECT " _ $SELECT(limit>0: "TOP " _limit, 1: "") _  " * FROM %IPM_General.History WHERE 1 = 1 "
     Set col = ""
     For {
-        // TODO: consider the case where value starts with > or <. For now we assume it's an exact match
         Set col = $Order(filter(col), 1, value)
         If (col = "") || ($Data(value) # 2 = 0) || (col '? 1A.AN){
             Quit
         }
         // col is safe from SQL injection because we ensured it's alphanumeric above
-        Set query = query _ " AND " _ col _ " = ?"
-        Set varargs($Increment(varargs)) = value
+        If $ListFind($ListBuild(">=", "<=", "<>"), $Extract(value, 1, 2)) {
+            Set query = query _ " AND " _ col _ $Extract(value, 1, 2) _ "?"
+            Set varargs($Increment(varargs)) = $Extract(value, 3, *)
+        } ElseIf $ListFind($ListBuild(">", "<", "="), $Extract(value, 1, 1)) {
+            Set query = query _ " AND " _ col _ $Extract(value, 1) _ "?"
+            Set varargs($Increment(varargs)) = $Extract(value, 2, *)
+        } ElseIf value [ "*" {
+            Set query = query _ " AND " _ col _ " LIKE ?"
+            Set varargs($Increment(varargs)) = $Replace(value, "*", "%")
+        } Else {
+            Set query = query _ " AND " _ col _ " = ?"
+            Set varargs($Increment(varargs)) = value
+        }
     }
-    If ascend {
-        set query = query _ " ORDER BY ID ASC"
-    } Else {
-        set query = query _ " ORDER BY ID DESC"
-    }
+    Set query = query _ " ORDER BY ID "  _ $Select(ascend: "ASC", 1: "DESC")
     Quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
 }
 

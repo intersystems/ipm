@@ -642,6 +642,8 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<parameter name="action" required="true" description="One of history actions: find (default), details, delete, schema" />
 	<parameter name="argument" required="false" description="Argument for `details` command" />
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
+	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
+	<example description="Show history of all packages in the current namespace where start time is later than 2000-01-01 00:00:00">history find -DTimeStart=">2000-01-01 00:00:00"</example>
 	<example description="Show 5 history records in the current namespace in ascending order">history find -ascend -limit 5</example>
 	<example description="Show column names that the table can be filtered by">history schema</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
@@ -767,6 +769,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			Merge tCommandInfo = tParsedCommandInfo
 
 			// Stashed for use in %IPM.General.History:Init
+			New $$$ZPMCommandToLog
 			Set $$$ZPMCommandToLog = tCommand
 			
 			If (tCommandInfo = "quit") {
