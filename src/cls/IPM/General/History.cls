@@ -1,4 +1,4 @@
-Include %IPM.Common
+Include (%IPM.Common, %IPM.Formatting)
 
 Class %IPM.General.History Extends %Persistent
 {
@@ -145,19 +145,167 @@ ClassMethod GetHistoryGlobally(ByRef filter) As %Library.ArrayOfObjects
     Set array = ##class(%Library.ArrayOfObjects).%New()
     While rs.%Next() {
         Set ns = rs.%Get("Nsp")
-        Do array.SetAt(..GetHistory(.filter, ns), ns)
+        Set historyRS = ..GetHistory(.filter, ns)
+        If historyRS = $$$NULLOREF {
+            Continue
+        }
+        Do array.SetAt(historyRS, ns)
     }
     Return array
+}
+
+ClassMethod DisplayOneRecord(id As %Integer)
+{
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT TOP 1 * FROM %IPM_General.History WHERE ID = ?", id)
+    If rs.%Next() {
+        Do ..ShowColumns(rs, 1)
+    } Else {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No record found with ID "_id_". Use `history find` command to show all entries. "))
+    }
+}
+
+/// If detail is 1, will display full details each property on a separate line
+/// If detail is "header", will display the column names using the same style as the data
+/// Otherwise, will display on a single line, with some details omitted
+ClassMethod ShowColumns(rs As %SQL.StatementResult, detail As %Boolean = 0) As %Status
+{
+    Set columnStyles = $ListBuild(
+        $ListBuild("ID", $$$Bright),
+        $ListBuild("Action", $$$Red),
+        $ListBuild("Package", $$$Green),
+        $ListBuild("Version", $$$Green),
+        $ListBuild("UserName", $$$Blue),
+        $ListBuild("Namespace", $$$Magenta),
+        $ListBuild("Time", $$$Yellow),
+        $ListBuild("Success", $$$Default),
+        $ListBuild("Committed", $$$Cyan),
+        $ListBuild("CommandString", $$$Red),
+        $ListBuild("Source", $$$Default)
+    )
+
+    Set ptr = 0
+    Write !
+    While $ListNext(columnStyles, ptr, pair) {
+        Set $ListBuild(column, style) = pair
+        If detail = "header" {
+            Write $$$FormattedLine(style, column), " "
+            Continue
+        }
+        Set cls = $classname()
+        Set mthd = column_"ToString"
+        If $System.CLS.IsMthd(cls, mthd) {
+            Set value = $classmethod(cls, mthd, rs, detail)
+        } Else {
+            Set value = rs.%Get(column)
+        }
+        Set value = $$$FormattedLine(style, value)
+        If detail {
+            Write $$$FormattedLine($$$Dim, column), ": ", value, !
+        } Else { 
+            Write value, " " 
+        }
+    }
+    Return $$$OK
+}
+
+ClassMethod VersionToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+{
+    Set obj = ##class(%IPM.General.History).%OpenId(rs.%Get("ID"))
+    If $IsObject(obj) {
+        Set str = obj.Version.ToString()
+        If str '= "0.0.0-0" {
+            Quit "v"_str
+        }
+    }
+    Quit ""
+}
+
+ClassMethod TimeToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+{
+    If detail {
+        Quit "Started At " _ rs.%Get("TimeStart") _ "; Ended At " _ rs.%Get("TimeEnd")
+    } 
+
+    Set start = rs.%Get("TimeStart")
+    Set start = $Zdatetimeh(start, 3)
+    set $ListBuild(startDate, startTime) = $ListFromString(start, ",")
+    Set startTimestamp = startDate * 86400 + startTime
+    Set end = rs.%Get("TimeEnd")
+    If end = "" {
+        Quit rs.%Get("TimeStart")
+    } 
+
+    Set end = $Zdatetimeh(end, 3)
+    Set $ListBuild(endDate, endTime) = $ListFromString(end, ",")
+    Set endTimeStamp = endDate * 86400 + endTime
+    Set diff =  endTime - startTime
+
+    Set diffDays = diff \ 86400
+    Set diff = diff # 86400
+    Set diffHours = diff \ 3600
+    Set diff = diff # 3600
+    Set diffMinutes = diff \ 60
+    Set diffSeconds = diff # 60
+
+    Set duration = $Select(diffDays: diffDays _ "D ", 1:"") 
+        _$Select(diffHours: diffHours _ "h ", 1:"")
+        _$Select(diffMinutes: diffMinutes _ "m ", 1:"")
+        _$Select(diffSeconds: diffSeconds _ "s ", 1:"")
+
+    If duration = "" {
+        Set duration = "0s"
+    }
+
+    Quit rs.%Get("TimeStart") _ " (" _ $Zstrip(duration, "<>W") _ ")"
+}
+
+ClassMethod SourceToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+{
+    If rs.%Get("Action") '= "install" {
+        Quit "n/a"
+    }
+    If rs.%Get("SourceName") = "" {
+        Quit "<no source set>"
+    }
+    If detail {
+        Quit rs.%Get("SourceName") _ " (" _ rs.%Get("SourceMoniker") _ "): " _ rs.%Get("SourceDetails")
+    } Else {
+        Quit rs.%Get("SourceName")
+    }
+}
+
+ClassMethod SuccessToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+{
+    Set success = rs.%Get("Success")
+    If detail {
+        Quit success
+    }
+    Quit $Select($$$ISOK(success): "Success", 1:$System.Status.GetErrorText(success))
+}
+
+ClassMethod CommittedToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+{
+    Quit $Select(rs.%Get("Committed"): "Committed", 1: "Uncommitted")
 }
 
 ClassMethod DisplayQueryResult(rs As %SQL.StatementResult)
 {
     // TODO improve the display output
-    If $IsObject(rs) {
-        Do rs.%Display()
-    } Else {
-        Write !, "No results found"
+    If (rs = $$$NULLOREF) {
+        Write !, "IPM is not enabled for this namespace"
+        Quit
     }
+
+    set found = 0
+    While rs.%Next() {
+        If 'found {
+            Set found = 1
+            Do ..ShowColumns(rs, "header")
+            Write !
+        }
+        Do ..ShowColumns(rs, 0)
+    }
+    Write !
 }
 
 ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
@@ -168,7 +316,7 @@ ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
         If rs = "" {
             Quit
         }
-        Write !, "Namespace: ", ns, !
+        Write !, "Namespace: ", ns
         Do ..DisplayQueryResult(rs)
     }
 }
