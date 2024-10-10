@@ -2917,12 +2917,13 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 ClassMethod History(ByRef pCommandInfo)
 {
 	Set action = $Get(pCommandInfo("parameters", "action"))
-	Set globally = $$$HasModifier(pCommandInfo, "globally")
 
 	If (action = "find") || (action = "") {
-		Merge filter = pCommandInfo("data", "zpm")
+		Set globally = $$$HasModifier(pCommandInfo, "globally")
 		Set ascend = $$$HasModifier(pCommandInfo, "ascend")
 		Set limit = $$$GetModifier(pCommandInfo, "limit")
+
+		Merge filter = pCommandInfo("data", "zpm")
 		Set mthd = $Select(globally: "GetHistoryGlobally", 1: "GetHistory")
 		Set rs = $Classmethod("%IPM.General.History", mthd, .filter, ascend, limit)
 		Set mthd = $Select(globally: "DisplayArray", 1: "DisplayQueryResult")
