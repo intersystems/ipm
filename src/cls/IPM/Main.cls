@@ -469,6 +469,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
 <modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
 <modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
+<modifier name="showupstream" aliases="su" value="true" description="If specified, show the lastest registry version for each module" />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 
 </command>
@@ -2952,25 +2953,36 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     $ListBuild("Repository", $$$Blue)
   )
 
+  Kill serverVersions
+  If $Data(pModifiers("showupstream"), repoName) && ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
+    Set query = "SELECT Name,Version FROM %IPM_Utils.Module_GetModuleList(?,?) "
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, repoName, 0)
+    While rs.%Next() {
+		Set serverVersions(rs.%Get("Name")) = rs.%Get("Version")
+	}
+  }
+  For i=1:1:pList {
   Set width = $Get(pList("width")) + 1
   Set tIndent = pIndent
   Set tIndent = $Select(pIndent > 0: pIndent, 1: width)
-  For i=1:1:pList {
     Set info = pList(i)
     Set developerMode = 0
     Set root = ""
     Set $ListBuild(name, version, externalName, developerMode, root, lastUpdated) = info
     Write:i>1 !,?pIndent
     Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Blue, version)
+    If $Data(pModifiers("showupstream")) && ($Data(serverVersions(name), version) # 2) {
+      Write " ", $$$FormattedLine($$$Blue, "(ServerSide: "_version_")")
+    }
     If $Get(developerMode) {
       Write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
     }
     If $Data(pModifiers("showsource")) {
       Write " ", $$$FormattedLine($$$Magenta, root)
     }
-	If $Data(pModifiers("showtime")) {
-	  Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
-	}
+    If $Data(pModifiers("showtime")) {
+      Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
+    }
 
     Set ptr = 0 
     While $ListNext(extraColumns, ptr, column) {
