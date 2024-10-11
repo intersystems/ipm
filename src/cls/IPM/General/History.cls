@@ -243,36 +243,13 @@ ClassMethod TimeToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As 
     } 
 
     Set start = rs.%Get("TimeStart")
-    Set start = $Zdatetimeh(start, 3)
-    set $ListBuild(startDate, startTime) = $ListFromString(start, ",")
-    Set startTimestamp = startDate * 86400 + startTime
     Set end = rs.%Get("TimeEnd")
     If end = "" {
         Quit rs.%Get("TimeStart")
     } 
+    Set diff = $System.SQL.DATEDIFF("ss", start, end)
 
-    Set end = $Zdatetimeh(end, 3)
-    Set $ListBuild(endDate, endTime) = $ListFromString(end, ",")
-    Set endTimeStamp = endDate * 86400 + endTime
-    Set diff =  endTime - startTime
-
-    Set diffDays = diff \ 86400
-    Set diff = diff # 86400
-    Set diffHours = diff \ 3600
-    Set diff = diff # 3600
-    Set diffMinutes = diff \ 60
-    Set diffSeconds = diff # 60
-
-    Set duration = $Select(diffDays: diffDays _ "D ", 1:"") 
-        _$Select(diffHours: diffHours _ "h ", 1:"")
-        _$Select(diffMinutes: diffMinutes _ "m ", 1:"")
-        _$Select(diffSeconds: diffSeconds _ "s ", 1:"")
-
-    If duration = "" {
-        Set duration = "0s"
-    }
-
-    Quit rs.%Get("TimeStart") _ " (" _ $Zstrip(duration, "<>W") _ ")"
+    Quit $$$FormatText("%1 (%2 sec)", start, diff)
 }
 
 ClassMethod SourceToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
