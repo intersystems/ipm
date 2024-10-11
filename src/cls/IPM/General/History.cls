@@ -5,6 +5,7 @@ Class %IPM.General.History Extends %Persistent
 
 Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
 
+/// Package is not necessarily requried. E.g., when loading a nonexistent directory.
 Property Package As %IPM.DataType.ModuleName;
 
 Property Version As %IPM.General.SemanticVersion [ Required ];
@@ -179,7 +180,7 @@ ClassMethod DisplayOneRecord(id As %Integer)
 /// If detail is 1, will display full details each property on a separate line
 /// If detail is "header", will display the column names using the same style as the data
 /// Otherwise, will display on a single line, with some details omitted
-ClassMethod ShowColumns(rs As %SQL.StatementResult, detail As %Boolean = 0) As %Status
+ClassMethod ShowColumns(rs As %SQL.StatementResult, detail As %Boolean = 0) As %Status [ Internal, Private ]
 {
     Set columnStyles = $ListBuild(
         $ListBuild("ID", $$$Bright),
@@ -223,7 +224,7 @@ ClassMethod ShowColumns(rs As %SQL.StatementResult, detail As %Boolean = 0) As %
     Return $$$OK
 }
 
-ClassMethod VersionToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+ClassMethod VersionToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
 {
     Set obj = ##class(%IPM.General.History).%OpenId(rs.%Get("ID"))
     If $IsObject(obj) {
@@ -232,10 +233,10 @@ ClassMethod VersionToString(rs As %SQL.StatementResult, detail As %Boolean = 0) 
             Quit "v"_str
         }
     }
-    Quit ""
+    Quit "<unset>"
 }
 
-ClassMethod TimeToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+ClassMethod TimeToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
 {
     If detail {
         Quit "Started At " _ rs.%Get("TimeStart") _ "; Ended At " _ rs.%Get("TimeEnd")
@@ -274,7 +275,7 @@ ClassMethod TimeToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As 
     Quit rs.%Get("TimeStart") _ " (" _ $Zstrip(duration, "<>W") _ ")"
 }
 
-ClassMethod SourceToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+ClassMethod SourceToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
 {
     If rs.%Get("Action") '= "install" {
         Quit "n/a"
@@ -289,7 +290,7 @@ ClassMethod SourceToString(rs As %SQL.StatementResult, detail As %Boolean = 0) A
     }
 }
 
-ClassMethod SuccessToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+ClassMethod SuccessToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
 {
     Set success = rs.%Get("Success")
     If detail {
@@ -298,7 +299,7 @@ ClassMethod SuccessToString(rs As %SQL.StatementResult, detail As %Boolean = 0) 
     Quit $Select($$$ISOK(success): "Success", 1:$System.Status.GetErrorText(success))
 }
 
-ClassMethod CommittedToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String
+ClassMethod CommittedToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
 {
     Quit $Select(rs.%Get("Committed"): "Committed", 1: "Uncommitted")
 }
