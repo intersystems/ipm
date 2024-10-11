@@ -468,6 +468,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
 <modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
 <modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
+<modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 
 </command>
@@ -949,7 +950,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Quit
   }
   Set tArgs = 0
-	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root FROM %IPM_Storage.ModuleItem WHERE 1=1 "
+	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root,LastUpdated FROM %IPM_Storage.ModuleItem WHERE 1=1 "
   Set pSearch = $ZStrip(pSearch, "<>WC")
   If pSearch'="" {
     If pSearch["," {
@@ -982,7 +983,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
 		$$$ThrowOnError(tSC)
     Set name = tRes.Name
     Set list = list + 1
-		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
+		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root, tRes.LastUpdated)
 		If maxWidth<$Length(name) {
       Set maxWidth = $Length(name)
     }
@@ -2179,7 +2180,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 	} Else {
     Set showFields = ""
     If +$Get(pCommandInfo("data","Desc")) {
-      Set showFields = $ListBuild(
+      Set showFields = showFields_$ListBuild(
         "Description",
         "Author.CopyrightDate", 
         "Author.License", 
@@ -2958,7 +2959,7 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     Set info = pList(i)
     Set developerMode = 0
     Set root = ""
-    Set $ListBuild(name, version, externalName, developerMode, root) = info
+    Set $ListBuild(name, version, externalName, developerMode, root, lastUpdated) = info
     Write:i>1 !,?pIndent
     Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Blue, version)
     If $Get(developerMode) {
@@ -2967,6 +2968,9 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     If $Data(pModifiers("showsource")) {
       Write " ", $$$FormattedLine($$$Magenta, root)
     }
+	If $Data(pModifiers("showtime")) {
+	  Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
+	}
 
     Set ptr = 0 
     While $ListNext(extraColumns, ptr, column) {
