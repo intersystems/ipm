@@ -2961,10 +2961,10 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
 		Set serverVersions(rs.%Get("Name")) = rs.%Get("Version")
 	}
   }
-  For i=1:1:pList {
   Set width = $Get(pList("width")) + 1
   Set tIndent = pIndent
   Set tIndent = $Select(pIndent > 0: pIndent, 1: width)
+  For i=1:1:pList {
     Set info = pList(i)
     Set developerMode = 0
     Set root = ""
