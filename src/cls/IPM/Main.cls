@@ -633,6 +633,25 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		</example>
 	</command>
 
+<command name="history" aliases="log" dataPrefix="D">
+	<summary>Manage history of package installation/uninstallation.</summary>
+	<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall. By default, all entries will be affected. To specify filters, use the -Dcol=val syntax. See examples for more.</description>
+	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
+	<modifier name="ascend" aliases="asc" value="false" description="If specified, will list the history logs in ascending order. Default behaviour is to list in descending order."/>
+	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. By default, all logs will be printed. "/>
+	<parameter name="action" required="true" description="One of history actions: find (default), details, delete, schema" />
+	<parameter name="argument" required="false" description="Argument for `details` command" />
+	<example description="Show history of all packages in the current namespace in descending order">history find </example>
+	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
+	<example description="Show history of all packages in the current namespace where start time is later than 2000-01-01 00:00:00">history find -DTimeStart=">2000-01-01 00:00:00"</example>
+	<example description="Show 5 history records in the current namespace in ascending order">history find -ascend -limit 5</example>
+	<example description="Show column names that the table can be filtered by">history schema</example>
+	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
+	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
+	<example description="Delete all histories in the namespace">history delete</example>
+	<example description="Show details of history item with ID 3">history details 3</example>
+</command>
+
 </commands>
 }
 
@@ -748,6 +767,10 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			Do ..GetNamespaceDefaultModifiers(.tDefaultArray)
 			Merge tCommandInfo("data") = tDefaultArray
 			Merge tCommandInfo = tParsedCommandInfo
+
+			// Stashed for use in %IPM.General.History:Init
+			New $$$ZPMCommandToLog
+			Set $$$ZPMCommandToLog = tCommand
 			
 			If (tCommandInfo = "quit") {
 				Return
@@ -802,6 +825,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Namespace(.tCommandInfo)			
 			} ElseIf (tCommandInfo = "enable") {
 				Do ..EnableIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "history") {
+				Do ..History(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -1862,6 +1887,19 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
+	Set devMode = $Get(pCommandInfo("data", "DeveloperMode"), 1)
+	Set log = ##class(%IPM.General.History).LoadInit()
+	Try {
+		Do ..LoadInternal(.pCommandInfo, log)
+	} Catch Ex {
+		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
+		Throw Ex
+	}
+	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+}
+
+ClassMethod LoadInternal(ByRef pCommandInfo, pLog As %IPM.General.History) [ Internal ]
+{
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
 	Merge tParams = pCommandInfo("data")
 	Set tParams("cmd") = "load"
@@ -1871,7 +1909,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
+		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams, , , pLog))
 	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
 		If $Get(pCommandInfo("data", "Verbose")) {
@@ -1900,7 +1938,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 				Write !, "Using module.xml file at ", tModuleFilePath
 			}
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
+		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , , pLog))
 	}
 }
 
@@ -1911,73 +1949,84 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	If (tModuleName["/") {
 		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
-  If (tModuleName = "") {
-    Quit $$$OK
-  }
+	If (tModuleName = "") {
+		Quit $$$OK
+	}
 
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
+
+	#dim log As %IPM.General.History
+	Set log = ##class(%IPM.General.History).InstallInit(tModuleName)
+	Set devMode = $Get(tParams("DeveloperMode"), 0)
 	
-	Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-	Set tSearchCriteria.Registry = tRegistry
-	Set tSearchCriteria.Name = $$$lcase(tModuleName)
-	Set tSearchCriteria.VersionExpression = tVersion
-	Set tSearchCriteria.Keywords = tKeywords
-	$$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
-	
-	If (tResults.Count() > 0) {
-		Set tResult = ""
-		#dim tResult As %IPM.Storage.QualifiedModuleInfo
-		// Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
-		If ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
-			Set tResult = tResults.GetAt(1)
-		} ElseIf (tResults.Count() > 0) {
-			For i=1:1:tResults.Count() {
-				Set tResultInfo = tResults.GetAt(i)
-				Set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
-			}
-			
-			Set tValue = ""
-      		Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
-      		If (tResponse '= $$$SuccessResponse) {
-        		$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-      		}
-			
-			If (tValue '= "") {
-				Set tResult = tResults.GetAt(tValue)
-			}
-		}
+	Try {
+		Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+		Set tSearchCriteria.Registry = tRegistry
+		Set tSearchCriteria.Name = $$$lcase(tModuleName)
+		Set tSearchCriteria.VersionExpression = tVersion
+		Set tSearchCriteria.Keywords = tKeywords
+		$$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
 		
-		If (tResult '= "") {
-			Do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
-			Merge tParams = pCommandInfo("data")
-      Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
-			Set tParams("cmd") = "install"
-			Set tParams("Install") = 1
-      If tResult.Deployed {
-        Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
-        Set tResult.PlatformVersion = platformVersion
-        If ('tResult.PlatformVersions.Find(platformVersion)) {
-          $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
-        }
-      }
-			$$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
-    
-    }
-	} Else {
-		Set tPrefix = ""
-		If (tModuleName '= "") {
-			If (tVersion '= "") {
-				$$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
-			} Else {
-				$$$ThrowStatus($$$ERROR($$$GeneralError, "'"_tModuleName_"' not found in any repository."))
+		If (tResults.Count() > 0) {
+			Set tResult = ""
+			#dim tResult As %IPM.Storage.QualifiedModuleInfo
+			// Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
+			If ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
+				Set tResult = tResults.GetAt(1)
+			} ElseIf (tResults.Count() > 0) {
+				For i=1:1:tResults.Count() {
+					Set tResultInfo = tResults.GetAt(i)
+					Set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
+				}
+				
+				Set tValue = ""
+				Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
+				If (tResponse '= $$$SuccessResponse) {
+					$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+				}
+				
+				If (tValue '= "") {
+					Set tResult = tResults.GetAt(tValue)
+				}
 			}
-		} ElseIf (tKeywords '= "") {
-			$$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
+			
+			If (tResult '= "") {
+				Do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
+				Merge tParams = pCommandInfo("data")
+				Set tParams("DeveloperMode") = devMode
+				Set tParams("cmd") = "install"
+				Set tParams("Install") = 1
+				If tResult.Deployed {
+					Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
+					Set tResult.PlatformVersion = platformVersion
+					If ('tResult.PlatformVersions.Find(platformVersion)) {
+						$$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
+					}
+				}
+				$$$ThrowOnError(log.SetSource(tResult.ServerName))
+				$$$ThrowOnError(log.SetVersion(tResult.Version))
+				$$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
+			}
 		} Else {
-			Write !,"No modules found. Are there any repositories configured in the current namespace?"
+			Set tPrefix = ""
+			If (tModuleName '= "") {
+				If (tVersion '= "") {
+					$$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
+				} Else {
+					$$$ThrowStatus($$$ERROR($$$GeneralError, "'"_tModuleName_"' not found in any repository."))
+				}
+			} ElseIf (tKeywords '= "") {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
+			} Else {
+				Write !,"No modules found. Are there any repositories configured in the current namespace?"
+			}
 		}
+	} Catch ex {
+		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+		Throw ex
 	}
+	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
@@ -2008,9 +2057,9 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 {
 	Merge tParams = pCommandInfo("data")
 	Set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
+
 	If $$$HasModifier(pCommandInfo,"all") {
 		$$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
-    Return
 	} Else {
 		Set tModuleName = pCommandInfo("parameters","module")
 		Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
@@ -2862,6 +2911,44 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
 			$$$ThrowOnError(tOverallSC)
 		}
+	}
+}
+
+ClassMethod History(ByRef pCommandInfo)
+{
+	Set action = $Get(pCommandInfo("parameters", "action"))
+
+	If (action = "find") || (action = "") {
+		Set globally = $$$HasModifier(pCommandInfo, "globally")
+		Set ascend = $$$HasModifier(pCommandInfo, "ascend")
+		Set limit = $$$GetModifier(pCommandInfo, "limit")
+
+		Merge filter = pCommandInfo("data", "zpm")
+		Set mthd = $Select(globally: "GetHistoryGlobally", 1: "GetHistory")
+		Set rs = $Classmethod("%IPM.General.History", mthd, .filter, ascend, limit)
+		Set mthd = $Select(globally: "DisplayArray", 1: "DisplayQueryResult")
+		Do $Classmethod("%IPM.General.History", mthd, rs)
+	} ElseIf action = "details" {
+		Set id = $Get(pCommandInfo("parameters", "argument"))
+		Do ##class(%IPM.General.History).DisplayOneRecord(id)
+	} ElseIf action = "schema" {
+		$$$ThrowOnError($System.SQL.Schema.GetAllColumns("%IPM_General.History", , .columns))
+		Write "Columns available for filtering are: "
+		Set idx = ""
+		For {
+			Set idx = $Order(columns(idx), 1, col)
+			If idx = "" {
+				Quit
+			}
+			If $Extract(col, 1, 3) = "x__" {
+				Continue
+			}
+			Write !, "- ", col
+		}
+	} ElseIf action = "delete" {
+		Do ##class(%IPM.General.History).%KillExtent()
+	} Else {
+		$$$ThrowStatus($$$ERROR($$$GeneralError,"Invalid action specified. Use `help history` to see available actions."))
 	}
 }
 
