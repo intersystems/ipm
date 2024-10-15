@@ -2955,21 +2955,7 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
 
   Kill serverVersions
   If $Data(pModifiers("showupstream")) {
-    Set query = "SELECT %DLIST(Name) AS Repos FROM %IPM_Repo.Definition"
-    Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
-    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-    If rs.%Next() {
-      Set repos = rs.%Get("Repos")
-    }
-
-    Set ptr = 0
-    While $ListNext(repos, ptr, r) {
-      Set query = "SELECT Name,Version FROM %IPM_Utils.Module_GetModuleList(?,?) "
-      Set rs = ##class(%SQL.Statement).%ExecDirect(, query, r, 0)
-      While rs.%Next() {
-        Set serverVersions(rs.%Get("Name"), r) = rs.%Get("Version")
-      }
-    }
+    Do ..GetUpstreamPackageVersions(.serverVersions)
   }
 
   Set width = $Get(pList("width")) + 1
@@ -3018,6 +3004,25 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
         Write !,?tIndent
         Do ..DrawColumn($$$FormattedLine(color, colName _ ": ") _ value)
       }
+    }
+  }
+}
+
+ClassMethod GetUpstreamPackageVersions(Output list)
+{
+  Set query = "SELECT %DLIST(Name) AS Repos FROM %IPM_Repo.Definition"
+  Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
+  $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+  If rs.%Next() {
+    Set repos = rs.%Get("Repos")
+  }
+
+  Set ptr = 0
+  While $ListNext(repos, ptr, r) {
+    Set query = "SELECT Name,Version FROM %IPM_Utils.Module_GetModuleList(?,?) "
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, r, 0)
+    While rs.%Next() {
+      Set list(rs.%Get("Name"), r) = rs.%Get("Version")
     }
   }
 }
