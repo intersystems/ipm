@@ -222,12 +222,12 @@ ClassMethod GlobalRecordsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByR
 {
     Try {
         While qHandle.Count() > 0 {
-            /// Always get the first namespace. Remove it from list once corresponding result set is exhausted.
+            // Always get the first namespace. Remove it from list once corresponding result set is exhausted.
             Set ns = ""
             Set rs = qHandle.GetNext(.ns)
             $$$ThrowOnError(..RecordsFetch(rs, .Row, .AtEnd))
             If AtEnd {
-                /// If rs is empty, there could still be more namespaces to process
+                // If rs is empty, there could still be more namespaces to process
                 Do qHandle.RemoveAt(ns, .success)
                 If 'success {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to remove namespace "_ns_" from list"))
