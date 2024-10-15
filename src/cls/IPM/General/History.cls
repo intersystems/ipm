@@ -104,7 +104,63 @@ Method Finalize(status As %Status, dev As %Boolean = 0) As %Status
     Return ..%Save()
 }
 
-/// @API.Method
+/// @API.Query
+/// Get load/install/uninstall records in the specified namespace
+Query Records(ascend As %Boolean, limit As %Integer, namespace As %String) As %Query(CONTAINID = 1, ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
+{
+}
+
+ClassMethod RecordsExecute(ByRef qHandle As %Binary, ascend As %Boolean, limit As %Integer, namespace As %String) As %Status [ Internal ]
+{
+    Try {
+        Kill filter
+        Set qHandle = ..GetHistory(.filter, .ascend, .limit, .namespace)
+    } Catch e {
+        Return e.AsStatus()
+    }
+    Return $$$OK
+}
+
+ClassMethod RecordsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = RecordsExecute ]
+{
+    Try {
+        If qHandle.%Next() {
+            Set Row = $ListBuild(
+                qHandle.%Get("Action"),
+                qHandle.%Get("Package"),
+                qHandle.%Get("Version_Major"),
+                qHandle.%Get("Version_Minor"),
+                qHandle.%Get("Version_Patch"),
+                qHandle.%Get("Version_Prerelease"),
+                qHandle.%Get("Version_Build"),
+                qHandle.%Get("SourceName"),
+                qHandle.%Get("SourceMoniker"),
+                qHandle.%Get("SourceDetails"),
+                qHandle.%Get("TimeStart"),
+                qHandle.%Get("TimeEnd"),
+                qHandle.%Get("NameSpace"),
+                qHandle.%Get("UserName"),
+                qHandle.%Get("Success"),
+                qHandle.%Get("Committed"),
+                qHandle.%Get("CommandString")
+            )
+            Set AtEnd = 0
+        } Else {
+            Set Row = ""
+            Set AtEnd = 1
+        }
+    } Catch ex {
+        Return ex.AsStatus()
+    }
+    Return $$$OK
+}
+
+ClassMethod RecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceAfter = RecordsFetch ]
+{
+    Set qHandle = ""
+    Quit $$$OK
+}
+
 /// Get the history of all installations, uninstalls, and loads in given namespace
 /// The filter argument is a multidimensional array with structure 
 /// filter(columnName) = value
@@ -146,7 +202,59 @@ ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer =
     Quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
 }
 
-/// @API.Method
+/// @API.Query
+Query GlobalRecords(ascend As %Boolean, limit As %Integer) As %Query(ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
+{
+}
+
+ClassMethod GlobalRecordsExecute(ByRef qHandle As %Binary, ascend As %Boolean, limit As %Integer) As %Status [ Internal ]
+{
+    Try {
+        Kill filter
+        Set qHandle = ..GetHistoryGlobally(.filter, .ascend, .limit)
+    } Catch e {
+        Return e.AsStatus()
+    }
+    Return $$$OK
+}
+
+ClassMethod GlobalRecordsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = GlobalRecordsExecute ]
+{
+    Try {
+        While qHandle.Count() > 0 {
+            /// Always get the first namespace. Remove it from list once corresponding result set is exhausted.
+            Set ns = ""
+            Set rs = qHandle.GetNext(.ns)
+            $$$ThrowOnError(..RecordsFetch(rs, .Row, .AtEnd))
+            If AtEnd {
+                /// If rs is empty, there could still be more namespaces to process
+                Do qHandle.RemoveAt(ns, .success)
+                If 'success {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to remove namespace "_ns_" from list"))
+                }
+            } Else {
+                Return $$$OK
+            }
+        }
+        // Only when the list is empty should we return AtEnd = 1 and Row = ""
+        Set Row = "", AtEnd = 1
+        Return $$$OK
+    } Catch ex {
+        Return ex.AsStatus()
+    }
+    Return $$$OK
+}
+
+ClassMethod GlobalRecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceAfter = GlobalRecordsFetch ]
+{
+    // Should not happen, but just in case
+    If qHandle.Count() '= 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Namespace list not empty in GlobalRecordsFetch()!"))
+    }
+    Set qHandle = ""
+    Quit $$$OK
+}
+
 /// Get the history of all installations, uninstalls, and loads in all namespaces
 /// See GetHistory() for the `filter` argument
 ClassMethod GetHistoryGlobally(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0) As %Library.ArrayOfObjects
