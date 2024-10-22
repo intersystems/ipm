@@ -4,10 +4,12 @@ on:
     branches:
       - master
       - v1
+      - v1-next
   pull_request:
     branches:
       - master
       - v1
+      - v1-next
   release:
     types:
       - released
