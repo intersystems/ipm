@@ -635,7 +635,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		</example>
 	</command>
 
-<command name="outdated">
+<command name="list-outdated" aliases="outdated">
   <description>
     Shows outdated modules and the latest version available in each repository.
   </description>
@@ -813,7 +813,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Namespace(.tCommandInfo)			
 			} ElseIf (tCommandInfo = "enable") {
 				Do ..EnableIPM(.tCommandInfo)
-			} ElseIf (tCommandInfo = "outdated") {
+			} ElseIf (tCommandInfo = "list-outdated") {
 				Do ..ListOutdated(.tCommandInfo)
 			}
 		} Catch pException {
@@ -2876,6 +2876,30 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			$$$ThrowOnError(tOverallSC)
 		}
 	}
+}
+
+ClassMethod CanUpdate(modName As %String, semver As %IPM.General.SemanticVersion) As %Boolean
+{
+  Do ..GetListModules($Namespace, "", .list)
+  For i=1:1:list {
+    Set $ListBuild(otherMod, version) = list(i)
+    If (otherMod = modName) {
+      Continue
+    }
+    Set otherMod = ##class(%IPM.Storage.Module).NameOpen(otherMod)
+    // There is no need to recurse here
+    For i = 1:1:otherMod.Dependencies.Count() {
+      If (otherMod.Dependencies.GetAt(i).Name '= modName) {
+        Continue
+      }
+      #dim expresion As %IPM.General.SemanticVersionExpression
+      Set expression = otherMod.Dependencies.GetAt(i).Version
+      If 'expression.IsSatisfiedBy(semver) {
+        Return 0
+      }
+    }
+  }
+  Return 1
 }
 
 ClassMethod ListOutdated(ByRef pCommandInfo)
