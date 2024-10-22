@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #469 Added ability to include an `IPMVersion` in `SystemRequirement` of module.xml
 - #530 Added a `CustomPhase` attribute to `<Invoke>` that doesn't require a corresponding %method in lifecycle class.
 - #578 Added functionality to record and display zpm history of install, uninstall, and load
+- #582 Added functionality to optionally see time of last update and server version of each package
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.

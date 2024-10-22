@@ -468,6 +468,8 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
 <modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
 <modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
+<modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
+<modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 
 </command>
@@ -974,7 +976,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Quit
   }
   Set tArgs = 0
-	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root FROM %IPM_Storage.ModuleItem WHERE 1=1 "
+	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root,LastUpdated FROM %IPM_Storage.ModuleItem WHERE 1=1 "
   Set pSearch = $ZStrip(pSearch, "<>WC")
   If pSearch'="" {
     If pSearch["," {
@@ -1007,7 +1009,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
 		$$$ThrowOnError(tSC)
     Set name = tRes.Name
     Set list = list + 1
-		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
+		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root, tRes.LastUpdated)
 		If maxWidth<$Length(name) {
       Set maxWidth = $Length(name)
     }
@@ -2228,7 +2230,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 	} Else {
     Set showFields = ""
     If +$Get(pCommandInfo("data","Desc")) {
-      Set showFields = $ListBuild(
+      Set showFields = showFields_$ListBuild(
         "Description",
         "Author.CopyrightDate", 
         "Author.License", 
@@ -3038,6 +3040,11 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     $ListBuild("Repository", $$$Blue)
   )
 
+  Kill serverVersions
+  If $Data(pModifiers("showupstream")) {
+    Do ..GetUpstreamPackageVersions(.serverVersions)
+  }
+
   Set width = $Get(pList("width")) + 1
   Set tIndent = pIndent
   Set tIndent = $Select(pIndent > 0: pIndent, 1: width)
@@ -3045,14 +3052,33 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     Set info = pList(i)
     Set developerMode = 0
     Set root = ""
-    Set $ListBuild(name, version, externalName, developerMode, root) = info
+    Set $ListBuild(name, version, externalName, developerMode, root, lastUpdated) = info
     Write:i>1 !,?pIndent
     Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Blue, version)
+    If $Data(pModifiers("showupstream")) && ($Data(serverVersions(name)) / 10) {
+      Set r = ""
+      Set diffs = ""
+      For {
+        Set r = $Order(serverVersions(name, r), 1, sVer)
+        If r = "" {
+          Quit
+        }
+        If sVer '= version {
+          Set diffs = diffs_$ListBuild($$$FormatText("%1: %2", r, sVer))
+        }
+      }
+      If diffs '= "" {
+        Write " ", $$$FormattedLine($$$Blue, "(" _ $ListToString(diffs, ", ") _ ")")
+      }
+    }
     If $Get(developerMode) {
       Write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
     }
     If $Data(pModifiers("showsource")) {
       Write " ", $$$FormattedLine($$$Magenta, root)
+    }
+    If $Data(pModifiers("showtime")) {
+      Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
     }
 
     Set ptr = 0 
@@ -3065,6 +3091,25 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
         Write !,?tIndent
         Do ..DrawColumn($$$FormattedLine(color, colName _ ": ") _ value)
       }
+    }
+  }
+}
+
+ClassMethod GetUpstreamPackageVersions(Output list)
+{
+  Set query = "SELECT %DLIST(Name) AS Repos FROM %IPM_Repo.Definition"
+  Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
+  $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+  If rs.%Next() {
+    Set repos = rs.%Get("Repos")
+  }
+
+  Set ptr = 0
+  While $ListNext(repos, ptr, r) {
+    Set query = "SELECT Name,Version FROM %IPM_Utils.Module_GetModuleList(?,?) "
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, r, 0)
+    While rs.%Next() {
+      Set list(rs.%Get("Name"), r) = rs.%Get("Version")
     }
   }
 }

@@ -105,7 +105,8 @@ ClassMethod moduleSqlToList(pQuery As %String, pSearchCriteria As %IPM.Repo.Sear
 		Set tOrderByParts = tOrderByParts_$ListBuild("case m.VersionString when ? then 0 else 1 end")
 		Set tArgs($i(tArgs)) = pSearchCriteria.VersionExpression
 	}
-	
+	Set tOrderByParts = tOrderByParts_$ListBuild("m.Name")
+	Set tOrderByParts = tOrderByParts_$ListBuild("m.Version_Major desc", "m.Version_Minor desc", "m.Version_Patch desc", "m.Version_Prerelease desc", "m.Version_Build desc")
 	If (tKeywordList '= "") {
 		// TODO: Find some way to order by max similarity (or just similarity of latest version of the module) instead?
 		Set tOrderByParts = tOrderByParts_$ListBuild("%SIMILARITY(Manifest,?) desc")
@@ -122,7 +123,7 @@ ClassMethod moduleSqlToList(pQuery As %String, pSearchCriteria As %IPM.Repo.Sear
 		}
 	}
 	
-	Set tList = ##class(%Library.ListOfObjects).%New()
+	Set tArray = ##class(%Library.ArrayOfObjects).%New()
 	Set tRes = ##class(%SQL.Statement).%ExecDirect(,pQuery,tArgs...)
 	If (tRes.%SQLCODE < 0) {
 		$$$ThrowStatus($$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message))
@@ -131,14 +132,33 @@ ClassMethod moduleSqlToList(pQuery As %String, pSearchCriteria As %IPM.Repo.Sear
 		If $$$ISERR(tStatus) {
 			Quit
 		}
-		
-		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-		Set tModRef.Name = tRes.%Get("Name")
-		Set tModRef.VersionString = tRes.%Get("VersionString")
-		Do tList.Insert(tModRef)
+		Set Name = tRes.%Get("Name")
+		Set VersionString = tRes.%Get("VersionString")
+
+		Set tModRef = tArray.GetAt(tRes.%Get("Name")) 
+		If tModRef = "" {
+			Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
+			Set tModRef.Name = tRes.%Get("Name")
+			Set tModRef.VersionString = tRes.%Get("VersionString")
+			If pSearchCriteria.AllVersions {
+				Set tModRef.AllVersions = VersionString
+			}
+			Do tArray.SetAt(tModRef, Name)
+		} ElseIf pSearchCriteria.AllVersions {
+			Set tModRef.AllVersions = tModRef.AllVersions_", "_VersionString
+		}
 	}
 	If $$$ISERR(tStatus) {
 		$$$ThrowStatus(tStatus)
+	}
+	Set tList = ##class(%Library.ListOfObjects).%New()
+	Set key = ""
+	For {
+		Set mod = tArray.GetNext(.key)
+		If (key = "") {
+			Quit
+		}
+		Do tList.Insert(mod)
 	}
 	Quit tList
 }
