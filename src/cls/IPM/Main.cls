@@ -902,7 +902,7 @@ ClassMethod GetListNamespace(Output list, pSearch As %String = "")
   Set transformedPieces = ""
   Set ptr = 0
   While $ListNext(pieces, ptr, val) {
-    If val '? .(1AN,1"%") { // namespace
+    If val '? .(1AN,1"%") { // namespace contain only numbers, letters and %, otherwise there's guaranteed no match
       Return
     }
     Set transformedPieces = transformedPieces _ $ListBuild(1_$$$QUOTE(val))
@@ -913,9 +913,8 @@ ClassMethod GetListNamespace(Output list, pSearch As %String = "")
   }
 
   Set width = 0
-  Set tArgs = 0
   Set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
-  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
+  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery) 
   $$$ThrowSQLIfError(tRes.%SQLCODE, tRes.%Message)
   While tRes.%Next(.tSC) {
     $$$ThrowOnError(tSC)
