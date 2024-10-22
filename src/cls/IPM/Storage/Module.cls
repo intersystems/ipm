@@ -29,6 +29,8 @@ Property Packaging As %String [ Required ];
 
 Property Dependencies As list Of %IPM.Storage.ModuleReference(STORAGEDEFAULT = "array");
 
+Property LastUpdated As %TimeStamp;
+
 Relationship Resources As %IPM.Storage.ResourceReference(XMLIO = "IN", XMLITEMNAME = "Resource", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
 /// Calculated property used for XML output of Resources relationship (in a reasonable order:
@@ -1458,6 +1460,19 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Return attrValue
 }
 
+/// This callback method is invoked by the <METHOD>%Save</METHOD> method to 
+/// provide notification that the object is being saved. It is called before 
+/// any data is written to disk.
+/// 
+/// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
+/// 
+/// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
+Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
+{
+	Set ..LastUpdated = $ZDateTime($Horolog, 3)
+	Quit $$$OK
+}
+
 Storage Default
 {
 <Data name="Defaults">
@@ -1551,6 +1566,9 @@ Storage Default
 </Value>
 <Value name="27">
 <Value>AvailabilityClass</Value>
+</Value>
+<Value name="28">
+<Value>LastUpdated</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>
