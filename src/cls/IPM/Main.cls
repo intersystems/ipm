@@ -951,7 +951,16 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Quit
   }
   Set tArgs = 0
-	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root,LastUpdated FROM %IPM_Storage.ModuleItem WHERE 1=1 "
+  // HACK: Certain IRIS kit, e.g., irishealth-community 2024.1 comes with %IPM in HSLIB and HSSYS namespaces
+  // The caveat is that the %IPM.Storage.Module doesn't have an "LastUpdated" property
+  // So, we need to check if the property exists before querying it
+  $$$ThrowOnError(##class(%SYSTEM.SQL.Schema).GetAllColumns("%IPM_Storage.ModuleItem", .columns))
+  Set checkUpdateTime = $Data(columns("LastUpdated"))
+  Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root"
+  If checkUpdateTime {
+	Set tQuery = tQuery _ ",LastUpdated"
+  }
+  Set tQuery = tQuery _ " FROM %IPM_Storage.ModuleItem WHERE 1=1 "
   Set pSearch = $ZStrip(pSearch, "<>WC")
   If pSearch'="" {
     If pSearch["," {
@@ -984,7 +993,10 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
 		$$$ThrowOnError(tSC)
     Set name = tRes.Name
     Set list = list + 1
-		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root, tRes.LastUpdated)
+		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
+		If checkUpdateTime {
+			Set list(list) = list(list) _ $ListBuild(tRes.LastUpdated)
+		}
 		If maxWidth<$Length(name) {
       Set maxWidth = $Length(name)
     }
@@ -2990,7 +3002,7 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     If $Data(pModifiers("showsource")) {
       Write " ", $$$FormattedLine($$$Magenta, root)
     }
-    If $Data(pModifiers("showtime")) {
+    If $Data(pModifiers("showtime")) && ($Data(lastUpdated) # 2) {
       Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
     }
 
