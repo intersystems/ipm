@@ -892,25 +892,13 @@ ClassMethod GetListNamespace(Output list, pSearch As %String = "")
   Kill list
   Set list = 0
 
-  // Build pattern for matching outside of SQL. 
+  // Build regex for matching outside of SQL. 
   // Directly using `where Nsp LIKE ?` causes a bug described in https://github.com/intersystems/ipm/issues/579 
   Set pSearch = $Zstrip(pSearch, "<>WC")
   If pSearch = "" {
     Set pSearch = "*"
   }
-  Set pieces = $ListFromString(pSearch, "*")
-  Set transformedPieces = ""
-  Set ptr = 0
-  While $ListNext(pieces, ptr, val) {
-    If val '? .(1AN,1"%") { // namespace contain only numbers, letters and %, otherwise there's guaranteed no match
-      Return
-    }
-    Set transformedPieces = transformedPieces _ $ListBuild(1_$$$QUOTE(val))
-  }
-  Set pattern = $ListToString(transformedPieces, ".(1AN,1""%"")")
-  If pattern = "" { // should never happen
-    Set pattern = "0""""" 
-  }
+  Set regex = ##class(%IPM.DataType.RegExString).FromWildCard(pSearch)
 
   Set width = 0
   Set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
@@ -919,7 +907,7 @@ ClassMethod GetListNamespace(Output list, pSearch As %String = "")
   While tRes.%Next(.tSC) {
     $$$ThrowOnError(tSC)
     Set nsp = tRes.Nsp
-    If nsp ? @pattern {
+    If $Match(nsp, regex) {
       Set list(nsp) = ""
     }
   }
