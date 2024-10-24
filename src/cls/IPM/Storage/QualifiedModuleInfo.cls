@@ -6,7 +6,7 @@ Class %IPM.Storage.QualifiedModuleInfo Extends %IPM.Storage.ModuleInfo
 Parameter DEFAULTGLOBAL = "^IPM.Storage.QualifyModInfo";
 
 /// The name of the repository the module is in (The Name property in <class>%IPM.Repo.Definition</class>. <br />
-Property ServerName As %String;
+Property ServerName As %String(MAXLEN = 100);
 
 Method %OnNew(pServerName As %String = "", pResolvedReference As %IPM.Storage.ModuleInfo = "") As %Status [ Private, ServerOnly = 1 ]
 {
@@ -66,4 +66,3 @@ Storage Default
 }
 
 }
-
