@@ -613,7 +613,7 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
   Set tVerbose = $Get(pParams("Verbose"))
   If $Get(pParams("BypassPyDeps"), 0) {
     If tVerbose {
-      Write !, "Skipping installation of Python dependencies because BypassPyDeps is set."
+      Write !, "Skipping installation of Python dependencies because -bypass-py-deps is set."
     }
 	Quit $$$OK
   }

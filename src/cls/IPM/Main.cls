@@ -251,7 +251,7 @@ load https://github.com/user/repository.git
 load https://github.com/user/repository.git -branch feature-1
 </example>
 <example description="Loads the module described in C:\module\root\path\module.xml without installing python dependencies">
-	load -DBypassPyDeps=1 C:\module\root\path\
+	load -bypass-py-deps C:\module\root\path\
 </example>
 
 
@@ -261,6 +261,7 @@ load https://github.com/user/repository.git -branch feature-1
 <modifier name="nodev" dataAlias="DeveloperMode" dataValue="0" description="Disables the DeveloperMode flag for the module's lifecycle." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -360,7 +361,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 	install HS.JSON 1.x
 </example>
 <example description="Installs HS.JSON without installing python dependencies">
-	install -DBypassPyDeps=1 HS.JSON
+	install -bypass-py-deps HS.JSON
 </example>
 
 <!-- Parameters -->
@@ -374,6 +375,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
+<modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 
 </command>
 
@@ -389,7 +391,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 	reinstall -dev ZHSLIB
 </example>
 <example description="Reinstalls the currently-installed vresion of the ZHSLIB module without reinstalling python dependencies">
-	reinstall -DBypassPyDeps=1 ZHSLIB
+	reinstall -bypass-py-deps ZHSLIB
 </example>
 
 <!-- Parameters -->
@@ -400,6 +402,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="shallow" aliases="s" dataAlias="UpdateSnapshots" dataValue="0" description="Suppresses updating of dependencies with '+snapshot' versions." />
+<modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 
 </command>
 
