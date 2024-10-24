@@ -725,6 +725,7 @@ ClassMethod GetVersion(ModuleName, ByRef out, list)
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
+	New $$$DeprecationWarned
 	Set pException = $$$NULLOREF
 	Set tOneCommand = 0
 	Set tCommand = $Get(pCommand)
@@ -739,6 +740,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	)
 	Set tInShell = 0
 	For {
+		Kill $$$DeprecationWarned
 		Try {
 			
 			// Have intro message just for first entrance to shell
