@@ -50,4 +50,19 @@ ClassMethod IsValid(%val As %CacheString) As %Status [ ServerOnly = 0 ]
     return $$$OK
 }
 
+ClassMethod FromWildCard(wildcard As %String) As %String
+{
+    Set regex = ""
+    For i=1:1:$Length(wildcard) {
+        Set char = $Extract(wildcard, i)
+        If char = "*" {
+            Set regex = regex_".*"
+        } Else {
+            Set regex = regex_char
+        }
+    }
+    // Is there a way to return an instance of this class instead of %String?
+    Quit "^(?i)"_regex_"$"
+}
+
 }
