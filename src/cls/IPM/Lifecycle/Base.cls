@@ -611,6 +611,12 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     Quit $$$OK
   }
   Set tVerbose = $Get(pParams("Verbose"))
+  If $Get(pParams("BypassPyDeps"), 0) {
+    If tVerbose {
+      Write !, "Skipping installation of Python dependencies because BypassPyDeps is set."
+    }
+	Quit $$$OK
+  }
   Set pythonRequirements = ##class(%File).NormalizeFilename("requirements.txt", pRoot)
   If '##class(%File).Exists(pythonRequirements) {
     Quit $$$OK

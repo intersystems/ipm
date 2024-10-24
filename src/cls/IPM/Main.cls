@@ -250,6 +250,9 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 load https://github.com/user/repository.git
 load https://github.com/user/repository.git -branch feature-1
 </example>
+<example description="Loads the module described in C:\module\root\path\module.xml without installing python dependencies">
+	load -DBypassPyDeps=1 C:\module\root\path\
+</example>
 
 
 <!-- Modifiers -->
@@ -356,6 +359,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Installs the most recent 1.x version of HS.JSON available in any configured repository in the current namespace.">
 	install HS.JSON 1.x
 </example>
+<example description="Installs HS.JSON without installing python dependencies">
+	install -DBypassPyDeps=1 HS.JSON
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to install" />
@@ -381,6 +387,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <!-- Examples -->
 <example description="Reinstalls the currently-installed version of the ZHSLIB module, in development mode">
 	reinstall -dev ZHSLIB
+</example>
+<example description="Reinstalls the currently-installed vresion of the ZHSLIB module without reinstalling python dependencies">
+	reinstall -DBypassPyDeps=1 ZHSLIB
 </example>
 
 <!-- Parameters -->

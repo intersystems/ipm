@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #538 Added ability to customize caller to PipCaller and UseStandalonePip through `config set`, which are empty by default and can be used to override the auto-detection of pip.
 - #562 Added a generic resource processpor `WebApplication`, which handles creating and removal of all Security.Applications resources
 - #575 Added ability to expand `$$$macro` in module.xml. The macro cannot take any arguments yet.
+- #595 Added ability to bypass installation of python dependencies with -DBypassPyDeps=1.
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.
