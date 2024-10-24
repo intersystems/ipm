@@ -1,4 +1,4 @@
-Include (%sySecurity, %occErrors)
+Include (%sySecurity, %occErrors, %IPM.Common, %IPM.Formatting)
 
 Class %IPM.ResourceProcessor.CSPApplication Extends (%IPM.ResourceProcessor.Abstract, %XML.Adaptor, %Installer.CSPApplication) [ PropertyClass = %IPM.ResourceProcessor.PropertyParameters ]
 {
@@ -31,10 +31,10 @@ Parameter XMLTYPE = "IPMCSPApplication";
 Property Enabled As %Boolean [ InitialExpression = 1 ];
 
 /// DeepSee Enabled
-Property DeepSeeEnabled As %Boolean [ InitialExpression = 0 ];
+Property DeepSeeEnabled As %Installer.Boolean [ InitialExpression = 0 ];
 
 /// iKnow Enabled
-Property iKnowEnabled As %Boolean [ InitialExpression = 0 ];
+Property iKnowEnabled As %Installer.Boolean [ InitialExpression = 0 ];
 
 /// Password authentication enabled
 Property PasswordAuthEnabled As %Boolean [ InitialExpression = 0 ];
@@ -68,6 +68,12 @@ Property PermittedClasses As %String(MAXLEN = 32767);
 
 Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
+	Set packageName = pResourceReference.Module.Name
+	If ($Get(packageName) '= "") && '$Data($$$DeprecationWarned(packageName)) {
+		Set $$$DeprecationWarned(packageName) = 1
+		Write !, $$$FormattedLine($$$Red, "WARNING: The <CSPApplication></CSPApplication> resource tag is deprecated and may be removed in a future release of IPM.")
+		Write !, $$$FormattedLine($$$Red, $$$FormatText("         Please contact the package developer of %1 to use <WebApplication></WebApplication> instead", packageName))
+	}
 	Set tSC = ##super(pResourceReference)
 	Set ..Url = $ZConvert(..Url,"L")
 	Quit tSC
