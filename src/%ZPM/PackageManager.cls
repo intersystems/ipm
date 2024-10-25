@@ -657,20 +657,27 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 /// Get list Namespace, example do ##(%ZPM.PackageManager).GetListNamespace(.ns)
 ClassMethod GetListNamespace(Output list, pSearch As %String = "")
 {
+  Kill list
   Set list = 0
-  Set width = 0
-  Set tArgs = 0
-  Set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
-  If pSearch'="" {
-    Set tQuery = tQuery _ " WHERE Nsp " _ $Select(pSearch["*": "LIKE", 1: "=") _ " ?"
-    Set tArgs($Increment(tArgs)) = $Translate($$$UPPER(pSearch), "*", "%")
+
+  // Build regex for matching outside of SQL. 
+  // Directly using `where Nsp LIKE ?` causes a bug described in https://github.com/intersystems/ipm/issues/579 
+  Set pSearch = $Zstrip(pSearch, "<>WC")
+  If pSearch = "" {
+    Set pSearch = "*"
   }
-  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
+  Set regex = ##class(%ZPM.PackageManager.Core.RegExString).FromWildCard(pSearch)
+
+  Set width = 0
+  Set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
+  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
   $$$ThrowSQLIfError(tRes.%SQLCODE, tRes.%Message)
   While tRes.%Next(.tSC) {
     $$$ThrowOnError(tSC)
     Set nsp = tRes.Nsp
-    Set list(nsp) = ""
+    If $Match(nsp, regex) {
+      Set list(nsp) = ""
+    }
   }
 }
 
@@ -1759,9 +1766,49 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-Query ActiveNamespaces() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
+/// Implemented as custom query instead of `select Nsp, Nsp from %SYS.Namespace_List(0,0) WHERE status = 1` because of a DP issue, see https://github.com/intersystems/ipm/issues/579
+Query ActiveNamespaces() As %Query(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
 {
-	select Nsp,Nsp from %SYS.Namespace_List(0,0) where Status = 1
+}
+
+ClassMethod ActiveNamespacesExecute(qHandle As %Binary) As %Status
+{
+  Try {
+    Set tQuery = "SELECT NSP, Status FROM %SYS.Namespace_List(0,0)"
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, tQuery)
+    Kill qHandle
+    While rs.%Next() {
+      If rs.%Get("Status") {
+        Set qHandle($INCREMENT(qHandle)) = rs.%Get("NSP")
+      }
+    }
+    Set qHandle = 0
+  } catch ex {
+    Return ex.AsStatus()
+  }
+  Return $$$OK
+}
+
+ClassMethod ActiveNamespacesFetch(qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = ActiveNamespacesExecute ]
+{
+  Try {
+    If $Data(qHandle($Increment(qHandle)), nsp) # 2 {
+      Set Row = $ListBuild(nsp, nsp)
+      Set AtEnd = 0
+    } Else {
+      Set Row = ""
+      Set AtEnd = 1
+    }
+  } catch ex {
+    Return ex.AsStatus()
+  }
+  Return $$$OK
+}
+
+ClassMethod ActiveNamespacesClose(qHandle As %Binary) As %Status [ PlaceAfter = ActiveNamespacesFetch ]
+{
+  Kill qHandle
+  Return $$$OK
 }
 
 ClassMethod Manage(ByRef pCommandInfo) [ Internal ]
