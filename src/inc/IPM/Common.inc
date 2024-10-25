@@ -27,11 +27,11 @@ ROUTINE %IPM.Common [Type=INC]
 #define ZPMDependencyTempDataNext $Increment($$$ZPMDependencyTempData)
 /// Global to keep track of packages in the current namespace for invalid reference
 /// checks in the dependency analyzer
-#define ZPMDependencyNsPackages ^IRIS.Temp.ZPMDepNsPackages
+#define ZPMDependencyNsPackages ^IRIS.Temp.IPMDepNsPackages
 #define ZPMDefaultModifiers ^%IPM.DefaultModifiers
 
 #; Temp global used to store source control output from CSP pages to be shown in Studio/Atelier console
-#define ZPMExtensionOutput ^IRIS.Temp.ZPMExtensionOutput($Username,$Namespace)
+#define ZPMExtensionOutput ^IRIS.Temp.IPMExtensionOutput($Username,$Namespace)
 #define ZPMExtensionOutputClear Kill $$$ZPMExtensionOutput
 #define ZPMExtensionOutputSet(%array) $$$ZPMExtensionOutputClear Merge $$$ZPMExtensionOutput = %array
 #define ZPMExtensionOutputGet(%array) Merge %array = $$$ZPMExtensionOutput
