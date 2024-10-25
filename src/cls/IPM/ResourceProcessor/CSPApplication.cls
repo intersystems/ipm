@@ -69,8 +69,8 @@ Property PermittedClasses As %String(MAXLEN = 32767);
 Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set packageName = pResourceReference.Module.Name
-	If ($Get(packageName) '= "") && '$Data($$$DeprecationWarned(packageName)) {
-		Set $$$DeprecationWarned(packageName) = 1
+	If ($Get(packageName) '= "") && '$Data($$$DeprecationWarned(packageName, "CSPApplication")) {
+		Set $$$DeprecationWarned(packageName, "CSPApplication") = 1
 		Write !, $$$FormattedLine($$$Red, "WARNING: The <CSPApplication></CSPApplication> resource tag is deprecated and may be removed in a future release of IPM.")
 		Write !, $$$FormattedLine($$$Red, $$$FormatText("         Please contact the package developer of %1 to use <WebApplication></WebApplication> instead", packageName))
 	}
