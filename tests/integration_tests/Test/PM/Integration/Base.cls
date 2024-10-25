@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class Test.PM.Integration.Base Extends %UnitTest.TestCase
 {
 
@@ -13,11 +15,18 @@ Property ClientNSCreated As %Boolean [ InitialExpression = 0 ];
 
 Property RegistryAdded As %Boolean [ InitialExpression = 0 ];
 
+Property PreexistingModules As %Library.ArrayOfDataTypes;
+
+Property OriginalNamespace As %String;
+
+// Multidimensional doesn't work well
+
 Method Setup() As %Status
 {
 	Set tSC = $$$OK
 	Try {
 		New $Namespace
+		Set tSC = $$$ADDSC(tSC, ..RecordOldModules())
 		do $$$AssertStatusOK(##class(%IPM.Repo.Filesystem.Definition).%DeleteExtent())
 		do $$$AssertStatusOK(##class(%IPM.Repo.Remote.Definition).%DeleteExtent())
 		
@@ -69,10 +78,51 @@ Method TearDown() As %Status
 		if ..RegistryAdded {
 			Do $$$AssertStatusOK(##class(%IPM.Repo.Definition).ServerDefinitionKeyDelete(..#REGISTRYNAME))
 		}
+		Set tSC = $$$ADDSC(tSC, ..DeleteNewModules())
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
+}
+
+Method DeleteNewModules() As %Status
+{
+	Set sc = $$$OK
+	Try {
+		Do ##class(%IPM.Main).GetListModules(..OriginalNamespace, "", .list)	
+		Zwrite "", "DeleteNewModules", $classname(), list
+		For i = 1:1:list {
+			Set modName = $ListGet(list(i))
+			// $$$IPMModuleName should be already in PreexistingModules, but just in case
+			If modName = $$$IPMModuleName { 
+				Continue
+			}
+			If ..PreexistingModules.IsDefined(modName) {
+				Set sc = $$$ADDSC(sc, ##class(%IPM.Main).Shell("uninstall "_modName))
+			}
+		}
+	} Catch e {
+		Set sc = $$$ADDSC(sc, e.AsStatus())
+	}
+	Return sc
+}
+
+/// OnBeforeAllTests is not compatible with $$$AssertSkipped
+Method RecordOldModules() As %Status
+{
+	Try {
+		Set ..OriginalNamespace = $Namespace
+		Do ##class(%IPM.Main).GetListModules($Namespace, "", .list)
+		Zwrite "", "RecordOldModules", $classname(), list
+		Do ..PreexistingModules.Clear()
+		For i = 1:1:list {
+			Set modName = $ListGet(list(i))
+			Do ..PreexistingModules.SetAt("", modName)
+		}
+	} Catch e {
+		Return e.AsStatus()
+	}
+	Return $$$OK
 }
 
 ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName As %String, ByRef pModule As %IPM.Storage.Module) As %Status
