@@ -1,33 +1,46 @@
 Include (%IPM.Common, %IPM.Formatting)
 
+/// Persistent class for history of all installations, uninstalls, and loads in the system. This class is shared among namespaces that share %IPM mappings.
 Class %IPM.General.History Extends %Persistent
 {
 
+/// Action of this history record. Can be load, install, or uninstall
 Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
 
-/// Package is not necessarily requried. E.g., when loading a nonexistent directory.
+/// Name of the package being loaded/installed/uninstall. This is not necessarily requried. E.g., when loading a nonexistent directory.
 Property Package As %IPM.DataType.ModuleName;
 
+/// Version of the package being loaded/installed/uninstall. This is not necessarily requried. E.g., when loading a nonexistent directory.
 Property Version As %IPM.General.SemanticVersion [ Required ];
 
-Property SourceName As %String(MAXLEN = 100);
+/// Name of the repository where the package is being installed. For load and uninstall, this will be empty.
+Property SourceName As %IPM.DataType.RepoName(MAXLEN = 100);
 
-Property SourceMoniker As %String(MAXLEN = 100);
+/// Moniker of the repository where the package is being installed. For load and uninstall, this will be empty.
+Property SourceMoniker As %IPM.DataType.RepoMoniker(MAXLEN = 100);
 
+/// Details of the repository where the package is being installed. For load and uninstall, this will be empty.
 Property SourceDetails As %String(MAXLEN = "");
 
+/// Time when the action started
 Property TimeStart As %TimeStamp [ Required ];
 
+/// Time when the action ended. This will be empty if the action is still in progress or ended abnormally.
 Property TimeEnd As %TimeStamp;
 
+/// Namespace where the action is being performed
 Property NameSpace As %String [ InitialExpression = {$NAMESPACE}, Required ];
 
+/// User who initiated the action
 Property UserName As %String [ InitialExpression = {$USERNAME}, Required ];
 
+/// Status of the action. If the action is still in progress, this will be 0. Otherwise, it will be the status code of the action.
 Property Success As %Status [ InitialExpression = 0, Required ];
 
+/// Whether the action is committed. In non developer mode, this indicates whether the action was successful. In developer mode, this is always true.
 Property Committed As %Boolean [ InitialExpression = 0, Required ];
 
+/// The command string that triggered the action
 Property CommandString As %String(MAXLEN = 8192) [ Required ];
 
 ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName) As %IPM.General.History [ Private ]
