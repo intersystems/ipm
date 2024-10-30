@@ -281,9 +281,9 @@ Method %Clean(ByRef pParams) As %Status
 					}
 					
 					Set tName = $Piece(tChildKey,".",1,*-1)
-					Set tExt = $Piece(tChildKey,".",*)
-          Continue:tExt=""
-          Continue:tName=""
+					Set tExt = $ZConvert($Piece(tChildKey,".",*),"U")
+					Continue:tExt=""
+					Continue:tName=""
 					Set tDeleteArray(tExt,tName) = ""
 				}
 			}
@@ -344,6 +344,9 @@ Method %Clean(ByRef pParams) As %Status
 							Continue
 						}
 						
+						If tVerbose {
+							Write !,"Deleting ",tFullName
+						}
 						Set tDelSC = ##class(%Library.RoutineMgr).Delete(tFullName)
 						If $$$ISERR(tDelSC) {
 							Write !,"WARNING: "_$System.Status.GetErrorText(tDelSC)
