@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #544: When installing a package from remote repo, IPM specifies `includePrerelease` and `includeSnapshots` in HTTP request. Correctly-behaving zpm registry should respect that.
 - #557: When comparing semver against semver expressions, exclude prereleases and snapshots from the range maximum.
 - #559: Allow treating the "w" in SemVer x.y.z-w as a post-release rather than pre-release.
+- #606: Don't put garbage folders in tar archive
 
 ### Security
 -

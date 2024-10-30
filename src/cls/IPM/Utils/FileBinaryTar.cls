@@ -321,6 +321,10 @@ ClassMethod ConstructTar(Path As %String, RelativeTo As %String, archive As %Str
     set flag = 5 // Directory
     set size = 0
     set name = ##class(%File).GetFilename($Extract(Path,1,*-1))
+    set prefix = $Extract(prefix,1,*-$Length(name)-1)
+    if $$$isWINDOWS {
+      set prefix = $Replace(prefix,"\","/")
+    }
   } else {
     set Path = ##class(%File).NormalizeFilename(Path)
     set prefix = ##class(%File).GetDirectory(Path)
@@ -328,6 +332,9 @@ ClassMethod ConstructTar(Path As %String, RelativeTo As %String, archive As %Str
     set flag = 0 // Ordinary File
     set size = ##class(%File).GetFileSize(Path)
     set name = ##class(%File).GetFilename(Path)
+    if $$$isWINDOWS {
+      set prefix = $Replace(prefix,"\","/")
+    }
   }
 
   set mtime = ##class(%File).GetFileDateModified(Path, 1)
@@ -366,7 +373,9 @@ ClassMethod ConstructTar(Path As %String, RelativeTo As %String, archive As %Str
       do archive.Write(padding)
     }
   } else {
-    do archive.Write(header)
+    if (Path '= RelativeTo) {
+      do archive.Write(header)
+    }
     set rs = ##class(%File).FileSetFunc(Path, , "Type", 1)
     while rs.%Next() {
       do ..ConstructTar(rs.Name, RelativeTo, archive)
