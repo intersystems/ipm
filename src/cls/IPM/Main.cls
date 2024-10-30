@@ -639,14 +639,14 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<summary>Manage history of package installation/uninstallation.</summary>
 	<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall. By default, all entries will be affected. To specify filters, use the -Dcol=val syntax. See examples for more.</description>
 	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
-	<modifier name="ascend" aliases="asc" value="false" description="If specified, will list the history logs in ascending order. Default behaviour is to list in descending order."/>
-	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. By default, all logs will be printed. "/>
+	<modifier name="sort" aliases="asc" value="true" description="List the history logs in a specific order. Allowed values are asc and desc. Default behaviour is to list logs in descending order of %ID."/>
+	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. If set to 0, all logs will be displayed. If omitted, will use the value returned by `zpm &quot;config get DefaultLogEntryLimit&quot;`."/>
 	<parameter name="action" required="true" description="One of history actions: find (default), details, delete, schema" />
 	<parameter name="argument" required="false" description="Argument for `details` command" />
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
 	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
 	<example description="Show history of all packages in the current namespace where start time is later than 2000-01-01 00:00:00">history find -DTimeStart=">2000-01-01 00:00:00"</example>
-	<example description="Show 5 history records in the current namespace in ascending order">history find -ascend -limit 5</example>
+	<example description="Show 5 history records in the current namespace in ascending order">history find -sort asc -limit 5</example>
 	<example description="Show column names that the table can be filtered by">history schema</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
@@ -2922,8 +2922,9 @@ ClassMethod History(ByRef pCommandInfo)
 
 	If (action = "find") || (action = "") {
 		Set globally = $$$HasModifier(pCommandInfo, "globally")
-		Set ascend = $$$HasModifier(pCommandInfo, "ascend")
+		Set ascend = ($$$GetModifier(pCommandInfo, "sort") = "asc")
 		Set limit = $$$GetModifier(pCommandInfo, "limit")
+		Set limit = $Select(limit="": ##class(%IPM.Repo.UniversalSettings).GetValue("DefaultLogEntryLimit"), limit=0: "", 1: +limit)
 
 		Merge filter = pCommandInfo("data", "zpm")
 		Set mthd = $Select(globally: "GetHistoryGlobally", 1: "GetHistory")

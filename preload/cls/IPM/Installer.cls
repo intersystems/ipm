@@ -102,6 +102,7 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("DefaultLogEntryLimit",20, 0))
     Quit $$$OK
 }
 
