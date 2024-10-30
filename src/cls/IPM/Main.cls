@@ -70,7 +70,7 @@ Currently, there may only be one of these per namespace.
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="export-deps" dataAlias="ExportDependencies" dataValue="1" description="If specified, will export dependencies of the module to the filesystem. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. Can be manually set to 0 with -DExportDependencies=0. This modifier is only used in &quot;Package&quot; lifecycle." />
+<modifier name="export-deps" value="true" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; lifecycle." />
 
 </command>
 
