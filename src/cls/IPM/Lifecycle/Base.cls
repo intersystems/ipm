@@ -864,7 +864,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 	Set tSC = $$$OK
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
-    Merge tParams = pParams
+		Merge tParams = pParams
 
 		Kill pDependencyGraph
 		If ($Get(pTargetDirectory) = "") {
@@ -881,15 +881,16 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Quit
 			}
 		}
-    Set tParams("ModuleExportPath") = pTargetDirectory
+		Set tParams("ModuleExportPath") = pTargetDirectory
 		
-		Set tSC = ..Module.GetResolvedReferences(.tResourceArray,..#EXPORTDEPENDENCIES,..PhaseList,1,.pDependencyGraph)
+		Set tExportDependencies = $Get(pParams("ExportDependencies"), ..#EXPORTDEPENDENCIES)
+		Set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,1,.pDependencyGraph)
 		If $$$ISERR(tSC) {
 			Quit
 		}
 		
 		// First pass: if we're exporting dependencies, build an array of modules from which we are deriving things.
-		If ..#EXPORTDEPENDENCIES {
+		If tExportDependencies {
 			Set tFullResourceName = ""
 			For {
 				Set tFullResourceName = $Order(tResourceArray(tFullResourceName))
