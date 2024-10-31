@@ -29,6 +29,8 @@ Property Packaging As %String [ Required ];
 
 Property Dependencies As list Of %IPM.Storage.ModuleReference(STORAGEDEFAULT = "array");
 
+Property LastUpdated As %TimeStamp;
+
 Relationship Resources As %IPM.Storage.ResourceReference(XMLIO = "IN", XMLITEMNAME = "Resource", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
 /// Calculated property used for XML output of Resources relationship (in a reasonable order:
@@ -164,6 +166,23 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 	Return isEqual
 }
 
+/// Returns a multidimensional array of custom phases defined by the module's invokes,
+/// where the keys are the custom phase names and the values are empty strings.
+/// Custom phases do not have corresponding %method implementation in the lifecycle class.
+Method GetCustomPhases(Output pPhases)
+{
+    Kill pPhases
+    Set pPhases = ""
+    Set key = ""
+    For {
+        Set tInvoke = ..Invokes.GetNext(.key)
+        Quit:(key = "")
+        If (tInvoke.CustomPhase '= "") {
+            Set pPhases(tInvoke.CustomPhase) = ""
+        }
+    }
+}
+
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
 /// Example: $ListBuild("Clean","Test") or $ListBuild("Test","Install")
 /// @API.Method
@@ -196,7 +215,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			} ElseIf $$$comClassDefined($$$DefaultLifecyclePackageDot_tLifecycle) {
 				Set tModule.OverrideLifecycleClass = $$$DefaultLifecyclePackageDot_tLifecycle
 			} ElseIf ##class(%Library.File).Exists(tLifecycle) {
-				Set tSC = $System.OBJ.Load(tLifecycle,"ck"_$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+				Set tSC = $System.OBJ.Load(tLifecycle,"k"_$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+				$$$ThrowOnError(tSC)
+				Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoadedList)
 				$$$ThrowOnError(tSC)
 				Set tLoadedList = $ListFromString(tLoadedList)
 				Set tLifecycleClassFound = 0
@@ -271,7 +292,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tLifecycle.PhaseList = tPhases
 		Set tPointer = 0
 		Set tFullStart = $zh
+		Do tModule.GetCustomPhases(.tCustomPhases)
 		While $ListNext(tPhases,tPointer,tOnePhase) {
+            Set tIsCustomPhase = $Data(tCustomPhases(tOnePhase)) # 2
 			Set tStart = $zh
 			If tOnePhase="*" {
 				Kill tModule,tLifecycle
@@ -322,12 +345,14 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
           Quit:$$$ISERR(tSC)
         }
         Quit:$$$ISERR(tSC)
-				
-				// Lifecycle before / (phase) / after
-				$$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
-				$$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
-				$$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
-				
+
+        If 'tIsCustomPhase {
+            // Lifecycle before / (phase) / after
+            $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
+            $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
+            $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
+        }
+
         #; Call Invoke Methods After Phase	
         Set tKey = ""
         For {
@@ -1435,6 +1460,19 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Return attrValue
 }
 
+/// This callback method is invoked by the <METHOD>%Save</METHOD> method to 
+/// provide notification that the object is being saved. It is called before 
+/// any data is written to disk.
+/// 
+/// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
+/// 
+/// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
+Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
+{
+	Set ..LastUpdated = $ZDateTime($Horolog, 3)
+	Quit $$$OK
+}
+
 Storage Default
 {
 <Data name="Defaults">
@@ -1528,6 +1566,9 @@ Storage Default
 </Value>
 <Value name="27">
 <Value>AvailabilityClass</Value>
+</Value>
+<Value name="28">
+<Value>LastUpdated</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>

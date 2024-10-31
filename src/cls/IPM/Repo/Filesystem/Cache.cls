@@ -37,7 +37,7 @@ ClassMethod %OnBeforeBuildIndices(ByRef indexlist As %String(MAXLEN="") = "") As
 	Quit $$$OK
 }
 
-Query OrderedMatches(pRoot As %String = "", pName As %String = "", pVersionExpression As %String = "*", pParameters As %String = "") As %Query(ROWSPEC = "Name:%String,VersionString:%String") [ SqlProc ]
+Query OrderedMatches(pRoot As %String = "", pName As %String = "", pVersionExpression As %String = "*", pParameters As %String = "") As %Query(ROWSPEC = "Name:%String,VersionString:%String,Version_Major:%String,Version_Minor:%String,Version_Patch:%String,Version_Prerelease:%String,Version_Build:%String") [ SqlProc ]
 {
 }
 
@@ -62,7 +62,7 @@ ClassMethod OrderedMatchesFetch(ByRef qHandle As %Binary, ByRef Row As %List, By
 		}
 		Set tRoot = ..RootGetStored($ListGet(tRow))
 		If (tRoot = qHandle("root")) {
-			Set Row = $ListBuild(..NameGetStored($ListGet(tRow)),..VersionStringGetStored($ListGet(tRow)))
+			Set Row = $ListBuild(..NameGetStored($ListGet(tRow)),..VersionStringGetStored($ListGet(tRow)))_..VersionGetStored($ListGet(tRow))
 			Quit
 		}
 	}

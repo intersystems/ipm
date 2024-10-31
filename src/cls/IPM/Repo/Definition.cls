@@ -15,6 +15,10 @@ Parameter MONIKER As STRING [ Abstract ];
 
 Parameter MONIKERALIAS As STRING [ Abstract ];
 
+/// The maximum number of tabs to display for padding purposes.
+/// Override this in subclasses to provide more padding.
+Parameter MaxDisplayTabCount As INTEGER = 3;
+
 Index ServerDefinitionKey On Name [ Unique ];
 
 Property Name As %String(MAXLEN = 100) [ Required ];
@@ -79,17 +83,31 @@ ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 	Quit tServer.GetSortOrder()
 }
 
+/// Get a number of TABs (ascii 9) for display padding purposes.
+/// A total of (..#MaxDisplayTabCount - pDecrement) tabs are returned
+/// This is used to align output in the package manager shell.
+/// If a new option is added to the display, only the parameter `#MaxDisplayTabCount` needs to be changed.
+ClassMethod Padding(pDecrement As %Integer = 0) As %String [ Internal ]
+{
+	Set pDecrement = ..#MaxDisplayTabCount - pDecrement
+	Set tTabs = ""
+	For i = 1:1:pDecrement {
+		Set tTabs = tTabs_$Char(9)
+	}
+	Return tTabs
+}
+
 /// Outputs information about this server to the current device.
 /// Subclasses may override to show additional information, but should typically call ##super() at the beginning.
 Method Display()
 {
 	Write !,..Name
-	Write !,$c(9),"Source: ",$c(9),$c(9),..Details
-	Write !,$c(9),"Enabled?",$c(9),$c(9),$$$YesNo(..Enabled)
-	Write !,$c(9),"Available?",$c(9),$c(9),$$$YesNo(..GetPackageService().IsAvailable())
-	Write !,$c(9),"Use for Snapshots?",$c(9),$$$YesNo(..Snapshots)
-	Write !,$c(9),"Use for Prereleases?",$c(9),$$$YesNo(..Prereleases)
-	Write !,$c(9),"Is Read-Only?",$c(9),$c(9),$$$YesNo(..ReadOnly)
+	Write !,$c(9),"Source: ",..Padding(1),..Details
+	Write !,$c(9),"Enabled?",..Padding(1),$$$YesNo(..Enabled)
+	Write !,$c(9),"Available?",..Padding(1),$$$YesNo(..GetPackageService().IsAvailable())
+	Write !,$c(9),"Use for Snapshots?",..Padding(2),$$$YesNo(..Snapshots)
+	Write !,$c(9),"Use for Prereleases?",..Padding(2),$$$YesNo(..Prereleases)
+	Write !,$c(9),"Is Read-Only?",..Padding(1),$$$YesNo(..ReadOnly)
 }
 
 /// Called from package manager shell to create or update an instance of this class.

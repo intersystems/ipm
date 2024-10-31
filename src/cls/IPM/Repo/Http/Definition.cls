@@ -3,6 +3,10 @@ Class %IPM.Repo.Http.Definition Extends %IPM.Repo.Definition [ Abstract ]
 
 Parameter MONIKER As String = "http";
 
+/// The maximum number of tabs to display for padding purposes.
+/// Override this in subclasses to provide more padding.
+Parameter MaxDisplayTabCount As INTEGER = 4;
+
 Property URL As %String(MAXLEN = 2048) [ Required ];
 
 Index URL On URL [ Unique ];
@@ -69,16 +73,16 @@ Method Display()
 {
 	Do ##super()
 
-	Write !,$c(9),"Deployment Enabled? ",$c(9),$Case(..DeploymentEnabled,1:"Yes",:"No")
+	Write !,$c(9),"Deployment Enabled? ",..Padding(3),$Case(..DeploymentEnabled,1:"Yes",:"No")
 
 	If (..Username '= "") {
-		Write !,$c(9),"Username: ",$c(9),$c(9),..Username
+		Write !,$c(9),"Username: ",..Padding(1),..Username
 	}
 	If (..Password '= "") {
-		Write !,$c(9),"Password: ",$c(9),$c(9),$Case(..Password,"":"<unset>",:"<set>")
+		Write !,$c(9),"Password: ",..Padding(1),$Case(..Password,"":"<unset>",:"<set>")
 	}
 	If (..Token '= "") {
-		Write !,$c(9),"Token: ",$c(9),$c(9),$c(9),$Case(..Token,"":"<unset>",:"<set>")
+		Write !,$c(9),"Token: ",..Padding(0),$Case(..Token,"":"<unset>",:"<set>")
 	}
 }
 

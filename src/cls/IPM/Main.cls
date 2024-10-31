@@ -70,6 +70,7 @@ Currently, there may only be one of these per namespace.
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="export-deps" value="true" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; lifecycle." />
 
 </command>
 
@@ -242,6 +243,7 @@ repositories configured with the 'repo' command.
 <example description="Loads the module described in C:\module\root\path\module.xml">
 load C:\module\root\path\
 load C:\module\root\path\module-0.0.1.tgz
+load C:\module\root\path\module-0.0.1.tar.gz
 </example>
 <example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
 load -dev -verbose C:\module\root\path\
@@ -467,6 +469,10 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <!-- Modifiers -->
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
 <modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
+<modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
+<modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
+<modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
+<modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 
 </command>
 
@@ -910,7 +916,7 @@ ClassMethod SwitchToNamespace(pNamespace As %String = {$Namespace}) As %Status
 
 /// Get List Modules
 /// example d ##class(%IPM.Main).GetListModules("%SYS","zpm",.list)
-ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %String = "", ByRef list, pExtraFields As %String = "") [ Internal ]
+ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %String = "", ByRef list, pExtraFields As %String = "", pRepository As %String = "") [ Internal ]
 {
   Set list = 0
   If (pNamespace="") || (pNamespace["*") {
@@ -922,7 +928,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
       Set ns = $Order(listNS(ns)) 
       Quit:ns=""
       Kill listModules
-      Do ..GetListModules(ns, pSearch, .listModules, pExtraFields)
+      Do ..GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
       Continue:(pSearch'="")&&('$Get(listModules))
       If width < $Length(ns) {
         Set width = $Length(ns)
@@ -947,7 +953,16 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Quit
   }
   Set tArgs = 0
-	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode FROM %IPM_Storage.ModuleItem"
+  // HACK: Certain IRIS kit, e.g., irishealth-community 2024.1 comes with %IPM in HSLIB and HSSYS namespaces
+  // The caveat is that the %IPM.Storage.Module doesn't have an "LastUpdated" property
+  // So, we need to check if the property exists before querying it
+  $$$ThrowOnError(##class(%SYSTEM.SQL.Schema).GetAllColumns("%IPM_Storage.ModuleItem", .columns))
+  Set checkUpdateTime = $Data(columns("LastUpdated"))
+  Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root"
+  If checkUpdateTime {
+	Set tQuery = tQuery _ ",LastUpdated"
+  }
+  Set tQuery = tQuery _ " FROM %IPM_Storage.ModuleItem WHERE 1=1 "
   Set pSearch = $ZStrip(pSearch, "<>WC")
   If pSearch'="" {
     If pSearch["," {
@@ -960,11 +975,15 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
         Set tParams = tParams _ $ListBuild("?")
         Set tArgs($Increment(tArgs)) = tItem
       }
-      Set tQuery = tQuery _ " WHERE name IN (" _ $ListToString(tParams, ", ") _ ")"
+      Set tQuery = tQuery _ " AND name IN (" _ $ListToString(tParams, ", ") _ ")"
     } ElseIf pSearch'="*" {
-      Set tQuery = tQuery _ " WHERE name " _ $Select(pSearch["*": "like ?", 1: "= ?")
+      Set tQuery = tQuery _ " AND name " _ $Select(pSearch["*": "like ?", 1: "= ?")
       Set tArgs($Increment(tArgs)) = $Translate(pSearch, "*", "%")
     }
+  }
+  If pRepository'="" {
+    Set tQuery = tQuery _ " AND Repository = ?"
+    Set tArgs($Increment(tArgs)) = pRepository
   }
   Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
 	If (tRes.%SQLCODE < 0) {
@@ -976,7 +995,10 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
 		$$$ThrowOnError(tSC)
     Set name = tRes.Name
     Set list = list + 1
-		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode)
+		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
+		If checkUpdateTime {
+			Set list(list) = list(list) _ $ListBuild(tRes.LastUpdated)
+		}
 		If maxWidth<$Length(name) {
       Set maxWidth = $Length(name)
     }
@@ -1869,9 +1891,34 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
-	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($Piece(tDirectoryName, ".", *)) = "tgz" {
+	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
-		Set tSC = ##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory)
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Extracting archive to ",tTargetDirectory
+		}
+		$$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
+		// Try to locate the top-level module.xml file
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Trying to locate module.xml file in ", tTargetDirectory
+		}
+		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
+		If (tCount = 0) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
+		} Else {
+			// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+			Set tModuleFilePath = $ListGet(tList(tCount), *)
+			Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+			If $Get(pCommandInfo("data", "Verbose")) {
+				Write !,"Found "_tCount_" results. They are: "
+				Set idx = ""
+				For {
+					Set idx = $Order(tList(idx))
+					Quit:(idx="")
+					Write !, $Char(9), $List(tList(idx), *)
+				}
+				Write !, "Using module.xml file at ", tModuleFilePath
+			}
+		}
 		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
 	}
 }
@@ -2152,7 +2199,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 	} Else {
     Set showFields = ""
     If +$Get(pCommandInfo("data","Desc")) {
-      Set showFields = $ListBuild(
+      Set showFields = showFields_$ListBuild(
         "Description",
         "Author.CopyrightDate", 
         "Author.License", 
@@ -2163,9 +2210,10 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
       )
     }
 		Set tDesc=+$Get(pCommandInfo("data","Desc"))
-    Do ..GetListModules(,tSearchString, .list, showFields)
+    Do ..GetListModules(,tSearchString, .list, showFields, $Get(pCommandInfo("modifiers", "repository")))
 	}
-  Do ..DisplayModules(.list)
+  Merge tModifiers = pCommandInfo("modifiers")
+  Do ..DisplayModules(.list,,,, .tModifiers)
 }
 
 /// Get module list in currently namespace
@@ -2878,7 +2926,7 @@ ClassMethod ShellScript(pCommand As %String, pOutputLogFile As %String = "", pAp
 	}
 }
 
-ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespace As %Boolean = 0, pIndent As %Integer = 0)
+ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespace As %Boolean = 0, pIndent As %Integer = 0, ByRef pModifiers)
 {
   If '$Data(pList) {
     Quit
@@ -2923,17 +2971,45 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     $ListBuild("Repository", $$$Blue)
   )
 
+  Kill serverVersions
+  If $Data(pModifiers("showupstream")) {
+    Do ..GetUpstreamPackageVersions(.serverVersions)
+  }
+
   Set width = $Get(pList("width")) + 1
   Set tIndent = pIndent
   Set tIndent = $Select(pIndent > 0: pIndent, 1: width)
   For i=1:1:pList {
     Set info = pList(i)
     Set developerMode = 0
-    Set $ListBuild(name, version, externalName, developerMode) = info
+    Set root = ""
+    Set $ListBuild(name, version, externalName, developerMode, root, lastUpdated) = info
     Write:i>1 !,?pIndent
     Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Blue, version)
+    If $Data(pModifiers("showupstream")) && ($Data(serverVersions(name)) / 10) {
+      Set r = ""
+      Set diffs = ""
+      For {
+        Set r = $Order(serverVersions(name, r), 1, sVer)
+        If r = "" {
+          Quit
+        }
+        If sVer '= version {
+          Set diffs = diffs_$ListBuild($$$FormatText("%1: %2", r, sVer))
+        }
+      }
+      If diffs '= "" {
+        Write " ", $$$FormattedLine($$$Blue, "(" _ $ListToString(diffs, ", ") _ ")")
+      }
+    }
     If $Get(developerMode) {
       Write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
+    }
+    If $Data(pModifiers("showsource")) {
+      Write " ", $$$FormattedLine($$$Magenta, root)
+    }
+    If $Data(pModifiers("showtime")) && ($Data(lastUpdated) # 2) {
+      Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
     }
 
     Set ptr = 0 
@@ -2946,6 +3022,25 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
         Write !,?tIndent
         Do ..DrawColumn($$$FormattedLine(color, colName _ ": ") _ value)
       }
+    }
+  }
+}
+
+ClassMethod GetUpstreamPackageVersions(Output list)
+{
+  Set query = "SELECT %DLIST(Name) AS Repos FROM %IPM_Repo.Definition"
+  Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
+  $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+  If rs.%Next() {
+    Set repos = rs.%Get("Repos")
+  }
+
+  Set ptr = 0
+  While $ListNext(repos, ptr, r) {
+    Set query = "SELECT Name,Version FROM %IPM_Utils.Module_GetModuleList(?,?) "
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, r, 0)
+    While rs.%Next() {
+      Set list(rs.%Get("Name"), r) = rs.%Get("Version")
     }
   }
 }
