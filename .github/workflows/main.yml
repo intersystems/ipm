@@ -95,10 +95,10 @@ jobs:
           ORAS_IMAGE=ghcr.io/project-zot/zot-linux-amd64:latest
           docker pull $ORAS_IMAGE
           ORAS=$(docker run --rm -d \
-            --network zpm 
-            --name oras 
-            -p 5001:5000
-            --network-alias oras 
+            --network zpm \
+            --name oras \
+            -p 5001:5000 \
+            --network-alias oras \
             $ORAS_IMAGE)
           sleep 5
           docker logs $ORAS
