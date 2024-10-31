@@ -313,14 +313,13 @@ ClassMethod GetLatestTagPy(registry, repository, namespace, username, password, 
 	import iris
 	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
 	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token)
-	tags = client.get_tags(target)
-
-	# Return most recent version
-	# If no tags exist, then module has been deleted
-	if not tags:
-		return ""
-	else:
-		return tags[-1]
+	try:
+		tags = client.get_tags(target)
+		# Return most recent version
+		# If no tags exist, then module has been deleted
+		return tags[-1] if tags else ""
+	except:
+		return 0
 }
 
 /// Returns comma separated string of all the tags for a given repository
@@ -335,10 +334,10 @@ ClassMethod GetAllTagsPy(registry, repository, namespace, client) [ Language = p
 		tags.reverse()
 		
 		# convert from list to comma separated string
-		tags = ", ".join(str(x) for x in tags)
+		return ", ".join(str(x) for x in tags)
 	except e:
 		print("Error: ", repr(e))
-	return tags
+		return ""
 }
 
 /// Returns whether the given repository is in the registry
@@ -349,9 +348,11 @@ ClassMethod HasModulePy(registry, repository, namespace, client) As %Boolean [ L
 	# If tags are not found, then the repository does not exist
 	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
 
-	tags = client.get_tags(target, 1)
 	# check if tags is [] through boolean coercion
-	return not not tags
+	try:
+		return bool(client.get_tags(target, 1))
+	except:
+		return False
 }
 
 // ** UTILITY FUNCTIONS **

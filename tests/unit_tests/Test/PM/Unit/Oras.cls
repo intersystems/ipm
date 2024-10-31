@@ -3,7 +3,7 @@ Class Test.PM.Unit.Oras Extends %UnitTest.TestCase
 
 Method TestOras()
 {
-    Set Registry = "http://oras:5000"
+    Set Registry = "http://oras:5001"
     Set Name = "objectscript-math"
 
     // Target package
@@ -23,6 +23,10 @@ Method TestOras()
     Set oci = ##class(%IPM.Repo.Oras.Definition).%OpenId(ociId)
     Set packageService = oci.GetPackageService()
     Set publishService = oci.GetPublishService()
+
+    If 'packageService.IsAvailable() {
+        Do $$$AssertSkipped("ORAS registry unavailable, skipping")
+    }
 
     // make sure package is not in the registry first
     Set version = packageService.GetLatestTagPy(Registry, Name, "", "", "", "")
