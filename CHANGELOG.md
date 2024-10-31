@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #454: IPM 0.9.x+ uses different globals for storage vs. 0.7.0 and previous. Installation will automatically migrate data from the old globals to the new ones. The old globals are left around in case the user decides to revert to an earlier version.
 
 ### Fixed
+- HSIEO-11006: Fix conditions for marking code as deployed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
 - HSIEO-9269, HSIEO-9404: Repo check should happen in the order to repo creation, not by repo name
 - HSIEO-9269, HSIEO-9411: Make sure can load and export xml Package-type resource
