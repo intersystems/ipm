@@ -19,6 +19,15 @@ Property Token As %String(MAXLEN = "");
 
 // ** PACKAGE SERVICE FUNCTIONS **
 
+/// For run-time checks to ensure the service is available before attempting to invoke it.
+Method IsAvailable() As %Boolean
+{
+	Set request = ..GetHttpRequest(..Location)
+	$$$ThrowOnError(request.Get("v2/"))
+	Set statusCode = request.HttpResponse.StatusCode
+	Quit (200 <= statusCode) && (statusCode < 300)
+}
+
 Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 0) As %Stream.Object
 {
 	Set name = pModuleReference.Name _ ":" _ pModuleReference.VersionString

@@ -73,7 +73,7 @@ Method Display()
 {
 	Do ##super()
 
-	Write !,$c(9),"Deployment Enabled? ",..Padding(3),$Case(..DeploymentEnabled,1:"Yes",:"No")
+	Write !,$c(9),"Default Deployment Registry? ",..Padding(3),$Case(..DeploymentEnabled,1:"Yes",:"No")
 
 	If (..Username '= "") {
 		Write !,$c(9),"Username: ",..Padding(1),..Username
