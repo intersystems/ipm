@@ -321,7 +321,7 @@ ClassMethod GetLatestTagPy(registry, repository, namespace, username, password, 
 		# If no tags exist, then module has been deleted
 		return tags[-1] if tags else ""
 	except:
-		return 0
+		return ""
 }
 
 /// Returns comma separated string of all the tags for a given repository
