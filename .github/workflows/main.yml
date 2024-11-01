@@ -113,6 +113,16 @@ jobs:
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
           echo `docker exec -i --workdir /home/irisowner/zpm/ $CONTAINER ls -rtl`
+          docker exec -i $CONTAINER bash << EOF
+            echo "Testing oras host in container"
+            curl -vI http://oras:5000/v2/
+            echo "Testing localhost in container"
+            curl -vI http://localhost:5000/v2/
+          EOF
+          echo "Testing oras host outside container"
+          curl -vI http://oras:5000/v2/
+          echo "Testing localhost outside container"
+          curl -vI http://localhost:5000/v2/
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             zpm "list":1
             zpm "test zpm -v -only":1
