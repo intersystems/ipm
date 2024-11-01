@@ -3,7 +3,7 @@ Class Test.PM.Unit.Oras Extends %UnitTest.TestCase
 
 Method TestOras()
 {
-    Set Registry = "http://oras:5001"
+    Set Registry = "http://oras:5000"
     Set Name = "objectscript-math"
 
     // Target package

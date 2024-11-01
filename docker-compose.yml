@@ -41,4 +41,4 @@ services:
   oras:
     image: ghcr.io/project-zot/zot-linux-amd64:latest
     ports:
-      - 5001:5000
+      - 5000:5000
