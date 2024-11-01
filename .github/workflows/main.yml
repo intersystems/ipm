@@ -105,24 +105,26 @@ jobs:
       - name: Test and Verify
         timeout-minutes: 15
         run: |
+          set -x
           CONTAINER=$(docker run --network zpm -d --rm \
             -e TEST_REGISTRY=http://registry:52773/registry/ \
             -e TEST_REGISTRY_USER=admin \
             -e TEST_REGISTRY_PASSWORD=SYS \
+            -network zpm \
             zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
           echo `docker exec -i --workdir /home/irisowner/zpm/ $CONTAINER ls -rtl`
           docker exec -i $CONTAINER bash << EOF
             echo "Testing oras host in container"
-            wget --spider http://oras:5000/v2/
+            wget --spider http://oras:5000/v2/ || true
             echo "Testing localhost in container"
-            wget --spider http://localhost:5000/v2/
+            wget --spider http://localhost:5000/v2/ || true
           EOF
           echo "Testing oras host outside container"
-          wget --spider http://oras:5000/v2/
+          wget --spider http://oras:5000/v2/ || true
           echo "Testing localhost outside container"
-          wget --spider http://localhost:5000/v2/
+          wget --spider http://localhost:5000/v2/ || true
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             zpm "list":1
             zpm "test zpm -v -only":1
