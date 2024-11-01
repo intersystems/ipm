@@ -23,7 +23,9 @@ Property Token As %String(MAXLEN = "");
 Method IsAvailable() As %Boolean
 {
 	Set request = ..GetHttpRequest(..Location)
-	$$$ThrowOnError(request.Get("v2/"))
+	If $$$ISERR(request.Get("v2/")) {
+		Quit 0
+	}
 	Set statusCode = request.HttpResponse.StatusCode
 	Quit (200 <= statusCode) && (statusCode < 300)
 }
