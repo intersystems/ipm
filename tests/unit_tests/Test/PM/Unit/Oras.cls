@@ -54,6 +54,10 @@ Method TestOras()
 
     // Install from default
     Do ..AssertNoException("install " _ Name)
+
+    // Clean up
+    Do ..RunCommand("repo -delete-all")
+    Do ..RunCommand("repo -reset-defaults")
 }
 
 Method RunCommand(pCommand As %String)
