@@ -7,7 +7,7 @@ Class %IPM.Main Extends %IPM.CLI
 
 Parameter DOMAIN = "ZPM";
 
-Parameter STANDARDPHASES = {$ListBuild("reload","compile","test","package","verify","publish")};
+Parameter STANDARDPHASES = {$ListBuild("reload","compile","test","package","verify","publish","makedeployed")};
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -45,6 +45,7 @@ resources exported to the filesystem (and possible to source control) are consis
 with what is in the database.
 * compile: compiles all resources within the module.
 * activate: performs post-compilation installation/configuration steps.
+* makedeployed: deploys resources within the module for which deployment is enabled.
 * document: regenerates the API documentation for the module
 * test: runs any unit tests associated with the module, in the current namespace.
 * package: exports the module's resources and bundles them into a module artifact (.tgz file).
@@ -153,6 +154,18 @@ This command is an alias for `module-action module-name publish`
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
 <modifier name="only" aliases="o" description="Only runs the specified phase (publish), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="makedeployed">
+<description>
+This command is an alias for `module-action module-name makedeployed`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform reload action" />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="only" aliases="o" description="Only runs the specified phase (makedeployed), rather than also running predecessors." />
+<modifier name="recurse" aliases="r" description="Runs the specified phase (makedeployed) on the module and all of its dependencies." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
@@ -2038,7 +2051,8 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
-  Set tParams("cmd") = pCommandInfo
+  	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
+	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }

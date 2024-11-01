@@ -257,7 +257,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 				Set tPhases = $ListBuild("PrepareDeploy") _ tPhases
 			}
 		} Else {
-			Set tPhases = pPhases
+			Set tPhases = $ListBuild(##class(%IPM.Lifecycle.Base).MatchSinglePhase($LISTTOSTRING(pPhases)))
 		}
 		
 		// Lifecycle-provided default parameters
@@ -330,7 +330,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 						Quit
 					}
 					If $IsObject(tResource.Processor) {
-            Do tResource.Processor.SetParams(.pParams)
+            			Do tResource.Processor.SetParams(.pParams)
 						Set tSC = $Method(tResource.Processor,"OnBeforePhase",tOnePhase,.pParams)
 						$$$ThrowOnError(tSC)
 					}
@@ -503,6 +503,7 @@ Method GetDefaultParameters(Output pParams)
 	}
 }
 
+/// Returns whether pScope is in the list of pPhases <br />
 ClassMethod HasScope(pPhases As %List, pScope As %String) [ Private ]
 {
 	If (pScope = "") {
@@ -940,6 +941,13 @@ ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 	Quit tKnownDependencyList
 }
 
+/// Builds a module's immediate dependency graph and array of resources.<br />
+/// Optionally loads uninstalled dependency modules and recurses over each module in the dependency graph.<br />
+/// @Argument	pReferenceArray		Array of all module's resources (including resources that compose a resource) that contain the appropriate phase scope.<br />
+/// @Argument	pLockedDependencies	Whether method should be recursively applied to the module's dependencies (true = yes).<br />
+/// @Argument	pPhases				List of IPM lifecycle phases to be applied to the current module.<br />
+/// @Argument	pSkipDependencies	Whether to skip loading uninstalled dependency modules.<br />
+/// @Argument	pDependencyGraph 	Tree of module's dependencies.<br />
 Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boolean = 0, pPhases As %List = "", pSkipDependencies As %Boolean = 0, ByRef pDependencyGraph) As %Status
 {
 	Set tSC = $$$OK
