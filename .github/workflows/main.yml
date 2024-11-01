@@ -106,6 +106,8 @@ jobs:
         timeout-minutes: 15
         run: |
           set -x
+          docker ps
+          docker network ls
           CONTAINER=$(docker run --network zpm -d --rm \
             -e TEST_REGISTRY=http://registry:52773/registry/ \
             -e TEST_REGISTRY_USER=admin \
