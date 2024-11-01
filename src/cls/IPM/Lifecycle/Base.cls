@@ -55,8 +55,11 @@ Method OnAfterResourceProcessing(pPhase As %String, ByRef pParams) As %Status
 
 Method %DispatchMethod(pMethod As %String, ByRef pParams, Args...) [ ServerOnly = 1 ]
 {
-	if $listfind(..#PHASES,pMethod)=0 do $zu(96,3,$$$ERNOMETHOD,1,"","method "_pMethod_" of class "_$classname())
-	quit ..Module.ExecutePhases(..Module.Name,$lb(pMethod),1,.pParams)
+	// Match method name with CamelCased lifecycle method
+	set convertedMethod = ..MatchSinglePhase(pMethod)
+
+	if $listfind(..#PHASES,convertedMethod)=0 do $zu(96,3,$$$ERNOMETHOD,1,"","method "_convertedMethod_" of class "_$classname())
+	quit ..Module.ExecutePhases(..Module.Name,$lb(convertedMethod),1,.pParams)
 }
 
 /// Merges default parameters into pParams
@@ -131,22 +134,48 @@ ClassMethod GetCompletePhases(pPhases As %List) As %List
 /// This method defines what a complete phase means for a given phase
 ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 {
+	set pOnePhase = $ZCONVERT(pOnePhase, "L")
+
 	Quit $Case(pOnePhase,
-		"Clean":		$ListBuild("Clean"),
-		"Reload":		$ListBuild("Reload","*"),
-		"Validate":		$ListBuild("Reload","*","Validate"),
-		"ExportData":	$ListBuild("ExportData"),
-		"Compile":		$ListBuild("Reload","*","Validate","Compile"),
-		"Activate":		$ListBuild("Reload","*","Validate","Compile","Activate"),
-		"Document":		$ListBuild("Document"),
-		"MakeDeployed":	$ListBuild("MakeDeployed"),
-		"Test":			$ListBuild("Reload","*","Validate","Compile","Activate","Test"),
-		"Package":		$ListBuild("Reload","*","Validate","Compile","Activate","Package"),
-		"Verify":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Verify"),
-		"Register":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register"),
-		"Publish":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
-		"Configure":	$ListBuild("Configure"),
-		"Unconfigure":	$ListBuild("Unconfigure"),
+		"clean":		$ListBuild("Clean"),
+		"reload":		$ListBuild("Reload","*"),
+		"validate":		$ListBuild("Reload","*","Validate"),
+		"exportdata":	$ListBuild("ExportData"),
+		"compile":		$ListBuild("Reload","*","Validate","Compile"),
+		"activate":		$ListBuild("Reload","*","Validate","Compile","Activate"),
+		"document":		$ListBuild("Document"),
+		"makedeployed":	$ListBuild("MakeDeployed"),
+		"test":			$ListBuild("Reload","*","Validate","Compile","Activate","Test"),
+		"package":		$ListBuild("Reload","*","Validate","Compile","Activate","Package"),
+		"verify":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Verify"),
+		"register":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register"),
+		"publish":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
+		"configure":	$ListBuild("Configure"),
+		"unconfigure":	$ListBuild("Unconfigure"),
+		:				""
+	)
+}
+
+/// Match single inputted phase to the correctly CamelCased lifecycle phase <br/>
+ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
+{
+	set pOnePhase = $ZCONVERT(pOnePhase, "L")
+	Quit $Case(pOnePhase,
+		"clean":		"Clean",
+		"reload":		"Reload",
+		"validate":		"Validate",
+		"exportdata":	"ExportData",
+		"compile":		"Compile",
+		"activate":		"Activate",
+		"document":		"Document",
+		"makedeployed":	"MakeDeployed",
+		"test":			"Test",
+		"package":		"Package",
+		"verify":		"Verify",
+		"register":		"Register",
+		"publish":		"Publish",
+		"configure":	"Configure",
+		"unconfigure":	"Unconfigure",
 		:				""
 	)
 }
@@ -1405,13 +1434,18 @@ Method %MakeDeployed(ByRef pParams) As %Status
 	Try {
 		Set tDev = ..Module.DeveloperMode
 		Set tVerbose = $Get(pParams("Verbose"))
+
+		// If the recurse parameter is set, then this lifecycle method should recursively deploy all of the 
+		// module's dependencies marked for deployment
+		Set tLockedDependencies = $Get(pParams("Recurse"),0) // Indicates whether entire dependency graph should be traversed and deployed
+
 		If tDev && tVerbose {
 		  Write !,"Module is in developer mode; will only report what WOULD be deployed unless packaging, in which case items WILL be deployed."
 		}
 		
 		// Default implementation: see which resources are expicitly flagged with Deploy = true.
 		// Build an array of those, then mark them as deployed.
-		$$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,1,..PhaseList,1,.pDependencyGraph))
+		$$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,1,.pDependencyGraph))
 		
 		Set tResourceKey = ""
 		For {
