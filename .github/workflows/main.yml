@@ -110,7 +110,6 @@ jobs:
             -e TEST_REGISTRY=http://registry:52773/registry/ \
             -e TEST_REGISTRY_USER=admin \
             -e TEST_REGISTRY_PASSWORD=SYS \
-            --network zpm \
             zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
