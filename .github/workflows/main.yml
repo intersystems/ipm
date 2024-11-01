@@ -97,7 +97,7 @@ jobs:
           ORAS=$(docker run --rm -d \
             --network zpm \
             --name oras \
-            -p 0000:5000 \
+            -p 5000:5000 \
             --network-alias oras \
             $ORAS_IMAGE)
           sleep 5
