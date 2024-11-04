@@ -20,7 +20,7 @@ Method TestPackageAndExtract()
     Set outFile = ##class(%Library.File).TempFilename()
     Set outDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).TempFilename()_"dir-out")
     Do ##class(%Library.File).CreateDirectoryChain(outDir)
-    Do $$$AssertEquals($zf(-100,"/STDOUT="_outFile_"/STDERR="_outFile,"tar","-xvf",tempDir_".tgz","-C",outDir),0)
+    Do $$$AssertEquals($zf(-100,"/STDOUT="""_outFile_"""/STDERR="""_outFile_"""","tar","-xvf",tempDir_".tgz","-C",outDir),0)
 
     Do $$$AssertNotTrue(##class(%File).DirectoryExists(outDir_"src/cls/Test/Test"))
     Do $$$AssertNotTrue(##class(%File).DirectoryExists(outDir_"src/src"))
