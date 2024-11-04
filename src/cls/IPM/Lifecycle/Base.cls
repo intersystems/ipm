@@ -159,8 +159,8 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 /// Match single inputted phase to the correctly CamelCased lifecycle phase <br/>
 ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 {
-	set pOnePhase = $ZCONVERT(pOnePhase, "L")
-	Quit $Case(pOnePhase,
+	Set phase = $ZCONVERT(pOnePhase, "L")
+	Quit $Case(phase,
 		"clean":		"Clean",
 		"reload":		"Reload",
 		"validate":		"Validate",
@@ -176,7 +176,7 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 		"publish":		"Publish",
 		"configure":	"Configure",
 		"unconfigure":	"Unconfigure",
-		:				""
+		:				pOnePhase // return the phase as-is if it's a custom phase name
 	)
 }
 
