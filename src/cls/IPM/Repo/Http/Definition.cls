@@ -1,4 +1,4 @@
-Class %IPM.Repo.Http.Definition Extends %IPM.Repo.Definition [ Abstract ]
+Class %IPM.Repo.Http.Definition Extends %IPM.Repo.Definition [ Abstract, NoExtent ]
 {
 
 Parameter MONIKER As String = "http";
