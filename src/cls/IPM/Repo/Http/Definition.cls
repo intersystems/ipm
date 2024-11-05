@@ -142,11 +142,8 @@ Method GetPublishingManager(ByRef status) [ Abstract ]
 
 Storage Default
 {
-<Data name="HttpRepoDefinitionDefaultData">
-<Subscript>"Definition"</Subscript>
-<Value name="1">
-<Value>URL</Value>
-</Value>
+<Data name="RemoteRepoDefinitionDefaultData">
+<Subscript>"RemoteRepoDefinition"</Subscript>
 <Value name="2">
 <Value>Username</Value>
 </Value>
@@ -154,13 +151,16 @@ Storage Default
 <Value>Password</Value>
 </Value>
 <Value name="4">
-<Value>Token</Value>
+<Value>URL</Value>
 </Value>
 <Value name="5">
+<Value>Token</Value>
+</Value>
+<Value name="6">
 <Value>DeploymentEnabled</Value>
 </Value>
 </Data>
-<DefaultData>HttpRepoDefinitionDefaultData</DefaultData>
+<DefaultData>RemoteRepoDefinitionDefaultData</DefaultData>
 <Type>%Storage.Persistent</Type>
 }
 
