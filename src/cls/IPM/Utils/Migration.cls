@@ -187,7 +187,7 @@ ClassMethod MigrateOneRepo(oldId As %String, name As %String, verbose As %Boolea
 
     Write:verbose !,"Migrating repo "_name_"... "
 
-    Set $List(data,1) = "~%IPM.Repo.Remote.Definition~"
+    Set $List(data,1) = "~%IPM.Repo.Http.Definition~%IPM.Repo.Remote.Definition~"
     Set data("RepoDefinition") = data
     Merge data("RemoteRepoDefinition") = data("RemoteServerDefinition")
     ZKill data
