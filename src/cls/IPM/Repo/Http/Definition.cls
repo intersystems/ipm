@@ -1,4 +1,4 @@
-Class %IPM.Repo.Http.Definition Extends %IPM.Repo.Definition [ Abstract, NoExtent ]
+Class %IPM.Repo.Http.Definition Extends %IPM.Repo.Definition [ Abstract ]
 {
 
 Parameter MONIKER As String = "http";
@@ -142,8 +142,11 @@ Method GetPublishingManager(ByRef status) [ Abstract ]
 
 Storage Default
 {
-<Data name="RemoteRepoDefinitionDefaultData">
-<Subscript>"RemoteRepoDefinition"</Subscript>
+<Data name="HttpRepoDefinitionDefaultData">
+<Subscript>"Definition"</Subscript>
+<Value name="1">
+<Value>URL</Value>
+</Value>
 <Value name="2">
 <Value>Username</Value>
 </Value>
@@ -151,16 +154,13 @@ Storage Default
 <Value>Password</Value>
 </Value>
 <Value name="4">
-<Value>URL</Value>
-</Value>
-<Value name="5">
 <Value>Token</Value>
 </Value>
-<Value name="6">
+<Value name="5">
 <Value>DeploymentEnabled</Value>
 </Value>
 </Data>
-<DefaultData>RemoteRepoDefinitionDefaultData</DefaultData>
+<DefaultData>HttpRepoDefinitionDefaultData</DefaultData>
 <Type>%Storage.Persistent</Type>
 }
 
