@@ -111,9 +111,6 @@ Method Finalize(status As %Status, dev As %Boolean = 0) As %Status
     Set ..Success = status
     Set ..Committed = (dev = 1) || $$$ISOK(status)
     Set ..TimeEnd = $ZDateTime($Now(), 3)
-    If ..Package = "" {
-        Return $$$ERROR($$$GeneralError, "Package name not set")
-    }
     Return ..%Save()
 }
 
