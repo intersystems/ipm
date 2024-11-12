@@ -1,4 +1,4 @@
-Include (%occInclude, %occErrors, %syConfig, %syPrompt, %IPM.Common)
+Include (%occInclude, %occErrors, %syConfig, %syPrompt, %IPM.Common, %IPM.Formatting)
 
 Class %IPM.Utils.Module [ System = 3 ]
 {
@@ -2288,6 +2288,10 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
 	Set result = ..%RegExReplace(result, "webroot", urlRoot)
 
+	If '$Get($$$DeprecationWarned("<expression>", "dbrole")) && ((result [ "${dbrole}") || (result [ "{$dbrole}")) {
+		Set $$$DeprecationWarned("<expression>", "dbrole") = 1
+		Write !, $$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.")
+	}
 	Set dbRole = ..GetDatabaseRole()
 	Set result = ..%RegExReplace(result, "dbrole", dbRole)
 	Set result = ..%RegExReplace(result, "globalsDbRole", dbRole)
