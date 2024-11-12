@@ -323,6 +323,7 @@ ClassMethod ConstructTar(Path As %String, RelativeTo As %String, archive As %Str
     set name = ##class(%File).GetFilename($Extract(Path,1,*-1))
     set prefix = $Extract(prefix,1,*-$Length(name)-1)
     if $$$isWINDOWS {
+      // Archive should have Unix-style slashes, so change to that on Windows
       set prefix = $Replace(prefix,"\","/")
     }
   } else {
@@ -333,6 +334,7 @@ ClassMethod ConstructTar(Path As %String, RelativeTo As %String, archive As %Str
     set size = ##class(%File).GetFileSize(Path)
     set name = ##class(%File).GetFilename(Path)
     if $$$isWINDOWS {
+      // Archive should have Unix-style slashes, so change to that on Windows
       set prefix = $Replace(prefix,"\","/")
     }
   }
