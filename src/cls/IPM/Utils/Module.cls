@@ -121,7 +121,7 @@ ClassMethod LoadDependencies(ByRef pDependencyGraph, ByRef pParams, pWorkQueue A
 						Write !,"Queuing module load: ",tModuleName," ",tVersion," @ ",tServerName
 					}
 					Merge tParams = pParams
-					Set tParams("CommandToLog") = $$$ZPMCommandToLog
+					Set tParams("CommandToLog") = $Get($$$ZPMCommandToLog, "<unset>")
 					Set tSC = pWorkQueue.QueueCallback(
 						"##class("_$ClassName()_").LoadModuleReference",
 						"##class("_$ClassName()_").LoadCompleted",
