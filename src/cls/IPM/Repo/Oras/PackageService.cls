@@ -17,6 +17,7 @@ Property Namespace As %String;
 Method IsAvailable() As %Boolean
 {
 	Set request = ..GetHttpRequest(..Location)
+	Set request.Timeout = 5
 	If $$$ISERR(request.Get("v2/")) {
 		Quit 0
 	}
