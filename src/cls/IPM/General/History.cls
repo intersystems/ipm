@@ -177,16 +177,10 @@ ClassMethod RecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceA
 /// Where value can optionally start with >, >=, <, <=, =, <> or contain * to indicate a wildcard
 ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0, namespace As %String) As %SQL.StatementResult
 {
-    New $namespace
-    If $Data(namespace) # 2 {
-        Set $namespace = $ZStrip(namespace, "<>WC")
-    }
-    If '$$$comClassDefined("%IPM.General.History") {
-        Quit $$$NULLOREF
-    }
     Kill varargs
     Set limit = +limit // Coerce to number to prevent SQL injection
-    Set query = "SELECT " _ $SELECT(limit>0: "TOP " _limit, 1: "") _  " * FROM %IPM_General.History WHERE 1 = 1 "
+    Set query = "SELECT " _ $SELECT(limit>0: "TOP " _ limit, 1: "") _  " * FROM %IPM_General.History WHERE Namespace = ? "
+    Set varargs($Increment(varargs)) = $ZStrip($Get(namespace, $Namespace), "<>WC")
     Set col = ""
     For {
         Set col = $Order(filter(col), 1, value)
