@@ -30,7 +30,8 @@ jobs:
             for tag in $tags
             do
               # Skip irishealth-community due to bad interaction with ZPM document type
-              if test "$n" = "irishealth-community" && test "$tag" = "2023.3"
+              # Also skip 2023.2 because the license has expired
+              if [ "$tag" = "2023.3" -o "$tag" = "2023.2" ];
                 then
                   continue
               fi
