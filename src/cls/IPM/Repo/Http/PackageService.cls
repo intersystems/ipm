@@ -30,7 +30,7 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
 
 	Set tLocation = $$$URLDECODE(tLocation)
 	If ($piece(tLocation, "://")'["http") {
-		Set tLocation = "http://" _ tLocation
+		Set tLocation = "https://" _ tLocation
 	}
 	
 	Do ##class(%Net.URLParser).Parse(tLocation,.tComponents)
