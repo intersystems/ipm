@@ -263,10 +263,12 @@ ClassMethod GlobalRecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, 
 /// See GetHistory() for the `filter` argument
 ClassMethod GetHistoryGlobally(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0) As %Library.ArrayOfObjects
 {
-    New $namespace
-    Set $namespace = "%SYS"
+    Set originalNS = $Namespace
+    New $Namespace
+    Set $Namespace = "%SYS"
     Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
     $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    Set $Namespace = originalNS
     Set array = ##class(%Library.ArrayOfObjects).%New()
     While rs.%Next() {
         Set ns = rs.%Get("Nsp")
@@ -393,7 +395,7 @@ ClassMethod CommittedToString(rs As %SQL.StatementResult, detail As %Boolean = 0
     Quit $Select(rs.%Get("Committed"): "Committed", 1: "Uncommitted")
 }
 
-ClassMethod DisplayQueryResult(rs As %SQL.StatementResult)
+ClassMethod DisplayQueryResult(rs As %SQL.StatementResult, namespace As %String)
 {
     // TODO improve the display output
     If (rs = $$$NULLOREF) {
@@ -401,16 +403,21 @@ ClassMethod DisplayQueryResult(rs As %SQL.StatementResult)
         Quit
     }
 
-    set found = 0
+    Set found = 0
     While rs.%Next() {
         If 'found {
             Set found = 1
+            If $Data(namespace) {
+                Write !, "Namespace: ", namespace
+            }
             Do ..ShowColumns(rs, "header")
             Write !
         }
         Do ..ShowColumns(rs, 0)
     }
-    Write !
+    If found {
+        Write !
+    }
 }
 
 ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
@@ -421,8 +428,7 @@ ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
         If rs = "" {
             Quit
         }
-        Write !, "Namespace: ", ns
-        Do ..DisplayQueryResult(rs)
+        Do ..DisplayQueryResult(rs, ns)
     }
 }
 
