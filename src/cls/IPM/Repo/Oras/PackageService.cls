@@ -11,12 +11,6 @@ Property Location As %String;
 /// i.e. the API endpoint for a given module will be at <Location>/v2/<Namespace>/<Module>
 Property Namespace As %String;
 
-Property Username As %String(MAXLEN = "");
-
-Property Password As %String(MAXLEN = "");
-
-Property Token As %String(MAXLEN = "");
-
 // ** PACKAGE SERVICE FUNCTIONS **
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.

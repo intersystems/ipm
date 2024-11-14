@@ -5,11 +5,11 @@ Class %IPM.Repo.Http.PackageService Extends (%RegisteredObject, %IPM.Repo.IPacka
 
 Property Location As %String;
 
-Property Username As %String;
+Property Username As %String(MAXLEN = "");
 
-Property Password As %String;
+Property Password As %String(MAXLEN = "");
 
-Property Token As %String;
+Property Token As %String(MAXLEN = "");
 
 Property TokenBasicAuth As %Boolean [ InitialExpression = 0 ];
 
