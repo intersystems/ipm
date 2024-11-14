@@ -190,7 +190,7 @@ ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer =
     Set col = ""
     For {
         Set col = $Order(filter(col), 1, value)
-        If (col = "") || ($Data(value) # 2 = 0) || (col '? 1A.AN){
+        If (col = "") || ($Data(value) # 2 = 0) || ('$Match(col, "^[a-zA-Z][a-zA-Z0-9]*$")) {
             Quit
         }
         // col is safe from SQL injection because we ensured it's alphanumeric above
