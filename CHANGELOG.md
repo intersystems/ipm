@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #530 Added a `CustomPhase` attribute to `<Invoke>` that doesn't require a corresponding %method in lifecycle class.
 - #578 Added functionality to record and display zpm history of install, uninstall, and load
 - #582 Added functionality to optionally see time of last update and server version of each package
+- #609 Added support for `-export-deps` when running the "Package" phase of lifecycle
 
 ### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #454: IPM 0.9.x+ uses different globals for storage vs. 0.7.0 and previous. Installation will automatically migrate data from the old globals to the new ones. The old globals are left around in case the user decides to revert to an earlier version.
 
 ### Fixed
+- HSIEO-11006: Fix conditions for marking code as deployed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
 - HSIEO-9269, HSIEO-9404: Repo check should happen in the order to repo creation, not by repo name
 - HSIEO-9269, HSIEO-9411: Make sure can load and export xml Package-type resource

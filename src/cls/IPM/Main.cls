@@ -7,7 +7,7 @@ Class %IPM.Main Extends %IPM.CLI
 
 Parameter DOMAIN = "ZPM";
 
-Parameter STANDARDPHASES = {$ListBuild("reload","compile","test","package","verify","publish")};
+Parameter STANDARDPHASES = {$ListBuild("reload","compile","test","package","verify","publish","makedeployed")};
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -45,6 +45,7 @@ resources exported to the filesystem (and possible to source control) are consis
 with what is in the database.
 * compile: compiles all resources within the module.
 * activate: performs post-compilation installation/configuration steps.
+* makedeployed: deploys resources within the module for which deployment is enabled.
 * document: regenerates the API documentation for the module
 * test: runs any unit tests associated with the module, in the current namespace.
 * package: exports the module's resources and bundles them into a module artifact (.tgz file).
@@ -70,6 +71,7 @@ Currently, there may only be one of these per namespace.
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="export-deps" value="true" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; lifecycle." />
 
 </command>
 
@@ -152,6 +154,18 @@ This command is an alias for `module-action module-name publish`
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
 <modifier name="only" aliases="o" description="Only runs the specified phase (publish), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="makedeployed">
+<description>
+This command is an alias for `module-action module-name makedeployed`
+</description>
+<parameter name="module" required="true" description="Name of module on which to perform reload action" />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="only" aliases="o" description="Only runs the specified phase (makedeployed), rather than also running predecessors." />
+<modifier name="recurse" aliases="r" description="Runs the specified phase (makedeployed) on the module and all of its dependencies." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
@@ -976,7 +990,16 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Quit
   }
   Set tArgs = 0
-	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root,LastUpdated FROM %IPM_Storage.ModuleItem WHERE 1=1 "
+  // HACK: Certain IRIS kit, e.g., irishealth-community 2024.1 comes with %IPM in HSLIB and HSSYS namespaces
+  // The caveat is that the %IPM.Storage.Module doesn't have an "LastUpdated" property
+  // So, we need to check if the property exists before querying it
+  $$$ThrowOnError(##class(%SYSTEM.SQL.Schema).GetAllColumns("%IPM_Storage.ModuleItem", .columns))
+  Set checkUpdateTime = $Data(columns("LastUpdated"))
+  Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root"
+  If checkUpdateTime {
+	Set tQuery = tQuery _ ",LastUpdated"
+  }
+  Set tQuery = tQuery _ " FROM %IPM_Storage.ModuleItem WHERE 1=1 "
   Set pSearch = $ZStrip(pSearch, "<>WC")
   If pSearch'="" {
     If pSearch["," {
@@ -1009,7 +1032,10 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
 		$$$ThrowOnError(tSC)
     Set name = tRes.Name
     Set list = list + 1
-		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root, tRes.LastUpdated)
+		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
+		If checkUpdateTime {
+			Set list(list) = list(list) _ $ListBuild(tRes.LastUpdated)
+		}
 		If maxWidth<$Length(name) {
       Set maxWidth = $Length(name)
     }
@@ -2074,7 +2100,8 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
-  Set tParams("cmd") = pCommandInfo
+  	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
+	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
@@ -3078,7 +3105,7 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     If $Data(pModifiers("showsource")) {
       Write " ", $$$FormattedLine($$$Magenta, root)
     }
-    If $Data(pModifiers("showtime")) {
+    If $Data(pModifiers("showtime")) && ($Data(lastUpdated) # 2) {
       Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
     }
 
