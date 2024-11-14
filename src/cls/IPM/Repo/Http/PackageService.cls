@@ -11,6 +11,8 @@ Property Password As %String;
 
 Property Token As %String;
 
+Property TokenBasicAuth As %Boolean [ InitialExpression = 0 ];
+
 ClassMethod GetSSLConfiguration(host) As %String
 {
 	New $NAMESPACE
@@ -59,11 +61,9 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
 		Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
 
 		If (..Token '= "") {
-			If (tLocation [ "aws") {
-				// aws token auth
+			If ..TokenBasicAuth {
 				Do tRequest.SetHeader("Authorization","Basic " _ ..Token)
 			} Else {
-				// key auth
 				Do tRequest.SetHeader("apikey",..Token)
 			}
 		}
