@@ -3,6 +3,8 @@ Include %IPM.Common
 Class %IPM.Repo.Http.PackageService Extends (%RegisteredObject, %IPM.Repo.IPackageService)
 {
 
+Parameter ALLOWPREFIXINLOCATION = 1;
+
 Property Location As %String;
 
 Property Username As %String(MAXLEN = "");
@@ -48,6 +50,9 @@ Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
 			Set tRequest.Https = 1
 		}
 		If ($Get(tComponents("path"))'="") {
+			If '..#ALLOWPREFIXINLOCATION {
+				$$$ThrowStatus($$$ERROR($$$GeneralError,"Location should not contain a prefix"))
+			}
 			Set path = tComponents("path")
 			If ($Extract(path,1,1)="/") {
 				Set path = $Extract(path,2,*)	

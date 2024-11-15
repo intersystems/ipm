@@ -11,6 +11,11 @@ Property Location As %String;
 /// i.e. the API endpoint for a given module will be at <Location>/v2/<Namespace>/<Module>
 Property Namespace As %String;
 
+/// Prefix for ORAS API calls
+Property PathPrefix As %String(MAXLEN = "");
+
+Parameter ALLOWPREFIXINLOCATION = 0;
+
 // ** PACKAGE SERVICE FUNCTIONS **
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.
@@ -18,7 +23,7 @@ Method IsAvailable() As %Boolean
 {
 	Set request = ..GetHttpRequest(..Location)
 	Set request.Timeout = 5
-	If $$$ISERR(request.Get("v2/")) {
+	If $$$ISERR(request.Get(..PathPrefix _ "v2/")) {
 		Quit 0
 	}
 	Set statusCode = request.HttpResponse.StatusCode
@@ -74,7 +79,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 	Set request = ..GetHttpRequest()
 	
 	#; Make GET request
-	Set tSC=request.Get("/v2/_catalog")
+	Set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
 	$$$ThrowOnError(tSC)
 	Set response=request.HttpResponse
 	If response.StatusCode'=200 {

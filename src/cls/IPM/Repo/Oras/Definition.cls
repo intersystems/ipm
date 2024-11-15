@@ -26,7 +26,17 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 Method GetPackageService() As %IPM.Repo.IPackageService
 {
 	Set tClient = ##class(%IPM.Repo.Oras.PackageService).%New()
-	Set tClient.Location = ..URL
+	// We want to preprend the prefix to the "GET"/"POST"/etc. requests
+	// Otherwise, it will be overwritten
+	Do ##class(%Net.URLParser).Decompose(..URL,.comp)
+	If $Data(comp("path"), path) && path '= "" {
+		If $Extract(path, *) '= "/" {
+			Set path = path _ "/"
+		}
+		Set tClient.PathPrefix = path
+	}
+	Kill comp("path")
+	Set tClient.Location = ##class(%Net.URLParser).Compose(.comp)
 	Set tClient.Namespace = ..Namespace
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
