@@ -34,9 +34,7 @@ Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive A
 {
 	Set name = pModuleReference.Name _ ":" _ pModuleReference.VersionString
 	Set status = ..Pull(..Location, name, ..Namespace, ..Username, ..Password, ..Token, .stream)
-	If $$$ISERR(status) {
-		$$$ThrowStatus(status)
-	}
+	$$$ThrowOnError(status)
 	#; module is pulled as a .tgz file
 	Set AsArchive = 1
 	Return stream
