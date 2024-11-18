@@ -38,7 +38,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 <modifier name="username" aliases="user" value="true" description="For HTTP(s) repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For HTTP(s) repositories, specifies the password to use when connecting." />
 <modifier name="token" value="true" description="For HTTP(s) repositories, specifies the key to use when connecting." />
-<modifier name="token-basic-auth" value="true" description="If set to 1, token will be included as basic auth instead of in apikey header." />
+<modifier name="token-basic-auth" value="false" description="If set, token will be included as basic auth instead of in apikey header." />
 <modifier name="sslconfig" aliases="ssl" value="true" description="For HTTP(s) repositories, specifies the SSL configuration name to use when connecting." />
 </group>
 </command>

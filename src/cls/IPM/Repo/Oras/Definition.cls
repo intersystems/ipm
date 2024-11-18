@@ -93,6 +93,9 @@ ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Bool
 		If $Data(pModifiers("token"), tToken) {
 			Set pInstance.Token = tToken
 		}
+		If $Data(pModifiers("token-basic-auth")) # 2 { 
+			Set pInstance.TokenBasicAuth = 1
+		}
 		If $Data(pModifiers("publish"), tPublish) {
 			Set pInstance.DeploymentEnabled = tPublish
 		}
