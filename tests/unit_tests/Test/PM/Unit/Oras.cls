@@ -29,9 +29,9 @@ Method TestOras()
     }
 
     // make sure package is not in the registry first
-    Set version = packageService.GetLatestTagPy(Registry, Name, "", "", "", "")
+    Set version = packageService.GetLatestTagPy(Registry, Name, "", "", "", "", 0)
     If version '= "" {
-        Do publishService.DeleteModule(Registry, Name, "", "", "", "")
+        Do publishService.DeleteModule(Registry, Name, "", "", "", "", 0)
     }
     Do $$$AssertNotTrue(packageService.HasModule(moduleRef))
 
@@ -47,7 +47,7 @@ Method TestOras()
     Do ..AssertNoException("install oci/" _ Name)
 
     // Delete from OCI registry
-    Do publishService.DeleteModule(Registry, Name, "", "", "", "")
+    Do publishService.DeleteModule(Registry, Name, "", "", "", "", 0)
 
     // Set as default registry
     Do ..RunCommand("repo -publish 1 -n oci")
