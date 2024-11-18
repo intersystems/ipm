@@ -29,7 +29,7 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 	// We want to preprend the prefix to the "GET"/"POST"/etc. requests
 	// Otherwise, it will be overwritten
 	Do ##class(%Net.URLParser).Decompose(..URL,.comp)
-	If $Data(comp("path"), path) && path '= "" {
+	If $Data(comp("path"), path) && (path '= "") {
 		If $Extract(path, *) '= "/" {
 			Set path = path _ "/"
 		}
