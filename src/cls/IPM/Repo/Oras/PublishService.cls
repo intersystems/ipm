@@ -73,13 +73,13 @@ Method Unpublish(packageName As %String, packageVersion As %String) As %Status
 /// Pushes the files as an artifact with the given name and tag(s) as versions
 /// Existing tags will be overwritten
 /// Params:
-/// 	repository - string name of repository to push to, e.g. test-artifact
-/// 	tags       - comma separated strings of tags, e.g. "1.0.0,latest"
-ClassMethod Push(registry As %String, repository As %String, namespace As %String, path As %String, tags As %String, metadata As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean)
+/// 	package - string name of package to push to, e.g. test-artifact
+/// 	tags    - comma separated strings of tags, e.g. "1.0.0,latest"
+ClassMethod Push(registry As %String, package As %String, namespace As %String, path As %String, tags As %String, metadata As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean)
 {
-	#; Remove the tag from the repository name if it exists and add it to tags
-	Set repo = $piece(repository, ":", 1)
-	Set tag = $piece(repository, ":", 2)
+	#; Remove the tag from the package name if it exists and add it to tags
+	Set repo = $piece(package, ":", 1)
+	Set tag = $piece(package, ":", 2)
 	If tag '= "" { Set tags = tags _ "," _ tag }
 	If tags = "" {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Must specify version."))
@@ -97,7 +97,7 @@ ClassMethod Push(registry As %String, repository As %String, namespace As %Strin
 }
 
 /// Publishes/pushes the package using ORAS
-ClassMethod PushPy(registry As %String, repository As %String, namespace As %String, tags As %String, directoryPath As %String, metadata As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean) [ Language = python ]
+ClassMethod PushPy(registry As %String, package As %String, namespace As %String, tags As %String, directoryPath As %String, metadata As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean) [ Language = python ]
 {
 	import iris
 	import os, sys
@@ -121,7 +121,7 @@ ClassMethod PushPy(registry As %String, repository As %String, namespace As %Str
         # Suppress console output
 		sys.stdout = open(os.devnull, "w")
 
-		target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace) + ":" + tag
+		target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
 
 		try:
 			res = client.push(files=file_paths, target=target, disable_path_validation=True, manifest_annotations=manifest_annotations)
@@ -134,11 +134,11 @@ ClassMethod PushPy(registry As %String, repository As %String, namespace As %Str
 }
 
 /// Deletes the specified tags from the module
-ClassMethod DeleteTagsPy(registry As %String, repository As %String, namespace As %String, tags As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean) [ Language = python ]
+ClassMethod DeleteTagsPy(registry As %String, package As %String, namespace As %String, tags As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean) [ Language = python ]
 {
 	import iris
 
-	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
+	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
 	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenBasicAuth)
 
 	# remove whitespace and convert to a list
@@ -149,13 +149,13 @@ ClassMethod DeleteTagsPy(registry As %String, repository As %String, namespace A
 }
 
 /// Deletes the module by deleting all tags
-ClassMethod DeleteModule(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean)
+ClassMethod DeleteModule(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean)
 {
-	set target = ##class(%IPM.Repo.Oras.PackageService).GetAPITarget(registry, repository, namespace)
+	set target = ##class(%IPM.Repo.Oras.PackageService).GetAPITarget(registry, package, namespace)
 	set client = ##class(%IPM.Repo.Oras.PackageService).GetClient(registry, username, password, token, tokenBasicAuth)
 	try {
 		set tags = client."get_tags"(target)
-		do ..DeleteTagsPy(registry, repository, namespace, tags, username, password, token, tokenBasicAuth)
+		do ..DeleteTagsPy(registry, package, namespace, tags, username, password, token, tokenBasicAuth)
 	} Catch sc {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to delete: " _ sc.DisplayString()))
 	}

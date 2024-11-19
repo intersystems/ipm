@@ -173,19 +173,19 @@ ClassMethod GetClient(registry As %String, username As %String = "", password As
 
 /// Pulls the specified module to disk and returns the module in tgz form as %Stream.FileBinary
 /// If no tag is specified, then the latest version will be pulled
-ClassMethod Pull(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean, Output stream As %Stream.FileBinary) As %Status
+ClassMethod Pull(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean, Output stream As %Stream.FileBinary) As %Status
 {
 	Set stream = ""
 	Set tSC = $$$OK
 
-	Set repoAndTag = ..GetRepoVersionPy(registry, repository,  namespace, username, password, token, tokenBasicAuth, 1)
-	Set repo = $piece(repoAndTag, ",", 1)
-	Set tag = $piece(repoAndTag, ",", 2)
+	Set pkgAndTag = ..GetPackageVersionPy(registry, package,  namespace, username, password, token, tokenBasicAuth, 1)
+	Set pkg = $piece(pkgAndTag, ",", 1)
+	Set tag = $piece(pkgAndTag, ",", 2)
 
 	Try {
 		#; Pull into temp directory
 		Set tempFile = ""
-		Set tempDirectory = $$$FileTempDir _ "/" _ repo _ "/" _ tag
+		Set tempDirectory = $$$FileTempDir _ "/" _ pkg _ "/" _ tag
 
 		#; Empty temp directory first
 		If ##class(%File).DirectoryExists(tempDirectory) {
@@ -194,7 +194,7 @@ ClassMethod Pull(registry As %String, repository As %String, namespace As %Strin
 		}
 
 		#; Pull the module using ORAS
-		Do ..PullOras(registry, repository, "", username, password, token, tokenBasicAuth, tempDirectory)
+		Do ..PullOras(registry, package, "", username, password, token, tokenBasicAuth, tempDirectory)
 
 		#; Find only the tgz file
 		Set result=##class(%ResultSet).%New("%File:FileSet")
@@ -218,7 +218,7 @@ ClassMethod Pull(registry As %String, repository As %String, namespace As %Strin
 		Set hash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
 		Set hash = ##class(%xsd.hexBinary).LogicalToXSD(hash)
 
-		Set verified = ..VerifyModuleHashAndSizePy(registry, repository, "", username, password, token, tokenBasicAuth, hash, ##class(%Library.File).GetFileSize(tempFile))
+		Set verified = ..VerifyModuleHashAndSizePy(registry, package, "", username, password, token, tokenBasicAuth, hash, ##class(%Library.File).GetFileSize(tempFile))
 		If 'verified {
 			$$$ThrowStatus($$$ERROR($$$GeneralError, "Module size and/or hash failed validation!"))
 		}
@@ -229,13 +229,13 @@ ClassMethod Pull(registry As %String, repository As %String, namespace As %Strin
 }
 
 /// Pulls the package using ORAS
-ClassMethod PullOras(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean, path As %String)
+ClassMethod PullOras(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean, path As %String)
 {
-	Set repoTag = ..GetRepoVersionPy(registry, repository, namespace, username, password, token, tokenBasicAuth, 1)
-	Set repo = $PIECE(repoTag, ",", 1)
-	Set tag = $PIECE(repoTag, ",", 2)
+	Set pkgTag = ..GetPackageVersionPy(registry, package, namespace, username, password, token, tokenBasicAuth, 1)
+	Set pkg = $PIECE(pkgTag, ",", 1)
+	Set tag = $PIECE(pkgTag, ",", 2)
 
-	Set target = ..GetAPITarget(registry, repo, namespace) _ ":" _ tag
+	Set target = ..GetAPITarget(registry, pkg, namespace) _ ":" _ tag
 	Set client = ..GetClient(registry, username, password, token, tokenBasicAuth)
 	
 	#; set up for python call
@@ -245,12 +245,12 @@ ClassMethod PullOras(registry As %String, repository As %String, namespace As %S
 	Set res = client.pull(args...)
 }
 
-/// Returns the contents of the module.xml for the given repository
-ClassMethod GetModuleXMLPy(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean) As %String [ Language = python ]
+/// Returns the contents of the module.xml for the given package
+ClassMethod GetModuleXMLPy(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean) As %String [ Language = python ]
 {
 	import iris
 
-	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
+	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
 	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenBasicAuth)
 
 	# loop through the annotations to find the module.xml text
@@ -269,12 +269,12 @@ ClassMethod GetModuleXMLPy(registry As %String, repository As %String, namespace
 	return ""
 }
 
-ClassMethod GetPackageMetadataPy(registry As %String, repository As %String, namespace As %String, tag As %String, client As %String) As %String [ Language = python ]
+ClassMethod GetPackageMetadataPy(registry As %String, package As %String, namespace As %String, tag As %String, client As %String) As %String [ Language = python ]
 {
 	import iris
 	import json
 
-	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace) + ":" + tag
+	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
 	
 	try:
 		manifest = client.get_manifest(target)
@@ -287,33 +287,33 @@ ClassMethod GetPackageMetadataPy(registry As %String, repository As %String, nam
 	return ""
 }
 
-/// Given a repository name, either parses out the tag or determines the latest tag
+/// Given a package name, either parses out the tag or determines the latest tag
 /// Params:
-/// 	repository : is either in the form <repo>:<tag> or <repo>
+/// 	package : is either in the form <package>:<tag> or <package>
 /// 			     in the latter case, returns latest tag
-/// 	asString   : 0 => returns as python tuple of (repo, tag)
-/// 			     1 => returns as string of "<repo>,<tag>"
-ClassMethod GetRepoVersionPy(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean, asString As %Boolean = 0) [ Language = python ]
+/// 	asString   : 0 => returns as python tuple of (package, tag)
+/// 			     1 => returns as string of "<package>,<tag>"
+ClassMethod GetPackageVersionPy(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean, asString As %Boolean = 0) [ Language = python ]
 {
 	import iris
 	
-	if ":" in repository:
-		repo, tag = repository.split(":", 1)
+	if ":" in package:
+		pkg, tag = package.split(":", 1)
 	else:
-		repo = repository
-		tag = iris.cls("%IPM.Repo.Oras.PackageService").GetLatestTagPy(registry, repo,  namespace, username, password, token, tokenBasicAuth, asString )
+		pkg = package
+		tag = iris.cls("%IPM.Repo.Oras.PackageService").GetLatestTagPy(registry, pkg,  namespace, username, password, token, tokenBasicAuth, asString )
 	if asString:
-		return repo + "," + tag
+		return pkg + "," + tag
 	else:
-		return (repo, tag)
+		return (pkg, tag)
 }
 
-/// Lists all of the modules and their latest versions in the repository
+/// Lists all of the modules and their latest versions in the package
 /// Returns the tag for the highest numbered version
-ClassMethod GetLatestTagPy(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean) As %String [ Language = python ]
+ClassMethod GetLatestTagPy(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %Boolean) As %String [ Language = python ]
 {
 	import iris
-	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
+	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
 	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenBasicAuth)
 	try:
 		tags = client.get_tags(target)
@@ -324,12 +324,12 @@ ClassMethod GetLatestTagPy(registry As %String, repository As %String, namespace
 		return ""
 }
 
-/// Returns comma separated string of all the tags for a given repository
-ClassMethod GetAllTagsPy(registry As %String, repository As %String, namespace As %String, client As %SYS.Python) As %String [ Language = python ]
+/// Returns comma separated string of all the tags for a given package
+ClassMethod GetAllTagsPy(registry As %String, package As %String, namespace As %String, client As %SYS.Python) As %String [ Language = python ]
 {
 	import iris
 	try:
-		target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
+		target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
 		tags = client.get_tags(target)
 
 		# flip list so higher versions are first
@@ -342,13 +342,13 @@ ClassMethod GetAllTagsPy(registry As %String, repository As %String, namespace A
 		return ""
 }
 
-/// Returns whether the given repository is in the registry
-ClassMethod HasModulePy(registry As %String, repository As %String, namespace As %String, client As %SYS.Python) As %Boolean [ Language = python ]
+/// Returns whether the given package is in the registry
+ClassMethod HasModulePy(registry As %String, package As %String, namespace As %String, client As %SYS.Python) As %Boolean [ Language = python ]
 {
 	import iris
-	# Attempt to get the tags of the specified repository
-	# If tags are not found, then the repository does not exist
-	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
+	# Attempt to get the tags of the specified package
+	# If tags are not found, then the package does not exist
+	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
 
 	# check if tags is [] through boolean coercion
 	try:
@@ -360,12 +360,12 @@ ClassMethod HasModulePy(registry As %String, repository As %String, namespace As
 // ** UTILITY FUNCTIONS **
 
 /// Gets the URL for the API endpoint, i.e. returns target where <target>/v2/ is the endpoint
-ClassMethod GetAPITarget(registry As %String, repository As %String, namespace As %String = "") As %String
+ClassMethod GetAPITarget(registry As %String, package As %String, namespace As %String = "") As %String
 {
 	If namespace '= "" {
-		Set repository = ..AppendURIs(namespace, repository)
+		Set package = ..AppendURIs(namespace, package)
 	}
-	Set target = ..AppendURIs(registry, repository)
+	Set target = ..AppendURIs(registry, package)
 	Return $Replace($Replace(target, "http://", ""), "https://", "")
 }
 
@@ -386,11 +386,11 @@ ClassMethod AppendURIs(uri1 As %String, uri2 As %String) As %String
 }
 
 /// Returns whether the given SHA256 hash and file size matches the hash and size in the ORAS manifest for the module
-ClassMethod VerifyModuleHashAndSizePy(registry As %String, repository As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %String, hash As %String, size As %String) As %Boolean [ Language = python ]
+ClassMethod VerifyModuleHashAndSizePy(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenBasicAuth As %String, hash As %String, size As %String) As %Boolean [ Language = python ]
 {
 	import iris
 
-	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, repository, namespace)
+	target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
 	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenBasicAuth)
 	
 	try:
