@@ -3,55 +3,61 @@ Class %IPM.Repo.Oras.PublishService Extends (%IPM.Repo.Oras.PackageService, %IPM
 
 Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
 {
-    Set repo = pModule.Name
-    Set tag = pModule.VersionString
+	Set status = $$$OK
+    Try {
+		Set repo = pModule.Name
+		Set tag = pModule.VersionString
 
-    #; Use a temp directory
-    Set tempFile = ""
-    Set tempDirectory = ##class(%File).NormalizeDirectory($$$FileTempDir _ "/" _ repo _ "/" _ tag _ "/")
+		#; Use a temp directory
+		Set tDir = $$$FileTempDir
+		If tDir = ("-" _ -tDir) { // $zu(140,17) can return a negative number if it fails
+			Throw ##class(%Exception.General).%New("Failed to create temporary directory. Error code: " _ -tDir)
+		}
+		Set tempDirectory = ##class(%File).NormalizeDirectory(tDir _ "/" _ repo _ "/" _ tag _ "/")
 
-    #; Empty temp directory first
-    If ##class(%File).DirectoryExists(tempDirectory) {
+		#; Create temp directory
+		Set tCreated = ##class(%File).CreateDirectoryChain(tempDirectory,.tReturnValue)
+		If 'tCreated {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Error creating directory %1: %2", tempDirectory, tReturnValue)))
+		}
+
+		#; Create tgz file in temp directory
+		Set tFileBinStream = ##class(%Stream.FileBinary).%New()
+		Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz", tempDirectory, .return)
+		Do tFileBinStream.CopyFromAndSave(pModule.Payload)
+
+		#; Convert module.xml into string
+		Set moduleXML = ""
+		While (pModule.Manifest.AtEnd = 0) {
+			Set moduleXML = moduleXML _ pModule.Manifest.ReadLine(, .status)
+			$$$ThrowOnError(status)
+		}
+
+		#; Set metadata
+		Set metadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+		Set metadata.ImageTitle = pModule.Name
+		Set metadata.ImageDescription = pModule.Description
+		Set metadata.ImageVersion = pModule.VersionString
+		Set metadata.ImageSource = pModule.Repository
+		Set metadata.ImageCreated = $zdt($now(),3,2)
+		Set metadata.IPMAllVersions = pModule.AllVersions
+		Set metadata.IPMOrigin = pModule.Origin
+		Set metadata.IPMDeployed = pModule.Deployed
+		Set metadata.IPMModuleV1XML = moduleXML
+		Do metadata.%JSONExportToString(.metaDataString)
+
+		#; Push file
+		$$$ThrowOnError(..Push(..Location, repo, ..Namespace, tempDirectory, tag, metaDataString, ..Username, ..Password, ..Token, ..TokenBasicAuth))
+	} catch ex {
+		Set status = ex.AsStatus()
+	}
+	// Clean up temp directory whether successful or not
+    If ($Data(tempDirectory) # 2) && ##class(%File).DirectoryExists(tempDirectory) {
         Set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tempDirectory)
         $$$ThrowOnError(tSC)
     }
 
-    #; Create temp directory
-    Set tCreated = ##class(%File).CreateDirectoryChain(tempDirectory,.tReturnValue)
-    If 'tCreated {
-		$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Error creating directory %1: %2", tempDirectory, tReturnValue)))
-    }
-
-    #; Create tgz file in temp directory
-    Set tFileBinStream = ##class(%Stream.FileBinary).%New()
-    Set tFileBinStream.Filename = ##class(%File).TempFilename("tgz", tempDirectory, .return)
-    Do tFileBinStream.CopyFromAndSave(pModule.Payload)
-
-    #; Convert module.xml into string
-    Set moduleXML = ""
-    While (pModule.Manifest.AtEnd = 0) {
-        Set moduleXML = moduleXML _ pModule.Manifest.ReadLine(, .status)
-        $$$ThrowOnError(status)
-    }
-
-	#; Set metadata
-	Set metadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-	Set metadata.ImageTitle = pModule.Name
-	Set metadata.ImageDescription = pModule.Description
-	Set metadata.ImageVersion = pModule.VersionString
-	Set metadata.ImageSource = pModule.Repository
-	Set metadata.ImageCreated = $zdt($now(),3,2)
-	Set metadata.IPMAllVersions = pModule.AllVersions
-	Set metadata.IPMOrigin = pModule.Origin
-	Set metadata.IPMDeployed = pModule.Deployed
-	Set metadata.IPMModuleV1XML = moduleXML
-	Do metadata.%JSONExportToString(.metaDataString)
-
-    #; Push file
-	Set status = ..Push(..Location, repo, ..Namespace, tempDirectory, tag, metaDataString, ..Username, ..Password, ..Token, ..TokenBasicAuth)
-	$$$ThrowOnError(status)
-
-    Return 1
+    Return status
 }
 
 Method CheckUnpublishEnabled(packageName As %String, packageVersion As %String) As %Boolean
