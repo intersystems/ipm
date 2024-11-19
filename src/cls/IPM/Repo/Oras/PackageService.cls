@@ -360,29 +360,29 @@ ClassMethod HasModulePy(registry As %String, repository As %String, namespace As
 // ** UTILITY FUNCTIONS **
 
 /// Gets the URL for the API endpoint, i.e. returns target where <target>/v2/ is the endpoint
-ClassMethod GetAPITarget(registry As %String, repository As %String, namespace As %String = "") As %String [ Language = python ]
+ClassMethod GetAPITarget(registry As %String, repository As %String, namespace As %String = "") As %String
 {
-	import iris
-	
-	if namespace != "":
-		repository = iris.cls("%IPM.Repo.Oras.PackageService").AppendURIs(namespace, repository)
-	target = iris.cls("%IPM.Repo.Oras.PackageService").AppendURIs(registry, repository)
-
-	# remove http(s) from target url
-	return target.replace("http://","").replace("https://","")
+	If namespace '= "" {
+		Set repository = ..AppendURIs(namespace, repository)
+	}
+	Set target = ..AppendURIs(registry, repository)
+	Return $Replace($Replace(target, "http://", ""), "https://", "")
 }
 
 /// Given two URIs, appends them such that the "/" are correctly placed in between
 /// Removes the leading and trailing "/"
-ClassMethod AppendURIs(uriOne As %String, uriTwo As %String) As %String [ Language = python ]
+ClassMethod AppendURIs(uri1 As %String, uri2 As %String) As %String
 {
-	if uriOne[-1] != "/" and uriTwo[0] != "/":
-		uriOne = uriOne + "/"
-	if uriOne[-1] == "/" and uriTwo[0] == "/":
-		uriOne = uriOne[:-1]
-	if uriTwo[-1] == "/":
-		uriTwo = uriTwo[:-1]
-	return uriOne + uriTwo
+	If ($Extract(uri1, *) '= "/" ) && ($Extract(uri2, 1) '= "/") {
+		Set uri1 = uri1 _ "/"
+	}
+	If ($Extract(uri1, *) = "/" ) && ($Extract(uri2, 1) = "/") {
+		Set uri1 = $Extract(uri1, 1, *-1)
+	}
+	If ($Extract(uri2, *) = "/" ) {
+		Set uri2 = $Extract(uri2, 1, *-1)
+	}
+	Return uri1 _ uri2
 }
 
 /// Returns whether the given SHA256 hash and file size matches the hash and size in the ORAS manifest for the module
