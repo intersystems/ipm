@@ -62,6 +62,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 	Set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenBasicAuth)
 
 	#; Parse search criteria
+	// The OCI /v2/_catalog endpoint always returns all packages. We will filter by name and version on the client side.
 	Set name = $$$lcase(pSearchCriteria.Name)
 	Set tVersionExpression = pSearchCriteria.VersionExpression
 	Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
@@ -77,6 +78,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 	Set request = ..GetHttpRequest()
 	
 	#; Make GET request
+	// response is a JSON structure like {"repositories":["package1", "package2", ...]}
 	Set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
 	$$$ThrowOnError(tSC)
 	Set response=request.HttpResponse
@@ -117,11 +119,11 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			Do artifactMetadata.%JSONImport(metadata)
 
 			Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-			Set tModRef.Name = artifactMetadata."org-opencontainers-image-title"
-			Set tModRef.Repository = artifactMetadata."org-opencontainers-image-source"
-			Set tModRef.VersionString = artifactMetadata."org-opencontainers-image-version"
-			Set tModRef.Description = artifactMetadata."org-opencontainers-image-description"
-			Set tModRef.Deployed = artifactMetadata."com-intersystems-ipm-deployed"
+			Set tModRef.Name = artifactMetadata.ImageTitle
+			Set tModRef.Repository = artifactMetadata.ImageSource
+			Set tModRef.VersionString = artifactMetadata.ImageVersion
+			Set tModRef.Description = artifactMetadata.ImageDescription
+			Set tModRef.Deployed = artifactMetadata.IPMDeployed
 			#; If $IsObject(item."platform_versions") {
 			#;   Set tIterPVer = item."platform_versions".%GetIterator() 
 			#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
@@ -129,7 +131,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			#;   }
 			#; }
 			Set tModRef.AllVersions = allTagsString
-			Set tModRef.Origin = artifactMetadata."com-intersystems-ipm-origin"
+			Set tModRef.Origin = artifactMetadata.IPMOrigin
 			Do tList.Insert(tModRef)
 			
 			#; If not all versions are requested, return the latest one

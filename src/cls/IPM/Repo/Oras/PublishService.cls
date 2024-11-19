@@ -36,15 +36,15 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
 
 	#; Set metadata
 	Set metadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-	Set metadata."org-opencontainers-image-title" = pModule.Name
-	Set metadata."org-opencontainers-image-description" = pModule.Description
-	Set metadata."org-opencontainers-image-version" = pModule.VersionString
-	Set metadata."org-opencontainers-image-source" = pModule.Repository
-	Set metadata."org-opencontainers-image-created" = $zdt($now(),3,2)
-	Set metadata."com-intersystems-ipm-allVersions" = pModule.AllVersions
-	Set metadata."com-intersystems-ipm-origin" = pModule.Origin
-	Set metadata."com-intersystems-ipm-deployed" = pModule.Deployed
-	Set metadata."com-intersystems-ipm-module-v1+xml" = moduleXML
+	Set metadata.ImageTitle = pModule.Name
+	Set metadata.ImageDescription = pModule.Description
+	Set metadata.ImageVersion = pModule.VersionString
+	Set metadata.ImageSource = pModule.Repository
+	Set metadata.ImageCreated = $zdt($now(),3,2)
+	Set metadata.IPMAllVersions = pModule.AllVersions
+	Set metadata.IPMOrigin = pModule.Origin
+	Set metadata.IPMDeployed = pModule.Deployed
+	Set metadata.IPMModuleV1XML = moduleXML
 	Do metadata.%JSONExportToString(.metaDataString)
 
     #; Push file
