@@ -40,7 +40,7 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 	Set tClient.Namespace = ..Namespace
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
-    Set tClient.Token = ..Token
+	Set tClient.Token = ..Token
 	Set tClient.TokenBasicAuth = ..TokenBasicAuth
 	Quit tClient
 }
@@ -53,7 +53,7 @@ Method GetPublishService() As %IPM.Repo.IPublishService
 	Set tClient.Namespace = ..Namespace
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
-    Set tClient.Token = ..Token
+	Set tClient.Token = ..Token
 	Quit tClient
 }
 
@@ -64,7 +64,7 @@ Method Display()
 	Do ##super()
 
 	If (..Namespace '= "") {
-		Write !,$c(9),"Namespace: ",$c(9),$c(9),..Namespace
+		Write !,$c(9),"Namespace: ",..Padding(1),..Namespace
 	}
 }
 
