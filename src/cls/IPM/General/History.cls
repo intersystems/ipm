@@ -221,7 +221,7 @@ ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer =
 {
     Set limit = +limit // Coerce to number to prevent SQL injection
     Set query = "SELECT " _ $SELECT(limit>0: "TOP " _ limit, 1: "") _  " * FROM %IPM_General.History "
-    $$$ThrowOnError(..ConstructSQLWhere(.filter, namespace, .where, .varargs))
+    $$$ThrowOnError(..ConstructSQLWhere(.filter, .namespace, .where, .varargs))
     Set query = query _ where
     Set query = query _ " ORDER BY ID "  _ $Select(ascend: "ASC", 1: "DESC")
     Quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)

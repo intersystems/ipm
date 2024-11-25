@@ -655,6 +655,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
 	<modifier name="sort" aliases="asc" value="true" description="List the history logs in a specific order. Allowed values are asc and desc. Default behaviour is to list logs in descending order of %ID."/>
 	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. If set to 0, all logs will be displayed. If omitted, will use the value returned by `zpm &quot;config get DefaultLogEntryLimit&quot;`."/>
+	<modifier name="confirm" value="false" description="If present, will delete all records in the current namespace. Ignored if -globally is passed too."/>
 	<parameter name="action" required="true" description="One of history actions: find (default), details, delete, schema" />
 	<parameter name="argument" required="false" description="Argument for `details` command" />
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
@@ -2949,6 +2950,7 @@ ClassMethod History(ByRef pCommandInfo)
 
 	Set globally = $$$HasModifier(pCommandInfo, "globally")
 	Set ascend = ($$$GetModifier(pCommandInfo, "sort") = "asc")
+	Set confirm = $$$HasModifier(pCommandInfo, "confirm")
 	Set limit = $$$GetModifier(pCommandInfo, "limit")
 	Set limit = $Select(limit="": ##class(%IPM.Repo.UniversalSettings).GetValue("DefaultLogEntryLimit"), limit=0: "", 1: +limit)
 	Merge filter = pCommandInfo("data", "zpm")
@@ -2976,6 +2978,9 @@ ClassMethod History(ByRef pCommandInfo)
 			Write !, "- ", col
 		}
 	} ElseIf action = "delete" {
+		If ($Data(filter) \ 2 = 0) && ('globally) && ('confirm) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"No filter specified. Should specify at least one column to filter on or pass -confirm to delete all records in the current namespace."))
+		}
 		Set count = ##class(%IPM.General.History).DeleteHistory(.filter, $Select(globally: "", 1: $Namespace), globally)
 		Write !, "Deleted ", count, " record(s)."
 	} Else {
