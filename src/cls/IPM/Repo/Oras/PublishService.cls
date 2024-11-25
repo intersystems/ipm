@@ -54,7 +54,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
 	// Clean up temp directory whether successful or not
     If ($Data(tempDirectory) # 2) && ##class(%File).DirectoryExists(tempDirectory) {
         Set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tempDirectory)
-        $$$ThrowOnError(tSC)
+		Set status = $$$ADDSC(status, tSC)
     }
 
     Return status
