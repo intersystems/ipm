@@ -7,7 +7,7 @@ Parameter MONIKER As String = "http";
 /// Override this in subclasses to provide more padding.
 Parameter MaxDisplayTabCount As INTEGER = 4;
 
-Property URL As %String(MAXLEN = 2048) [ Required ];
+Property URL As %IPM.DataType.RepoLocation [ Required ];
 
 Index URL On URL [ Unique ];
 

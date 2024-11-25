@@ -5,11 +5,11 @@ Class %IPM.Repo.Oras.PackageService Extends %IPM.Repo.Http.PackageService
 
 /// The base URL for this repo, e.g. https://irepo.intersystems.com
 /// The API endpoint is will be located at <Location>/v2/
-Property Location As %String;
+Property Location As %IPM.DataType.RepoLocation;
 
 /// Optional extension for where packages get published to and pulled from
 /// i.e. the API endpoint for a given module will be at <Location>/v2/<Namespace>/<Module>
-Property Namespace As %String;
+Property Namespace As %IPM.DataType.OrasNamespace;
 
 /// Prefix for ORAS API calls
 Property PathPrefix As %String(MAXLEN = "");

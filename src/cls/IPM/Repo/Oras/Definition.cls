@@ -5,7 +5,7 @@ Parameter DISPLAYNAME As STRING = "ORAS";
 
 Parameter MONIKER As STRING = "oras";
 
-Property Namespace As %String;
+Property Namespace As %IPM.DataType.OrasNamespace;
 
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
 {
