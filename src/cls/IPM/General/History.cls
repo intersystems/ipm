@@ -171,39 +171,74 @@ ClassMethod RecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceA
     Quit $$$OK
 }
 
+/// Get an SQL "where" clause based on the filter argument
+/// See GetHistory() for the `filter` argument
+/// Output "clause" is the SQL WHERE clause as a string, container zero or more ? placeholders
+/// The "varargs" is an array of values to be substituted in the ? placeholders. 
+/// The "varargs" may already be populated with values, and new values will be appended to it.
+ClassMethod ConstructSQLWhere(filter As %String, namespace As %String, Output clause As %String, ByRef varargs As %String) As %Status [ Internal ]
+{
+    Try {
+        Set clause = " WHERE 1 = 1 "
+        Set namespace = $ZStrip($Get(namespace, $Namespace), "<>WC")
+        If (namespace '= "") {
+            Set clause = clause _ " AND NameSpace = ?"
+            Set varargs($Increment(varargs)) = namespace
+        }
+        Set col = ""
+        For {
+            Set col = $Order(filter(col), 1, value)
+            If (col = "") || ($Data(value) # 2 = 0) || ('$Match(col, "^[a-zA-Z][a-zA-Z0-9]*$")) {
+                Quit
+            }
+            // col is safe from SQL injection because we ensured it's alphanumeric above
+            If $ListFind($ListBuild(">=", "<=", "<>"), $Extract(value, 1, 2)) {
+                Set clause = clause _ " AND " _ col _ $Extract(value, 1, 2) _ "?"
+                Set varargs($Increment(varargs)) = $Extract(value, 3, *)
+            } ElseIf $ListFind($ListBuild(">", "<", "="), $Extract(value, 1, 1)) {
+                Set clause = clause _ " AND " _ col _ $Extract(value, 1) _ "?"
+                Set varargs($Increment(varargs)) = $Extract(value, 2, *)
+            } ElseIf value [ "*" {
+                Set clause = clause _ " AND " _ col _ " LIKE ?"
+                Set varargs($Increment(varargs)) = $Replace(value, "*", "%")
+            } Else {
+                Set clause = clause _ " AND " _ col _ "=?"
+                Set varargs($Increment(varargs)) = value
+            }
+        }
+        Set clause = clause _ " " // Ensure there's a space at the end
+    } catch ex {
+        Return ex.AsStatus()
+    }
+    Return $$$OK
+}
+
 /// Get the history of all installations, uninstalls, and loads in given namespace
 /// The filter argument is a multidimensional array with structure 
 /// filter(columnName) = value
 /// Where value can optionally start with >, >=, <, <=, =, <> or contain * to indicate a wildcard
 ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0, namespace As %String) As %SQL.StatementResult
 {
-    Kill varargs
     Set limit = +limit // Coerce to number to prevent SQL injection
-    Set query = "SELECT " _ $SELECT(limit>0: "TOP " _ limit, 1: "") _  " * FROM %IPM_General.History WHERE Namespace = ? "
-    Set varargs($Increment(varargs)) = $ZStrip($Get(namespace, $Namespace), "<>WC")
-    Set col = ""
-    For {
-        Set col = $Order(filter(col), 1, value)
-        If (col = "") || ($Data(value) # 2 = 0) || ('$Match(col, "^[a-zA-Z][a-zA-Z0-9]*$")) {
-            Quit
-        }
-        // col is safe from SQL injection because we ensured it's alphanumeric above
-        If $ListFind($ListBuild(">=", "<=", "<>"), $Extract(value, 1, 2)) {
-            Set query = query _ " AND " _ col _ $Extract(value, 1, 2) _ "?"
-            Set varargs($Increment(varargs)) = $Extract(value, 3, *)
-        } ElseIf $ListFind($ListBuild(">", "<", "="), $Extract(value, 1, 1)) {
-            Set query = query _ " AND " _ col _ $Extract(value, 1) _ "?"
-            Set varargs($Increment(varargs)) = $Extract(value, 2, *)
-        } ElseIf value [ "*" {
-            Set query = query _ " AND " _ col _ " LIKE ?"
-            Set varargs($Increment(varargs)) = $Replace(value, "*", "%")
-        } Else {
-            Set query = query _ " AND " _ col _ " = ?"
-            Set varargs($Increment(varargs)) = value
-        }
-    }
+    Set query = "SELECT " _ $SELECT(limit>0: "TOP " _ limit, 1: "") _  " * FROM %IPM_General.History "
+    $$$ThrowOnError(..ConstructSQLWhere(.filter, namespace, .where, .varargs))
+    Set query = query _ where
     Set query = query _ " ORDER BY ID "  _ $Select(ascend: "ASC", 1: "DESC")
     Quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+}
+
+/// Delete the history of installations, uninstalls, and loads in
+ClassMethod DeleteHistory(ByRef filter, namespace As %String, allowDeleteAll As %String) As %Integer
+{
+    Set query = "DELETE FROM %IPM_General.History "
+    $$$ThrowOnError(..ConstructSQLWhere(.filter, namespace, .where, .varargs))
+    If ($Data(varargs) = 0) && ('allowDeleteAll) {
+        $$$ThrowOnError("Cannot delete all history records by default. If you want to delete everything, use `history delete -g`.")
+    }
+    Set query = query _ where
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    Quit rs.%ROWCOUNT
 }
 
 /// @API.Query

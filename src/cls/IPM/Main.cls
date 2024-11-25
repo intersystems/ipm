@@ -2947,13 +2947,13 @@ ClassMethod History(ByRef pCommandInfo)
 {
 	Set action = $Get(pCommandInfo("parameters", "action"))
 
-	If (action = "find") || (action = "") {
-		Set globally = $$$HasModifier(pCommandInfo, "globally")
-		Set ascend = ($$$GetModifier(pCommandInfo, "sort") = "asc")
-		Set limit = $$$GetModifier(pCommandInfo, "limit")
-		Set limit = $Select(limit="": ##class(%IPM.Repo.UniversalSettings).GetValue("DefaultLogEntryLimit"), limit=0: "", 1: +limit)
+	Set globally = $$$HasModifier(pCommandInfo, "globally")
+	Set ascend = ($$$GetModifier(pCommandInfo, "sort") = "asc")
+	Set limit = $$$GetModifier(pCommandInfo, "limit")
+	Set limit = $Select(limit="": ##class(%IPM.Repo.UniversalSettings).GetValue("DefaultLogEntryLimit"), limit=0: "", 1: +limit)
+	Merge filter = pCommandInfo("data", "zpm")
 
-		Merge filter = pCommandInfo("data", "zpm")
+	If (action = "find") || (action = "") {
 		Set mthd = $Select(globally: "GetHistoryGlobally", 1: "GetHistory")
 		Set rs = $Classmethod("%IPM.General.History", mthd, .filter, ascend, limit)
 		Set mthd = $Select(globally: "DisplayArray", 1: "DisplayQueryResult")
@@ -2976,7 +2976,8 @@ ClassMethod History(ByRef pCommandInfo)
 			Write !, "- ", col
 		}
 	} ElseIf action = "delete" {
-		Do ##class(%IPM.General.History).%KillExtent()
+		Set count = ##class(%IPM.General.History).DeleteHistory(.filter, $Select(globally: "", 1: $Namespace), globally)
+		Write !, "Deleted ", count, " record(s)."
 	} Else {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Invalid action specified. Use `help history` to see available actions."))
 	}
