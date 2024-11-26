@@ -73,7 +73,7 @@ Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As
 			} ElseIf ..TokenAuthMethod = "bearer" {
 				Do tRequest.SetHeader("Authorization","Bearer " _ ..Token)
 			} Else {
-				$$$ThrowStatus($$$ERROR(($$$GeneralError, $$$FormatText("Unknown token auth method: ""%1""", ..TokenAuthMethod))))
+				$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Unknown token auth method: ""%1""", ..TokenAuthMethod)))
 			}
 		}
 		If (..Username '= "") && (..Password '= "") {
