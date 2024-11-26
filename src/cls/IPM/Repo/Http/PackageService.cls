@@ -5,7 +5,7 @@ Class %IPM.Repo.Http.PackageService Extends (%RegisteredObject, %IPM.Repo.IPacka
 
 Parameter ALLOWPREFIXINLOCATION = 1;
 
-Property Location As %String;
+Property Location As %IPM.DataType.RepoLocation;
 
 Property Username As %String(MAXLEN = "");
 
@@ -15,18 +15,18 @@ Property Token As %String(MAXLEN = "");
 
 Property TokenBasicAuth As %Boolean [ InitialExpression = 0 ];
 
-ClassMethod GetSSLConfiguration(host) As %String
+ClassMethod GetSSLConfiguration(name As %String) As %String
 {
 	New $NAMESPACE
 	Set $NAMESPACE = "%SYS"
 	
-	If '##class(Security.SSLConfigs).Exists(host) {
-		Do ##class(Security.SSLConfigs).Create(host)
+	If '##class(Security.SSLConfigs).Exists(name) {
+		Do ##class(Security.SSLConfigs).Create(name)
 	}
-	Quit host
+	Quit name
 }
 
-Method GetHttpRequest(tLocation = {..Location}) As %Net.HttpRequest
+Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As %Net.HttpRequest
 {
 	Set tRequest = ##class(%Net.HttpRequest).%New()
 
