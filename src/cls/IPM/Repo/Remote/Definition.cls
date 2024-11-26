@@ -40,7 +40,7 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
 	Set tClient.Token = ..Token
-	Set tClient.TokenBasicAuth = ..TokenBasicAuth
+	Set tClient.TokenAuthMethod = ..TokenAuthMethod
 	Quit tClient
 }
 

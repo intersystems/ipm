@@ -41,7 +41,7 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
 	Set tClient.Token = ..Token
-	Set tClient.TokenBasicAuth = ..TokenBasicAuth
+	Set tClient.TokenAuthMethod = ..TokenAuthMethod
 	Quit tClient
 }
 
@@ -93,8 +93,8 @@ ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Bool
 		If $Data(pModifiers("token"), tToken) {
 			Set pInstance.Token = tToken
 		}
-		If $Data(pModifiers("token-basic-auth")) # 2 { 
-			Set pInstance.TokenBasicAuth = 1
+		If $Data(pModifiers("token-auth-method"), tokenAuthMethod) # 2 { 
+			Set pInstance.TokenAuthMethod = tokenAuthMethod
 		}
 		If $Data(pModifiers("publish"), tPublish) {
 			Set pInstance.DeploymentEnabled = tPublish

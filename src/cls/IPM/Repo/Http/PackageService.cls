@@ -13,7 +13,7 @@ Property Password As %String(MAXLEN = "");
 
 Property Token As %String(MAXLEN = "");
 
-Property TokenBasicAuth As %Boolean [ InitialExpression = 0 ];
+Property TokenAuthMethod As %Boolean [ InitialExpression = 0 ];
 
 ClassMethod GetSSLConfiguration(name As %String) As %String
 {
@@ -66,10 +66,14 @@ Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As
 		Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
 
 		If (..Token '= "") {
-			If ..TokenBasicAuth {
+			If ..TokenAuthMethod = "basic"{
 				Do tRequest.SetHeader("Authorization","Basic " _ ..Token)
-			} Else {
+			} ElseIf ..TokenAuthMethod = "apiKey" {
 				Do tRequest.SetHeader("apikey",..Token)
+			} ElseIf ..TokenAuthMethod = "bearer" {
+				Do tRequest.SetHeader("Authorization","Bearer " _ ..Token)
+			} Else {
+				$$$ThrowStatus($$$ERROR(($$$GeneralError, $$$FormatText("Unknown token auth method: ""%1""", ..TokenAuthMethod))))
 			}
 		}
 		If (..Username '= "") && (..Password '= "") {

@@ -19,7 +19,7 @@ Property Password As %String(MAXLEN = "");
 
 Property Token As %String(MAXLEN = "");
 
-Property TokenBasicAuth As %Boolean [ InitialExpression = 0 ];
+Property TokenAuthMethod As %String(VALUELIST = "-apiKey-bearer-basic") [ InitialExpression = "apiKey" ];
 
 Property DeploymentEnabled As %Boolean [ InitialExpression = 0 ];
 
@@ -38,7 +38,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 <modifier name="username" aliases="user" value="true" description="For HTTP(s) repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For HTTP(s) repositories, specifies the password to use when connecting." />
 <modifier name="token" value="true" description="For HTTP(s) repositories, specifies the key to use when connecting." />
-<modifier name="token-basic-auth" value="false" description="If set, token will be included as basic auth instead of in apikey header." />
+<modifier name="token-auth-method" value="true" description="Enum of { basic, bearer, apiKey }. Defaults to apiKey. If set to 'basic', token will be included as 'Authorization: Basic <token>'. If set to 'bearer', token will be included as 'Authorization: Bearer <token>'. If set to 'apiKey', token will be included as 'apiKey: <token>'" />
 <modifier name="sslconfig" aliases="ssl" value="true" description="For HTTP(s) repositories, specifies the SSL configuration name to use when connecting." />
 </group>
 </command>
@@ -87,8 +87,8 @@ Method Display()
 	If (..Token '= "") {
 		Write !,$c(9),"Token: ",..Padding(0),$Case(..Token,"":"<unset>",:"<set>")
 	}
-	If (..TokenBasicAuth '= "") {
-		Write !,$c(9),"Use Token in Basic Auth?",..Padding(3),$Select(+..TokenBasicAuth: "Yes", 1:"No")
+	If (..Token '= "") || (..Password '= "") || (..Username '= "") {
+		Write !,$c(9),"Token Auth Method: ",..Padding(2),..TokenAuthMethod
 	}
 }
 
@@ -166,7 +166,7 @@ Storage Default
 <Value>DeploymentEnabled</Value>
 </Value>
 <Value name="6">
-<Value>TokenBasicAuth</Value>
+<Value>TokenAuthMethod</Value>
 </Value>
 </Data>
 <DefaultData>HttpRepoDefinitionDefaultData</DefaultData>
