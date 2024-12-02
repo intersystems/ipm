@@ -2054,6 +2054,9 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
   	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
 	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
+	If $Data(tParams("Path"), path) # 2 {
+		Set tParams("Path") = ##class(%File).NormalizeDirectory(path)
+	}
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
 
