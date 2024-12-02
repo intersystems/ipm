@@ -1,0 +1,524 @@
+Include (%IPM.Common, %IPM.Formatting)
+
+/// Persistent class for history of all installations, uninstalls, and loads in the system. This class is shared among namespaces that share %IPM mappings.
+Class %IPM.General.History Extends %Persistent
+{
+
+/// Action of this history record. Can be load, install, or uninstall
+Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
+
+/// Name of the package being loaded/installed/uninstall. This is not necessarily requried. E.g., when loading a nonexistent directory.
+Property Package As %IPM.DataType.ModuleName;
+
+/// Version of the package being loaded/installed/uninstall. This is not necessarily requried. E.g., when loading a nonexistent directory.
+Property Version As %IPM.General.SemanticVersion [ Required ];
+
+/// Name of the repository where the package is being installed. For load and uninstall, this will be empty.
+Property SourceName As %IPM.DataType.RepoName(MAXLEN = 100);
+
+/// Moniker of the repository where the package is being installed. For load and uninstall, this will be empty.
+Property SourceMoniker As %IPM.DataType.RepoMoniker(MAXLEN = 100);
+
+/// Details of the repository where the package is being installed. For load and uninstall, this will be empty.
+Property SourceDetails As %String(MAXLEN = "");
+
+/// Time when the action started
+Property TimeStart As %TimeStamp [ Required ];
+
+/// Time when the action ended. This will be empty if the action is still in progress or ended abnormally.
+Property TimeEnd As %TimeStamp;
+
+/// Namespace where the action is being performed
+Property NameSpace As %String [ InitialExpression = {$NAMESPACE}, Required ];
+
+/// User who initiated the action
+Property UserName As %String [ InitialExpression = {$USERNAME}, Required ];
+
+/// Status of the action. If the action is still in progress, this will be 0. Otherwise, it will be the status code of the action.
+Property Success As %Status [ InitialExpression = 0, Required ];
+
+/// Whether the action is committed. In non developer mode, this indicates whether the action was successful. In developer mode, this is always true.
+Property Committed As %Boolean [ InitialExpression = 0, Required ];
+
+/// The command string that triggered the action
+Property CommandString As %String(MAXLEN = 8192) [ Required ];
+
+ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName) As %IPM.General.History [ Private ]
+{
+    Set log = ..%New()
+    Set log.TimeStart = $ZDateTime($Now(), 3)
+    Set log.Action = Action
+    Set log.Package = Package
+    Set log.CommandString = $Get($$$ZPMCommandToLog, "<unset>")
+    Set log.NameSpace = $Namespace
+    Set log.UserName = $Username
+    $$$ThrowOnError(log.SetVersion()) // Set the version to placeholder 0.0.0-0, Will be updated before finalizing
+    $$$ThrowOnError(log.%Save()) // Save it now in case Finalize isn't called
+    Quit log
+}
+
+ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
+{
+    Quit ..Init("install", Package)
+}
+
+ClassMethod LoadInit() As %IPM.General.History
+{
+    // Package name is not known at this point, so use a placeholder
+    Quit ..Init("load", "")
+}
+
+ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
+{
+    Quit ..Init("uninstall", Package)
+}
+
+Method SetSource(ServerName As %String) As %Status
+{
+    $$$ThrowOnError(..%Reload())
+    Set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(ServerName)
+    If '$IsObject(server) {
+        Quit $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is not defined.", ServerName))
+    }
+    Set ..SourceName = ServerName
+    Set ..SourceMoniker = server.#MONIKER
+    Set ..SourceDetails = server.Details
+    Quit ..%Save()
+}
+
+Method SetVersion(pVersion As %IPM.General.SemanticVersion) As %Status
+{
+    If ..%Id() '= "" {
+        $$$ThrowOnError(..%Reload())
+    }
+    If $Get(pVersion) = "" {
+        Set pVersion = "0.0.0-0"
+    }
+    Set ..Version = $Select($IsObject(pVersion): pVersion, 1: ##class(%IPM.General.SemanticVersion).FromString(pVersion))
+    Quit ..%Save()
+}
+
+Method SetName(pName As %String) As %Status
+{
+    $$$ThrowOnError(..%Reload())
+    Set ..Package = pName
+    Quit ..%Save()
+}
+
+Method Finalize(status As %Status, dev As %Boolean = 0) As %Status
+{
+    $$$ThrowOnError(..%Reload())
+    Set ..Success = status
+    Set ..Committed = (dev = 1) || $$$ISOK(status)
+    Set ..TimeEnd = $ZDateTime($Now(), 3)
+    Return ..%Save()
+}
+
+/// @API.Query
+/// Get load/install/uninstall records in the specified namespace
+Query Records(ascend As %Boolean, limit As %Integer, namespace As %String) As %Query(CONTAINID = 1, ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
+{
+}
+
+ClassMethod RecordsExecute(ByRef qHandle As %Binary, ascend As %Boolean, limit As %Integer, namespace As %String) As %Status [ Internal ]
+{
+    Try {
+        Kill filter
+        Set qHandle = ..GetHistory(.filter, .ascend, .limit, .namespace)
+    } Catch e {
+        Return e.AsStatus()
+    }
+    Return $$$OK
+}
+
+ClassMethod RecordsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = RecordsExecute ]
+{
+    Try {
+        If qHandle.%Next() {
+            Set Row = $ListBuild(
+                qHandle.%Get("Action"),
+                qHandle.%Get("Package"),
+                qHandle.%Get("Version_Major"),
+                qHandle.%Get("Version_Minor"),
+                qHandle.%Get("Version_Patch"),
+                qHandle.%Get("Version_Prerelease"),
+                qHandle.%Get("Version_Build"),
+                qHandle.%Get("SourceName"),
+                qHandle.%Get("SourceMoniker"),
+                qHandle.%Get("SourceDetails"),
+                qHandle.%Get("TimeStart"),
+                qHandle.%Get("TimeEnd"),
+                qHandle.%Get("NameSpace"),
+                qHandle.%Get("UserName"),
+                qHandle.%Get("Success"),
+                qHandle.%Get("Committed"),
+                qHandle.%Get("CommandString")
+            )
+            Set AtEnd = 0
+        } Else {
+            Set Row = ""
+            Set AtEnd = 1
+        }
+    } Catch ex {
+        Return ex.AsStatus()
+    }
+    Return $$$OK
+}
+
+ClassMethod RecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceAfter = RecordsFetch ]
+{
+    Set qHandle = ""
+    Quit $$$OK
+}
+
+/// Get an SQL "where" clause based on the filter argument
+/// See GetHistory() for the `filter` argument
+/// Output "clause" is the SQL WHERE clause as a string, container zero or more ? placeholders
+/// The "varargs" is an array of values to be substituted in the ? placeholders. 
+/// The "varargs" may already be populated with values, and new values will be appended to it.
+ClassMethod ConstructSQLWhere(filter As %String, namespace As %String, Output clause As %String, ByRef varargs As %String) As %Status [ Internal ]
+{
+    Try {
+        Set clause = " WHERE 1 = 1 "
+        Set namespace = $ZStrip($Get(namespace, $Namespace), "<>WC")
+        If (namespace '= "") {
+            Set clause = clause _ " AND NameSpace = ?"
+            Set varargs($Increment(varargs)) = namespace
+        }
+        Set col = ""
+        For {
+            Set col = $Order(filter(col), 1, value)
+            If (col = "") || ($Data(value) # 2 = 0) || ('$Match(col, "^[a-zA-Z][a-zA-Z0-9]*$")) {
+                Quit
+            }
+            // col is safe from SQL injection because we ensured it's alphanumeric above
+            If $ListFind($ListBuild(">=", "<=", "<>"), $Extract(value, 1, 2)) {
+                Set clause = clause _ " AND " _ col _ $Extract(value, 1, 2) _ "?"
+                Set varargs($Increment(varargs)) = $Extract(value, 3, *)
+            } ElseIf $ListFind($ListBuild(">", "<", "="), $Extract(value, 1, 1)) {
+                Set clause = clause _ " AND " _ col _ $Extract(value, 1) _ "?"
+                Set varargs($Increment(varargs)) = $Extract(value, 2, *)
+            } ElseIf value [ "*" {
+                Set clause = clause _ " AND " _ col _ " LIKE ?"
+                Set varargs($Increment(varargs)) = $Replace(value, "*", "%")
+            } Else {
+                Set clause = clause _ " AND " _ col _ "=?"
+                Set varargs($Increment(varargs)) = value
+            }
+        }
+        Set clause = clause _ " " // Ensure there's a space at the end
+    } catch ex {
+        Return ex.AsStatus()
+    }
+    Return $$$OK
+}
+
+/// Get the history of all installations, uninstalls, and loads in given namespace
+/// The filter argument is a multidimensional array with structure 
+/// filter(columnName) = value
+/// Where value can optionally start with >, >=, <, <=, =, <> or contain * to indicate a wildcard
+ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0, namespace As %String) As %SQL.StatementResult
+{
+    Set limit = +limit // Coerce to number to prevent SQL injection
+    Set query = "SELECT " _ $SELECT(limit>0: "TOP " _ limit, 1: "") _  " * FROM %IPM_General.History "
+    $$$ThrowOnError(..ConstructSQLWhere(.filter, .namespace, .where, .varargs))
+    Set query = query _ where
+    Set query = query _ " ORDER BY ID "  _ $Select(ascend: "ASC", 1: "DESC")
+    Quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+}
+
+/// Delete the history of installations, uninstalls, and loads in
+ClassMethod DeleteHistory(ByRef filter, namespace As %String, allowDeleteAll As %String) As %Integer
+{
+    Set query = "DELETE FROM %IPM_General.History "
+    $$$ThrowOnError(..ConstructSQLWhere(.filter, namespace, .where, .varargs))
+    If ($Data(varargs) = 0) && ('allowDeleteAll) {
+        $$$ThrowOnError("Cannot delete all history records by default. If you want to delete everything, use `history delete -g`.")
+    }
+    Set query = query _ where
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    Quit rs.%ROWCOUNT
+}
+
+/// @API.Query
+Query GlobalRecords(ascend As %Boolean, limit As %Integer) As %Query(ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
+{
+}
+
+ClassMethod GlobalRecordsExecute(ByRef qHandle As %Binary, ascend As %Boolean, limit As %Integer) As %Status [ Internal ]
+{
+    Try {
+        Kill filter
+        Set qHandle = ..GetHistoryGlobally(.filter, .ascend, .limit)
+    } Catch e {
+        Return e.AsStatus()
+    }
+    Return $$$OK
+}
+
+ClassMethod GlobalRecordsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = GlobalRecordsExecute ]
+{
+    Try {
+        While qHandle.Count() > 0 {
+            // Always get the first namespace. Remove it from list once corresponding result set is exhausted.
+            Set ns = ""
+            Set rs = qHandle.GetNext(.ns)
+            $$$ThrowOnError(..RecordsFetch(rs, .Row, .AtEnd))
+            If AtEnd {
+                // If rs is empty, there could still be more namespaces to process
+                Do qHandle.RemoveAt(ns, .success)
+                If 'success {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to remove namespace "_ns_" from list"))
+                }
+            } Else {
+                Return $$$OK
+            }
+        }
+        // Only when the list is empty should we return AtEnd = 1 and Row = ""
+        Set Row = "", AtEnd = 1
+        Return $$$OK
+    } Catch ex {
+        Return ex.AsStatus()
+    }
+    Return $$$OK
+}
+
+ClassMethod GlobalRecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceAfter = GlobalRecordsFetch ]
+{
+    // Should not happen, but just in case
+    If qHandle.Count() '= 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Namespace list not empty in GlobalRecordsFetch()!"))
+    }
+    Set qHandle = ""
+    Quit $$$OK
+}
+
+/// Get the history of all installations, uninstalls, and loads in all namespaces
+/// See GetHistory() for the `filter` argument
+ClassMethod GetHistoryGlobally(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0) As %Library.ArrayOfObjects
+{
+    Set originalNS = $Namespace
+    New $Namespace
+    Set $Namespace = "%SYS"
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    Set $Namespace = originalNS
+    Set array = ##class(%Library.ArrayOfObjects).%New()
+    While rs.%Next() {
+        Set ns = rs.%Get("Nsp")
+        Set historyRS = ..GetHistory(.filter, ascend, limit, ns)
+        If historyRS = $$$NULLOREF {
+            Continue
+        }
+        Do array.SetAt(historyRS, ns)
+    }
+    Return array
+}
+
+ClassMethod DisplayOneRecord(id As %Integer)
+{
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT TOP 1 * FROM %IPM_General.History WHERE ID = ?", id)
+    If rs.%Next() {
+        Do ..ShowColumns(rs, 1)
+    } Else {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No record found with ID "_id_". Use `history find` command to show all entries. "))
+    }
+}
+
+/// If detail is 1, will display full details each property on a separate line
+/// If detail is "header", will display the column names using the same style as the data
+/// Otherwise, will display on a single line, with some details omitted
+ClassMethod ShowColumns(rs As %SQL.StatementResult, detail As %Boolean = 0) As %Status [ Internal, Private ]
+{
+    Set columnStyles = $ListBuild(
+        $ListBuild("ID", $$$Bright),
+        $ListBuild("Action", $$$Red),
+        $ListBuild("Package", $$$Green),
+        $ListBuild("Version", $$$Green),
+        $ListBuild("UserName", $$$Blue),
+        $ListBuild("Namespace", $$$Magenta),
+        $ListBuild("Time", $$$Yellow),
+        $ListBuild("Success", $$$Default),
+        $ListBuild("Committed", $$$Cyan),
+        $ListBuild("CommandString", $$$Red),
+        $ListBuild("Source", $$$Default)
+    )
+
+    Set ptr = 0
+    Write !
+    While $ListNext(columnStyles, ptr, pair) {
+        Set $ListBuild(column, style) = pair
+        If detail = "header" {
+            Write $$$FormattedLine(style, column), " "
+            Continue
+        }
+        Set cls = $classname()
+        Set mthd = column_"ToString"
+        If $System.CLS.IsMthd(cls, mthd) {
+            Set value = $classmethod(cls, mthd, rs, detail)
+        } Else {
+            Set value = rs.%Get(column)
+        }
+        Set value = $Replace(value, $Char(13), $$$FormattedLine($$$Dim, "<CR>"))
+        Set value = $Replace(value, $Char(10), $$$FormattedLine($$$Dim, "<LF>"))
+        Set value = $Replace(value, $Char(9), $$$FormattedLine($$$Dim, "<TAB>"))
+        Set value = $$$FormattedLine(style, value)
+        If detail {
+            Write $$$FormattedLine($$$Dim, column), ": ", value, !
+        } Else { 
+            Write value, " " 
+        }
+    }
+    Return $$$OK
+}
+
+ClassMethod VersionToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+{
+    Set obj = ##class(%IPM.General.History).%OpenId(rs.%Get("ID"))
+    If $IsObject(obj) {
+        Set str = obj.Version.ToString()
+        If str '= "0.0.0-0" {
+            Quit "v"_str
+        }
+    }
+    Quit "<unset>"
+}
+
+ClassMethod TimeToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+{
+    If detail {
+        Quit "Started At " _ rs.%Get("TimeStart") _ "; Ended At " _ rs.%Get("TimeEnd")
+    } 
+
+    Set start = rs.%Get("TimeStart")
+    Set end = rs.%Get("TimeEnd")
+    If end = "" {
+        Quit rs.%Get("TimeStart")
+    } 
+    Set diff = $System.SQL.DATEDIFF("ss", start, end)
+
+    Quit $$$FormatText("%1 (%2 sec)", start, diff)
+}
+
+ClassMethod SourceToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+{
+    If rs.%Get("Action") '= "install" {
+        Quit "n/a"
+    }
+    If rs.%Get("SourceName") = "" {
+        Quit "<no source set>"
+    }
+    If detail {
+        Quit rs.%Get("SourceName") _ " (" _ rs.%Get("SourceMoniker") _ "): " _ rs.%Get("SourceDetails")
+    } Else {
+        Quit rs.%Get("SourceName")
+    }
+}
+
+ClassMethod SuccessToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+{
+    Set success = rs.%Get("Success")
+    If detail {
+        Quit success
+    }
+    Quit $Select($$$ISOK(success): "Success", 1:$System.Status.GetErrorText(success))
+}
+
+ClassMethod CommittedToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+{
+    Quit $Select(rs.%Get("Committed"): "Committed", 1: "Uncommitted")
+}
+
+ClassMethod DisplayQueryResult(rs As %SQL.StatementResult, namespace As %String)
+{
+    // TODO improve the display output
+    If (rs = $$$NULLOREF) {
+        Write !, "IPM is not enabled for this namespace"
+        Quit
+    }
+
+    Set found = 0
+    While rs.%Next() {
+        If 'found {
+            Set found = 1
+            If $Data(namespace) {
+                Write !, "Namespace: ", namespace
+            }
+            Do ..ShowColumns(rs, "header")
+            Write !
+        }
+        Do ..ShowColumns(rs, 0)
+    }
+    If found {
+        Write !
+    }
+}
+
+ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
+{
+    Set ns = ""
+    For {
+        Set rs = array.GetNext(.ns)
+        If rs = "" {
+            Quit
+        }
+        Do ..DisplayQueryResult(rs, ns)
+    }
+}
+
+Storage Default
+{
+<Data name="HistoryDefaultData">
+<Value name="1">
+<Value>%%CLASSNAME</Value>
+</Value>
+<Value name="2">
+<Value>Action</Value>
+</Value>
+<Value name="3">
+<Value>Package</Value>
+</Value>
+<Value name="4">
+<Value>Version</Value>
+</Value>
+<Value name="5">
+<Value>SourceName</Value>
+</Value>
+<Value name="6">
+<Value>SourceMoniker</Value>
+</Value>
+<Value name="7">
+<Value>SourceDetails</Value>
+</Value>
+<Value name="8">
+<Value>TimeStart</Value>
+</Value>
+<Value name="9">
+<Value>TimeEnd</Value>
+</Value>
+<Value name="10">
+<Value>NameSpace</Value>
+</Value>
+<Value name="11">
+<Value>UserName</Value>
+</Value>
+<Value name="12">
+<Value>Success</Value>
+</Value>
+<Value name="13">
+<Value>Committed</Value>
+</Value>
+<Value name="14">
+<Value>CommandString</Value>
+</Value>
+</Data>
+<DataLocation>^%IPM.General.HistoryD</DataLocation>
+<DefaultData>HistoryDefaultData</DefaultData>
+<IdLocation>^%IPM.General.HistoryD</IdLocation>
+<IndexLocation>^%IPM.General.HistoryI</IndexLocation>
+<StreamLocation>^%IPM.General.HistoryS</StreamLocation>
+<Type>%Storage.Persistent</Type>
+}
+
+}

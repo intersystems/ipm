@@ -22,7 +22,9 @@ Parameter TerminalPrompt = "TerminalPrompt";
 
 Parameter PublishTimeout = "publish_timeout";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout";
+Parameter DefaultLogEntryLimit = "DefaultLogEntryLimit";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,DefaultLogEntryLimit";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
