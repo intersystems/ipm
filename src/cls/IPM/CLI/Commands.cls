@@ -39,7 +39,7 @@ XData Schema [ Internal, MimeType = application/xml ]
 <!-- A group contains command modifiers that have specific usage. -->
 <xs:element name="group" type="group"/>
 
-<!-- A parameter is a space-delimted string provided to a command without a modifier. These appear in order at the end of the command. -->
+<!-- A parameter is a space-delimited string provided to a command without a modifier. These appear in order at the end of the command. -->
 <xs:element name="parameter">
   <xs:complexType>
     <!-- Parameter name -->

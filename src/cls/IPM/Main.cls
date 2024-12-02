@@ -156,6 +156,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
 </command>
 
 <command name="makedeployed">
@@ -1767,6 +1768,9 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		}
 		While tRepoTypeResult.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
+			If tRepoTypeResult.%Get("Moniker") = "http" {
+				Continue
+			}
 			Set tMonikers($ZConvert(tRepoTypeResult.%Get("Moniker"),"L")) = tRepoTypeResult.%Get("Classname")
 			Set tClassList($Increment(tClassList)) = tRepoTypeResult.%Get("Classname")
 			Set tDescList($Increment(tDescList)) = tRepoTypeResult.%Get("Description")
@@ -2051,7 +2055,7 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
-  	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
+  Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
 	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
@@ -2071,9 +2075,9 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
 	If ( tRegistry = "" ) {
-		Set tRS = ##class(%IPM.Repo.Remote.Definition).PublishingServerFunc()
+		Set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
 		If (tRS.%SQLCODE = 0) && tRS.%Next() {
-			Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
+			Set tServer = $ClassMethod(tRS.Class, "%OpenId", tRS.ID)
 		}
 	} Else {
 		Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
@@ -2085,9 +2089,10 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 
 	Try {
-		Set tManager = ##class(%IPM.Repo.Remote.PublishManager).%Get(.tSC)
+		Set tManager = tServer.GetPublishingManager(.tSC)
 		$$$ThrowOnError(tSC)
 		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+
 		If (isEnabled) {
             Set tResult = 0
 			If ($$$lcase(tVersion)="all") {

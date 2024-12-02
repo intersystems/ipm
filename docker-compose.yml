@@ -13,7 +13,7 @@ services:
       - ~/iris.key:/usr/irissys/mgr/iris.key
       - ./:/home/irisowner/zpm/
     command:
-      - -a 
+      - -a
       - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
   registry:
     image: intersystemsdc/iris-community:preview
@@ -38,3 +38,7 @@ services:
     volumes:
       - ./:/home/irisowner/zpm/
       - ./tests/sandbox/:/home/irisowner/sandbox/
+  oras:
+    image: ghcr.io/project-zot/zot-linux-amd64:latest
+    ports:
+      - 5000:5000

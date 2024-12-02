@@ -8,6 +8,7 @@ ClassMethod RunAll(verbose As %Boolean = 1) As %Status
     Set sc = $$$OK
     Try {
         Do ..MigrateZPMToIPM(verbose)
+        Do ..MigrateReposFromIPM09(verbose)
     } Catch e {
         Set sc = e.AsStatus()
     }
@@ -187,7 +188,7 @@ ClassMethod MigrateOneRepo(oldId As %String, name As %String, verbose As %Boolea
 
     Write:verbose !,"Migrating repo "_name_"... "
 
-    Set $List(data,1) = "~%IPM.Repo.Remote.Definition~"
+    Set $List(data,1) = "~%IPM.Repo.Http.Definition~%IPM.Repo.Remote.Definition~"
     Set data("RepoDefinition") = data
     Merge data("RemoteRepoDefinition") = data("RemoteServerDefinition")
     ZKill data
@@ -204,6 +205,40 @@ ClassMethod MigrateOneRepo(oldId As %String, name As %String, verbose As %Boolea
     $$$ThrowOnError(newObj.%Save())
 
     Write:verbose !,"done."
+}
+
+ClassMethod MigrateReposFromIPM09(verbose As %Boolean = 1) As %Status
+{
+    If verbose {
+        Write !,"Starting IPM repo migration from IPM 0.9..."
+    }
+    Set tSC = $$$OK
+    Try {
+        If $Data(^IPM.Repo.DefinitionD) / 2 = 0 {
+            If verbose {
+                Write !,"No IPM repos found; nothing to migrate."
+            }
+            Quit
+        }
+        Set sub = ""
+        Set oldValue = "~%IPM.Repo.Remote.Definition~"
+        Set newValue = "~%IPM.Repo.Http.Definition~%IPM.Repo.Remote.Definition~"
+        For {
+            Set sub = $Order(^IPM.Repo.DefinitionD(sub))
+            If sub = "" {
+                Quit
+            }
+            If ($Data(^IPM.Repo.DefinitionD(sub,"RepoDefinition"), list) # 2) && ($ListGet(list, 1) = oldValue){
+                Set $List(^IPM.Repo.DefinitionD(sub, "RepoDefinition"), 1) = newValue
+            }
+        }
+        If verbose {
+            Write !,"Repos migrated from IPM 0.9."
+        }
+    } Catch e {
+        Set tSC = e.AsStatus()
+    }
+    Quit tSC
 }
 
 }
