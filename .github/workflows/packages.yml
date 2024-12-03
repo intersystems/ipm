@@ -114,9 +114,10 @@ jobs:
           
             echo "::group::Test package $package"
             set +e
-            docker exec -i $CONTAINER iris session IRIS <<- EOF
-                  zpm "install $package":1
+            timeout 60s docker exec -i $CONTAINER iris session IRIS <<- EOF
+                zpm "install $package":1
                 zpm "$package test -only ${{ env.test-flags }}":1:1
+                halt
           EOF
 
             if [ $? -ne 0 ]; then
