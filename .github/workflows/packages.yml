@@ -53,8 +53,8 @@ jobs:
           CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
           docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session IRIS << EOF
-              zpm "list":1
               zn "%SYS"
+              zpm "list":1
               zpm "test zpm -v -only":1:1
           EOF
           docker container stop $CONTAINER
@@ -78,7 +78,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Download Artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: zpmimage
           path: /tmp
@@ -114,9 +114,10 @@ jobs:
           
             echo "::group::Test package $package"
             set +e
-            docker exec -i $CONTAINER iris session IRIS <<- EOF
-                  zpm "install $package":1
-                zpm "$package test -only ${{ env.test-flags }}":1:1
+            timeout 60s docker exec -i $CONTAINER iris session IRIS <<- EOF
+              zpm "install $package":1
+              zpm "$package test -only ${{ env.test-flags }}":1:1
+              halt
           EOF
 
             if [ $? -ne 0 ]; then
