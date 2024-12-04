@@ -12,6 +12,11 @@ on:
         required: true
         type: number
         default: 1
+      timeoutSeconds:
+        description: "Timeout in seconds for each test"
+        required: true
+        type: number
+        default: 120
 
 jobs:
   matrix-setup:
@@ -114,7 +119,7 @@ jobs:
           
             echo "::group::Test package $package"
             set +e
-            timeout 60s docker exec -i $CONTAINER iris session IRIS <<- EOF
+            timeout ${{ inputs.timeoutSeconds }}s docker exec -i $CONTAINER iris session IRIS <<- EOF
               zpm "install $package":1
               zpm "$package test -only ${{ env.test-flags }}":1:1
               halt
