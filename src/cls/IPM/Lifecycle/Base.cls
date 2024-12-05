@@ -620,6 +620,7 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
     }
 	Quit $$$OK
   }
+  Set tExtraPipFlags = $ZStrip($Get(pParams("ExtraPipFlags"), ""), "<>WC")
   Set pythonRequirements = ##class(%File).NormalizeFilename("requirements.txt", pRoot)
   If '##class(%File).Exists(pythonRequirements) {
     Quit $$$OK
@@ -638,7 +639,7 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
 	Set tPyMinor = tSysModule."version_info".minor
 	Set tPyMicro = tSysModule."version_info".micro
 	Set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
-    Set command = ..ResolvePipCaller(.pParams) _ $ListBuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:")
+    Set command = ..ResolvePipCaller(.pParams) _ $ListBuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $ListFromString(tExtraPipFlags, " ")
     If tVerbose {
         Write !, "Running "
         Zwrite command
