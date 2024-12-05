@@ -265,7 +265,7 @@ load https://github.com/user/repository.git -branch feature-1
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
-<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present" />
+<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -383,7 +383,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
-<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present" />
+<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 
 </command>
 
@@ -414,7 +414,7 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="shallow" aliases="s" dataAlias="UpdateSnapshots" dataValue="0" description="Suppresses updating of dependencies with '+snapshot' versions." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
-<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present" />
+<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 
 </command>
 
