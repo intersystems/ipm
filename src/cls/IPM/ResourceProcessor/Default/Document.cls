@@ -428,7 +428,7 @@ Method OnLoad(pFullResourcePath As %String, pVerbose As %Boolean, pCompile As %B
           try {
             Quit:'##class(%XML.XPATH.Document).CreateFromStream(stream, .tDocument)
             Quit:'$ISOBJECT(tDocument)
-            Quit:'tDocument.EvaluateExpression("/Export/Document", "text()", .tRes)
+            Quit:'tDocument.EvaluateExpression("/Export/Document", "node()", .tRes)
             If $IsObject(tRes),tRes.Size  {
               Set tSC = $System.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
               Set tProcessed = 1
