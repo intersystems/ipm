@@ -16,13 +16,19 @@ ClassMethod UpdateSuperclassAndCompile(ByRef pItems, ByRef qSpec = "") As %Statu
             Continue
         }
         Set tClass = $EXTRACT(tName, 1, *-4)
-        // Assuming this is the only one we care about. Eventually it may become a list.
-        Set tOldLifecycle = "%ZPM.PackageManager.Developer.Lifecycle.Module"
-        Set tNewLifecycle = "%IPM.Lifecycle.Module"
-        If $$$defClassKeyGet(tClass, $$$cCLASSsuper) = tOldLifecycle {
-            $$$defClassKeySet(tClass, $$$cCLASSsuper, tNewLifecycle)
-            Write !, $$$FormattedLine($$$Magenta, "WARNING: ")
-            Write tName _ " extends the deprecated class " _ tOldLifecycle _ ". It has been updated to " _ tNewLifecycle _ " before compiled.", !
+
+        Set tPairs = $ListBuild(
+            $LISTBUILD("%ZPM.PackageManager.Developer.Lifecycle.Module", "%IPM.Lifecycle.Module"),
+            $LISTBUILD("%ZPM.PackageManager.Developer.Processor.Abstract", "%IPM.ResourceProcessor.Abstract")
+        )
+        Set ptr = 0
+        While $ListNext(tPairs, ptr, pair) {
+            Set $ListBuild(tOldLifecycle, tNewLifecycle) = pair
+            If $$$defClassKeyGet(tClass, $$$cCLASSsuper) = tOldLifecycle {
+                $$$defClassKeySet(tClass, $$$cCLASSsuper, tNewLifecycle)
+                Write !, $$$FormattedLine($$$Magenta, "WARNING: ")
+                Write tName _ " extends the deprecated class " _ tOldLifecycle _ ". It has been updated to " _ tNewLifecycle _ " before compiled.", !
+            }
         }
     }
     Quit $System.OBJ.CompileList(.pItems, .qSpec)
