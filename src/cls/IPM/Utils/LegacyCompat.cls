@@ -27,7 +27,7 @@ ClassMethod UpdateSuperclassAndCompile(ByRef pItems, ByRef qSpec = "") As %Statu
             If $$$defClassKeyGet(tClass, $$$cCLASSsuper) = tOldLifecycle {
                 $$$defClassKeySet(tClass, $$$cCLASSsuper, tNewLifecycle)
                 Write !, $$$FormattedLine($$$Magenta, "WARNING: ")
-                Write tName _ " extends the deprecated class " _ tOldLifecycle _ ". It has been updated to " _ tNewLifecycle _ " before compiled.", !
+                Write tName _ " extends the deprecated class " _ tOldLifecycle _ ". It has been updated to " _ tNewLifecycle _ " before compilation.", !
             }
         }
     }
