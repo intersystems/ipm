@@ -97,7 +97,7 @@ jobs:
             zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
-          docker exec -it --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/
+          echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
           echo `docker exec -i --workdir /home/irisowner/zpm/ $CONTAINER ls -rtl`
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             zpm "list":1
