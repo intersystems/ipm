@@ -607,8 +607,8 @@ Method OnGetUniqueName(Output pUniqueName)
 	}
 }
 
-/// Returns a boolean of whether current file exists in the the routine database of the current namespace exists in current namespace's database
-/// Helper method to be used in derived classes' OnConfigureMappings() to skip creating unnecessary mapping
+/// Helper method to be used in derived classes' OnConfigureMappings() to skip creating unnecessary mappings.
+/// Returns true if <var>pResourceName</var> (in InternalName format - e.g., %Foo.Bar.PKG) is mapped to the current namespace's default routine database.
 ClassMethod ResourceIsMappedToDefaultDB(pResourceName As %String) As %Boolean
 {
 	Set defaultDB = ##class(%IPM.Utils.Module).GetRoutineDatabaseDir($Namespace)
