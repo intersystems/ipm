@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #527: IPM 0.9.x+ ignores the casing of resources when matching files on disk even on case-sensitive filesystems
 
 ### Fixed
+- HSIEO-11006: Fix conditions for marking code as deployed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
 - HSIEO-9269, HSIEO-9404: Repo check should happen in the order to repo creation, not by repo name
 - HSIEO-9269, HSIEO-9411: Make sure can load and export xml Package-type resource
