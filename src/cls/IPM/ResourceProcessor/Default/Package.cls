@@ -16,7 +16,7 @@ Property Directory As %String(MAXLEN = "") [ InitialExpression = "cls" ];
 Property LoadAsDirectory As %Boolean [ InitialExpression = 1 ];
 
 /// Extension for individual filename(s) that comprise this resource
-Property FilenameExtension As %String [ InitialExpression = "" ];
+Property FilenameExtension As %String;
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
@@ -26,7 +26,7 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
 		Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
 		If 'tGlobalScope {
-			Set tNeedExplicitMapping = ..FileExistsInCurrentNS(tName)
+			Set tNeedExplicitMapping = ..ResourceIsMappedToDefaultDB(..ResourceReference.Name)
 			If tNeedExplicitMapping {
 				Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
 				Set tSC = ##class(%IPM.Utils.Module).AddPackageMapping($namespace,tName,tSourceDB)
