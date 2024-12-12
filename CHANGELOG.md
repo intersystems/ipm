@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #559: Allow treating the "w" in SemVer x.y.z-w as a post-release rather than pre-release.
 - #607: Uninstall reports deletion of non-classes
 - #606: Don't put garbage folders in tar archive
+- #652: Don't create extra needless mappings (could cause deadlock with parallel installation of dependencies)
 
 ### Security
 -

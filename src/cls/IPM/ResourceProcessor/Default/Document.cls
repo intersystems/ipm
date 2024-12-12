@@ -607,25 +607,22 @@ Method OnGetUniqueName(Output pUniqueName)
 	}
 }
 
-/// Returns a boolean of whether current file exists in the the routine database of the current namespace exists in current namespace's database
-/// Helper method to be used in derived classes' OnConfigureMappings() to skip creating unnecessary mapping
-ClassMethod FileExistsInCurrentNS(pFileName As %String) As %Boolean
+/// Helper method to be used in derived classes' OnConfigureMappings() to skip creating unnecessary mappings.
+/// Returns true if <var>pResourceName</var> (in InternalName format - e.g., %Foo.Bar.PKG) is mapped to the current namespace's default routine database.
+ClassMethod ResourceIsMappedToDefaultDB(pResourceName As %String) As %Boolean
 {
-	Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
-	// Check if current file exists in the the routine database of the current namespace exists in current namespace('s database)
-	// If yes, skip creating unnecessary mappings
-	// (Spec,Dir=1,OrderBy=1,SystemFiles=1,Flat,NotStudio=0,ShowGenerated=0,Filter,RoundTime=0,Mapped=0)
-	// Set mapped=0 since we only want to check whether the file exists in the current routine DB
-	Set tResult = ##class(%Library.RoutineMgr).StudioOpenDialogFunc(pFileName_".*",1,1,1,,,,,,0)
-	Set tNeedExplicitMapping = 1
-	While tResult.%Next(.tSC) {
-		$$$ThrowOnError(tSC)
-		if ($ZConvert(tResult.%Get("Name"),"U") = $ZConvert(pFileName, "U")) {
-			Set tNeedExplicitMapping = 0
-		}
-	}
-	$$$ThrowOnError(tSC)
-	Return tNeedExplicitMapping
+	Set defaultDB = ##class(%IPM.Utils.Module).GetRoutineDatabaseDir($Namespace)
+  Set name = $Piece(pResourceName,".",1,*-1)
+  Set type = $ZConvert($Piece(pResourceName,".",*),"U")
+  If (type = "PKG") {
+    Set db = ##class(%SYS.Namespace).GetPackageDest(,name)
+  } ElseIf (type = "CLS") {
+    Set db = ##class(%SYS.Namespace).GetPackageDest(,$Piece(name,".",1,*-1))
+  } Else {
+    Set db = ##class(%SYS.Namespace).GetRoutineDest(,name)
+  }
+  Set db = $Piece(db,"^",2,*) // Slight difference in format of reporting here
+	Return (db = defaultDB)
 }
 
 }
