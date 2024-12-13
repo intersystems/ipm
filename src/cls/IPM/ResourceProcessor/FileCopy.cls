@@ -39,7 +39,12 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 		}
 
 		If (pPhase = "Activate") && (..InstallDirectory '= "") && ('..Defer) {
-      Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
+      if ($Extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2) = "{$") {
+        Set tSource = $Case(..SourceDirectory, "": ..ResourceReference.Module.Root _ ..ResourceReference.Name,: ..SourceDirectory)
+      }
+      else {
+        Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
+      }
       Set tTarget = ..InstallDirectory
       Set tSC = ..DoCopy(tSource, tTarget, .pParams)
       If $$$ISERR(tSC) {
@@ -65,7 +70,12 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 		}
 
 		If (pPhase = "Activate") && (..InstallDirectory '= "") && (..Defer) {
-      Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
+      if ($Extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2) = "{$") {
+        Set tSource = $Case(..SourceDirectory, "": ..ResourceReference.Module.Root _ ..ResourceReference.Name,: ..SourceDirectory)
+      }
+      else {
+        Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
+      }
       Set tTarget = ..InstallDirectory
       Set tSC = ..DoCopy(tSource, tTarget, .pParams)
       If $$$ISERR(tSC) {
