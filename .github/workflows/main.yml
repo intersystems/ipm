@@ -2,14 +2,14 @@ name: CI
 on:
   push:
     branches:
-      - master
-      - v1
-      - v1-next
+      - v0.7.x
+      - v0.9.x
+      - v0.10.x
   pull_request:
     branches:
-      - master
-      - v1
-      - v1-next
+      - v0.7.x
+      - v0.9.x
+      - v0.10.x
   release:
     types:
       - released
