@@ -132,9 +132,9 @@ Method NormalizeNames(
   }
 }
 
+/// Prefixes the path to the module root if it does not start with a $ variable
 Method GetSource()
 {
-  // We don't want to prefix if the path starts with a $ variable
   if (($Extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2) = "{$") || ($Extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2) = "${")) {
     return $Case(..SourceDirectory, "": ..ResourceReference.Module.Root _ ..ResourceReference.Name,: ..SourceDirectory)
   }
