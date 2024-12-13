@@ -5,11 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.9.0+snapshot]
+## [Unreleased - 0.10.0+snapshot]
 
 ### Added
-- #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
-- #518 Added ability to show source file location when running `list-installed`. E.g., `zpm "list-installed -showsource"`.
 - #474 Added compatibility to load ".tar.gz" archives in addition to ".tgz"
 - #469 Added ability to include an `IPMVersion` in `SystemRequirement` of module.xml
 - #530 Added a `CustomPhase` attribute to `<Invoke>` that doesn't require a corresponding %method in lifecycle class.
@@ -18,12 +16,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #541 Added support for ORAS repository
 
 ### Changed
+- 
+
+### Fixed
+- #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
+- #635: When calling the "package" command, the directory is now normalized to include trailing slash (or backslash).
+
+### Security
+-
+
+### Removed
+- 
+
+### Deprecated
+-
+
+## [Unreleased - 0.9.0+snapshot]
+
+### Added
+- #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
+- #518 Added ability to show source file location when running `list-installed`. E.g., `zpm "list-installed -showsource"`.
+- #538 Added ability to customize caller to PipCaller and UseStandalonePip through `config set`, which are empty by default and can be used to override the auto-detection of pip.
+- #562 Added a generic resource processpor `WebApplication`, which handles creating and removal of all Security.Applications resources
+- #575 Added ability to expand `$$$macro` in module.xml. The macro cannot take any arguments yet.
+- #595 Added ability to bypass installation of python dependencies with -bypass-py-deps or -DBypassPyDeps=1.
+- #647 Added ability to add extra flags when installing python dependencies using pip
+
+### Changed
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.
 - HSIEO-9484: Add additional argument to buildDepsGraph to allow putting in an additional list element of dependency's DisplayName
 - HSIEO-9484: Add additional property DisplayName to %IPM.Storage.ModuleReference
 - HSIEO-10274: Separate DependencyAnalyzer out from IPM
 - #261: IPM now truly supports using multiple registries for installation / discovery of packages (without needing to prefix the package with the registry name on "install", although it is still possible and now effective to use the prefix).
 - #454: IPM 0.9.x+ uses different globals for storage vs. 0.7.0 and previous. Installation will automatically migrate data from the old globals to the new ones. The old globals are left around in case the user decides to revert to an earlier version.
+- #527: IPM 0.9.x+ ignores the casing of resources when matching files on disk even on case-sensitive filesystems
 
 ### Fixed
 - HSIEO-11006: Fix conditions for marking code as deployed
@@ -56,8 +82,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #224: When updating zpm, existing configuration won't be reset
 - #482: Reenabled deployed code support without impact on embedded source control (reworks HSIEO-9277)
 - #487: When loading a package, relative paths staring with prefix "http" won't be mistaken for git repo
-- #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
-- #635: When calling the "package" command, the directory is now normalized to include trailing slash (or backslash).
+- #544: When installing a package from remote repo, IPM specifies `includePrerelease` and `includeSnapshots` in HTTP request. Correctly-behaving zpm registry should respect that.
+- #557: When comparing semver against semver expressions, exclude prereleases and snapshots from the range maximum.
+- #559: Allow treating the "w" in SemVer x.y.z-w as a post-release rather than pre-release.
+- #607: Uninstall reports deletion of non-classes
+- #606: Don't put garbage folders in tar archive
+- #652: Don't create extra needless mappings (could cause deadlock with parallel installation of dependencies)
 
 ### Security
 -
@@ -66,4 +96,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 
 
 ### Deprecated
--
+- #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
