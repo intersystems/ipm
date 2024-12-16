@@ -650,6 +650,15 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		</example>
 	</command>
 
+<command name="list-outdated" aliases="outdated">
+  <description>
+    Shows outdated modules and the latest version available in each repository.
+  </description>
+  <summary>
+    Shows outdated modules.
+  </summary>
+</command>
+
 </commands>
 }
 
@@ -819,6 +828,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Namespace(.tCommandInfo)			
 			} ElseIf (tCommandInfo = "enable") {
 				Do ..EnableIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "list-outdated") {
+				Do ..ListOutdated(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -2900,6 +2911,62 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			$$$ThrowOnError(tOverallSC)
 		}
 	}
+}
+
+ClassMethod CanUpdate(modName As %String, semver As %IPM.General.SemanticVersion) As %Boolean
+{
+  Do ..GetListModules($Namespace, "", .list)
+  For i=1:1:list {
+    Set $ListBuild(otherMod, version) = list(i)
+    If (otherMod = modName) {
+      Continue
+    }
+    Set otherMod = ##class(%IPM.Storage.Module).NameOpen(otherMod)
+    // There is no need to recurse here
+    For i = 1:1:otherMod.Dependencies.Count() {
+      If (otherMod.Dependencies.GetAt(i).Name '= modName) {
+        Continue
+      }
+      #dim expresion As %IPM.General.SemanticVersionExpression
+      Set expression = otherMod.Dependencies.GetAt(i).Version
+      If 'expression.IsSatisfiedBy(semver) {
+        Return 0
+      }
+    }
+  }
+  Return 1
+}
+
+ClassMethod ListOutdated(ByRef pCommandInfo)
+{
+  Do ..GetListModules($Namespace, "", .list)
+  Do ..GetUpstreamPackageVersions(.serverVersions)
+
+  For i=1:1:list {
+    Set $ListBuild(module, version) = list(i)
+    If $Data(serverVersions(module)) \ 10 = 0 {
+      Continue
+    }
+    Set semver = ##class(%IPM.General.SemanticVersion).FromString(version)
+    Set repo = ""
+    Set found = 0
+    For {
+      Set repo = $Order(serverVersions(module, repo), 1, remoteVersion) 
+      If repo = "" {
+        Quit
+      }
+      Set remoteSemver = ##class(%IPM.General.SemanticVersion).FromString(remoteVersion)
+      // TODO use better comparison method
+      If 'remoteSemver.Follows(semver) { 
+        Continue
+      }
+      If 'found {
+        Set found = 1
+        Write !, $$$FormattedLine($$$Green, module), " ", $$$FormattedLine($$$Blue, version)
+      }
+      Write " ", $$$FormattedLine($$$Red, $$$FormatText("%1:v%2", repo, remoteVersion))
+    }
+  }
 }
 
 /// Runs package manager commands in a way that is friendly to the OS-level shell.
