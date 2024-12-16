@@ -257,7 +257,7 @@ jobs:
       - uses: actions/checkout@master
         if: github.event_name == 'release'
         with:
-          ref: master
+          ref: main
       - uses: actions/download-artifact@v3
         with:
           name: zpm-${{ needs.prepare.outputs.version }}
