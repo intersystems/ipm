@@ -2930,6 +2930,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 					Continue
 				}
 				// If repository settings are already present, also skip repo mapping avoid override
+				Set $Namespace = namespace
 				If $Data(^IPM.Repo.DefinitionD) \ 2 {
 					If 'quiet || preview {
 						Write !,"Skipping repository settings mapping of "_namespace_" - IPM Repo settings found."
