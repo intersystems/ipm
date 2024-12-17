@@ -654,6 +654,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<modifier name="local-only" description="If specified, only local artifacts will be used for installation. By default, this modifier is not set and will not limit to local artifacts." />
 		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By default, this modifier is not ste and will not allow upgrade." />
 		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy." />
+		<modifier name="repos" aliases="r" description="If specified, will map repository settings across namespaces. Must be used together with -map." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 		<modifier name="preview" aliases="p" description="Preview what will be changed without actually making the changes." />
 		<!-- Examples -->
@@ -2848,6 +2849,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	Set version = $$$GetModifier(pCommandInfo, "version")
 	Set namespaces = $$$GetModifier(pCommandInfo, "namespaces")
 	Set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
+	Set mapRepos = $$$HasModifier(pCommandInfo,"repos")
 	Set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
 	Set targetVersion = "" 		// var to store the final version of IPM to be installed
 	Kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
@@ -2865,6 +2867,9 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	}
 	If map && 'globally && (namespaces = "") {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"If mapping from the current namespace's routine database with -map, must specify either -globally or a list of namespaces with -ns"))
+	}
+	If ('map) && (mapRepos) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify -repos without -map"))
 	}
 
 	If map {
@@ -2884,13 +2889,15 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		} Else {
 			Set namespaces = $ListFromString(namespaces)
 		}
+
+		// First try to map IPM itself
 		Set pointer = 0
 		While $ListNext(namespaces,pointer,namespace) {
 			Set namespace = $Zstrip(namespace, "<>WC")
 			Set $Namespace = namespace
 			If ..IPMInstalled() {
 				If 'quiet || preview {
-					Write !,"Skipping "_namespace_" - IPM already installed."
+					Write !,"Skipping IPM mapping of "_namespace_" - IPM already installed."
 				}
 				Continue
 			}
@@ -2908,6 +2915,41 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
 		}
+
+		// Then try to map Repo settings if -repos is specified
+		If mapRepos {
+			Do ..GetMapInfo(.isMappedFrom)
+			Set pointer = 0
+			While $ListNext(namespaces,pointer,namespace) {
+				Set namespace = $ZStrip(namespace, "<>WC")
+				// If IPM is not mapped from source namespace, skip repo mapping 
+				If $Get(isMappedFrom(namespace)) '= initNamespace {
+					If 'quiet || preview {
+						Write !,"Skipping repository settings mapping of "_namespace_" - IPM not mapped from source namespace."
+					}
+					Continue
+				}
+				// If repository settings are already present, also skip repo mapping avoid override
+				If $Data(^IPM.Repo.DefinitionD) \ 2 {
+					If 'quiet || preview {
+						Write !,"Skipping repository settings mapping of "_namespace_" - IPM Repo settings found."
+					}
+					Continue
+				}
+				Set $Namespace = initNamespace
+				If preview {
+					Write !,"Would add IPM repository settings mappings to "_namespace
+					Continue
+				}
+				If 'quiet {
+					Write !,"Mapping IPM repository settings in "_namespace_" equivalently to "_initNamespace
+				}
+				For suffix = "D", "S", "I" {
+					$$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace))
+				}
+			}
+		}
+
 		Set $Namespace = initNamespace
 		If preview {
 			Write !,"Preview mode; no configuration changes were made."
