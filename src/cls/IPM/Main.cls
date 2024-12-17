@@ -2933,7 +2933,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
 		}
 
-		// Then try to map Repo settings if -repos is specified
+		// Then try to map repositories if -repos is specified
 		If mapRepos {
 			Do ..GetMapInfo(.isMappedFrom)
 			Set pointer = 0
@@ -2942,25 +2942,25 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				// If IPM is not mapped from source namespace, skip repo mapping 
 				If $Get(isMappedFrom(namespace)) '= initNamespace {
 					If 'quiet || preview {
-						Write !,"Skipping repository settings mapping of "_namespace_" - IPM not mapped from source namespace."
+						Write !,"Skipping repository mapping of "_namespace_" - IPM not mapped from source namespace."
 					}
 					Continue
 				}
-				// If repository settings are already present, also skip repo mapping avoid override
+				// If repository are already present, also skip repo mapping avoid override
 				Set $Namespace = namespace
 				If $Data(^IPM.Repo.DefinitionD) \ 2 {
 					If 'quiet || preview {
-						Write !,"Skipping repository settings mapping of "_namespace_" - IPM Repo settings found."
+						Write !,"Skipping repository mapping of "_namespace_" - IPM repositories found."
 					}
 					Continue
 				}
 				Set $Namespace = initNamespace
 				If preview {
-					Write !,"Would add IPM repository settings mappings to "_namespace
+					Write !,"Would add IPM repository mappings to "_namespace
 					Continue
 				}
 				If 'quiet {
-					Write !,"Mapping IPM repository settings in "_namespace_" equivalently to "_initNamespace
+					Write !,"Mapping IPM repository in "_namespace_" equivalently to "_initNamespace
 				}
 				For suffix = "D", "S", "I" {
 					$$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace))
