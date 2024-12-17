@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #663 Added support for unmapping of repository settings alone
 - #663 Added support for `enable -community`, which resets repository settings to default and maps IPM along with repo settings globally
 
-### Changed
+### Fixed
 - #663 Improved error output and instructions in the language extension when "zpm" is run from a namespace without IPM
 
 ## [0.9.0] - 2024-12-16
