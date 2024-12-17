@@ -2808,9 +2808,12 @@ ZPM(pArgs...)
 		Set found = 0	
 		While rs.%Next() {
 			Set $Namespace = $Zstrip(rs.%Get("Nsp"), "<>WC")
-			If $System.CLS.IsMthd("%IPM.Main", "Shell") {
+			// Some I4H containers come with %IPM.Main but the "version" command doesn't work ?!
+			If $System.CLS.IsMthd("%IPM.Main", "Shell") && ($Namespace '= "HSLIB") && ($Namespace '= "HSSYS") {
 				Write !, "Change namepace to one of the following to run the ""zpm"" command"
 				Do ##class(%IPM.Main).Shell("version")
+				Write !, "If you want to map IPM globally, switch to one of the namesapaces above and run: zpm ""enable -map -globally""."
+				Write !, "If you want to reset repository and map IPM globally along with repository settings, switch to one of the namesapaces above and run: zpm ""enable -community""."
 				Set found = 1
 				Quit
 			}
