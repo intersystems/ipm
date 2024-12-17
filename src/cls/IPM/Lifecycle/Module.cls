@@ -88,7 +88,9 @@ Method %PrepareDeploy(ByRef pParams) As %Status
 
 			Set tName = $Piece(tResource.Name, ".", 1, *-1)
 			Set tExtension = $$$ucase($Piece(tResource.Name, ".", *))
-			continue:tExtension=""
+			if (tExtension = "") || ($Extract(tExtension) = "/") {
+				continue
+			}
 
 			Set tSC = $Case(tExtension,
 				"GBL":##class(%IPM.Utils.Module).AddGlobalMapping(tPackageDeployNamespace, tName, tSource),
@@ -96,9 +98,9 @@ Method %PrepareDeploy(ByRef pParams) As %Status
 				"INT":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "INT", tSource),
 				"MAC":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "MAC", tSource),
 				"PKG":##class(%IPM.Utils.Module).AddPackageMapping(tPackageDeployNamespace, tName, tSource),
-				"":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "ALL", tSource))
+				"":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "ALL", tSource),
+				:$$$OK)
 			$$$ThrowOnError(tSC)
-
 		}
 		Set $Namespace = tPackageDeployNamespace
 		Write:tVerbose !,"Packaging in namespace: ",$Namespace

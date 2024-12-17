@@ -4,6 +4,7 @@ Class Test.PM.Unit.Module Extends %UnitTest.TestCase
 Method TestEvaluateAttribute()
 {
   Set tModule = ##class(%IPM.Storage.Module).%New()
+  Set tModule.Root = "/tmp/foo/bar"
 
   Set tests = $ListBuild(
     "${cspdir}","{$cspdir}",
@@ -23,6 +24,15 @@ Method TestEvaluateAttribute()
     Set test = $ListGet(tests, i)
     Do $$$AssertNotTrue(tModule.%Evaluate(test)=test, test)
   }
+  Do $$$AssertEquals(tModule.%Evaluate("#{..Root}"),tModule.Root)
+}
+
+Method TestEvaluateMacro()
+{
+  Do $$$AssertEquals(##class(%IPM.Utils.Module).%EvaluateMacro("$$$ "), "$$$ ")
+  Do $$$AssertEquals(##class(%IPM.Utils.Module).%EvaluateMacro("Hello $$$OK $$$RandomJibberish123 World"), "Hello 1  World")
+  Do $$$AssertEquals(##class(%IPM.Utils.Module).%EvaluateMacro("Hello $$$OK$$$RandomJibberish123 World"), "Hello 1 World")
+  Do $$$AssertEquals(##class(%IPM.Utils.Module).%EvaluateMacro("$$$AutheUnauthenticated + $$$AutheCache + MAGIC"), $$$AutheUnauthenticated _ " + " _ $$$AutheCache _ " + MAGIC")
 }
 
 }

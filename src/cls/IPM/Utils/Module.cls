@@ -1,4 +1,4 @@
-Include (%occInclude, %occErrors, %syConfig, %syPrompt, %IPM.Common)
+Include (%occInclude, %occErrors, %syConfig, %syPrompt, %IPM.Common, %IPM.Formatting)
 
 Class %IPM.Utils.Module [ System = 3 ]
 {
@@ -2245,6 +2245,9 @@ ClassMethod GetFileLines(pFileName As %String, Output pOutput) As %Status [ Inte
 /// 	<li>{$binDir} - the instance's bin directory.</li>
 /// 	<li>{$libDir} - the instance's lib directory.</li>
 /// 	<li>{$webroot} - the instance's constructed url with host and port (e.g. http://123.45.678.90:52773/) </li>
+/// 	<li>{$dbrole} - (deprecated in favor of {$globalsDbRole}) the current namespace's globals database role</li>
+/// 	<li>{$globalsDbRole} - the current namespace's globals database role, functionally equivalent to {$dbrole} in legacy packages.</li>
+/// 	<li>$$$macros - triple dollars ($$$) followed immediately by alphanumeric string will be substituted with corresponding macro value. If the macro is undefined on the instance, will return null ("") </li>
 /// </ul>
 /// For backward compatibility, supporting both ${var} and {$var}
 ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal ]
@@ -2285,7 +2288,56 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 	Do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
 	Set result = ..%RegExReplace(result, "webroot", urlRoot)
 
+	If '$Get($$$DeprecationWarned("<expression>", "dbrole")) && ((result [ "${dbrole}") || (result [ "{$dbrole}")) {
+		Set $$$DeprecationWarned("<expression>", "dbrole") = 1
+		Write !, $$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.")
+	}
+	Set dbRole = ..GetDatabaseRole()
+	Set result = ..%RegExReplace(result, "dbrole", dbRole)
+	Set result = ..%RegExReplace(result, "globalsDbRole", dbRole)
+
 	Return result
+}
+
+ClassMethod %EvaluateMacro(pString As %String) As %String [ Internal ]
+{
+	If pString '[ "$$$" {
+		Return pString // Return early for efficiency
+	}
+	Set tString = pString
+	Set tPattern = "\$\$\$[a-zA-Z0-9]+"
+	Set tMatch = ##class(%Regex.Matcher).%New(tPattern, tString)
+	While tMatch.Locate() {
+		Set group = tMatch.Group
+		Set macroVal = ..EvaluateMacroHelper($Extract(group, 4, *))
+		set tString = $Replace(tString, group, macroVal)
+	}
+	Return tString
+}
+
+/// Helper metohd to evaluate macro at runtime. 
+ClassMethod EvaluateMacroHelper(pMacro As %String) As %String [ Internal, Private ]
+{
+    Set stream = ##class(%Stream.TmpCharacter).%New()
+    Do stream.WriteLine("Class %IPM.Generated.MacroEval")
+    Do stream.WriteLine("{")
+    Do stream.WriteLine("ClassMethod EvalMacro() [ CodeMode = objectgenerator ]")
+    Do stream.WriteLine("{")
+    Do stream.WriteLine("  Do %code.WriteLine(""#IfDef "_ pMacro _""")")
+    Do stream.WriteLine("  Do %code.WriteLine("" Quit $$$"_pMacro_""")")
+    Do stream.WriteLine("  Do %code.WriteLine(""#Else "")")
+    Do stream.WriteLine("  Do %code.WriteLine("" Quit """""""" "")")
+    Do stream.WriteLine("  Do %code.WriteLine(""#EndIf "")")
+    Do stream.WriteLine("  Quit $$$OK") 
+    Do stream.WriteLine("}")
+    Do stream.WriteLine("}")
+
+    // If it reaches here, pMacro is a valid expression (although may be undefined). 
+	// We should throw an error instead of failing silently.
+    $$$ThrowOnError($system.OBJ.LoadStream(stream, "ck-d"))
+    Set value = $ClassMethod("%IPM.Generated.MacroEval", "EvalMacro")
+    Do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d")
+    Return value
 }
 
 /// Wrapper around Config.Namespaces:Get()
@@ -2295,6 +2347,12 @@ ClassMethod GetDatabaseInfoForNamespace(pNamespace As %String, Output pPropertie
 	New $Namespace
 	Set $Namespace = "%SYS"
 	Set sc = $ClassMethod("Config.Namespaces", "Get", pNamespace, .pProperties)
+}
+
+ClassMethod GetDatabaseRole()
+{
+	Do ##class(%SYS.Namespace).GetNSInfo($NAMESPACE, .nsInfo)
+	Return $Get(nsInfo("Resource"), "%DB_DEFAULT")
 }
 
 ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %String) As %String [ Internal ]

@@ -1,0 +1,2 @@
+# This is where you list all python dependencies, including Flask
+flask >= 3.0.0, < 4.0.0

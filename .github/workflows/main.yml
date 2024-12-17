@@ -114,6 +114,7 @@ jobs:
             zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
+          echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
           echo `docker exec -i --workdir /home/irisowner/zpm/ $CONTAINER ls -rtl`
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             zpm "list":1
@@ -291,7 +292,7 @@ jobs:
           CONTAINER=$(docker run -d --rm -v $(pwd):/home/irisowner/zpm/ containers.intersystems.com/intersystems/${{ needs.prepare.outputs.main }} --check-caps false)
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
-            set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/Installer.cls","ck")
+            set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/preload/cls/IPM/Installer.cls","ck")
             set sc=##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
             zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1
             zpm "publish zpm -v":1

@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 -
 
-## [Unreleased - 0.9.0+snapshot]
+## [0.9.0] - 2024-12-16
 
 ### Added
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #527: IPM 0.9.x+ ignores the casing of resources when matching files on disk even on case-sensitive filesystems
 
 ### Fixed
+- HSIEO-11006: Fix conditions for marking code as deployed
+- HSIEO-10884: Bug Fix - FileCopy to check for $ variables in path
 - HSIEO-11006: Fix conditions for marking code as deployed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
 - HSIEO-9269, HSIEO-9404: Repo check should happen in the order to repo creation, not by repo name
@@ -88,12 +90,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #607: Uninstall reports deletion of non-classes
 - #606: Don't put garbage folders in tar archive
 - #652: Don't create extra needless mappings (could cause deadlock with parallel installation of dependencies)
-
-### Security
--
-
-### Removed
-- 
 
 ### Deprecated
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.

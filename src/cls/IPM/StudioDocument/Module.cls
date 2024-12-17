@@ -463,6 +463,11 @@ XData InternalXSL
       <xsl:copy-of select="." />
     </xsl:element>
   </xsl:template>
+  <xsl:template match="Module/Mapping">
+    <xsl:element name="Mappings">
+      <xsl:copy-of select="." />
+    </xsl:element>
+  </xsl:template>
   <xsl:template match="Module/Default|Module/Parameter">
     <xsl:element name="Defaults">
       <xsl:element name="Default">

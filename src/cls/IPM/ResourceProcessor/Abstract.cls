@@ -252,6 +252,7 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
 	If (tAttrValue '[ "{") {
 		Return tAttrValue
 	}
+	Set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
 	Set root = ..ResourceReference.Module.Root
 	If (root '= "") {
@@ -261,6 +262,15 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
 	// {name} expression does not contain dollar sign; handle separately
 	Set name = ..ResourceReference.Name
 	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
+
+	Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", attrValue)
+	While regex.Locate() {
+		Set expr = regex.Group(1)
+		Set value = ..ResourceReference.Module.%EvaluateExpression(expr)
+		Set $Extract(attrValue, regex.Start, regex.End - 1) = value
+		Set regex.Text = attrValue
+	}
+
 	Return attrValue
 }
 
