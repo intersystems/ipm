@@ -680,12 +680,15 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</command>
 
 <command name="unmap">
+	<summary>Unmap %IPM package and routines in specified namespaces.</summary>
 	<description>
 		Unmap %IPM package and routines in specified namespaces. Will Skip non-mapped namespaces.
+		If repository settings are mapped, will also unmap repository settings.
 	</description>
 	<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM mapping needs to be deleted."/>
 	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed."/>
 	<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
+	<modifier name="repos-only" description="If specified, will only unmap repository settings across namespaces. This doesn't affect mapping of IPM packages and routines." />
 	<example description="Unmap IPM from namespaces NS1, NS2, NS3.">
 		unmap -ns NS1,NS2,NS3
 	</example>
@@ -3204,6 +3207,7 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 	Set globally = $$$HasModifier(pCommandInfo,"globally")
 	Set namespaces = $ListFromString($$$GetModifier(pCommandInfo,"namespaces"), ",")
 	Set verbose = '$$$HasModifier(pCommandInfo,"quiet")
+	set reposOnly = $$$HasModifier(pCommandInfo,"repos-only")
 	// Sanity check
 	If (globally && (namespaces '= "")) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global unmap flag at the same time."))
@@ -3224,7 +3228,11 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 		}
 	}
 	If verbose {
-		Write !,"Will attempt to unmap %IPM package and routines from: "_ $ListToString(namespaces, ", ")
+		If reposOnly {
+			Write !,"Will attempt to unmap IPM repository settings from: "_ $ListToString(namespaces, ", ")
+		} Else {
+			Write !,"Will attempt to unmap IPM package, routines, and repository settings from: "_ $ListToString(namespaces, ", ")
+		}
 	}
 
 	// Gather namespaces where %IPM is mapped into
@@ -3239,11 +3247,21 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 			}
 			Continue
 		} 
+
 		If verbose {
-			Write !,"Unmapping %IPM package and routines from "_ns_" (mapped from "_src_")"
+			Write !,"Unmapping repository settings from "_ns_" (mapped from "_src_")"
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
-		$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+		For suffix = "D", "S", "I" {
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveGlobalMapping(ns, "IPM.Repo.Definition"_suffix))
+		}
+
+		If 'reposOnly {
+			If verbose {
+				Write !,"Unmapping IPM package and routines from "_ns_" (mapped from "_src_")"
+			}
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+		}
 	}
 }
 
