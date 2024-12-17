@@ -657,6 +657,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<modifier name="repos" aliases="r" description="If specified, will map repository settings across namespaces. Must be used together with -map." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 		<modifier name="preview" aliases="p" description="Preview what will be changed without actually making the changes." />
+		<modifier name="community" description="If specified, will reset repository to the community repository and map IPM to all namespaces along with the repository settings. This is functionaly equivalent to &quot;repo -delete-all&quot;, &quot;repo -reset-defaults&quot;, and &quot;enable -map -repos -globally&quot;. With this modifier, all other modifiers will be ignored."/>
 		<!-- Examples -->
 		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database. Namespace-specific installation will override this.">
 			enable -map -globally
@@ -672,6 +673,9 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		</example>
 		<example description="Install or upgrade IPM to latest IPM version in namespaces: NS1, NS2, NS3.">
 			enable -v latest -allow-upgrade NS1,NS2,NS3
+		</example>
+		<example description="Reset repository to the community repository and map IPM to all namespaces along with the repository settings.">
+			enable -community
 		</example>
 	</command>
 
@@ -2839,6 +2843,19 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		$$$ThrowOnError(sc)
 		Write !, "Version of IPM in current namespace: "
 		Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_modDef.VersionString
+	}
+
+	If $$$HasModifier(pCommandInfo,"community") {
+		For cmd = "repo -delete-all", "repo -reset-defaults", "enable -map -repos -globally" {
+			Write !!, "RUNNING command: """, cmd, """"
+			Do ..ShellInternal(cmd, .exc)
+			If exc '= $$$NULLOREF {
+				Write !, $$$FormattedLine($$$Red, $$$FormatText("Error running command ""%1"" - %2", cmd, exc.DisplayString()))
+			} Else {
+				Write !, $$$FormattedLine($$$Green, $$$FormatText("Command ""%1"" finished successfull", cmd))
+			}
+		}
+		Return
 	}
 
 	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
