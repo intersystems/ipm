@@ -62,7 +62,6 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 	Set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
 	#; Parse search criteria
-	// The OCI /v2/_catalog endpoint always returns all packages. We will filter by name and version on the client side.
 	Set name = $$$lcase(pSearchCriteria.Name)
 	Set tVersionExpression = pSearchCriteria.VersionExpression
 	Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
@@ -315,7 +314,10 @@ ClassMethod GetAllTagsPy(registry As %String, package As %String, namespace As %
 		
 		# convert from list to comma separated string
 		return ", ".join(str(x) for x in tags)
-	except e:
+	except ValueError:
+	    # ValueError indicates the package is missing and has no tags. Fail silently with no tags returned
+		return ""
+	except Exception as e:
 		print("Error: ", repr(e))
 		return ""
 }
