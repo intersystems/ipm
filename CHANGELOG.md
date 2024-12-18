@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.9.0+snapshot]
+## [0.9.1] - 2024-12-17
+
+### Added
+- #663 Added support for mapping of repository settings along with, or in addition to, IPM package and routines
+- #663 Added functionality to always unmap repository settings when IPM package and routines are unmapped
+- #663 Added support for unmapping of repository settings alone
+- #663 Added support for `enable -community`, which resets repository settings to default and maps IPM along with repo settings globally
+
+### Fixed
+- #663 Improved error output and instructions in the language extension when "zpm" is run from a namespace without IPM
+
+## [0.9.0] - 2024-12-16
 
 ### Added
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
@@ -63,12 +74,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #607: Uninstall reports deletion of non-classes
 - #606: Don't put garbage folders in tar archive
 - #652: Don't create extra needless mappings (could cause deadlock with parallel installation of dependencies)
-
-### Security
--
-
-### Removed
-- 
 
 ### Deprecated
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
