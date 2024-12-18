@@ -654,8 +654,10 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<modifier name="local-only" description="If specified, only local artifacts will be used for installation. By default, this modifier is not set and will not limit to local artifacts." />
 		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By default, this modifier is not ste and will not allow upgrade." />
 		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy." />
+		<modifier name="repos" aliases="r" description="If specified, will map repository settings across namespaces. Must be used together with -map." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 		<modifier name="preview" aliases="p" description="Preview what will be changed without actually making the changes." />
+		<modifier name="community" description="If specified, will reset repository to the community repository and map IPM to all namespaces along with the repository settings. This is functionaly equivalent to &quot;repo -delete-all&quot;, &quot;repo -reset-defaults&quot;, and &quot;enable -map -repos -globally&quot;. With this modifier, all other modifiers will be ignored."/>
 		<!-- Examples -->
 		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database. Namespace-specific installation will override this.">
 			enable -map -globally
@@ -672,15 +674,21 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<example description="Install or upgrade IPM to latest IPM version in namespaces: NS1, NS2, NS3.">
 			enable -v latest -allow-upgrade NS1,NS2,NS3
 		</example>
+		<example description="Reset repository to the community repository and map IPM to all namespaces along with the repository settings.">
+			enable -community
+		</example>
 	</command>
 
 <command name="unmap">
+	<summary>Unmap %IPM package and routines in specified namespaces.</summary>
 	<description>
 		Unmap %IPM package and routines in specified namespaces. Will Skip non-mapped namespaces.
+		If repository settings are mapped, will also unmap repository settings.
 	</description>
 	<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM mapping needs to be deleted."/>
 	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed."/>
 	<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
+	<modifier name="repos-only" description="If specified, will only unmap repository settings across namespaces. This doesn't affect mapping of IPM packages and routines." />
 	<example description="Unmap IPM from namespaces NS1, NS2, NS3.">
 		unmap -ns NS1,NS2,NS3
 	</example>
@@ -2803,9 +2811,12 @@ ZPM(pArgs...)
 		Set found = 0	
 		While rs.%Next() {
 			Set $Namespace = $Zstrip(rs.%Get("Nsp"), "<>WC")
-			If $System.CLS.IsMthd("%IPM.Main", "Shell") {
+			// Some I4H containers come with %IPM.Main but the "version" command doesn't work ?!
+			If $System.CLS.IsMthd("%IPM.Main", "Shell") && ($Namespace '= "HSLIB") && ($Namespace '= "HSSYS") {
 				Write !, "Change namepace to one of the following to run the ""zpm"" command"
 				Do ##class(%IPM.Main).Shell("version")
+				Write !, "If you want to map IPM globally, switch to one of the namespaces above and run: zpm ""enable -map -globally""."
+				Write !, "If you want to reset repository and map IPM globally along with repository settings, switch to one of the namespaces above and run: zpm ""enable -community""."
 				Set found = 1
 				Quit
 			}
@@ -2840,6 +2851,19 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_modDef.VersionString
 	}
 
+	If $$$HasModifier(pCommandInfo,"community") {
+		For cmd = "repo -delete-all", "repo -reset-defaults", "enable -map -repos -globally" {
+			Write !!, "RUNNING command: """, cmd, """"
+			Do ..ShellInternal(cmd, .exc)
+			If exc '= $$$NULLOREF {
+				Write !, $$$FormattedLine($$$Red, $$$FormatText("Error running command ""%1"" - %2", cmd, exc.DisplayString()))
+			} Else {
+				Write !, $$$FormattedLine($$$Green, $$$FormatText("Command ""%1"" finished successfull", cmd))
+			}
+		}
+		Return
+	}
+
 	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
 	Set preview = $$$HasModifier(pCommandInfo,"preview")
 	Set map = $$$HasModifier(pCommandInfo,"map")
@@ -2848,6 +2872,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	Set version = $$$GetModifier(pCommandInfo, "version")
 	Set namespaces = $$$GetModifier(pCommandInfo, "namespaces")
 	Set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
+	Set mapRepos = $$$HasModifier(pCommandInfo,"repos")
 	Set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
 	Set targetVersion = "" 		// var to store the final version of IPM to be installed
 	Kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
@@ -2865,6 +2890,9 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	}
 	If map && 'globally && (namespaces = "") {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"If mapping from the current namespace's routine database with -map, must specify either -globally or a list of namespaces with -ns"))
+	}
+	If ('map) && (mapRepos) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify -repos without -map"))
 	}
 
 	If map {
@@ -2884,13 +2912,15 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		} Else {
 			Set namespaces = $ListFromString(namespaces)
 		}
+
+		// First try to map IPM itself
 		Set pointer = 0
 		While $ListNext(namespaces,pointer,namespace) {
 			Set namespace = $Zstrip(namespace, "<>WC")
 			Set $Namespace = namespace
 			If ..IPMInstalled() {
 				If 'quiet || preview {
-					Write !,"Skipping "_namespace_" - IPM already installed."
+					Write !,"Skipping IPM mapping of "_namespace_" - IPM already installed."
 				}
 				Continue
 			}
@@ -2908,6 +2938,42 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
 		}
+
+		// Then try to map repositories if -repos is specified
+		If mapRepos {
+			Do ..GetMapInfo(.isMappedFrom)
+			Set pointer = 0
+			While $ListNext(namespaces,pointer,namespace) {
+				Set namespace = $ZStrip(namespace, "<>WC")
+				// If IPM is not mapped from source namespace, skip repo mapping 
+				If $Get(isMappedFrom(namespace)) '= initNamespace {
+					If 'quiet || preview {
+						Write !,"Skipping repository mapping of "_namespace_" - IPM not mapped from source namespace."
+					}
+					Continue
+				}
+				// If repository are already present, also skip repo mapping avoid override
+				Set $Namespace = namespace
+				If $Data(^IPM.Repo.DefinitionD) \ 2 {
+					If 'quiet || preview {
+						Write !,"Skipping repository mapping of "_namespace_" - IPM repositories found."
+					}
+					Continue
+				}
+				Set $Namespace = initNamespace
+				If preview {
+					Write !,"Would add IPM repository mappings to "_namespace
+					Continue
+				}
+				If 'quiet {
+					Write !,"Mapping IPM repository in "_namespace_" equivalently to "_initNamespace
+				}
+				For suffix = "D", "S", "I" {
+					$$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace))
+				}
+			}
+		}
+
 		Set $Namespace = initNamespace
 		If preview {
 			Write !,"Preview mode; no configuration changes were made."
@@ -3141,6 +3207,7 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 	Set globally = $$$HasModifier(pCommandInfo,"globally")
 	Set namespaces = $ListFromString($$$GetModifier(pCommandInfo,"namespaces"), ",")
 	Set verbose = '$$$HasModifier(pCommandInfo,"quiet")
+	set reposOnly = $$$HasModifier(pCommandInfo,"repos-only")
 	// Sanity check
 	If (globally && (namespaces '= "")) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global unmap flag at the same time."))
@@ -3161,7 +3228,11 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 		}
 	}
 	If verbose {
-		Write !,"Will attempt to unmap %IPM package and routines from: "_ $ListToString(namespaces, ", ")
+		If reposOnly {
+			Write !,"Will attempt to unmap IPM repository settings from: "_ $ListToString(namespaces, ", ")
+		} Else {
+			Write !,"Will attempt to unmap IPM package, routines, and repository settings from: "_ $ListToString(namespaces, ", ")
+		}
 	}
 
 	// Gather namespaces where %IPM is mapped into
@@ -3176,11 +3247,21 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 			}
 			Continue
 		} 
+
 		If verbose {
-			Write !,"Unmapping %IPM package and routines from "_ns_" (mapped from "_src_")"
+			Write !,"Unmapping repository settings from "_ns_" (mapped from "_src_")"
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
-		$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+		For suffix = "D", "S", "I" {
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveGlobalMapping(ns, "IPM.Repo.Definition"_suffix))
+		}
+
+		If 'reposOnly {
+			If verbose {
+				Write !,"Unmapping IPM package and routines from "_ns_" (mapped from "_src_")"
+			}
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+		}
 	}
 }
 
