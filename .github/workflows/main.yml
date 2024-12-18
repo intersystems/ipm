@@ -118,8 +118,8 @@ jobs:
           echo `docker exec -i --workdir /home/irisowner/zpm/ $CONTAINER ls -rtl`
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             zpm "list":1
-            # zpm "test zpm -v -only":1
-            # zpm "verify zpm -v -only":1
+            zpm "test zpm -v -only":1
+            zpm "verify zpm -v -only":1
             halt
           EOF
           docker stop $CONTAINER
