@@ -75,69 +75,42 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 
 	#; Get all modules
 	Set tList = ##class(%Library.ListOfObjects).%New()
-	Set request = ..GetHttpRequest()
-	
-	#; Make GET request
-	// response is a JSON structure like {"repositories":["package1", "package2", ...]}
-	Set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
-	$$$ThrowOnError(tSC)
-	Set response=request.HttpResponse
-	If response.StatusCode'=200 {
-		// todo improve error processing
-		Set data = response.Data.Read()
-		Write !, "Error! " _ response.StatusCode _ ": " _ response.ReasonPhrase
-		Return ""
-	}
-
-	#; Handle results
-	Set json = response.Data.ReadLine()
-	Set data = ##class(%DynamicAbstractObject).%FromJSON(json)
-	Set iter = data.repositories.%GetIterator()
-	While iter.%GetNext(.key, .package, .type) {
-		If (package="") { 
-			Continue
-		}
-		#; filter by module name
-		If (name'="") && (package'=name) {
-			Continue
-		}
-		
-		#; get all versions
-		Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
-		Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
-		Set pointer = 0
-		While $ListNext(allTagsList,pointer,tag) {
-			#; filter by version
-			Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
-			If 'tVersion.Satisfies(tVersionExpression) { 
-				Continue
-			}
-
-			#; get metadata from annotations
-			Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
-			set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-			Do artifactMetadata.%JSONImport(metadata)
-
-			Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-			Set tModRef.Name = artifactMetadata.ImageTitle
-			Set tModRef.Repository = artifactMetadata.ImageSource
-			Set tModRef.VersionString = artifactMetadata.ImageVersion
-			Set tModRef.Description = artifactMetadata.ImageDescription
-			Set tModRef.Deployed = artifactMetadata.IPMDeployed
-			#; If $IsObject(item."platform_versions") {
-			#;   Set tIterPVer = item."platform_versions".%GetIterator() 
-			#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
-			#;     Do tModRef.PlatformVersions.Insert(platformVersion)
-			#;   }
-			#; }
-			Set tModRef.AllVersions = allTagsString
-			Set tModRef.Origin = artifactMetadata.IPMOrigin
-			Do tList.Insert(tModRef)
 			
-			#; If not all versions are requested, return the latest one
-			If 'pSearchCriteria.AllVersions, name="" {
-				Quit
-			}
+	#; get all versions
+	Set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
+	Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
+	Set pointer = 0
+	While $ListNext(allTagsList,pointer,tag) {
+		#; filter by version
+		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
+		If 'tVersion.Satisfies(tVersionExpression) { 
+			Continue
+		}
+
+		#; get metadata from annotations
+		Set metadata = ..GetPackageMetadataPy(..Location, name, "", tag, client)
+		set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+		Do artifactMetadata.%JSONImport(metadata)
+
+		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
+		Set tModRef.Name = artifactMetadata.ImageTitle
+		Set tModRef.Repository = artifactMetadata.ImageSource
+		Set tModRef.VersionString = artifactMetadata.ImageVersion
+		Set tModRef.Description = artifactMetadata.ImageDescription
+		Set tModRef.Deployed = artifactMetadata.IPMDeployed
+		#; If $IsObject(item."platform_versions") {
+		#;   Set tIterPVer = item."platform_versions".%GetIterator() 
+		#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
+		#;     Do tModRef.PlatformVersions.Insert(platformVersion)
+		#;   }
+		#; }
+		Set tModRef.AllVersions = allTagsString
+		Set tModRef.Origin = artifactMetadata.IPMOrigin
+		Do tList.Insert(tModRef)
+		
+		#; If not all versions are requested, return the latest one
+		If 'pSearchCriteria.AllVersions, name="" {
+			Quit
 		}
 	}
 	Quit tList
