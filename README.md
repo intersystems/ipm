@@ -9,7 +9,7 @@ Helps to install ObjectScript classes and routines, globals, Embedded Python mod
 
 ## Compatibility Note
 With the release of IPM v0.9.0 on Dec 2024, IPM is no longer mapped across namespaces. 
-This is an intentioal change so that users can have different IPM versions and configurations in different namespaces. 
+This is an intentional change so that users can have different IPM versions and configurations in different namespaces. 
 If you install IPM on an instance without the legacy 0.7.x version, IPM is only installed to the current namespace.
 
 * To retain the old behavior where %IPM routines and classes mapped across all namespaces, run `zpm "enable -map -globally`. This is automatically performed when upgrading from a legacy version and can be undone by running `zpm "unmap -globally"`.
@@ -20,9 +20,10 @@ If you install IPM on an instance without the legacy 0.7.x version, IPM is only 
 
 0. Use one-liner in terminal call or programmatically:
 ```
-s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/latest/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
+s version="latest" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/"_version_"/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
 ```
 **If you want the legacy behavior of mapping IPM classes, routines, and repository settings to all namespaces, run `zpm "enable -community"` after installing IPM. See `zpm "help enable"` for details.**
+**In a CI script, for deterministic behavior, you should replace version="latest" with the IPM version you wish to use.**
 
 OR:
 
