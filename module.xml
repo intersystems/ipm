@@ -2,7 +2,7 @@
 <Export generator="Cache" version="25">
 <Document name="ZPM.ZPM"><Module>
   <Name>ZPM</Name>
-  <Version>0.9.1-SNAPSHOT</Version>
+  <Version>0.9.2-SNAPSHOT</Version>
   <ExternalName>Package Management System</ExternalName>
   <Description>Provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
   <Keywords>Package Manager</Keywords>
