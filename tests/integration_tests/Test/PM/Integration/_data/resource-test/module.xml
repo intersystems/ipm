@@ -10,6 +10,7 @@
     <Resource Name="Covid19-bubble_chart_vscode.dashboard.dfi"/>
     <Resource Name="Covid19-Countries_bubble_atelier.pivot.dfi"/>
     <Resource Name="Covid19-Countries_bubble_vscode.pivot.dfi"/>
+    <Resource Name="HTTP.Statuses.LOC"/>
     <Resource Name="Test_HIPAA_5010.X12">
       <Attribute Name="Directory">misc</Attribute>
     </Resource>
@@ -31,6 +32,7 @@
     <Resource Name="ResourceTest.TestBPL.bpl"/>
     <Resource Name="ResourceTest.INC">
     </Resource>
+    <Resource Name="ResourceTest.APackage.AnotherIncludeFile.INC" />
     <Resource Name="ResourceTest.MAC">
     </Resource>
     <Resource Name="ResourceTest.GBL">

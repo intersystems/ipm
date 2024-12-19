@@ -102,6 +102,9 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("PipCaller", "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("UseStandalonePip", "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("SemVerPostRelease", 0, 0))
     Quit $$$OK
 }
 
@@ -113,6 +116,14 @@ ClassMethod ZPMLoad(pDirectoryName)
 ClassMethod ZPMCompile()
 {
   Quit ##class(%IPM.Main).Shell("ZPM compile")
+}
+
+ClassMethod MapIfLegacy()
+{
+  If ##class(%IPM.Utils.Migration).HasLegacyZPMPackage() {
+    Quit ##class(%IPM.Main).Shell("enable -globally -map")
+  }
+  Quit $$$OK
 }
 
 ClassMethod EndCompile(qstruct) As %Status

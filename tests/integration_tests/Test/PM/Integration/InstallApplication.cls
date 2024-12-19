@@ -29,4 +29,42 @@ Method TestSimpleApp()
   }
 }
 
+Method TestWSGIApp()
+{
+  Set tSC = $$$OK
+  Try {
+    Set tVersion = $Piece($ZVersion," ",9)
+    If $Piece(tVersion, ".", 1) < 2024 {
+      Do $$$AssertSkipped("WSGI applications are only supported in 2024+. Current version: "_tVersion)
+      Return
+    }
+    Set tTestRoot = ##class(%File).NormalizeDirectory($Get(^UnitTestRoot))
+    set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/wsgi-app/")
+    Set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
+    Do $$$AssertStatusOK(tSC,"Loaded WSGI Application successfully. " _ tModuleDir)
+    Do $$$AssertStatusOK(..HttpGet("my/flask/demo/"))
+  } Catch e {
+    Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+  }
+}
+
+Method TestRestApp()
+{
+  Set tSC = $$$OK
+  Try {
+    Set tTestRoot = ##class(%File).NormalizeDirectory($Get(^UnitTestRoot))
+
+    Set tModuleDir1 = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/rest-app/")
+    Set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir1)
+    Do $$$AssertStatusOK(tSC,"Loaded REST Application ""restdemo/"" successfully. " _ tModuleDir1)
+    Do $$$AssertStatusOK(..HttpGet("restdemo/"))
+
+    // Delete the 1st REST application
+    Set tSC = ##class(%IPM.Main).Shell("uninstall -verbose rest-demo")
+    Do $$$AssertStatusOK(tSC,"Deleted REST Application ""restdemo/"" successfully. " _ tModuleDir1)
+  } Catch e {
+    Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+  }
+}
+
 }
