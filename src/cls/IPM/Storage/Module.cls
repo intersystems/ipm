@@ -1458,12 +1458,21 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Set customParams("packagename") = ..Name
 	Set customParams("version") = ..VersionString
 	Set customParams("verbose") = +$Get(pParams("Verbose"))
+	Set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
 	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
 	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
 	
 	// {name} expression does not contain dollar sign; handle separately
 	Set name = ..Name
 	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
+
+	Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", attrValue)
+	While regex.Locate() {
+		Set expr = regex.Group(1)
+		Set value = ..%EvaluateExpression(expr)
+		Set $Extract(attrValue, regex.Start, regex.End - 1) = value
+		Set regex.Text = attrValue
+	}
 
 	Return attrValue
 }
@@ -1479,6 +1488,17 @@ Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set ..LastUpdated = $ZDateTime($Horolog, 3)
 	Quit $$$OK
+}
+
+Method %EvaluateExpression(pExpr) As %String [ Internal ]
+{
+  Try {
+	// Remove leading whitespace because there can only be 1 whitespace between "return" and its argument
+	set pExpr = $Zstrip(pExpr, "<W") 
+    return @pExpr
+  } Catch ex {
+  }
+  Return ""
 }
 
 Storage Default
@@ -1588,3 +1608,4 @@ Storage Default
 }
 
 }
+

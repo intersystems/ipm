@@ -101,6 +101,8 @@ Method SearchRepositoriesForModule(pSearchCriteria As %IPM.Repo.SearchCriteria, 
 			}
 		}
 	Set major = ""
+    // Sorting direction for prereleases/postreleases. Only set once outside of the whole loop.
+    Set subDirection = $SELECT(+##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease"): -1, 1: 1)
 	For {
 		Set major = $Order(versions(major), -1)
 		Quit:major=""
@@ -114,7 +116,7 @@ Method SearchRepositoriesForModule(pSearchCriteria As %IPM.Repo.SearchCriteria, 
             Quit:patch=""
             Set sub = ""
             For  {
-              Set sub = $Order(versions(major, minor, patch, sub), 1)
+              Set sub = $Order(versions(major, minor, patch, sub), subDirection)
               Quit:sub=""
               Set repoOrder = ""
               For {

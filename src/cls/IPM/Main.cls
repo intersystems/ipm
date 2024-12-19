@@ -266,6 +266,12 @@ load -dev -verbose C:\module\root\path\module-0.0.1.tgz
 load https://github.com/user/repository.git
 load https://github.com/user/repository.git -branch feature-1
 </example>
+<example description="Loads the module described in C:\module\root\path\module.xml without installing python dependencies">
+	load -bypass-py-deps C:\module\root\path\
+</example>
+<example description="Loads the module described in C:\module\root\path\module.xml but set pip timeout to 30 seconds">
+	load -extra-pip-flags "--timeout 30" C:\module\root\path\
+</example>
 
 
 <!-- Modifiers -->
@@ -274,6 +280,8 @@ load https://github.com/user/repository.git -branch feature-1
 <modifier name="nodev" dataAlias="DeveloperMode" dataValue="0" description="Disables the DeveloperMode flag for the module's lifecycle." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
+<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -372,6 +380,12 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Installs the most recent 1.x version of HS.JSON available in any configured repository in the current namespace.">
 	install HS.JSON 1.x
 </example>
+<example description="Installs HS.JSON without installing python dependencies">
+	install -bypass-py-deps HS.JSON
+</example>
+<example description="Installs HS.JSON but set pip timeout to 30 seconds">
+	install -extra-pip-flags "--timeout 30" HS.JSON
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to install" />
@@ -384,6 +398,8 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
+<modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
+<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 
 </command>
 
@@ -398,6 +414,12 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Reinstalls the currently-installed version of the ZHSLIB module, in development mode">
 	reinstall -dev ZHSLIB
 </example>
+<example description="Reinstalls the currently-installed vresion of the ZHSLIB module without reinstalling python dependencies">
+	reinstall -bypass-py-deps ZHSLIB
+</example>
+<example description="Reinstalls ZHSLIB but set pip timeout to 30 seconds">
+	reinstall -extra-pip-flags "--timeout 30" ZHSLIB
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to reinstall" />
@@ -407,6 +429,8 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="shallow" aliases="s" dataAlias="UpdateSnapshots" dataValue="0" description="Suppresses updating of dependencies with '+snapshot' versions." />
+<modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
+<modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 
 </command>
 
@@ -631,11 +655,16 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<!-- Modifiers -->
 		<modifier name="version" aliases="v" value="true" description="A special version of IPM can be provided. If not specified, the latest version from the registry will be installed (hence is not required if quiet flag is set)."/>
 		<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM needs to be enabled."/>
-		<modifier name="globally" description="Will install IPM in all non-%SYS explicit namespaces that currently do not have IPM installed. By default, this modifier is not set and will not install globally."/>
+		<modifier name="globally" aliases="g" description="Will install IPM in all explicit namespaces that currently do not have IPM installed. Unless using it together with the -map option, will not include %SYS. By default, this modifier is not set and will not install globally."/>
 		<modifier name="local-only" description="If specified, only local artifacts will be used for installation. By default, this modifier is not set and will not limit to local artifacts." />
-		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By deafult, this modifier is not ste and will not allow upgrade." />
+		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By default, this modifier is not ste and will not allow upgrade." />
+		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
+		<modifier name="preview" aliases="p" description="Preview what will be changed without actually making the changes." />
 		<!-- Examples -->
+		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database. Namespace-specific installation will override this.">
+			enable -map -globally
+		</example>
 		<example description="Install IPM version 0.3.4 in quiet mode in namespaces: NS1, NS2, NS3.">
 			enable -v 0.3.4 -q -ns NS1,NS2,NS3
 		</example>
@@ -649,6 +678,21 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 			enable -v latest -allow-upgrade NS1,NS2,NS3
 		</example>
 	</command>
+
+<command name="unmap">
+	<description>
+		Unmap %IPM package and routines in specified namespaces. Will Skip non-mapped namespaces.
+	</description>
+	<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM mapping needs to be deleted."/>
+	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed."/>
+	<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
+	<example description="Unmap IPM from namespaces NS1, NS2, NS3.">
+		unmap -ns NS1,NS2,NS3
+	</example>
+	<example description="Unmap IPM from all namespaces">
+		unmap -g
+	</example>
+</command>
 
 </commands>
 }
@@ -723,6 +767,7 @@ ClassMethod GetVersion(ModuleName, ByRef out, list)
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
+	New $$$DeprecationWarned
 	Set pException = $$$NULLOREF
 	Set tOneCommand = 0
 	Set tCommand = $Get(pCommand)
@@ -737,6 +782,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	)
 	Set tInShell = 0
 	For {
+		Kill $$$DeprecationWarned
 		Try {
 			
 			// Have intro message just for first entrance to shell
@@ -819,6 +865,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..Namespace(.tCommandInfo)			
 			} ElseIf (tCommandInfo = "enable") {
 				Do ..EnableIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "unmap") {
+				Do ..UnmapIPM(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -885,20 +933,27 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 /// Get list Namespace, example do ##class(%IPM.Main).GetListNamespace(.ns)
 ClassMethod GetListNamespace(Output list, pSearch As %String = "")
 {
+  Kill list
   Set list = 0
-  Set width = 0
-  Set tArgs = 0
-  Set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
-  If pSearch'="" {
-    Set tQuery = tQuery _ " WHERE Nsp " _ $Select(pSearch["*": "LIKE", 1: "=") _ " ?"
-    Set tArgs($Increment(tArgs)) = $Translate($$$UPPER(pSearch), "*", "%")
+
+  // Build regex for matching outside of SQL. 
+  // Directly using `where Nsp LIKE ?` causes a bug described in https://github.com/intersystems/ipm/issues/579 
+  Set pSearch = $Zstrip(pSearch, "<>WC")
+  If pSearch = "" {
+    Set pSearch = "*"
   }
-  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
+  Set regex = ##class(%IPM.DataType.RegExString).FromWildCard(pSearch)
+
+  Set width = 0
+  Set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
+  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery) 
   $$$ThrowSQLIfError(tRes.%SQLCODE, tRes.%Message)
   While tRes.%Next(.tSC) {
     $$$ThrowOnError(tSC)
     Set nsp = tRes.Nsp
-    Set list(nsp) = ""
+    If $Match(nsp, regex) {
+      Set list(nsp) = ""
+    }
   }
 }
 
@@ -1168,8 +1223,9 @@ ClassMethod GetVersionModule(name, namespace = {$namespace})
 /// Version client and registry
 ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
-  Do ..GetListModules("*", $$$IPMModuleName_","_$$$IPMServerRegistryModuleName, .list)
-  Do ..DisplayModules(.list)
+	Do ..GetListModules("*", $$$IPMModuleName_","_$$$IPMServerRegistryModuleName, .list)
+	Do ..AddIPMMappedNamespaces(.list)
+	Do ..DisplayModules(.list)
 
 	// Get URL current registry
 	Set tRes = ##class(%IPM.Repo.Remote.Definition).ExtentFunc()
@@ -1184,6 +1240,54 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		Write !,$$$FormattedLine($$$Blue,tRepository.URL)," - ",tInfo.ToString()
 	}
 	Quit $$$OK
+}
+
+/// Argument `list` is a multidimensional array where `list` contains the a numeric value `n`, indicating the length of the list
+/// Each subnode `list(i)` where 1 <= i <= n contains a $ListBuild of a single namespace
+/// Each subnote `list(i,"modules")` contains the number of modules in the namespace
+/// For 1 <= j <= `list(i,"modules")`, each subnode `list(i,"modules",j)` contains a $ListBuild of the module name, version, external name, and whether the module is installed in developer mode
+/// Additional nodes are also accepted, although they are not used in this method
+/// For example:
+/// list=1
+/// list(1)=$lb("USER")
+/// list(1,"modules")=2
+/// list(1,"modules",1)=$lb("zpm","0.9.0-SNAPSHOT","Package Management System",1)
+/// list(1,"modules",2)=$lb("zpm-registry","1.3.2","ZPM Registry",0)
+/// list(1,"modules","width")=12
+/// list("ns")="*"
+/// list("width")=4
+ClassMethod AddIPMMappedNamespaces(ByRef list) [ Private ]
+{
+	Do ..GetListNamespace(.allNS,"*")
+	For i=1:1:+$Get(list) {
+		Set namespace = $ListGet(list(i))
+		If (namespace '= "") {
+			Kill allNS(namespace)
+		}
+		Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
+		Set mappedFrom(sourceDB) = namespace
+		Merge mappedFrom(sourceDB,"info") = list(i)
+	}
+
+	Set namespace = ""
+	For {
+		Set namespace = $Order(allNS(namespace))
+		If namespace = "" {
+			Quit
+		}
+
+		Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
+		If $Data(mappedFrom(sourceDB),sourceNamespace) {
+			Kill info
+			Merge info = mappedFrom(sourceDB,"info")
+			Set info = $lb(namespace)
+			Set info("modules",1,"Installed In") = sourceNamespace
+			Merge list($i(list)) = info
+			If $Length(namespace) > +$Get(list("width")) {
+				Set list("width") = $Length(namespace)
+			}
+		}
+	}
 }
 
 /// @API.Method
@@ -1936,6 +2040,26 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
+ClassMethod CheckModuleNamespace() As %Status
+{
+	Do ..GetMapInfo(.tIsMappedFrom, .tIsMappedTo)
+	If $Data(tIsMappedFrom($Namespace), sourceNS) # 2 {
+		Quit $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' in namespace '%2' because it is mapped from namespace '%3'.", $$$IPMModuleName, $Namespace, sourceNS))
+	}
+	If $Data(tIsMappedTo($Namespace)) / 2 {
+		Write !, "Will affect the following namespaces:", $NAMESPACE
+		Set ns = ""
+		For {
+			Set ns = $Order(tIsMappedTo($Namespace, ns))
+			If ns = "" {
+				Quit
+			}
+			Write ", ", ns
+		}
+	}
+	Quit $$$OK
+}
+
 ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 {
 	Set tRegistry = ""
@@ -1943,9 +2067,13 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 	If (tModuleName["/") {
 		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
-  If (tModuleName = "") {
-    Quit $$$OK
-  }
+	If (tModuleName = "") {
+		Quit $$$OK
+	}
+
+	If tModuleName = $$$IPMModuleName {
+		$$$ThrowOnError(..CheckModuleNamespace())
+	}
 
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
@@ -1983,7 +2111,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 		If (tResult '= "") {
 			Do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
 			Merge tParams = pCommandInfo("data")
-      Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
+			Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
 			Set tParams("cmd") = "install"
 			Set tParams("Install") = 1
       If tResult.Deployed {
@@ -2029,6 +2157,10 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module '%1' is not currently installed.",tModuleName)))
 	}
 	$$$ThrowOnError(tSC)
+
+	If tModuleName = $$$IPMModuleName {
+		$$$ThrowOnError(..CheckModuleNamespace())
+	}
 	
 	Set tVersionString = tModule.Version.ToString()
 	Write !,"Reinstalling ",tModuleName," ",tVersionString
@@ -2045,6 +2177,9 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
     Return
 	} Else {
 		Set tModuleName = pCommandInfo("parameters","module")
+		If tModuleName = $$$IPMModuleName {
+			$$$ThrowOnError(..CheckModuleNamespace())
+		}	
 		Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
 		$$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
 	}
@@ -2055,7 +2190,7 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
-  Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
+	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
 	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
 	If $Data(tParams("Path"), path) # 2 {
@@ -2182,9 +2317,49 @@ ClassMethod RunDependencyAnalyzer(ByRef pCommandInfo)
 	Write !
 }
 
-Query ActiveNamespaces() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
+/// Implemented as custom query instead of `select Nsp, Nsp from %SYS.Namespace_List(0,0) WHERE status = 1` because of a DP issue, see https://github.com/intersystems/ipm/issues/579
+Query ActiveNamespaces() As %Query(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
 {
-	select Nsp,Nsp from %SYS.Namespace_List(0,0) where Status = 1
+}
+
+ClassMethod ActiveNamespacesExecute(qHandle As %Binary) As %Status
+{
+  Try {
+    Set tQuery = "SELECT NSP, Status FROM %SYS.Namespace_List(0,0)"
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, tQuery)
+    Kill qHandle
+    While rs.%Next() {
+      If rs.%Get("Status") {
+        Set qHandle($INCREMENT(qHandle)) = rs.%Get("NSP")
+      }
+    }
+    Set qHandle = 0
+  } catch ex {
+    Return ex.AsStatus()
+  }
+  Return $$$OK
+}
+
+ClassMethod ActiveNamespacesFetch(qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = ActiveNamespacesExecute ]
+{
+  Try {
+    If $Data(qHandle($Increment(qHandle)), nsp) # 2 {
+      Set Row = $ListBuild(nsp, nsp)
+      Set AtEnd = 0
+    } Else {
+      Set Row = ""
+      Set AtEnd = 1
+    }
+  } catch ex {
+    Return ex.AsStatus()
+  }
+  Return $$$OK
+}
+
+ClassMethod ActiveNamespacesClose(qHandle As %Binary) As %Status [ PlaceAfter = ActiveNamespacesFetch ]
+{
+  Kill qHandle
+  Return $$$OK
 }
 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
@@ -2665,22 +2840,58 @@ ZPM(pArgs...)
  If $System.CLS.IsMthd("%IPM.Main", "Shell") { 
  	Do ##class(%IPM.Main).Shell(pArgs...) Quit
  } Else {
-	// TODO: Decide what to do here; definitely needs to support enabling IPM from here as well,
-	// but need to decide what level of customization to provide
-	Quit ""
+	// TODO: Needs to support enabling IPM from here, also need to decide what level of customization to provide
+	Set quitOnError = $Get(pArgs(2))
+	Set haltOnComplete = $Get(pArgs(3))
+	Write !, "IPM is not enabled in this namespace."
+	Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Nsp FROM %SYS.Namespace_List()")
+	If rs.%SQLCODE '= 0 {
+		Write !, "Error getting namespace name. SQLCODE =", rs.%SQLCODE
+	} Else {
+		New $Namespace
+		Set found = 0	
+		While rs.%Next() {
+			Set $Namespace = $Zstrip(rs.%Get("Nsp"), "<>WC")
+			If $System.CLS.IsMthd("%IPM.Main", "Shell") {
+				Write !, "Change namepace to one of the following to run the ""zpm"" command"
+				Do ##class(%IPM.Main).Shell("version")
+				Set found = 1
+				Quit
+			}
+		}
+		// Shouldn't happen since %ZLANGC00.mac and %ZLANGF00.mac are present
+		If 'found {
+			Write !, "No namespace found with IPM enabled."
+		}
+	}
+
+	If quitOnError {
+		Write ! // Add a newline before quitting, otherwise the shell prompt will be on the same line as the error message
+		Do $System.Process.Terminate($Job, 1)
+	}
+	If haltOnComplete {
+		Write ! // Add a newline before halting
+		Halt
+	}
+	// The $$$ERROR macro is not available for use in language extension
+	Return $System.Status.Error(5001, "IPM is not enabled in this namespace.")
  }
 }
 
 ClassMethod EnableIPM(ByRef pCommandInfo)
 {
-	Write !, "Version of IPM in current namespace: "
-	Do ..GetListModules($Namespace,$$$IPMModuleName,.list)
-	If $Data(list($$$IPMModuleName)) {
-			Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_$ListGet(list($$$IPMModuleName),1)
+	New $Namespace
+	Set initNamespace = $Namespace
+	If ..IPMInstalled(.ipmModuleId){
+		Set modDef = ##class(%IPM.Storage.Module).%OpenId(ipmModuleId,,.sc)
+		$$$ThrowOnError(sc)
+		Write !, "Version of IPM in current namespace: "
+		Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_modDef.VersionString
 	}
-	Kill list
 
 	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	Set preview = $$$HasModifier(pCommandInfo,"preview")
+	Set map = $$$HasModifier(pCommandInfo,"map")
 	Set globally = $$$HasModifier(pCommandInfo, "globally")
 	Set localOnly = $$$HasModifier(pCommandInfo, "local-only")
 	Set version = $$$GetModifier(pCommandInfo, "version")
@@ -2697,6 +2908,63 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	}
 	If ((namespaces '= "") && globally) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global installation flag at the same time."))
+	}
+	If (version '= "") && (globally && map) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify version when mapping the currently-installed version globally."))
+	}
+	If map && 'globally && (namespaces = "") {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"If mapping from the current namespace's routine database with -map, must specify either -globally or a list of namespaces with -ns"))
+	}
+
+	If map {
+		If globally {
+			Set namespaces = ""
+			Do ..GetListNamespace(.list)
+			// Namespace-specific mappings aren't allowed to override %ALL mappings. See https://github.com/intersystems/ipm/pull/485
+			Kill list("%ALL")
+			Set key = ""
+			For {
+				Set key = $Order(list(key))
+				If key = "" {
+					Quit
+				}
+				Set namespaces = namespaces _ $ListBuild(key)
+			}
+		} Else {
+			Set namespaces = $ListFromString(namespaces)
+		}
+		Set pointer = 0
+		While $ListNext(namespaces,pointer,namespace) {
+			Set namespace = $Zstrip(namespace, "<>WC")
+			Set $Namespace = namespace
+			If ..IPMInstalled() {
+				If 'quiet || preview {
+					Write !,"Skipping "_namespace_" - IPM already installed."
+				}
+				Continue
+			}
+			Set $Namespace = initNamespace
+			If preview {
+				Write !,"Would add IPM mappings to "_namespace
+				Continue
+			}
+			If 'quiet {
+				Write !,"Mapping %IPM package in "_namespace_" equivalently to "_initNamespace
+			}
+			$$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace))
+			If 'quiet {
+				Write !,"Mapping %IPM.* routines in "_namespace_" equivalently to "_initNamespace
+			}
+			$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
+		}
+		Set $Namespace = initNamespace
+		If preview {
+			Write !,"Preview mode; no configuration changes were made."
+		} ElseIf 'quiet {
+			Write !,"Done.",!
+			Do ..Version()
+		}
+		Return
 	}
 
 	New $Namespace
@@ -2871,6 +3139,10 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 					Quit
 				}
 				Set $Namespace = currentNS
+				If preview {
+					Write !, $$$FormatText("Would install IPM version %1 from registry in namespace %2", targetVersion, currentNS)
+					Continue
+				}
 				Do $SYSTEM.OBJ.LoadStream(manifest, loadFlag)
 				Write !, "IPM enabled for namespace "_currentNS
 			}
@@ -2885,6 +3157,11 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		Set tOverallSC = $$$OK
 		While (currentNS '="") {
 			Set $Namespace = currentNS
+			If preview {
+				Set filePath = ##class(%File).NormalizeFilename(targetIPMFileName, XMLDir)
+				Write !, $$$FormatText("Would install IPM using file at %1 in namespace %2", filePath, currentNS)
+				Continue
+			}
 			Set tSC = $SYSTEM.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag)
 			If $$$ISOK(tSC) {
 				Set enabledNSList = enabledNSList_$ListBuild(currentNS)
@@ -2894,12 +3171,90 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Set currentNS = $ORDER(targetNamespaces(currentNS))
 			Set tOverallSC = $$$ADDSC(tOverallSC,tSC)
 		}
-		Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
-		If $$$ISERR(tOverallSC) {
-			Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
-			$$$ThrowOnError(tOverallSC)
+		If 'preview {
+			Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
+			If $$$ISERR(tOverallSC) {
+				Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
+				$$$ThrowOnError(tOverallSC)
+			}
 		}
 	}
+
+	If preview {
+		Write !,"Preview mode; no configuration changes were made."
+	}
+}
+
+ClassMethod UnmapIPM(ByRef pCommandInfo)
+{
+	Set globally = $$$HasModifier(pCommandInfo,"globally")
+	Set namespaces = $ListFromString($$$GetModifier(pCommandInfo,"namespaces"), ",")
+	Set verbose = '$$$HasModifier(pCommandInfo,"quiet")
+	// Sanity check
+	If (globally && (namespaces '= "")) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global unmap flag at the same time."))
+	}
+	If ('globally && (namespaces = "")) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Must specify either -globally or a list of namespaces with -ns"))
+	}
+	// populate namespaces if globally is set
+	If globally {
+		Do ..GetListNamespace(.nsTree)
+		Set ns = ""
+		For {
+			Set ns = $Order(nsTree(ns))
+			If ns = "" {
+				Quit
+			}
+			Set namespaces = namespaces_$ListBuild(ns)
+		}
+	}
+	If verbose {
+		Write !,"Will attempt to unmap %IPM package and routines from: "_ $ListToString(namespaces, ", ")
+	}
+
+	// Gather namespaces where %IPM is mapped into
+	Do ..GetMapInfo(.tIsMappedFrom)
+	
+	Set ptr = 0
+	While $ListNext(namespaces, ptr, ns) {
+		Set src = $Get(tIsMappedFrom(ns))
+		If (src = "") {
+			If verbose {
+				Write !,"No mapping found for "_ns_". Skipping."
+			}
+			Continue
+		} 
+		If verbose {
+			Write !,"Unmapping %IPM package and routines from "_ns_" (mapped from "_src_")"
+		}
+		$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
+		$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+	}
+}
+
+/// Get the mapping relationship for %IPM package. Format: 
+/// <ul>
+/// <li>pIsMappedFrom(destinationNamespace) = sourceNamespace</li>
+/// <li>pIsMappedTo(sourceNamespace, destinationNamespace) = ""</li>
+/// </ul>
+ClassMethod GetMapInfo(Output pIsMappedFrom, Output pIsMappedTo)
+{
+	Kill pIsMappedFrom, pIsMappedTo 
+	Do ..GetListModules("*", $$$IPMModuleName, .list)	
+	Do ..AddIPMMappedNamespaces(.list)
+	For i = 1:1:list {
+		Set destNS = $ListGet(list(i))
+		If $Data(list(i,  "modules", 1, "Installed In"), srcNS) # 2 {
+			Set pIsMappedFrom(destNS) = srcNS
+			Set pIsMappedTo(srcNS, destNS) = ""
+		}
+	}
+}
+
+ClassMethod IPMInstalled(ByRef ipmModuleId) As %Boolean [ CodeMode = expression ]
+{
+$$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .ipmModuleId)
 }
 
 /// Runs package manager commands in a way that is friendly to the OS-level shell.
@@ -2985,7 +3340,8 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     $ListBuild("Author.Person", $$$Yellow, "Author"),
     $ListBuild("Origin", $$$Blue),
     $ListBuild("AllVersions", $$$Blue, "Versions"),
-    $ListBuild("Repository", $$$Blue)
+    $ListBuild("Repository", $$$Blue),
+    $ListBuild("Installed In", $$$Blue)
   )
 
   Kill serverVersions
