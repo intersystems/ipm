@@ -108,6 +108,9 @@ ClassMethod CompareContents(ByRef content1, ByRef content2) As %Boolean
     If $Data(content1) '= $Data(content2) {
         Quit 0
     }
+    If $Get(content1) '= $Get(content2) {
+        Quit 0
+    }
     For i = 1:1:$Get(content1) {
         If content1(i) '= content2(i) {
             Return 0
