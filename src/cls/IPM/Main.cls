@@ -2723,7 +2723,10 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
         For i=1:1:tGenLines {
           Set tRtnLines($Increment(tRtnLines)) = tGenLines(i)
         }
-      }
+      } Else { 
+        // outside of the tags, just copy the lines to preserve users' custom code
+        Set tRtnLines($Increment(tRtnLines)) = tLine
+	  }
     }
     If 'tEnded {
       Set tRtnLines($Increment(tRtnLines)) = $$$ENDTAGQ
