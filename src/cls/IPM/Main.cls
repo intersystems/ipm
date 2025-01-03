@@ -2711,7 +2711,6 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
 {
 	Set tRtn = ##class(%Routine).%New(RoutineName)
 	If ##class(%Routine).Exists(RoutineName) {
-    Set tEnded = 1
     While 'tRtn.AtEnd {
       Set tLine = tRtn.ReadLine()
       If $Match(tLine,$$$STARTTAGREGEX) {
@@ -2728,9 +2727,7 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
         Set tRtnLines($Increment(tRtnLines)) = tLine
 	  }
     }
-    If 'tEnded {
-      Set tRtnLines($Increment(tRtnLines)) = $$$ENDTAGQ
-    } ElseIf 'pFound {
+    If 'pFound {
       For i=1:1:tGenLines {
         Set tRtnLines($Increment(tRtnLines)) = tGenLines(i)
       }
