@@ -2996,23 +2996,25 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
   	Set sc = statement.%PrepareClassQuery("%File", "FileSet")
   	$$$ThrowOnError(sc)
 	// Valid IPM installation manifest should be of format: ipm-0.0.1.xml
-	Set resultSet = statement.%Execute(XMLDir, "ipm-*.xml")
-	If (resultSet.%SQLCODE < 0)  {
-		$$$ThrowSQLIfError(resultSet.%SQLCODE,resultSet.%Message)
-	}
-	Kill ipmLocalArray			// multi-dim array to store local ipm manifests; ipmLocalArray(<version>)=<fileName>
-	Kill menuList				// menu to let user choose which version of local ipm to install (if not in quiet mode and no version is specified)
-	While resultSet.%Next(.sc) {
-		$$$ThrowOnError(sc)
-		Set fileName = resultSet.%Get("Name")
-		If (resultSet.%Get("Type") = "F") {
-			// get the exact version string from filename
-			Set exactIPMVer = $Piece($Piece(fileName, "ipm-", 2, *), ".xml", 1, *-1)
-			Set ipmLocalArray(exactIPMVer) = fileName
-			Set menuList($Increment(menuList)) = exactIPMVer_" (local version)"
+	If ##class(%File).DirectoryExists(XMLDir) {
+		Set resultSet = statement.%Execute(XMLDir, "ipm-*.xml")
+		If (resultSet.%SQLCODE < 0)  {
+			$$$ThrowSQLIfError(resultSet.%SQLCODE,resultSet.%Message)
 		}
+		Kill ipmLocalArray			// multi-dim array to store local ipm manifests; ipmLocalArray(<version>)=<fileName>
+		Kill menuList				// menu to let user choose which version of local ipm to install (if not in quiet mode and no version is specified)
+		While resultSet.%Next(.sc) {
+			$$$ThrowOnError(sc)
+			Set fileName = resultSet.%Get("Name")
+			If (resultSet.%Get("Type") = "F") {
+				// get the exact version string from filename
+				Set exactIPMVer = $Piece($Piece(fileName, "ipm-", 2, *), ".xml", 1, *-1)
+				Set ipmLocalArray(exactIPMVer) = fileName
+				Set menuList($Increment(menuList)) = exactIPMVer_" (local version)"
+			}
+		}
+		$$$ThrowOnError(sc)
 	}
-	$$$ThrowOnError(sc)
 
 	If ('$DATA(menuList) && localOnly) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"No ipm-<version>.xml installer file is found locally in directory: "__XMLDir))
