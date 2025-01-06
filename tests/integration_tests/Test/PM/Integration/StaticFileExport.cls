@@ -15,7 +15,7 @@ Method TestWSGIApp()
     Set tSC = ##class(%IPM.Main).Shell("static-file-export-test package -DPath="_exportDir)
     Do $$$AssertStatusOK(tSC,"Exported to directory " _ exportDir _ " successfully.")
     Do $$$AssertTrue(##class(%File).DirectoryExists(exportDir))
-    For file = "LICENSE","README.md","requirements.txt" {
+    For file = "LICENSE","README.md","requirements.txt","CHANGELOG.md" {
       Set tFile = ##class(%File).NormalizeFilename(file, exportDir)
       If '$$$AssertTrue(##class(%File).Exists(tFile)) {
         Do $$$LogMessage("File "_tFile_" does not exist.")
