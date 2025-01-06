@@ -6,14 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased - 0.9.2+snapshot]
+
+### Added
+- #682 When downloading IPM via the `enable` command from a remote registry, allow user to pass in the registry name (or get the only existent one), instead of the deployment enabled registry.
+
 ### Fixed
 - #682 When enabling IPM in a namespace using local IPM caches, check for existence of `<iris-root>/lib/ipm/` beforing querying it.
 - #682 Use more standard wording of mapping when enabling IPM
 - #681 Convert specified namespaces to upper case for `enable` and `unmap` commands.
+- #680 Always export static files (README.md, LICENSE, requirements.txt) if existent
+- #678 Only update comment-flagged part of the language extension, allowing users to keep their custom code when upgrading
 - #680, #683 Always export static files (README.md, LICENSE, requirements.txt, CHANGELOG.md) if existent
-
-### Changed
-- #682 When downloading IPM via the `enable` command from a remote registry, allow user to pass in the registry name (or get the only existent one), instead of the deployment enabled registry.
 
 ## [0.9.1] - 2024-12-18
 
