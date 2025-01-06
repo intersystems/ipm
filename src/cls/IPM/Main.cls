@@ -2930,11 +2930,11 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				Continue
 			}
 			If 'quiet {
-				Write !,"Mapping %IPM package in "_namespace_" equivalently to "_initNamespace
+				Write !,"Mapping %IPM package in "_initNamespace_" equivalently to "_namespace
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace))
 			If 'quiet {
-				Write !,"Mapping %IPM.* routines in "_namespace_" equivalently to "_initNamespace
+				Write !,"Mapping %IPM.* routines in "_initNamespace_" equivalently to "_namespace
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
 		}
@@ -2966,7 +2966,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 					Continue
 				}
 				If 'quiet {
-					Write !,"Mapping IPM repository in "_namespace_" equivalently to "_initNamespace
+					Write !,"Mapping IPM repository in "_initNamespace_" equivalently to "_namespace
 				}
 				For suffix = "D", "S", "I" {
 					$$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace))
