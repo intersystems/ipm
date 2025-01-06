@@ -655,6 +655,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By default, this modifier is not ste and will not allow upgrade." />
 		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy." />
 		<modifier name="repos" aliases="r" description="If specified, will map repository settings across namespaces. Must be used together with -map." />
+		<modifier name="remote" value="true" description="If specified, will use fetch IPM versions from this remote repository. If this is omitted and multiple remote repositories are present, an error will occur." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 		<modifier name="preview" aliases="p" description="Preview what will be changed without actually making the changes." />
 		<modifier name="community" description="If specified, will reset repository to the community repository and map IPM to all namespaces along with the repository settings. This is functionaly equivalent to &quot;repo -delete-all&quot;, &quot;repo -reset-defaults&quot;, and &quot;enable -map -repos -globally&quot;. With this modifier, all other modifiers will be ignored."/>
@@ -662,16 +663,16 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database. Namespace-specific installation will override this.">
 			enable -map -globally
 		</example>
-		<example description="Install IPM version 0.3.4 in quiet mode in namespaces: NS1, NS2, NS3.">
-			enable -v 0.3.4 -q -ns NS1,NS2,NS3
+		<example description="Install IPM version 0.3.4 from the remote registry namd &quot;registry&quot; in quiet mode in namespaces: NS1, NS2, NS3.">
+			enable -v 0.3.4 -q -ns NS1,NS2,NS3 -remote registry
 		</example>
-		<example description="Install IPM in all non-%SYS explicit namespaces, and select version later in terminal prompt menu.">
+		<example description="Install IPM in all non-%SYS explicit namespaces, and select version later in terminal prompt menu. This works if there is only 1 remote repository configured.">
 			enable -globally
 		</example>
-		<example description="User wants to get the latest version of IPM from the registry server, and install it in all non-%SYS explicit namespaces.">
+		<example description="User wants to get the latest version of IPM from the registry server, and install it in all non-%SYS explicit namespaces. This works if there is only 1 remote repository configured.">
 			enable -v latest -globally
 		</example>
-		<example description="Install or upgrade IPM to latest IPM version in namespaces: NS1, NS2, NS3.">
+		<example description="Install or upgrade IPM to latest IPM version in namespaces: NS1, NS2, NS3. This works if there is only 1 remote repository configured.">
 			enable -v latest -allow-upgrade NS1,NS2,NS3
 		</example>
 		<example description="Reset repository to the community repository and map IPM to all namespaces along with the repository settings.">
@@ -2873,6 +2874,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	Set namespaces = $$$GetModifier(pCommandInfo, "namespaces")
 	Set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
 	Set mapRepos = $$$HasModifier(pCommandInfo,"repos")
+	Set remoteName = $$$GetModifier(pCommandInfo,"remote")
 	Set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
 	Set targetVersion = "" 		// var to store the final version of IPM to be installed
 	Kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
@@ -3056,7 +3058,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Set localIPMCount = $Get(menuList, 0)
 			If 'localOnly {
 				// Add remote version options to menuList
-				Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
+				Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 				$$$ThrowOnError(sc)
 				If $IsObject(server) {
 					Set latestVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
@@ -3127,7 +3129,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 
 	// 4. Now that we got all the namespaces that need to install IPM, do the actual installation
 	If 'useLocal {
-		Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
+		Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 		$$$ThrowOnError(sc)
 		If $IsObject(server) {
 			Set packageService = server.GetPackageService()
@@ -3136,7 +3138,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Set ipmRef.Name = $$$IPMModuleName
 			If (targetVersion = "latest") {
 				// convert latest to semantic version so that it can be undestood by ModuleInfo class
-				Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
+				Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 				$$$ThrowOnError(sc)
 				If $IsObject(server) {
 					Set targetVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)

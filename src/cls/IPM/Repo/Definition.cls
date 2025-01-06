@@ -211,6 +211,31 @@ SELECT Name FROM %IPM_Repo.Definition
 ORDER BY %IPM_Repo.Definition_SortOrder(ID) DESC
 }
 
+/// If a name is provided, return the repo of this type with the name
+/// Otherwise, return the only repo of this type in the system
+/// If there are multiple repos (or no repos) of this type, return an error
+ClassMethod GetOne(name As %String = "", Output sc As %Status) As %IPM.Repo.Definition
+{
+	If $Get(name) '= "" {
+		Quit ..ServerDefinitionKeyOpen(name, , .sc)
+	}
+	Set fst = $PIECE($classname(), ".", 1, *-1)
+	Set scd = $PIECE($classname(), ".", *)
+	Set tablename = $Replace(fst, ".", "_")_"."_scd
+	Set query = "SELECT id FROM " _ tablename  // should be safe from SQL injection, since $classname() is safe
+	Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
+	$$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+	Set list = ""
+	While rs.%Next() {
+		Set list = list _ $lb(rs.%Get("id"))
+	}
+	If $ListLength(list) = 1 {
+		Quit ..%OpenId($ListGet(list, 1), , .sc)
+	}
+	Set sc = $$$ERROR($$$GeneralError, "Unable to find a unique repo of type " _ $CLASSNAME())
+	Quit ""
+}
+
 Storage Default
 {
 <Data name="RepoDefinitionDefaultData">
