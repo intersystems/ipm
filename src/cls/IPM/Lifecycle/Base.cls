@@ -1185,7 +1185,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
     /// Always keep these files
      Set staticFiles = $ListBuild(
        "readme.md",
-	   "changelog.md",
+       "changelog.md",
        "license",
        "requirements.txt",
     )
