@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased - 0.9.2+snapshot]
 ### Fixed
 - #681 Convert specified namespaces to upper case for `enable` and `unmap` commands.
-- #680 Always export static files (README.md, LICENSE, requirements.txt) if existent
+- #680, #683 Always export static files (README.md, LICENSE, requirements.txt, CHANGELOG.md) if existent
 
 ## [0.9.1] - 2024-12-18
 
