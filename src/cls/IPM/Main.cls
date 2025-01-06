@@ -2871,6 +2871,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	Set localOnly = $$$HasModifier(pCommandInfo, "local-only")
 	Set version = $$$GetModifier(pCommandInfo, "version")
 	Set namespaces = $$$GetModifier(pCommandInfo, "namespaces")
+	Set namespaces = $$$ucase(namespaces)
 	Set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
 	Set mapRepos = $$$HasModifier(pCommandInfo,"repos")
 	Set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
@@ -3206,6 +3207,7 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 {
 	Set globally = $$$HasModifier(pCommandInfo,"globally")
 	Set namespaces = $ListFromString($$$GetModifier(pCommandInfo,"namespaces"), ",")
+	Set namespaces = $$$ucase(namespaces)
 	Set verbose = '$$$HasModifier(pCommandInfo,"quiet")
 	set reposOnly = $$$HasModifier(pCommandInfo,"repos-only")
 	// Sanity check

@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased - 0.9.2+snapshot]
 ### Fixed
+- #681 Convert specified namespaces to upper case for `enable` and `unmap` commands.
 - #678 Only update comment-flagged part of the language extension, allowing users to keep their custom code when upgrading
 
 ## [0.9.1] - 2024-12-18
