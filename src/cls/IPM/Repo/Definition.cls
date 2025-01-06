@@ -219,9 +219,7 @@ ClassMethod GetOne(name As %String = "", Output sc As %Status) As %IPM.Repo.Defi
 	If $Get(name) '= "" {
 		Quit ..ServerDefinitionKeyOpen(name, , .sc)
 	}
-	Set fst = $PIECE($classname(), ".", 1, *-1)
-	Set scd = $PIECE($classname(), ".", *)
-	Set tablename = $Replace(fst, ".", "_")_"."_scd
+	Set tablename = $$$comClassKeyGet($classname(), $$$cCLASSsqlqualifiednameQ)
 	Set query = "SELECT id FROM " _ tablename  // should be safe from SQL injection, since $classname() is safe
 	Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
 	$$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
