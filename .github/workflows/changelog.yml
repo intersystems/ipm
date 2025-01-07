@@ -17,26 +17,11 @@ jobs:
       with: 
         fetch-depth: 0
 
-    - name: Debug git refs
-      run: |
-        git fetch origin ${{ github.event.pull_request.base.ref }}
-        git log
-        echo original HEAD
-        echo ${{ github.event.pull_request.head.sha }}
-        echo HEAD
-        git rev-parse HEAD
-        echo origin/${{ github.event.pull_request.base.ref }}
-        git rev-parse origin/${{ github.event.pull_request.base.ref }}
-
     - name: Check for updated CHANGELOG.md
       run: |
-        git fetch origin ${{ github.event.pull_request.base.ref }}
-        echo "diffing HEAD and HEAD^1"
-        git diff HEAD HEAD^1
-        echo "diffing HEAD and HEAD^2"
-        git diff HEAD HEAD^2
-
-        if git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep -q 'CHANGELOG.md'; then
+        # actions/checkout@v4 will merge the feature branch into target branch, hence `HEAD` is not the feature head
+        # While it is probably okay to diff this HEAD against the target branch, we explicitly compare the feature head against the target for readability.
+        if git diff --name-only ${{ github.event.pull_request.head.sha }}...origin/${{ github.event.pull_request.base.ref }} | grep -q 'CHANGELOG.md'; then
           echo "CHANGELOG.md has been updated."
         else
           echo "CHANGELOG.md has not been updated."
