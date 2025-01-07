@@ -15,6 +15,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Debug git refs
+      run: |
+        echo HEAD
+        git rev-parse HEAD
+        echo origin/${{ github.event.pull_request.base.ref }}
+        git rev-parse origin/${{ github.event.pull_request.base.ref }}
+
     - name: Check for updated CHANGELOG.md
       run: |
         git fetch origin ${{ github.event.pull_request.base.ref }}
