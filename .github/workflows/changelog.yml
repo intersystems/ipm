@@ -25,7 +25,7 @@ jobs:
           echo "CHANGELOG.md has been updated."
         else
           echo -e "\033[31mERROR: CHANGELOG.md has NOT been updated\033[0m"
-          echo "BASE COMMIT: origin/${{ github.event.pull_request.base.sha }}"
+          echo "BASE COMMIT: ${{ github.event.pull_request.base.sha }}"
           echo "HEAD COMMIT: ${{ github.event.pull_request.head.sha }}"
           exit 1
         fi
