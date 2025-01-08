@@ -779,10 +779,15 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 		Set tOneCommand = 1
 	}
 	do ##class(%IPM.Main).GetVersion("zpm",.out)	
+	If $Get(out) = "" {
+		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
+	} Else {
+		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
+	}
 	Set introMessageList = $ListBuild(
 		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
 		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
-		"Current registry "_$$$FormattedLine($$$Cyan,$g(out))
+		registryInfo
 	)
 	Set tInShell = 0
 	For {
@@ -1204,11 +1209,12 @@ ClassMethod GetVersionModule(name, namespace = {$namespace})
 {
 	New $Namespace
 	Set $Namespace=namespace
-	Do ..GetListModules(name,.list)
-	If $Data(list(name)) {
-			quit $ListGet(list(name),1)
+	Try {
+		Do ..GetListModules(,name,.list)
+		Return $ListGet(list(1), 2)
+	} Catch ex {
+		Return ""
 	}
-	quit ""
 }
 
 /// @API.Method
