@@ -1,7 +1,7 @@
 Class %IPM.Repo.IPublishService [ Abstract ]
 {
 
-Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean [ Abstract ]
+Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status [ Abstract ]
 {
 }
 
