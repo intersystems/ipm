@@ -1,7 +1,7 @@
 Class %IPM.Repo.Oras.PublishService Extends (%IPM.Repo.Oras.PackageService, %IPM.Repo.IPublishService)
 {
 
-Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
+Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
 {
 	Set status = $$$OK
     Try {

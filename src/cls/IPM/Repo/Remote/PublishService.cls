@@ -1,12 +1,17 @@
 Class %IPM.Repo.Remote.PublishService Extends (%IPM.Repo.Remote.PackageService, %IPM.Repo.IPublishService)
 {
 
-Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
+Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
 {
-  Quit ..Publish(pModule)
+  Try {
+    Do ..Publish(pModule)
+  } Catch Ex {
+    Return Ex.AsStatus()
+  }
+  Return $$$OK
 }
 
-Method Publish(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
+Method Publish(pModule As %IPM.Repo.Remote.ModuleInfo)
 {
   If ((..Username="") || (..Password="")) && (..Token="") {
     $$$ThrowStatus($$$ERROR($$$GeneralError, "Publishing module, authorization required."))
@@ -28,7 +33,6 @@ Method Publish(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
       $$$ThrowStatus($$$ERROR($$$GeneralError, tMessage))
     }
   }
-  Return 1
 }
 
 Method CheckUnpublishEnabled(packageName As %String, packageVersion As %String) As %Boolean
