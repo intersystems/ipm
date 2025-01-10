@@ -67,3 +67,7 @@ ROUTINE %IPM.Common [Type=INC]
 
 #; Variable to mark deprecation warning has been shown in the current process
 #define DeprecationWarned %IPMModuleDeprecatedResource
+
+#; Convert module version from/to OCI tag
+#def1arg Semver2Tag(%semver) $Replace(%semver,"+","_")
+#def1arg Tag2Semver(%tag) $Replace(%tag,"_","+")
