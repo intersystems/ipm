@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="oras-tag.ZPM">
+    <Module>
+      <Name>oras-tag</Name>
+      <Version>0.0.1-beta.1+build</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="OrasTag.Main.CLS"/>
+    </Module>
+  </Document>
+</Export>
