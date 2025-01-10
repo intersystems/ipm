@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
 - #635: When calling the "package" command, the directory is now normalized to include trailing slash (or backslash).
 - #696: Fix a bug that caused error status to be ignored when publishing a module.
+- #700: Fix a bug due to incompatible conventions between SemVer and OCI tags
 
 ### Security
 -
