@@ -1403,7 +1403,7 @@ Method %Publish(ByRef pParams) As %Status
 		}
 
 
-		Do tPublishClient.PublishModule(tModule)
+		$$$ThrowOnError(tPublishClient.PublishModule(tModule))
 		
 
 		// May need to update the version of the currently-installed module.
