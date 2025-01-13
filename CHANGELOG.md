@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #582 Added functionality to optionally see time of last update and server version of each package
 - #609 Added support for `-export-deps` when running the "Package" phase of lifecycle
 - #541 Added support for ORAS repository
+- #702 Added a new lifecycle phase `Initialize` which supports merging the new `<CPF/>` resource.
 
 ### Changed
 - 
