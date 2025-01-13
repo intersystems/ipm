@@ -32,7 +32,7 @@ Method IsAvailable() As %Boolean
 
 Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-	Set name = pModuleReference.Name _ ":" _ pModuleReference.VersionString
+	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
 	Set status = ..Pull(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
 	$$$ThrowOnError(status)
 	#; module is pulled as a .tgz file
@@ -42,13 +42,13 @@ Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive A
 
 Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
 {
-	Set name = pModuleReference.Name _ ":" _ pModuleReference.VersionString
+	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
 	Return ..GetModuleXMLPy(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 }
 
 Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
 {
-	Set name = pModuleReference.Name _ ":" _ pModuleReference.VersionString
+	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
 	
 	#; Get ORAS client
 	Set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
@@ -238,7 +238,7 @@ ClassMethod PullOras(registry As %String, package As %String, namespace As %Stri
 {
 	Set pkgTag = ..GetPackageVersionPy(registry, package, namespace, username, password, token, tokenAuthMethod, 1)
 	Set pkg = $PIECE(pkgTag, ",", 1)
-	Set tag = $PIECE(pkgTag, ",", 2)
+	Set tag = $$$Semver2Tag($PIECE(pkgTag, ",", 2))
 
 	Set target = ..GetAPITarget(registry, pkg, namespace) _ ":" _ tag
 	Set client = ..GetClient(registry, username, password, token, tokenAuthMethod)
@@ -295,9 +295,9 @@ ClassMethod GetPackageMetadataPy(registry As %String, package As %String, namesp
 /// Given a package name, either parses out the tag or determines the latest tag
 /// Params:
 /// 	package : is either in the form <package>:<tag> or <package>
-/// 			     in the latter case, returns latest tag
-/// 	asString   : 0 => returns as python tuple of (package, tag)
-/// 			     1 => returns as string of "<package>,<tag>"
+/// 			     in the latter case, returns semver corresponding to the latest tag
+/// 	asString   : 0 => returns as python tuple of (package, semver)
+/// 			     1 => returns as string of "<package>,<semver>"
 ClassMethod GetPackageVersionPy(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenAuthMethod As %String, asString As %Boolean = 0) [ Language = python ]
 {
 	import iris
@@ -307,10 +307,12 @@ ClassMethod GetPackageVersionPy(registry As %String, package As %String, namespa
 	else:
 		pkg = package
 		tag = iris.cls("%IPM.Repo.Oras.PackageService").GetLatestTagPy(registry, pkg,  namespace, username, password, token, tokenAuthMethod, asString )
+	
+	semver = tag.replace("_", "+")
 	if asString:
-		return pkg + "," + tag
+		return pkg + "," + semver
 	else:
-		return (pkg, tag)
+		return (pkg, semver)
 }
 
 /// Lists all of the modules and their latest versions in the package
