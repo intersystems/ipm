@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$ListBuild("Clean","Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
+Parameter PHASES = {$ListBuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -138,18 +138,19 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 
 	Quit $Case(pOnePhase,
 		"clean":		$ListBuild("Clean"),
-		"reload":		$ListBuild("Reload","*"),
-		"validate":		$ListBuild("Reload","*","Validate"),
+		"initialize":   $ListBuild("Initialize"),
+		"reload":		$ListBuild("Initialize","Reload","*"),
+		"validate":		$ListBuild("Initialize","Reload","*","Validate"),
 		"exportdata":	$ListBuild("ExportData"),
-		"compile":		$ListBuild("Reload","*","Validate","Compile"),
-		"activate":		$ListBuild("Reload","*","Validate","Compile","Activate"),
+		"compile":		$ListBuild("Initialize","Reload","*","Validate","Compile"),
+		"activate":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate"),
 		"document":		$ListBuild("Document"),
 		"makedeployed":	$ListBuild("MakeDeployed"),
-		"test":			$ListBuild("Reload","*","Validate","Compile","Activate","Test"),
-		"package":		$ListBuild("Reload","*","Validate","Compile","Activate","Package"),
-		"verify":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Verify"),
-		"register":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register"),
-		"publish":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
+		"test":			$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
+		"package":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
+		"verify":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
+		"register":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
+		"publish":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
 		"configure":	$ListBuild("Configure"),
 		"unconfigure":	$ListBuild("Unconfigure"),
 		:				""
@@ -162,6 +163,7 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 	Set phase = $ZCONVERT(pOnePhase, "L")
 	Quit $Case(phase,
 		"clean":		"Clean",
+		"initialize":	"Initialize",
 		"reload":		"Reload",
 		"validate":		"Validate",
 		"exportdata":	"ExportData",
@@ -499,6 +501,11 @@ Method %Unconfigure(ByRef pParams) As %Status
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
+}
+
+Method %Initialize(ByRef pParams) As %Status
+{
+	Quit $$$OK
 }
 
 Method %Reload(ByRef pParams) As %Status
