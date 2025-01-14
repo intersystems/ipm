@@ -507,6 +507,15 @@ Method %Initialize(ByRef pParams) As %Status
 {
 	Set status = $$$OK
 	Try {
+		Set key = ""
+		For {
+			Set resource = ..Module.Resources.GetNext(.key)
+			Quit:key=""
+			If $IsObject(resource.Processor) {
+				Set status = $$$ADDSC(status,resource.Processor.OnPhase("Initialize",.pParams))
+			}
+		}
+
 		Set preloadRoot = $Get(pParams("RootDirectory"))_"preload"
 		Set verbose = $Get(pParams("Verbose"))
 		If ##class(%File).DirectoryExists(preloadRoot) {
@@ -516,15 +525,6 @@ Method %Initialize(ByRef pParams) As %Status
 			If $$$ISERR(tSC) { Quit }
 		} ElseIf verbose {
 			Write !,"Skipping preload - directory does not exist."
-		}
-		
-		Set key = ""
-		For {
-			Set resource = ..Module.Resources.GetNext(.key)
-			Quit:key=""
-			If $IsObject(resource.Processor) {
-				Set status = $$$ADDSC(status,resource.Processor.OnPhase("Initialize",.pParams))
-			}
 		}
 	} Catch ex {
 		Set status = ex.AsStatus()
