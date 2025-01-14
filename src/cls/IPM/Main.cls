@@ -272,9 +272,13 @@ load https://github.com/user/repository.git -branch feature-1
 <example description="Loads the module described in C:\module\root\path\module.xml but set pip timeout to 30 seconds">
 	load -extra-pip-flags "--timeout 30" C:\module\root\path\
 </example>
+<example description="Loads the module described in C:\module\root\path\module.xml using the C:\path\to\env.json as the install time configuration">
+load -env C:\path\to\env.json C:\module\root\path
+</example>
 
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="nodev" dataAlias="DeveloperMode" dataValue="0" description="Disables the DeveloperMode flag for the module's lifecycle." />
@@ -386,12 +390,16 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Installs HS.JSON but set pip timeout to 30 seconds">
 	install -extra-pip-flags "--timeout 30" HS.JSON
 </example>
+<example description="Installs example-package using the /path/to/env.json as the install time configuration">
+install -env /path/to/env.json example-package
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to install" />
 <parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="latest" aliases="l" description="Installs the latest available version of this module without prompting the user." />
 <modifier name="prompt" aliases="p" description="Prompts user which version to install, if more then one found." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
@@ -420,12 +428,16 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Reinstalls ZHSLIB but set pip timeout to 30 seconds">
 	reinstall -extra-pip-flags "--timeout 30" ZHSLIB
 </example>
+<example description="Reinstalls example-package using the /path/to/env.json as the install time configuration">
+reinstall -env /path/to/env.json example-package
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to reinstall" />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="shallow" aliases="s" dataAlias="UpdateSnapshots" dataValue="0" description="Suppresses updating of dependencies with '+snapshot' versions." />
@@ -768,6 +780,9 @@ ClassMethod GetVersion(ModuleName, ByRef out, list)
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
 	New $$$DeprecationWarned
+	// Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
+	Set configReference = ##class(%IPM.General.InstallTimeConfig).%Get()
+
 	Set pException = $$$NULLOREF
 	Set tOneCommand = 0
 	Set tCommand = $Get(pCommand)

@@ -517,6 +517,7 @@ Method %Reload(ByRef pParams) As %Status
 		If (tRoot = "") && tDeveloperMode {
 			Set tRoot = ..Module.Root
 		}
+		Do ..LoadInstallTimeConfig($Get(pParams("EnvFiles")))
 		
 		// For now, no-op if no root is configured.
 		Quit:tRoot=""
@@ -1788,6 +1789,18 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 		and cp.Final = 1
 		and cp.Origin = cd.Name
 		and (:pPackaging is null or cp._default = :pPackaging)
+}
+
+ClassMethod LoadInstallTimeConfig(paths As %String)
+{
+	#dim config As %IPM.General.InstallTimeConfig
+	Set config = ##class(%IPM.General.InstallTimeConfig).%Get()
+	$$$ThrowOnError(config.Clear())
+	Set paths = $ListFromString(paths, ";")
+	Set ptr = 0
+	While $ListNext(paths, ptr, file) {
+		$$$ThrowOnError(config.Load(file))
+	}
 }
 
 }

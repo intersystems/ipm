@@ -31,6 +31,14 @@ ClassMethod UpdateSuperclassAndCompile(ByRef pItems, ByRef qSpec = "") As %Statu
             }
         }
     }
+
+    // If the install-time configuration (aka env.json) is set, compile in the current process where singleton %IPM.General.InstallTimeConfig is available 
+    // Methods with [CodeMode = objectgenerator] can then use this to access configuration set in env.json
+    Set itconfig = ##class(%IPM.General.InstallTimeConfig).%Get()
+    If 'itconfig.IsEmpty() {
+        Set qSpec = qSpec _ "/multicompile=0"
+    }
+
     Quit $System.OBJ.CompileList(.pItems, .qSpec)
 }
 

@@ -220,6 +220,9 @@ ClassMethod LoadQualifiedReference(pReference As %IPM.Storage.QualifiedModuleInf
 
 ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %Boolean, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
+	// Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
+	Set configReference = ##class(%IPM.General.InstallTimeConfig).%Get()
+
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
 	#dim tExpression As %IPM.General.SemanticVersionExpression
@@ -438,6 +441,7 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			Merge tParams("AngularBuild") = pParams("AngularBuild")
 			Merge tParams("Artifactory") = pParams("Artifactory")
 			Merge tParams("AngularArtifact") = pParams("AngularArtifact")
+			Merge tParams("EnvFiles") = pParams("EnvFiles")
 		}
 		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository)
 		If $$$ISERR(tSC) {
