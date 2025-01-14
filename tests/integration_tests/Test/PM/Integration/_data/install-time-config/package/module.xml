@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="install-time-config.ZPM">
+    <Module>
+      <Name>install-time-config</Name>
+      <Version>0.0.1</Version>
+      <Dependencies>
+        <ModuleReference>
+          <Name>install-time-config-dependency</Name>
+          <Version>0.0.1</Version>
+        </ModuleReference>
+      </Dependencies>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="InstallTimeConfig.Main.CLS"></Resource>
+    </Module>
+  </Document>
+</Export>
