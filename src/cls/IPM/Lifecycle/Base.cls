@@ -507,6 +507,17 @@ Method %Initialize(ByRef pParams) As %Status
 {
 	Set status = $$$OK
 	Try {
+		Set preloadRoot = $Get(pParams("RootDirectory"))_"preload"
+		Set verbose = $Get(pParams("Verbose"))
+		If ##class(%File).DirectoryExists(preloadRoot) {
+			Set tSC = $System.OBJ.ImportDir(preloadRoot, "*", $Select(verbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+			If $$$ISERR(tSC) { Quit }
+			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
+			If $$$ISERR(tSC) { Quit }
+		} ElseIf verbose {
+			Write !,"Skipping preload - directory does not exist."
+		}
+		
 		Set key = ""
 		For {
 			Set resource = ..Module.Resources.GetNext(.key)
@@ -595,16 +606,6 @@ Method %Reload(ByRef pParams) As %Status
 		}
 
     $$$ThrowOnError(..InstallPythonRequirements(tRoot, .pParams))
-		
-		Set tPreloadRoot = tRoot_"preload"
-		If ##class(%File).DirectoryExists(tPreloadRoot) {
-			Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
-			If $$$ISERR(tSC) { Quit }
-			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
-			If $$$ISERR(tSC) { Quit }
-		} ElseIf tVerbose {
-			Write !,"Skipping preload - directory does not exist."
-		}
 		
 		// Reload the module definition
 		Set tSC = ..Module.%Reload()
