@@ -26,7 +26,7 @@ Method GetArg(package As %String, args... As %String) As %Any
     Set obj = ..Config.%Get(package)
 
     For i = 1:1:$Get(args) {
-        If '($IsObject(obj) && obj.%IsA("%Library.DynamicObject")) {
+        If '($IsObject(obj) && obj.%IsA("%Library.DynamicAbstractObject")) {
             Return ""
         }
         Set obj = obj.%Get(args(i))
