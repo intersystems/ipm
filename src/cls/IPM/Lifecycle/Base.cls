@@ -505,20 +505,20 @@ Method %Unconfigure(ByRef pParams) As %Status
 
 Method %Initialize(ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
+	Set status = $$$OK
 	Try {
-		Set tKey = ""
+		Set key = ""
 		For {
-			Set tResource = ..Module.Resources.GetNext(.tKey)
-			Quit:tKey=""
-			If $IsObject(tResource.Processor) && ($CLASSNAME(tResource.Processor) = "%IPM.ResourceProcessor.CPF") {
-				Set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Initialize",.pParams))
+			Set resource = ..Module.Resources.GetNext(.key)
+			Quit:key=""
+			If $IsObject(resource.Processor) {
+				Set status = $$$ADDSC(status,resource.Processor.OnPhase("Initialize",.pParams))
 			}
 		}
 	} Catch ex {
-		Set tSC = ex.AsStatus()
+		Set status = ex.AsStatus()
 	}
-	Quit tSC
+	Quit status
 }
 
 Method %Reload(ByRef pParams) As %Status
