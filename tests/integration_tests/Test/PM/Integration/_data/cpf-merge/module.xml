@@ -5,7 +5,7 @@
       <Name>cpf-merge</Name>
       <Version>0.0.1</Version>
       <Packaging>module</Packaging>
-      <CPF Path="/Merge.CPF"/>
+      <CPF Name="Merge.CPF"/>
     </Module>
   </Document>
 </Export>
