@@ -1,0 +1,5 @@
+[Actions]   
+CreateRole:Name=MyTestRole
+CreateResource:Name=MyTestResource,PublicPermission=R
+CreateApplication:Name=/csp/my-test-webapp
+

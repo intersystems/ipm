@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$ListBuild("Clean","Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
+Parameter PHASES = {$ListBuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -138,18 +138,19 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 
 	Quit $Case(pOnePhase,
 		"clean":		$ListBuild("Clean"),
-		"reload":		$ListBuild("Reload","*"),
-		"validate":		$ListBuild("Reload","*","Validate"),
+		"initialize":   $ListBuild("Initialize"),
+		"reload":		$ListBuild("Initialize","Reload","*"),
+		"validate":		$ListBuild("Initialize","Reload","*","Validate"),
 		"exportdata":	$ListBuild("ExportData"),
-		"compile":		$ListBuild("Reload","*","Validate","Compile"),
-		"activate":		$ListBuild("Reload","*","Validate","Compile","Activate"),
+		"compile":		$ListBuild("Initialize","Reload","*","Validate","Compile"),
+		"activate":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate"),
 		"document":		$ListBuild("Document"),
 		"makedeployed":	$ListBuild("MakeDeployed"),
-		"test":			$ListBuild("Reload","*","Validate","Compile","Activate","Test"),
-		"package":		$ListBuild("Reload","*","Validate","Compile","Activate","Package"),
-		"verify":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Verify"),
-		"register":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register"),
-		"publish":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
+		"test":			$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
+		"package":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
+		"verify":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
+		"register":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
+		"publish":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
 		"configure":	$ListBuild("Configure"),
 		"unconfigure":	$ListBuild("Unconfigure"),
 		:				""
@@ -162,6 +163,7 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 	Set phase = $ZCONVERT(pOnePhase, "L")
 	Quit $Case(phase,
 		"clean":		"Clean",
+		"initialize":	"Initialize",
 		"reload":		"Reload",
 		"validate":		"Validate",
 		"exportdata":	"ExportData",
@@ -501,6 +503,35 @@ Method %Unconfigure(ByRef pParams) As %Status
 	Quit tSC
 }
 
+Method %Initialize(ByRef pParams) As %Status
+{
+	Set status = $$$OK
+	Try {
+		Set key = ""
+		For {
+			Set resource = ..Module.Resources.GetNext(.key)
+			Quit:key=""
+			If $IsObject(resource.Processor) {
+				Set status = $$$ADDSC(status,resource.Processor.OnPhase("Initialize",.pParams))
+			}
+		}
+
+		Set preloadRoot = $Get(pParams("RootDirectory"))_"preload"
+		Set verbose = $Get(pParams("Verbose"))
+		If ##class(%File).DirectoryExists(preloadRoot) {
+			Set tSC = $System.OBJ.ImportDir(preloadRoot, "*", $Select(verbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+			If $$$ISERR(tSC) { Quit }
+			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
+			If $$$ISERR(tSC) { Quit }
+		} ElseIf verbose {
+			Write !,"Skipping preload - directory does not exist."
+		}
+	} Catch ex {
+		Set status = ex.AsStatus()
+	}
+	Quit status
+}
+
 Method %Reload(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
@@ -575,16 +606,6 @@ Method %Reload(ByRef pParams) As %Status
 		}
 
     $$$ThrowOnError(..InstallPythonRequirements(tRoot, .pParams))
-		
-		Set tPreloadRoot = tRoot_"preload"
-		If ##class(%File).DirectoryExists(tPreloadRoot) {
-			Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
-			If $$$ISERR(tSC) { Quit }
-			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
-			If $$$ISERR(tSC) { Quit }
-		} ElseIf tVerbose {
-			Write !,"Skipping preload - directory does not exist."
-		}
 		
 		// Reload the module definition
 		Set tSC = ..Module.%Reload()
