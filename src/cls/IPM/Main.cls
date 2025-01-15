@@ -273,8 +273,8 @@ load https://github.com/user/repository.git -branch feature-1
 <example description="Loads the module described in C:\module\root\path\module.xml but set pip timeout to 30 seconds">
 	load -extra-pip-flags "--timeout 30" C:\module\root\path\
 </example>
-<example description="Loads the module described in C:\module\root\path\module.xml using the C:\path\to\env.json as the install time configuration">
-load -env C:\path\to\env.json C:\module\root\path
+<example description="Loads the module described in C:\module\root\path\module.xml using the C:\path\to\env.json1 and C:\path\to\env.json2 as the install time configuration">
+load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 </example>
 
 
@@ -391,8 +391,8 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Installs HS.JSON but set pip timeout to 30 seconds">
 	install -extra-pip-flags "--timeout 30" HS.JSON
 </example>
-<example description="Installs example-package using the /path/to/env.json as the install time configuration">
-install -env /path/to/env.json example-package
+<example description="Installs example-package using the /path/to/env1.json and /path/to/env2.json as the install time configuration">
+install -env /path/to/env1.json;/path/to/env2.json example-package
 </example>
 
 <!-- Parameters -->
@@ -429,8 +429,8 @@ install -env /path/to/env.json example-package
 <example description="Reinstalls ZHSLIB but set pip timeout to 30 seconds">
 	reinstall -extra-pip-flags "--timeout 30" ZHSLIB
 </example>
-<example description="Reinstalls example-package using the /path/to/env.json as the install time configuration">
-reinstall -env /path/to/env.json example-package
+<example description="Reinstalls example-package using the /path/to/env1.json and /path/to/env2.json as the install time configuration">
+reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 </example>
 
 <!-- Parameters -->
