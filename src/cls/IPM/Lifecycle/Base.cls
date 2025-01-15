@@ -1799,6 +1799,7 @@ ClassMethod LoadInstallTimeConfig(paths As %String)
 	Set paths = $ListFromString(paths, ";")
 	Set ptr = 0
 	While $ListNext(paths, ptr, file) {
+		Set file = $ZStrip(file, "<>WC")
 		Do config.Load(file)
 	}
 }
