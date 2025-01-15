@@ -52,11 +52,20 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
 ClassMethod MergeCPF(file As %String)
 {
-    New $Namespace
-    Set $Namespace = "%SYS"
+    // TODO The $zf(-100) callout is much slower than ##class(Config.CPF).Merge() 
+    //      Figure out why ##class(Config.CPF).Merge() doesn't work
+    //      c.f. https://github.com/intersystems/ipm/pull/703#discussion_r1917290136
 
-    Set config = $SYSTEM.Util.DataDirectory()_"iris.cpf"
-    $$$ThrowOnError(##class(Config.CPF).Merge(config, file))
+    Set args($Increment(args)) = "merge"
+    Set args($Increment(args)) = ##class(%SYS.System).GetInstanceName()
+    Set args($Increment(args)) = file
+
+    // Somehow, if the STDOUT is not set, the merge will silently fail
+    Set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
+    Set status = $ZF(-100, flags, "iris", .args)
+    If status '= 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error merging CPF file. $zf(-100) exited with "_status))
+    }
 }
 
 }
