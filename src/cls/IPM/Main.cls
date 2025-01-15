@@ -61,7 +61,7 @@ Currently, there may only be one of these per namespace.
 <example description="Compiles the module named &quot;MyModuleName&quot;">module-action MyModuleName compile</example>
 <example description="Performs multiple actions on the module named &quot;MyModuleName&quot;; &quot;clean&quot; deletes all of its dependenices, and &quot;install&quot; will then re-download them, package the module, and register it in the current namespace's module cache.">MyModuleName clean register</example>
 <example description="Compiles the module named MyUIModule with verbose output and pParams(&quot;UIFW&quot;,&quot;force&quot;) (passed to all lifecycle phases) set to 42.">MyUIModule compile -v -DUIFW.force=42</example>
-<example description="Verify the module MyModule with the env file /path/to/env.json. The module is responsible for accessing the data using %IPM.General.InstallTimeConfig:GetArg()">MyModule verify -env /path/to/env.json</example>
+<example description="Verify the module MyModule with the env file /path/to/env.json. The module is responsible for accessing the data using %IPM.General.EnvironmentConfig:GetArg()">MyModule verify -env /path/to/env.json</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module on which to perform lifecycle actions" />
@@ -789,7 +789,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 {
 	New $$$DeprecationWarned
 	// Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
-	Set configReference = ##class(%IPM.General.InstallTimeConfig).%Get()
+	Set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
 
 	Set pException = $$$NULLOREF
 	Set tOneCommand = 0

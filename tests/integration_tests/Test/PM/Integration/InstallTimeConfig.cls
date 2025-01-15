@@ -1,4 +1,4 @@
-Class Test.PM.Integration.InstallTimeConfig Extends Test.PM.Integration.Base
+Class Test.PM.Integration.EnvironmentConfig Extends Test.PM.Integration.Base
 {
 
 Parameter TargetPath = "install-time-config";

@@ -1,4 +1,4 @@
-Class %IPM.General.InstallTimeConfig Extends %IPM.General.Singleton
+Class %IPM.General.EnvironmentConfig Extends %IPM.General.Singleton
 {
 
 Property Config As %Library.DynamicObject [ InitialExpression = {{}}, Private ];

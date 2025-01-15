@@ -7,8 +7,8 @@ Parameter PackageName = "install-time-config-dependency";
 
 ClassMethod RunOnLoad() [ CodeMode = objectgenerator ]
 {
-    #dim config As %IPM.General.InstallTimeConfig
-    Set config = ##class(%IPM.General.InstallTimeConfig).%Get()
+    #dim config As %IPM.General.EnvironmentConfig
+    Set config = ##class(%IPM.General.EnvironmentConfig).%Get()
     Set magicValue = config.GetArg(..#PackageName, "nested", "magic")
     If magicValue '= ..#MagicValue {
         If magicValue = "" {

@@ -1793,8 +1793,8 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 
 ClassMethod LoadInstallTimeConfig(paths As %String)
 {
-	#dim config As %IPM.General.InstallTimeConfig
-	Set config = ##class(%IPM.General.InstallTimeConfig).%Get()
+	#dim config As %IPM.General.EnvironmentConfig
+	Set config = ##class(%IPM.General.EnvironmentConfig).%Get()
 	Do config.Clear()
 	Set paths = $ListFromString(paths, ";")
 	Set ptr = 0

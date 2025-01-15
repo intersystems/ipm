@@ -77,7 +77,7 @@ Method TestMergeDynamicObjects()
     Set allTestCases = [].%FromJSON(stream)
     Set iter = allTestCases.%GetIterator()
     While iter.%GetNext(.key, .case) {
-        Do ##class(%IPM.General.InstallTimeConfig).MergeDynamicObjects(case.dest, case.src)
+        Do ##class(%IPM.General.EnvironmentConfig).MergeDynamicObjects(case.dest, case.src)
         If '$$$AssertTrue(..Equal(case.dest, case.expected)) {
             Set message = $$$FormatText("Failed test case: %1, output = %2", case.%ToJSON(), case.dest.%ToJSON())
             Do $$$LogMessage(message)

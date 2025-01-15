@@ -1,4 +1,4 @@
-Class InstallTimeConfig.Main Extends InstallTimeConfigDependency.Main
+Class EnvironmentConfig.Main Extends InstallTimeConfigDependency.Main
 {
 
 Parameter MagicValue = 42;
@@ -9,8 +9,8 @@ Parameter PackageName = "install-time-config";
 
 ClassMethod RunOnLoad() [ CodeMode = objectgenerator ]
 {
-    #dim config As %IPM.General.InstallTimeConfig
-    Set config = ##class(%IPM.General.InstallTimeConfig).%Get()
+    #dim config As %IPM.General.EnvironmentConfig
+    Set config = ##class(%IPM.General.EnvironmentConfig).%Get()
     Set magicValue = config.GetArg(..#PackageName, "nested", "magic")
     If magicValue '= ..#MagicValue {
         If magicValue = "" {
