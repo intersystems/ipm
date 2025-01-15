@@ -5,7 +5,9 @@
       <Name>cpf-merge</Name>
       <Version>0.0.1</Version>
       <Packaging>module</Packaging>
-      <CPF Name="Merge.CPF"/>
+      <CPF Name="config-globals.CPF"/>
+      <CPF Name="create-roles.CPF" Directory="custom-cpf-directory"/>
+      <CPF Name="package-mapping.CPF"/>
     </Module>
   </Document>
 </Export>
