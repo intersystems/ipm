@@ -1,3 +1,5 @@
+Include %IPM.Formatting
+
 Class %IPM.ResourceProcessor.CPF Extends %IPM.ResourceProcessor.Abstract
 {
 
@@ -36,15 +38,25 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             Write !, "Merging CPF file: ", filename, !
             Do stream.OutputToDevice()
         }
-        // TODO actually merge the CPF file
-        // ...
+
+        Do ..MergeCPF(filename)
 
         Set pResourceHandled = 1
     } Catch ex {
         Set pResourceHandled = 0
+        Write !, $$$FormattedLine($$$Red, $$$FormatText("Error merging CPF file. See the error for details."))
         Set status = ex.AsStatus()
     }
     Return status
+}
+
+ClassMethod MergeCPF(file As %String)
+{
+    New $Namespace
+    Set $Namespace = "%SYS"
+
+    Set config = $SYSTEM.Util.DataDirectory()_"iris.cpf"
+    $$$ThrowOnError(##class(Config.CPF).Merge(config, file))
 }
 
 }
