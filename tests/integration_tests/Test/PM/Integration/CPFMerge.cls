@@ -23,8 +23,13 @@ Method TestCPFMerge()
     Do $$$AssertEquals(packageMap.Database, "USER")
 
     // Test role
-    // Somehow the role cannot be created. Something's wrong with create-roles.cpf
-    Do $$$AssertTrue(##class(Security.Roles).Exists("MyTestRole", .role))
+    Do $$$AssertTrue(##class(Security.Roles).Exists("MyTestRole"))
+
+    // Test Resource
+    Do $$$AssertTrue(##class(Security.Resources).Exists("MyTestResource"))
+
+    // Test Web Application
+    Do $$$AssertTrue(##class(Security.Applications).Exists("/csp/my-test-webapp"))
 }
 
 }

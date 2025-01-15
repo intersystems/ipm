@@ -6,7 +6,7 @@
       <Version>0.0.1</Version>
       <Packaging>module</Packaging>
       <CPF Name="config-globals.cpf"/>
-      <CPF Name="create-roles.cpf" Directory="custom-cpf-directory"/>
+      <CPF Name="actions.cpf" Directory="custom-cpf-directory"/>
       <CPF Name="package-mapping.cpf"/>
     </Module>
   </Document>
