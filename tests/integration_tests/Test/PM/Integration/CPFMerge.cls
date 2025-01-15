@@ -12,7 +12,7 @@ Method TestCPFMerge()
 
     // Config.* classes are only available in %SYS
     New $Namespace
-    Set $Namespace = %SYS
+    Set $Namespace = "%SYS"
 
     // Test config globals
     Do $$$AssertStatusOK(##class(Config.config).Get(.props))
