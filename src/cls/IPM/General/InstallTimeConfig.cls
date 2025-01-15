@@ -4,20 +4,30 @@ Class %IPM.General.InstallTimeConfig Extends %IPM.General.Singleton
 Property Config As %Library.DynamicObject [ InitialExpression = {{}}, Private ];
 
 /// Load the configuration from the specified path into <property>Config</property>
-Method Load(path As %String) As %Status
+Method Load(path As %String)
 {
-    Set tSC = $$$OK
     Try {
-        Set newConfig = {}.%FromJSONFile(path)
-        If '($IsObject(newConfig) && newConfig.%IsA("%Library.DynamicObject")) {
-            Set tSC = $$$ERROR($$$GeneralError, "Invalid configuration file. Expected a JSON object, not JSON array")
-            Quit
+        Set stream = ##class(%Stream.FileCharacter).%New()
+        Set stream.TranslateTable = "UTF8"
+        $$$ThrowOnError(stream.LinkToFile(path))
+        Set jsonString = ""
+        While 'stream.AtEnd {
+            Set jsonString = jsonString _ stream.Read()
+        }
+        Try {
+            Set newConfig = {}.%FromJSON(jsonString)
+        } Catch Ex {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file: " _ path))
+        }
+
+        If newConfig.%IsA("%Library.DynamicArray") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file. Expected a JSON object, not a JSON array"))
         }
         Do ..MergeDynamicObjects(..Config, newConfig)
     } Catch ex {
-        Set tSC = $$$ADDSC(ex.AsStatus(), ..Clear())
+        Do ..Clear()
+        Throw ex
     }
-    Return tSC
 }
 
 /// Get the specified argument for the specified package
@@ -34,7 +44,7 @@ Method GetArg(package As %String, args... As %String) As %Any
     Return obj
 }
 
-Method Clear() As %Status
+Method Clear()
 {
     Set ..Config = {}
     Quit $$$OK

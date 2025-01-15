@@ -1795,11 +1795,11 @@ ClassMethod LoadInstallTimeConfig(paths As %String)
 {
 	#dim config As %IPM.General.InstallTimeConfig
 	Set config = ##class(%IPM.General.InstallTimeConfig).%Get()
-	$$$ThrowOnError(config.Clear())
+	Do config.Clear()
 	Set paths = $ListFromString(paths, ";")
 	Set ptr = 0
 	While $ListNext(paths, ptr, file) {
-		$$$ThrowOnError(config.Load(file))
+		Do config.Load(file)
 	}
 }
 
