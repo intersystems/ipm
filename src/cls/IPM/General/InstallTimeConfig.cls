@@ -50,16 +50,6 @@ Method Clear()
     Quit $$$OK
 }
 
-Method ToJson() As %String
-{
-    Quit ..Config.%ToJSON()
-}
-
-Method SetJson(json As %String)
-{
-    Set ..Config = {}.%FromJSON(json)
-}
-
 Method IsEmpty()
 {
     Return ..Config.%Size() = 0
