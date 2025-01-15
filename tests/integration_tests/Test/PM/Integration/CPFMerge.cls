@@ -24,8 +24,7 @@ Method TestCPFMerge()
 
     // Test role
     // Somehow the role cannot be created. Something's wrong with create-roles.cpf
-    #; Do $$$AssertTrue(##class(Security.Role).Exists("MyTestRole", .role))
-    #; Do $$$AssertEquals(role.Resources, "%DB_%DEFAULT:RW")
+    Do $$$AssertTrue(##class(Security.Roles).Exists("MyTestRole", .role))
 }
 
 }
