@@ -31,7 +31,7 @@ Method Load(path As %String)
 }
 
 /// Get the specified argument for the specified package
-Method GetArg(package As %String, args... As %String) As %Any
+Method GetArg(package As %String, args... As %String) As %IPM.DataType.Any
 {
     Set obj = ..Config.%Get(package)
 
