@@ -2210,7 +2210,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 {
-	Do ##class(%IPM.Lifecycle.Base).LoadInstallTimeConfig($$$GetModifier(pCommandInfo,"env"))
+	Do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($Get(pCommandInfo("data", "EnvFiles")))
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
@@ -2287,7 +2287,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 {
-	Do ##class(%IPM.Lifecycle.Base).LoadInstallTimeConfig($$$GetModifier(pCommandInfo,"env"))
+	Do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($Get(pCommandInfo("data", "EnvFiles")))
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListFromString($Get(pCommandInfo("parameters","actions"))," ")
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
