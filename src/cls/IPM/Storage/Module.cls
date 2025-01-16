@@ -169,6 +169,7 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 /// Returns a multidimensional array of custom phases defined by the module's invokes,
 /// where the keys are the custom phase names and the values are empty strings.
 /// Custom phases do not have corresponding %method implementation in the lifecycle class.
+/// Return the phases in lower case for case-insensitive lookup.
 Method GetCustomPhases(Output pPhases)
 {
     Kill pPhases
@@ -178,7 +179,7 @@ Method GetCustomPhases(Output pPhases)
         Set tInvoke = ..Invokes.GetNext(.key)
         Quit:(key = "")
         If (tInvoke.CustomPhase '= "") {
-            Set pPhases(tInvoke.CustomPhase) = ""
+            Set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
         }
     }
 }
@@ -294,7 +295,10 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tFullStart = $zh
 		Do tModule.GetCustomPhases(.tCustomPhases)
 		While $ListNext(tPhases,tPointer,tOnePhase) {
-            Set tIsCustomPhase = $Data(tCustomPhases(tOnePhase)) # 2
+            Set tIsCustomPhase = $Data(tCustomPhases($$$lcase(tOnePhase)), tNormalizedPhaseName) # 2
+			If tIsCustomPhase {
+				Set tOnePhase = tNormalizedPhaseName
+			}
 			Set tStart = $zh
 			If tOnePhase="*" {
 				Kill tModule,tLifecycle

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="phase-config.ZPM">
+    <Module>
+      <Name>phase-config</Name>
+      <Version>0.0.1</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="PhaseConfig.Main.CLS"></Resource>
+      <Invoke Class="PhaseConfig.Main" Method="AfterCompile" Phase="Compile" When="After" />
+      <Invoke Class="PhaseConfig.Main" Method="BeforeVerify" Phase="Verify" When="Before" />
+      <Invoke Class="PhaseConfig.Main" Method="MyPhase" CustomPhase="CustomPhase" />
+    </Module>
+  </Document>
+</Export>
