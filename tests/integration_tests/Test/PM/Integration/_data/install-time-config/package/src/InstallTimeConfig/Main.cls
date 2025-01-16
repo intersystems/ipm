@@ -1,4 +1,4 @@
-Class EnvironmentConfig.Main Extends InstallTimeConfigDependency.Main
+Class InstallTimeConfig.Main Extends InstallTimeConfigDependency.Main
 {
 
 Parameter MagicValue = 42;
