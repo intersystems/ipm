@@ -4,31 +4,49 @@ Class %IPM.ResourceProcessor.CPF Extends %IPM.ResourceProcessor.Abstract
 {
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Name,Directory";
+Parameter ATTRIBUTES As STRING = "Name,Directory,Phase,CustomPhase,When";
 
 /// Description of resource processor class (shown in UI)
 Parameter DESCRIPTION As STRING = "Merges the specified CPF file in the ""Initialize"" lifecycle phase.";
 
+/// Directory containing the CPF file to merge
 Property Directory As %IPM.DataType.ResourceDirectory [ InitialExpression = "cpf" ];
 
+/// FileN ame of the CPF merge file
 Property Name As %IPM.DataType.ResourceName [ Required ];
 
-/// Called as phase <var>pPhase</var> is executed for the resource. If <var>pResourceHandled</var> is set to true,
-/// then the default behavior for that resource will be bypassed in the current phase.
-/// Currently, this is only used in the Verify phase, because of different handling of intermediate error statuses.
-/// TODO: Implement for standard database resources (.INC, .CLS, etc.)
-Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
-{
-    Set verbose = $Get(pParams("Verbose"))
-    Set status = $$$OK
-    Try {
-        If pPhase '= "Initialize" {
-            Quit
-        }
+/// The phase before/after which the CPF file should be merged
+Property Phase As %IPM.DataType.PhaseName [ InitialExpression = "Initialize" ];
 
+/// If provided, the Phase property will be ignored. The CPF merge will happen during this custom phase.
+Property CustomPhase As %IPM.DataType.CustomPhaseName;
+
+/// When to merge the CPF file: Before or After the specified phase. This only applies to the standard phases.
+Property When As %IPM.DataType.PhaseWhen [ InitialExpression = "Before" ];
+
+Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
+{
+    If (..When = "Before") && (..Phase = pPhase) && ($Get(..CustomPhase) = "") {
+        Quit ..DoMerge(.pParams)
+    }
+    Quit $$$OK
+}
+
+Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+{
+    If (..When = "After") && (..Phase = pPhase) && ($Get(..CustomPhase) = "") {
+        Quit ..DoMerge(.pParams)
+    }
+    Quit $$$OK
+}
+
+Method DoMerge(ByRef pParams) As %Status
+{
+    Try {
+        Set verbose = $GET(pParams("Verbose"))
         Set root = ..ResourceReference.Module.Root
         // Use Construct first, rather than NormalizeFilename, so we don't have to deal with leading/trailing slashes
-        Set dir = $Select($$$isWINDOWS: $Replace(..Directory, "/", "\"), 1: ..Directory)
+        Set dir = $SELECT($$$isWINDOWS: $REPLACE(..Directory, "/", "\"), 1: ..Directory)
         Set dir = ##class(%File).Construct(root, dir)
         Set filename = ##class(%File).NormalizeFilename(..Name, dir)
 
@@ -38,16 +56,11 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
             Write !, "Merging CPF file: ", filename, !
             Do stream.OutputToDevice()
         }
-
         Do ..MergeCPF(filename)
-
-        Set pResourceHandled = 1
     } Catch ex {
-        Set pResourceHandled = 0
-        Write !, $$$FormattedLine($$$Red, $$$FormatText("Error merging CPF file. See the error for details."))
-        Set status = ex.AsStatus()
+        Return ex.AsStatus()
     }
-    Return status
+    Return $$$OK
 }
 
 ClassMethod MergeCPF(file As %String)
@@ -56,9 +69,9 @@ ClassMethod MergeCPF(file As %String)
     //      Figure out why ##class(Config.CPF).Merge() doesn't work
     //      c.f. https://github.com/intersystems/ipm/pull/703#discussion_r1917290136
 
-    Set args($Increment(args)) = "merge"
-    Set args($Increment(args)) = ##class(%SYS.System).GetInstanceName()
-    Set args($Increment(args)) = file
+    Set args($INCREMENT(args)) = "merge"
+    Set args($INCREMENT(args)) = ##class(%SYS.System).GetInstanceName()
+    Set args($INCREMENT(args)) = file
 
     // Somehow, if the STDOUT is not set, the merge will silently fail
     Set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
