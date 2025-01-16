@@ -9,7 +9,7 @@
       <Resource Name="PhaseConfig.Main.CLS"></Resource>
       <Invoke Class="PhaseConfig.Main" Method="AfterCompile" Phase="Compile" When="After" />
       <Invoke Class="PhaseConfig.Main" Method="BeforeVerify" Phase="Verify" When="Before" />
-      <Invoke Class="PhaseConfig.Main" Method="MyPhase" CustomPhase="Custom" />
+      <Invoke Class="PhaseConfig.Main" Method="MyPhase" CustomPhase="CustomPhase" />
     </Module>
   </Document>
 </Export>

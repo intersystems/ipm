@@ -49,7 +49,7 @@ Method TestPhaseConfig()
     }
 
     Do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    Set tSC = ##class(%IPM.Main).Shell($$$FormatText("%1 custom -env %2", packageName, envPath))
+    Set tSC = ##class(%IPM.Main).Shell($$$FormatText("%1 CustomPhase -env %2", packageName, envPath))
     Do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
     Do $$$AssertStatusOK(tSC, "Ran custom phase ""MyPhase"" successfully")
     Do $$$AssertTrue(..FindStringInMultiDimArray("MyPhase: zzz", .output))

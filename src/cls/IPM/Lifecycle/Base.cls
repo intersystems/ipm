@@ -120,6 +120,10 @@ ClassMethod GetDefaultResourceProcessorProc(pLifecycleClass As %Dictionary.Class
 /// This method defines what a complete phase means for a given list of phases
 ClassMethod GetCompletePhases(pPhases As %List) As %List
 {
+	// If there is only phase, and the phase is not found in standard phases, it is a custom phase. Return as-is.
+	If ($ListLength(pPhases) = 1) && ('$ListFind(..#PHASES, $List(pPhases,1))) {
+		Return pPhases
+	}
 	For i=1:1:$ListLength(pPhases) {
 		Set tPhasesList = ..GetCompletePhasesForOne($List(pPhases,i))
 		For j=1:1:$ListLength(tPhasesList) Set one = $List(tPhasesList,j) If one'="" Set tPhasesArray(one) = ""
