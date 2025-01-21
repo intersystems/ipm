@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #635: When calling the "package" command, the directory is now normalized to include trailing slash (or backslash).
 - #696: Fix a bug that caused error status to be ignored when publishing a module.
 - #700: Fix a bug due to incompatible conventions between SemVer and OCI tags
+- #669: Work with a wider variety of ORAS repos (removes _catalog call)
 
 ### Security
 -
@@ -92,7 +93,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #607: Uninstall reports deletion of non-classes
 - #606: Don't put garbage folders in tar archive
 - #652: Don't create extra needless mappings (could cause deadlock with parallel installation of dependencies)
-- #669: Work with a wider variety of ORAS repos (removes _catalog call)
 
 ### Deprecated
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
