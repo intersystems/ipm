@@ -92,6 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #607: Uninstall reports deletion of non-classes
 - #606: Don't put garbage folders in tar archive
 - #652: Don't create extra needless mappings (could cause deadlock with parallel installation of dependencies)
+- #669: Work with a wider variety of ORAS repos (removes _catalog call)
 
 ### Deprecated
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
