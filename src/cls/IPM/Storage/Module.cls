@@ -177,11 +177,23 @@ Method GetCustomPhases(Output pPhases)
     Set key = ""
     For {
         Set tInvoke = ..Invokes.GetNext(.key)
-        Quit:(key = "")
+		If key = "" {
+			Quit
+		}
         If (tInvoke.CustomPhase '= "") {
             Set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
         }
     }
+	For {
+		Set tResource = ..Resources.GetNext(.key)
+		If key = "" {
+			Quit
+		}
+		Set tProcessor = tResource.Processor
+		If ($ClassName(tProcessor) = "%IPM.ResourceProcessor.CPF") && (tProcessor.CustomPhase '= "") {
+			Set pPhases($$$lcase(tProcessor.CustomPhase)) = tProcessor.CustomPhase
+		}
+	}
 }
 
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
@@ -350,7 +362,20 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
         }
         Quit:$$$ISERR(tSC)
 
-        If 'tIsCustomPhase {
+        If tIsCustomPhase {
+			// Handle CPF merges in custom phases
+			Set tKey = ""
+			For {
+				Set tResource = tModule.Resources.GetNext(.tKey)
+				If tKey = "" {
+					Quit
+				}
+				Set tProcessor = tResource.Processor
+				If ($ClassName(tProcessor) = "%IPM.ResourceProcessor.CPF") && (tProcessor.CustomPhase = tOnePhase) {
+					$$$ThrowOnError(tProcessor.DoMerge(.pParams))
+				}
+			}
+		} Else {
             // Lifecycle before / (phase) / after
             $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
             $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
@@ -1612,4 +1637,3 @@ Storage Default
 }
 
 }
-

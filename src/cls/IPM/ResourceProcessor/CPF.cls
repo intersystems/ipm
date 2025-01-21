@@ -26,7 +26,7 @@ Property When As %IPM.DataType.PhaseWhen [ InitialExpression = "Before" ];
 
 Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 {
-    If (..When = "Before") && (..Phase = pPhase) && ($Get(..CustomPhase) = "") {
+    If (..When = "Before") && (..Phase = pPhase) && (..CustomPhase = "") {
         Quit ..DoMerge(.pParams)
     }
     Quit $$$OK
@@ -34,7 +34,7 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 
 Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 {
-    If (..When = "After") && (..Phase = pPhase) && ($Get(..CustomPhase) = "") {
+    If (..When = "After") && (..Phase = pPhase) && (..CustomPhase = "") {
         Quit ..DoMerge(.pParams)
     }
     Quit $$$OK
@@ -45,10 +45,16 @@ Method DoMerge(ByRef pParams) As %Status
     Try {
         Set verbose = $GET(pParams("Verbose"))
         Set root = ..ResourceReference.Module.Root
+        Set sourcesRoot = ..ResourceReference.Module.SourcesRoot
         // Use Construct first, rather than NormalizeFilename, so we don't have to deal with leading/trailing slashes
         Set dir = $SELECT($$$isWINDOWS: $REPLACE(..Directory, "/", "\"), 1: ..Directory)
-        Set dir = ##class(%File).Construct(root, dir)
+        Set dir = ##class(%File).Construct(root, sourcesRoot, dir)
         Set filename = ##class(%File).NormalizeFilename(..Name, dir)
+        If filename = "" {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
+        } ElseIf '##class(%File).Exists(filename) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found", filename)))
+        }
 
         Set stream = ##class(%Stream.FileCharacter).%New()  
         $$$ThrowOnError(stream.LinkToFile(filename))
