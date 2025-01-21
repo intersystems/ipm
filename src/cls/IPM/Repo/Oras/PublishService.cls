@@ -1,12 +1,14 @@
+Include %IPM.Common
+
 Class %IPM.Repo.Oras.PublishService Extends (%IPM.Repo.Oras.PackageService, %IPM.Repo.IPublishService)
 {
 
-Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Boolean
+Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
 {
 	Set status = $$$OK
     Try {
 		Set repo = pModule.Name
-		Set tag = pModule.VersionString
+		Set tag = $$$Semver2Tag(pModule.VersionString)
 
 		#; Use a temp directory
 		Set tDir = $$$FileTempDir
@@ -85,7 +87,7 @@ ClassMethod Push(registry As %String, package As %String, namespace As %String, 
 {
 	#; Remove the tag from the package name if it exists and add it to tags
 	Set repo = $piece(package, ":", 1)
-	Set tag = $piece(package, ":", 2)
+	Set tag = $$$Semver2Tag($piece(package, ":", 2))
 	If tag '= "" { Set tags = tags _ "," _ tag }
 	If tags = "" {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Must specify version."))
@@ -108,31 +110,31 @@ ClassMethod PushPy(registry As %String, package As %String, namespace As %String
 	import iris
 	import os, sys
 	import json
+	import re
 
 	# Get all files in the directory and fully specify path
-	files = os.listdir(directoryPath)
-	result = map(lambda x: directoryPath + x, files)
-	file_paths = list(result)
-
+	file_paths = [os.path.join(directoryPath, f) for f in os.listdir(directoryPath)]
 	client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenAuthMethod)
+	regex = re.compile(r"^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$")
 
 	# Push once for each tag
 	for tag in tags.split(","):
-		if tag == "":
-			continue
+		if not regex.search(tag):
+			raise ValueError(f"Invalid OCI tag: {tag}")
 
 		# Annotations are manifest.xml and other metadata
 		manifest_annotations = json.loads(metadata)
 
+        # TODO write a context manager for stdout/stderr redirection
         # Suppress console output
 		sys.stdout = open(os.devnull, "w")
 
-		target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
-
 		try:
+			target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
 			res = client.push(files=file_paths, target=target, disable_path_validation=True, manifest_annotations=manifest_annotations)
 		except Exception as e:
-			print("Error: ", repr(e))
+			print("Error: ", repr(e), file=sys.stderr)
+			sys.stdout = sys.__stdout__
 			raise e
 
 		# Reenable console output
