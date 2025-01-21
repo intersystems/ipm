@@ -5,9 +5,20 @@
       <Name>cpf-merge</Name>
       <Version>0.0.1</Version>
       <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+
+      <!-- By default, the CPF merge happens right before Initialize -->
       <CPF Name="config-globals.cpf"/>
-      <CPF Name="actions.cpf" Directory="custom-cpf-directory"/>
-      <CPF Name="package-mapping.cpf"/>
+
+      <!-- Optionally, make it happen after MakeDeployed -->
+      <CPF Name="actions.cpf" Directory="custom-cpf-directory" Phase="MakeDeployed" When="After"/>
+
+      <!-- Also can make it happen only for a custom phase -->
+      <CPF Name="package-mapping.cpf" CustomPhase="MyPhase" />
+
+      <!-- Both the CPF merge above and the Invoke should run during MyPhase -->
+      <Resource Name="CPFMerge.Main.CLS" />
+      <Invoke Class="CPFMerge.Main" Method="SayHello" CustomPhase="MyPhase" />
     </Module>
   </Document>
 </Export>
