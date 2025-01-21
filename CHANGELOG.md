@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #582 Added functionality to optionally see time of last update and server version of each package
 - #609 Added support for `-export-deps` when running the "Package" phase of lifecycle
 - #541 Added support for ORAS repository
-- #702 Added a new lifecycle phase `Initialize` which supports merging the new `<CPF/>` resource.
+- #704 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax
+- #702 Added a new lifecycle phase `Initialize` which is used for preload
+- #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
 
 ### Changed
 - 
@@ -23,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
 - #635: When calling the "package" command, the directory is now normalized to include trailing slash (or backslash).
 - #696: Fix a bug that caused error status to be ignored when publishing a module.
+- #700: Fix a bug due to incompatible conventions between SemVer and OCI tags
 
 ### Security
 -

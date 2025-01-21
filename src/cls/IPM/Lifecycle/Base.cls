@@ -120,6 +120,10 @@ ClassMethod GetDefaultResourceProcessorProc(pLifecycleClass As %Dictionary.Class
 /// This method defines what a complete phase means for a given list of phases
 ClassMethod GetCompletePhases(pPhases As %List) As %List
 {
+	// If there is only phase, and the phase is not found in standard phases, it is a custom phase. Return as-is.
+	If ($ListLength(pPhases) = 1) && ('$ListFind(..#PHASES, $List(pPhases,1))) {
+		Return pPhases
+	}
 	For i=1:1:$ListLength(pPhases) {
 		Set tPhasesList = ..GetCompletePhasesForOne($List(pPhases,i))
 		For j=1:1:$ListLength(tPhasesList) Set one = $List(tPhasesList,j) If one'="" Set tPhasesArray(one) = ""
@@ -548,6 +552,7 @@ Method %Reload(ByRef pParams) As %Status
 		If (tRoot = "") && tDeveloperMode {
 			Set tRoot = ..Module.Root
 		}
+		Do ..LoadEnvironmentConfig($Get(pParams("EnvFiles")))
 		
 		// For now, no-op if no root is configured.
 		Quit:tRoot=""
@@ -1809,6 +1814,19 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 		and cp.Final = 1
 		and cp.Origin = cd.Name
 		and (:pPackaging is null or cp._default = :pPackaging)
+}
+
+ClassMethod LoadEnvironmentConfig(paths As %String)
+{
+	#dim config As %IPM.General.EnvironmentConfig
+	Set config = ##class(%IPM.General.EnvironmentConfig).%Get()
+	Do config.Clear()
+	Set paths = $ListFromString(paths, ";")
+	Set ptr = 0
+	While $ListNext(paths, ptr, file) {
+		Set file = $ZStrip(file, "<>WC")
+		Do config.Load(file)
+	}
 }
 
 }

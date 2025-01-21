@@ -1,0 +1,15 @@
+{
+  "install-time-config": {
+    "nested": {
+      "non-relevant-data": "xyz"
+    },
+    "non-relevant-data": "xyz"
+  },
+  "install-time-config-dependency": {
+    "nested": {
+      "magic": 1234,
+      "non-relevant-data": "xyz"
+    },
+    "non-relevant-data": "xyz"
+  }
+}
