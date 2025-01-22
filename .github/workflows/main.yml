@@ -177,7 +177,7 @@ jobs:
           CONTAINER=$(docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
           docker cp tests/migration/v0.7-to-v0.9/. $CONTAINER:/tmp/test-package/
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          docker exec -i $CONTAINER iris session iris -UUSER << EOF 
+          docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
             s version="0.7.4" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/"_version_"/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
             zpm "list":1
             zpm "install dsw":1
