@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
 
 ### Changed
-- 
+- #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
 
 ### Fixed
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
