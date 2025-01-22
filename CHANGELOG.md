@@ -94,3 +94,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
+
