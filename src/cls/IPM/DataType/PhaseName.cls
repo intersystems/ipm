@@ -9,6 +9,6 @@ Parameter MAXLEN As INTEGER = 50;
 /// separated list (where the delimiter is the first character) of logical values.
 /// If a non-null value is present, then the attribute is restricted to values
 /// in the list, and the validation code simply checks to see if the value is in the list.
-Parameter VALUELIST = ",Clean,Initialize,Reload,*,Validate,ExportData,Compile,Activate,Document,MakeDeployed,Test,Package,Verify,Publish,Configure,Unconfigure ";
+Parameter VALUELIST = ",Clean,Initialize,Reload,*,Validate,ExportData,Compile,Activate,Document,MakeDeployed,Test,Package,Verify,Publish,Configure,Unconfigure";
 
 }
