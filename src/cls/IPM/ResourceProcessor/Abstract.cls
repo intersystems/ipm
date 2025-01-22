@@ -192,6 +192,13 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 	Quit $$$OK
 }
 
+/// Some processors may need to do something custom when a custom phase is executed.
+/// Such as the CPF processor, which optionally merges a CPF file during a custom phase.
+Method OnCustomPhase(pCustomPhase As %String, ByRef pParams) As %Status
+{
+	Quit $$$OK
+}
+
 Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 {
 	Quit $$$OK
@@ -230,7 +237,6 @@ Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.Res
 	Set pInfo = ##class(%IPM.ExtensionBase.SourceControl.ResourceInfo).%New()
 	Quit $$$OK
 }
-
 
 /// Evaluates an expression in a provided string. <br />
 /// These special expressions are case-insensitive. <br />

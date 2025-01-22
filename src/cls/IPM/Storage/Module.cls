@@ -371,8 +371,8 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 					Quit
 				}
 				Set tProcessor = tResource.Processor
-				If ($ClassName(tProcessor) = "%IPM.ResourceProcessor.CPF") && (tProcessor.CustomPhase = tOnePhase) {
-					$$$ThrowOnError(tProcessor.DoMerge(.pParams))
+				If $IsObject(tProcessor) {
+					$$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
 				}
 			}
 		} Else {
