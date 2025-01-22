@@ -3303,7 +3303,7 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module stream "_modName_" not found."))
 	}
 	If 'quiet {
-		Write !,$$$FormatText("Current version of module %1: %2", modName, mod.VersionString)
+		Write !,$$$FormatText("Current version of module %1 is: %2", modName, mod.VersionString)
 	}
 
 	// Compute the new semver
@@ -3314,6 +3314,8 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 		Set semver = mod.Version.WithBumpMinor()
 	} ElseIf versionString = "patch" {
 		Set semver = mod.Version.WithBumpPatch()
+	} ElseIf versionString = "" {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(mod.Version.ToString())
 	} Else {
 		Set semver = ##class(%IPM.General.SemanticVersion).FromString(versionString)
 	}
@@ -3331,12 +3333,18 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 	}
 
 	If 'quiet {
-		Write !,$$$FormatText("Setting version of module %1 to %2", modName, semver.ToString())
+		Write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
 	}
 
 	// Ensure semver is not lower than the current version, unless permit-downgrade is set
 	If ('permitDowngrade) && (semver.IsLowerThan(mod.Version)) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot set version to "_semver.ToString()_" as it is lower than the current version "_mod.VersionString))
+	}
+	If (semver.ToString() = mod.Version.ToString()) {
+		If 'quiet {
+			Write !,"Version is unchanged - Skipping."
+		}
+		Return
 	}
 
 	Set initTLevel = $TLevel
