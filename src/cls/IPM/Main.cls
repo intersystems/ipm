@@ -718,7 +718,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<description>
 		Updates the version of the module in the current namespace.
 	</description>
-	<parameter name="module" description="Name of the module to update the version for." />
+	<parameter name="module" required="true" description="Name of the module to update the version for." />
 	<parameter name="version" description="Either a valid SemVer string, or 'major', 'minor', 'patch'. If it's 'major', 'minor', or 'patch', will bump the cooresponding part of SemVer." />
 
 	<modifier name="prerelease" value="true" aliases="p" description="Set the prerelease to a specific value" />
@@ -3332,10 +3332,6 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 		Set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
 	}
 
-	If 'quiet {
-		Write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
-	}
-
 	// Ensure semver is not lower than the current version, unless permit-downgrade is set
 	If ('permitDowngrade) && (semver.IsLowerThan(mod.Version)) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot set version to "_semver.ToString()_" as it is lower than the current version "_mod.VersionString))
@@ -3345,6 +3341,10 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 			Write !,"Version is unchanged - Skipping."
 		}
 		Return
+	}
+
+	If 'quiet {
+		Write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
 	}
 
 	Set initTLevel = $TLevel
