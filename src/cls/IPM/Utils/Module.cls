@@ -2369,4 +2369,26 @@ ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %Strin
 	Quit tString
 }
 
+ClassMethod UpdateSemverInStream(stream As %Stream.Object, semver As %IPM.General.SemanticVersion)
+{
+	Set regex = "<Version>(.*?)</Version>"
+	Set content = ""
+	Do stream.Rewind()
+	While 'stream.AtEnd {
+		Set content = content _ stream.Read()
+	}
+	Set start = $LOCATE(content, regex, 0, end, val)
+	If start {
+		Set content = $EXTRACT(content, 1, start - 1) 
+			_ "<Version>" _ semver.ToString() _ "</Version>" 
+			_ $EXTRACT(content, end, *)
+	} Else {
+		$$$ThrowStatus($$$ERROR($$$GeneralError, "Version tag not found in: "_content))
+	}
+
+	Do stream.Clear()
+	Do stream.Rewind()
+	Do stream.Write(content)
+}
+
 }
