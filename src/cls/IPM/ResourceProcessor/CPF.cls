@@ -7,7 +7,7 @@ Class %IPM.ResourceProcessor.CPF Extends %IPM.ResourceProcessor.Abstract
 Parameter ATTRIBUTES As STRING = "Name,Directory,Phase,CustomPhase,When";
 
 /// Description of resource processor class (shown in UI)
-Parameter DESCRIPTION As STRING = "Merges the specified CPF file in the ""Initialize"" lifecycle phase.";
+Parameter DESCRIPTION As STRING = "Merges the specified CPF file in the specified lifecycle phase (""Initialize"" by default).";
 
 /// Directory containing the CPF file to merge
 Property Directory As %IPM.DataType.ResourceDirectory [ InitialExpression = "cpf" ];
