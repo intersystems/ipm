@@ -3298,7 +3298,10 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 	If mod = "" {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_modName_" not found."))
 	}
-	$$$ThrowOnError(sc)
+	Set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(modName)
+	If stream = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module stream "_modName_" not found."))
+	}
 	If 'quiet {
 		Write !,$$$FormatText("Current version of module %1: %2", modName, mod.VersionString)
 	}
@@ -3336,9 +3339,20 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot set version to "_semver.ToString()_" as it is lower than the current version "_mod.VersionString))
 	}
 
-	Set mod.Version = semver
-	Set mod.VersionString = semver.ToString()
-	$$$ThrowOnError(mod.%Save())
+	Set initTLevel = $TLevel
+	TSTART
+	Try {
+		Set mod.Version = semver
+		Set mod.VersionString = semver.ToString()
+		$$$ThrowOnError(mod.%Save())
+		Do stream.UpdateVersion(semver)
+		TCOMMIT
+	} Catch ex {
+		While ($TLevel > initTLevel) {
+			TROLLBACK 1
+		}
+		Throw ex
+	}
 }
 
 /// Get the mapping relationship for %IPM package. Format: 
