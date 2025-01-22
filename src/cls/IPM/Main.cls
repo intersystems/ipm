@@ -714,6 +714,32 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</example>
 </command>
 
+<command name="module-version" aliases="modver">
+	<description>
+		Updates the version of the module in the current namespace.
+	</description>
+	<parameter name="module" description="Name of the module to update the version for." />
+	<parameter name="version" description="Either a valid SemVer string, or 'major', 'minor', 'patch'. If it's 'major', 'minor', or 'patch', will bump the cooresponding part of SemVer." />
+
+	<modifier name="prerelease" value="true" aliases="p" description="Set the prerelease to a specific value" />
+	<modifier name="build" value="true" aliases="b" description="Set the build to a specific value" />
+	<modifier name="permit-downgrade" description="Permit the version to be downgraded. By default, trying to downgrade the version will fail" />
+	<modifier name="quiet" aliases="q" description="Suppress output (except for errors)" />
+
+	<example description="Sets the version of the module HS.JSON to 1.2.3">
+		module-version HS.JSON 1.2.3
+	</example>
+	<example description="Bump the major version the module HS.JSON. If current version is 1.2.3, the new version will be 2.0.0">
+		module-version HS.JSON major
+	</example>
+	<example description="Bump the minor version and set prerelease to 'alpha' and build to 'xyz'. If current version is 1.2.3, the new version will be 1.3.0-alpha+xyz">
+		module-version HS.JSON minor -prerelease alpha -build xyz
+	</example>
+	<example description="Downgrade the version to 1.2.3. If the current version is 1.3.0, this will still work because the permit-downgrade flag is set.">
+		module-version HS.JSON 1.2.3 -permit-downgrade
+	</example>
+</command>
+
 </commands>
 }
 
@@ -890,6 +916,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..EnableIPM(.tCommandInfo)
 			} ElseIf (tCommandInfo = "unmap") {
 				Do ..UnmapIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "module-version") {
+				Do ..ModuleVersion(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -3256,6 +3284,61 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 		$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
 		$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
 	}
+}
+
+ClassMethod ModuleVersion(ByRef pCommandInfo)
+{
+	Set modName = $Get(pCommandInfo("parameters","module"))
+	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	Set permitDowngrade = $$$HasModifier(pCommandInfo,"permit-downgrade")
+	If (modName = "") {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"No module name specified."))
+	}
+	Set mod = ##class(%IPM.Storage.Module).NameOpen(modName,.sc)
+	If mod = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_modName_" not found."))
+	}
+	$$$ThrowOnError(sc)
+	If 'quiet {
+		Write !,$$$FormatText("Current version of module %1: %2", modName, mod.VersionString)
+	}
+
+	// Compute the new semver
+	Set versionString = $Get(pCommandInfo("parameters","version"))
+	If versionString = "major" {
+		Set semver = mod.Version.WithBumpMajor()
+	} ElseIf versionString = "minor" {
+		Set semver = mod.Version.WithBumpMinor()
+	} ElseIf versionString = "patch" {
+		Set semver = mod.Version.WithBumpPatch()
+	} Else {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(versionString)
+	}
+
+	// Validate the semver
+	If 'semver.%ValidateObject() {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Invalid version string: "_versionString))
+	}
+
+	If $$$HasModifier(pCommandInfo,"prerelease") {
+		Set semver = semver.WithPrerelease($$$GetModifier(pCommandInfo,"prerelease"))
+	}
+	If $$$HasModifier(pCommandInfo,"build") {
+		Set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
+	}
+
+	If 'quiet {
+		Write !,$$$FormatText("Setting version of module %1 to %2", modName, semver.ToString())
+	}
+
+	// Ensure semver is not lower than the current version, unless permit-downgrade is set
+	If ('permitDowngrade) && (semver.IsLowerThan(mod.Version)) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot set version to "_semver.ToString()_" as it is lower than the current version "_mod.VersionString))
+	}
+
+	Set mod.Version = semver
+	Set mod.VersionString = semver.ToString()
+	$$$ThrowOnError(mod.%Save())
 }
 
 /// Get the mapping relationship for %IPM package. Format: 

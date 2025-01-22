@@ -206,6 +206,68 @@ Method Satisfies(pExpression As %IPM.General.SemanticVersionExpression) As %Bool
 	Quit pExpression.IsSatisfiedBy($this)
 }
 
+Method WithBumpMajor() As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major + 1
+	Set tVer.Minor = 0
+	Set tVer.Patch = 0
+	Set tVer.Prerelease = ""
+	Set tVer.Build = ""
+	Quit tVer
+}
+
+Method WithBumpMinor() As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major
+	Set tVer.Minor = ..Minor + 1
+	Set tVer.Patch = 0
+	Set tVer.Prerelease = ""
+	Set tVer.Build = ""
+	Quit tVer
+}
+
+Method WithBumpPatch() As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major
+	Set tVer.Minor = ..Minor
+	Set tVer.Patch = ..Patch + 1
+	Set tVer.Prerelease = ""
+	Set tVer.Build = ""
+	Quit tVer
+}
+
+Method WithPrerelease(pPrerelease As %String) As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major
+	Set tVer.Minor = ..Minor
+	Set tVer.Patch = ..Patch
+	Set tVer.Prerelease = pPrerelease
+	Set tVer.Build = ..Build
+	Quit tVer
+}
+
+Method WithBuild(pBuild As %String) As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major
+	Set tVer.Minor = ..Minor
+	Set tVer.Patch = ..Patch
+	Set tVer.Prerelease = ..Prerelease
+	Set tVer.Build = pBuild
+	Quit tVer
+}
+
+Method IsLowerThan(pVersion As %IPM.General.SemanticVersion) As %Boolean
+{
+	Quit (..Major < pVersion.Major) || 
+		((..Major = pVersion.Major) && (..Minor < pVersion.Minor)) || 
+		((..Major = pVersion.Major) && (..Minor = pVersion.Minor) && (..Patch < pVersion.Patch))
+}
+
 Storage Default
 {
 <Data name="SemanticVersionState">
