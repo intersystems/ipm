@@ -3,7 +3,7 @@
   <Document name="mv.ZPM">
     <Module>
       <Name>mv</Name>
-      <Version>0.0.1-snapshot+build</Version>
+      <Version>0.0.2-snapshot+build</Version>
       <Packaging>module</Packaging>
       <SystemRequirements/>
     </Module>
