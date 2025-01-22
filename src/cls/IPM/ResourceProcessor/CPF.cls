@@ -50,10 +50,8 @@ Method DoMerge(ByRef pParams) As %Status
         Set dir = $SELECT($$$isWINDOWS: $REPLACE(..Directory, "/", "\"), 1: ..Directory)
         Set dir = ##class(%File).Construct(root, sourcesRoot, dir)
         Set filename = ##class(%File).NormalizeFilename(..Name, dir)
-        If filename = "" {
+        If (filename = "") || ('##class(%File).Exists(filename)) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
-        } ElseIf '##class(%File).Exists(filename) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found", filename)))
         }
 
         Set stream = ##class(%Stream.FileCharacter).%New()  
