@@ -190,8 +190,11 @@ Method GetCustomPhases(Output pPhases)
 			Quit
 		}
 		Set tProcessor = tResource.Processor
-		If ($ClassName(tProcessor) = "%IPM.ResourceProcessor.CPF") && (tProcessor.CustomPhase '= "") {
-			Set pPhases($$$lcase(tProcessor.CustomPhase)) = tProcessor.CustomPhase
+		If ($$$comMemberDefined($ClassName(tProcessor), $$$cCLASSproperty, "CustomPhase")) {
+			Set cp = tProcessor.CustomPhase
+			If cp '= "" {
+				Set pPhases($$$lcase(cp)) = cp
+			}
 		}
 	}
 }
@@ -363,19 +366,18 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
         Quit:$$$ISERR(tSC)
 
         If tIsCustomPhase {
-			// Handle CPF merges in custom phases
-			Set tKey = ""
-			For {
-				Set tResource = tModule.Resources.GetNext(.tKey)
-				If tKey = "" {
-					Quit
-				}
-				Set tProcessor = tResource.Processor
-				If $IsObject(tProcessor) {
-					$$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
-				}
-			}
-		} Else {
+            Set tKey = ""
+            For {
+                Set tResource = tModule.Resources.GetNext(.tKey)
+                If tKey = "" {
+                    Quit
+                }
+                Set tProcessor = tResource.Processor
+                If $IsObject(tProcessor) && $$$comMemberDefined($ClassName(tProcessor), $$$cCLASSmethod, "OnCustomPhase") {
+                    $$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
+                }
+            }
+        } Else {
             // Lifecycle before / (phase) / after
             $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
             $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
