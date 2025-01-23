@@ -23,7 +23,10 @@ Method TestOrasTagConversion()
     Do $$$AssertStatusOK(tSC,"Uninstalled module successfully")
 
     Set tSC = ##class(%IPM.Main).Shell("install oras-tag")
-    Do $$$AssertStatusOK(tSC,"Installed module from ORAS registry successfully")
+    If '$$$AssertStatusOK(tSC,"Installed module from ORAS registry successfully") {
+        Zwrite %objlasterror
+        Zwrite tSC
+    }
 
     Set tSC = ##class(%IPM.Main).Shell("repo -delete-all")
     Do $$$AssertStatusOK(tSC,"Deleted repos successfully")
