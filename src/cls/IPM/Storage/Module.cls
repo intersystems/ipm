@@ -190,7 +190,8 @@ Method GetCustomPhases(Output pPhases)
 			Quit
 		}
 		Set tProcessor = tResource.Processor
-		If ($$$comMemberDefined($ClassName(tProcessor), $$$cCLASSproperty, "CustomPhase")) {
+		// %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+		If tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
 			Set cp = tProcessor.CustomPhase
 			If cp '= "" {
 				Set pPhases($$$lcase(cp)) = cp
@@ -373,7 +374,8 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
                     Quit
                 }
                 Set tProcessor = tResource.Processor
-                If $IsObject(tProcessor) && $$$comMemberDefined($ClassName(tProcessor), $$$cCLASSmethod, "OnCustomPhase") {
+                // %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+                If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
                     $$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
                 }
             }

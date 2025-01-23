@@ -1,6 +1,6 @@
 Include %IPM.Formatting
 
-Class %IPM.ResourceProcessor.CPF Extends %IPM.ResourceProcessor.Abstract
+Class %IPM.ResourceProcessor.CPF Extends (%IPM.ResourceProcessor.Abstract, %IPM.ResourceProcessor.CustomPhaseMixin)
 {
 
 /// Comma-separated list of resource attribute names that this processor uses
@@ -40,8 +40,6 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
     Quit $$$OK
 }
 
-/// Some processors may need to do something custom when a custom phase is executed.
-/// Such as the CPF processor, which optionally merges a CPF file during a custom phase.
 Method OnCustomPhase(pCustomPhase As %String, ByRef pParams) As %Status
 {
     If (..CustomPhase = pCustomPhase) {
