@@ -191,7 +191,7 @@ Method GetCustomPhases(Output pPhases)
 		}
 		Set tProcessor = tResource.Processor
 		// %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
-		If tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+		If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
 			Set cp = tProcessor.CustomPhase
 			If cp '= "" {
 				Set pPhases($$$lcase(cp)) = cp
