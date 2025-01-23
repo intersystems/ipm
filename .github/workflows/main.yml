@@ -50,10 +50,6 @@ jobs:
         image: ${{ fromJson(github.event.inputs.IMAGE || needs.prepare.outputs.images) }}
     runs-on: ubuntu-latest
     steps:
-      - name: debug
-        run: |
-          echo "matrix image: ${{ matrix.image }}"
-          echo "needs.prepare.outputs.main: ${{ needs.prepare.outputs.main }}"
       - uses: actions/checkout@master
       - name: Set image
         id: image
