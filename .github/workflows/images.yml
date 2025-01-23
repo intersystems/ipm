@@ -40,8 +40,8 @@ jobs:
           done;
           echo images="[${images%?}]" >> $GITHUB_OUTPUT
 
-          // The syntax GitHub expects is `main=string`, rather than `main="string"`
-          // I think this is way too confusing and makes no sense.
-          // Even for bash, `main=string` and `main="string"` should be equivalent.
+          # The syntax GitHub expects is `main=string`, rather than `main="string"`
+          # I think this is way too confusing and makes no sense.
+          # Even for bash, `main=string` and `main="string"` should be equivalent except for $var expansions.
           main=$(echo ${images%%,*} | awk -F'"' '{print $2}')
           echo "main=$main" >> $GITHUB_OUTPUT
