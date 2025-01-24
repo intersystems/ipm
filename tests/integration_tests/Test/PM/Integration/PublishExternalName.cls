@@ -12,13 +12,13 @@ Method TestExternalName()
     Set moduleDir = ..GetModuleDir(..#Folder)
 
     Set sc = ##class(%IPM.Main).Shell("repo -delete-all")
-    Do $$$AssertStatusOK(moduleDir, "Deleted all repos")
+    Do $$$AssertStatusOK(sc, "Deleted all repos")
 
     Set sc = ##class(%IPM.Main).Shell("repo -o -name oras -url http://oras:5000 -publish 1")
     Do $$$AssertStatusOK(sc, "Added ORAS repo")
 
     Set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir))
-    Do $$$AssertStatusOK(moduleDir, "Loaded module")
+    Do $$$AssertStatusOK(sc, "Loaded module")
 
     Set sc = ##class(%IPM.Main).Shell($$$FormatText("publish %1 -use-ext", ..#DefaultName))
     Do $$$AssertStatusOK(sc, "Published module with default name")
@@ -30,10 +30,10 @@ Method TestExternalName()
     Do $$$AssertStatusOK(sc, "Installed module by external name")
 
     Set sc = ##class(%IPM.Main).Shell("repo -delete-all")
-    Do $$$AssertStatusOK(moduleDir, "Deleted all repos")
+    Do $$$AssertStatusOK(sc, "Deleted all repos")
 
     Set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
-    Do $$$AssertStatusOK(moduleDir, "Reset repos to default")
+    Do $$$AssertStatusOK(sc, "Reset repos to default")
 }
 
 }
