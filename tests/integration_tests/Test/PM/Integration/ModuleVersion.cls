@@ -83,19 +83,6 @@ Method TestModuleVersion()
         Set content = stream.Contents.Read()
         Do $$$AssertTrue(content [ ("<Version>"_expected_"</Version>"))
         Do $$$AssertNotTrue(content [ ("<Version>"_..#OriginalVersion_"</Version>"))
-
-        Kill fileStream
-	      Set fileStream = ##class(%Stream.FileCharacter).%New()
-        Set sc = fileStream.LinkToFile(##class(%File).NormalizeFilename("module.xml", modDir))
-        Do $$$AssertStatusOK(sc, "File stream linked successfully")
-        Do fileStream.Rewind()
-        Set fileContent = fileStream.Read()
-        Do $$$AssertTrue(fileContent [ ("<Version>"_expected_"</Version>"))
-        Do $$$AssertNotTrue(fileContent [ ("<Version>"_..#OriginalVersion_"</Version>"))
-
-        // Cleanup
-        Set sc = ##class(%IPM.Main).Shell("modver mv " _ ..#OriginalVersion _ " -permit-downgrade")
-        Do $$$AssertStatusOK(sc, "Module version reverted back")
     }
 }
 

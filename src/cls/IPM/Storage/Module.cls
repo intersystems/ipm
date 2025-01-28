@@ -1494,24 +1494,6 @@ Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 	Quit $$$OK
 }
 
-/// Update both the object and the module XML file with the new version.
-Method UpdateVersion(semver As %IPM.General.SemanticVersion)
-{
-	Set moduleXML = ##class(%File).NormalizeFilename("module.xml", ..Root)
-	If '##class(%File).Exists(moduleXML) {
-		$$$ThrowStatus($$$ERROR($$$GeneralError,"Module XML file not found: "_moduleXML))	
-	}
-
-	Set stream = ##class(%Stream.FileCharacter).%New()
-	$$$ThrowOnError(stream.LinkToFile(moduleXML))
-	Do ##class(%IPM.Utils.Module).UpdateSemverInStream(stream, semver)
-	Do stream.%Save()
-
-	Set ..Version = semver
-	Set ..VersionString = semver.ToString()
-	$$$ThrowOnError(..%Save())
-}
-
 Method %EvaluateExpression(pExpr) As %String [ Internal ]
 {
   Try {
@@ -1630,3 +1612,4 @@ Storage Default
 }
 
 }
+

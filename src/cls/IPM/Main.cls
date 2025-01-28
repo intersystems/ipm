@@ -3350,8 +3350,10 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 	Set initTLevel = $TLevel
 	TSTART
 	Try {
+		Set mod.Version = semver
+		Set mod.VersionString = semver.ToString()
+		$$$ThrowOnError(mod.%Save())
 		Do stream.UpdateVersion(semver)
-		Do mod.UpdateVersion(semver)
 		TCOMMIT
 	} Catch ex {
 		While ($TLevel > initTLevel) {
