@@ -261,13 +261,6 @@ Method WithBuild(pBuild As %String) As %IPM.General.SemanticVersion
 	Quit tVer
 }
 
-Method IsLowerThan(pVersion As %IPM.General.SemanticVersion) As %Boolean
-{
-	Quit (..Major < pVersion.Major) || 
-		((..Major = pVersion.Major) && (..Minor < pVersion.Minor)) || 
-		((..Major = pVersion.Major) && (..Minor = pVersion.Minor) && (..Patch < pVersion.Patch))
-}
-
 Storage Default
 {
 <Data name="SemanticVersionState">

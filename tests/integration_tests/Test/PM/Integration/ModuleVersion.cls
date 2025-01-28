@@ -7,7 +7,7 @@ XData AllCases [ MimeType = application/json ]
 {
 [
   {
-    "args": "major -prerelease alpha",
+    "args": "major -prerelease alpha -force",
     "expected": "1.0.0-alpha"
   },
   {
@@ -19,11 +19,15 @@ XData AllCases [ MimeType = application/json ]
     "expected": "0.0.3"
   },
   {
-    "args": "-prerelease alpha -build mybuild",
+    "args": "-prerelease alpha -build mybuild -force",
     "expected": "0.0.2-alpha+mybuild"
   },
   {
     "args": "3.4.5-abc+xyz",
+    "expected": ""
+  },
+  {
+    "args": "3.4.5-abc+xyz -force",
     "expected": "3.4.5-abc+xyz"
   },
   {
@@ -35,7 +39,7 @@ XData AllCases [ MimeType = application/json ]
     "expected": ""
   },
   {
-    "args": "0.0.1 -permit-downgrade",
+    "args": "0.0.1 -force",
     "expected": "0.0.1"
   },
   {

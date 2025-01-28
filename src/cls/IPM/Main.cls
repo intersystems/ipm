@@ -723,7 +723,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 
 	<modifier name="prerelease" value="true" aliases="p" description="Set the prerelease to a specific value" />
 	<modifier name="build" value="true" aliases="b" description="Set the build to a specific value" />
-	<modifier name="permit-downgrade" description="Permit the version to be downgraded. By default, trying to downgrade the version will fail" />
+	<modifier name="force" description="Permit the version to be downgraded. By default, trying to downgrade the version will fail" />
 	<modifier name="quiet" aliases="q" description="Suppress output (except for errors)" />
 
 	<example description="Sets the version of the module HS.JSON to 1.2.3">
@@ -735,8 +735,8 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Bump the minor version and set prerelease to 'alpha' and build to 'xyz'. If current version is 1.2.3, the new version will be 1.3.0-alpha+xyz">
 		module-version HS.JSON minor -prerelease alpha -build xyz
 	</example>
-	<example description="Downgrade the version to 1.2.3. If the current version is 1.3.0, this will still work because the permit-downgrade flag is set.">
-		module-version HS.JSON 1.2.3 -permit-downgrade
+	<example description="Downgrade the version to 1.2.3. If the current version is 1.3.0, this will still work because the force flag is set.">
+		module-version HS.JSON 1.2.3 -force
 	</example>
 </command>
 
@@ -3290,7 +3290,7 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 {
 	Set modName = $Get(pCommandInfo("parameters","module"))
 	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
-	Set permitDowngrade = $$$HasModifier(pCommandInfo,"permit-downgrade")
+	Set force = $$$HasModifier(pCommandInfo,"force")
 	If (modName = "") {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"No module name specified."))
 	}
@@ -3332,9 +3332,12 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 		Set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
 	}
 
-	// Ensure semver is not lower than the current version, unless permit-downgrade is set
-	If ('permitDowngrade) && (semver.IsLowerThan(mod.Version)) {
-		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot set version to "_semver.ToString()_" as it is lower than the current version "_mod.VersionString))
+	// Ensure semver is not lower than the current version, unless force is set
+	If ('force) && ('semver.Follows(mod.Version)) {
+		Set msg = $$$FormatText("Cannot set version to %1 as it is not strictly higher than the current version %2 (Use -force to override)", semver.ToString(), mod.VersionString)
+		Set msg = msg _ $Char(10, 13) _ "Note: when either version has a nonempty prerelease value, and differ from the other by major.minor.patch, neither version is considered strictly higher than the other."
+		Set msg = msg _ $Char(10, 13) _ "      See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags for more information."
+		$$$ThrowOnError($$$ERROR($$$GeneralError, msg))
 	}
 	If (semver.ToString() = mod.Version.ToString()) {
 		If 'quiet {
