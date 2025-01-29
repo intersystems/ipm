@@ -3351,17 +3351,27 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 	}
 
 	Set initTLevel = $TLevel
+	Set ex = $$$NULLOREF
 	TSTART
 	Try {
+		New %SourceControl
+		Set docName = modName_".ZPM"
+		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		If $IsObject($Get(%SourceControl)) {
+			Write !,"Checking out "_docName
+			$$$ThrowOnError(%SourceControl.CheckOut(docName))
+		}
 		Set mod.Version = semver
 		Set mod.VersionString = semver.ToString()
 		$$$ThrowOnError(mod.%Save())
-		Do stream.UpdateVersion(semver)
+		Do ##class(%IPM.StudioDocument.Module).UpdateVersion(modName,semver)
 		TCOMMIT
 	} Catch ex {
-		While ($TLevel > initTLevel) {
-			TROLLBACK 1
-		}
+	}
+	While ($TLevel > initTLevel) {
+		TROLLBACK 1
+	}
+	If $IsObject(ex) {
 		Throw ex
 	}
 }
