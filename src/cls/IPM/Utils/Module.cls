@@ -1224,17 +1224,6 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			}
 		}
 		
-		Set tPath = pDirectory_"preload"
-		If ##class(%File).DirectoryExists(tPath) {
-			// Load first, update legacy superclasses, then compile
-			Set tSC = $system.OBJ.ImportDir(tPath,,$Select(tVerbose:"d",1:"-d")_$Select($TLevel:"/multicompile=0",1:""),,1,.tImported)
-			$$$ThrowOnError(tSC)
-			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
-			$$$ThrowOnError(tSC)
-		} Else {
-			Write:tVerbose !,"Skipping preload - directory does not exist."
-		}
-  
 		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
 		$$$ThrowOnError(tSC)
 		Set tSC = tModule.%Reload()

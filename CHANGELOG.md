@@ -14,12 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #582 Added functionality to optionally see time of last update and server version of each package
 - #609 Added support for `-export-deps` when running the "Package" phase of lifecycle
 - #541 Added support for ORAS repository
+- #702 Added a new lifecycle phase `Initialize` which is used for preload
+- #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
 - #704 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax
 - #710 Added support for `module-version` command which updates the version of a module
 - #716 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. 
 
 ### Changed
-- 
+- #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
 
 ### Fixed
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)

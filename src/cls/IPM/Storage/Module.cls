@@ -177,11 +177,27 @@ Method GetCustomPhases(Output pPhases)
     Set key = ""
     For {
         Set tInvoke = ..Invokes.GetNext(.key)
-        Quit:(key = "")
+		If key = "" {
+			Quit
+		}
         If (tInvoke.CustomPhase '= "") {
             Set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
         }
     }
+	For {
+		Set tResource = ..Resources.GetNext(.key)
+		If key = "" {
+			Quit
+		}
+		Set tProcessor = tResource.Processor
+		// %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+		If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+			Set cp = tProcessor.CustomPhase
+			If cp '= "" {
+				Set pPhases($$$lcase(cp)) = cp
+			}
+		}
+	}
 }
 
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
@@ -350,7 +366,20 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
         }
         Quit:$$$ISERR(tSC)
 
-        If 'tIsCustomPhase {
+        If tIsCustomPhase {
+            Set tKey = ""
+            For {
+                Set tResource = tModule.Resources.GetNext(.tKey)
+                If tKey = "" {
+                    Quit
+                }
+                Set tProcessor = tResource.Processor
+                // %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+                If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+                    $$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
+                }
+            }
+        } Else {
             // Lifecycle before / (phase) / after
             $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
             $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
@@ -1612,4 +1641,3 @@ Storage Default
 }
 
 }
-
