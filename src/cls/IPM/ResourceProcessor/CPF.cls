@@ -18,9 +18,6 @@ Property Name As %IPM.DataType.ResourceName [ Required ];
 /// The phase before/after which the CPF file should be merged
 Property Phase As %IPM.DataType.PhaseName [ InitialExpression = "Initialize" ];
 
-/// If provided, the Phase property will be ignored. The CPF merge will happen during this custom phase.
-Property CustomPhase As %IPM.DataType.CustomPhaseName;
-
 /// When to merge the CPF file: Before or After the specified phase. This only applies to the standard phases.
 Property When As %IPM.DataType.PhaseWhen [ InitialExpression = "Before" ];
 
