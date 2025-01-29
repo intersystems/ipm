@@ -1369,6 +1369,7 @@ Method %Publish(ByRef pParams) As %Status
 		Set tRelease = $Get(pParams("Release"),$Get(pParams("zpm","Release"),0))
 		Set tPublishTo = $Get(pParams("PublishTo"),$Get(pParams("zpm","PublishTo"),""))
 		Set tNewVersion = $Get(pParams("NewVersion"),$Get(pParams("zpm","NewVersion"),""))
+		Set tUseExternalName = $Get(pParams("UseExternalName"),$Get(pParams("zpm","UseExternalName"),0))
 
 		// Determine which server/registry to publish to
 		Set tServer =  ""
@@ -1400,7 +1401,10 @@ Method %Publish(ByRef pParams) As %Status
 			$$$ThrowStatus(tSC)
 		}
 		Set tModule = ##class(%IPM.Repo.Remote.ModuleInfo).%New()
-		Set tModule.Name = ..Module.Name
+		Set tModule.Name = $Select(tUseExternalName: ..Module.ExternalName, 1: ..Module.Name)
+		If '##class(%IPM.DataType.ModuleName).IsValid(tModule.Name) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module name '%1' is invalid for publishing",tModule.Name)))
+		}
 		If tRelease && ('..Module.IsLocked()) {
 			Set tSC = ..Module.Lock()
 			If $$$ISERR(tSC) {
@@ -1412,12 +1416,12 @@ Method %Publish(ByRef pParams) As %Status
 			Quit
 		}
 		Set tModule.VersionString = ..Module.VersionString
-    If (..Module.Deployed) {
-      Set tModule.Deployed = 1
-      If $IsObject(..Module.SystemRequirements) {
-        Set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
-      }
-    }
+		If (..Module.Deployed) {
+			Set tModule.Deployed = 1
+			If $IsObject(..Module.SystemRequirements) {
+				Set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
+			}
+		}
 		Set tSC = ..Module.XMLExportToStream(tModule.Manifest)
 		If $$$ISERR(tSC) {
 			Quit

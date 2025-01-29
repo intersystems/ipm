@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #704 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax
 - #702 Added a new lifecycle phase `Initialize` which is used for preload
 - #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
+- #716 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. 
 
 ### Changed
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
