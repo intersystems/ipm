@@ -38,6 +38,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 -
 
+## [Unreleased - 0.9.2+snapshot]
+
+### Added
+- #682 When downloading IPM via the `enable` command from a remote registry, allow user to pass in the registry name (or get the only existent one), instead of the deployment enabled registry.
+
+### Fixed
+- #684 Fixed banner display issues in interactive `zpm` shell.
+- #682 When enabling IPM in a namespace using local IPM caches, check for existence of `<iris-root>/lib/ipm/` beforing querying it.
+- #682 Use more standard wording of mapping when enabling IPM
+- #681 Convert specified namespaces to upper case for `enable` and `unmap` commands.
+- #680 Always export static files (README.md, LICENSE, requirements.txt) if existent
+- #678 Only update comment-flagged part of the language extension, allowing users to keep their custom code when upgrading
+- #680, #683 Always export static files (README.md, LICENSE, requirements.txt, CHANGELOG.md) if existent
+
+### Security
+- #697 When publishing modules, will get an status with error message (instead of just a boolean) in case of failures.
+
+## [0.9.1] - 2024-12-18
+
+### Added
+- #663 Added support for mapping of repository settings along with, or in addition to, IPM package and routines
+- #663 Added functionality to always unmap repository settings when IPM package and routines are unmapped
+- #663 Added support for unmapping of repository settings alone
+- #663 Added support for `enable -community`, which resets repository settings to default and maps IPM along with repo settings globally
+
+### Fixed
+- #663 Improved error output and instructions in the language extension when "zpm" is run from a namespace without IPM
+
 ## [0.9.0] - 2024-12-16
 
 ### Added

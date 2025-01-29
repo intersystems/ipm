@@ -1211,9 +1211,10 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 		}
     /// Always keep these files
      Set staticFiles = $ListBuild(
-    //   "readme.md",
-    //   "license",
-    //   "requirements.txt",
+       "readme.md",
+       "changelog.md",
+       "license",
+       "requirements.txt",
     )
     Set tRes = ##class(%File).FileSetFunc(..Module.Root)
     While tRes.%Next() {
