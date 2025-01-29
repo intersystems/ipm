@@ -389,7 +389,7 @@ ClassMethod CompiledUpdateVersionXSLT(semver As %IPM.General.SemanticVersion) As
 ClassMethod UpdateVersion(moduleName As %String, semver As %IPM.General.SemanticVersion)
 {
 	// Can't use %IPM.Repo.XSLTProvider because we need to pass a parameter
-	Set compiledTransfrom = ..CompiledUpdateVersionXSLT(semver)
+	Set compiledTransform = ..CompiledUpdateVersionXSLT(semver)
 	Set document = ##class(%Library.RoutineMgr).%OpenId(moduleName_".ZPM")
 	If '$IsObject(document) {
 		// %Library.RoutineMgr:%OpenId doesn't have a byref status arg.
@@ -397,7 +397,7 @@ ClassMethod UpdateVersion(moduleName As %String, semver As %IPM.General.Semantic
 	}
 
 	$$$ThrowOnError(document.Code.Rewind())
-	$$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(document.Code, compiledTransfrom, .updatedContents))
+	$$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(document.Code, compiledTransform, .updatedContents))
 	$$$ThrowOnError(document.Code.Clear())
 	$$$ThrowOnError(document.Code.CopyFrom(updatedContents))
 	$$$ThrowOnError(document.%Save())
