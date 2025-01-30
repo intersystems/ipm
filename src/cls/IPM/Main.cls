@@ -724,6 +724,32 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</example>
 </command>
 
+<command name="module-version" aliases="modver">
+	<description>
+		Updates the version of the module in the current namespace.
+	</description>
+	<parameter name="module" required="true" description="Name of the module to update the version for." />
+	<parameter name="version" description="Either a valid SemVer string, or 'major', 'minor', 'patch'. If it's 'major', 'minor', or 'patch', will bump the cooresponding part of SemVer." />
+
+	<modifier name="prerelease" value="true" aliases="p" description="Set the prerelease to a specific value" />
+	<modifier name="build" value="true" aliases="b" description="Set the build to a specific value" />
+	<modifier name="force" description="Permit the version to be downgraded. By default, trying to downgrade the version will fail" />
+	<modifier name="quiet" aliases="q" description="Suppress output (except for errors)" />
+
+	<example description="Sets the version of the module HS.JSON to 1.2.3">
+		module-version HS.JSON 1.2.3
+	</example>
+	<example description="Bump the major version the module HS.JSON. If current version is 1.2.3, the new version will be 2.0.0">
+		module-version HS.JSON major
+	</example>
+	<example description="Bump the minor version and set prerelease to 'alpha' and build to 'xyz'. If current version is 1.2.3, the new version will be 1.3.0-alpha+xyz">
+		module-version HS.JSON minor -prerelease alpha -build xyz
+	</example>
+	<example description="Downgrade the version to 1.2.3. If the current version is 1.3.0, this will still work because the force flag is set.">
+		module-version HS.JSON 1.2.3 -force
+	</example>
+</command>
+
 </commands>
 }
 
@@ -905,6 +931,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..EnableIPM(.tCommandInfo)
 			} ElseIf (tCommandInfo = "unmap") {
 				Do ..UnmapIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "module-version") {
+				Do ..ModuleVersion(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -3349,6 +3377,96 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 			$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
 			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
 		}
+	}
+}
+
+ClassMethod ModuleVersion(ByRef pCommandInfo)
+{
+	Set modName = $Get(pCommandInfo("parameters","module"))
+	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	Set force = $$$HasModifier(pCommandInfo,"force")
+	If (modName = "") {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"No module name specified."))
+	}
+	Set mod = ##class(%IPM.Storage.Module).NameOpen(modName,.sc)
+	If mod = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_modName_" not found."))
+	}
+	Set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(modName)
+	If stream = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module stream "_modName_" not found."))
+	}
+	If 'quiet {
+		Write !,$$$FormatText("Current version of module %1 is: %2", modName, mod.VersionString)
+	}
+
+	// Compute the new semver
+	Set versionString = $Get(pCommandInfo("parameters","version"))
+	If versionString = "major" {
+		Set semver = mod.Version.WithBumpMajor()
+	} ElseIf versionString = "minor" {
+		Set semver = mod.Version.WithBumpMinor()
+	} ElseIf versionString = "patch" {
+		Set semver = mod.Version.WithBumpPatch()
+	} ElseIf versionString = "" {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(mod.Version.ToString())
+	} Else {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(versionString)
+	}
+
+	// Validate the semver
+	If 'semver.%ValidateObject() {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Invalid version string: "_versionString))
+	}
+
+	If $$$HasModifier(pCommandInfo,"prerelease") {
+		Set semver = semver.WithPrerelease($$$GetModifier(pCommandInfo,"prerelease"))
+	}
+	If $$$HasModifier(pCommandInfo,"build") {
+		Set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
+	}
+
+	// Ensure semver is not lower than the current version, unless force is set
+	If ('force) && ('semver.Follows(mod.Version)) {
+		Set msg = $$$FormatText("Cannot set version to %1 as it is not strictly higher than the current version %2 (Use -force to override)", semver.ToString(), mod.VersionString)
+		Set msg = msg _ $Char(10, 13) _ "Note: when either version has a nonempty prerelease value, and differ from the other by major.minor.patch, neither version is considered strictly higher than the other."
+		Set msg = msg _ $Char(10, 13) _ "      See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags for more information."
+		$$$ThrowOnError($$$ERROR($$$GeneralError, msg))
+	}
+	If (semver.ToString() = mod.Version.ToString()) {
+		If 'quiet {
+			Write !,"Version is unchanged - Skipping."
+		}
+		Return
+	}
+
+	If 'quiet {
+		Write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
+	}
+
+	Set initTLevel = $TLevel
+	Set ex = $$$NULLOREF
+	TSTART
+	Try {
+		New %SourceControl
+		Set docName = modName_".ZPM"
+		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		If $IsObject($Get(%SourceControl)) {
+			Write !,"Checking out "_docName
+			$$$ThrowOnError(%SourceControl.CheckOut(docName))
+		}
+		Set mod.Version = semver
+		Set mod.VersionString = semver.ToString()
+		$$$ThrowOnError(mod.%Save())
+		Do ##class(%IPM.StudioDocument.Module).UpdateVersion(modName,semver)
+		TCOMMIT
+	} Catch ex {
+	}
+	While ($TLevel > initTLevel) {
+		TROLLBACK 1
+	}
+	If $IsObject(ex) {
+		Throw ex
 	}
 }
 
