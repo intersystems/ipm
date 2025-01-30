@@ -1,10 +1,10 @@
-Class Test.PM.Integration.PythonWheel Extends Test.PM.Integration.Base
+Class Test.PM.Integration.ExportPythonWheel Extends Test.PM.Integration.Base
 {
 
 /// A reference to Python's sys.path
 Property PythonPath As %SYS.Python;
 
-/// A copy of python list containing the original sys.path
+/// A copy of the original sys.path
 Property PythonPathCopy As %SYS.Python;
 
 /// Run by <B>RunTest</B> once after all test methods in the test class are run. Can be used to tear down a test environment that was set up by <B>OnBeforeAllTests</B> See example in <b>OnBeforeAllTests</b>. 
@@ -45,7 +45,7 @@ Method OnBeforeAllTests() As %Status
     Quit $$$OK
 }
 
-Method TestPythonWheel()
+Method TestExportPythonWheel()
 {
     Set package = "oras"
     Set outputDirectory = $$$FileTempDir
@@ -77,8 +77,7 @@ Method TestPythonWheel()
     Do ..PythonPath.remove(mgrPython)
     Do ..PythonPath.append(targetInstallDir)
     Try {
-        // At this point, oras is probably already in sys.modules cache
-        // because it was used in OrasTag test (which is alphabetically before this test)
+        // At this point, oras might be already in sys.modules cache because it was used by something else in this process
         // but if it's not, we import it here so that we can use importlib.reload() with updated sys.path
         Set oras = ##class(%SYS.Python).Import("oras")
         Set importlib = ##class(%SYS.Python).Import("importlib")
