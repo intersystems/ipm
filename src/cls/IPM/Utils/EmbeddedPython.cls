@@ -111,9 +111,10 @@ ClassMethod LocatePackage(pkg As %String) As %SYS.Python
 /// bundleName is the name of the genreated wheel file
 /// bundleVersion is the version of the generated wheel file
 /// TODO: eliminate the need to manually create setup.py + call os.system()
-ClassMethod BundleWheel(packages As %SYS.Python, outputDirectory As %String, bundleName As %String, bundleVerions As %String)
+ClassMethod BundleWheel(packages As %SYS.Python, outputDirectory As %String, bundleName As %String, bundleVersion As %String)
 {
     import os
+    import re
     import shutil
     import tempfile
     import importlib.util
@@ -132,26 +133,34 @@ ClassMethod BundleWheel(packages As %SYS.Python, outputDirectory As %String, bun
         version="{ bundleVersion }",
         package_dir={{"": "src"}},
         packages=find_packages(where="src"),
-        install_requires={ packages },
         include_package_data=True,
     )
-    """
+    """[1:]  # strip the leading newline
+    match = re.match(r'^\s*', SETUP_PY_CONTENT)
+    n_whitespace = len(match.group()) if match else 0 
+    SETUP_PY_CONTENT = "\n".join([line[n_whitespace:] for line in SETUP_PY_CONTENT.splitlines()])
      
     with tempfile.TemporaryDirectory() as tdir:
         tdir = Path(tdir)
         src = tdir / "src"
         src.mkdir(parents=True, exist_ok=True)
-     
+
         for pkg in packages:
-            for location in iris.cls("%IPM.Utils.EmbeddedPython").LocatePackage(pkg):
-                pkg_from = Path(location)
-                pkg_to = src / pkg
-                shutil.copytree(pkg_from, pkg_to, dirs_exist_ok=True)
-     
+            for base, loc in iris.cls("%IPM.Utils.EmbeddedPython").LocatePackage(pkg):
+                pkg_from = Path(base) / loc
+                pkg_to = src / loc
+                if pkg_from.is_file():
+                    pkg_to.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy(pkg_from, pkg_to)
+                else:
+                    shutil.copytree(pkg_from, pkg_to, dirs_exist_ok=True)
+
         (tdir / "setup.py").write_text(SETUP_PY_CONTENT)
-     
+
+        # include_package_data=True in setup() instructs setuptools to look into MANIFEST.in for package data
+        (tdir / "MANIFEST.in").write_text("recursive-include src *")
+
         os.system(f"cd {tdir} && python3 setup.py bdist_wheel")
-     
         for wheel in (tdir / "dist").glob("*.whl"): # there should be only one such file
             shutil.move(str(wheel), outputDirectory)
 }
