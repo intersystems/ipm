@@ -3,9 +3,9 @@ Class Test.PM.Integration.ProcessPythonWheel Extends Test.PM.Integration.Base
 
 Parameter PackageLocation = "python-wheel";
 
+/// The PythonWheel resource processor expects to install wheels from the dist directory, as opposed to source code
 ClassMethod GenerateWheel()
 {
-    break "L"
     Set command = $ListBuild("python3", "setup.py", "bdist_wheel")
     Set dir = ..GetModuleDir(..#PackageLocation, "modules", "python", "ipm_dummy_package")
     Do ##class(%IPM.Utils.Module).RunCommand(dir, command)
