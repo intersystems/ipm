@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #702 Added a new lifecycle phase `Initialize` which is used for preload
 - #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
 - #716 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. 
+- #720 Added support to export package with Python dependencies exported as a wheel file.
 
 ### Changed
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
