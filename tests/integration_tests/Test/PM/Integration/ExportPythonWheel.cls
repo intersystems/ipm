@@ -10,8 +10,8 @@ Property PythonPathCopy As %SYS.Python;
 /// Run by <B>RunTest</B> once after all test methods in the test class are run. Can be used to tear down a test environment that was set up by <B>OnBeforeAllTests</B> See example in <b>OnBeforeAllTests</b>. 
 Method OnAfterAllTests() As %Status
 {
-    Set copy = ##class(%SYS.Python).Import("copy")
-    Set PythonPath = copy.deepcopy(..PythonPathCopy)
+    Set sys = ##class(%SYS.Python).Import("sys")
+    Set sys.path = ..PythonPathCopy
     Quit $$$OK
 }
 
@@ -74,7 +74,11 @@ Method TestExportPythonWheel()
     // Exclude mgr/python from sys.path and include targetInstallDir to check if the installed wheel works
     Set mgrPython = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
     Set mgrPython = $Extract(mgrPython, 1, *-1) // Remove trailing slash
-    Do ..PythonPath.remove(mgrPython)
+    While ..PythonPath."__contains__"(mgrPython) {
+        // IRIS 2025 preview seems to have 2 copies of mgr/python in sys.path
+        // Need to do this repeatedly until all copies are removed
+        Do ..PythonPath.remove(mgrPython)
+    }
     Do ..PythonPath.append(targetInstallDir)
     Try {
         // At this point, oras might be already in sys.modules cache because it was used by something else in this process
@@ -83,7 +87,10 @@ Method TestExportPythonWheel()
         Set importlib = ##class(%SYS.Python).Import("importlib")
         Set oras = importlib.reload(oras)
 
-        Do $$$AssertTrue(oras."__file__" [ targetInstallDir, "oras is imported from the installed wheel")
+        If '$$$AssertTrue(oras."__file__" [ targetInstallDir, "oras is imported from the installed wheel") {
+            Do $$$LogMessage("oras.__file__ = "_oras."__file__")
+            Do $$$LogMessage("python path = "_##class(%IPM.Utils.EmbeddedPython).ToListBuild(..PythonPath))
+        }
 
         // revert oras back to the original one
         Do ..PythonPath.remove(targetInstallDir)
