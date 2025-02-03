@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #696: Fix a bug that caused error status to be ignored when publishing a module.
 - #700: Fix a bug due to incompatible conventions between SemVer and OCI tags
 - #669: Work with a wider variety of ORAS repos (removes _catalog call)
+- #726: Fixed a bug where loading a tarball doesn't install dependencies from `.modules` subfolder even when it's available
 
 ### Security
 -
