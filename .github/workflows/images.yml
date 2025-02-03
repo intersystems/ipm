@@ -39,4 +39,8 @@ jobs:
             done
           done;
           echo images="[${images%?}]" >> $GITHUB_OUTPUT
-          echo main=${images%%,*} >> $GITHUB_OUTPUT
+
+          # The syntax GitHub expects is `main=string`, rather than `main="string"`
+          main=$(echo ${images%%,*} | awk -F'"' '{print $2}')
+          echo "main=$main" >> $GITHUB_OUTPUT
+
