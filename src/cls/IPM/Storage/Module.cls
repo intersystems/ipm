@@ -561,6 +561,24 @@ Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
 		// Resolve and validate dependencies
 		Set tReloadSnapshots = +$Get(pParams("UpdateSnapshots"))
 		Set tPermitDowngrade = +$Get(pParams("PermitDowngrade"))
+
+		// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+		// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
+		If $Get(pParams("RootDirectory")) '= "" {
+			Set dotModules = ##class(%File).NormalizeDirectory(".modules", pParams("RootDirectory"))
+			If ##class(%File).DirectoryExists(dotModules) {
+				Set repoNameBase = "ipm-temp-dot-modules-"
+				Set count = 1
+				For {
+					Set repoName = repoNameBase _ count
+					If '##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
+						Quit
+					}
+				}
+				Do ##class(%IPM.Main).Shell("repo -fs -name "_repoName_" -path "_dotModules_" -snapshots 1 -prereleases 1")
+			}
+		}
+
 		Set tSC = ..BuildDependencyGraph(.tDependencyGraph,,tReloadSnapshots,.qstruct,pPhaseList,,,,,,tPermitDowngrade)
 		If $$$ISERR(tSC) {
 			Quit
