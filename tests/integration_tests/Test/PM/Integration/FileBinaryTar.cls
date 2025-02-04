@@ -28,7 +28,7 @@ Method TestPackageAndExtract()
     Do $$$AssertTrue(##class(%File).Exists(outDir_"src/cls/Test/Test.cls"))
     Do $$$AssertTrue(##class(%File).Exists(outDir_"module.xml"))
 
-    Set tSC = ##class(%IPM.Main).Shell("load "_outFile)
+    Set tSC = ##class(%IPM.Main).Shell("load "_tempDir_".tgz")
     Do $$$AssertStatusOK(tSC,"Loaded SimpleModule module successfully from .tgz file.")
 
     Set tSC = ##class(%IPM.Main).Shell("load "_outDir)
