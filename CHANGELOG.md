@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
+- #726 When running `zpm "load ..."` on a nonexistent path, it now returns an error instead of silently failing with a $$$OK status.
 
 ### Fixed
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
