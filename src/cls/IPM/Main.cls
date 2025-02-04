@@ -2075,7 +2075,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
+		Set tTargetDirectory = tDirectoryName
 	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
 		If $Get(pCommandInfo("data", "Verbose")) {
@@ -2089,23 +2089,47 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
 		If (tCount = 0) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
-		} Else {
-			// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
-			Set tModuleFilePath = $ListGet(tList(tCount), *)
-			Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-			If $Get(pCommandInfo("data", "Verbose")) {
-				Write !,"Found "_tCount_" results. They are: "
-				Set idx = ""
-				For {
-					Set idx = $Order(tList(idx))
-					Quit:(idx="")
-					Write !, $Char(9), $List(tList(idx), *)
-				}
-				Write !, "Using module.xml file at ", tModuleFilePath
+		}
+
+		// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+		Set tModuleFilePath = $ListGet(tList(tCount), *)
+		Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Found "_tCount_" results. They are: "
+			Set idx = ""
+			For {
+				Set idx = $Order(tList(idx))
+				Quit:(idx="")
+				Write !, $Char(9), $List(tList(idx), *)
+			}
+			Write !, "Using module.xml file at ", tModuleFilePath
+		}
+	}
+
+	// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
+	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+	If ##class(%File).DirectoryExists(dotModules) {
+		Set count = 0
+		For {
+			Set repoName = "ipm-temp-dot-modules-" _ $Increment(count)
+			If '##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
+				Quit
 			}
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
+		Set tempRepo = ##class(%IPM.Repo.Filesystem.Definition).%New()
+		Set tempRepo.Name = repoName
+		Set tempRepo.Root = dotModules
+		Set tempRepo.Snapshots = 1
+		Set tempRepo.Prereleases = 1
+		Set tempRepo.OveriddenSortOrder = -1000 // Make sure this is the first repo to be found by SQL query in %IPM.Repo.Manager:SearchRepositoriesForModule
+		$$$ThrowOnError(tempRepo.%Save())
 	}
+	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams)
+	If $Data(tempRepo) # 2 {
+		Set tSC = $$$ADDSC(tSC, tempRepo.%DeleteId(tempRepo.%Id()))
+	}
+	$$$ThrowOnError(tSC)
 }
 
 ClassMethod CheckModuleNamespace() As %Status
