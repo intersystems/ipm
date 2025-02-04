@@ -6,7 +6,7 @@
       <Version>0.0.1+snapshot</Version>
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
-      <SystemRequirements Version=">=2020.1" Interoperability="disabled" Health="false" />
+      <SystemRequirements Version=">=2020.1" Interoperability="disabled"/>
     </Module>
   </Document>
 </Export>
