@@ -2075,7 +2075,6 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-		Set tTargetDirectory = tDirectoryName
 	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
 		If $Get(pCommandInfo("data", "Verbose")) {
@@ -2108,6 +2107,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 
 	// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
 	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
+	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
 	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
 	If ##class(%File).DirectoryExists(dotModules) {
 		Set count = 0
