@@ -6,7 +6,7 @@ Parameter CommonPathPrefix As STRING = "interoperability-test";
 Method TestInteroperabilityDisabled()
 {
   Set subfolder = "interoperability-disabled"
-  Set tModuleDir = ..GetModuleDir(subfolder)
+  Set tModuleDir = ..GetModuleDir(..#CommonPathPrefix, subfolder)
   Set tSC = ##class(%IPM.Main).Shell("load " _ tModuleDir)
   Do $$$AssertStatusOK(tSC,"Loaded module successfully(" _ subfolder _ ")")
 }

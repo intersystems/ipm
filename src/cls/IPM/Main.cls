@@ -73,7 +73,7 @@ Currently, there may only be one of these per namespace.
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="export-deps" value="true" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; lifecycle." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; lifecycle." />
 
 </command>
 
@@ -139,6 +139,7 @@ This command is an alias for `module-action module-name package`
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Use specified path to export package." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="verify" dataPrefix="D">
@@ -2074,7 +2075,6 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
 		If $Get(pCommandInfo("data", "Verbose")) {
@@ -2088,23 +2088,48 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
 		If (tCount = 0) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
-		} Else {
-			// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
-			Set tModuleFilePath = $ListGet(tList(tCount), *)
-			Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-			If $Get(pCommandInfo("data", "Verbose")) {
-				Write !,"Found "_tCount_" results. They are: "
-				Set idx = ""
-				For {
-					Set idx = $Order(tList(idx))
-					Quit:(idx="")
-					Write !, $Char(9), $List(tList(idx), *)
-				}
-				Write !, "Using module.xml file at ", tModuleFilePath
+		}
+
+		// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+		Set tModuleFilePath = $ListGet(tList(tCount), *)
+		Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Found "_tCount_" results. They are: "
+			Set idx = ""
+			For {
+				Set idx = $Order(tList(idx))
+				Quit:(idx="")
+				Write !, $Char(9), $List(tList(idx), *)
+			}
+			Write !, "Using module.xml file at ", tModuleFilePath
+		}
+	}
+
+	// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
+	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
+	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+	If (dotModules '= "") && ##class(%File).DirectoryExists(dotModules) {
+		Set count = 0
+		For {
+			Set repoName = "ipm-temp-dot-modules-" _ $Increment(count)
+			If '##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
+				Quit
 			}
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
+		Set tempRepo = ##class(%IPM.Repo.Filesystem.Definition).%New()
+		Set tempRepo.Name = repoName
+		Set tempRepo.Root = dotModules
+		Set tempRepo.Snapshots = 1
+		Set tempRepo.Prereleases = 1
+		Set tempRepo.OverriddenSortOrder = -1000 // Make sure this is the first repo to be found by SQL query in %IPM.Repo.Manager:SearchRepositoriesForModule
+		$$$ThrowOnError(tempRepo.BuildCache(1,1,1))
 	}
+	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams)
+	If $Data(tempRepo) # 2 {
+		Set tSC = $$$ADDSC(tSC, tempRepo.%DeleteId(tempRepo.%Id()))
+	}
+	$$$ThrowOnError(tSC)
 }
 
 ClassMethod CheckModuleNamespace() As %Status
