@@ -1175,8 +1175,8 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		Set tModule.Repository = pRepository
 		
 		If $Data(pParams("DeveloperMode"),tDeveloperMode) {
-			// Mark module as not deployed if installing with dev mode
-			Set tModule.Deployed = 0
+      // Mark module as not deployed if installing with dev mode
+      Set tModule.Deployed = 0
 			Set tModule.DeveloperMode = tDeveloperMode
 			Set tModule.Root = pDirectory
 			Set tSC = tModule.%Save()
@@ -1206,9 +1206,8 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 		}
 		Merge $$$ZPMHandledModules($Namespace) = pParams("Multicompile","ModuleContext")
 
-		$$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
-		Set pParams("RootDirectory") = pDirectory
-
+    $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
+  
 		#dim tInstallContext As %IPM.General.InstallContext
 		Set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
@@ -1221,7 +1220,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 				// Temporary custom loading of dependencies in a synchronous
 				// manner to prevent lock timeouts until lifecycle rework
 				// is complete (HSIEO-4450)
-				Do ..SyncLoadDependencies(tModule, .pParams)
+        Do ..SyncLoadDependencies(tModule, .pParams)
 			}
 		}
 		
@@ -1235,6 +1234,7 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			// in a transaction; we want to be able to debug!
 			TCOMMIT
 		}
+		Set pParams("RootDirectory") = pDirectory
 		If tVerbose || $Get(pParams("Multicompile","Verbose"),0) {
 			Write !,"Loading "_tDisplayName_" in process "_$Job
 		}

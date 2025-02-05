@@ -561,7 +561,6 @@ Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
 		// Resolve and validate dependencies
 		Set tReloadSnapshots = +$Get(pParams("UpdateSnapshots"))
 		Set tPermitDowngrade = +$Get(pParams("PermitDowngrade"))
-
 		Set tSC = ..BuildDependencyGraph(.tDependencyGraph,,tReloadSnapshots,.qstruct,pPhaseList,,,,,,tPermitDowngrade)
 		If $$$ISERR(tSC) {
 			Quit
