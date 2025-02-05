@@ -2122,7 +2122,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 		Set tempRepo.Root = dotModules
 		Set tempRepo.Snapshots = 1
 		Set tempRepo.Prereleases = 1
-		Set tempRepo.OveriddenSortOrder = -1000 // Make sure this is the first repo to be found by SQL query in %IPM.Repo.Manager:SearchRepositoriesForModule
+		Set tempRepo.OverriddenSortOrder = -1000 // Make sure this is the first repo to be found by SQL query in %IPM.Repo.Manager:SearchRepositoriesForModule
 		$$$ThrowOnError(tempRepo.BuildCache(1,1,1))
 	}
 	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams)

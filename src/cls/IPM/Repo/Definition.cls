@@ -34,7 +34,7 @@ Property Prereleases As %Boolean [ InitialExpression = 0 ];
 /// If set to a non-empty value, this will be used as the sort order for this repository, bypassing the GetSortOrder() method.
 /// This should be only configured by IPM during certain processes (e.g., installing depdenencies from .modules directory).
 /// There is no current plan to support configuring this from the package manager shell.
-Property OveriddenSortOrder As %Integer;
+Property OverriddenSortOrder As %Integer [ Internal ];
 
 ClassMethod %GetCommandStructure(Output pCommandStructure)
 {
@@ -85,8 +85,8 @@ Method GetPublishService() As %IPM.Repo.IPublishService [ Abstract ]
 ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 {
 	Set tServer = ..%OpenId(pID)
-	If tServer.OveriddenSortOrder '= "" {
-		Quit tServer.OveriddenSortOrder
+	If tServer.OverriddenSortOrder '= "" {
+		Quit tServer.OverriddenSortOrder
 	}
 	Quit tServer.GetSortOrder()
 }
@@ -292,7 +292,7 @@ Storage Default
 <Value>ReadOnly</Value>
 </Value>
 <Value name="13">
-<Value>OveriddenSortOrder</Value>
+<Value>OverriddenSortOrder</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.DefinitionD</DataLocation>
