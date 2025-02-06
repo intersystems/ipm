@@ -1403,6 +1403,10 @@ Method %Publish(ByRef pParams) As %Status
 		}
 		Set tModule = ##class(%IPM.Repo.Remote.ModuleInfo).%New()
 		Set tModule.Name = $Select(tUseExternalName: ..Module.ExternalName, 1: ..Module.Name)
+		// Apparently, an empty name can pass the %IPM.DataType.ModuleName:IsValid check
+		If tModule.Name = "" {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot publish module with empty name."))
+		}
 		If '##class(%IPM.DataType.ModuleName).IsValid(tModule.Name) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module name '%1' is invalid for publishing",tModule.Name)))
 		}
