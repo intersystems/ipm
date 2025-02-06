@@ -73,7 +73,7 @@ Currently, there may only be one of these per namespace.
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; lifecycle." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
 
 </command>
 
@@ -166,6 +166,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are published. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="makedeployed">
