@@ -176,6 +176,9 @@ ClassMethod MigrateRepoDefinitions(verbose As %Boolean = 1) As %Status
             }
         }
 
+        // Need to kill indices first to avoid a <FRAMESTACK> saving an existing Remote repo
+        Kill ^IPM.Repo.DefinitionI
+
         TSTART
         Set key = ""
         For {
