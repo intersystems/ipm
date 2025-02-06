@@ -24,8 +24,8 @@ ClassMethod RunAll(verbose As %Boolean = 1) As %Status
         }
         Try {
             Set $Namespace = $Zstrip(ns,"<>WC")
+            Do ..MigrateReposFromIPM09(verbose) // Do this first; MigrateZPMToIPM will fail with <FRAMESTACK> otherwise.
             Do ..MigrateZPMToIPM(verbose)
-            Do ..MigrateReposFromIPM09(verbose)
         } Catch e {
             Set sc = $$$ADDSC(sc, e.AsStatus())
         }
@@ -175,9 +175,6 @@ ClassMethod MigrateRepoDefinitions(verbose As %Boolean = 1) As %Status
                 $$$ThrowStatus($$$ERROR($$$LockFailedExtent,lockName))
             }
         }
-
-        // Need to kill indices first to avoid a <FRAMESTACK> saving an existing Remote repo
-        Kill ^IPM.Repo.DefinitionI
 
         TSTART
         Set key = ""
