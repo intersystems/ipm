@@ -272,7 +272,7 @@ jobs:
           tag_name: v${{ needs.prepare.outputs.version }}
           release_name: v${{ needs.prepare.outputs.version }}
           prerelease: ${{ github.event_name != 'release' }}
-      - name: Upload Beta Release Asset
+      - name: Upload Beta Release Asset (versioned)
         uses: actions/upload-release-asset@v1
         if: github.event_name == 'push'
         env:
@@ -281,6 +281,16 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
           asset_name: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_content_type: text/xml
+      - name: Upload Beta Release Asset (versionless)
+        uses: actions/upload-release-asset@v1
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_name: zpm.xml
           asset_content_type: text/xml
       - name: Publish release
         if: github.event_name == 'release'
@@ -299,7 +309,7 @@ jobs:
             halt
           EOF
           docker stop $CONTAINER
-      - name: Upload Public Release Asset
+      - name: Upload Public Release Asset (versioned)
         uses: actions/upload-release-asset@v1
         if: github.event_name == 'release'
         env:
@@ -308,6 +318,16 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
           asset_name: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_content_type: text/xml
+      - name: Upload Public Release Asset (versionless)
+        uses: actions/upload-release-asset@v1
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_name: zpm.xml
           asset_content_type: text/xml
       - name: Bump Release number
         if: github.event_name == 'release'
