@@ -40,7 +40,7 @@ ClassMethod SkipCreate(location As %String) As %Boolean [ Internal ]
 	Set query = "SELECT COUNT(*) As Total FROM %IPM_Repo_Filesystem.Definition WHERE Root = ?"
 	Set rs = ##class(%SQL.Statement).%ExecDirect(, query, location)
 	$$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-	If rs.%Next() && rs.%Get("Total") > 0 {
+	If rs.%Next() && (rs.%Get("Total") > 0) {
 		Return 1
 	}
 	Return 0
