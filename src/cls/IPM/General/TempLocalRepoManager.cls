@@ -62,8 +62,7 @@ Method %OnNew(location As %String, useFirst As %Boolean = 0) As %Status
 	Try {
 		Do ..Create(useFirst)
 	} Catch ex {
-		Do ..CleanUp()
-		Return ex.AsStatus()
+		Return $$$ADDSC(ex.AsStatus(), ..CleanUp())
 	}
 
 	Return $$$OK
