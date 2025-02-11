@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
 - #704 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax
 - #710 Added support for `module-version` command which updates the version of a module
-- #716 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. 
+- #716,#733 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. Fail early if external name is illegal / empty.
 
 ### Changed
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #700: Fix a bug due to incompatible conventions between SemVer and OCI tags
 - #669: Work with a wider variety of ORAS repos (removes _catalog call)
 - #726,#729: Fixed a bug where install/loading a tarball doesn't install dependencies from `.modules` subfolder even when it's available
+- #731: Issue upgrading from v0.9.x due to refactor of repo classes
+- #718: Upload zpm.xml (without the version) as an artifact to provide a more stable URL to latest release artifact on GitHub
 
 ### Security
 -
