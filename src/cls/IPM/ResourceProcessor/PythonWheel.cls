@@ -1,7 +1,7 @@
 Class %IPM.ResourceProcessor.PythonWheel Extends %IPM.ResourceProcessor.Abstract
 {
 
-Parameter ATTRIBUTES As STRING = "Name,Directory,ExtraPipArgs";
+Parameter ATTRIBUTES As STRING = "Name,Directory,ExtraPipFlags";
 
 Parameter DESCRIPTION As STRING = "Installs a Python wheel package.";
 
@@ -9,7 +9,7 @@ Property Name As %IPM.DataType.PythonWheelName;
 
 Property Directory As %IPM.DataType.ResourceDirectory;
 
-Property ExtraPipArgs As %IPM.DataType.CommandLineArgs;
+Property ExtraPipFlags As %IPM.DataType.CommandLineArgs;
 
 /// Called as phase <var>pPhase</var> is executed for the resource. If <var>pResourceHandled</var> is set to true,
 /// then the default behavior for that resource will be bypassed in the current phase.
@@ -39,7 +39,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
 
         Set pipCaller = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.pParams)
         Set target = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
-        Set command = pipCaller _ $ListBuild("install", wheel, "-t", target) _ $ListFromString(..ExtraPipArgs, " ")
+        Set command = pipCaller _ $ListBuild("install", wheel, "-t", target) _ $ListFromString(..ExtraPipFlags, " ")
         If verbose {
             Write !,"Running command: ",command
         }
