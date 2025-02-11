@@ -2110,26 +2110,9 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
 	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
 	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
-	If (dotModules '= "") && ##class(%File).DirectoryExists(dotModules) {
-		Set count = 0
-		For {
-			Set repoName = "ipm-temp-dot-modules-" _ $Increment(count)
-			If '##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
-				Quit
-			}
-		}
-		Set tempRepo = ##class(%IPM.Repo.Filesystem.Definition).%New()
-		Set tempRepo.Name = repoName
-		Set tempRepo.Root = dotModules
-		Set tempRepo.Snapshots = 1
-		Set tempRepo.Prereleases = 1
-		Set tempRepo.OverriddenSortOrder = -1000 // Make sure this is the first repo to be found by SQL query in %IPM.Repo.Manager:SearchRepositoriesForModule
-		$$$ThrowOnError(tempRepo.BuildCache(1,1,1))
-	}
+	Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
 	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams)
-	If $Data(tempRepo) # 2 {
-		Set tSC = $$$ADDSC(tSC, tempRepo.%DeleteId(tempRepo.%Id()))
-	}
+	Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 	$$$ThrowOnError(tSC)
 }
 
