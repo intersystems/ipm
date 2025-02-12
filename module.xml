@@ -35,6 +35,7 @@
   <PythonWheel Name="oras-0.1.30-py3-none-any.whl" Directory="wheels" ExtraPipFlags="--no-deps"/>
   <PythonWheel Name="referencing-0.36.2-py3-none-any.whl" Directory="wheels" ExtraPipFlags="--no-deps"/>
   <PythonWheel Name="requests-2.32.3-py3-none-any.whl" Directory="wheels" ExtraPipFlags="--no-deps"/>
+  <PythonWheel Name="typing_extensions-4.12.2-py3-none-any.whl" Directory="wheels" ExtraPipFlags="--no-deps"/>
   <PythonWheel Name="urllib3-2.3.0-py3-none-any.whl" Directory="wheels" ExtraPipFlags="--no-deps"/>
 
   <!-- Pure python implementation of rpds-py for offline installation or behind a firewall. 
