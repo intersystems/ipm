@@ -7,7 +7,7 @@ Method TestInteroperabilityEnabled()
 {
   Set tCases = $ListBuild( 
     $ListBuild("version-req-missing", 1),
-    $ListBuild("version-req-satisified", 1),
+    $ListBuild("version-req-satisfied", 1),
     $ListBuild("version-req-too-high", 0),
     $ListBuild("version-req-too-low", 0)
   )

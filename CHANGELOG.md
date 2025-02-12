@@ -12,17 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #469 Added ability to include an `IPMVersion` in `SystemRequirement` of module.xml
 - #530 Added a `CustomPhase` attribute to `<Invoke>` that doesn't require a corresponding %method in lifecycle class.
 - #582 Added functionality to optionally see time of last update and server version of each package
-- #609 Added support for `-export-deps` when running the "Package" phase of lifecycle
+- #609,#729 Added support for `-export-deps` when running the "Package" phase (and, consequently, the "Publish" phase) of lifecycle
 - #541 Added support for ORAS repository
-- #704 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax
 - #702 Added a new lifecycle phase `Initialize` which is used for preload
 - #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
-- #716 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. 
+- #704 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax
+- #710 Added support for `module-version` command which updates the version of a module
+- #716,#733 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. Fail early if external name is illegal / empty.
 - #720 Added support to export package with Python dependencies exported as a wheel file.
 - #720 Support offline installation of oras using fixed version of pure python wheels and an adaptor for rpds.
 
 ### Changed
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
+- #726 When running `zpm "load ..."` on a nonexistent path, it now returns an error instead of silently failing with a $$$OK status.
 
 ### Fixed
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
@@ -30,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #696: Fix a bug that caused error status to be ignored when publishing a module.
 - #700: Fix a bug due to incompatible conventions between SemVer and OCI tags
 - #669: Work with a wider variety of ORAS repos (removes _catalog call)
+- #726,#729: Fixed a bug where install/loading a tarball doesn't install dependencies from `.modules` subfolder even when it's available
+- #731: Issue upgrading from v0.9.x due to refactor of repo classes
+- #718: Upload zpm.xml (without the version) as an artifact to provide a more stable URL to latest release artifact on GitHub
 
 ### Security
 -

@@ -306,7 +306,10 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				// This doesn't make sense if we're loading the dependency from a remote server.
 				Set tDeveloperMode = 1
 			}
+			Set dotModules = ##class(%File).NormalizeDirectory(".modules", tDirectory)
+			Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
 			Set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName)
+			Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		} Else {
 			Set tAsArchive = -1
 			Set tPayload = tClient.GetModule(tModRef, .tAsArchive)
@@ -405,7 +408,10 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 			Write:tVerbose !,tOutput(i)
 		}
 		
+		Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+		Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
 		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository)
+		Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		If $$$ISERR(tSC) {
 			Quit
 		}

@@ -7,6 +7,9 @@ Parameter MONIKER As String = "http";
 /// Override this in subclasses to provide more padding.
 Parameter MaxDisplayTabCount As INTEGER = 4;
 
+/// Overridden to avoid upgrade issues because of the refactor from Remote.Definition -> Http.Definition
+Parameter MANAGEDEXTENT = 0;
+
 Property URL As %IPM.DataType.RepoLocation [ Required ];
 
 Index URL On URL [ Unique ];

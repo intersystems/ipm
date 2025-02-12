@@ -73,7 +73,7 @@ Currently, there may only be one of these per namespace.
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="export-deps" value="true" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; lifecycle." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
 
 </command>
 
@@ -139,6 +139,7 @@ This command is an alias for `module-action module-name package`
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Use specified path to export package." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="verify" dataPrefix="D">
@@ -165,6 +166,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are published. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="makedeployed">
@@ -724,6 +726,32 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</example>
 </command>
 
+<command name="module-version" aliases="modver">
+	<description>
+		Updates the version of the module in the current namespace.
+	</description>
+	<parameter name="module" required="true" description="Name of the module to update the version for." />
+	<parameter name="version" description="Either a valid SemVer string, or 'major', 'minor', 'patch'. If it's 'major', 'minor', or 'patch', will bump the cooresponding part of SemVer." />
+
+	<modifier name="prerelease" value="true" aliases="p" description="Set the prerelease to a specific value" />
+	<modifier name="build" value="true" aliases="b" description="Set the build to a specific value" />
+	<modifier name="force" description="Permit the version to be downgraded. By default, trying to downgrade the version will fail" />
+	<modifier name="quiet" aliases="q" description="Suppress output (except for errors)" />
+
+	<example description="Sets the version of the module HS.JSON to 1.2.3">
+		module-version HS.JSON 1.2.3
+	</example>
+	<example description="Bump the major version the module HS.JSON. If current version is 1.2.3, the new version will be 2.0.0">
+		module-version HS.JSON major
+	</example>
+	<example description="Bump the minor version and set prerelease to 'alpha' and build to 'xyz'. If current version is 1.2.3, the new version will be 1.3.0-alpha+xyz">
+		module-version HS.JSON minor -prerelease alpha -build xyz
+	</example>
+	<example description="Downgrade the version to 1.2.3. If the current version is 1.3.0, this will still work because the force flag is set.">
+		module-version HS.JSON 1.2.3 -force
+	</example>
+</command>
+
 </commands>
 }
 
@@ -905,6 +933,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..EnableIPM(.tCommandInfo)
 			} ElseIf (tCommandInfo = "unmap") {
 				Do ..UnmapIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "module-version") {
+				Do ..ModuleVersion(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -2046,7 +2076,6 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
 		If $Get(pCommandInfo("data", "Verbose")) {
@@ -2060,23 +2089,31 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
 		If (tCount = 0) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
-		} Else {
-			// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
-			Set tModuleFilePath = $ListGet(tList(tCount), *)
-			Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-			If $Get(pCommandInfo("data", "Verbose")) {
-				Write !,"Found "_tCount_" results. They are: "
-				Set idx = ""
-				For {
-					Set idx = $Order(tList(idx))
-					Quit:(idx="")
-					Write !, $Char(9), $List(tList(idx), *)
-				}
-				Write !, "Using module.xml file at ", tModuleFilePath
-			}
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
+
+		// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+		Set tModuleFilePath = $ListGet(tList(tCount), *)
+		Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Found "_tCount_" results. They are: "
+			Set idx = ""
+			For {
+				Set idx = $Order(tList(idx))
+				Quit:(idx="")
+				Write !, $Char(9), $List(tList(idx), *)
+			}
+			Write !, "Using module.xml file at ", tModuleFilePath
+		}
 	}
+
+	// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
+	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
+	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+	Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
+	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams)
+	Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
+	$$$ThrowOnError(tSC)
 }
 
 ClassMethod CheckModuleNamespace() As %Status
@@ -3349,6 +3386,96 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 			$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
 			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
 		}
+	}
+}
+
+ClassMethod ModuleVersion(ByRef pCommandInfo)
+{
+	Set modName = $Get(pCommandInfo("parameters","module"))
+	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	Set force = $$$HasModifier(pCommandInfo,"force")
+	If (modName = "") {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"No module name specified."))
+	}
+	Set mod = ##class(%IPM.Storage.Module).NameOpen(modName,.sc)
+	If mod = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_modName_" not found."))
+	}
+	Set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(modName)
+	If stream = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module stream "_modName_" not found."))
+	}
+	If 'quiet {
+		Write !,$$$FormatText("Current version of module %1 is: %2", modName, mod.VersionString)
+	}
+
+	// Compute the new semver
+	Set versionString = $Get(pCommandInfo("parameters","version"))
+	If versionString = "major" {
+		Set semver = mod.Version.WithBumpMajor()
+	} ElseIf versionString = "minor" {
+		Set semver = mod.Version.WithBumpMinor()
+	} ElseIf versionString = "patch" {
+		Set semver = mod.Version.WithBumpPatch()
+	} ElseIf versionString = "" {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(mod.Version.ToString())
+	} Else {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(versionString)
+	}
+
+	// Validate the semver
+	If 'semver.%ValidateObject() {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Invalid version string: "_versionString))
+	}
+
+	If $$$HasModifier(pCommandInfo,"prerelease") {
+		Set semver = semver.WithPrerelease($$$GetModifier(pCommandInfo,"prerelease"))
+	}
+	If $$$HasModifier(pCommandInfo,"build") {
+		Set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
+	}
+
+	// Ensure semver is not lower than the current version, unless force is set
+	If ('force) && ('semver.Follows(mod.Version)) {
+		Set msg = $$$FormatText("Cannot set version to %1 as it is not strictly higher than the current version %2 (Use -force to override)", semver.ToString(), mod.VersionString)
+		Set msg = msg _ $Char(10, 13) _ "Note: when either version has a nonempty prerelease value, and differ from the other by major.minor.patch, neither version is considered strictly higher than the other."
+		Set msg = msg _ $Char(10, 13) _ "      See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags for more information."
+		$$$ThrowOnError($$$ERROR($$$GeneralError, msg))
+	}
+	If (semver.ToString() = mod.Version.ToString()) {
+		If 'quiet {
+			Write !,"Version is unchanged - Skipping."
+		}
+		Return
+	}
+
+	If 'quiet {
+		Write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
+	}
+
+	Set initTLevel = $TLevel
+	Set ex = $$$NULLOREF
+	TSTART
+	Try {
+		New %SourceControl
+		Set docName = modName_".ZPM"
+		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		If $IsObject($Get(%SourceControl)) {
+			Write !,"Checking out "_docName
+			$$$ThrowOnError(%SourceControl.CheckOut(docName))
+		}
+		Set mod.Version = semver
+		Set mod.VersionString = semver.ToString()
+		$$$ThrowOnError(mod.%Save())
+		Do ##class(%IPM.StudioDocument.Module).UpdateVersion(modName,semver)
+		TCOMMIT
+	} Catch ex {
+	}
+	While ($TLevel > initTLevel) {
+		TROLLBACK 1
+	}
+	If $IsObject(ex) {
+		Throw ex
 	}
 }
 

@@ -24,8 +24,8 @@ ClassMethod RunAll(verbose As %Boolean = 1) As %Status
         }
         Try {
             Set $Namespace = $Zstrip(ns,"<>WC")
+            Do ..MigrateReposFromIPM09(verbose) // Do this first; MigrateZPMToIPM will fail with <FRAMESTACK> otherwise.
             Do ..MigrateZPMToIPM(verbose)
-            Do ..MigrateReposFromIPM09(verbose)
         } Catch e {
             Set sc = $$$ADDSC(sc, e.AsStatus())
         }
