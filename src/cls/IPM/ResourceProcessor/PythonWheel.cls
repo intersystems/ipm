@@ -83,7 +83,7 @@ Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean
 {
     Set key = $Order(pResourceArray(""))
     If key = "" {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Empty resource array for PythonWheel resource processor: "_..Name))
+        Quit $$$ERROR($$$GeneralError, "Empty resource array for PythonWheel resource processor: "_..Name)
     }
     Set pResourceArray(key, "RelativePath") = ..Directory _"/"_..Name
     Quit $$$OK
