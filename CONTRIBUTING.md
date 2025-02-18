@@ -45,14 +45,14 @@ docker system prune -a
 ```
 
 ### Testing
-There are 2 kinds of tests in IPM -- unit tests and integration tests. You can find all the test cases in the `tests/` folder. 
+There are 2 kinds of tests in IPM: unit tests and integration tests. You can find all the test cases in the `tests/` folder.
 
-- To run all the unit tests, use `zpm "zpm test -only -v"`;
-- To run all the integrationt tests, use `zpm "zpm verify -only -v"`;
+-  To run all the unit tests, use `zpm "zpm test -only -v"`;
+-  To run all the integration tests, use `zpm "zpm verify -only -v"`;
 
 where the `-v` is an optional verbosity flag.
 
-Some tests involve publishing to test registries, such as the ones in `ipm-registry-1` and `ipm-oras-1`. If those tests fail, check if those 2 containers are running on the correct ports and endpoints. Tests also fail for other reasons. Typically, you can run both tests on unchanged codebase to establish a baseline first. After development, if it doesn't incur new failures beyond the baseline, then your changes should be fine. We also have CI to double check all unit/integration tests when you open a pull request.
+Some tests involve publishing to test registries, such as the ones in `ipm-registry-1` and `ipm-oras-1`. If those tests fail, check if those 2 containers are running on the correct ports and endpoints. Tests can also fail for other reasons. Typically, you can run both tests on an unchanged codebase to establish a baseline first. After development, if it doesn't incur new failures beyond the baseline, then your changes should be fine. We also have CI to double-check all unit/integration tests when you open a pull request.
 
 ### Pull Request
 Before creating a PR, make sure you document the changes involved in `CHANGELOG.md` and add unit/integration tests in the `tests/` folder.
