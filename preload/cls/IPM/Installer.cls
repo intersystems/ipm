@@ -320,7 +320,7 @@ ClassMethod ExtractPackage(Output pFolder As %String) As %String
     set gzip = ##class(%Stream.FileBinaryGzip).%New()
     set gzip.Filename = tmpFile
 
-    if $Piece(fileName,".") = "whl" {
+    if $Piece(fileName,".",*) = "whl" {
       // TODO: generalize to other binary file types?
       set fs = ##class(%Stream.FileBinary).%New()
     } else {
