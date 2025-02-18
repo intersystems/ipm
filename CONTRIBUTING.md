@@ -20,7 +20,7 @@ This will spin up 3 (or 4, if you're working on v0.10.x) containers, which are:
 - `ipm-oras-1`, a container WITHOUT any IRIS instance. This container is based on [zot](https://github.com/project-zot/zot) and provides an OCI image registry, with port 5000 published to the host OS at 5000. On the Docker network, this container has the hostname `oras`.
 
 ### Important notes
-- In both `ipm-iris-1` and `ipm-sandbox-1`, the IPM repo itself is mounted at `/home/iris`.
+- In both `ipm-iris-1` and `ipm-sandbox-1`, the IPM repo itself is mounted at `/home/irisowner/zpm/`.
 - Sometimes `ipm-registry-1` doesn't install zpm-registry properly; you may need to perform the following steps to manually make it work:
   - Run `docker exec -it ipm-registry-1 /bin/bash` to access the container.
   - Inside the container, run `iris session iris` to access the IRIS instance.
