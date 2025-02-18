@@ -1,3 +1,5 @@
+Include %IPM.Formatting
+
 Class %IPM.ResourceProcessor.PythonWheel Extends %IPM.ResourceProcessor.Abstract
 {
 
@@ -46,6 +48,13 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
         $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommand(, command))
     } Catch ex {
         Set pResourceHandled = 0
+        // Special case: we want the installation of IPM to continue, even if the wheel package fails to install
+        If ..ResourceReference.Module.Name = $$$IPMModuleName {
+            Set errMsg = $$$FormatText("Skipping installation of python wheel '%1' due to error: '%2'. ", ..Name, ex.AsStatus())
+            Set errMsg = errMsg _ "You may need to install this wheel manually or from PyPI to use certain features of IPM."
+            Write !, $$$FormattedLine($$$Red, errMsg)
+            Return $$$OK
+        }
         Return ex.AsStatus()
     }
     Return $$$OK
