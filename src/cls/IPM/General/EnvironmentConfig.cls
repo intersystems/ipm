@@ -41,6 +41,38 @@ Method GetArg(package As %String, args... As %String) As %IPM.DataType.Any
         }
         Set obj = obj.%Get(args(i))
     }
+    Return %Evaluate(obj)
+}
+
+/// Recursively evaluate ${myVarName} to the value of the variable myVarName
+/// The input could be a primitive type, a dynamic object, or a dynamic array
+/// "CopyCreated" should only be used internally to avoid computation overhead. It should not be used by the any caller other than the recursive call in itself.
+ClassMethod %Evaluate(obj As %IPM.DataType.Any, CopyCreated As %Boolean = 0) As %IPM.DataType.Any [ Internal ]
+{
+    If '$IsObject(obj) {
+        // All numbers, bools, null, etc. will always fail this test. 
+        // Only strings of the form "${myVarName}" will pass
+        If ($Length(obj) > 3) && ($Extract(obj, 1, 2) = "${") && ($Extract(obj, *) = "}") {
+            Set varName = $Extract(obj, 3, *-1)
+            Set varName = $ZStrip(varName, "<>WC")
+            Return $System.Util.GetEnviron(varName)
+        }
+        Return obj
+    }
+
+    // If the object is already a copy, we don't need to create a new copy recursively
+    If 'CopyCreated {
+        Set obj = obj.%FromJSON(obj.%ToJSON())
+    }
+    Set iter = obj.%GetIterator()
+    While iter.%GetNext(.key, .value, .type) {
+        // type cannot be set for array / object
+        If (type = "object") || (type = "array") {
+            Set type = ""
+        }
+        // since we are already in a recursive call, we don't need to create a new copy
+        Do obj.%Set(key, ..%Evaluate(value, 1), type) 
+    }
     Return obj
 }
 
