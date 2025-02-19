@@ -41,7 +41,7 @@ Method GetArg(package As %String, args... As %String) As %IPM.DataType.Any
         }
         Set obj = obj.%Get(args(i))
     }
-    Return %Evaluate(obj)
+    Return ..%Evaluate(obj)
 }
 
 /// Recursively evaluate ${myVarName} to the value of the variable myVarName
