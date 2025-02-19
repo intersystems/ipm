@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #541 Added support for ORAS repository
 - #702 Added a new lifecycle phase `Initialize` which is used for preload
 - #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
-- #704 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax
+- #704,743 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax. Environment variables are also supported via ${var} syntax.
 - #710 Added support for `module-version` command which updates the version of a module
 - #716,#733 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. Fail early if external name is illegal / empty.
 
