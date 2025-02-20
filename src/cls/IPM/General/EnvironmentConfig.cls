@@ -44,10 +44,16 @@ Method GetArg(package As %String, args... As %String) As %IPM.DataType.Any
     Return ..%Evaluate(obj)
 }
 
-/// Recursively evaluate ${myVarName} to the value of the variable myVarName
 /// The input could be a primitive type, a dynamic object, or a dynamic array
-/// "CopyCreated" should only be used internally to avoid computation overhead. It should not be used by the any caller other than the recursive call in itself.
-ClassMethod %Evaluate(obj As %IPM.DataType.Any, CopyCreated As %Boolean = 0) As %IPM.DataType.Any [ Internal ]
+/// This function wll evaluate ${myVarName} to the value of the environment variable $myVarName
+/// If the environment variable is not set, it will be empty string
+ClassMethod %Evaluate(obj As %IPM.DataType.Any) As %IPM.DataType.Any
+{
+    Return ..%EvaluateHelper(obj, 0)
+}
+
+/// Acutal implementation of %Evaluate
+ClassMethod %EvaluateHelper(obj As %IPM.DataType.Any, copyCreated As %Boolean) As %IPM.DataType.Any [ Internal, Private ]
 {
     If '$IsObject(obj) {
         // All numbers, bools, null, etc. will always fail this test. 
@@ -61,7 +67,7 @@ ClassMethod %Evaluate(obj As %IPM.DataType.Any, CopyCreated As %Boolean = 0) As 
     }
 
     // If the object is already a copy, we don't need to create a new copy recursively
-    If 'CopyCreated {
+    If 'copyCreated {
         Set obj = obj.%FromJSON(obj.%ToJSON())
     }
     Set iter = obj.%GetIterator()
@@ -71,7 +77,7 @@ ClassMethod %Evaluate(obj As %IPM.DataType.Any, CopyCreated As %Boolean = 0) As 
             Set type = ""
         }
         // since we are already in a recursive call, we don't need to create a new copy
-        Do obj.%Set(key, ..%Evaluate(value, 1), type) 
+        Do obj.%Set(key, ..%EvaluateHelper(value, 1), type) 
     }
     Return obj
 }
