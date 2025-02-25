@@ -24,6 +24,7 @@ Method Load(path As %String)
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file. Expected a JSON object, not a JSON array"))
         }
         Do ..MergeDynamicObjects(..Config, newConfig)
+        Set ..Config = ..%Evaluate(..Config)
     } Catch ex {
         Do ..Clear()
         Throw ex
@@ -41,7 +42,7 @@ Method GetArg(package As %String, args... As %String) As %IPM.DataType.Any
         }
         Set obj = obj.%Get(args(i))
     }
-    Return ..%Evaluate(obj)
+    Return obj
 }
 
 /// The input could be a primitive type, a dynamic object, or a dynamic array
