@@ -57,12 +57,14 @@ ClassMethod %Evaluate(obj As %IPM.DataType.Any) As %IPM.DataType.Any
 ClassMethod %EvaluateHelper(obj As %IPM.DataType.Any, copyCreated As %Boolean) As %IPM.DataType.Any [ Internal, Private ]
 {
     If '$IsObject(obj) {
-        // All numbers, bools, null, etc. will always fail this test. 
-        // Only strings of the form "${myVarName}" will pass
-        If ($Length(obj) > 3) && ($Extract(obj, 1, 2) = "${") && ($Extract(obj, *) = "}") {
-            Set varName = $Extract(obj, 3, *-1)
-            Set varName = $ZStrip(varName, "<>WC")
-            Return $System.Util.GetEnviron(varName)
+        Set regex= "\$\{([a-zA-Z0-9_]+)\}"
+        For {
+            Set matcher = ##class(%Regex.Matcher).%New(regex, obj)
+            If 'matcher.Locate() {
+                Quit
+            }
+            Set varName = $Extract(matcher.Group, 3, *-1)
+            Set obj = matcher.ReplaceFirst($System.Util.GetEnviron(varName))
         }
         Return obj
     }
