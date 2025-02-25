@@ -1,4 +1,4 @@
-Include (%IPM.Common, %IPM.Formatting)
+Include %IPM.Common
 
 Class %IPM.Repo.Oras.PackageService Extends %IPM.Repo.Http.PackageService
 {
@@ -87,10 +87,10 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 		Set response=request.HttpResponse
 		If response.StatusCode'=200 {
 			// TODO improve error processing
-			Write !, $$$FormattedLine($$$Red, "Error: ORAS namespace is not set and the call to /v2/_catalog endpoint failed")
-			Write !, $$$FormattedLine($$$Red, "Either set an ORAS namespace or ensure the ORAS server supports the /v2/_catalog endpoint")
-			Write !, $$$FormattedLine($$$Red, "Response Code: "_response.StatusCode _ " - " _ response.Data.Read())
-			Return ""
+			Set msg = "Error: ORAS namespace is not set and the call to /v2/_catalog endpoint failed"
+			Set msg = msg _ $Char(10,13) _ "Either set an ORAS namespace or ensure the ORAS server supports the /v2/_catalog endpoint"
+			Set msg = msg _ $Char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.Data.Read()
+			$$$ThrowStatus($$$ERROR($$$GeneralError, msg))
 		}
 
 		#; Handle results
