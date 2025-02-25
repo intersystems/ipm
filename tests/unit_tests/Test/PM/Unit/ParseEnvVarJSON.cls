@@ -62,7 +62,7 @@ ClassMethod UnsetEnvironmentVariable()
     Do os.environ.pop(..#ENVNAME, "")
 }
 
-Method TestarseEnvVarJSON()
+Method TestParseEnvVarJSON()
 {
     Do ..SetEnvironmentVariable()
 
