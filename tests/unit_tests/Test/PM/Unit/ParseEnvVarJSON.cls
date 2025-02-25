@@ -1,19 +1,33 @@
 Class Test.PM.Unit.ParseEnvVarJSON Extends %UnitTest.TestCase
 {
 
-Parameter ENVNAME = "mySecretEnvVarName";
+Parameter ENVNAME1 = "mySecretEnvVarName1";
 
-Parameter ENVVALUE = "This is a secret value";
+Parameter ENVNAME2 = "mySecretEnvVarName2";
+
+Parameter ENVNAME3 = "mySecretEnvVarName3";
+
+Parameter ENVNAME4 = "mySecretEnvVarName4";
+
+Parameter ENVVALUE1 = "This is a secret value 1 with "" ";
+
+Parameter ENVVALUE2 = "This is a secret value 2 with "" ";
+
+Parameter ENVVALUE3 = "This is a secret value 3 with "" ";
+
+Parameter ENVVALUE4 = "This is a secret value 4 with "" ";
 
 XData SampleJSON [ MimeType = application/json ]
 {
 {
     "package": {
         "nested": {
-            "key": "${mySecretEnvVarName}"
+            "key": "${mySecretEnvVarName1}"
         },
         "other": [ 1, 2, 3 ]
-    }
+    },
+    "toplevel": "${mySecretEnvVarName2}",
+    "arrayConcatenated": ["${mySecretEnvVarName3}${mySecretEnvVarName4}"]
 }
 }
 
@@ -53,33 +67,35 @@ ClassMethod SetEnvironmentVariable()
     // Will update once we have a pure COS way to do this.
     Set os = ##class(%SYS.Python).Import("os")
     // Note: the putenv only affects environment variables for the current process without any mapping to the actual environment variables.
-    Do os.putenv(..#ENVNAME, ..#ENVVALUE)
+    Do os.putenv(..#ENVNAME1, ..#ENVVALUE1)
+    Do os.putenv(..#ENVNAME2, ..#ENVVALUE2)
+    Do os.putenv(..#ENVNAME3, ..#ENVVALUE3)
+    Do os.putenv(..#ENVNAME4, ..#ENVVALUE4)
 }
 
 ClassMethod UnsetEnvironmentVariable()
 {
     Set os = ##class(%SYS.Python).Import("os")
-    Do os.environ.pop(..#ENVNAME, "")
+    Do os.environ.pop(..#ENVNAME1, "")
+    Do os.environ.pop(..#ENVNAME2, "")
+    Do os.environ.pop(..#ENVNAME3, "")
+    Do os.environ.pop(..#ENVNAME4, "")
 }
 
 Method TestParseEnvVarJSON()
 {
     Do ..SetEnvironmentVariable()
 
-    Set xdataID=$classname()_"||SampleJSON"
+    Set xdataID=$CLASSNAME()_"||SampleJSON"
     Set compiledXdata=##class(%Dictionary.CompiledXData).%OpenId(xdataID)
     Set stream=compiledXdata.Data
-    Do $$$AssertTrue($IsObject(stream))
-
+    Do $$$AssertTrue($ISOBJECT(stream))
     Set sampleJSON = {}.%FromJSON(stream)
 
-    Set output = ##class(%IPM.General.EnvironmentConfig).%Evaluate(sampleJSON).%ToJSON()
-    Set expected = $Replace(sampleJSON.%ToJSON(), "${"_..#ENVNAME_"}", ..#ENVVALUE)
-    Do $$$AssertEquals(output, expected)
-
-    Set output = ##class(%IPM.General.EnvironmentConfig).%Evaluate("${"_..#ENVNAME_"}")
-    Set expected = ..#ENVVALUE
-    Do $$$AssertEquals(output, expected)
+    Set parsedJSON = ##class(%IPM.General.EnvironmentConfig).%Evaluate(sampleJSON)
+    Do $$$AssertEquals(parsedJSON.package.nested.key, ..#ENVVALUE1)
+    Do $$$AssertEquals(parsedJSON.toplevel, ..#ENVVALUE2)
+    Do $$$AssertEquals(parsedJSON.arrayConcatenated."0", ..#ENVVALUE3_..#ENVVALUE4)
 
     Do ..UnsetEnvironmentVariable()
 }
