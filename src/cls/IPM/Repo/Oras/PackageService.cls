@@ -76,6 +76,73 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 	Set tList = ##class(%Library.ListOfObjects).%New()
 			
 	#; get all versions
+
+	// When no namespace is specified, we can only call "v2/_catalog" to get all the packages. In case of error, fail descriptively
+	If (..Namespace = "") {
+		Set request = ..GetHttpRequest()
+		#; Make GET request
+		// response is a JSON structure like {"repositories":["package1", "package2", ...]}
+		Set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
+		$$$ThrowOnError(tSC)
+		Set response=request.HttpResponse
+		If response.StatusCode'=200 {
+			// TODO improve error processing
+			Set msg = "Error: ORAS namespace is not set and the call to /v2/_catalog endpoint failed"
+			Set msg = msg _ $Char(10,13) _ "Either set an ORAS namespace or ensure the ORAS server supports the /v2/_catalog endpoint"
+			Set msg = msg _ $Char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.Data.Read()
+			$$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+		}
+
+		#; Handle results
+		Set json = ""
+		While 'response.Data.AtEnd {
+			Set json = json _ response.Data.Read()
+		}
+		Set data = ##class(%DynamicAbstractObject).%FromJSON(json)
+		Set iter = data.repositories.%GetIterator()
+		While iter.%GetNext(.key, .package, .type) {
+			If (package="") { 
+				Continue
+			}
+			#; filter by module name
+			If (name'="") && (package'=name) {
+				Continue
+			}
+			#; get all versions
+			Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
+			Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
+			Set pointer = 0
+			While $ListNext(allTagsList,pointer,tag) {
+				#; filter by version
+				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
+				If 'tVersion.Satisfies(tVersionExpression) { 
+					Continue
+				}
+
+				#; get metadata from annotations
+				Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
+				set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+				Do artifactMetadata.%JSONImport(metadata)
+
+				Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
+				Set tModRef.Name = artifactMetadata.ImageTitle
+				Set tModRef.Repository = artifactMetadata.ImageSource
+				Set tModRef.VersionString = artifactMetadata.ImageVersion
+				Set tModRef.Description = artifactMetadata.ImageDescription
+				Set tModRef.Deployed = artifactMetadata.IPMDeployed
+				Set tModRef.AllVersions = allTagsString
+				Set tModRef.Origin = artifactMetadata.IPMOrigin
+				Do tList.Insert(tModRef)
+
+				#; If not all versions are requested, return the latest one
+				If 'pSearchCriteria.AllVersions, name="" {
+					Quit
+				}
+			}
+		}
+		Return tList
+	}
+
 	Set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
 	Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
 	Set pointer = 0

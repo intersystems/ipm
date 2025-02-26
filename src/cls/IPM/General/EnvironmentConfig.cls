@@ -24,6 +24,7 @@ Method Load(path As %String)
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file. Expected a JSON object, not a JSON array"))
         }
         Do ..MergeDynamicObjects(..Config, newConfig)
+        Set ..Config = ..%Evaluate(..Config)
     } Catch ex {
         Do ..Clear()
         Throw ex
@@ -40,6 +41,46 @@ Method GetArg(package As %String, args... As %String) As %IPM.DataType.Any
             Return ""
         }
         Set obj = obj.%Get(args(i))
+    }
+    Return obj
+}
+
+/// The input could be a primitive type, a dynamic object, or a dynamic array
+/// This function wll evaluate ${myVarName} to the value of the environment variable $myVarName
+/// If the environment variable is not set, it will be empty string
+ClassMethod %Evaluate(obj As %IPM.DataType.Any) As %IPM.DataType.Any
+{
+    Return ..%EvaluateHelper(obj, 0)
+}
+
+/// Acutal implementation of %Evaluate
+ClassMethod %EvaluateHelper(obj As %IPM.DataType.Any, copyCreated As %Boolean) As %IPM.DataType.Any [ Internal, Private ]
+{
+    If '$IsObject(obj) {
+        Set regex= "\$\{([a-zA-Z0-9_]+)\}"
+        For {
+            Set matcher = ##class(%Regex.Matcher).%New(regex, obj)
+            If 'matcher.Locate() {
+                Quit
+            }
+            Set varName = $Extract(matcher.Group, 3, *-1)
+            Set obj = matcher.ReplaceFirst($System.Util.GetEnviron(varName))
+        }
+        Return obj
+    }
+
+    // If the object is already a copy, we don't need to create a new copy recursively
+    If 'copyCreated {
+        Set obj = obj.%FromJSON(obj.%ToJSON())
+    }
+    Set iter = obj.%GetIterator()
+    While iter.%GetNext(.key, .value, .type) {
+        // type cannot be set for array / object
+        If (type = "object") || (type = "array") {
+            Set type = ""
+        }
+        // since we are already in a recursive call, we don't need to create a new copy
+        Do obj.%Set(key, ..%EvaluateHelper(value, 1), type) 
     }
     Return obj
 }

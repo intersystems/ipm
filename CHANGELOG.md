@@ -16,11 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #541 Added support for ORAS repository
 - #702 Added a new lifecycle phase `Initialize` which is used for preload
 - #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
-- #704 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax
+- #704,743 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax. Environment variables are also supported via ${var} syntax.
 - #710 Added support for `module-version` command which updates the version of a module
 - #716,#733 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. Fail early if external name is illegal / empty.
 - #720 Added support to export package with Python dependencies exported as a wheel file.
 - #720 Support offline installation of oras using fixed version of pure python wheels and an adaptor for rpds.
+- #746: Added support for loading modules synchronously without multiprocessing
 
 ### Changed
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
@@ -31,7 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #635: When calling the "package" command, the directory is now normalized to include trailing slash (or backslash).
 - #696: Fix a bug that caused error status to be ignored when publishing a module.
 - #700: Fix a bug due to incompatible conventions between SemVer and OCI tags
-- #669: Work with a wider variety of ORAS repos (removes _catalog call)
 - #726,#729: Fixed a bug where install/loading a tarball doesn't install dependencies from `.modules` subfolder even when it's available
 - #731: Issue upgrading from v0.9.x due to refactor of repo classes
 - #718: Upload zpm.xml (without the version) as an artifact to provide a more stable URL to latest release artifact on GitHub
@@ -135,4 +135,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
-
