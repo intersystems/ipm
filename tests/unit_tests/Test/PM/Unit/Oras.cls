@@ -17,6 +17,7 @@ Method TestOras()
     // Set up ORAS repo
     Do ..AssertNoException("repo -o -name oci -url " _ Registry)
 	Do ..RunCommand("repo -list")
+	Do ..RunCommand("repo -list-modules")
     
     &sql(SELECT id INTO :ociId FROM %IPM_Repo_Oras.definition WHERE name='oci')
     Do $$$AssertEquals(SQLCODE, 0)
