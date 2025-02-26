@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="python-wheel.ZPM">
+    <Module>
+      <Name>python-wheel</Name>
+      <Version>0.0.1</Version>
+      <Packaging>module</Packaging>
+      <PythonWheel Name="ipm_dummy_package-0.1-py3-none-any.whl" Directory="."/>
+    </Module>
+  </Document>
+</Export>
