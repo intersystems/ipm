@@ -13,10 +13,6 @@ Property Directory As %IPM.DataType.ResourceDirectory [ InitialExpression = "whe
 
 Property ExtraPipFlags As %IPM.DataType.CommandLineArgs;
 
-/// Called as phase <var>pPhase</var> is executed for the resource. If <var>pResourceHandled</var> is set to true,
-/// then the default behavior for that resource will be bypassed in the current phase.
-/// Currently, this is only used in the Verify phase, because of different handling of intermediate error statuses.
-/// TODO: Implement for standard database resources (.INC, .CLS, etc.)
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
 {
     If (pPhase '= "Initialize") {
