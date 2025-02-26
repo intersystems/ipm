@@ -297,6 +297,7 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
+<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -2068,6 +2069,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
+	Set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
 	Merge tParams = pCommandInfo("data")
 	Set tParams("cmd") = "load"
 	Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
@@ -2111,7 +2113,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
 	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
 	Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams)
+	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
 	Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 	$$$ThrowOnError(tSC)
 }
