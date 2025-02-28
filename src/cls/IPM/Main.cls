@@ -823,6 +823,47 @@ ClassMethod GetVersion(ModuleName, ByRef out, list)
 	Quit sc
 }
 
+ClassMethod GetSystemMode()
+{
+	New $Namespace
+	Set $Namespace = "%SYS"
+	If $$$ISOK(##class(Config.Startup).Get(.tProperties)) {
+		Quit $Get(tProperties("SystemMode")) 
+	}
+	Quit ""
+}
+
+ClassMethod BuildIntroMessages() As %List
+{
+	Do ##class(%IPM.Main).GetVersion("zpm",.out)	
+	If $Get(out) = "" {
+		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
+	} Else {
+		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
+	}
+	Set systemMode = ..GetSystemMode()
+	If systemMode = "" {
+		Set systemMode = "System Mode: <unset>"
+	} Else {
+		Set systemMode = "System Mode: " _ systemMode
+	}
+	Set cls = "%ZHSLIB.Version", mthd = "GetFullBuildNumber"
+	If $System.CLS.IsMthd(cls, mthd) {
+		Set version = "HealthShare: " _ $ClassMethod(cls, mthd)
+	} Else {
+		Set version = $zv
+	}
+	Write !, $ZVersion // $ZV is too long for the box
+	Set list = $ListBuild(
+		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
+		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
+		registryInfo,
+		version,
+		systemMode
+	)
+	Quit list
+}
+
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
@@ -836,17 +877,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	If (tCommand '= "") {
 		Set tOneCommand = 1
 	}
-	do ##class(%IPM.Main).GetVersion("zpm",.out)	
-	If $Get(out) = "" {
-		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
-	} Else {
-		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
-	}
-	Set introMessageList = $ListBuild(
-		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
-		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
-		registryInfo
-	)
+	Set introMessageList = ..BuildIntroMessages()
 	Set tInShell = 0
 	For {
 		Kill $$$DeprecationWarned
