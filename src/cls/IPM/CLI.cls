@@ -438,22 +438,44 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Set tAccum = ""
 					Set tState = $$$PREARGUMENT
 				} ElseIf (tState = $$$MODIFIERNAME) {
+					set modifierSubscript = pCommandInfo
 					If $Data(tCommandStructure(pCommandInfo,"modifiers",tAccum)) {
 						Set tModifier = tAccum
 					} ElseIf $Data(tCommandStructure(pCommandInfo,"modifiers",1,tAccum),tAliasFor) {
 						Set tModifier = tAliasFor
+					} ElseIf (($data(pCommandInfo("parameters","actions"),phases)) && (pCommandInfo = "module-action")) || ($listfind(##class(%IPM.Main).#STANDARDPHASES,pCommandInfo)) {
+						
+						// Lifecycle phases can be called directly or through module-action, we need to share modifiers
+						if (pCommandInfo = "module-action") {
+							set phases = $listfromString(phases)
+						} else {
+							set phases = $lb("module-action")
+						}
+						set llen = $LISTLENGTH(phases)
+						for x=1:1:llen {
+							set currPhase = $listget(phases,x, "")
+							if $data(tCommandStructure(currPhase,"modifiers",tAccum)) {
+								set tModifier = tAccum
+								set modifierSubscript = currPhase
+							} ElseIf $Data(tCommandStructure(currPhase,"modifiers",1,tAccum),tAliasFor) {
+								set tModifier = tAliasFor
+								set modifierSubscript = currPhase
+							} Else {
+								$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Unknown modifier for command '%1': %2",pCommandInfo,tAccum)))
+							}
+						}
 					} Else {
 						$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Unknown modifier for command '%1': %2",pCommandInfo,tAccum)))
 					}
-					If $Data(tCommandStructure(pCommandInfo,"modifiers",tModifier,"dataAlias"),tDataAlias) {
+					If $Data(tCommandStructure(modifierSubscript,"modifiers",tModifier,"dataAlias"),tDataAlias) {
 						Set tDataName = tDataAlias
-						If $Data(tCommandStructure(pCommandInfo,"modifiers",tModifier,"dataValue"),tDataValue) {
+						If $Data(tCommandStructure(modifierSubscript,"modifiers",tModifier,"dataValue"),tDataValue) {
 							Do ..SetData(.pCommandInfo,tDataAlias,tDataValue)
 							Set tState = $$$PREARGUMENT
 						} Else {
 							Set tState = $$$MODIFIERVALUE
 						}
-					} ElseIf tCommandStructure(pCommandInfo,"modifiers",tModifier,"value") {
+					} ElseIf tCommandStructure(modifierSubscript,"modifiers",tModifier,"value") {
 						Set tState = $$$MODIFIERVALUE
 					} Else {
 						Set pCommandInfo("modifiers",tModifier) = ""

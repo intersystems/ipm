@@ -2344,6 +2344,7 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListFromString($Get(pCommandInfo("parameters","actions"))," ")
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
+	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
 	If $ListLength(tPhases) {
 		// Accept lower-case phase names in the command.
 		Set tPtr = 0
@@ -2352,6 +2353,9 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 			Set tActualPhases = tActualPhases_$ListBuild($ZConvert(tPhase, "w"))
 		}
 		Merge tParams = pCommandInfo("data")
+		if $Data(tParams("Path"), path) # 2 {
+			set tParams("Path") = ##class(%File).NormalizeDirectory(path)
+		}
 		$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tActualPhases,tIsComplete,.tParams))
 	} Else {
 		If (tModName '= "") && ##class(%IPM.Storage.Module).NameExists(tModName) {
