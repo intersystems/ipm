@@ -714,7 +714,7 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
   Quit tSC
 }
 
-Method ResolvePipCaller(ByRef pParams) As %List
+ClassMethod ResolvePipCaller(ByRef pParams) As %List
 {
 	Set tUseStandalonePip = ##class(%IPM.Repo.UniversalSettings).GetValue("UseStandalonePip")
 	Set tPipCaller = ##class(%IPM.Repo.UniversalSettings).GetValue("PipCaller")
@@ -734,7 +734,7 @@ Method ResolvePipCaller(ByRef pParams) As %List
 	Return ..DetectPipCaller(tUseStandalonePip, $Get(pParams("Verbose"), 0))
 }
 
-Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
+ClassMethod DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
 {
 	If pVerbose {
 		Write !,"Detecting pip caller"

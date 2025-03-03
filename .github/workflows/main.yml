@@ -41,7 +41,7 @@ jobs:
           echo number=${VERSION} >> $GITHUB_OUTPUT
   
   build:
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: 
       - prepare
     strategy:

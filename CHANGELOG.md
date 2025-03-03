@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #704,743 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax. Environment variables are also supported via ${var} syntax.
 - #710 Added support for `module-version` command which updates the version of a module
 - #716,#733 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. Fail early if external name is illegal / empty.
+- #720 Added support to export package with Python dependencies exported as a wheel file.
+- #720 Support offline installation of oras using fixed version of pure python wheels and an adaptor for rpds.
 - #746: Added support for loading modules synchronously without multiprocessing
 - #749: Added more debugging information in the welcome banner
 
