@@ -1,0 +1,16 @@
+# This requirements.txt will not be picked up or used by IPM.
+# Instead, it's meant to be picked up by dependabot or other vulnerability scanner.
+# Dependencies listed here can and should be used to generate the wheel files for IPM.
+attrs==25.1.0
+certifi==2025.1.31
+charset_normalizer==2.1.1
+idna==3.10
+jsonschema_specifications==2024.10.1
+jsonschema==4.23.0
+oras==0.1.30
+referencing==0.36.2
+requests==2.32.3
+typing_extensions==4.12.2
+urllib3==2.3.0
+# When https://github.com/pypa/pip/pull/10837 is merged, we should specify per-requirement `--no-deps` in requirements.txt directly,
+# so that dependabot etc. don't pick up vulnerabilities in `rpds-py`, which we implement ourselves.
