@@ -833,33 +833,40 @@ ClassMethod GetSystemMode()
 	Quit ""
 }
 
-ClassMethod BuildIntroMessages() As %List
+/// Return a list of messages to display when the shell is first started
+/// For messages that are too long to fit in a box, they should be returned in the outOfBoxMessage parameter
+ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
 {
+	Set cls = "%ZHSLIB.HealthShareMgr", mthd = "VersionInfo"
+	If $System.CLS.IsMthd(cls, mthd) {
+		Set outOfBoxMessage = $ClassMethod(cls, mthd)
+	} Else {
+		Set outOfBoxMessage = $ZVersion
+	}
+
 	Do ##class(%IPM.Main).GetVersion("zpm",.out)	
 	If $Get(out) = "" {
 		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
 	} Else {
 		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
 	}
+
 	Set systemMode = ..GetSystemMode()
 	If systemMode = "" {
 		Set systemMode = "System Mode: <unset>"
 	} Else {
 		Set systemMode = "System Mode: " _ systemMode
 	}
-	Set cls = "%ZHSLIB.Version", mthd = "GetFullBuildNumber"
-	If $System.CLS.IsMthd(cls, mthd) {
-		Set version = "HealthShare: " _ $ClassMethod(cls, mthd)
-	} Else {
-		Set version = $zv
-	}
-	Write !, $ZVersion // $ZV is too long for the box
+
+	Set mirrorStatus = $System.Mirror.GetStatus()
+	Set mirrorStatus = "Mirror Status: " _ mirrorStatus
+
 	Set list = $ListBuild(
 		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
 		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
 		registryInfo,
-		version,
-		systemMode
+		systemMode,
+		mirrorStatus
 	)
 	Quit list
 }
@@ -877,7 +884,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	If (tCommand '= "") {
 		Set tOneCommand = 1
 	}
-	Set introMessageList = ..BuildIntroMessages()
+	Set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
 	Set tInShell = 0
 	For {
 		Kill $$$DeprecationWarned
@@ -887,6 +894,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			// Ensure not displayed if its just one command
 			If 'tInShell && 'tOneCommand {
 				Do ..DrawBorder(introMessageList, ..TerminalPromptColor())
+				Write $Get(outOfBoxMessage),! // Display long messages outside of the box
 				Set tInShell = 1
 			}
 			
