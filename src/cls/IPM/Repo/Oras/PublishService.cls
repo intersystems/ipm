@@ -45,6 +45,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
 		Set metadata.IPMAllVersions = pModule.AllVersions
 		Set metadata.IPMOrigin = pModule.Origin
 		Set metadata.IPMDeployed = pModule.Deployed
+		Set metadata.IPMPlatformVersion = pModule.PlatformVersion
 		Set metadata.IPMModuleV1XML = moduleXML
 		Do metadata.%JSONExportToString(.metaDataString)
 

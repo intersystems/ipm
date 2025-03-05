@@ -122,7 +122,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 				#; get metadata from annotations
 				Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
 				set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-				Do artifactMetadata.%JSONImport(metadata)
+				$$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
 				Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
 				Set tModRef.Name = artifactMetadata.ImageTitle
@@ -130,6 +130,10 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 				Set tModRef.VersionString = artifactMetadata.ImageVersion
 				Set tModRef.Description = artifactMetadata.ImageDescription
 				Set tModRef.Deployed = artifactMetadata.IPMDeployed
+				Set tModRef.PlatformVersion = artifactMetadata.IPMPlatformVersion
+				If artifactMetadata.IPMPlatformVersion '= "" {
+					$$$ThrowOnError(tModRef.PlatformVersions.Insert(artifactMetadata.IPMPlatformVersion))
+				}
 				Set tModRef.AllVersions = allTagsString
 				Set tModRef.Origin = artifactMetadata.IPMOrigin
 				Do tList.Insert(tModRef)
