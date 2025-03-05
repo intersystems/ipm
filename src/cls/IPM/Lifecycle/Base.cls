@@ -1672,7 +1672,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		} ElseIf tVerbose {
 			Write !,"No classes to mark as deployed."
 		}
-		If $Data(tDeployRtnArray) {
+		If ($Data(tDeployRtnArray) || $Data(tDeployClassArray)) {
 			Set ..HasDeployedResources = 1
       Set ..Module.Deployed = 1
       If '$IsObject(..Module.SystemRequirements) {
