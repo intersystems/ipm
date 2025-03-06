@@ -145,12 +145,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 // but this makes IPM less picky about reasonable things users might do.
                 Set tItemFileExtension = $$$lcase("." _ $Piece(..ResourceReference.Name, ".", *))
                 Set tFileExtension =  $$$lcase("." _ ..FilenameExtension)
-                Set tFileExtensionOptions = $ListBuild(tFileExtension, tItemFileExtension)
-                If ..ResourceReference.Deploy {
-                  Set tFileExtensionOptions = tFileExtensionOptions _ $ListBuild(tFileExtension _ ".deploy", tItemFileExtension _ ".deploy")
-                }
-                Set tFileExtensionPtr = 0
-                While $ListNext(tFileExtensionOptions, tFileExtensionPtr, tFileExtension) {
+                For tFileExtension = tFileExtension,tItemFileExtension {
                   Quit:##class(%IPM.Utils.File).Exists(tResourcePath _ tFileExtension)
                 } 
 
