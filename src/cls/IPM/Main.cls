@@ -61,16 +61,19 @@ Currently, there may only be one of these per namespace.
 <example description="Compiles the module named &quot;MyModuleName&quot;">module-action MyModuleName compile</example>
 <example description="Performs multiple actions on the module named &quot;MyModuleName&quot;; &quot;clean&quot; deletes all of its dependenices, and &quot;install&quot; will then re-download them, package the module, and register it in the current namespace's module cache.">MyModuleName clean register</example>
 <example description="Compiles the module named MyUIModule with verbose output and pParams(&quot;UIFW&quot;,&quot;force&quot;) (passed to all lifecycle phases) set to 42.">MyUIModule compile -v -DUIFW.force=42</example>
+<example description="Verify the module MyModule with the env file /path/to/env.json. The module is responsible for accessing the data using %IPM.General.EnvironmentConfig:GetArg()">MyModule verify -env /path/to/env.json</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module on which to perform lifecycle actions" />
 <parameter name="actions" required="true" description="Space-delimited list of module lifecycle phases to run" trailing="true" />
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase(s), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
 
 </command>
 
@@ -95,6 +98,7 @@ included for username, password, Perforce workspace, and a few other settings.
 This command is an alias for `module-action module-name reload`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform reload action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (reload), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
@@ -106,6 +110,7 @@ This command is an alias for `module-action module-name reload`
 This command is an alias for `module-action module-name compile`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform compile action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (compile), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
@@ -117,6 +122,7 @@ This command is an alias for `module-action module-name compile`
 This command is an alias for `module-action module-name test`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform test action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (test),rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
@@ -133,6 +139,7 @@ This command is an alias for `module-action module-name package`
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Use specified path to export package." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="verify" dataPrefix="D">
@@ -140,6 +147,7 @@ This command is an alias for `module-action module-name package`
 This command is an alias for `module-action module-name verify`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform verify action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (verify), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
@@ -151,10 +159,14 @@ This command is an alias for `module-action module-name verify`
 This command is an alias for `module-action module-name publish`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (publish), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
+<modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are published. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="makedeployed">
@@ -162,6 +174,7 @@ This command is an alias for `module-action module-name publish`
 This command is an alias for `module-action module-name makedeployed`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform reload action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (makedeployed), rather than also running predecessors." />
 <modifier name="recurse" aliases="r" description="Runs the specified phase (makedeployed) on the module and all of its dependencies." />
@@ -254,6 +267,7 @@ repositories configured with the 'repo' command.
 <example description="Loads the module described in C:\module\root\path\module.xml">
 load C:\module\root\path\
 load C:\module\root\path\module-0.0.1.tgz
+load C:\module\root\path\module-0.0.1.tar.gz
 </example>
 <example description="Loads the module described in C:\module\root\path\module.xml in developer mode and with verbose output.">
 load -dev -verbose C:\module\root\path\
@@ -269,9 +283,13 @@ load https://github.com/user/repository.git -branch feature-1
 <example description="Loads the module described in C:\module\root\path\module.xml but set pip timeout to 30 seconds">
 	load -extra-pip-flags "--timeout 30" C:\module\root\path\
 </example>
+<example description="Loads the module described in C:\module\root\path\module.xml using the C:\path\to\env.json1 and C:\path\to\env.json2 as the install time configuration">
+load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
+</example>
 
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="nodev" dataAlias="DeveloperMode" dataValue="0" description="Disables the DeveloperMode flag for the module's lifecycle." />
@@ -279,6 +297,7 @@ load https://github.com/user/repository.git -branch feature-1
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
+<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -383,12 +402,16 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Installs HS.JSON but set pip timeout to 30 seconds">
 	install -extra-pip-flags "--timeout 30" HS.JSON
 </example>
+<example description="Installs example-package using the /path/to/env1.json and /path/to/env2.json as the install time configuration">
+install -env /path/to/env1.json;/path/to/env2.json example-package
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to install" />
 <parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="latest" aliases="l" description="Installs the latest available version of this module without prompting the user." />
 <modifier name="prompt" aliases="p" description="Prompts user which version to install, if more then one found." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
@@ -417,12 +440,16 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Reinstalls ZHSLIB but set pip timeout to 30 seconds">
 	reinstall -extra-pip-flags "--timeout 30" ZHSLIB
 </example>
+<example description="Reinstalls example-package using the /path/to/env1.json and /path/to/env2.json as the install time configuration">
+reinstall -env /path/to/env1.json;/path/to/env2.json example-package
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to reinstall" />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="shallow" aliases="s" dataAlias="UpdateSnapshots" dataValue="0" description="Suppresses updating of dependencies with '+snapshot' versions." />
@@ -504,6 +531,8 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <modifier name="tree" aliases="t" description="If specified, show dependency tree for installed modules." />
 <modifier name="description" aliases="d" dataAlias="Desc" dataValue="1" description="Additional information is displayed for each module." />
 <modifier name="showsource" aliases="ss" description="If specified, show dependency list with local source for installed modules." />
+<modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
+<modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 
 </command>
@@ -698,6 +727,32 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</example>
 </command>
 
+<command name="module-version" aliases="modver">
+	<description>
+		Updates the version of the module in the current namespace.
+	</description>
+	<parameter name="module" required="true" description="Name of the module to update the version for." />
+	<parameter name="version" description="Either a valid SemVer string, or 'major', 'minor', 'patch'. If it's 'major', 'minor', or 'patch', will bump the cooresponding part of SemVer." />
+
+	<modifier name="prerelease" value="true" aliases="p" description="Set the prerelease to a specific value" />
+	<modifier name="build" value="true" aliases="b" description="Set the build to a specific value" />
+	<modifier name="force" description="Permit the version to be downgraded. By default, trying to downgrade the version will fail" />
+	<modifier name="quiet" aliases="q" description="Suppress output (except for errors)" />
+
+	<example description="Sets the version of the module HS.JSON to 1.2.3">
+		module-version HS.JSON 1.2.3
+	</example>
+	<example description="Bump the major version the module HS.JSON. If current version is 1.2.3, the new version will be 2.0.0">
+		module-version HS.JSON major
+	</example>
+	<example description="Bump the minor version and set prerelease to 'alpha' and build to 'xyz'. If current version is 1.2.3, the new version will be 1.3.0-alpha+xyz">
+		module-version HS.JSON minor -prerelease alpha -build xyz
+	</example>
+	<example description="Downgrade the version to 1.2.3. If the current version is 1.3.0, this will still work because the force flag is set.">
+		module-version HS.JSON 1.2.3 -force
+	</example>
+</command>
+
 </commands>
 }
 
@@ -768,27 +823,68 @@ ClassMethod GetVersion(ModuleName, ByRef out, list)
 	Quit sc
 }
 
+ClassMethod GetSystemMode()
+{
+	New $Namespace
+	Set $Namespace = "%SYS"
+	If $$$ISOK(##class(Config.Startup).Get(.tProperties)) {
+		Quit $Get(tProperties("SystemMode")) 
+	}
+	Quit ""
+}
+
+/// Return a list of messages to display when the shell is first started
+/// For messages that are too long to fit in a box, they should be returned in the outOfBoxMessage parameter
+ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
+{
+	Set cls = "%ZHSLIB.HealthShareMgr", mthd = "VersionInfo"
+	If $System.CLS.IsMthd(cls, mthd) {
+		Set outOfBoxMessage = $ClassMethod(cls, mthd)
+	} Else {
+		Set outOfBoxMessage = $ZVersion
+	}
+
+	Do ##class(%IPM.Main).GetVersion("zpm",.out)	
+	If $Get(out) = "" {
+		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
+	} Else {
+		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
+	}
+
+	Set systemMode = ..GetSystemMode()
+	If systemMode = "" {
+		Set systemMode = "System Mode: <unset>"
+	} Else {
+		Set systemMode = "System Mode: " _ systemMode
+	}
+
+	Set mirrorStatus = $System.Mirror.GetStatus()
+	Set mirrorStatus = "Mirror Status: " _ mirrorStatus
+
+	Set list = $ListBuild(
+		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
+		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
+		registryInfo,
+		systemMode,
+		mirrorStatus
+	)
+	Quit list
+}
+
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
 	New $$$DeprecationWarned
+	// Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
+	Set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
+
 	Set pException = $$$NULLOREF
 	Set tOneCommand = 0
 	Set tCommand = $Get(pCommand)
 	If (tCommand '= "") {
 		Set tOneCommand = 1
 	}
-	do ##class(%IPM.Main).GetVersion("zpm",.out)	
-	If $Get(out) = "" {
-		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
-	} Else {
-		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
-	}
-	Set introMessageList = $ListBuild(
-		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
-		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
-		registryInfo
-	)
+	Set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
 	Set tInShell = 0
 	For {
 		Kill $$$DeprecationWarned
@@ -798,6 +894,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			// Ensure not displayed if its just one command
 			If 'tInShell && 'tOneCommand {
 				Do ..DrawBorder(introMessageList, ..TerminalPromptColor())
+				Write $Get(outOfBoxMessage),! // Display long messages outside of the box
 				Set tInShell = 1
 			}
 			
@@ -876,6 +973,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..EnableIPM(.tCommandInfo)
 			} ElseIf (tCommandInfo = "unmap") {
 				Do ..UnmapIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "module-version") {
+				Do ..ModuleVersion(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -1030,7 +1129,16 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Quit
   }
   Set tArgs = 0
-	Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root FROM %IPM_Storage.ModuleItem WHERE 1=1 "
+  // HACK: Certain IRIS kit, e.g., irishealth-community 2024.1 comes with %IPM in HSLIB and HSSYS namespaces
+  // The caveat is that the %IPM.Storage.Module doesn't have an "LastUpdated" property
+  // So, we need to check if the property exists before querying it
+  $$$ThrowOnError(##class(%SYSTEM.SQL.Schema).GetAllColumns("%IPM_Storage.ModuleItem", .columns))
+  Set checkUpdateTime = $Data(columns("LastUpdated"))
+  Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root"
+  If checkUpdateTime {
+	Set tQuery = tQuery _ ",LastUpdated"
+  }
+  Set tQuery = tQuery _ " FROM %IPM_Storage.ModuleItem WHERE 1=1 "
   Set pSearch = $ZStrip(pSearch, "<>WC")
   If pSearch'="" {
     If pSearch["," {
@@ -1064,6 +1172,9 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
     Set name = tRes.Name
     Set list = list + 1
 		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
+		If checkUpdateTime {
+			Set list(list) = list(list) _ $ListBuild(tRes.LastUpdated)
+		}
 		If maxWidth<$Length(name) {
       Set maxWidth = $Length(name)
     }
@@ -1870,6 +1981,9 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 		}
 		While tRepoTypeResult.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
+			If tRepoTypeResult.%Get("Moniker") = "http" {
+				Continue
+			}
 			Set tMonikers($ZConvert(tRepoTypeResult.%Get("Moniker"),"L")) = tRepoTypeResult.%Get("Classname")
 			Set tClassList($Increment(tClassList)) = tRepoTypeResult.%Get("Classname")
 			Set tDescList($Increment(tDescList)) = tRepoTypeResult.%Get("Description")
@@ -1994,6 +2108,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
+	Set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
 	Merge tParams = pCommandInfo("data")
 	Set tParams("cmd") = "load"
 	Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
@@ -2002,12 +2117,44 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
-	} ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($Piece(tDirectoryName, ".", *)) = "tgz" {
+	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
-		Set tSC = ##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory)
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Extracting archive to ",tTargetDirectory
+		}
+		$$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
+		// Try to locate the top-level module.xml file
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Trying to locate module.xml file in ", tTargetDirectory
+		}
+		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
+		If (tCount = 0) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
+		}
+
+		// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+		Set tModuleFilePath = $ListGet(tList(tCount), *)
+		Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Found "_tCount_" results. They are: "
+			Set idx = ""
+			For {
+				Set idx = $Order(tList(idx))
+				Quit:(idx="")
+				Write !, $Char(9), $List(tList(idx), *)
+			}
+			Write !, "Using module.xml file at ", tModuleFilePath
+		}
 	}
+
+	// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
+	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
+	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+	Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
+	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
+	Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
+	$$$ThrowOnError(tSC)
 }
 
 ClassMethod CheckModuleNamespace() As %Status
@@ -2157,12 +2304,16 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 {
+	Do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($Get(pCommandInfo("data", "EnvFiles")))
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
-  	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
+	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
 	Set tParams("cmd") = pCommandInfo
 	Merge tParams = pCommandInfo("data")
+	If $Data(tParams("Path"), path) # 2 {
+		Set tParams("Path") = ##class(%File).NormalizeDirectory(path)
+	}
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
 
@@ -2180,9 +2331,9 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
 	}
 	If ( tRegistry = "" ) {
-		Set tRS = ##class(%IPM.Repo.Remote.Definition).PublishingServerFunc()
+		Set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
 		If (tRS.%SQLCODE = 0) && tRS.%Next() {
-			Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
+			Set tServer = $ClassMethod(tRS.Class, "%OpenId", tRS.ID)
 		}
 	} Else {
 		Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
@@ -2194,9 +2345,10 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 
 	Try {
-		Set tManager = ##class(%IPM.Repo.Remote.PublishManager).%Get(.tSC)
+		Set tManager = tServer.GetPublishingManager(.tSC)
 		$$$ThrowOnError(tSC)
 		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+
 		If (isEnabled) {
             Set tResult = 0
 			If ($$$lcase(tVersion)="all") {
@@ -2229,6 +2381,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 {
+	Do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($Get(pCommandInfo("data", "EnvFiles")))
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListFromString($Get(pCommandInfo("parameters","actions"))," ")
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
@@ -2357,7 +2510,7 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 	} Else {
     Set showFields = ""
     If +$Get(pCommandInfo("data","Desc")) {
-      Set showFields = $ListBuild(
+      Set showFields = showFields_$ListBuild(
         "Description",
         "Author.CopyrightDate", 
         "Author.License", 
@@ -3277,6 +3430,96 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 	}
 }
 
+ClassMethod ModuleVersion(ByRef pCommandInfo)
+{
+	Set modName = $Get(pCommandInfo("parameters","module"))
+	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	Set force = $$$HasModifier(pCommandInfo,"force")
+	If (modName = "") {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"No module name specified."))
+	}
+	Set mod = ##class(%IPM.Storage.Module).NameOpen(modName,.sc)
+	If mod = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_modName_" not found."))
+	}
+	Set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(modName)
+	If stream = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module stream "_modName_" not found."))
+	}
+	If 'quiet {
+		Write !,$$$FormatText("Current version of module %1 is: %2", modName, mod.VersionString)
+	}
+
+	// Compute the new semver
+	Set versionString = $Get(pCommandInfo("parameters","version"))
+	If versionString = "major" {
+		Set semver = mod.Version.WithBumpMajor()
+	} ElseIf versionString = "minor" {
+		Set semver = mod.Version.WithBumpMinor()
+	} ElseIf versionString = "patch" {
+		Set semver = mod.Version.WithBumpPatch()
+	} ElseIf versionString = "" {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(mod.Version.ToString())
+	} Else {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(versionString)
+	}
+
+	// Validate the semver
+	If 'semver.%ValidateObject() {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Invalid version string: "_versionString))
+	}
+
+	If $$$HasModifier(pCommandInfo,"prerelease") {
+		Set semver = semver.WithPrerelease($$$GetModifier(pCommandInfo,"prerelease"))
+	}
+	If $$$HasModifier(pCommandInfo,"build") {
+		Set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
+	}
+
+	// Ensure semver is not lower than the current version, unless force is set
+	If ('force) && ('semver.Follows(mod.Version)) {
+		Set msg = $$$FormatText("Cannot set version to %1 as it is not strictly higher than the current version %2 (Use -force to override)", semver.ToString(), mod.VersionString)
+		Set msg = msg _ $Char(10, 13) _ "Note: when either version has a nonempty prerelease value, and differ from the other by major.minor.patch, neither version is considered strictly higher than the other."
+		Set msg = msg _ $Char(10, 13) _ "      See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags for more information."
+		$$$ThrowOnError($$$ERROR($$$GeneralError, msg))
+	}
+	If (semver.ToString() = mod.Version.ToString()) {
+		If 'quiet {
+			Write !,"Version is unchanged - Skipping."
+		}
+		Return
+	}
+
+	If 'quiet {
+		Write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
+	}
+
+	Set initTLevel = $TLevel
+	Set ex = $$$NULLOREF
+	TSTART
+	Try {
+		New %SourceControl
+		Set docName = modName_".ZPM"
+		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		If $IsObject($Get(%SourceControl)) {
+			Write !,"Checking out "_docName
+			$$$ThrowOnError(%SourceControl.CheckOut(docName))
+		}
+		Set mod.Version = semver
+		Set mod.VersionString = semver.ToString()
+		$$$ThrowOnError(mod.%Save())
+		Do ##class(%IPM.StudioDocument.Module).UpdateVersion(modName,semver)
+		TCOMMIT
+	} Catch ex {
+	}
+	While ($TLevel > initTLevel) {
+		TROLLBACK 1
+	}
+	If $IsObject(ex) {
+		Throw ex
+	}
+}
+
 /// Get the mapping relationship for %IPM package. Format: 
 /// <ul>
 /// <li>pIsMappedFrom(destinationNamespace) = sourceNamespace</li>
@@ -3388,6 +3631,11 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     $ListBuild("Installed In", $$$Blue)
   )
 
+  Kill serverVersions
+  If $Data(pModifiers("showupstream")) {
+    Do ..GetUpstreamPackageVersions(.serverVersions)
+  }
+
   Set width = $Get(pList("width")) + 1
   Set tIndent = pIndent
   Set tIndent = $Select(pIndent > 0: pIndent, 1: width)
@@ -3395,14 +3643,33 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     Set info = pList(i)
     Set developerMode = 0
     Set root = ""
-    Set $ListBuild(name, version, externalName, developerMode, root) = info
+    Set $ListBuild(name, version, externalName, developerMode, root, lastUpdated) = info
     Write:i>1 !,?pIndent
     Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Blue, version)
+    If $Data(pModifiers("showupstream")) && ($Data(serverVersions(name)) / 10) {
+      Set r = ""
+      Set diffs = ""
+      For {
+        Set r = $Order(serverVersions(name, r), 1, sVer)
+        If r = "" {
+          Quit
+        }
+        If sVer '= version {
+          Set diffs = diffs_$ListBuild($$$FormatText("%1: %2", r, sVer))
+        }
+      }
+      If diffs '= "" {
+        Write " ", $$$FormattedLine($$$Blue, "(" _ $ListToString(diffs, ", ") _ ")")
+      }
+    }
     If $Get(developerMode) {
       Write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
     }
     If $Data(pModifiers("showsource")) {
       Write " ", $$$FormattedLine($$$Magenta, root)
+    }
+    If $Data(pModifiers("showtime")) && ($Data(lastUpdated) # 2) {
+      Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
     }
 
     Set ptr = 0 
@@ -3415,6 +3682,25 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
         Write !,?tIndent
         Do ..DrawColumn($$$FormattedLine(color, colName _ ": ") _ value)
       }
+    }
+  }
+}
+
+ClassMethod GetUpstreamPackageVersions(Output list)
+{
+  Set query = "SELECT %DLIST(Name) AS Repos FROM %IPM_Repo.Definition"
+  Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
+  $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+  If rs.%Next() {
+    Set repos = rs.%Get("Repos")
+  }
+
+  Set ptr = 0
+  While $ListNext(repos, ptr, r) {
+    Set query = "SELECT Name,Version FROM %IPM_Utils.Module_GetModuleList(?,?) "
+    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, r, 0)
+    While rs.%Next() {
+      Set list(rs.%Get("Name"), r) = rs.%Get("Version")
     }
   }
 }

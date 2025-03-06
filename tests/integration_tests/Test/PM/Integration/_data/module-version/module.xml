@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="mv.ZPM">
+    <Module>
+      <Name>mv</Name>
+      <Version>0.0.2-snapshot+build</Version>
+      <Packaging>module</Packaging>
+      <SystemRequirements/>
+    </Module>
+  </Document>
+</Export>

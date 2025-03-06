@@ -220,6 +220,9 @@ ClassMethod LoadQualifiedReference(pReference As %IPM.Storage.QualifiedModuleInf
 
 ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %Boolean, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
+	// Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
+	Set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
+
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
 	#dim tExpression As %IPM.General.SemanticVersionExpression
@@ -303,7 +306,10 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				// This doesn't make sense if we're loading the dependency from a remote server.
 				Set tDeveloperMode = 1
 			}
+			Set dotModules = ##class(%File).NormalizeDirectory(".modules", tDirectory)
+			Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
 			Set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName)
+			Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		} Else {
 			Set tAsArchive = -1
 			Set tPayload = tClient.GetModule(tModRef, .tAsArchive)
@@ -402,7 +408,10 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 			Write:tVerbose !,tOutput(i)
 		}
 		
+		Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+		Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
 		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository)
+		Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		If $$$ISERR(tSC) {
 			Quit
 		}
@@ -438,6 +447,7 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			Merge tParams("AngularBuild") = pParams("AngularBuild")
 			Merge tParams("Artifactory") = pParams("Artifactory")
 			Merge tParams("AngularArtifact") = pParams("AngularArtifact")
+			Merge tParams("EnvFiles") = pParams("EnvFiles")
 		}
 		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository)
 		If $$$ISERR(tSC) {
@@ -1220,17 +1230,6 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			}
 		}
 		
-		Set tPath = pDirectory_"preload"
-		If ##class(%File).DirectoryExists(tPath) {
-			// Load first, update legacy superclasses, then compile
-			Set tSC = $system.OBJ.ImportDir(tPath,,$Select(tVerbose:"d",1:"-d")_$Select($TLevel:"/multicompile=0",1:""),,1,.tImported)
-			$$$ThrowOnError(tSC)
-			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
-			$$$ThrowOnError(tSC)
-		} Else {
-			Write:tVerbose !,"Skipping preload - directory does not exist."
-		}
-  
 		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
 		$$$ThrowOnError(tSC)
 		Set tSC = tModule.%Reload()

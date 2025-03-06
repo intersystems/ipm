@@ -231,7 +231,6 @@ Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.Res
 	Quit $$$OK
 }
 
-
 /// Evaluates an expression in a provided string. <br />
 /// These special expressions are case-insensitive. <br />
 /// Current valid expressions:

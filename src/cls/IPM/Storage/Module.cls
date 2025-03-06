@@ -29,6 +29,8 @@ Property Packaging As %String [ Required ];
 
 Property Dependencies As list Of %IPM.Storage.ModuleReference(STORAGEDEFAULT = "array");
 
+Property LastUpdated As %TimeStamp;
+
 Relationship Resources As %IPM.Storage.ResourceReference(XMLIO = "IN", XMLITEMNAME = "Resource", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
 /// Calculated property used for XML output of Resources relationship (in a reasonable order:
@@ -164,6 +166,40 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 	Return isEqual
 }
 
+/// Returns a multidimensional array of custom phases defined by the module's invokes,
+/// where the keys are the custom phase names and the values are empty strings.
+/// Custom phases do not have corresponding %method implementation in the lifecycle class.
+/// Return the phases in lower case for case-insensitive lookup.
+Method GetCustomPhases(Output pPhases)
+{
+    Kill pPhases
+    Set pPhases = ""
+    Set key = ""
+    For {
+        Set tInvoke = ..Invokes.GetNext(.key)
+		If key = "" {
+			Quit
+		}
+        If (tInvoke.CustomPhase '= "") {
+            Set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
+        }
+    }
+	For {
+		Set tResource = ..Resources.GetNext(.key)
+		If key = "" {
+			Quit
+		}
+		Set tProcessor = tResource.Processor
+		// %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+		If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+			Set cp = tProcessor.CustomPhase
+			If cp '= "" {
+				Set pPhases($$$lcase(cp)) = cp
+			}
+		}
+	}
+}
+
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
 /// Example: $ListBuild("Clean","Test") or $ListBuild("Test","Install")
 /// @API.Method
@@ -269,7 +305,12 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tLifecycle.PhaseList = tPhases
 		Set tPointer = 0
 		Set tFullStart = $zh
+		Do tModule.GetCustomPhases(.tCustomPhases)
 		While $ListNext(tPhases,tPointer,tOnePhase) {
+            Set tIsCustomPhase = $Data(tCustomPhases($$$lcase(tOnePhase)), tNormalizedPhaseName) # 2
+			If tIsCustomPhase {
+				Set tOnePhase = tNormalizedPhaseName
+			}
 			Set tStart = $zh
 			If tOnePhase="*" {
 				Kill tModule,tLifecycle
@@ -320,12 +361,27 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
           Quit:$$$ISERR(tSC)
         }
         Quit:$$$ISERR(tSC)
-				
-				// Lifecycle before / (phase) / after
-				$$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
-				$$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
-				$$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
-				
+
+        If tIsCustomPhase {
+            Set tKey = ""
+            For {
+                Set tResource = tModule.Resources.GetNext(.tKey)
+                If tKey = "" {
+                    Quit
+                }
+                Set tProcessor = tResource.Processor
+                // %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+                If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+                    $$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
+                }
+            }
+        } Else {
+            // Lifecycle before / (phase) / after
+            $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
+            $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
+            $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
+        }
+
         #; Call Invoke Methods After Phase	
         Set tKey = ""
         For {
@@ -1450,6 +1506,19 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	Return attrValue
 }
 
+/// This callback method is invoked by the <METHOD>%Save</METHOD> method to 
+/// provide notification that the object is being saved. It is called before 
+/// any data is written to disk.
+/// 
+/// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
+/// 
+/// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
+Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
+{
+	Set ..LastUpdated = $ZDateTime($Horolog, 3)
+	Quit $$$OK
+}
+
 Method %EvaluateExpression(pExpr) As %String [ Internal ]
 {
   Try {
@@ -1555,6 +1624,9 @@ Storage Default
 <Value name="27">
 <Value>AvailabilityClass</Value>
 </Value>
+<Value name="28">
+<Value>LastUpdated</Value>
+</Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
@@ -1565,4 +1637,3 @@ Storage Default
 }
 
 }
-

@@ -15,6 +15,10 @@ Parameter MONIKER As STRING [ Abstract ];
 
 Parameter MONIKERALIAS As STRING [ Abstract ];
 
+/// The maximum number of tabs to display for padding purposes.
+/// Override this in subclasses to provide more padding.
+Parameter MaxDisplayTabCount As INTEGER = 3;
+
 Index ServerDefinitionKey On Name [ Unique ];
 
 Property Name As %String(MAXLEN = 100) [ Required ];
@@ -26,6 +30,11 @@ Property Details As %String(MAXLEN = "") [ SqlComputeCode = {Set {*} = ""}, SqlC
 Property Snapshots As %Boolean [ InitialExpression = 0 ];
 
 Property Prereleases As %Boolean [ InitialExpression = 0 ];
+
+/// If set to a non-empty value, this will be used as the sort order for this repository, bypassing the GetSortOrder() method.
+/// This should be only configured by IPM during certain processes (e.g., installing depdenencies from .modules directory).
+/// There is no current plan to support configuring this from the package manager shell.
+Property OverriddenSortOrder As %Integer [ Internal ];
 
 ClassMethod %GetCommandStructure(Output pCommandStructure)
 {
@@ -76,7 +85,24 @@ Method GetPublishService() As %IPM.Repo.IPublishService [ Abstract ]
 ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 {
 	Set tServer = ..%OpenId(pID)
+	If tServer.OverriddenSortOrder '= "" {
+		Quit tServer.OverriddenSortOrder
+	}
 	Quit tServer.GetSortOrder()
+}
+
+/// Get a number of TABs (ascii 9) for display padding purposes.
+/// A total of (..#MaxDisplayTabCount - pDecrement) tabs are returned
+/// This is used to align output in the package manager shell.
+/// If a new option is added to the display, only the parameter `#MaxDisplayTabCount` needs to be changed.
+ClassMethod Padding(pDecrement As %Integer = 0) As %String [ Internal ]
+{
+	Set pDecrement = ..#MaxDisplayTabCount - pDecrement
+	Set tTabs = ""
+	For i = 1:1:pDecrement {
+		Set tTabs = tTabs_$Char(9)
+	}
+	Return tTabs
 }
 
 /// Outputs information about this server to the current device.
@@ -84,12 +110,12 @@ ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 Method Display()
 {
 	Write !,..Name
-	Write !,$c(9),"Source: ",$c(9),$c(9),..Details
-	Write !,$c(9),"Enabled?",$c(9),$c(9),$$$YesNo(..Enabled)
-	Write !,$c(9),"Available?",$c(9),$c(9),$$$YesNo(..GetPackageService().IsAvailable())
-	Write !,$c(9),"Use for Snapshots?",$c(9),$$$YesNo(..Snapshots)
-	Write !,$c(9),"Use for Prereleases?",$c(9),$$$YesNo(..Prereleases)
-	Write !,$c(9),"Is Read-Only?",$c(9),$c(9),$$$YesNo(..ReadOnly)
+	Write !,$c(9),"Source: ",..Padding(1),..Details
+	Write !,$c(9),"Enabled?",..Padding(1),$$$YesNo(..Enabled)
+	Write !,$c(9),"Available?",..Padding(1),$$$YesNo(..GetPackageService().IsAvailable())
+	Write !,$c(9),"Use for Snapshots?",..Padding(2),$$$YesNo(..Snapshots)
+	Write !,$c(9),"Use for Prereleases?",..Padding(2),$$$YesNo(..Prereleases)
+	Write !,$c(9),"Is Read-Only?",..Padding(1),$$$YesNo(..ReadOnly)
 }
 
 /// Called from package manager shell to create or update an instance of this class.
@@ -264,6 +290,9 @@ Storage Default
 </Value>
 <Value name="12">
 <Value>ReadOnly</Value>
+</Value>
+<Value name="13">
+<Value>OverriddenSortOrder</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.DefinitionD</DataLocation>
