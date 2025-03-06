@@ -893,7 +893,6 @@ Method %Compile(ByRef pParams) As %Status
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
 				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject && ('tDeployedItemsLoaded) {
 					Set tDeployedItemsLoaded = 1
-					Set tDeployedDirectory = ##class(%File).NormalizeDirectory("studio-project", ..Module.Root)
 					Merge deployedList = tResource.Processor.CompileFromProjectList
 					Set deployedItem = ""
 					For {

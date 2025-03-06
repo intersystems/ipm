@@ -19,6 +19,7 @@ Property ExportFlags As %String(MAXLEN = "");
 /// Certain Deployed Resources cannot be compiled directly, but must be compiled from a studio project.
 Property CompileFromProject As %Boolean [ InitialExpression = 0 ];
 
+/// If this resource is compiled from a studio project, this is the list of files contained in the project.
 Property CompileFromProjectList As %String [ MultiDimensional ];
 
 }
