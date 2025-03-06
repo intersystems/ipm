@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #720 Support offline installation of oras using fixed version of pure python wheels and an adaptor for rpds.
 - #746: Added support for loading modules synchronously without multiprocessing
 - #749: Added more debugging information in the welcome banner
+- #754: Support publishing and installing deployed items for ORAS repository
 
 ### Changed
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
@@ -36,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #726,#729: Fixed a bug where install/loading a tarball doesn't install dependencies from `.modules` subfolder even when it's available
 - #731: Issue upgrading from v0.9.x due to refactor of repo classes
 - #718: Upload zpm.xml (without the version) as an artifact to provide a more stable URL to latest release artifact on GitHub
+- #754: Fix a bug where `MakeDeployed` doesn't mark a module as deployed if there are only class (but not routine) resources with `Deploy=true`
 
 ### Security
 -
