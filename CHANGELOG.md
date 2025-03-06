@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #527: IPM 0.9.x+ ignores the casing of resources when matching files on disk even on case-sensitive filesystems
 
 ### Fixed
+- HSIEO-10884: Bug Fix - FileCopy to check for $ variables in path
 - HSIEO-11006: Fix conditions for marking code as deployed
 - HSIEO-9269, HSIEO-9402: % percent perforce directories are no longer necessary
 - HSIEO-9269, HSIEO-9404: Repo check should happen in the order to repo creation, not by repo name
@@ -61,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #559: Allow treating the "w" in SemVer x.y.z-w as a post-release rather than pre-release.
 - #607: Uninstall reports deletion of non-classes
 - #606: Don't put garbage folders in tar archive
+- #652: Don't create extra needless mappings (could cause deadlock with parallel installation of dependencies)
 
 ### Security
 -

@@ -27,7 +27,9 @@ Property CSPApplication As %String(MAXLEN = "");
 /// Use this for build artifacts.
 Property Defer As %Boolean [ InitialExpression = 0 ];
 
-Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
+Method OnBeforePhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
   Set tVerbose = $Get(pParams("Verbose"))
 	// Default implementation: call %ValidateObject to validate attributes
@@ -39,7 +41,7 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 		}
 
 		If (pPhase = "Activate") && (..InstallDirectory '= "") && ('..Defer) {
-      Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
+      Set tSource = ..GetSource()
       Set tTarget = ..InstallDirectory
       Set tSC = ..DoCopy(tSource, tTarget, .pParams)
       If $$$ISERR(tSC) {
@@ -52,7 +54,9 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 	Quit tSC
 }
 
-Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+Method OnAfterPhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
   Set tVerbose = $Get(pParams("Verbose"))
 	// Default implementation: call %ValidateObject to validate attributes
@@ -65,7 +69,7 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 		}
 
 		If (pPhase = "Activate") && (..InstallDirectory '= "") && (..Defer) {
-      Set tSource = ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
+      Set tSource = ..GetSource()
       Set tTarget = ..InstallDirectory
       Set tSC = ..DoCopy(tSource, tTarget, .pParams)
       If $$$ISERR(tSC) {
@@ -78,7 +82,10 @@ Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 	Quit tSC
 }
 
-Method OnBeforeArtifact(pExportDirectory As %String, pWorkingDirectory As %String, ByRef pParams) As %Status
+Method OnBeforeArtifact(
+	pExportDirectory As %String,
+	pWorkingDirectory As %String,
+	ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -98,7 +105,11 @@ Method OnBeforeArtifact(pExportDirectory As %String, pWorkingDirectory As %Strin
 	Quit tSC
 }
 
-Method NormalizeNames(ByRef pSource As %String, ByRef pTarget As %String, Output pTargetDir, Output pAsFile As %Boolean)
+Method NormalizeNames(
+	ByRef pSource As %String,
+	ByRef pTarget As %String,
+	Output pTargetDir,
+	Output pAsFile As %Boolean)
 {
   Set pAsFile = 0
   If ("\/"[$Extract(pSource, *))
@@ -121,7 +132,21 @@ Method NormalizeNames(ByRef pSource As %String, ByRef pTarget As %String, Output
   }
 }
 
-Method DoCopy(tSource, tTarget, pParams)
+/// Prefixes the path to the module root if it does not start with a $ variable
+Method GetSource()
+{
+  if (($Extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2) = "{$") || ($Extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2) = "${")) {
+    return $Case(..SourceDirectory, "": ..ResourceReference.Module.Root _ ..ResourceReference.Name,: ..SourceDirectory)
+  }
+  else {
+    return ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
+  }
+}
+
+Method DoCopy(
+	tSource,
+	tTarget,
+	pParams)
 {
   Set tVerbose = $Get(pParams("Verbose"))
   Set tSC = $$$OK
@@ -157,7 +182,12 @@ Method DoCopy(tSource, tTarget, pParams)
   Quit tSC
 }
 
-Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+Method OnExportItem(
+	pFullExportPath As %String,
+	pItemName As %String,
+	ByRef pItemParams,
+	ByRef pParams,
+	Output pItemHandled As %Boolean = 0) As %Status
 {
   
   Set tVerbose = $Get(pParams("Verbose"))
@@ -170,7 +200,10 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 	Quit ..DoCopy(tSource, tTarget, .pParams)
 }
 
-Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
+Method OnPhase(
+	pPhase As %String,
+	ByRef pParams,
+	Output pResourceHandled As %Boolean = 0) As %Status
 {
   Set tVerbose = $Get(pParams("Verbose"))
   If (pPhase = "Clean") {
