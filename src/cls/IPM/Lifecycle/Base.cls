@@ -894,7 +894,7 @@ Method %Compile(ByRef pParams) As %Status
 				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject && ('tDeployedItemsLoaded) {
 					Set tDeployedItemsLoaded = 1
 					Set tDeployedDirectory = ##class(%File).NormalizeDirectory("studio-project", ..Module.Root)
-					$$$ThrowOnError($System.OBJ.Load(tDeployedDirectory_"Deployed.xml", "<none>", , .deployedList))
+					Merge deployedList = tResource.Processor.CompileFromProjectList
 					Set deployedItem = ""
 					For {
 						Set deployedItem = $Order(deployedList(deployedItem))

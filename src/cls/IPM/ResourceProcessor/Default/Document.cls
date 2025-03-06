@@ -177,6 +177,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   Write !, "Skipping deployed resource: " _ ..ResourceReference.Name
                 }
                 Set ..CompileFromProject = 1
+                Set tDeployedDirectory = ##class(%File).NormalizeDirectory("studio-project", ..ResourceReference.Module.Root)
+                $$$ThrowOnError($System.OBJ.Load(tDeployedDirectory_"Deployed.xml", "<none>", , .tLoadedList))
+                Merge ..CompileFromProjectList = tLoadedList
                 Return $$$OK
               }
               Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
