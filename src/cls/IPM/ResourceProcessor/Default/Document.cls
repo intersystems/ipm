@@ -172,6 +172,13 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 Set tSC = $$$OK
                 Quit
               }
+              If ..ResourceReference.Deploy {
+                If tVerbose {
+                  Write !, "Skipping deployed resource: " _ ..ResourceReference.Name
+                }
+                Set ..CompileFromProject = 1
+                Return $$$OK
+              }
               Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
             }
             If $$$ISERR(tSC) Continue

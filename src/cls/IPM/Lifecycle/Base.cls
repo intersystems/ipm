@@ -883,6 +883,7 @@ Method %Compile(ByRef pParams) As %Status
 			}
 		}
 		
+		Set tDeployedItemsLoaded = 0
 		// Build maps of other compilable things
 		Set tKey = ""
 		For {
@@ -890,7 +891,19 @@ Method %Compile(ByRef pParams) As %Status
 			Quit:tKey=""
 			
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
-				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
+				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject && ('tDeployedItemsLoaded) {
+					Set tDeployedItemsLoaded = 1
+					Set tDeployedDirectory = ##class(%File).NormalizeDirectory("studio-project", ..Module.Root)
+					$$$ThrowOnError($System.OBJ.Load(tDeployedDirectory_"Deployed.xml", "<none>", , .deployedList))
+					Set deployedItem = ""
+					For {
+						Set deployedItem = $Order(deployedList(deployedItem))
+						If deployedItem = "" {
+							Quit
+						}
+						Set tCompileFlagMap("ck", deployedItem, deployedItem) = ""
+					}
+				} ElseIf tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
 					Kill tOneResourceList
 					Set tOneResourceList(tResource.Name) = ""
 					Set tSC = tResource.ResolveChildren(.tOneResourceList)
