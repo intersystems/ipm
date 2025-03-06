@@ -1,2 +1,2 @@
 ROUTINE DeployableTest.Routine
- write "hello"
+ Write !, "Hello from DeployableTest.Routine"

@@ -7,7 +7,6 @@
       <Packaging>module</Packaging>
       <Resource Name="DeployableTest.Main.CLS" Deploy="true"/>
       <Resource Name="DeployableTest.Routine.MAC" Deploy="true"/>
-
       <Resource Name="DeployableTest.Undeployed.CLS"/>
     </Module>
   </Document>

@@ -3,7 +3,7 @@ Class DeployableTest.Main
 
 ClassMethod Hello()
 {
-    Write "Hello, World!"
+    Write !, "Hello from DeployableTest.Main"
 }
 
 }

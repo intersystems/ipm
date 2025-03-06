@@ -3,7 +3,7 @@ Class DeployableTest.Undeployed
 
 ClassMethod Hello()
 {
-    Write "Hello, World!"
+    Write !, "Hello from DeployableTest.Undeployed"
 }
 
 }
