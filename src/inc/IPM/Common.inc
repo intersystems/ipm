@@ -71,3 +71,6 @@ ROUTINE %IPM.Common [Type=INC]
 #; Convert module version from/to OCI tag
 #def1arg Semver2Tag(%semver) $Replace(%semver,"+","_")
 #def1arg Tag2Semver(%tag) $Replace(%tag,"_","+")
+
+#; Separator for package version and platform version in OCI tag , e.g. "1.0.0__2024.1"
+#Define OrasTagPlatformSeparator "__"

@@ -114,7 +114,8 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			Set pointer = 0
 			While $ListNext(allTagsList,pointer,tag) {
 				#; filter by version
-				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
+				Set $ListBuild(tModuleVersion, tPlatformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
+				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(tModuleVersion))
 				If 'tVersion.Satisfies(tVersionExpression) { 
 					Continue
 				}
@@ -152,7 +153,8 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 	Set pointer = 0
 	While $ListNext(allTagsList,pointer,tag) {
 		#; filter by version
-		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
+		Set $ListBuild(tModuleVersion, tPlatformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
+		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(tModuleVersion))
 		If 'tVersion.Satisfies(tVersionExpression) { 
 			Continue
 		}
@@ -168,12 +170,10 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 		Set tModRef.VersionString = artifactMetadata.ImageVersion
 		Set tModRef.Description = artifactMetadata.ImageDescription
 		Set tModRef.Deployed = artifactMetadata.IPMDeployed
-		#; If $IsObject(item."platform_versions") {
-		#;   Set tIterPVer = item."platform_versions".%GetIterator() 
-		#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
-		#;     Do tModRef.PlatformVersions.Insert(platformVersion)
-		#;   }
-		#; }
+		Set tModRef.PlatformVersion = artifactMetadata.IPMPlatformVersion
+		If tModRef.Deployed {
+			$$$ThrowOnError(tModRef.PlatformVersions.Insert(artifactMetadata.IPMPlatformVersion))
+		}
 		Set tModRef.AllVersions = allTagsString
 		Set tModRef.Origin = artifactMetadata.IPMOrigin
 		Do tList.Insert(tModRef)
