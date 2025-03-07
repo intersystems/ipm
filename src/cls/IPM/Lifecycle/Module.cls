@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.Lifecycle.Module Extends %IPM.Lifecycle.Base
 {
 
@@ -22,6 +24,20 @@ Method %Clean(ByRef pParams) As %Status
 		Set tSC = ##super(.pParams)
 		If $$$ISERR(tSC) {
 			Quit
+		}
+
+		Set tDeployedProjectName = ..Module.Name _ "___deployed"
+		If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
+			Set project = ##class(%Studio.Project).%OpenId(tDeployedProjectName, , .tSC)
+			If $$$ISERR(tSC) {
+				Quit
+			}
+			For i = 1:1:project.Items.Count() {
+				Set item = project.Items.GetAt(i)
+				write !, "Deleting item: ", item.Name, " in project", tDeployedProjectName
+				// TODO delete item
+			}
+			$$$ThrowOnError(##class(%Studio.Project).Delete(tDeployedProjectName))
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
