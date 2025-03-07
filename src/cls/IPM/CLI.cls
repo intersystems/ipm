@@ -35,6 +35,10 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 	If (tCommand '= "") && (tCommand '= +tCommand) && $Data(tCommandStruct(tCommand)) {
 		Kill tOneCommandStruct
 		Merge tOneCommandStruct = tCommandStruct(tCommand)
+		set phases = $select(tCommand = "module-action":##class(%IPM.Main).#STANDARDPHASES,1:$lb("module-action"))
+		if ((tCommand = "module-action") || ($listfind(##class(%IPM.Main).#STANDARDPHASES,tCommand))) {
+			do ..UnifyLifecycles(.tOneCommandStruct,.tCommandStruct,phases)
+		}
 		Do ..%HelpForCommand(tCommand,.tOneCommandStruct,1,tMarkdown)
 	} Else {
 		// For markdown mode only, merge aliases into main part of tCommandStruct array.
@@ -69,6 +73,10 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 			
 			Kill tOneCommandStruct
 			Merge tOneCommandStruct = tCommandStruct(tCommand)
+			set phases = $select(tCommand = "module-action":##class(%IPM.Main).#STANDARDPHASES,1:$lb("module-action"))
+			if ((tCommand = "module-action") || ($listfind(##class(%IPM.Main).#STANDARDPHASES,tCommand))) {
+				do ..UnifyLifecycles(.tOneCommandStruct,.tCommandStruct,phases)
+			}
 			Do ..%HelpForCommand(tCommand,.tOneCommandStruct,tVerbose,tMarkdown,$Get(tCommandStruct(-1, "maxLength"),0))
 			
 			Write !
@@ -81,7 +89,32 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
 	Write !
 }
 
-ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDetailed As %Boolean = 0, pMarkdownFormat As %Boolean = 0, pMaxLength As %Integer = 0)
+ClassMethod UnifyLifecycles(
+	ByRef tOneCommandStruct,
+	ByRef tCommandStruct,
+	phases As %List)
+{
+
+	set ptr = 0
+	while $listnext(phases, ptr, currPhase) {
+		set key = $order(tCommandStruct(currPhase,"groups","-","modifiers",""),1,modifier)
+		while (key'="") {
+			if ('$data(tOneCommandStruct("modifiers",modifier))) {
+				// Modifier is not present yet
+				set tOneCommandStruct("groups","-","modifiers",key) = modifier
+				merge tOneCommandStruct("modifiers",modifier) = tCommandStruct(currPhase,"modifiers",modifier)
+			}
+			set key = $order(tCommandStruct(currPhase,"groups","-","modifiers",key),1,modifier)
+		}
+	}
+}
+
+ClassMethod %HelpForCommand(
+	pCommandName As %String,
+	ByRef pCommandStruct,
+	pDetailed As %Boolean = 0,
+	pMarkdownFormat As %Boolean = 0,
+	pMaxLength As %Integer = 0)
 {
 	/// Section separator in Markdown
 	#define SectionSeparator $Case(pMarkdownFormat, 1: "-----", : "")
@@ -186,7 +219,9 @@ ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDeta
     Do ..%HelpForCommandDetails(.pCommandStruct, pMarkdownFormat)
 }
 
-ClassMethod %HelpForCommandDetails(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
+ClassMethod %HelpForCommandDetails(
+	ByRef pCommandStruct,
+	pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
 	Do ..%HelpForCommandParameters(.pCommandStruct, pMarkdownFormat)
 	Do ..%HelpForCommandModifiers(.pCommandStruct, pMarkdownFormat)
@@ -200,7 +235,9 @@ ClassMethod %HelpForCommandDetails(ByRef pCommandStruct, pMarkdownFormat As %Boo
 	}
 }
 
-ClassMethod %HelpForCommandParameters(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
+ClassMethod %HelpForCommandParameters(
+	ByRef pCommandStruct,
+	pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
 	If ('$Data(pCommandStruct("parameters"))) {
 		Quit
@@ -243,7 +280,9 @@ ClassMethod %HelpForCommandParameters(ByRef pCommandStruct, pMarkdownFormat As %
   	}
 }
 
-ClassMethod %HelpForCommandModifiers(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
+ClassMethod %HelpForCommandModifiers(
+	ByRef pCommandStruct,
+	pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
 	If ('$Data(pCommandStruct("groups"))) {
     	Quit
@@ -313,7 +352,9 @@ ClassMethod %HelpForCommandModifiers(ByRef pCommandStruct, pMarkdownFormat As %B
   	}
 }
 
-ClassMethod %HelpForCommandExamples(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
+ClassMethod %HelpForCommandExamples(
+	ByRef pCommandStruct,
+	pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
 	If ('$Data(pCommandStruct("examples"))) {
     	Quit
@@ -369,7 +410,9 @@ ClassMethod %HelpForCommandExamples(ByRef pCommandStruct, pMarkdownFormat As %Bo
 /// pCommandInfo("modifiers","<modifier-name>") = "<modifier-value>"
 /// pCommandInfo("parameters","<parameter-name>") = "<parameter-value>"
 /// pCommandInfo("data","<data-name>") = "<data-value>"
-ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) As %Status [ Final ]
+ClassMethod %ParseCommandInput(
+	pCommandString As %String,
+	Output pCommandInfo) As %Status [ Final ]
 {
 	Set tSC = $$$OK
 	Kill pCommandInfo
@@ -438,22 +481,43 @@ ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) A
 					Set tAccum = ""
 					Set tState = $$$PREARGUMENT
 				} ElseIf (tState = $$$MODIFIERNAME) {
+					set modifierSubscript = pCommandInfo
 					If $Data(tCommandStructure(pCommandInfo,"modifiers",tAccum)) {
 						Set tModifier = tAccum
 					} ElseIf $Data(tCommandStructure(pCommandInfo,"modifiers",1,tAccum),tAliasFor) {
 						Set tModifier = tAliasFor
+					} ElseIf (($data(pCommandInfo("parameters","actions"),phases)) && (pCommandInfo = "module-action")) || ($listfind(##class(%IPM.Main).#STANDARDPHASES,pCommandInfo)) {
+						
+						// Lifecycle phases can be called directly or through module-action, we need to share modifiers
+						if (pCommandInfo = "module-action") {
+							set phases = $listfromString(phases)
+						} else {
+							set phases = $lb("module-action")
+						}
+						set ptr = 0
+						while $listnext(phases,ptr,currPhase) {
+							if $data(tCommandStructure(currPhase,"modifiers",tAccum)) {
+								set tModifier = tAccum
+								set modifierSubscript = currPhase
+							} ElseIf $Data(tCommandStructure(currPhase,"modifiers",1,tAccum),tAliasFor) {
+								set tModifier = tAliasFor
+								set modifierSubscript = currPhase
+							} Else {
+								$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Unknown modifier for command '%1': %2",pCommandInfo,tAccum)))
+							}
+						}
 					} Else {
 						$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Unknown modifier for command '%1': %2",pCommandInfo,tAccum)))
 					}
-					If $Data(tCommandStructure(pCommandInfo,"modifiers",tModifier,"dataAlias"),tDataAlias) {
+					If $Data(tCommandStructure(modifierSubscript,"modifiers",tModifier,"dataAlias"),tDataAlias) {
 						Set tDataName = tDataAlias
-						If $Data(tCommandStructure(pCommandInfo,"modifiers",tModifier,"dataValue"),tDataValue) {
+						If $Data(tCommandStructure(modifierSubscript,"modifiers",tModifier,"dataValue"),tDataValue) {
 							Do ..SetData(.pCommandInfo,tDataAlias,tDataValue)
 							Set tState = $$$PREARGUMENT
 						} Else {
 							Set tState = $$$MODIFIERVALUE
 						}
-					} ElseIf tCommandStructure(pCommandInfo,"modifiers",tModifier,"value") {
+					} ElseIf tCommandStructure(modifierSubscript,"modifiers",tModifier,"value") {
 						Set tState = $$$MODIFIERVALUE
 					} Else {
 						Set pCommandInfo("modifiers",tModifier) = ""
@@ -711,7 +775,11 @@ ClassMethod %GetCommandStructure(Output pCommandStructure)
 }
 
 /// Utility method for setting multiple subscripts based on .-delimited <var>pDataName</var>
-ClassMethod SetData(pTargetArray, pDataName, pDataValue, pCustomParam = 0) [ Private, PublicList = pTargetArray ]
+ClassMethod SetData(
+	pTargetArray,
+	pDataName,
+	pDataValue,
+	pCustomParam = 0) [ Private, PublicList = pTargetArray ]
 {
 	If (pCustomParam && (pDataName'[".")) {
 		// dubplicate param without prefix zpm for compatibility
@@ -731,7 +799,9 @@ ClassMethod SetData(pTargetArray, pDataName, pDataValue, pCustomParam = 0) [ Pri
 /// Draw a border around a list of strings. Optionally provide a text format for the strings. <br />
 /// @Argument	pLineList		List of strings to write. <br />
 /// @Argument	pTextFormat		Text format (e.g. $$$Red, $$$Bold, etc.). <br />
-ClassMethod DrawBorder(pLineList As %Library.List, pTextFormat As %Integer = {$$$Default})
+ClassMethod DrawBorder(
+	pLineList As %Library.List,
+	pTextFormat As %Integer = {$$$Default})
 {
 	// Find longest line in list
 	Set ptr = 0
