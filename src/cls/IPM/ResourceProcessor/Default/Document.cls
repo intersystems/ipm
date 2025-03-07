@@ -172,6 +172,16 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 Set tSC = $$$OK
                 Quit
               }
+              If ..ResourceReference.Deploy {
+                If tVerbose {
+                  Write !, "Skipping deployed resource: " _ ..ResourceReference.Name
+                }
+                Set ..CompileFromProject = 1
+                Set tDeployedDirectory = ##class(%File).NormalizeDirectory("studio-project", ..ResourceReference.Module.Root)
+                $$$ThrowOnError($System.OBJ.Load(tDeployedDirectory_"Deployed.xml", "<none>", , .tLoadedList))
+                Merge ..CompileFromProjectList = tLoadedList
+                Return $$$OK
+              }
               Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
             }
             If $$$ISERR(tSC) Continue
@@ -258,23 +268,7 @@ Method OnExportDeployedItem(pFullExportPath As %String, pItemName As %String, By
     Set fileExt = $$$ucase($Piece(pItemName, ".", *))	
     Set tName = $Piece(pItemName, ".", 1, * - 1)	
     Quit:'($ListFind($ListBuild("CLS","MAC","INT"), fileExt))
-    Set tFullExportPath = pFullExportPath	
-    Set tFullExportPath = tFullExportPath _ ".deploy"	
-    Write:tVerbose !,"Exporting Deployed '",pItemName,"' to '",tFullExportPath,"'"	
-    Set list = ""	
-    If fileExt = "CLS" {	
-      Set list = ..ListGlobals4Class(tName)	
-    } Else {	
-      Set list = ..ListGlobals4Routine(tName)	
-    }	
-    Quit:list=""	
-    Set ptr = 0	
-    While $ListNext(list, ptr, item) {
-      Set list(item _ ".gbl") = ""	
-    }	
-    $$$ThrowOnError(##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullExportPath)))	
-    Set flags = $Select(tVerbose: "d", 1: "-d")	
-    $$$ThrowOnError($System.OBJ.Export(.list, tFullExportPath, flags))	
+    // TODO verify that the deployed item is in the %Studio.Project
     Set pItemHandled = 1	
   }	Catch e {	
     Set tSC = e.AsStatus()	
