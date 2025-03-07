@@ -32,7 +32,11 @@ Method IsAvailable() As %Boolean
 
 Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
+	Set version = $$$Semver2Tag(pModuleReference.VersionString)
+	If (pModuleReference.Deployed) {
+		Set version = version _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
+	}
+	Set name = pModuleReference.Name _ ":" _ version
 	Set status = ..Pull(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
 	$$$ThrowOnError(status)
 	#; module is pulled as a .tgz file

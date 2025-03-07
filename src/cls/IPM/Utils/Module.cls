@@ -265,7 +265,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
-    Set tModRef.Deployed = pDeployed
+		Set tModRef.Deployed = pDeployed
+		Set tModRef.PlatformVersion = pPlatformVersion
+		If pDeployed {
+			$$$ThrowOnError(tModRef.PlatformVersions.Insert(pPlatformVersion))
+		}
 		
 		// Make sure we're not downgrading.
 		If '$Get(pParams("PermitDowngrade")) {
