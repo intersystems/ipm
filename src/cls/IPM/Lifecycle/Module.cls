@@ -32,11 +32,23 @@ Method %Clean(ByRef pParams) As %Status
 			If $$$ISERR(tSC) {
 				Quit
 			}
+			Kill deleteList
 			For i = 1:1:project.Items.Count() {
 				Set item = project.Items.GetAt(i)
-				write !, "Deleting item: ", item.Name, " in project", tDeployedProjectName
-				// TODO delete item
+				// TODO fix the following hack
+				If $ListFind($ListBuild(".0.OBJ", ".1.OBJ"), $Extract(item.Name, *-5, *)) {
+					Set deleteList($Extract(item.Name, 1, *-6) _ ".CLS") = ""
+				}
 			}
+			Set item = ""
+			For {
+				Set item = $Order(deleteList(item))
+				If item = "" {
+					Quit
+				}
+				$$$ThrowOnError($System.OBJ.Delete(item))
+			}
+
 			$$$ThrowOnError(##class(%Studio.Project).Delete(tDeployedProjectName))
 		}
 	} Catch e {
