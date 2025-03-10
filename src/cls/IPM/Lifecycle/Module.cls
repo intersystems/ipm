@@ -1,5 +1,3 @@
-Include %IPM.Common
-
 Class %IPM.Lifecycle.Module Extends %IPM.Lifecycle.Base
 {
 
