@@ -18,6 +18,8 @@ Property Version As %IPM.General.SemanticVersion(ForceCodeGenerate = 0, XMLPROJE
 
 Property ExternalName As %String(MAXLEN = 255);
 
+Index ExternalName On ExternalName [ Unique ];
+
 Property Description As %String(MAXLEN = "");
 
 Property Keywords As %String(MAXLEN = "");
@@ -1215,6 +1217,11 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 			If $$$ISERR(tSC) {
 				Quit
 			}
+		}
+		Set query = "SELECT %DLIST(Name) AS NameList FROM %IPM_Storage.ModuleItem"
+		Set rs = ##class(%SQL.Statement).%ExecDirect(,query)
+		If rs.%Next() && $ListFind(rs.%Get("NameList"), ..ExternalName) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("External name '%1' conflicts with the real name of another module", ..ExternalName)))
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
