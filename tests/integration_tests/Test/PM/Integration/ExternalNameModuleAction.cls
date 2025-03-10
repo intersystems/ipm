@@ -17,7 +17,19 @@ Method TestExternalNameModuleAction()
     Do $$$AssertStatusOK(sc, "Successfully executed action by default name")
 
     Set sc = ##class(%IPM.Main).Shell(..#ExternalName_" greeting")
-    Do $$$AssertStatusOK(sc, "Successfully executed action by default name")
+    Do $$$AssertStatusOK(sc, "Successfully executed action by external name")
+
+    Set sc = ##class(%IPM.Main).Shell(..#DefaultName_" package")
+    Do $$$AssertStatusOK(sc, "Successfully package by default name")
+
+    Set sc = ##class(%IPM.Main).Shell(..#ExternalName_" package")
+    Do $$$AssertStatusOK(sc, "Successfully package by external name")
+
+    Set sc = ##class(%IPM.Main).Shell("package "_..#DefaultName)
+    Do $$$AssertStatusOK(sc, "Successfully package by default name")
+
+    Set sc = ##class(%IPM.Main).Shell("package "_..#ExternalName)
+    Do $$$AssertStatusOK(sc, "Successfully package by external name")
 }
 
 }
