@@ -32,7 +32,11 @@ Method IsAvailable() As %Boolean
 
 Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
+	Set version = $$$Semver2Tag(pModuleReference.VersionString)
+	If (pModuleReference.Deployed) {
+		Set version = version _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
+	}
+	Set name = pModuleReference.Name _ ":" _ version
 	Set status = ..Pull(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
 	$$$ThrowOnError(status)
 	#; module is pulled as a .tgz file
@@ -114,7 +118,8 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			Set pointer = 0
 			While $ListNext(allTagsList,pointer,tag) {
 				#; filter by version
-				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
+				Set $ListBuild(tModuleVersion, tPlatformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
+				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(tModuleVersion))
 				If 'tVersion.Satisfies(tVersionExpression) { 
 					Continue
 				}
@@ -122,7 +127,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 				#; get metadata from annotations
 				Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
 				set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-				Do artifactMetadata.%JSONImport(metadata)
+				$$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
 				Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
 				Set tModRef.Name = artifactMetadata.ImageTitle
@@ -130,6 +135,10 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 				Set tModRef.VersionString = artifactMetadata.ImageVersion
 				Set tModRef.Description = artifactMetadata.ImageDescription
 				Set tModRef.Deployed = artifactMetadata.IPMDeployed
+				Set tModRef.PlatformVersion = artifactMetadata.IPMPlatformVersion
+				If artifactMetadata.IPMPlatformVersion '= "" {
+					$$$ThrowOnError(tModRef.PlatformVersions.Insert(artifactMetadata.IPMPlatformVersion))
+				}
 				Set tModRef.AllVersions = allTagsString
 				Set tModRef.Origin = artifactMetadata.IPMOrigin
 				Do tList.Insert(tModRef)
@@ -148,7 +157,8 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 	Set pointer = 0
 	While $ListNext(allTagsList,pointer,tag) {
 		#; filter by version
-		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
+		Set $ListBuild(tModuleVersion, tPlatformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
+		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(tModuleVersion))
 		If 'tVersion.Satisfies(tVersionExpression) { 
 			Continue
 		}
@@ -164,12 +174,10 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 		Set tModRef.VersionString = artifactMetadata.ImageVersion
 		Set tModRef.Description = artifactMetadata.ImageDescription
 		Set tModRef.Deployed = artifactMetadata.IPMDeployed
-		#; If $IsObject(item."platform_versions") {
-		#;   Set tIterPVer = item."platform_versions".%GetIterator() 
-		#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
-		#;     Do tModRef.PlatformVersions.Insert(platformVersion)
-		#;   }
-		#; }
+		Set tModRef.PlatformVersion = artifactMetadata.IPMPlatformVersion
+		If tModRef.Deployed {
+			$$$ThrowOnError(tModRef.PlatformVersions.Insert(artifactMetadata.IPMPlatformVersion))
+		}
 		Set tModRef.AllVersions = allTagsString
 		Set tModRef.Origin = artifactMetadata.IPMOrigin
 		Do tList.Insert(tModRef)

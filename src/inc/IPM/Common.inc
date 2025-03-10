@@ -71,3 +71,15 @@ ROUTINE %IPM.Common [Type=INC]
 #; Convert module version from/to OCI tag
 #def1arg Semver2Tag(%semver) $Replace(%semver,"+","_")
 #def1arg Tag2Semver(%tag) $Replace(%tag,"_","+")
+
+#; Separator for package version and platform version in OCI tag , e.g. "1.0.0__2024.1"
+#Define OrasTagPlatformSeparator "__"
+
+#; Place where Deployed.xml is stored
+#Define DeployedXMLDir "studio-project"
+#Define DeployedXMLName "Deployed.xml"
+#Define DeployedProjectSuffix "__deployed"
+
+#; Variable to keep track of the loaded content of Deployed.xml
+#; Structure: %IPMDeployedProjectItems("/path/to/Deployed.xml") = a tree of the loaded items from project
+#Define DeployedProjectItems %IPMDeployedProjectItems

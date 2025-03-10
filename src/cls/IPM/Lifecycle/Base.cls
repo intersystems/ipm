@@ -351,6 +351,10 @@ Method %Clean(ByRef pParams) As %Status
 							If $$$ISERR(tDelSC) {
 								Write !,"WARNING: ",$System.Status.GetErrorText(tDelSC)
 							}
+						} ElseIf $System.CLS.IsMthd(tClassKey, "%Extends") {
+							// Could apparently get here for a deployed class; neither ^oddCOM nor ^oddDEF exists??
+							// Give it a try, but don't even output a warning.
+							Do $System.OBJ.Delete(tClassKey,$Select(tVerbose:"d",1:"-d"))
 						}
 					}
 					Kill tDeleteArray("CLS")
@@ -883,6 +887,7 @@ Method %Compile(ByRef pParams) As %Status
 			}
 		}
 		
+		Set tDeployedItemsLoaded = 0
 		// Build maps of other compilable things
 		Set tKey = ""
 		For {
@@ -890,7 +895,18 @@ Method %Compile(ByRef pParams) As %Status
 			Quit:tKey=""
 			
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
-				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
+				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject && ('tDeployedItemsLoaded) {
+					Set tDeployedItemsLoaded = 1
+					Merge deployedList = tResource.Processor.CompileFromProjectList
+					Set deployedItem = ""
+					For {
+						Set deployedItem = $Order(deployedList(deployedItem))
+						If deployedItem = "" {
+							Quit
+						}
+						Set tCompileFlagMap("ck", deployedItem, deployedItem) = ""
+					}
+				} ElseIf tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
 					Kill tOneResourceList
 					Set tOneResourceList(tResource.Name) = ""
 					Set tSC = tResource.ResolveChildren(.tOneResourceList)
@@ -1103,6 +1119,13 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			}
 		}
   
+		// Deployed items should be exported as a studio project to a designated directory
+		// Use double underscores to avoid conflicts with names of other modules
+		$$$ThrowOnError(..Module.GetStudioProject(.deployedProject, 1, 0, $$$DeployedProjectSuffix))
+		Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
+		Set qspec = $Select(tVerbose:"d",1:"-d")
+		$$$ThrowOnError(deployedProject.Export(tDeployedProjectPath, qspec))
+
 		Set tFullResourceName = ""
 		For {
 			Set tFullResourceName = $Order(tResourceArray(tFullResourceName),1,tSrcModule)
@@ -1672,7 +1695,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		} ElseIf tVerbose {
 			Write !,"No classes to mark as deployed."
 		}
-		If $Data(tDeployRtnArray) {
+		If ($Data(tDeployRtnArray) || $Data(tDeployClassArray)) {
 			Set ..HasDeployedResources = 1
       Set ..Module.Deployed = 1
       If '$IsObject(..Module.SystemRequirements) {
