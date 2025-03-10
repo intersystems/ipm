@@ -211,7 +211,10 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"),0)
 		Set tModule = ..NameOpen(pModuleName,,.tSC)
-		If '$isobject(tModule) {
+		If '$Isobject(tModule) {
+			Set tModule = ..ExternalNameOpen(pModuleName,,.tSC)
+		}
+		If '$Isobject(tModule) {	
 			$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' not found.", pModuleName)))
 		}
 		$$$ThrowOnError(tSC)
