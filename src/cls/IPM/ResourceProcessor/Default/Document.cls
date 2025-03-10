@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.ResourceProcessor.Default.Document Extends %IPM.ResourceProcessor.AbstractCompilable
 {
 
@@ -177,9 +179,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   Write !, "Skipping deployed resource: " _ ..ResourceReference.Name
                 }
                 Set ..CompileFromProject = 1
-                Set tDeployedDirectory = ##class(%File).NormalizeDirectory("studio-project", ..ResourceReference.Module.Root)
-                $$$ThrowOnError($System.OBJ.Load(tDeployedDirectory_"Deployed.xml", "<none>", , .tLoadedList))
-                Set tDeployedProjectName = ..ResourceReference.Module.Name _ "___deployed"
+                Set tDeployedDirectory = ##class(%File).NormalizeDirectory($$$DeployedXMLDir, ..ResourceReference.Module.Root)
+                $$$ThrowOnError($System.OBJ.Load(tDeployedDirectory_$$$DeployedXMLName, "<none>", , .tLoadedList))
+                Set tDeployedProjectName = ..ResourceReference.Module.Name _ "_" _ $$$DeployedProjectSuffix
                 If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
                   If tVerbose {
                     Write !, "Deleting deployed project '" _ tDeployedProjectName _ "' while preserving loaded resources"

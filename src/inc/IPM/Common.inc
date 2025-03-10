@@ -74,3 +74,8 @@ ROUTINE %IPM.Common [Type=INC]
 
 #; Separator for package version and platform version in OCI tag , e.g. "1.0.0__2024.1"
 #Define OrasTagPlatformSeparator "__"
+
+#; Place where Deployed.xml is stored
+#Define DeployedXMLDir "studio-project"
+#Define DeployedXMLName "Deployed.xml"
+#Define DeployedProjectSuffix "__deployed"

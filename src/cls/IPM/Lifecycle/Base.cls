@@ -1121,11 +1121,10 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
   
 		// Deployed items should be exported as a studio project to a designated directory
 		// Use double underscores to avoid conflicts with names of other modules
-		#Define DeployedProjectSuffix "__deployed"
 		$$$ThrowOnError(..Module.GetStudioProject(.deployedProject, 1, 0, $$$DeployedProjectSuffix))
-		Set tDeployedDirectory = ##class(%File).NormalizeDirectory("studio-project", pTargetDirectory)
+		Set tDeployedDirectory = ##class(%File).NormalizeDirectory($$$DeployedXMLDir, pTargetDirectory)
 		Set qspec = $Select(tVerbose:"d",1:"-d")
-		$$$ThrowOnError(deployedProject.Export(tDeployedDirectory_"Deployed.xml", qspec))
+		$$$ThrowOnError(deployedProject.Export(tDeployedDirectory_$$$DeployedXMLName, qspec))
 
 		Set tFullResourceName = ""
 		For {
