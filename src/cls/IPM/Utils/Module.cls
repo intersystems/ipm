@@ -2368,4 +2368,10 @@ ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %Strin
 	Quit tString
 }
 
+ClassMethod GetDeployedProjectPath(root As %String) As %String
+{
+	Set deployedDirectory = ##class(%File).NormalizeDirectory($$$DeployedXMLDir, root)
+	Quit deployedDirectory_$$$DeployedXMLName
+}
+
 }

@@ -179,8 +179,8 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   Write !, "Skipping deployed resource: " _ ..ResourceReference.Name
                 }
                 Set ..CompileFromProject = 1
-                Set tDeployedDirectory = ##class(%File).NormalizeDirectory($$$DeployedXMLDir, ..ResourceReference.Module.Root)
-                $$$ThrowOnError($System.OBJ.Load(tDeployedDirectory_$$$DeployedXMLName, "<none>", , .tLoadedList))
+                Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Name)
+                $$$ThrowOnError($System.OBJ.Load(tDeployedProjectPath, "<none>", , .tLoadedList))
                 Set tDeployedProjectName = ..ResourceReference.Module.Name _ "_" _ $$$DeployedProjectSuffix
                 If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
                   If tVerbose {
