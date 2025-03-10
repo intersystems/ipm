@@ -176,22 +176,27 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
               }
               If ..ResourceReference.Deploy {
                 If tVerbose {
-                  Write !, "Skipping deployed resource: " _ ..ResourceReference.Name
+                  Write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
                 }
                 Set ..CompileFromProject = 1
                 Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
-                $$$ThrowOnError($System.OBJ.Load(tDeployedProjectPath, "<none>", , .tLoadedList))
-                Set tDeployedProjectName = ..ResourceReference.Module.Name _ "_" _ $$$DeployedProjectSuffix
-                If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
-                  If tVerbose {
-                    Write !, "Deleting deployed project '" _ tDeployedProjectName _ "' while preserving loaded resources"
-                  }
-                  $$$ThrowOnError(##class(%Studio.Project).Delete(tDeployedProjectName))
+                If $Data($$$DeployedProjectItems(tDeployedProjectPath), compileFromProjectList) {
+                  Merge ..CompileFromProjectList = compileFromProjectList
                 } Else {
-                  /// Shouldn't reach here
-                  $$$ThrowStatus("Deployed project '" _ tDeployedProjectName _ "' not found after successful loading.")
+                  $$$ThrowOnError($System.OBJ.Load(tDeployedProjectPath, "<none>", , .tLoadedList))
+                  Set tDeployedProjectName = ..ResourceReference.Module.Name _ "_" _ $$$DeployedProjectSuffix
+                  If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
+                    If tVerbose {
+                      Write !, "Deleting deployed project '" _ tDeployedProjectName _ "' while preserving loaded resources"
+                    }
+                    $$$ThrowOnError(##class(%Studio.Project).Delete(tDeployedProjectName))
+                  } Else {
+                    /// Shouldn't reach here
+                    $$$ThrowStatus("Deployed project '" _ tDeployedProjectName _ "' not found after successful loading.")
+                  }
+                  Merge ..CompileFromProjectList = tLoadedList
+                  Merge $$$DeployedProjectItems(tDeployedProjectPath) = tLoadedList
                 }
-                Merge ..CompileFromProjectList = tLoadedList
                 Return $$$OK
               }
               Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")

@@ -79,3 +79,7 @@ ROUTINE %IPM.Common [Type=INC]
 #Define DeployedXMLDir "studio-project"
 #Define DeployedXMLName "Deployed.xml"
 #Define DeployedProjectSuffix "__deployed"
+
+#; Variable to keep track of the loaded content of Deployed.xml
+#; Structure: %IPMDeployedProjectItems("/path/to/Deployed.xml") = a tree of the loaded items from project
+#Define DeployedProjectItems %IPMDeployedProjectItems
