@@ -32,6 +32,14 @@ _ $Case(..Prerelease, "": "", : "-" _ ..Prerelease)
 _ $Case(..Build, "": "", : "+" _ ..Build)
 }
 
+Method ToStringWithoutBuild() As %String [ CodeMode = expression ]
+{
+..Major 
+_ "." _ ..Minor 
+_ $Case(..Patch, "": "", : "." _ ..Patch) 
+_ $Case(..Prerelease, "": "", : "-" _ ..Prerelease)
+}
+
 ClassMethod FromString(pString As %String) As %IPM.General.SemanticVersion
 {
   Set tVer = ..%New()

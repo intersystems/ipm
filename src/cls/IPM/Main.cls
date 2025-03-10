@@ -753,6 +753,17 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</example>
 </command>
 
+<command name="information" aliases="info">
+	<description>Output information about the current ZPM environment.</description>
+	<modifier name="verbose" aliases="v" description="Show more detailed information"/>
+	<example description="Show basic information about the current ZPM environment">
+		info
+	</example>
+	<example description="Show detailed information about the current ZPM environment">
+		info -verbose
+	</example>
+</command>
+
 </commands>
 }
 
@@ -975,6 +986,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..UnmapIPM(.tCommandInfo)
 			} ElseIf (tCommandInfo = "module-version") {
 				Do ..ModuleVersion(.tCommandInfo)
+			} ElseIf (tCommandInfo = "information") {
+				Do ..Information(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -3703,6 +3716,54 @@ ClassMethod GetUpstreamPackageVersions(Output list)
       Set list(rs.%Get("Name"), r) = rs.%Get("Version")
     }
   }
+}
+
+ClassMethod Information(ByRef pCommandInfo)
+{
+	Set verbose = $$$HasModifier(pCommandInfo,"verbose")
+	// Get all dependency modules
+	$$$ThrowOnError(##class(%IPM.Utils.Module).BuildAllDependencyGraphs(, .graph))
+	Set sub = "" 
+	For {
+		Set sub = $Order(graph(sub))
+		If sub = "" {
+			Quit
+		}
+		Set dep= ""
+		For {
+			Set dep= $Order(graph(sub, dep))
+			If dep= "" {
+				Quit
+			}
+			Set dependencies(dep) = ""
+		}
+	}
+
+	Do ..GetListModules(,,.list)
+	Set updatedList("width") = 0
+	For i = 1:1:list {
+		Set entry = list(i)
+		Set name = $ListGet(entry, 1)
+		// only list non-dependencies
+		If $Data(dependencies(name)) {
+			Continue
+		}
+		Set package = ##class(%IPM.Storage.Module).NameOpen(name, , .sc)
+		$$$ThrowOnError(sc)
+		If (package.ExternalName '= "") && (package.ExternalName '= name) {
+			If verbose {
+				Set $List(entry, 1) = package.ExternalName_" (" _ name _ ")"
+			} Else {
+				Set $List(entry, 1) = package.ExternalName
+			}
+		}
+		If updatedList("width") < $Length($ListGet(entry)) {
+			Set updatedList("width") = $Length($ListGet(entry))
+		}
+		Set $List(entry, 2) = package.Version.ToStringWithoutBuild()
+		Set updatedList($Increment(updatedList)) = entry
+	}
+	Do ..DisplayModules(.updatedList)
 }
 
 }
