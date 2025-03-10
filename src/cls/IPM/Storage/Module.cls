@@ -213,6 +213,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tModule = ..NameOpen(pModuleName,,.tSC)
 		If '$Isobject(tModule) {
 			Set tModule = ..ExternalNameOpen(pModuleName,,.tSC)
+			Set pModuleName = tModule.Name
 		}
 		If '$Isobject(tModule) {	
 			$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' not found.", pModuleName)))
