@@ -179,7 +179,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   Write !, "Skipping deployed resource: " _ ..ResourceReference.Name
                 }
                 Set ..CompileFromProject = 1
-                Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Name)
+                Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
                 $$$ThrowOnError($System.OBJ.Load(tDeployedProjectPath, "<none>", , .tLoadedList))
                 Set tDeployedProjectName = ..ResourceReference.Module.Name _ "_" _ $$$DeployedProjectSuffix
                 If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
