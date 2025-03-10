@@ -25,10 +25,6 @@ Method %Clean(ByRef pParams) As %Status
 		If $$$ISERR(tSC) {
 			Quit
 		}
-		Set tDeployedProjectName = ..Module.Name _ "___deployed"
-		If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
-			$$$ThrowOnError(##class(%Studio.Project).Delete(tDeployedProjectName))
-		}
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

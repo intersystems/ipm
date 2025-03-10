@@ -179,6 +179,16 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 Set ..CompileFromProject = 1
                 Set tDeployedDirectory = ##class(%File).NormalizeDirectory("studio-project", ..ResourceReference.Module.Root)
                 $$$ThrowOnError($System.OBJ.Load(tDeployedDirectory_"Deployed.xml", "<none>", , .tLoadedList))
+                Set tDeployedProjectName = ..ResourceReference.Module.Name _ "___deployed"
+                If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
+                  If tVerbose {
+                    Write !, "Deleting deployed project '" _ tDeployedProjectName _ "' while preserving loaded resources"
+                  }
+                  $$$ThrowOnError(##class(%Studio.Project).Delete(tDeployedProjectName))
+                } Else {
+                  /// Shouldn't reach here
+                  $$$ThrowStatus("Deployed project '" _ tDeployedProjectName _ "' not found after successful loading.")
+                }
                 Merge ..CompileFromProjectList = tLoadedList
                 Return $$$OK
               }
