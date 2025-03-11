@@ -81,5 +81,6 @@ ROUTINE %IPM.Common [Type=INC]
 #Define DeployedProjectSuffix "__deployed"
 
 #; Variable to keep track of the loaded content of Deployed.xml
-#; Structure: %IPMDeployedProjectItems("/path/to/Deployed.xml") = a tree of the loaded items from project
-#Define DeployedProjectItems %IPMDeployedProjectItems
+#; Structure: %IPMDeployedProjectInstalled("/path/to/first/Deployed.xml") = ""
+#;            %IPMDeployedProjectInstalled("/path/to/second/Deployed.xml") = ""
+#Define DeployedProjectInstalled %IPMDeployedProjectInstalled

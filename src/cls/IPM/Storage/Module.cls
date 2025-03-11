@@ -385,7 +385,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
             }
         } Else {
             // Lifecycle before / (phase) / after
-			New $$$DeployedProjectItems
+			New $$$DeployedProjectInstalled
             $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
             $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
             $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))

@@ -180,9 +180,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 }
                 Set ..CompileFromProject = 1
                 Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
-                If $Data($$$DeployedProjectItems(tDeployedProjectPath), compileFromProjectList) {
-                  Merge ..CompileFromProjectList = compileFromProjectList
-                } Else {
+                If '$Data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
                   Do ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>", , .project)
                   If $IsObject(project) {
                     If tVerbose {
@@ -194,7 +192,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                     $$$ThrowStatus("Deployed project '" _ project.Name _ "' not found after successful loading.")
                   }
                   Merge ..CompileFromProjectList = tLoadedList
-                  Merge $$$DeployedProjectItems(tDeployedProjectPath) = tLoadedList
+                  Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
                 }
                 Return $$$OK
               }
