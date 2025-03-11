@@ -2536,6 +2536,19 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		Set tDesc=+$Get(pCommandInfo("data","Desc"))
     Do ..GetListModules(,tSearchString, .list, showFields, $Get(pCommandInfo("modifiers", "repository")))
 	}
+  For i = 1:1:list {
+	Set entry = list(i)
+	Set name = $ListGet(entry,1)
+	Set externalName = $ListGet(entry,3)
+	Set displayName = $Select(externalName'= "":externalName, 1:name)
+	If (displayName '= name) {
+		Set displayName = displayName_" ("_name_")"
+	}
+	Set $List(list(i), 1) = displayName
+	If list("width") < $Length(displayName) {
+		Set list("width") = $Length(displayName)
+	}
+  }
   Merge tModifiers = pCommandInfo("modifiers")
   Do ..DisplayModules(.list,,,, .tModifiers)
 }
@@ -3755,19 +3768,19 @@ ClassMethod Information(ByRef pCommandInfo)
 		If $Data(dependencies(name)) {
 			Continue
 		}
-		Set package = ##class(%IPM.Storage.Module).NameOpen(name, , .sc)
-		$$$ThrowOnError(sc)
-		If (package.ExternalName '= "") && (package.ExternalName '= name) {
+		Set externalName = $List(entry, 3)
+		If (externalName '= "") && (externalName '= name) {
 			If verbose {
-				Set $List(entry, 1) = package.ExternalName_" (" _ name _ ")"
+				Set $List(entry, 1) = externalName_" (" _ name _ ")"
 			} Else {
-				Set $List(entry, 1) = package.ExternalName
+				Set $List(entry, 1) = externalName
 			}
 		}
 		If updatedList("width") < $Length($ListGet(entry)) {
 			Set updatedList("width") = $Length($ListGet(entry))
 		}
-		Set $List(entry, 2) = package.Version.ToStringWithoutBuild()
+		Set version = ##class(%IPM.General.SemanticVersion).FromString($List(entry, 2))
+		Set $List(entry, 2) = version.ToStringWithoutBuild()
 		Set updatedList($Increment(updatedList)) = entry
 	}
 	Do ..DisplayModules(.updatedList)
