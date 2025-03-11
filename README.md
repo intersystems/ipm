@@ -71,8 +71,7 @@ This is described in the [following set of articles](https://community.intersyst
 The simplest and template repository [can be found here](https://openexchange.intersystems.com/package/objectscript-package-example).
 Here is the [alternative supported folder structure.](https://openexchange.intersystems.com/package/objectscript-package-template)
 
-
-
 ## Support and Collaboration
+Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for best development practices.
 ObjectScript Package Manager is a community supported project and thus open to collaboration via Pull Requests.
 Issues and feature requests [are very welcome](https://github.com/intersystems-community/zpm/issues)
