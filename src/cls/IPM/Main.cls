@@ -1311,7 +1311,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 		$$$ThrowOnError(tSC)
 		Set tService = tRepository.GetPackageService()
 		Set tInfo = tService.GetInfo()
-		Write !,$$$FormattedLine($$$Blue,tRepository.URL)," - ",tInfo.ToString()
+		Write !,$$$FormattedLine($$$Default,tRepository.URL)," - ",tInfo.ToString()
 	}
 	Quit $$$OK
 }
@@ -3594,10 +3594,10 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     $ListBuild("Author.Notes", $$$Yellow, "Notes"),
     $ListBuild("Author.Organization", $$$Yellow, "Organization"),
     $ListBuild("Author.Person", $$$Yellow, "Author"),
-    $ListBuild("Origin", $$$Blue),
-    $ListBuild("AllVersions", $$$Blue, "Versions"),
-    $ListBuild("Repository", $$$Blue),
-    $ListBuild("Installed In", $$$Blue)
+    $ListBuild("Origin", $$$Default),
+    $ListBuild("AllVersions", $$$Default, "Versions"),
+    $ListBuild("Repository", $$$Default),
+    $ListBuild("Installed In", $$$Default)
   )
 
   Kill serverVersions
@@ -3614,7 +3614,7 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
     Set root = ""
     Set $ListBuild(name, version, externalName, developerMode, root, lastUpdated) = info
     Write:i>1 !,?pIndent
-    Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Blue, version)
+    Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Default, version)
     If $Data(pModifiers("showupstream")) && ($Data(serverVersions(name)) / 10) {
       Set r = ""
       Set diffs = ""
@@ -3628,7 +3628,7 @@ ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespac
         }
       }
       If diffs '= "" {
-        Write " ", $$$FormattedLine($$$Blue, "(" _ $ListToString(diffs, ", ") _ ")")
+        Write " ", $$$FormattedLine($$$Default, "(" _ $ListToString(diffs, ", ") _ ")")
       }
     }
     If $Get(developerMode) {
