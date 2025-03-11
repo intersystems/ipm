@@ -1116,7 +1116,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 		$$$ThrowOnError(..Module.GetStudioProject(.deployedProject, 1, 0, $$$DeployedProjectSuffix))
 		Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
 		Set qspec = $Select(tVerbose:"d",1:"-d")
-		$$$ThrowOnError(deployedProject.Export(tDeployedProjectPath, qspec))
+		$$$ThrowOnError(deployedProject.DeployToFile(tDeployedProjectPath, qspec))
 
 		Set tFullResourceName = ""
 		For {
