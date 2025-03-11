@@ -183,16 +183,15 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 If $Data($$$DeployedProjectItems(tDeployedProjectPath), compileFromProjectList) {
                   Merge ..CompileFromProjectList = compileFromProjectList
                 } Else {
-                  $$$ThrowOnError($System.OBJ.Load(tDeployedProjectPath, "<none>", , .tLoadedList))
-                  Set tDeployedProjectName = ..ResourceReference.Module.Name _ "_" _ $$$DeployedProjectSuffix
-                  If ##class(%Studio.Project).%ExistsId(tDeployedProjectName) {
+                  Do ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>", , .project)
+                  If $IsObject(project) {
                     If tVerbose {
-                      Write !, "Deleting deployed project '" _ tDeployedProjectName _ "' while preserving loaded resources"
+                      Write !, "Deleting deployed project '" _ project.Name _ "' while preserving loaded resources"
                     }
-                    $$$ThrowOnError(##class(%Studio.Project).Delete(tDeployedProjectName))
+                    $$$ThrowOnError(##class(%Studio.Project).Delete(project.Name))
                   } Else {
                     /// Shouldn't reach here
-                    $$$ThrowStatus("Deployed project '" _ tDeployedProjectName _ "' not found after successful loading.")
+                    $$$ThrowStatus("Deployed project '" _ project.Name _ "' not found after successful loading.")
                   }
                   Merge ..CompileFromProjectList = tLoadedList
                   Merge $$$DeployedProjectItems(tDeployedProjectPath) = tLoadedList
