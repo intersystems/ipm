@@ -213,12 +213,14 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tModule = ..NameOpen(pModuleName,,.tSC)
 		If '$Isobject(tModule) {
 			Set tModule = ..ExternalNameOpen(pModuleName,,.tSC)
-			Set pModuleName = tModule.Name
 		}
 		If '$Isobject(tModule) {	
 			$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' not found.", pModuleName)))
 		}
 		$$$ThrowOnError(tSC)
+
+		// Regardless of whether the module was opened by name or external name, we want to use the name for the rest of the method.
+		Set pModuleName = tModule.Name
 		
 		// Ensure we reload and reinitialize transient properties.
 		// For example, prevents reuse of a previous OverrideLifecycleClass if the module object is in memory in the caller.
@@ -1222,9 +1224,9 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 				Quit
 			}
 		}
-		Set query = "SELECT %DLIST(Name) AS NameList FROM %IPM_Storage.ModuleItem"
-		Set rs = ##class(%SQL.Statement).%ExecDirect(,query)
-		If rs.%Next() && $ListFind(rs.%Get("NameList"), ..ExternalName) {
+		Set query = "SELECT COUNT(*) AS Conflict FROM %IPM_Storage.ModuleItem WHERE Name = ? AND Name <> ?"
+		Set rs = ##class(%SQL.Statement).%ExecDirect(,query, ..ExternalName, ..Name)
+		If rs.%Next() && (rs.%Get("Conflict") > 0) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("External name '%1' conflicts with the real name of another module", ..ExternalName)))
 		}
 	} Catch e {
