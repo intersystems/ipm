@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #718: Upload zpm.xml (without the version) as an artifact to provide a more stable URL to latest release artifact on GitHub
 - #754: Fix a bug where `MakeDeployed` doesn't mark a module as deployed if there are only class (but not routine) resources with `Deploy=true`
 
+- #722: Unified modifiers between ModuleAction and RunOnePhase
+
 ### Security
 -
 
@@ -64,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #680 Always export static files (README.md, LICENSE, requirements.txt) if existent
 - #678 Only update comment-flagged part of the language extension, allowing users to keep their custom code when upgrading
 - #680, #683 Always export static files (README.md, LICENSE, requirements.txt, CHANGELOG.md) if existent
+- #745 Allow publishing of deployments without developer mode
 
 ### Security
 - #697 When publishing modules, will get an status with error message (instead of just a boolean) in case of failures.
