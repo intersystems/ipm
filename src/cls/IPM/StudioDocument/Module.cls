@@ -344,6 +344,65 @@ Method ImportFromXML(stream As %RegisteredObject, flags As %String) As %Status
 	Quit $$$OK
 }
 
+/// XSLT to replace the top-level module version with a new value
+XData UpdateVersionTransform [ XMLNamespace = "http://www.intersystems.com/studio/document" ]
+{
+<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:param name="replacement" select="'replacementValue'" />
+
+  <xsl:template match="@*|node()">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()" />
+    </xsl:copy>
+  </xsl:template>
+
+  <xsl:template match="Module/Version">
+    <xsl:copy>
+      <xsl:value-of select="$replacement" />
+    </xsl:copy>
+  </xsl:template>
+
+</xsl:stylesheet>
+}
+
+/// Returns a compiled XSLT to update a module's version to the specified <var>semver</var> in its XML representation
+ClassMethod CompiledUpdateVersionXSLT(semver As %IPM.General.SemanticVersion) As %XML.XSLT.CompiledStyleSheet
+{
+	Set tXData = ##class(%Dictionary.CompiledXData).IDKEYOpen($ClassName(), "UpdateVersionTransform",,.tSC)
+	$$$ThrowOnError(tSC)
+	Set s = ""
+	While 'tXData.Data.AtEnd {
+		Set s = s _ tXData.Data.Read()
+	}
+	Set s = $REPLACE(s, "replacementValue", semver.ToString())
+	Set stream = ##class(%Stream.TmpCharacter).%New()
+	$$$ThrowOnError(stream.Write(s))
+	$$$ThrowOnError(stream.Rewind())
+	Set tSC = ##class(%XML.XSLT.CompiledStyleSheet).CreateFromStream(stream, .compiledStyleSheet)
+	$$$ThrowOnError(tSC)
+
+	Quit compiledStyleSheet
+}
+
+/// Updates the version of <var>moduleName</var> to <var>semver</var>
+ClassMethod UpdateVersion(moduleName As %String, semver As %IPM.General.SemanticVersion)
+{
+	// Can't use %IPM.Repo.XSLTProvider because we need to pass a parameter
+	Set compiledTransform = ..CompiledUpdateVersionXSLT(semver)
+	Set document = ##class(%Library.RoutineMgr).%OpenId(moduleName_".ZPM")
+	If '$IsObject(document) {
+		// %Library.RoutineMgr:%OpenId doesn't have a byref status arg.
+		$$$ThrowStatus($Get(%objlasterror,$$$ERROR($$$GeneralError,"Unknown error occurred.")))
+	}
+
+	$$$ThrowOnError(document.Code.Rewind())
+	$$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(document.Code, compiledTransform, .updatedContents))
+	$$$ThrowOnError(document.Code.Clear())
+	$$$ThrowOnError(document.Code.CopyFrom(updatedContents))
+	$$$ThrowOnError(document.%Save())
+}
+
 XData ExternalXSL
 {
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">

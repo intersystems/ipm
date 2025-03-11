@@ -32,7 +32,7 @@ Method IsAvailable() As %Boolean
 
 Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-	Set name = pModuleReference.Name _ ":" _ pModuleReference.VersionString
+	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
 	Set status = ..Pull(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
 	$$$ThrowOnError(status)
 	#; module is pulled as a .tgz file
@@ -42,13 +42,13 @@ Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive A
 
 Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
 {
-	Set name = pModuleReference.Name _ ":" _ pModuleReference.VersionString
+	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
 	Return ..GetModuleXMLPy(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 }
 
 Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
 {
-	Set name = pModuleReference.Name _ ":" _ pModuleReference.VersionString
+	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
 	
 	#; Get ORAS client
 	Set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
@@ -62,7 +62,6 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 	Set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
 	#; Parse search criteria
-	// The OCI /v2/_catalog endpoint always returns all packages. We will filter by name and version on the client side.
 	Set name = $$$lcase(pSearchCriteria.Name)
 	Set tVersionExpression = pSearchCriteria.VersionExpression
 	Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
@@ -75,69 +74,109 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 
 	#; Get all modules
 	Set tList = ##class(%Library.ListOfObjects).%New()
-	Set request = ..GetHttpRequest()
-	
-	#; Make GET request
-	// response is a JSON structure like {"repositories":["package1", "package2", ...]}
-	Set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
-	$$$ThrowOnError(tSC)
-	Set response=request.HttpResponse
-	If response.StatusCode'=200 {
-		// todo improve error processing
-		Set data = response.Data.Read()
-		Write !, "Error! " _ response.StatusCode _ ": " _ response.ReasonPhrase
-		Return ""
-	}
+			
+	#; get all versions
 
-	#; Handle results
-	Set json = response.Data.ReadLine()
-	Set data = ##class(%DynamicAbstractObject).%FromJSON(json)
-	Set iter = data.repositories.%GetIterator()
-	While iter.%GetNext(.key, .package, .type) {
-		If (package="") { 
-			Continue
+	// When no namespace is specified, we can only call "v2/_catalog" to get all the packages. In case of error, fail descriptively
+	If (..Namespace = "") {
+		Set request = ..GetHttpRequest()
+		#; Make GET request
+		// response is a JSON structure like {"repositories":["package1", "package2", ...]}
+		Set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
+		$$$ThrowOnError(tSC)
+		Set response=request.HttpResponse
+		If response.StatusCode'=200 {
+			// TODO improve error processing
+			Set msg = "Error: ORAS namespace is not set and the call to /v2/_catalog endpoint failed"
+			Set msg = msg _ $Char(10,13) _ "Either set an ORAS namespace or ensure the ORAS server supports the /v2/_catalog endpoint"
+			Set msg = msg _ $Char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.Data.Read()
+			$$$ThrowStatus($$$ERROR($$$GeneralError, msg))
 		}
-		#; filter by module name
-		If (name'="") && (package'=name) {
-			Continue
+
+		#; Handle results
+		Set json = ""
+		While 'response.Data.AtEnd {
+			Set json = json _ response.Data.Read()
 		}
-		
-		#; get all versions
-		Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
-		Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
-		Set pointer = 0
-		While $ListNext(allTagsList,pointer,tag) {
-			#; filter by version
-			Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
-			If 'tVersion.Satisfies(tVersionExpression) { 
+		Set data = ##class(%DynamicAbstractObject).%FromJSON(json)
+		Set iter = data.repositories.%GetIterator()
+		While iter.%GetNext(.key, .package, .type) {
+			If (package="") { 
 				Continue
 			}
-
-			#; get metadata from annotations
-			Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
-			set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-			Do artifactMetadata.%JSONImport(metadata)
-
-			Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-			Set tModRef.Name = artifactMetadata.ImageTitle
-			Set tModRef.Repository = artifactMetadata.ImageSource
-			Set tModRef.VersionString = artifactMetadata.ImageVersion
-			Set tModRef.Description = artifactMetadata.ImageDescription
-			Set tModRef.Deployed = artifactMetadata.IPMDeployed
-			#; If $IsObject(item."platform_versions") {
-			#;   Set tIterPVer = item."platform_versions".%GetIterator() 
-			#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
-			#;     Do tModRef.PlatformVersions.Insert(platformVersion)
-			#;   }
-			#; }
-			Set tModRef.AllVersions = allTagsString
-			Set tModRef.Origin = artifactMetadata.IPMOrigin
-			Do tList.Insert(tModRef)
-			
-			#; If not all versions are requested, return the latest one
-			If 'pSearchCriteria.AllVersions, name="" {
-				Quit
+			#; filter by module name
+			If (name'="") && (package'=name) {
+				Continue
 			}
+			#; get all versions
+			Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
+			Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
+			Set pointer = 0
+			While $ListNext(allTagsList,pointer,tag) {
+				#; filter by version
+				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
+				If 'tVersion.Satisfies(tVersionExpression) { 
+					Continue
+				}
+
+				#; get metadata from annotations
+				Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
+				set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+				Do artifactMetadata.%JSONImport(metadata)
+
+				Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
+				Set tModRef.Name = artifactMetadata.ImageTitle
+				Set tModRef.Repository = artifactMetadata.ImageSource
+				Set tModRef.VersionString = artifactMetadata.ImageVersion
+				Set tModRef.Description = artifactMetadata.ImageDescription
+				Set tModRef.Deployed = artifactMetadata.IPMDeployed
+				Set tModRef.AllVersions = allTagsString
+				Set tModRef.Origin = artifactMetadata.IPMOrigin
+				Do tList.Insert(tModRef)
+
+				#; If not all versions are requested, return the latest one
+				If 'pSearchCriteria.AllVersions, name="" {
+					Quit
+				}
+			}
+		}
+		Return tList
+	}
+
+	Set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
+	Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
+	Set pointer = 0
+	While $ListNext(allTagsList,pointer,tag) {
+		#; filter by version
+		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
+		If 'tVersion.Satisfies(tVersionExpression) { 
+			Continue
+		}
+
+		#; get metadata from annotations
+		Set metadata = ..GetPackageMetadataPy(..Location, name, "", tag, client)
+		set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+		Do artifactMetadata.%JSONImport(metadata)
+
+		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
+		Set tModRef.Name = artifactMetadata.ImageTitle
+		Set tModRef.Repository = artifactMetadata.ImageSource
+		Set tModRef.VersionString = artifactMetadata.ImageVersion
+		Set tModRef.Description = artifactMetadata.ImageDescription
+		Set tModRef.Deployed = artifactMetadata.IPMDeployed
+		#; If $IsObject(item."platform_versions") {
+		#;   Set tIterPVer = item."platform_versions".%GetIterator() 
+		#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
+		#;     Do tModRef.PlatformVersions.Insert(platformVersion)
+		#;   }
+		#; }
+		Set tModRef.AllVersions = allTagsString
+		Set tModRef.Origin = artifactMetadata.IPMOrigin
+		Do tList.Insert(tModRef)
+		
+		#; If not all versions are requested, return the latest one
+		If 'pSearchCriteria.AllVersions, name="" {
+			Quit
 		}
 	}
 	Quit tList
@@ -238,7 +277,7 @@ ClassMethod PullOras(registry As %String, package As %String, namespace As %Stri
 {
 	Set pkgTag = ..GetPackageVersionPy(registry, package, namespace, username, password, token, tokenAuthMethod, 1)
 	Set pkg = $PIECE(pkgTag, ",", 1)
-	Set tag = $PIECE(pkgTag, ",", 2)
+	Set tag = $$$Semver2Tag($PIECE(pkgTag, ",", 2))
 
 	Set target = ..GetAPITarget(registry, pkg, namespace) _ ":" _ tag
 	Set client = ..GetClient(registry, username, password, token, tokenAuthMethod)
@@ -295,9 +334,9 @@ ClassMethod GetPackageMetadataPy(registry As %String, package As %String, namesp
 /// Given a package name, either parses out the tag or determines the latest tag
 /// Params:
 /// 	package : is either in the form <package>:<tag> or <package>
-/// 			     in the latter case, returns latest tag
-/// 	asString   : 0 => returns as python tuple of (package, tag)
-/// 			     1 => returns as string of "<package>,<tag>"
+/// 			     in the latter case, returns semver corresponding to the latest tag
+/// 	asString   : 0 => returns as python tuple of (package, semver)
+/// 			     1 => returns as string of "<package>,<semver>"
 ClassMethod GetPackageVersionPy(registry As %String, package As %String, namespace As %String, username As %String, password As %String, token As %String, tokenAuthMethod As %String, asString As %Boolean = 0) [ Language = python ]
 {
 	import iris
@@ -307,10 +346,12 @@ ClassMethod GetPackageVersionPy(registry As %String, package As %String, namespa
 	else:
 		pkg = package
 		tag = iris.cls("%IPM.Repo.Oras.PackageService").GetLatestTagPy(registry, pkg,  namespace, username, password, token, tokenAuthMethod, asString )
+	
+	semver = tag.replace("_", "+")
 	if asString:
-		return pkg + "," + tag
+		return pkg + "," + semver
 	else:
-		return (pkg, tag)
+		return (pkg, semver)
 }
 
 /// Lists all of the modules and their latest versions in the package
@@ -342,7 +383,10 @@ ClassMethod GetAllTagsPy(registry As %String, package As %String, namespace As %
 		
 		# convert from list to comma separated string
 		return ", ".join(str(x) for x in tags)
-	except e:
+	except ValueError:
+	    # ValueError indicates the package is missing and has no tags. Fail silently with no tags returned
+		return ""
+	except Exception as e:
 		print("Error: ", repr(e))
 		return ""
 }

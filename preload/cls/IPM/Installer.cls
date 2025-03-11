@@ -269,8 +269,8 @@ ClassMethod CompactPackage(ByRef pList) As %Status
     set chunkSize = 22800
     while 'gzip.AtEnd {
       set data = gzip.Read(chunkSize)
-      set base64 = $SYSTEM.Encryption.Base64Encode(data)
-      do xdata.Data.WriteLine(base64)
+      set base64 = $SYSTEM.Encryption.Base64Encode(data,1)
+      do xdata.Data.Write(base64)
       set data1 = $SYSTEM.Encryption.Base64Decode(base64)
     }
     do xdata.%Save()
@@ -320,7 +320,12 @@ ClassMethod ExtractPackage(Output pFolder As %String) As %String
     set gzip = ##class(%Stream.FileBinaryGzip).%New()
     set gzip.Filename = tmpFile
 
-    set fs = ##class(%Stream.FileCharacter).%New()
+    if $Piece(fileName,".",*) = "whl" {
+      // TODO: generalize to other binary file types?
+      set fs = ##class(%Stream.FileBinary).%New()
+    } else {
+      set fs = ##class(%Stream.FileCharacter).%New()
+    }
     set fs.Filename = fileName
     do fs.CopyFromAndSave(gzip)
 

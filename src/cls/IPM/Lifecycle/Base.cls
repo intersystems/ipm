@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$ListBuild("Clean","Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
+Parameter PHASES = {$ListBuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -120,6 +120,10 @@ ClassMethod GetDefaultResourceProcessorProc(pLifecycleClass As %Dictionary.Class
 /// This method defines what a complete phase means for a given list of phases
 ClassMethod GetCompletePhases(pPhases As %List) As %List
 {
+	// If there is only phase, and the phase is not found in standard phases, it is a custom phase. Return as-is.
+	If ($ListLength(pPhases) = 1) && ('$ListFind(..#PHASES, ..MatchSinglePhase($List(pPhases,1)))) {
+		Return pPhases
+	}
 	For i=1:1:$ListLength(pPhases) {
 		Set tPhasesList = ..GetCompletePhasesForOne($List(pPhases,i))
 		For j=1:1:$ListLength(tPhasesList) Set one = $List(tPhasesList,j) If one'="" Set tPhasesArray(one) = ""
@@ -138,18 +142,19 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 
 	Quit $Case(pOnePhase,
 		"clean":		$ListBuild("Clean"),
-		"reload":		$ListBuild("Reload","*"),
-		"validate":		$ListBuild("Reload","*","Validate"),
+		"initialize":   $ListBuild("Initialize"),
+		"reload":		$ListBuild("Initialize","Reload","*"),
+		"validate":		$ListBuild("Initialize","Reload","*","Validate"),
 		"exportdata":	$ListBuild("ExportData"),
-		"compile":		$ListBuild("Reload","*","Validate","Compile"),
-		"activate":		$ListBuild("Reload","*","Validate","Compile","Activate"),
+		"compile":		$ListBuild("Initialize","Reload","*","Validate","Compile"),
+		"activate":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate"),
 		"document":		$ListBuild("Document"),
 		"makedeployed":	$ListBuild("MakeDeployed"),
-		"test":			$ListBuild("Reload","*","Validate","Compile","Activate","Test"),
-		"package":		$ListBuild("Reload","*","Validate","Compile","Activate","Package"),
-		"verify":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Verify"),
-		"register":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register"),
-		"publish":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
+		"test":			$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
+		"package":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
+		"verify":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
+		"register":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
+		"publish":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
 		"configure":	$ListBuild("Configure"),
 		"unconfigure":	$ListBuild("Unconfigure"),
 		:				""
@@ -162,6 +167,7 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 	Set phase = $ZCONVERT(pOnePhase, "L")
 	Quit $Case(phase,
 		"clean":		"Clean",
+		"initialize":	"Initialize",
 		"reload":		"Reload",
 		"validate":		"Validate",
 		"exportdata":	"ExportData",
@@ -501,6 +507,35 @@ Method %Unconfigure(ByRef pParams) As %Status
 	Quit tSC
 }
 
+Method %Initialize(ByRef pParams) As %Status
+{
+	Set status = $$$OK
+	Try {
+		Set key = ""
+		For {
+			Set resource = ..Module.Resources.GetNext(.key)
+			Quit:key=""
+			If $IsObject(resource.Processor) {
+				Set status = $$$ADDSC(status,resource.Processor.OnPhase("Initialize",.pParams))
+			}
+		}
+
+		Set preloadRoot = $Get(pParams("RootDirectory"))_"preload"
+		Set verbose = $Get(pParams("Verbose"))
+		If ##class(%File).DirectoryExists(preloadRoot) {
+			Set tSC = $System.OBJ.ImportDir(preloadRoot, "*", $Select(verbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+			If $$$ISERR(tSC) { Quit }
+			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
+			If $$$ISERR(tSC) { Quit }
+		} ElseIf verbose {
+			Write !,"Skipping preload - directory does not exist."
+		}
+	} Catch ex {
+		Set status = ex.AsStatus()
+	}
+	Quit status
+}
+
 Method %Reload(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
@@ -517,6 +552,7 @@ Method %Reload(ByRef pParams) As %Status
 		If (tRoot = "") && tDeveloperMode {
 			Set tRoot = ..Module.Root
 		}
+		Do ..LoadEnvironmentConfig($Get(pParams("EnvFiles")))
 		
 		// For now, no-op if no root is configured.
 		Quit:tRoot=""
@@ -575,16 +611,6 @@ Method %Reload(ByRef pParams) As %Status
 		}
 
     $$$ThrowOnError(..InstallPythonRequirements(tRoot, .pParams))
-		
-		Set tPreloadRoot = tRoot_"preload"
-		If ##class(%File).DirectoryExists(tPreloadRoot) {
-			Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
-			If $$$ISERR(tSC) { Quit }
-			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
-			If $$$ISERR(tSC) { Quit }
-		} ElseIf tVerbose {
-			Write !,"Skipping preload - directory does not exist."
-		}
 		
 		// Reload the module definition
 		Set tSC = ..Module.%Reload()
@@ -688,7 +714,7 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
   Quit tSC
 }
 
-Method ResolvePipCaller(ByRef pParams) As %List
+ClassMethod ResolvePipCaller(ByRef pParams) As %List
 {
 	Set tUseStandalonePip = ##class(%IPM.Repo.UniversalSettings).GetValue("UseStandalonePip")
 	Set tPipCaller = ##class(%IPM.Repo.UniversalSettings).GetValue("PipCaller")
@@ -708,7 +734,7 @@ Method ResolvePipCaller(ByRef pParams) As %List
 	Return ..DetectPipCaller(tUseStandalonePip, $Get(pParams("Verbose"), 0))
 }
 
-Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
+ClassMethod DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
 {
 	If pVerbose {
 		Write !,"Detecting pip caller"
@@ -1185,9 +1211,10 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 		}
     /// Always keep these files
      Set staticFiles = $ListBuild(
-    //   "readme.md",
-    //   "license",
-    //   "requirements.txt",
+       "readme.md",
+       "changelog.md",
+       "license",
+       "requirements.txt",
     )
     Set tRes = ##class(%File).FileSetFunc(..Module.Root)
     While tRes.%Next() {
@@ -1343,6 +1370,7 @@ Method %Publish(ByRef pParams) As %Status
 		Set tRelease = $Get(pParams("Release"),$Get(pParams("zpm","Release"),0))
 		Set tPublishTo = $Get(pParams("PublishTo"),$Get(pParams("zpm","PublishTo"),""))
 		Set tNewVersion = $Get(pParams("NewVersion"),$Get(pParams("zpm","NewVersion"),""))
+		Set tUseExternalName = $Get(pParams("UseExternalName"),$Get(pParams("zpm","UseExternalName"),0))
 
 		// Determine which server/registry to publish to
 		Set tServer =  ""
@@ -1374,7 +1402,14 @@ Method %Publish(ByRef pParams) As %Status
 			$$$ThrowStatus(tSC)
 		}
 		Set tModule = ##class(%IPM.Repo.Remote.ModuleInfo).%New()
-		Set tModule.Name = ..Module.Name
+		Set tModule.Name = $Select(tUseExternalName: ..Module.ExternalName, 1: ..Module.Name)
+		// Apparently, an empty name can pass the %IPM.DataType.ModuleName:IsValid check
+		If tModule.Name = "" {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot publish module with empty name."))
+		}
+		If '##class(%IPM.DataType.ModuleName).IsValid(tModule.Name) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module name '%1' is invalid for publishing",tModule.Name)))
+		}
 		If tRelease && ('..Module.IsLocked()) {
 			Set tSC = ..Module.Lock()
 			If $$$ISERR(tSC) {
@@ -1386,12 +1421,12 @@ Method %Publish(ByRef pParams) As %Status
 			Quit
 		}
 		Set tModule.VersionString = ..Module.VersionString
-    If (..Module.Deployed) {
-      Set tModule.Deployed = 1
-      If $IsObject(..Module.SystemRequirements) {
-        Set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
-      }
-    }
+		If (..Module.Deployed) {
+			Set tModule.Deployed = 1
+			If $IsObject(..Module.SystemRequirements) {
+				Set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
+			}
+		}
 		Set tSC = ..Module.XMLExportToStream(tModule.Manifest)
 		If $$$ISERR(tSC) {
 			Quit
@@ -1407,7 +1442,7 @@ Method %Publish(ByRef pParams) As %Status
 		}
 
 
-		Do tPublishClient.PublishModule(tModule)
+		$$$ThrowOnError(tPublishClient.PublishModule(tModule))
 		
 
 		// May need to update the version of the currently-installed module.
@@ -1788,6 +1823,19 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 		and cp.Final = 1
 		and cp.Origin = cd.Name
 		and (:pPackaging is null or cp._default = :pPackaging)
+}
+
+ClassMethod LoadEnvironmentConfig(paths As %String)
+{
+	#dim config As %IPM.General.EnvironmentConfig
+	Set config = ##class(%IPM.General.EnvironmentConfig).%Get()
+	Do config.Clear()
+	Set paths = $ListFromString(paths, ";")
+	Set ptr = 0
+	While $ListNext(paths, ptr, file) {
+		Set file = $ZStrip(file, "<>WC")
+		Do config.Load(file)
+	}
 }
 
 }

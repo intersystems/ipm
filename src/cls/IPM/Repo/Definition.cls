@@ -31,6 +31,11 @@ Property Snapshots As %Boolean [ InitialExpression = 0 ];
 
 Property Prereleases As %Boolean [ InitialExpression = 0 ];
 
+/// If set to a non-empty value, this will be used as the sort order for this repository, bypassing the GetSortOrder() method.
+/// This should be only configured by IPM during certain processes (e.g., installing depdenencies from .modules directory).
+/// There is no current plan to support configuring this from the package manager shell.
+Property OverriddenSortOrder As %Integer [ Internal ];
+
 ClassMethod %GetCommandStructure(Output pCommandStructure)
 {
   Kill pCommandStructure
@@ -80,6 +85,9 @@ Method GetPublishService() As %IPM.Repo.IPublishService [ Abstract ]
 ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 {
 	Set tServer = ..%OpenId(pID)
+	If tServer.OverriddenSortOrder '= "" {
+		Quit tServer.OverriddenSortOrder
+	}
 	Quit tServer.GetSortOrder()
 }
 
@@ -229,6 +237,29 @@ SELECT Name FROM %IPM_Repo.Definition
 ORDER BY %IPM_Repo.Definition_SortOrder(ID) DESC
 }
 
+/// If a name is provided, return the repo of this type with the name
+/// Otherwise, return the only repo of this type in the system
+/// If there are multiple repos (or no repos) of this type, return an error
+ClassMethod GetOne(name As %String = "", Output sc As %Status) As %IPM.Repo.Definition
+{
+	If $Get(name) '= "" {
+		Quit ..ServerDefinitionKeyOpen(name, , .sc)
+	}
+	Set tablename = $$$comClassKeyGet($classname(), $$$cCLASSsqlqualifiednameQ)
+	Set query = "SELECT id FROM " _ tablename  // should be safe from SQL injection, since $classname() is safe
+	Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
+	$$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+	Set list = ""
+	While rs.%Next() {
+		Set list = list _ $lb(rs.%Get("id"))
+	}
+	If $ListLength(list) = 1 {
+		Quit ..%OpenId($ListGet(list, 1), , .sc)
+	}
+	Set sc = $$$ERROR($$$GeneralError, "Unable to find a unique repo of type " _ $CLASSNAME())
+	Quit ""
+}
+
 Storage Default
 {
 <Data name="RepoDefinitionDefaultData">
@@ -259,6 +290,9 @@ Storage Default
 </Value>
 <Value name="12">
 <Value>ReadOnly</Value>
+</Value>
+<Value name="13">
+<Value>OverriddenSortOrder</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.DefinitionD</DataLocation>

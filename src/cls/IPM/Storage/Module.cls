@@ -169,6 +169,7 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 /// Returns a multidimensional array of custom phases defined by the module's invokes,
 /// where the keys are the custom phase names and the values are empty strings.
 /// Custom phases do not have corresponding %method implementation in the lifecycle class.
+/// Return the phases in lower case for case-insensitive lookup.
 Method GetCustomPhases(Output pPhases)
 {
     Kill pPhases
@@ -176,11 +177,27 @@ Method GetCustomPhases(Output pPhases)
     Set key = ""
     For {
         Set tInvoke = ..Invokes.GetNext(.key)
-        Quit:(key = "")
+		If key = "" {
+			Quit
+		}
         If (tInvoke.CustomPhase '= "") {
-            Set pPhases(tInvoke.CustomPhase) = ""
+            Set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
         }
     }
+	For {
+		Set tResource = ..Resources.GetNext(.key)
+		If key = "" {
+			Quit
+		}
+		Set tProcessor = tResource.Processor
+		// %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+		If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+			Set cp = tProcessor.CustomPhase
+			If cp '= "" {
+				Set pPhases($$$lcase(cp)) = cp
+			}
+		}
+	}
 }
 
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
@@ -294,7 +311,10 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tFullStart = $zh
 		Do tModule.GetCustomPhases(.tCustomPhases)
 		While $ListNext(tPhases,tPointer,tOnePhase) {
-            Set tIsCustomPhase = $Data(tCustomPhases(tOnePhase)) # 2
+            Set tIsCustomPhase = $Data(tCustomPhases($$$lcase(tOnePhase)), tNormalizedPhaseName) # 2
+			If tIsCustomPhase {
+				Set tOnePhase = tNormalizedPhaseName
+			}
 			Set tStart = $zh
 			If tOnePhase="*" {
 				Kill tModule,tLifecycle
@@ -346,7 +366,20 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
         }
         Quit:$$$ISERR(tSC)
 
-        If 'tIsCustomPhase {
+        If tIsCustomPhase {
+            Set tKey = ""
+            For {
+                Set tResource = tModule.Resources.GetNext(.tKey)
+                If tKey = "" {
+                    Quit
+                }
+                Set tProcessor = tResource.Processor
+                // %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+                If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+                    $$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
+                }
+            }
+        } Else {
             // Lifecycle before / (phase) / after
             $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
             $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
@@ -1608,4 +1641,3 @@ Storage Default
 }
 
 }
-

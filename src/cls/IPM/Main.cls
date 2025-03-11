@@ -61,17 +61,19 @@ Currently, there may only be one of these per namespace.
 <example description="Compiles the module named &quot;MyModuleName&quot;">module-action MyModuleName compile</example>
 <example description="Performs multiple actions on the module named &quot;MyModuleName&quot;; &quot;clean&quot; deletes all of its dependenices, and &quot;install&quot; will then re-download them, package the module, and register it in the current namespace's module cache.">MyModuleName clean register</example>
 <example description="Compiles the module named MyUIModule with verbose output and pParams(&quot;UIFW&quot;,&quot;force&quot;) (passed to all lifecycle phases) set to 42.">MyUIModule compile -v -DUIFW.force=42</example>
+<example description="Verify the module MyModule with the env file /path/to/env.json. The module is responsible for accessing the data using %IPM.General.EnvironmentConfig:GetArg()">MyModule verify -env /path/to/env.json</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module on which to perform lifecycle actions" />
 <parameter name="actions" required="true" description="Space-delimited list of module lifecycle phases to run" trailing="true" />
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase(s), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="export-deps" value="true" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; lifecycle." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
 
 </command>
 
@@ -96,6 +98,7 @@ included for username, password, Perforce workspace, and a few other settings.
 This command is an alias for `module-action module-name reload`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform reload action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (reload), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
@@ -107,6 +110,7 @@ This command is an alias for `module-action module-name reload`
 This command is an alias for `module-action module-name compile`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform compile action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (compile), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
@@ -118,6 +122,7 @@ This command is an alias for `module-action module-name compile`
 This command is an alias for `module-action module-name test`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform test action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (test),rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
@@ -134,6 +139,7 @@ This command is an alias for `module-action module-name package`
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Use specified path to export package." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="verify" dataPrefix="D">
@@ -141,6 +147,7 @@ This command is an alias for `module-action module-name package`
 This command is an alias for `module-action module-name verify`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform verify action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (verify), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
@@ -152,11 +159,14 @@ This command is an alias for `module-action module-name verify`
 This command is an alias for `module-action module-name publish`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (publish), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
+<modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are published. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="makedeployed">
@@ -164,6 +174,7 @@ This command is an alias for `module-action module-name publish`
 This command is an alias for `module-action module-name makedeployed`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform reload action" />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="only" aliases="o" description="Only runs the specified phase (makedeployed), rather than also running predecessors." />
 <modifier name="recurse" aliases="r" description="Runs the specified phase (makedeployed) on the module and all of its dependencies." />
@@ -272,9 +283,13 @@ load https://github.com/user/repository.git -branch feature-1
 <example description="Loads the module described in C:\module\root\path\module.xml but set pip timeout to 30 seconds">
 	load -extra-pip-flags "--timeout 30" C:\module\root\path\
 </example>
+<example description="Loads the module described in C:\module\root\path\module.xml using the C:\path\to\env.json1 and C:\path\to\env.json2 as the install time configuration">
+load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
+</example>
 
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="nodev" dataAlias="DeveloperMode" dataValue="0" description="Disables the DeveloperMode flag for the module's lifecycle." />
@@ -282,6 +297,7 @@ load https://github.com/user/repository.git -branch feature-1
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
+<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -386,12 +402,16 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Installs HS.JSON but set pip timeout to 30 seconds">
 	install -extra-pip-flags "--timeout 30" HS.JSON
 </example>
+<example description="Installs example-package using the /path/to/env1.json and /path/to/env2.json as the install time configuration">
+install -env /path/to/env1.json;/path/to/env2.json example-package
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to install" />
 <parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="latest" aliases="l" description="Installs the latest available version of this module without prompting the user." />
 <modifier name="prompt" aliases="p" description="Prompts user which version to install, if more then one found." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
@@ -420,12 +440,16 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Reinstalls ZHSLIB but set pip timeout to 30 seconds">
 	reinstall -extra-pip-flags "--timeout 30" ZHSLIB
 </example>
+<example description="Reinstalls example-package using the /path/to/env1.json and /path/to/env2.json as the install time configuration">
+reinstall -env /path/to/env1.json;/path/to/env2.json example-package
+</example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module to reinstall" />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 
 <!-- Modifiers -->
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="shallow" aliases="s" dataAlias="UpdateSnapshots" dataValue="0" description="Suppresses updating of dependencies with '+snapshot' versions." />
@@ -659,38 +683,73 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 		<modifier name="local-only" description="If specified, only local artifacts will be used for installation. By default, this modifier is not set and will not limit to local artifacts." />
 		<modifier name="allow-upgrade" description="If specified, will also check for IPM version in specified namespaces and upgrade if version is lower than the target version. By default, this modifier is not ste and will not allow upgrade." />
 		<modifier name="map" aliases="m" description="If specified, will map IPM code from the current namespace-default code database rather than installing a separate copy." />
+		<modifier name="repos" aliases="r" description="If specified, will map repository settings across namespaces. Must be used together with -map." />
+		<modifier name="remote" value="true" description="If specified, will use fetch IPM versions from this remote repository. If this is omitted and multiple remote repositories are present, an error will occur." />
 		<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
 		<modifier name="preview" aliases="p" description="Preview what will be changed without actually making the changes." />
+		<modifier name="community" description="If specified, will reset repository to the community repository and map IPM to all namespaces along with the repository settings. This is functionaly equivalent to &quot;repo -delete-all&quot;, &quot;repo -reset-defaults&quot;, and &quot;enable -map -repos -globally&quot;. With this modifier, all other modifiers will be ignored."/>
 		<!-- Examples -->
 		<example description="Make IPM available in all namespaces (including %SYS) by mapping the version in the current namespace default routine database. Namespace-specific installation will override this.">
 			enable -map -globally
 		</example>
-		<example description="Install IPM version 0.3.4 in quiet mode in namespaces: NS1, NS2, NS3.">
-			enable -v 0.3.4 -q -ns NS1,NS2,NS3
+		<example description="Install IPM version 0.3.4 from the remote registry namd &quot;registry&quot; in quiet mode in namespaces: NS1, NS2, NS3.">
+			enable -v 0.3.4 -q -ns NS1,NS2,NS3 -remote registry
 		</example>
-		<example description="Install IPM in all non-%SYS explicit namespaces, and select version later in terminal prompt menu.">
+		<example description="Install IPM in all non-%SYS explicit namespaces, and select version later in terminal prompt menu. This works if there is only 1 remote repository configured.">
 			enable -globally
 		</example>
-		<example description="User wants to get the latest version of IPM from the registry server, and install it in all non-%SYS explicit namespaces.">
+		<example description="User wants to get the latest version of IPM from the registry server, and install it in all non-%SYS explicit namespaces. This works if there is only 1 remote repository configured.">
 			enable -v latest -globally
 		</example>
-		<example description="Install or upgrade IPM to latest IPM version in namespaces: NS1, NS2, NS3.">
+		<example description="Install or upgrade IPM to latest IPM version in namespaces: NS1, NS2, NS3. This works if there is only 1 remote repository configured.">
 			enable -v latest -allow-upgrade NS1,NS2,NS3
+		</example>
+		<example description="Reset repository to the community repository and map IPM to all namespaces along with the repository settings.">
+			enable -community
 		</example>
 	</command>
 
 <command name="unmap">
+	<summary>Unmap %IPM package and routines in specified namespaces.</summary>
 	<description>
 		Unmap %IPM package and routines in specified namespaces. Will Skip non-mapped namespaces.
+		If repository settings are mapped, will also unmap repository settings.
 	</description>
 	<modifier name="namespaces" aliases="ns" value="true" description="Comma-separated namespaces in which IPM mapping needs to be deleted."/>
 	<modifier name="globally" aliases="g" description="Will unmap IPM in all explicit namespaces that currently do not have IPM installed."/>
 	<modifier name="quiet" aliases="q" description="Quiet mode. By default, this modifier is not set and will display the contents onto the terminal/caller command line." />
+	<modifier name="repos-only" description="If specified, will only unmap repository settings across namespaces. This doesn't affect mapping of IPM packages and routines." />
 	<example description="Unmap IPM from namespaces NS1, NS2, NS3.">
 		unmap -ns NS1,NS2,NS3
 	</example>
 	<example description="Unmap IPM from all namespaces">
 		unmap -g
+	</example>
+</command>
+
+<command name="module-version" aliases="modver">
+	<description>
+		Updates the version of the module in the current namespace.
+	</description>
+	<parameter name="module" required="true" description="Name of the module to update the version for." />
+	<parameter name="version" description="Either a valid SemVer string, or 'major', 'minor', 'patch'. If it's 'major', 'minor', or 'patch', will bump the cooresponding part of SemVer." />
+
+	<modifier name="prerelease" value="true" aliases="p" description="Set the prerelease to a specific value" />
+	<modifier name="build" value="true" aliases="b" description="Set the build to a specific value" />
+	<modifier name="force" description="Permit the version to be downgraded. By default, trying to downgrade the version will fail" />
+	<modifier name="quiet" aliases="q" description="Suppress output (except for errors)" />
+
+	<example description="Sets the version of the module HS.JSON to 1.2.3">
+		module-version HS.JSON 1.2.3
+	</example>
+	<example description="Bump the major version the module HS.JSON. If current version is 1.2.3, the new version will be 2.0.0">
+		module-version HS.JSON major
+	</example>
+	<example description="Bump the minor version and set prerelease to 'alpha' and build to 'xyz'. If current version is 1.2.3, the new version will be 1.3.0-alpha+xyz">
+		module-version HS.JSON minor -prerelease alpha -build xyz
+	</example>
+	<example description="Downgrade the version to 1.2.3. If the current version is 1.3.0, this will still work because the force flag is set.">
+		module-version HS.JSON 1.2.3 -force
 	</example>
 </command>
 
@@ -764,22 +823,68 @@ ClassMethod GetVersion(ModuleName, ByRef out, list)
 	Quit sc
 }
 
+ClassMethod GetSystemMode()
+{
+	New $Namespace
+	Set $Namespace = "%SYS"
+	If $$$ISOK(##class(Config.Startup).Get(.tProperties)) {
+		Quit $Get(tProperties("SystemMode")) 
+	}
+	Quit ""
+}
+
+/// Return a list of messages to display when the shell is first started
+/// For messages that are too long to fit in a box, they should be returned in the outOfBoxMessage parameter
+ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
+{
+	Set cls = "%ZHSLIB.HealthShareMgr", mthd = "VersionInfo"
+	If $System.CLS.IsMthd(cls, mthd) {
+		Set outOfBoxMessage = $ClassMethod(cls, mthd)
+	} Else {
+		Set outOfBoxMessage = $ZVersion
+	}
+
+	Do ##class(%IPM.Main).GetVersion("zpm",.out)	
+	If $Get(out) = "" {
+		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
+	} Else {
+		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
+	}
+
+	Set systemMode = ..GetSystemMode()
+	If systemMode = "" {
+		Set systemMode = "System Mode: <unset>"
+	} Else {
+		Set systemMode = "System Mode: " _ systemMode
+	}
+
+	Set mirrorStatus = $System.Mirror.GetStatus()
+	Set mirrorStatus = "Mirror Status: " _ mirrorStatus
+
+	Set list = $ListBuild(
+		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
+		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
+		registryInfo,
+		systemMode,
+		mirrorStatus
+	)
+	Quit list
+}
+
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
 	New $$$DeprecationWarned
+	// Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
+	Set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
+
 	Set pException = $$$NULLOREF
 	Set tOneCommand = 0
 	Set tCommand = $Get(pCommand)
 	If (tCommand '= "") {
 		Set tOneCommand = 1
 	}
-	do ##class(%IPM.Main).GetVersion("zpm",.out)	
-	Set introMessageList = $ListBuild(
-		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
-		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
-		"Current registry "_$$$FormattedLine($$$Cyan,$g(out))
-	)
+	Set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
 	Set tInShell = 0
 	For {
 		Kill $$$DeprecationWarned
@@ -789,6 +894,7 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			// Ensure not displayed if its just one command
 			If 'tInShell && 'tOneCommand {
 				Do ..DrawBorder(introMessageList, ..TerminalPromptColor())
+				Write $Get(outOfBoxMessage),! // Display long messages outside of the box
 				Set tInShell = 1
 			}
 			
@@ -867,6 +973,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..EnableIPM(.tCommandInfo)
 			} ElseIf (tCommandInfo = "unmap") {
 				Do ..UnmapIPM(.tCommandInfo)
+			} ElseIf (tCommandInfo = "module-version") {
+				Do ..ModuleVersion(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -1212,11 +1320,12 @@ ClassMethod GetVersionModule(name, namespace = {$namespace})
 {
 	New $Namespace
 	Set $Namespace=namespace
-	Do ..GetListModules(name,.list)
-	If $Data(list(name)) {
-			quit $ListGet(list(name),1)
+	Try {
+		Do ..GetListModules(,name,.list)
+		Return $ListGet(list(1), 2)
+	} Catch ex {
+		Return ""
 	}
-	quit ""
 }
 
 /// @API.Method
@@ -1999,6 +2108,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
+	Set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
 	Merge tParams = pCommandInfo("data")
 	Set tParams("cmd") = "load"
 	Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
@@ -2007,7 +2117,6 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 	}
 	If ##class(%File).DirectoryExists(tDirectoryName) {
 		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
 	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
 		Set tTargetDirectory = $$$FileTempDirSys
 		If $Get(pCommandInfo("data", "Verbose")) {
@@ -2021,23 +2130,31 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
 		If (tCount = 0) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
-		} Else {
-			// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
-			Set tModuleFilePath = $ListGet(tList(tCount), *)
-			Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-			If $Get(pCommandInfo("data", "Verbose")) {
-				Write !,"Found "_tCount_" results. They are: "
-				Set idx = ""
-				For {
-					Set idx = $Order(tList(idx))
-					Quit:(idx="")
-					Write !, $Char(9), $List(tList(idx), *)
-				}
-				Write !, "Using module.xml file at ", tModuleFilePath
-			}
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
+
+		// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+		Set tModuleFilePath = $ListGet(tList(tCount), *)
+		Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Found "_tCount_" results. They are: "
+			Set idx = ""
+			For {
+				Set idx = $Order(tList(idx))
+				Quit:(idx="")
+				Write !, $Char(9), $List(tList(idx), *)
+			}
+			Write !, "Using module.xml file at ", tModuleFilePath
+		}
 	}
+
+	// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
+	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
+	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+	Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
+	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
+	Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
+	$$$ThrowOnError(tSC)
 }
 
 ClassMethod CheckModuleNamespace() As %Status
@@ -2187,6 +2304,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 {
+	Do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($Get(pCommandInfo("data", "EnvFiles")))
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
@@ -2263,6 +2381,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 {
+	Do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($Get(pCommandInfo("data", "EnvFiles")))
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListFromString($Get(pCommandInfo("parameters","actions"))," ")
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
@@ -2760,7 +2879,6 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
 {
 	Set tRtn = ##class(%Routine).%New(RoutineName)
 	If ##class(%Routine).Exists(RoutineName) {
-    Set tEnded = 1
     While 'tRtn.AtEnd {
       Set tLine = tRtn.ReadLine()
       If $Match(tLine,$$$STARTTAGREGEX) {
@@ -2772,11 +2890,12 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
         For i=1:1:tGenLines {
           Set tRtnLines($Increment(tRtnLines)) = tGenLines(i)
         }
-      }
+      } Else { 
+        // outside of the tags, just copy the lines to preserve users' custom code
+        Set tRtnLines($Increment(tRtnLines)) = tLine
+	  }
     }
-    If 'tEnded {
-      Set tRtnLines($Increment(tRtnLines)) = $$$ENDTAGQ
-    } ElseIf 'pFound {
+    If 'pFound {
       For i=1:1:tGenLines {
         Set tRtnLines($Increment(tRtnLines)) = tGenLines(i)
       }
@@ -2852,9 +2971,12 @@ ZPM(pArgs...)
 		Set found = 0	
 		While rs.%Next() {
 			Set $Namespace = $Zstrip(rs.%Get("Nsp"), "<>WC")
-			If $System.CLS.IsMthd("%IPM.Main", "Shell") {
+			// Some I4H containers come with %IPM.Main but the "version" command doesn't work ?!
+			If $System.CLS.IsMthd("%IPM.Main", "Shell") && ($Namespace '= "HSLIB") && ($Namespace '= "HSSYS") {
 				Write !, "Change namepace to one of the following to run the ""zpm"" command"
 				Do ##class(%IPM.Main).Shell("version")
+				Write !, "If you want to map IPM globally, switch to one of the namespaces above and run: zpm ""enable -map -globally""."
+				Write !, "If you want to reset repository and map IPM globally along with repository settings, switch to one of the namespaces above and run: zpm ""enable -community""."
 				Set found = 1
 				Quit
 			}
@@ -2889,6 +3011,19 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_modDef.VersionString
 	}
 
+	If $$$HasModifier(pCommandInfo,"community") {
+		For cmd = "repo -delete-all", "repo -reset-defaults", "enable -map -repos -globally" {
+			Write !!, "RUNNING command: """, cmd, """"
+			Do ..ShellInternal(cmd, .exc)
+			If exc '= $$$NULLOREF {
+				Write !, $$$FormattedLine($$$Red, $$$FormatText("Error running command ""%1"" - %2", cmd, exc.DisplayString()))
+			} Else {
+				Write !, $$$FormattedLine($$$Green, $$$FormatText("Command ""%1"" finished successfull", cmd))
+			}
+		}
+		Return
+	}
+
 	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
 	Set preview = $$$HasModifier(pCommandInfo,"preview")
 	Set map = $$$HasModifier(pCommandInfo,"map")
@@ -2896,7 +3031,10 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	Set localOnly = $$$HasModifier(pCommandInfo, "local-only")
 	Set version = $$$GetModifier(pCommandInfo, "version")
 	Set namespaces = $$$GetModifier(pCommandInfo, "namespaces")
+	Set namespaces = $$$ucase(namespaces)
 	Set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
+	Set mapRepos = $$$HasModifier(pCommandInfo,"repos")
+	Set remoteName = $$$GetModifier(pCommandInfo,"remote")
 	Set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
 	Set targetVersion = "" 		// var to store the final version of IPM to be installed
 	Kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
@@ -2914,6 +3052,9 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	}
 	If map && 'globally && (namespaces = "") {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"If mapping from the current namespace's routine database with -map, must specify either -globally or a list of namespaces with -ns"))
+	}
+	If ('map) && (mapRepos) {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify -repos without -map"))
 	}
 
 	If map {
@@ -2933,13 +3074,15 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 		} Else {
 			Set namespaces = $ListFromString(namespaces)
 		}
+
+		// First try to map IPM itself
 		Set pointer = 0
 		While $ListNext(namespaces,pointer,namespace) {
 			Set namespace = $Zstrip(namespace, "<>WC")
 			Set $Namespace = namespace
 			If ..IPMInstalled() {
 				If 'quiet || preview {
-					Write !,"Skipping "_namespace_" - IPM already installed."
+					Write !,"Skipping IPM mapping of "_namespace_" - IPM already installed."
 				}
 				Continue
 			}
@@ -2949,14 +3092,50 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 				Continue
 			}
 			If 'quiet {
-				Write !,"Mapping %IPM package in "_namespace_" equivalently to "_initNamespace
+				Write !,"Mapping %IPM package in "_initNamespace_" equivalently to "_namespace
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace))
 			If 'quiet {
-				Write !,"Mapping %IPM.* routines in "_namespace_" equivalently to "_initNamespace
+				Write !,"Mapping %IPM.* routines in "_initNamespace_" equivalently to "_namespace
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
 		}
+
+		// Then try to map repositories if -repos is specified
+		If mapRepos {
+			Do ..GetMapInfo(.isMappedFrom)
+			Set pointer = 0
+			While $ListNext(namespaces,pointer,namespace) {
+				Set namespace = $ZStrip(namespace, "<>WC")
+				// If IPM is not mapped from source namespace, skip repo mapping 
+				If $Get(isMappedFrom(namespace)) '= initNamespace {
+					If 'quiet || preview {
+						Write !,"Skipping repository mapping of "_namespace_" - IPM not mapped from source namespace."
+					}
+					Continue
+				}
+				// If repository are already present, also skip repo mapping avoid override
+				Set $Namespace = namespace
+				If $Data(^IPM.Repo.DefinitionD) \ 2 {
+					If 'quiet || preview {
+						Write !,"Skipping repository mapping of "_namespace_" - IPM repositories found."
+					}
+					Continue
+				}
+				Set $Namespace = initNamespace
+				If preview {
+					Write !,"Would add IPM repository mappings to "_namespace
+					Continue
+				}
+				If 'quiet {
+					Write !,"Mapping IPM repository in "_initNamespace_" equivalently to "_namespace
+				}
+				For suffix = "D", "S", "I" {
+					$$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace))
+				}
+			}
+		}
+
 		Set $Namespace = initNamespace
 		If preview {
 			Write !,"Preview mode; no configuration changes were made."
@@ -2977,23 +3156,25 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
   	Set sc = statement.%PrepareClassQuery("%File", "FileSet")
   	$$$ThrowOnError(sc)
 	// Valid IPM installation manifest should be of format: ipm-0.0.1.xml
-	Set resultSet = statement.%Execute(XMLDir, "ipm-*.xml")
-	If (resultSet.%SQLCODE < 0)  {
-		$$$ThrowSQLIfError(resultSet.%SQLCODE,resultSet.%Message)
-	}
-	Kill ipmLocalArray			// multi-dim array to store local ipm manifests; ipmLocalArray(<version>)=<fileName>
-	Kill menuList				// menu to let user choose which version of local ipm to install (if not in quiet mode and no version is specified)
-	While resultSet.%Next(.sc) {
-		$$$ThrowOnError(sc)
-		Set fileName = resultSet.%Get("Name")
-		If (resultSet.%Get("Type") = "F") {
-			// get the exact version string from filename
-			Set exactIPMVer = $Piece($Piece(fileName, "ipm-", 2, *), ".xml", 1, *-1)
-			Set ipmLocalArray(exactIPMVer) = fileName
-			Set menuList($Increment(menuList)) = exactIPMVer_" (local version)"
+	If ##class(%File).DirectoryExists(XMLDir) {
+		Set resultSet = statement.%Execute(XMLDir, "ipm-*.xml")
+		If (resultSet.%SQLCODE < 0)  {
+			$$$ThrowSQLIfError(resultSet.%SQLCODE,resultSet.%Message)
 		}
+		Kill ipmLocalArray			// multi-dim array to store local ipm manifests; ipmLocalArray(<version>)=<fileName>
+		Kill menuList				// menu to let user choose which version of local ipm to install (if not in quiet mode and no version is specified)
+		While resultSet.%Next(.sc) {
+			$$$ThrowOnError(sc)
+			Set fileName = resultSet.%Get("Name")
+			If (resultSet.%Get("Type") = "F") {
+				// get the exact version string from filename
+				Set exactIPMVer = $Piece($Piece(fileName, "ipm-", 2, *), ".xml", 1, *-1)
+				Set ipmLocalArray(exactIPMVer) = fileName
+				Set menuList($Increment(menuList)) = exactIPMVer_" (local version)"
+			}
+		}
+		$$$ThrowOnError(sc)
 	}
-	$$$ThrowOnError(sc)
 
 	If ('$DATA(menuList) && localOnly) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"No ipm-<version>.xml installer file is found locally in directory: "__XMLDir))
@@ -3039,7 +3220,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Set localIPMCount = $Get(menuList, 0)
 			If 'localOnly {
 				// Add remote version options to menuList
-				Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
+				Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 				$$$ThrowOnError(sc)
 				If $IsObject(server) {
 					Set latestVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
@@ -3110,7 +3291,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 
 	// 4. Now that we got all the namespaces that need to install IPM, do the actual installation
 	If 'useLocal {
-		Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
+		Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 		$$$ThrowOnError(sc)
 		If $IsObject(server) {
 			Set packageService = server.GetPackageService()
@@ -3119,7 +3300,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 			Set ipmRef.Name = $$$IPMModuleName
 			If (targetVersion = "latest") {
 				// convert latest to semantic version so that it can be undestood by ModuleInfo class
-				Set server = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1,,.sc)
+				Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 				$$$ThrowOnError(sc)
 				If $IsObject(server) {
 					Set targetVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
@@ -3189,7 +3370,9 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 {
 	Set globally = $$$HasModifier(pCommandInfo,"globally")
 	Set namespaces = $ListFromString($$$GetModifier(pCommandInfo,"namespaces"), ",")
+	Set namespaces = $$$ucase(namespaces)
 	Set verbose = '$$$HasModifier(pCommandInfo,"quiet")
+	set reposOnly = $$$HasModifier(pCommandInfo,"repos-only")
 	// Sanity check
 	If (globally && (namespaces '= "")) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global unmap flag at the same time."))
@@ -3210,7 +3393,11 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 		}
 	}
 	If verbose {
-		Write !,"Will attempt to unmap %IPM package and routines from: "_ $ListToString(namespaces, ", ")
+		If reposOnly {
+			Write !,"Will attempt to unmap IPM repository settings from: "_ $ListToString(namespaces, ", ")
+		} Else {
+			Write !,"Will attempt to unmap IPM package, routines, and repository settings from: "_ $ListToString(namespaces, ", ")
+		}
 	}
 
 	// Gather namespaces where %IPM is mapped into
@@ -3225,11 +3412,111 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 			}
 			Continue
 		} 
+
 		If verbose {
-			Write !,"Unmapping %IPM package and routines from "_ns_" (mapped from "_src_")"
+			Write !,"Unmapping repository settings from "_ns_" (mapped from "_src_")"
 		}
-		$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
-		$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+		For suffix = "D", "S", "I" {
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveGlobalMapping(ns, "IPM.Repo.Definition"_suffix))
+		}
+
+		If 'reposOnly {
+			If verbose {
+				Write !,"Unmapping IPM package and routines from "_ns_" (mapped from "_src_")"
+			}
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
+			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+		}
+	}
+}
+
+ClassMethod ModuleVersion(ByRef pCommandInfo)
+{
+	Set modName = $Get(pCommandInfo("parameters","module"))
+	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	Set force = $$$HasModifier(pCommandInfo,"force")
+	If (modName = "") {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"No module name specified."))
+	}
+	Set mod = ##class(%IPM.Storage.Module).NameOpen(modName,.sc)
+	If mod = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_modName_" not found."))
+	}
+	Set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(modName)
+	If stream = "" {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module stream "_modName_" not found."))
+	}
+	If 'quiet {
+		Write !,$$$FormatText("Current version of module %1 is: %2", modName, mod.VersionString)
+	}
+
+	// Compute the new semver
+	Set versionString = $Get(pCommandInfo("parameters","version"))
+	If versionString = "major" {
+		Set semver = mod.Version.WithBumpMajor()
+	} ElseIf versionString = "minor" {
+		Set semver = mod.Version.WithBumpMinor()
+	} ElseIf versionString = "patch" {
+		Set semver = mod.Version.WithBumpPatch()
+	} ElseIf versionString = "" {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(mod.Version.ToString())
+	} Else {
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString(versionString)
+	}
+
+	// Validate the semver
+	If 'semver.%ValidateObject() {
+		$$$ThrowOnError($$$ERROR($$$GeneralError,"Invalid version string: "_versionString))
+	}
+
+	If $$$HasModifier(pCommandInfo,"prerelease") {
+		Set semver = semver.WithPrerelease($$$GetModifier(pCommandInfo,"prerelease"))
+	}
+	If $$$HasModifier(pCommandInfo,"build") {
+		Set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
+	}
+
+	// Ensure semver is not lower than the current version, unless force is set
+	If ('force) && ('semver.Follows(mod.Version)) {
+		Set msg = $$$FormatText("Cannot set version to %1 as it is not strictly higher than the current version %2 (Use -force to override)", semver.ToString(), mod.VersionString)
+		Set msg = msg _ $Char(10, 13) _ "Note: when either version has a nonempty prerelease value, and differ from the other by major.minor.patch, neither version is considered strictly higher than the other."
+		Set msg = msg _ $Char(10, 13) _ "      See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags for more information."
+		$$$ThrowOnError($$$ERROR($$$GeneralError, msg))
+	}
+	If (semver.ToString() = mod.Version.ToString()) {
+		If 'quiet {
+			Write !,"Version is unchanged - Skipping."
+		}
+		Return
+	}
+
+	If 'quiet {
+		Write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
+	}
+
+	Set initTLevel = $TLevel
+	Set ex = $$$NULLOREF
+	TSTART
+	Try {
+		New %SourceControl
+		Set docName = modName_".ZPM"
+		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		If $IsObject($Get(%SourceControl)) {
+			Write !,"Checking out "_docName
+			$$$ThrowOnError(%SourceControl.CheckOut(docName))
+		}
+		Set mod.Version = semver
+		Set mod.VersionString = semver.ToString()
+		$$$ThrowOnError(mod.%Save())
+		Do ##class(%IPM.StudioDocument.Module).UpdateVersion(modName,semver)
+		TCOMMIT
+	} Catch ex {
+	}
+	While ($TLevel > initTLevel) {
+		TROLLBACK 1
+	}
+	If $IsObject(ex) {
+		Throw ex
 	}
 }
 

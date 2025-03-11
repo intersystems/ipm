@@ -41,7 +41,7 @@ jobs:
           echo number=${VERSION} >> $GITHUB_OUTPUT
   
   build:
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: 
       - prepare
     strategy:
@@ -187,15 +187,11 @@ jobs:
         run: |
           curl http://localhost:52773/registry/packages/-/all | jq
           curl http://localhost:52773/registry/packages/zpm/ | jq
-          ASSET_NAME='zpm-0.7.4.xml'
-          ASSET_URL=`wget --header "Authorization: token ${GITHUB_TOKEN}" -qO- https://api.github.com/repos/intersystems/ipm/releases | jq -r ".[].assets[] | select(.name == \"${ASSET_NAME}\") | .browser_download_url"`
-          wget $ASSET_URL -O /tmp/zpm.xml
           CONTAINER=$(docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
-          docker cp /tmp/zpm.xml $CONTAINER:/home/irisowner/zpm.xml
           docker cp tests/migration/v0.7-to-v0.9/. $CONTAINER:/tmp/test-package/
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          docker exec -i $CONTAINER iris session iris -UUSER << EOF 
-            set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")
+          docker exec -i $CONTAINER iris session iris -UUSER << 'EOF' 
+            s version="0.7.4" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/"_version_"/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
             zpm "list":1
             zpm "install dsw":1
             zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1
@@ -246,8 +242,8 @@ jobs:
           docker stop $CONTAINER
           docker stop registry
           docker network rm zpm
-      - uses: actions/upload-artifact@v3
-        if: matrix.image == ${{ needs.prepare.outputs.main }}
+      - uses: actions/upload-artifact@v4
+        if: matrix.image == needs.prepare.outputs.main
         with:
           name: zpm-${{ needs.prepare.outputs.version }}
           path: zpm-${{ needs.prepare.outputs.version }}.xml
@@ -263,7 +259,7 @@ jobs:
         if: github.event_name == 'release'
         with:
           ref: main
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: zpm-${{ needs.prepare.outputs.version }}
       - name: Create Beta Release
@@ -276,7 +272,7 @@ jobs:
           tag_name: v${{ needs.prepare.outputs.version }}
           release_name: v${{ needs.prepare.outputs.version }}
           prerelease: ${{ github.event_name != 'release' }}
-      - name: Upload Beta Release Asset
+      - name: Upload Beta Release Asset (versioned)
         uses: actions/upload-release-asset@v1
         if: github.event_name == 'push'
         env:
@@ -285,6 +281,16 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
           asset_name: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_content_type: text/xml
+      - name: Upload Beta Release Asset (versionless)
+        uses: actions/upload-release-asset@v1
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_name: zpm.xml
           asset_content_type: text/xml
       - name: Publish release
         if: github.event_name == 'release'
@@ -303,7 +309,7 @@ jobs:
             halt
           EOF
           docker stop $CONTAINER
-      - name: Upload Public Release Asset
+      - name: Upload Public Release Asset (versioned)
         uses: actions/upload-release-asset@v1
         if: github.event_name == 'release'
         env:
@@ -312,6 +318,16 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
           asset_name: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_content_type: text/xml
+      - name: Upload Public Release Asset (versionless)
+        uses: actions/upload-release-asset@v1
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_name: zpm.xml
           asset_content_type: text/xml
       - name: Bump Release number
         if: github.event_name == 'release'
