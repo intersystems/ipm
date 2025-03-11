@@ -98,11 +98,6 @@ included for username, password, Perforce workspace, and a few other settings.
 This command is an alias for `module-action module-name reload`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform reload action" />
-<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
-<modifier name="only" aliases="o" description="Only runs the specified phase (reload), rather than also running predecessors." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
 <command name="compile">
@@ -110,11 +105,6 @@ This command is an alias for `module-action module-name reload`
 This command is an alias for `module-action module-name compile`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform compile action" />
-<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
-<modifier name="only" aliases="o" description="Only runs the specified phase (compile), rather than also running predecessors." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
 <command name="test" dataPrefix="D">
@@ -122,11 +112,6 @@ This command is an alias for `module-action module-name compile`
 This command is an alias for `module-action module-name test`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform test action" />
-<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
-<modifier name="only" aliases="o" description="Only runs the specified phase (test),rather than also running predecessors." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
 <command name="package" dataPrefix="D">
@@ -134,12 +119,8 @@ This command is an alias for `module-action module-name test`
 This command is an alias for `module-action module-name package`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform package actions" />
-<modifier name="only" aliases="o" description="Only runs the specified phase (package), rather than also running predecessors." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="path" aliases="p" dataAlias="Path" value="true" description="Use specified path to export package." />
-<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
+<modifier name="path" aliases="p" dataAlias="Path" value="true" description="the specified path to export package." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
 </command>
 
 <command name="verify" dataPrefix="D">
@@ -147,11 +128,6 @@ This command is an alias for `module-action module-name package`
 This command is an alias for `module-action module-name verify`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform verify action" />
-<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
-<modifier name="only" aliases="o" description="Only runs the specified phase (verify), rather than also running predecessors." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
 <command name="publish" dataPrefix="D">
@@ -159,14 +135,8 @@ This command is an alias for `module-action module-name verify`
 This command is an alias for `module-action module-name publish`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
-<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
-<modifier name="only" aliases="o" description="Only runs the specified phase (publish), rather than also running predecessors." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
-<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are published. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class." />
 </command>
 
 <command name="makedeployed">
@@ -174,12 +144,7 @@ This command is an alias for `module-action module-name publish`
 This command is an alias for `module-action module-name makedeployed`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform reload action" />
-<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-<modifier name="only" aliases="o" description="Only runs the specified phase (makedeployed), rather than also running predecessors." />
 <modifier name="recurse" aliases="r" description="Runs the specified phase (makedeployed) on the module and all of its dependencies." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
 <command name="unpublish">
@@ -2385,6 +2350,7 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 	Set tModName = $Get(pCommandInfo("parameters","module"))
 	Set tPhases = $ListFromString($Get(pCommandInfo("parameters","actions"))," ")
 	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
+	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
 	If $ListLength(tPhases) {
 		// Accept lower-case phase names in the command.
 		Set tPtr = 0
@@ -2393,6 +2359,9 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 			Set tActualPhases = tActualPhases_$ListBuild($ZConvert(tPhase, "w"))
 		}
 		Merge tParams = pCommandInfo("data")
+		if $Data(tParams("Path"), path) # 2 {
+			set tParams("Path") = ##class(%File).NormalizeDirectory(path)
+		}
 		$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tActualPhases,tIsComplete,.tParams))
 	} Else {
 		If (tModName '= "") && ##class(%IPM.Storage.Module).NameExists(tModName) {
