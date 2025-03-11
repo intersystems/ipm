@@ -191,7 +191,6 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                     /// Shouldn't reach here
                     $$$ThrowStatus("Deployed project '" _ project.Name _ "' not found after successful loading.")
                   }
-                  Merge ..CompileFromProjectList = tLoadedList
                   Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
                 }
                 Return $$$OK
