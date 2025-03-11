@@ -48,13 +48,7 @@ Method TestVersions()
 	Do ..AssertVersionNotValid("1.1.1-alpha?")
 }
 
-Method AssertVersionValid(
-	pVersion As %String,
-	pMajor As %String = "",
-	pMinor As %String = "",
-	pPatch As %String = "",
-	pPrerelease As %String = "",
-	pBuild As %String = "")
+Method AssertVersionValid(pVersion As %String, pMajor As %String = "", pMinor As %String = "", pPatch As %String = "", pPrerelease As %String = "", pBuild As %String = "")
 {
 	Set tSC = ##class(%IPM.General.SemanticVersion).IsValid(pVersion, .tSemVer)
 	If '$$$AssertStatusOK(tSC,pVersion_" is accepted as a valid semantic version.") {
@@ -74,18 +68,14 @@ Method AssertVersionNotValid(pVersion As %String)
 	Do $$$AssertStatusNotOK(##class(%IPM.General.SemanticVersion).IsValid(pVersion),pVersion_" is not accepted as a valid semantic version.")
 }
 
-Method AssertFollows(
-	pVersion1 As %String,
-	pVersion2 As %String)
+Method AssertFollows(pVersion1 As %String, pVersion2 As %String)
 {
 	Set tSemVer1 = ##class(%IPM.General.SemanticVersion).FromString(pVersion1)
 	Set tSemVer2 = ##class(%IPM.General.SemanticVersion).FromString(pVersion2)
 	Do $$$AssertEquals(tSemVer1.Follows(tSemVer2), 1, pVersion1_" follows "_pVersion2)
 }
 
-Method AssertNotFollows(
-	pVersion1 As %String,
-	pVersion2 As %String)
+Method AssertNotFollows(pVersion1 As %String, pVersion2 As %String)
 {
 	Set tSemVer1 = ##class(%IPM.General.SemanticVersion).FromString(pVersion1)
 	Set tSemVer2 = ##class(%IPM.General.SemanticVersion).FromString(pVersion2)
