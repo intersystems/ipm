@@ -3739,6 +3739,13 @@ ClassMethod Information(ByRef pCommandInfo)
 		}
 	}
 
+	Set messages = ..BuildIntroMessages(.outOfBoxMessage)
+	Set messages = messages _ $ListBuild(outOfBoxMessage)
+	Set ptr = 0
+	While $ListNext(messages, ptr, line) {
+		Write !, line
+	}
+	Write !!, "Currently installed top-level modules are listed below:", !
 	Do ..GetListModules(,,.list)
 	Set updatedList("width") = 0
 	For i = 1:1:list {
