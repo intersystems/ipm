@@ -181,15 +181,13 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 Set ..CompileFromProject = 1
                 Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
                 If '$Data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
-                  Do ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>", , .project)
-                  If $IsObject(project) {
+                  $$$ThrowOnError(##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>"))
+                  If $$$ISOK(sc) {
+                    Set tDeployedProjectName = ..ResourceReference.Module.Name _ "_" _ $$$DeployedProjectSuffix
                     If tVerbose {
-                      Write !, "Deleting deployed project '" _ project.Name _ "' while preserving loaded resources"
+                      Write !, "Deleting deployed project '" _ tDeployedProjectName _ "' while preserving loaded resources"
                     }
-                    $$$ThrowOnError(##class(%Studio.Project).Delete(project.Name))
-                  } Else {
-                    /// Shouldn't reach here
-                    $$$ThrowStatus("Deployed project '" _ project.Name _ "' not found after successful loading.")
+                    $$$ThrowOnError(##class(%Studio.Project).Delete(tDeployedProjectName))
                   }
                   Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
                 }
