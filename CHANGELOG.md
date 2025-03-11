@@ -12,15 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #469 Added ability to include an `IPMVersion` in `SystemRequirement` of module.xml
 - #530 Added a `CustomPhase` attribute to `<Invoke>` that doesn't require a corresponding %method in lifecycle class.
 - #582 Added functionality to optionally see time of last update and server version of each package
-- #609 Added support for `-export-deps` when running the "Package" phase of lifecycle
+- #609,#729 Added support for `-export-deps` when running the "Package" phase (and, consequently, the "Publish" phase) of lifecycle
 - #541 Added support for ORAS repository
+- #702 Added a new lifecycle phase `Initialize` which is used for preload
+- #702 Added a `<CPF/>` resource, which can be used for CPF merge before/after a specified lifecycle phase or in a custom lifecycle phase.
+- #704,743 Added support for passing in env files via `-env /path/to/env1.json;/path/to/env2.json` syntax. Environment variables are also supported via ${var} syntax.
+- #710 Added support for `module-version` command which updates the version of a module
+- #716,#733 Added support to publish under external name by passing `-use-external-name` or `-use-ext`. Fail early if external name is illegal / empty.
+- #720 Added support to export package with Python dependencies exported as a wheel file.
+- #720 Support offline installation of oras using fixed version of pure python wheels and an adaptor for rpds.
+- #746: Added support for loading modules synchronously without multiprocessing
+- #749: Added more debugging information in the welcome banner
 
 ### Changed
-- 
+- #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
+- #726 When running `zpm "load ..."` on a nonexistent path, it now returns an error instead of silently failing with a $$$OK status.
 
 ### Fixed
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
 - #635: When calling the "package" command, the directory is now normalized to include trailing slash (or backslash).
+- #696: Fix a bug that caused error status to be ignored when publishing a module.
+- #700: Fix a bug due to incompatible conventions between SemVer and OCI tags
+- #726,#729: Fixed a bug where install/loading a tarball doesn't install dependencies from `.modules` subfolder even when it's available
+- #731: Issue upgrading from v0.9.x due to refactor of repo classes
+- #718: Upload zpm.xml (without the version) as an artifact to provide a more stable URL to latest release artifact on GitHub
+- #757: Fixed a bug where mappings are not getting created when they should.
 
 ### Security
 -
@@ -30,6 +46,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 -
+
+## [Unreleased - 0.9.2+snapshot]
+
+### Added
+- #682 When downloading IPM via the `enable` command from a remote registry, allow user to pass in the registry name (or get the only existent one), instead of the deployment enabled registry.
+
+### Fixed
+- #684 Fixed banner display issues in interactive `zpm` shell.
+- #682 When enabling IPM in a namespace using local IPM caches, check for existence of `<iris-root>/lib/ipm/` beforing querying it.
+- #682 Use more standard wording of mapping when enabling IPM
+- #681 Convert specified namespaces to upper case for `enable` and `unmap` commands.
+- #680 Always export static files (README.md, LICENSE, requirements.txt) if existent
+- #678 Only update comment-flagged part of the language extension, allowing users to keep their custom code when upgrading
+- #680, #683 Always export static files (README.md, LICENSE, requirements.txt, CHANGELOG.md) if existent
+
+### Security
+- #697 When publishing modules, will get an status with error message (instead of just a boolean) in case of failures.
+
+## [0.9.1] - 2024-12-18
+
+### Added
+- #663 Added support for mapping of repository settings along with, or in addition to, IPM package and routines
+- #663 Added functionality to always unmap repository settings when IPM package and routines are unmapped
+- #663 Added support for unmapping of repository settings alone
+- #663 Added support for `enable -community`, which resets repository settings to default and maps IPM along with repo settings globally
+
+### Fixed
+- #663 Improved error output and instructions in the language extension when "zpm" is run from a namespace without IPM
 
 ## [0.9.0] - 2024-12-16
 
