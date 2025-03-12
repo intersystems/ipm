@@ -1112,11 +1112,14 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 		}
   
 		// Deployed items should be exported as a studio project to a designated directory
-		// Use double underscores to avoid conflicts with names of other modules
-		$$$ThrowOnError(..Module.GetStudioProject(.deployedProject, 1, 0, $$$DeployedProjectSuffix))
-		Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
-		Set qspec = $Select(tVerbose:"d",1:"-d")
-		$$$ThrowOnError(deployedProject.DeployToFile(tDeployedProjectPath, qspec))
+		Set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
+		Set tDeployedProject = ##class(%Studio.Project).%OpenId(tDeployedProjectName)
+		If '$IsObject(tDeployedProject) {
+			Set tDeployedProject = ##class(%Studio.Project).%New()
+			Set tDeployedProject.Name = tDeployedProjectName
+		}
+		Do tDeployedProject.Items.Clear()
+		Set tParams($$$DeployedProjectIndex) = tDeployedProject
 
 		Set tFullResourceName = ""
 		For {
@@ -1224,6 +1227,14 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			}
 			$$$ThrowOnError(tSC)
 		}
+
+		// Export the deployed project to the target directory, if it's non-empty
+		If tDeployedProject.Items.Count() > 0 {
+			// Intentionally not calling .%Save() on the project; we don't want to persist it.
+			Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
+			$$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $Select(tVerbose:"d",1:"-d")))
+		}
+
     /// Always keep these files
      Set staticFiles = $ListBuild(
        "readme.md",

@@ -1415,7 +1415,7 @@ Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Bo
 	Quit tSC
 }
 
-ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %String) As %Status [ Internal, Private ]
+ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %String) As %Status [ Internal ]
 {
 	Set tSC = $$$OK
 	Try {

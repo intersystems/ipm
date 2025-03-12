@@ -84,3 +84,5 @@ ROUTINE %IPM.Common [Type=INC]
 #; Structure: %IPMDeployedProjectInstalled("/path/to/first/Deployed.xml") = ""
 #;            %IPMDeployedProjectInstalled("/path/to/second/Deployed.xml") = ""
 #Define DeployedProjectInstalled %IPMDeployedProjectInstalled
+
+#Define DeployedProjectIndex "%Export","DeployedProject"

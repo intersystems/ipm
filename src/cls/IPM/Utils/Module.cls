@@ -2374,4 +2374,9 @@ ClassMethod GetDeployedProjectPath(root As %String) As %String
 	Quit deployedDirectory_$$$DeployedXMLName
 }
 
+ClassMethod GetDeployedProjectName(moduleName As %String) As %String [ CodeMode = expression ]
+{
+moduleName_"_"_$$$DeployedProjectSuffix
+}
+
 }

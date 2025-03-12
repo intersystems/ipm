@@ -272,8 +272,13 @@ Method OnExportDeployedItem(pFullExportPath As %String, pItemName As %String, By
     Set fileExt = $$$ucase($Piece(pItemName, ".", *))	
     Set tName = $Piece(pItemName, ".", 1, * - 1)	
     Quit:'($ListFind($ListBuild("CLS","MAC","INT"), fileExt))
-    // TODO verify that the deployed item is in the %Studio.Project
-    Set pItemHandled = 1	
+    If $Data(pParams($$$DeployedProjectIndex), deployedProject) {
+      If tVerbose {
+        Write !, $$$FormatText("Adding deployed item '%1' to project '%2'", pItemName, deployedProject.Name)
+      }
+      $$$ThrowOnError(##class(%IPM.Storage.Module).AddItemToProject(deployedProject, pItemName))
+      Set pItemHandled = 1	
+    }
   }	Catch e {	
     Set tSC = e.AsStatus()	
   }	
