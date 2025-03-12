@@ -181,7 +181,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 Set ..CompileFromProject = 1
                 Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
                 If '$Data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
-                  $$$ThrowOnError(##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>"))
+                  Set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
+                  If $$$ISERR(sc) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found"))
+                  }
                   Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
                 }
                 Return $$$OK
