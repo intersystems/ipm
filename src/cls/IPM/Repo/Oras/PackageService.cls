@@ -80,7 +80,7 @@ ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatfo
 
 		// prepare for sorting
 		Set semver = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(version))
-		Set sorter(semver.Major, semver.Minor, semver.Patch, semver.Prerelease, semver.Build) = version
+		Set sorter(+semver.Major, +semver.Minor, +semver.Patch, " "_semver.Prerelease, " "_semver.Build) = version
 	}
 
 	Set major = ""
@@ -136,8 +136,9 @@ Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.Gen
 		// If there are multiple platform versions for a given package version, we only want to use the metadata of one of them
 		Set platformVersions = aggregatedPlatformVersion(moduleVersion)
 		Set platformVersion = $ListGet(platformVersions)
+		Set tag = moduleVersion
 		If platformVersion '= "" {
-			Set tag = moduleVersion _ $$$OrasTagPlatformSeparator _ platformVersion
+			Set tag = tag _ $$$OrasTagPlatformSeparator _ platformVersion
 		}
 
 		#; get metadata from annotations
