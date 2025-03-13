@@ -123,6 +123,52 @@ ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatfo
 	Return order
 }
 
+Method ListModulesFromTagString(allTagsString As %String, tVersionExpression As %IPM.General.SemanticVersionExpression, package As %String, client As %SYS.Python, tList As %ListOfObjects, pSearchCriteria As %IPM.Repo.SearchCriteria, name As %String)
+{
+	Set allVersionsList = ..AggregatePlatformVersions($ListFromString(allTagsString, ", "), .aggregatedPlatformVersion)
+	Set pointer = 0
+	While $ListNext(allVersionsList,pointer,moduleVersion) {
+		#; filter by version
+		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(moduleVersion))
+		If 'tVersion.Satisfies(tVersionExpression) { 
+			Continue
+		}
+
+		// If there are multiple platform versions for a given package version, we only want to use the metadata of one of them
+		Set platformVersions = aggregatedPlatformVersion(moduleVersion)
+		Set platformVersion = $ListGet(platformVersions)
+		If platformVersion '= "" {
+			Set tag = moduleVersion _ $$$OrasTagPlatformSeparator _ platformVersion
+		}
+
+		#; get metadata from annotations
+		Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
+		set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+		$$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
+
+		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
+		Set tModRef.Name = artifactMetadata.ImageTitle
+		Set tModRef.Repository = artifactMetadata.ImageSource
+		Set tModRef.VersionString = artifactMetadata.ImageVersion
+		Set tModRef.Description = artifactMetadata.ImageDescription
+		Set tModRef.Deployed = artifactMetadata.IPMDeployed
+		If artifactMetadata.IPMDeployed '= "" {
+			Set pvPtr = 0
+			While $ListNext(platformVersions, pvPtr, pv) {
+				$$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))
+			}
+		}
+		Set tModRef.AllVersions = allTagsString
+		Set tModRef.Origin = artifactMetadata.IPMOrigin
+		Do tList.Insert(tModRef)
+
+		#; If not all versions are requested, return the latest one
+		If 'pSearchCriteria.AllVersions, name="" {
+			Quit
+		}
+	}
+}
+
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")
 {
 	#; Get ORAS client
@@ -177,88 +223,14 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			}
 			#; get all versions
 			Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
-			Set allVersionsList = ..AggregatePlatformVersions($ListFromString(allTagsString, ", "), .aggregatedPlatformVersion)
-			Set pointer = 0
-			While $ListNext(allVersionsList,pointer,moduleVersion) {
-				#; filter by version
-				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(moduleVersion))
-				If 'tVersion.Satisfies(tVersionExpression) { 
-					Continue
-				}
-
-				// If there are multiple platform versions for a given package version, we only want to use the metadata of one of them
-				Set platformVersions = aggregatedPlatformVersion(moduleVersion)
-				Set platformVersion = $ListGet(platformVersions)
-				If platformVersion '= "" {
-					Set tag = moduleVersion _ $$$OrasTagPlatformSeparator _ platformVersion
-				}
-
-				#; get metadata from annotations
-				Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
-				set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-				$$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
-
-				Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-				Set tModRef.Name = artifactMetadata.ImageTitle
-				Set tModRef.Repository = artifactMetadata.ImageSource
-				Set tModRef.VersionString = artifactMetadata.ImageVersion
-				Set tModRef.Description = artifactMetadata.ImageDescription
-				Set tModRef.Deployed = artifactMetadata.IPMDeployed
-				If artifactMetadata.IPMDeployed '= "" {
-					Set pvPtr = 0
-					While $ListNext(platformVersions, pvPtr, pv) {
-						$$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))
-					}
-				}
-				Set tModRef.AllVersions = allTagsString
-				Set tModRef.Origin = artifactMetadata.IPMOrigin
-				Do tList.Insert(tModRef)
-
-				#; If not all versions are requested, return the latest one
-				If 'pSearchCriteria.AllVersions, name="" {
-					Quit
-				}
-			}
+			Do ..ListModulesFromTagString(allTagsString, tVersionExpression, package, client, tList, pSearchCriteria, name)
 		}
 		Return tList
 	}
 
 	Set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
-	Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
-	Set pointer = 0
-	While $ListNext(allTagsList,pointer,tag) {
-		#; filter by version
-		Set $ListBuild(tModuleVersion, tPlatformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
-		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(tModuleVersion))
-		If 'tVersion.Satisfies(tVersionExpression) { 
-			Continue
-		}
-
-		#; get metadata from annotations
-		Set metadata = ..GetPackageMetadataPy(..Location, name, "", tag, client)
-		set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-		Do artifactMetadata.%JSONImport(metadata)
-
-		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-		Set tModRef.Name = artifactMetadata.ImageTitle
-		Set tModRef.Repository = artifactMetadata.ImageSource
-		Set tModRef.VersionString = artifactMetadata.ImageVersion
-		Set tModRef.Description = artifactMetadata.ImageDescription
-		Set tModRef.Deployed = artifactMetadata.IPMDeployed
-		Set tModRef.PlatformVersion = artifactMetadata.IPMPlatformVersion
-		If tModRef.Deployed {
-			$$$ThrowOnError(tModRef.PlatformVersions.Insert(artifactMetadata.IPMPlatformVersion))
-		}
-		Set tModRef.AllVersions = allTagsString
-		Set tModRef.Origin = artifactMetadata.IPMOrigin
-		Do tList.Insert(tModRef)
-		
-		#; If not all versions are requested, return the latest one
-		If 'pSearchCriteria.AllVersions, name="" {
-			Quit
-		}
-	}
-	Quit tList
+	Do ..ListModulesFromTagString(allTagsString, tVersionExpression, package, client, tList, pSearchCriteria, name)
+	Return tList
 }
 
 // ** ORAS FUNCTIONS **
