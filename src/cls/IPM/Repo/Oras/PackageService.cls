@@ -60,6 +60,69 @@ Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
 	Return ..HasModulePy(..Location, name, ..Namespace, client)
 }
 
+/// Given a list of ORAS tags, aggregate the platform versions by package version
+/// e.g. $lb("1.0.0__2024.1, "1.0.0__2024.2", "2.0.0__2023.1", "3.0.0") -> aggregatedPlatformVersion
+/// where aggregatedPlatformVersion("1.0.0") = $lb("2024.1","2024.2") 
+///       aggregatedPlatformVersion("2.0.0") = $lb("2023.1")
+///       aggregatedPlatformVersion("3.0.0") = $lb("")
+/// The returned list represents the correct order of the package versions, where latest versions are first
+/// e.g., $lb("1.0.0", "2.0.0", "3.0.0") -> order
+/// where order = $lb("3.0.0", "2.0.0", "1.0.0")
+ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatformVersion As %List) As %List
+{
+	Set ptr = 0
+	Set sorter = ""
+	Set order = ""
+	While $ListNext(tagsList, ptr, tag) {
+		// aggregate
+		Set $ListBuild(version, platformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
+		Set value = $Get(aggregatedPlatformVersion(version))
+		Set aggregatedPlatformVersion(version) = value _ $ListBuild(platformVersion) 
+
+		// prepare for sorting
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(version))
+		Set sorter(semver.Major, semver.Minor, semver.Patch, semver.Prerelease, semver.Build) = version
+	}
+
+	Set major = ""
+	For {
+		Set major = $Order(sorter(major), -1)
+		If major = "" {
+			Quit
+		}
+		Set minor = ""
+		For {
+			Set minor = $Order(sorter(major, minor), -1)
+			If minor = "" {
+				Quit
+			}
+			Set patch = ""
+			For {
+				Set patch = $Order(sorter(major, minor, patch), -1)
+				If patch = "" {
+					Quit
+				}
+				Set prerelease = ""
+				For {
+					Set prerelease = $Order(sorter(major, minor, patch, prerelease), -1)
+					If prerelease = "" {
+						Quit
+					}
+					Set build = ""
+					For {
+						Set build = $Order(sorter(major, minor, patch, prerelease, build), -1)
+						If build = "" {
+							Quit
+						}
+						Set order = order _ $ListBuild(version)
+					}
+				}
+			}
+		}
+	}
+	Return order
+}
+
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")
 {
 	#; Get ORAS client
@@ -114,14 +177,20 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			}
 			#; get all versions
 			Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
-			Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
+			Set allVersionsList = ..AggregatePlatformVersions($ListFromString(allTagsString, ", "), .aggregatedPlatformVersion)
 			Set pointer = 0
-			While $ListNext(allTagsList,pointer,tag) {
+			While $ListNext(allVersionsList,pointer,moduleVersion) {
 				#; filter by version
-				Set $ListBuild(tModuleVersion, tPlatformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
-				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(tModuleVersion))
+				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(moduleVersion))
 				If 'tVersion.Satisfies(tVersionExpression) { 
 					Continue
+				}
+
+				// If there are multiple platform versions for a given package version, we only want to use the metadata of one of them
+				Set platformVersions = aggregatedPlatformVersion(moduleVersion)
+				Set platformVersion = $ListGet(platformVersions)
+				If platformVersion '= "" {
+					Set tag = moduleVersion _ $$$OrasTagPlatformSeparator _ platformVersion
 				}
 
 				#; get metadata from annotations
@@ -135,9 +204,11 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 				Set tModRef.VersionString = artifactMetadata.ImageVersion
 				Set tModRef.Description = artifactMetadata.ImageDescription
 				Set tModRef.Deployed = artifactMetadata.IPMDeployed
-				Set tModRef.PlatformVersion = artifactMetadata.IPMPlatformVersion
-				If artifactMetadata.IPMPlatformVersion '= "" {
-					$$$ThrowOnError(tModRef.PlatformVersions.Insert(artifactMetadata.IPMPlatformVersion))
+				If artifactMetadata.IPMDeployed '= "" {
+					Set pvPtr = 0
+					While $ListNext(platformVersions, pvPtr, pv) {
+						$$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))
+					}
 				}
 				Set tModRef.AllVersions = allTagsString
 				Set tModRef.Origin = artifactMetadata.IPMOrigin
