@@ -109,7 +109,7 @@ ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatfo
 					}
 					Set build = ""
 					For {
-						Set build = $Order(sorter(major, minor, patch, prerelease, build), -1)
+						Set build = $Order(sorter(major, minor, patch, prerelease, build), -1, version)
 						If build = "" {
 							Quit
 						}
