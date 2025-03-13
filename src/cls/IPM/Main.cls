@@ -2533,24 +2533,24 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
         "Root"
       )
     }
-		Set tDesc=+$Get(pCommandInfo("data","Desc"))
+	Set tDesc=+$Get(pCommandInfo("data","Desc"))
     Do ..GetListModules(,tSearchString, .list, showFields, $Get(pCommandInfo("modifiers", "repository")))
+	For i = 1:1:list {
+		Set entry = list(i)
+		Set name = $ListGet(entry,1)
+		Set externalName = $ListGet(entry,3)
+		Set displayName = $Select(externalName'= "":externalName, 1:name)
+		If (displayName '= name) {
+			Set displayName = displayName_" ("_name_")"
+		}
+		Set $List(list(i), 1) = displayName
+		If list("width") < $Length(displayName) {
+			Set list("width") = $Length(displayName)
+		}
 	}
-  For i = 1:1:list {
-	Set entry = list(i)
-	Set name = $ListGet(entry,1)
-	Set externalName = $ListGet(entry,3)
-	Set displayName = $Select(externalName'= "":externalName, 1:name)
-	If (displayName '= name) {
-		Set displayName = displayName_" ("_name_")"
+	Merge tModifiers = pCommandInfo("modifiers")
+	Do ..DisplayModules(.list,,,, .tModifiers)
 	}
-	Set $List(list(i), 1) = displayName
-	If list("width") < $Length(displayName) {
-		Set list("width") = $Length(displayName)
-	}
-  }
-  Merge tModifiers = pCommandInfo("modifiers")
-  Do ..DisplayModules(.list,,,, .tModifiers)
 }
 
 /// Get module list in currently namespace
