@@ -66,9 +66,8 @@ Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
 ///       aggregatedPlatformVersion("2.0.0") = $lb("2023.1")
 ///       aggregatedPlatformVersion("3.0.0") = $lb("")
 /// The returned list represents the correct order of the package versions, where latest versions are first
-/// e.g., $lb("1.0.0", "2.0.0", "3.0.0") -> order
-/// where order = $lb("3.0.0", "2.0.0", "1.0.0")
-ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatformVersion As %List) As %List
+/// e.g., $lb("1.0.0", "2.0.0", "3.0.0") -> $lb("3.0.0", "2.0.0", "1.0.0")
+ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatformVersion As %String) As %List
 {
 	Set ptr = 0
 	Set sorter = ""
@@ -123,14 +122,14 @@ ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatfo
 	Return order
 }
 
-Method ListModulesFromTagString(allTagsString As %String, tVersionExpression As %IPM.General.SemanticVersionExpression, package As %String, client As %SYS.Python, tList As %ListOfObjects, pSearchCriteria As %IPM.Repo.SearchCriteria, name As %String)
+Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.General.SemanticVersionExpression, package As %String, client As %SYS.Python, moduleList As %ListOfObjects, searchCriteria As %IPM.Repo.SearchCriteria, name As %String)
 {
 	Set allVersionsList = ..AggregatePlatformVersions($ListFromString(allTagsString, ", "), .aggregatedPlatformVersion)
 	Set pointer = 0
 	While $ListNext(allVersionsList,pointer,moduleVersion) {
 		#; filter by version
 		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(moduleVersion))
-		If 'tVersion.Satisfies(tVersionExpression) { 
+		If 'tVersion.Satisfies(semverExpr) { 
 			Continue
 		}
 
@@ -160,10 +159,10 @@ Method ListModulesFromTagString(allTagsString As %String, tVersionExpression As 
 		}
 		Set tModRef.AllVersions = allTagsString
 		Set tModRef.Origin = artifactMetadata.IPMOrigin
-		Do tList.Insert(tModRef)
+		Do moduleList.Insert(tModRef)
 
 		#; If not all versions are requested, return the latest one
-		If 'pSearchCriteria.AllVersions, name="" {
+		If 'searchCriteria.AllVersions, name="" {
 			Quit
 		}
 	}
