@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #720 Support offline installation of oras using fixed version of pure python wheels and an adaptor for rpds.
 - #746: Added support for loading modules synchronously without multiprocessing
 - #749: Added more debugging information in the welcome banner
+- #755: Added an `info` command which prints external name (optionally including the real name) of top-level packages without the `build` part of semver. 
 - #756: Support running commands using external names of packages.
 
 ### Changed
