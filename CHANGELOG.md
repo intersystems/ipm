@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #746: Added support for loading modules synchronously without multiprocessing
 - #749: Added more debugging information in the welcome banner
 - #754: Support publishing and installing deployed items for ORAS repository
+- #755: Added an `info` command which prints external name (optionally including the real name) of top-level packages without the `build` part of semver. 
 - #756: Support running commands using external names of packages.
 
 ### Changed
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #726 When running `zpm "load ..."` on a nonexistent path, it now returns an error instead of silently failing with a $$$OK status.
 - #754 Deployed items are now exported together into a single `studio-project/Deployed.xml` instead of individual `.deploy` files.
 - #756 External name of packages are now unqiue and can no longer conflict with the real name of another packages.
+- #751: Blue terminal output replaced with default (white)
 
 ### Fixed
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
@@ -41,8 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #731: Issue upgrading from v0.9.x due to refactor of repo classes
 - #718: Upload zpm.xml (without the version) as an artifact to provide a more stable URL to latest release artifact on GitHub
 - #754: Fix a bug where `MakeDeployed` doesn't mark a module as deployed if there are only class (but not routine) resources with `Deploy=true`
-
 - #722: Unified modifiers between ModuleAction and RunOnePhase
+- #735: Prerelease now properly allows alphanumeric tags with zeros
 
 ### Security
 -
