@@ -26,7 +26,7 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
 		Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
 		If 'tGlobalScope {
-			Set tNeedExplicitMapping = ..ResourceIsMappedToDefaultDB(..ResourceReference.Name)
+			Set tNeedExplicitMapping = '..ResourceIsMappedToDefaultDB(..ResourceReference.Name)
 			If tNeedExplicitMapping {
 				Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
 				Set tSC = ##class(%IPM.Utils.Module).AddPackageMapping($namespace,tName,tSourceDB)
