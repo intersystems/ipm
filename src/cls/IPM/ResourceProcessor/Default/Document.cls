@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.ResourceProcessor.Default.Document Extends %IPM.ResourceProcessor.AbstractCompilable
 {
 
@@ -172,6 +174,21 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 Set tSC = $$$OK
                 Quit
               }
+              If ..ResourceReference.Deploy {
+                If tVerbose {
+                  Write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
+                }
+                Set ..CompileFromProject = 1
+                Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
+                If '$Data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
+                  Set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
+                  If $$$ISERR(sc) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found"))
+                  }
+                  Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
+                }
+                Return $$$OK
+              }
               Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
             }
             If $$$ISERR(tSC) Continue
@@ -258,124 +275,17 @@ Method OnExportDeployedItem(pFullExportPath As %String, pItemName As %String, By
     Set fileExt = $$$ucase($Piece(pItemName, ".", *))	
     Set tName = $Piece(pItemName, ".", 1, * - 1)	
     Quit:'($ListFind($ListBuild("CLS","MAC","INT"), fileExt))
-    Set tFullExportPath = pFullExportPath	
-    Set tFullExportPath = tFullExportPath _ ".deploy"	
-    Write:tVerbose !,"Exporting Deployed '",pItemName,"' to '",tFullExportPath,"'"	
-    Set list = ""	
-    If fileExt = "CLS" {	
-      Set list = ..ListGlobals4Class(tName)	
-    } Else {	
-      Set list = ..ListGlobals4Routine(tName)	
-    }	
-    Quit:list=""	
-    Set ptr = 0	
-    While $ListNext(list, ptr, item) {
-      Set list(item _ ".gbl") = ""	
-    }	
-    $$$ThrowOnError(##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullExportPath)))	
-    Set flags = $Select(tVerbose: "d", 1: "-d")	
-    $$$ThrowOnError($System.OBJ.Export(.list, tFullExportPath, flags))	
-    Set pItemHandled = 1	
+    If $Data(pParams($$$DeployedProjectIndex), deployedProject) {
+      If tVerbose {
+        Write !, $$$FormatText("Adding deployed item '%1' to project '%2'", pItemName, deployedProject.Name)
+      }
+      $$$ThrowOnError(##class(%IPM.Storage.Module).AddItemToProject(deployedProject, pItemName))
+      Set pItemHandled = 1	
+    }
   }	Catch e {	
     Set tSC = e.AsStatus()	
   }	
   Quit tSC
-}
-
-Method ListGlobals4Class(pClassName As %String = "") As %String [ Private ]
-{
-	
-  Set list = ""	
-  Set oddDEF = $Name(^oddDEF)	
-  Set oddCOM = $Name(^oddCOM)	
-  Set oddDEP = $Name(^oddDEP)	
-  Set oddEXT = $Name(^oddEXT)	
-  Set oddEXTR = $Name(^oddEXTR)	
-  Set oddMAP = $Name(^oddMAP)	
-  Set oddPROC = $Name(^oddPROC)	
-  Set oddSQL = $Name(^oddSQL)	
-  Set oddTSQL = $Name(^oddTSQL)	
-  Set rINDEX = $Name(^rINDEX)	
-  Set rINDEXSQL = $Name(^rINDEXSQL)	
-  Set rINDEXCLASS = $Name(^rINDEXCLASS)	
-  Set rOBJ = $Name(^rOBJ)	
-  Set rPYC = $Name(^rPYC)	
-  If (pClassName="")||('$Data(@oddCOM@(pClassName))) {	
-    Quit ""	
-  }	
-  Set list = list _ $ListBuild($Name(@oddDEF@(pClassName)))	
-  Set list = list _ $ListBuild($Name(@oddCOM@(pClassName)))	
-  Set list = list _ $ListBuild($Name(@oddDEP@(pClassName)))	
-  If 0 {	
-    Set ind = ""	
-    For {	
-      Set ind = $Order(@oddDEP@(pClassName, ind))	
-      Quit:ind=""	
-      Set dep = ""	
-      For {	
-        Set dep = $Order(@oddDEP@(pClassName, ind, dep))	
-        Quit:dep=""	
-        Set list = list _ $ListBuild($Name(@oddDEP@(0, dep, ind, pClassName)))	
-      }	
-    }	
-  }	
-  Set list = list _ $ListBuild($Name(@rINDEXCLASS@($$$ucase(pClassName))))	
-  Set ind = ""	
-  For {	
-    Set ind = $Order(@oddCOM@(pClassName,50,ind))	
-    Quit:ind=""	
-    Set list = list _ $ListBuild($Name(@rINDEX@(ind)))	
-    Set list = list _ $ListBuild($Name(@rOBJ@(ind)))	
-  }	
-  If $Data(@rPYC@(pClassName)) {	
-    Set list = list _ $ListBuild($Name(@rPYC@(pClassName)))	
-  }	
-  Set $ListBuild(schema, table) = $ListFromString($Get(@oddCOM@(pClassName, 53)), ".")	
-  If schema'="",table'="",$Data(@oddSQL@(schema, table)) {	
-  Set list = list _ $ListBuild($Name(@oddSQL@(schema, table)))	
-  Set list = list _ $ListBuild($Name(@rINDEXSQL@("TABLE", schema, table)))	
-  Set list = list _ $ListBuild($Name(@rINDEXSQL@("rv", $$$ucase(schema), $$$ucase(table))))	
-  #; Set tsqlId = ""	
-  #; For {	
-  #;   Set tsqlId = $Order(@oddSQL@(schema, table, "tsql", 1, tsqlId))	
-  #;   Quit:tsqlId=""	
-  #;   Set list = list _ $ListBuild($Name(@oddTSQL@(tsqlId)))	
-  #; }	
-  }	
-  Set ind = ""	
-  For {
-    Set ind = $Order(@oddCOM@(pClassName, $$$cCLASSprocedures, ind), 1, value)	
-    Quit:ind=""	
-    Set $ListBuild(schema, table) = value	
-    Continue:schema=""	
-    Continue:table=""	
-    Set list = list _ $ListBuild($Name(@oddPROC@($$$ucase(schema), ind)))	
-    Set list = list _ $ListBuild($Name(@oddSQL@(schema, table)))	
-  }	
-  If $Data(@oddEXT@(pClassName _ ".cls")) {	
-    Set list = list _ $ListBuild($Name(@oddEXT@(pClassName _ ".cls")))	
-  }	
-  If $Data(@oddEXTR@(pClassName)) {	
-    Set list = list _ $ListBuild($Name(@oddEXTR@(pClassName)))	
-  }	
-  If $Data(@oddMAP@(pClassName)) {	
-    Set list = list _ $ListBuild($Name(@oddMAP@(pClassName)))	
-  }	
-  Quit list
-}
-
-Method ListGlobals4Routine(pRoutine As %String = "") As %String [ Private ]
-{
-	
-  Set list = ""	
-  Set rINDEX = $Name(^rINDEX)	
-  Set rOBJ = $Name(^rOBJ)	
-  If (pRoutine="")||('$Data(@rOBJ@(pRoutine))) {	
-    Quit ""	
-  }	
-  Set list = list _ $ListBuild($Name(@rINDEX@(pRoutine)))	
-  Set list = list _ $ListBuild($Name(@rOBJ@(pRoutine)))	
-  Quit list
 }
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.

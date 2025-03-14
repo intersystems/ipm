@@ -385,6 +385,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
             }
         } Else {
             // Lifecycle before / (phase) / after
+			New $$$DeployedProjectInstalled
             $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
             $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
             $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
@@ -1414,7 +1415,7 @@ Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Bo
 	Quit tSC
 }
 
-ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %String) As %Status [ Internal, Private ]
+ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %String) As %Status [ Internal ]
 {
 	Set tSC = $$$OK
 	Try {

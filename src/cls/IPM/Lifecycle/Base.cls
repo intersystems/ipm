@@ -351,6 +351,10 @@ Method %Clean(ByRef pParams) As %Status
 							If $$$ISERR(tDelSC) {
 								Write !,"WARNING: ",$System.Status.GetErrorText(tDelSC)
 							}
+						} ElseIf $System.CLS.IsMthd(tClassKey, "%Extends") {
+							// Could apparently get here for a deployed class; neither ^oddCOM nor ^oddDEF exists??
+							// Give it a try, but don't even output a warning.
+							Do $System.OBJ.Delete(tClassKey,$Select(tVerbose:"d",1:"-d"))
 						}
 					}
 					Kill tDeleteArray("CLS")
@@ -890,7 +894,11 @@ Method %Compile(ByRef pParams) As %Status
 			Quit:tKey=""
 			
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
-				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
+				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject {
+					If tVerbose {
+						Write !, tResource.Name_" was loaded from studio project, skipping compilation."
+					}
+				} ElseIf tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
 					Kill tOneResourceList
 					Set tOneResourceList(tResource.Name) = ""
 					Set tSC = tResource.ResolveChildren(.tOneResourceList)
@@ -1103,6 +1111,16 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			}
 		}
   
+		// Deployed items should be exported as a studio project to a designated directory
+		Set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
+		Set tDeployedProject = ##class(%Studio.Project).%OpenId(tDeployedProjectName)
+		If '$IsObject(tDeployedProject) {
+			Set tDeployedProject = ##class(%Studio.Project).%New()
+			Set tDeployedProject.Name = tDeployedProjectName
+		}
+		Do tDeployedProject.Items.Clear()
+		Set tParams($$$DeployedProjectIndex) = tDeployedProject
+
 		Set tFullResourceName = ""
 		For {
 			Set tFullResourceName = $Order(tResourceArray(tFullResourceName),1,tSrcModule)
@@ -1209,6 +1227,14 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			}
 			$$$ThrowOnError(tSC)
 		}
+
+		// Export the deployed project to the target directory, if it's non-empty
+		If tDeployedProject.Items.Count() > 0 {
+			// Intentionally not calling .%Save() on the project; we don't want to persist it.
+			Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
+			$$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $Select(tVerbose:"d",1:"-d")))
+		}
+
     /// Always keep these files
      Set staticFiles = $ListBuild(
        "readme.md",
@@ -1672,7 +1698,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		} ElseIf tVerbose {
 			Write !,"No classes to mark as deployed."
 		}
-		If $Data(tDeployRtnArray) {
+		If ($Data(tDeployRtnArray) || $Data(tDeployClassArray)) {
 			Set ..HasDeployedResources = 1
       Set ..Module.Deployed = 1
       If '$IsObject(..Module.SystemRequirements) {
