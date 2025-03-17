@@ -10,22 +10,27 @@ Property Default As %IPM.Storage.ModuleSetting.ProcessorDefault;
 
 Method OnBeforeAllTests() As %Status
 {
-    Set ..Params = ##class(%Library.DynamicObject).%New()
-    Do ..Params.%Set("Verbose", 0)
-    Do ..Params.%Set("DeveloperMode", 0)
-    Do ..Params.%Set("NoMapping", 0)
-    Do ..Params.%Set("Compile", 1)
-    Do ..Params.%Set("Phase", "Reload")
-    Do ..Params.%Set("Namespace", "USER")
-    Do ..Params.%Set("ResourceName", "")
-    Do ..Params.%Set("ModuleName", "DefaultModule")
+    Set tSC = $$$OK
+    Try {
+        Set ..Params = ##class(%Library.DynamicObject).%New()
+        Do ..Params.%Set("Verbose", 0)
+        Do ..Params.%Set("DeveloperMode", 0)
+        Do ..Params.%Set("NoMapping", 0)
+        Do ..Params.%Set("Compile", 1)
+        Do ..Params.%Set("Phase", "Reload")
+        Do ..Params.%Set("Namespace", "USER")
+        Do ..Params.%Set("ResourceName", "")
+        Do ..Params.%Set("ModuleName", "DefaultModule")
 
-    Set ..ResourceReferenceClass = ##class(%IPM.Storage.ResourceReference).%New()
-    Set ..ResourceReferenceClass.Module = ##class(%IPM.Storage.Module).%New()
-    Set ..ResourceReferenceClass.Module.Defaults = ##class(%ListOfObjects).%New()
-    Set ..Default = ##class(%IPM.Storage.ModuleSetting.ProcessorDefault).%New()
-    Set ..Default.Conditions = ##class(%ListOfObjects).%New()
-    Quit $$$OK
+        Set ..ResourceReferenceClass = ##class(%IPM.Storage.ResourceReference).%New()
+        Set ..ResourceReferenceClass.Module = ##class(%IPM.Storage.Module).%New()
+        Set ..ResourceReferenceClass.Module.Defaults = ##class(%ListOfObjects).%New()
+        Set ..Default = ##class(%IPM.Storage.ModuleSetting.ProcessorDefault).%New()
+        Set ..Default.Conditions = ##class(%ListOfObjects).%New()
+    } Catch e {
+		Set tSC = e.AsStatus()
+	}
+	Quit tSC
 }
 
 Method TestNoParentMappingsMAC()
@@ -43,7 +48,7 @@ Method TestNoParentMappingsMAC()
     Set ns = "USER"
     Set parentRoutine = "Foo"
     Set childRoutine = "Foo.Bar"
-    Set db = "HSLIB"
+    Set db = "IRISLIB"
 
     // Start fresh
     Set sc = ##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, parentRoutine)
@@ -57,7 +62,7 @@ Method TestNoParentMappingsMAC()
     Set $namespace = "%SYS"
 	Do $$$AssertTrue('##class(Config.MapRoutines).Exists(ns, parentRoutine), "Confirm parentRoutine Foo does not have mappings")
     Set parentMapping = ##class(%SYS.Namespace).GetRoutineDest(ns, parentRoutine)
-    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB HSLIB yet")
+    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB IRISLIB")
 
     // Verify neither Foo nor Foo.Bar is mapped
     New $namespace
@@ -93,7 +98,7 @@ Method TestNoParentMappingsLOC()
     Set ns = "USER"
     Set parentRoutine = "Foo"
     Set childRoutine = "Foo.Bar"
-    Set db = "HSLIB"
+    Set db = "IRISLIB"
 
     // Start fresh
     Set sc = ##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, parentRoutine)
@@ -107,7 +112,7 @@ Method TestNoParentMappingsLOC()
     Set $namespace = "%SYS"
 	Do $$$AssertTrue('##class(Config.MapRoutines).Exists(ns, parentRoutine), "Confirm parentRoutine Foo does not have mappings")
     Set parentMapping = ##class(%SYS.Namespace).GetRoutineDest(ns, parentRoutine)
-    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB HSLIB yet")
+    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB IRISLIB")
 
     // Verify neither Foo nor Foo.Bar is mapped
     New $namespace
@@ -143,7 +148,7 @@ Method TestNoParentMappingsPKG()
     Set ns = "USER"
     Set parentPackage = "Foo"
     Set childPackage = "Foo.Bar"
-    Set db = "HSLIB"
+    Set db = "IRISLIB"
 
     // Start fresh
     Set sc = ##class(%IPM.Utils.Module).RemovePackageMapping(ns, parentPackage)
@@ -157,7 +162,7 @@ Method TestNoParentMappingsPKG()
     Set $namespace = "%SYS"
 	Do $$$AssertTrue('##class(Config.MapPackages).Exists(ns, parentPackage), "Confirm parentPackage Foo does not have mappings")
     Set parentMapping = ##class(%SYS.Namespace).GetPackageDest(ns, parentPackage)
-    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentPackage Foo is mapped to should not contain DB HSLIB yet")
+    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB IRISLIB")
 
     // Verify neither Foo nor Foo.Bar is mapped
     Do $$$AssertTrue('##class(Config.MapPackages).Exists(ns, parentPackage), "Confirm mapping for parentPackage Foo does not exist") 
@@ -193,7 +198,7 @@ Method TestNoParentMappingsCLS()
     Set ns = "USER"
     Set parentPackage = "Foo"
     Set childPackage = "Foo.Bar"
-    Set db = "HSLIB"
+    Set db = "IRISLIB"
 
     // Start fresh
     Set sc = ##class(%IPM.Utils.Module).RemovePackageMapping(ns, parentPackage)
@@ -207,7 +212,7 @@ Method TestNoParentMappingsCLS()
     Set $namespace = "%SYS"
 	Do $$$AssertTrue('##class(Config.MapPackages).Exists(ns, parentPackage), "Confirm parentPackage Foo does not have mappings")
     Set parentMapping = ##class(%SYS.Namespace).GetPackageDest(ns, parentPackage)
-    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentPackage Foo is mapped to should not contain DB HSLIB yet")
+    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB IRISLIB")
 
     // Verify neither Foo nor Foo.Bar is mapped
     Do $$$AssertTrue('##class(Config.MapPackages).Exists(ns, parentPackage), "Confirm mapping for parentPackage Foo does not exist") 
@@ -243,7 +248,7 @@ Method TestMappingsParentMappingExistsCLS()
     Set ns = "USER"
     Set parentPackage = "Foo"
     Set childPackage = "Foo.Bar"
-    Set db = "HSLIB"
+    Set db = "IRISLIB"
 
     // Start fresh
     Set sc = ##class(%IPM.Utils.Module).RemovePackageMapping(ns, parentPackage)
@@ -257,7 +262,7 @@ Method TestMappingsParentMappingExistsCLS()
     Set $namespace = "%SYS"
 	Do $$$AssertTrue('##class(Config.MapPackages).Exists(ns, parentPackage), "Confirm parentPackage Foo does not have mappings")
     Set parentMapping = ##class(%SYS.Namespace).GetPackageDest(ns, parentPackage)
-    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentPackage Foo is mapped to should not contain DB HSLIB yet")
+    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB IRISLIB")
 
     // Create a package mapping for Foo
     New $namespace
@@ -267,7 +272,7 @@ Method TestMappingsParentMappingExistsCLS()
 
     // Verify Foo is mapped, but Foo.Bar is not
     Set parentMapping = ##class(%SYS.Namespace).GetPackageDest(ns, parentPackage)
-    Do $$$AssertTrue($find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentPackage Foo is mapped to should contain DB HSLIB because of mapping")
+    Do $$$AssertTrue($find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should contain DB IRISLIB")
 
     New $namespace
     Set $namespace = "%SYS"
@@ -301,7 +306,7 @@ Method TestMappingsParentMappingExistsPKG()
     Set ns = "USER"
     Set parentPackage = "Foo"
     Set childPackage = "Foo.Bar"
-    Set db = "HSLIB"
+    Set db = "IRISLIB"
 
     // Start fresh
     Set sc = ##class(%IPM.Utils.Module).RemovePackageMapping(ns, parentPackage)
@@ -315,7 +320,7 @@ Method TestMappingsParentMappingExistsPKG()
     Set $namespace = "%SYS"
 	Do $$$AssertTrue('##class(Config.MapPackages).Exists(ns, parentPackage), "Confirm parentPackage Foo does not have mappings")
     Set parentMapping = ##class(%SYS.Namespace).GetPackageDest(ns, parentPackage)
-    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentPackage Foo is mapped to should not contain DB HSLIB yet")
+    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB IRISLIB")
 
     // Create a package mapping for Foo
     New $namespace
@@ -325,7 +330,8 @@ Method TestMappingsParentMappingExistsPKG()
 
     // Verify Foo is mapped, but Foo.Bar is not
     Set parentMapping = ##class(%SYS.Namespace).GetPackageDest(ns, parentPackage)
-    Do $$$AssertTrue($find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentPackage Foo is mapped to should contain DB HSLIB because of mapping")
+    zw parentMapping
+    Do $$$AssertTrue($find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should contain DB IRISLIB")
 
     New $namespace
     Set $namespace = "%SYS"
@@ -359,7 +365,7 @@ Method TestMappingsParentMappingExistsLOC()
     Set ns = "USER"
     Set parentRoutine = "Foo"
     Set childRoutine = "Foo.Bar"
-    Set db = "HSLIB"
+    Set db = "IRISLIB"
 
     // Start fresh
     Set sc = ##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, parentRoutine)
@@ -373,7 +379,7 @@ Method TestMappingsParentMappingExistsLOC()
     Set $namespace = "%SYS"
 	Do $$$AssertTrue('##class(Config.MapRoutines).Exists(ns, parentRoutine), "Confirm parentRoutine Foo does not have mappings")
     Set parentMapping = ##class(%SYS.Namespace).GetRoutineDest(ns, parentRoutine)
-    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB HSLIB yet")
+    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB IRISLIB")
 
     // Create a routine mapping for Foo
     New $namespace
@@ -383,7 +389,7 @@ Method TestMappingsParentMappingExistsLOC()
 
     // Verify Foo is mapped, but Foo.Bar is not
     Set parentMapping = ##class(%SYS.Namespace).GetRoutineDest(ns, parentRoutine)
-    Do $$$AssertTrue($find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should contain DB HSLIB because of mapping")
+    Do $$$AssertTrue($find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should contain DB IRISLIB")
 
     New $namespace
     Set $namespace = "%SYS"
@@ -417,7 +423,7 @@ Method TestMappingsParentMappingExistsMAC()
     Set ns = "USER"
     Set parentRoutine = "Foo"
     Set childRoutine = "Foo.Bar"
-    Set db = "HSLIB"
+    Set db = "IRISLIB"
 
     // Start fresh
     Set sc = ##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, parentRoutine)
@@ -431,8 +437,8 @@ Method TestMappingsParentMappingExistsMAC()
     Set $namespace = "%SYS"
 	Do $$$AssertTrue('##class(Config.MapRoutines).Exists(ns, parentRoutine), "Confirm parentRoutine Foo does not have mappings")
     Set parentMapping = ##class(%SYS.Namespace).GetRoutineDest(ns, parentRoutine)
-    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB HSLIB yet")
-
+    Do $$$AssertTrue('$find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should not contain DB IRISLIB")
+    
     // Create a routine mapping for Foo
     New $namespace
 	Set $namespace = prevNS
@@ -441,7 +447,7 @@ Method TestMappingsParentMappingExistsMAC()
 
     // Verify Foo is mapped, but Foo.Bar is not
     Set parentMapping = ##class(%SYS.Namespace).GetRoutineDest(ns, parentRoutine)
-    Do $$$AssertTrue($find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should contain DB HSLIB because of mapping")
+    Do $$$AssertTrue($find($zcvt(parentMapping, "L"), $zcvt(db, "L")), "system^directory where parentRoutine Foo is mapped to should contain DB IRISLIB")
 
     New $namespace
     Set $namespace = "%SYS"
