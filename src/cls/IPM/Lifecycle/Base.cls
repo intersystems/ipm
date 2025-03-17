@@ -1088,9 +1088,13 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 		
 		// First pass: if we're exporting dependencies, build an array of modules from which we are deriving things.
 		If tExportDependencies {
+			Set tModuleName = ""
+			For {
+				Set tModuleName = $Order(tResourceArray(tModuleName))
+				Quit:(tModuleName="")
 			Set tFullResourceName = ""
 			For {
-				Set tFullResourceName = $Order(tResourceArray(tFullResourceName))
+					Set tFullResourceName = $Order(tResourceArray(tModuleName, tFullResourceName))
 				Quit:(tFullResourceName="")
 				
 				Set tExt = $Piece(tFullResourceName,".",*)
@@ -1098,117 +1102,23 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				If ($$$ucase(tExt) = "ZPM") {
 					If (tName '= ..Module.Name) {
 						Set pDependencyGraph(tName,"Location") = ".modules/"_tName_"/"
+						}
 					}
 				}
 			}
 		}
   
-		Set tFullResourceName = ""
+		Set tModuleName = ""
 		For {
-			Set tFullResourceName = $Order(tResourceArray(tFullResourceName),1,tSrcModule)
-			If (tFullResourceName = "") {
+			Set tModuleName = $Order(tResourceArray(tModuleName))
+			If (tModuleName = "") {
 				Quit
 			}
-			
-			If $Get(tResourceArray(tFullResourceName,"Generated")) Continue
-			
-			Set tName = $Piece(tFullResourceName,".",1,*-1)
-			Set tExt = $Piece(tFullResourceName,".",*)
-			
-			If '$Data(tResourceArray(tFullResourceName,"RelativePath"),tRelativePath) {
-				Set tRelativePath = ..GetResourceRelativePath(tName,tExt)
-			}
-			
-			If (tExt = "ZPM") && (tName '= ..Module.Name) {
-				Set tRelativePath = pDependencyGraph(tName,"Location")_tRelativePath
-			} ElseIf (tSrcModule '= "") && (tSrcModule '= ..Module.Name) {
-				Set tRelativePath = pDependencyGraph(tSrcModule,"Location")_tRelativePath
-			}
-			
-			Set tFullPath = ##class(%File).NormalizeFilename(pTargetDirectory_tRelativePath)
-			Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
-			
-			#dim tProcessor As %IPM.ResourceProcessor.Abstract
-			If $Data(tResourceArray(tFullResourceName,"Processor"),tProcessor) && $IsObject(tProcessor) {
-				Kill tItemParams
-				Merge tItemParams = tResourceArray(tFullResourceName)
-				Set tItemHandled = 0
-				Set tSC = tProcessor.OnExportItem(tFullPath,tFullResourceName,.tItemParams,.tParams,.tItemHandled)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-				If tItemHandled {
-					Continue
-				}
-			}
-			
-			If ($Extract(tFullResourceName) = "/") {
-				// Resources with paths are relative to the module root and are simply copied to the export directory.
-				Set tModule = ##class(%IPM.Storage.Module).NameOpen(tSrcModule,,.tSC)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-				
-				If (tModule.Root = "") {
-					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No module root configured for '%1'",tSrcModule))
-					Quit
-				}
-				
-				If '##class(%File).DirectoryExists(tModule.Root) {
-					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Directory %2, listed as root for module '%1', does not exist.",tSrcModule,tModule.Root))
-					Quit
-				}
-				
-				Set tSourcePath = ##class(%File).NormalizeFilename(tModule.Root_tFullResourceName)
-				Set tSourcePath = ##class(%File).NormalizeFilenameWithSpaces(tSourcePath)
-				Set tExportPath = ##class(%File).NormalizeFilename(tFullPath_tFullResourceName)
-				Set tExportPath = ##class(%File).NormalizeFilenameWithSpaces(tExportPath)
-				Set tSC = $$$OK
-				Set tDirectory = ##class(%File).GetDirectory(tExportPath,1)
-				If '##class(%File).DirectoryExists(tDirectory) {
-					Set tGood = ##class(%File).CreateDirectoryChain(tDirectory,.tReturn)
-					If 'tGood {
-						Set tLastErr = $Get(%objlasterror)
-						Set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,$$$FormatText("Error creating directory '%1': %2",tDirectory,tReturn)),tLastErr)
-						Quit
-					}
-					Write:tVerbose !,"Created ",tDirectory
-				}
-				If ##class(%File).DirectoryExists(tSourcePath) {
-					// NOTE: Does not overlay directories.
-					Set tSourcePath = ##class(%File).NormalizeDirectory(tSourcePath)
-					Set tExportPath = ##class(%File).NormalizeDirectory(tExportPath)
-					Set tSC = ##class(%IPM.Utils.File).CopyDir(tSourcePath,tExportPath, , tVerbose)
-					If $$$ISERR(tSC) {
-						Quit
-					}
-					Write:tVerbose !,tSourcePath," -> ",tExportPath
-				} ElseIf ##class(%File).Exists(tSourcePath) {
-					Set tGood = ##class(%File).CopyFile(tSourcePath,tExportPath,1,.tReturn)
-					If 'tGood {
-						Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error copying file '%1' to '%2': %3",tSourcePath,tExportPath,tReturn))
-						Quit
-					}
-					Write:tVerbose !,tSourcePath," -> ",tExportPath
-				}
-			} ElseIf (tExt = "CLS") || (tExt = "DFI") || (tExt = "PRJ") || ($ZConvert($Extract(tFullPath,$Length(tFullPath)-2,*),"l")="xml") || (##class(%RoutineMgr).UserType(tFullResourceName)) {
-				If '##class(%File).Exists(tFullPath) {
-					Do ##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath))
-				}
-				Set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport",tFullResourceName)
-				$$$ThrowOnError(tSC)
-				If tVerbose {
-					Write !,"Exported to ",tFullPath
-				}
-			} Else {
-				Set tSC = $$Export^%apiRTN(tFullResourceName,tFullPath,"","WNSK\UTF8\","-d /diffexport")
-				$$$ThrowOnError(tSC)
-				If tVerbose {
-					Write !,"Exported to ",tFullPath
-				}
-			}
-			$$$ThrowOnError(tSC)
+			kill tSingleModuleArray
+			Merge tSingleModuleArray = tResourceArray(tModuleName)
+			do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
 		}
+
     /// Always keep these files
      Set staticFiles = $ListBuild(
        "readme.md",
@@ -1624,9 +1534,13 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		// Build an array of those, then mark them as deployed.
 		$$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,1,.pDependencyGraph))
 		
+		Set tModuleKey = ""
+		For {
+			Set tModuleKey = $Order(tResourceArray(tModuleKey))
+			Quit:(tModuleKey="")
 		Set tResourceKey = ""
 		For {
-			Set tResourceKey = $Order(tResourceArray(tResourceKey))
+				Set tResourceKey = $Order(tResourceArray(tModuleKey, tResourceKey))
 			Quit:(tResourceKey="")
 			
 			// Skip file resources - these are handled separately;
@@ -1636,7 +1550,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 			}
 			
 			Kill tResourceInfo
-			Merge tResourceInfo = tResourceArray(tResourceKey)
+				Merge tResourceInfo = tResourceArray(tModuleKey, tResourceKey)
 			// TODO: Refactor tResourceInfo to be an object.
 			Set tResourceInfo("Name") = tResourceKey
 			Set tSC = ..OnDetermineResourceDeployability(.pParams,.tResourceInfo,.tDeploy)
@@ -1653,6 +1567,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 					// For other types, if deployment has meaning, the associated resource processor
 					// class should handle it in OnBeforePhase/OnAfterPhase.
 					Continue
+					}
 				}
 			}
 		}
@@ -1786,7 +1701,123 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 	Quit tDirectory_tFile
 }
 
-ClassMethod GetBaseClassForPackaging(pPackaging As %String, Output pBaseClass As %Dictionary.Classname) As %Status [ Final ]
+Method ExportSingleModule(
+	ByRef pResourceArray,
+	ByRef pTargetDirectory As %String,
+	ByRef pDependencyGraph,
+	ByRef pParams,
+	pVerbose As %Boolean = 0)
+{
+	Merge tParams = pParams
+	Set tFullResourceName = ""
+	For {
+		Set tFullResourceName = $Order(pResourceArray(tFullResourceName),1,tSrcModule)
+		If (tFullResourceName = "") {
+			Quit
+		}
+		
+		If $Get(pResourceArray(tFullResourceName,"Generated")) Continue
+		
+		Set tName = $Piece(tFullResourceName,".",1,*-1)
+		Set tExt = $Piece(tFullResourceName,".",*)
+		If '$Data(pResourceArray(tFullResourceName,"RelativePath"),tRelativePath) {
+			Set tRelativePath = ..GetResourceRelativePath(tName,tExt)
+		}
+		
+		If (tExt = "ZPM") && (tName '= ..Module.Name) {
+			Set tRelativePath = pDependencyGraph(tName,"Location")_tRelativePath
+		} ElseIf (tSrcModule '= "") && (tSrcModule '= ..Module.Name) {
+			Set tRelativePath = pDependencyGraph(tSrcModule,"Location")_tRelativePath
+		}
+		
+		Set tFullPath = ##class(%File).NormalizeFilename(pTargetDirectory_tRelativePath)
+		Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
+		
+		#dim tProcessor As %IPM.ResourceProcessor.Abstract
+		If $Data(pResourceArray(tFullResourceName,"Processor"),tProcessor) && $IsObject(tProcessor) {
+			Kill tItemParams
+			Merge tItemParams = pResourceArray(tFullResourceName)
+			Set tItemHandled = 0
+			Set tSC = tProcessor.OnExportItem(tFullPath,tFullResourceName,.tItemParams,.pParams,.tItemHandled)
+			If $$$ISERR(tSC) {
+				Quit
+			}
+			If tItemHandled {
+				Continue
+			}
+		}
+		If ($Extract(tFullResourceName) = "/") {
+			// Resources with paths are relative to the module root and are simply copied to the export directory.
+			Set tModule = ##class(%IPM.Storage.Module).NameOpen(tSrcModule,,.tSC)
+			If $$$ISERR(tSC) {
+				Quit
+			}
+			
+			If (tModule.Root = "") {
+				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No module root configured for '%1'",tSrcModule))
+				Quit
+			}
+			
+			If '##class(%File).DirectoryExists(tModule.Root) {
+				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Directory %2, listed as root for module '%1', does not exist.",tSrcModule,tModule.Root))
+				Quit
+			}
+			
+			Set tSourcePath = ##class(%File).NormalizeFilename(tModule.Root_tFullResourceName)
+			Set tSourcePath = ##class(%File).NormalizeFilenameWithSpaces(tSourcePath)
+			Set tExportPath = ##class(%File).NormalizeFilename(tFullPath_tFullResourceName)
+			Set tExportPath = ##class(%File).NormalizeFilenameWithSpaces(tExportPath)
+			Set tSC = $$$OK
+			Set tDirectory = ##class(%File).GetDirectory(tExportPath,1)
+			If '##class(%File).DirectoryExists(tDirectory) {
+				Set tGood = ##class(%File).CreateDirectoryChain(tDirectory,.tReturn)
+				If 'tGood {
+					Set tLastErr = $Get(%objlasterror)
+					Set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,$$$FormatText("Error creating directory '%1': %2",tDirectory,tReturn)),tLastErr)
+					Quit
+				}
+				Write:pVerbose !,"Created ",tDirectory
+			}
+			If ##class(%File).DirectoryExists(tSourcePath) {
+				// NOTE: Does not overlay directories.
+				Set tSourcePath = ##class(%File).NormalizeDirectory(tSourcePath)
+				Set tExportPath = ##class(%File).NormalizeDirectory(tExportPath)
+				Set tSC = ##class(%IPM.Utils.File).CopyDir(tSourcePath,tExportPath, , pVerbose)
+				If $$$ISERR(tSC) {
+					Quit
+				}
+				Write:pVerbose !,tSourcePath," -> ",tExportPath
+			} ElseIf ##class(%File).Exists(tSourcePath) {
+				Set tGood = ##class(%File).CopyFile(tSourcePath,tExportPath,1,.tReturn)
+				If 'tGood {
+					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error copying file '%1' to '%2': %3",tSourcePath,tExportPath,tReturn))
+					Quit
+				}
+				Write:pVerbose !,tSourcePath," -> ",tExportPath
+			}
+		} ElseIf (tExt = "CLS") || (tExt = "DFI") || (tExt = "PRJ") || ($ZConvert($Extract(tFullPath,$Length(tFullPath)-2,*),"l")="xml") || (##class(%RoutineMgr).UserType(tFullResourceName)) {
+			If '##class(%File).Exists(tFullPath) {
+				Do ##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath))
+			}
+			Set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport",tFullResourceName)
+			$$$ThrowOnError(tSC)
+			If pVerbose {
+				Write !,"Exported to ",tFullPath
+			}
+		} Else {
+			Set tSC = $$Export^%apiRTN(tFullResourceName,tFullPath,"","WNSK\UTF8\","-d /diffexport")
+			$$$ThrowOnError(tSC)
+			If pVerbose {
+				Write !,"Exported to ",tFullPath
+			}
+		}
+		$$$ThrowOnError(tSC)
+	}
+}
+
+ClassMethod GetBaseClassForPackaging(
+	pPackaging As %String,
+	Output pBaseClass As %Dictionary.Classname) As %Status [ Final ]
 {
 	Set tSC = $$$OK
 	Set pBaseClass = ""
