@@ -351,10 +351,6 @@ Method %Clean(ByRef pParams) As %Status
 							If $$$ISERR(tDelSC) {
 								Write !,"WARNING: ",$System.Status.GetErrorText(tDelSC)
 							}
-						} ElseIf $System.CLS.IsMthd(tClassKey, "%Extends") {
-							// Could apparently get here for a deployed class; neither ^oddCOM nor ^oddDEF exists??
-							// Give it a try, but don't even output a warning.
-							Do $System.OBJ.Delete(tClassKey,$Select(tVerbose:"d",1:"-d"))
 						}
 					}
 					Kill tDeleteArray("CLS")

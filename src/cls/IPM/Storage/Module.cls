@@ -1423,22 +1423,6 @@ ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %Stri
 		Set tExt = $Piece(pResourceName,".",*)
 		If ((tExt = "MAC") || (tExt = "INT")) && '##class(%Library.Routine).Exists(pResourceName) {
 			Do tProject.AddItem(tName_".OBJ")
-		} ElseIf (tExt = "CLS") {
-			// If Deployed = 0 (normal) or 3 (datatype), the source is present.
-			// If Deployed = 1 or 2, it is not.
-			Set tHasSource = $Case($$$comClassKeyGet(tName,$$$cCLASSdeployed),1:0,2:0,:1)
-			If 'tHasSource {
-				Set tRoutine = ""
-				For {
-					Set tRoutine = $$$comClassArrayNext(tName,$$$cCLASSroutines,tRoutine)
-					If (tRoutine = "") {
-						Quit
-					}
-					Do tProject.AddItem(tRoutine_".OBJ")
-				}
-			} Else {
-				Do tProject.AddItem(pResourceName)
-			}
 		} Else {
 			Do tProject.AddItem(pResourceName)
 		}
