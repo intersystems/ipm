@@ -1680,8 +1680,14 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		}
 		If ($Data(tDeployRtnArray) || $Data(tDeployClassArray)) {
 			Set ..HasDeployedResources = 1
+			Set ..Module.Deployed = 1
+			If '$IsObject(..Module.SystemRequirements) {
+				Set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
+			}
+			Set tSystemVersion = $System.Version.GetMajor() _ "." _ $System.Version.GetMinor()
+			Set ..Module.SystemRequirements.VersionString = tSystemVersion
+			$$$ThrowOnError(..Module.%Save())
 			If $Data(tDeployClassArray) {
-				Set ..HasDeployedResources = 1
 				If (tVerbose) {
 					Set tClass = ""
 					Write !,"The following classes are flagged for deployment:"
@@ -1694,26 +1700,21 @@ Method %MakeDeployed(ByRef pParams) As %Status
 				}
 				$$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
 			}
-      Set ..Module.Deployed = 1
-      If '$IsObject(..Module.SystemRequirements) {
-        Set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
-      }
-      Set tSystemVersion = $System.Version.GetMajor() _ "." _ $System.Version.GetMinor()
-      Set ..Module.SystemRequirements.VersionString = tSystemVersion
-      $$$ThrowOnError(..Module.%Save())
-			Set tRtn = ""
-			If (tVerbose) {
-				Write !,"The following routines are flagged for deployment:"
-				#; Write !,"The following routines "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
-			}
-			For {
-				Set tRtn = $Order(tDeployRtnArray(tRtn))
-				Quit:tRtn=""
-				If tVerbose {
-					Write !,$Char(9),tRtn
+			If $Data(tDeployRtnArray) {
+				If (tVerbose) {
+					Write !,"The following routines are flagged for deployment:"
+					#; Write !,"The following routines "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
 				}
-				If 'tDev {
-					$$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
+				Set tRtn = ""
+				For {
+					Set tRtn = $Order(tDeployRtnArray(tRtn))
+					Quit:tRtn=""
+					If tVerbose {
+						Write !,$Char(9),tRtn
+					}
+					If 'tDev {
+						$$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
+					}
 				}
 			}
 		} ElseIf tVerbose {
