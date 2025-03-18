@@ -1735,7 +1735,7 @@ Method ExportSingleModule(
 		Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
 
 		// Handle FileCopy different --> set target directory from dependency graph
-		If ($FIND($GET(pResourceArray(tFullResourceName, "Processor")), "%IPM.ResourceProcessor.FileCopy")) {
+		If ($Get(pResourceArray(tFullResourceName, "Processor")) '= "") && $Get(pResourceArray(tFullResourceName, "Processor")).%IsA("%IPM.ResourceProcessor.FileCopy") {
 			Set tFullPath = pTargetDirectory_$GET(pDependencyGraph(tSrcModule, "Location"))
 		}
 		
