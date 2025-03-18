@@ -32,7 +32,11 @@ Method IsAvailable() As %Boolean
 
 Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-	Set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
+	Set version = $$$Semver2Tag(pModuleReference.VersionString)
+	If (pModuleReference.Deployed) {
+		Set version = version _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
+	}
+	Set name = pModuleReference.Name _ ":" _ version
 	Set status = ..Pull(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
 	$$$ThrowOnError(status)
 	#; module is pulled as a .tgz file
@@ -54,6 +58,115 @@ Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
 	Set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
 	Return ..HasModulePy(..Location, name, ..Namespace, client)
+}
+
+/// Given a list of ORAS tags, aggregate the platform versions by package version
+/// e.g. $lb("1.0.0__2024.1, "1.0.0__2024.2", "2.0.0__2023.1", "3.0.0") -> aggregatedPlatformVersion
+/// where aggregatedPlatformVersion("1.0.0") = $lb("2024.1","2024.2") 
+///       aggregatedPlatformVersion("2.0.0") = $lb("2023.1")
+///       aggregatedPlatformVersion("3.0.0") = $lb("")
+/// The returned list represents the correct order of the package versions, where latest versions are first
+/// e.g., $lb("1.0.0", "2.0.0", "3.0.0") -> $lb("3.0.0", "2.0.0", "1.0.0")
+ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatformVersion As %String) As %List
+{
+	Set ptr = 0
+	Set sorter = ""
+	Set order = ""
+	While $ListNext(tagsList, ptr, tag) {
+		// aggregate
+		Set $ListBuild(version, platformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
+		Set value = $Get(aggregatedPlatformVersion(version))
+		Set aggregatedPlatformVersion(version) = value _ $ListBuild(platformVersion) 
+
+		// prepare for sorting
+		Set semver = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(version))
+		Set sorter(+semver.Major, +semver.Minor, +semver.Patch, " "_semver.Prerelease, " "_semver.Build) = version
+	}
+
+	Set major = ""
+	For {
+		Set major = $Order(sorter(major), -1)
+		If major = "" {
+			Quit
+		}
+		Set minor = ""
+		For {
+			Set minor = $Order(sorter(major, minor), -1)
+			If minor = "" {
+				Quit
+			}
+			Set patch = ""
+			For {
+				Set patch = $Order(sorter(major, minor, patch), -1)
+				If patch = "" {
+					Quit
+				}
+				Set prerelease = ""
+				For {
+					Set prerelease = $Order(sorter(major, minor, patch, prerelease), -1)
+					If prerelease = "" {
+						Quit
+					}
+					Set build = ""
+					For {
+						Set build = $Order(sorter(major, minor, patch, prerelease, build), -1, version)
+						If build = "" {
+							Quit
+						}
+						Set order = order _ $ListBuild(version)
+					}
+				}
+			}
+		}
+	}
+	Return order
+}
+
+Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.General.SemanticVersionExpression, package As %String, client As %SYS.Python, moduleList As %ListOfObjects, searchCriteria As %IPM.Repo.SearchCriteria, name As %String)
+{
+	Set allVersionsList = ..AggregatePlatformVersions($ListFromString(allTagsString, ", "), .aggregatedPlatformVersion)
+	Set pointer = 0
+	While $ListNext(allVersionsList,pointer,moduleVersion) {
+		#; filter by version
+		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(moduleVersion))
+		If 'tVersion.Satisfies(semverExpr) { 
+			Continue
+		}
+
+		// If there are multiple platform versions for a given package version, we only want to use the metadata of one of them
+		Set platformVersions = aggregatedPlatformVersion(moduleVersion)
+		Set platformVersion = $ListGet(platformVersions)
+		Set tag = moduleVersion
+		If platformVersion '= "" {
+			Set tag = tag _ $$$OrasTagPlatformSeparator _ platformVersion
+		}
+
+		#; get metadata from annotations
+		Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
+		set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
+		$$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
+
+		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
+		Set tModRef.Name = artifactMetadata.ImageTitle
+		Set tModRef.Repository = artifactMetadata.ImageSource
+		Set tModRef.VersionString = artifactMetadata.ImageVersion
+		Set tModRef.Description = artifactMetadata.ImageDescription
+		Set tModRef.Deployed = artifactMetadata.IPMDeployed
+		If artifactMetadata.IPMDeployed '= "" {
+			Set pvPtr = 0
+			While $ListNext(platformVersions, pvPtr, pv) {
+				$$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))
+			}
+		}
+		Set tModRef.AllVersions = allTagsString
+		Set tModRef.Origin = artifactMetadata.IPMOrigin
+		Do moduleList.Insert(tModRef)
+
+		#; If not all versions are requested, return the latest one
+		If 'searchCriteria.AllVersions, name="" {
+			Quit
+		}
+	}
 }
 
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")
@@ -110,76 +223,14 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			}
 			#; get all versions
 			Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
-			Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
-			Set pointer = 0
-			While $ListNext(allTagsList,pointer,tag) {
-				#; filter by version
-				Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
-				If 'tVersion.Satisfies(tVersionExpression) { 
-					Continue
-				}
-
-				#; get metadata from annotations
-				Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
-				set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-				Do artifactMetadata.%JSONImport(metadata)
-
-				Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-				Set tModRef.Name = artifactMetadata.ImageTitle
-				Set tModRef.Repository = artifactMetadata.ImageSource
-				Set tModRef.VersionString = artifactMetadata.ImageVersion
-				Set tModRef.Description = artifactMetadata.ImageDescription
-				Set tModRef.Deployed = artifactMetadata.IPMDeployed
-				Set tModRef.AllVersions = allTagsString
-				Set tModRef.Origin = artifactMetadata.IPMOrigin
-				Do tList.Insert(tModRef)
-
-				#; If not all versions are requested, return the latest one
-				If 'pSearchCriteria.AllVersions, name="" {
-					Quit
-				}
-			}
+			Do ..ListModulesFromTagString(allTagsString, tVersionExpression, package, client, tList, pSearchCriteria, name)
 		}
 		Return tList
 	}
 
 	Set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
-	Set allTagsList = $LISTFROMSTRING(allTagsString, ", ")
-	Set pointer = 0
-	While $ListNext(allTagsList,pointer,tag) {
-		#; filter by version
-		Set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tag)
-		If 'tVersion.Satisfies(tVersionExpression) { 
-			Continue
-		}
-
-		#; get metadata from annotations
-		Set metadata = ..GetPackageMetadataPy(..Location, name, "", tag, client)
-		set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
-		Do artifactMetadata.%JSONImport(metadata)
-
-		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-		Set tModRef.Name = artifactMetadata.ImageTitle
-		Set tModRef.Repository = artifactMetadata.ImageSource
-		Set tModRef.VersionString = artifactMetadata.ImageVersion
-		Set tModRef.Description = artifactMetadata.ImageDescription
-		Set tModRef.Deployed = artifactMetadata.IPMDeployed
-		#; If $IsObject(item."platform_versions") {
-		#;   Set tIterPVer = item."platform_versions".%GetIterator() 
-		#;   While tIterPVer.%GetNext(.tPVerKey, .platformVersion) {
-		#;     Do tModRef.PlatformVersions.Insert(platformVersion)
-		#;   }
-		#; }
-		Set tModRef.AllVersions = allTagsString
-		Set tModRef.Origin = artifactMetadata.IPMOrigin
-		Do tList.Insert(tModRef)
-		
-		#; If not all versions are requested, return the latest one
-		If 'pSearchCriteria.AllVersions, name="" {
-			Quit
-		}
-	}
-	Quit tList
+	Do ..ListModulesFromTagString(allTagsString, tVersionExpression, package, client, tList, pSearchCriteria, name)
+	Return tList
 }
 
 // ** ORAS FUNCTIONS **
