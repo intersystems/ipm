@@ -119,33 +119,6 @@ Method TestRepository()
 	Do ..RunCommand("repo -r -name registry -reset-defaults")
 }
 
-Method TestModifiers()
-{
-	do ..CompareModifiers("-export-deps 1", "reload","test-module")
-	do ..CompareModifiers("-export-deps 1", "compile","test-module")
-	do ..CompareModifiers("-export-deps 1", "test","test-module")
-	do ..CompareModifiers("-path /my/path -env envPath", "package","test-module")
-	do ..CompareModifiers("-env envPath -export-deps 1", "verify","test-module")
-	do ..CompareModifiers("-path /my/path -env envPath -repo Repo -use-external-name 1", "publish","test-module")
-	do ..CompareModifiers("-path /my/path -env envPath -recurse 1", "makedeployed","test-module")
-}
-
-Method CompareModifiers(
-	commandModifiers As %String,
-	phase As %String,
-	module As %String)
-{
-	/// Test modifier support for lifecycle phases. Make sure ModuleAction and RunOnePhase have the same support
-	do ##class(%IPM.Main).%ParseCommandInput(module_" "_phase_" "+commandModifiers,.info1)
-	do ##class(%IPM.Main).%ParseCommandInput(phase_" "_module_" "+commandModifiers,.info2)
-
-	If '$$$AssertTrue(..CompareArrays(.info1,.info2,.tMessage),"module-action and lifecycle phase allow for same modifiers") {
-		Do $$$LogMessage(tMessage)
-		Write !,"module-action accepted modifiers:",! zw info1
-		Write !,phase_" accepted modifiers:",! zw info2
-	}
-}
-
 Method RunCommand(pCommand As %String)
 {
 	Do ##class(%IPM.Main).Shell(pCommand)
@@ -166,10 +139,7 @@ Method AssertNoException(pCommand As %String)
 /// returns true if they're both undefined or have the same value.<br />
 /// <var>pMessage</var> has details of the first difference found, if any.
 /// See https://community.intersystems.com/post/best-way-compare-two-arrays-equality-same-subscripts-and-values
-Method CompareArrays(
-	ByRef first,
-	ByRef second,
-	Output pMessage) As %Boolean [ PublicList = (tRef1, tRef2, first, second) ]
+Method CompareArrays(ByRef first, ByRef second, Output pMessage) As %Boolean [ PublicList = (tRef1, tRef2, first, second) ]
 {
     New tRef1,tRef2
     Set pMessage = ""

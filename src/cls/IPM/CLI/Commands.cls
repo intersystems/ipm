@@ -159,25 +159,6 @@ XData Schema [ Internal, MimeType = application/xml ]
 </xs:schema>
 }
 
-/// Turns the Comomand XData block into a subscripted array as follows:
-/// pCommandStructure(1, "<alias>") = "<command name>"
-/// pCommandStructure("<command-name>") ->
-/// 		"description" = describes the command
-/// 		"groups","-":
-/// 			"modifiers","<modifier-num>" = "<modifier-name>"
-/// 			"examples","<example-number>" = "<example-command
-/// 				"description" = description of example command
-/// 		"modifiers":
-/// 			"1","<modifier-alias>" = "<modifier-name>"
-/// 			"<modifier-name>":
-/// 				"aliases" = aliases for the modifier
-/// 				"description" = describes the modifier
-/// 				"required" = whether or not modifier is required for the command
-/// 				"trailing" = whether modifier is a trailing modifier
-/// 		"parameters":
-/// 			"<parameter>":
-/// 				"description" = description of parameter
-/// 				"required" = is parameter required
 ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objectgenerator ]
 {
   #define DefaultGroup "-"
