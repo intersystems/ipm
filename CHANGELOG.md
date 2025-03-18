@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #663 Improved error output and instructions in the language extension when "zpm" is run from a namespace without IPM
+- #757: Fixed a bug where mappings are not getting created when they should.
 
 ## [0.9.0] - 2024-12-16
 
