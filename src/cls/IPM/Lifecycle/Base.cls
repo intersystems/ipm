@@ -1682,24 +1682,22 @@ Method %MakeDeployed(ByRef pParams) As %Status
 				}
 			}
 		}
-		If $Data(tDeployClassArray) {
-			Set ..HasDeployedResources = 1
-			If (tVerbose) {
-				Set tClass = ""
-				Write !,"The following classes are flagged for deployment:"
-				#; Write !,"The following classes "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
-				For {
-					Set tClass = $Order(tDeployClassArray(tClass))
-					Quit:tClass=""
-					Write !,$Char(9),tClass
-				}
-			}
-      $$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
-		} ElseIf tVerbose {
-			Write !,"No classes to mark as deployed."
-		}
 		If ($Data(tDeployRtnArray) || $Data(tDeployClassArray)) {
 			Set ..HasDeployedResources = 1
+			If $Data(tDeployClassArray) {
+				Set ..HasDeployedResources = 1
+				If (tVerbose) {
+					Set tClass = ""
+					Write !,"The following classes are flagged for deployment:"
+					#; Write !,"The following classes "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+					For {
+						Set tClass = $Order(tDeployClassArray(tClass))
+						Quit:tClass=""
+						Write !,$Char(9),tClass
+					}
+				}
+				$$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
+			}
       Set ..Module.Deployed = 1
       If '$IsObject(..Module.SystemRequirements) {
         Set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
@@ -1723,7 +1721,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 				}
 			}
 		} ElseIf tVerbose {
-			Write !,"No routines to deploy."
+			Write !,"No routines or classes to deploy."
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
