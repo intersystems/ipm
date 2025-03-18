@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #718: Upload zpm.xml (without the version) as an artifact to provide a more stable URL to latest release artifact on GitHub
 - #722: Unified modifiers between ModuleAction and RunOnePhase
 - #735: Prerelease now properly allows alphanumeric tags with zeros
+- #736: Fixed a bug with FileCopy not handling a dependency's resource correctly
 
 ### Security
 -

@@ -1709,6 +1709,7 @@ Method ExportSingleModule(
 	pVerbose As %Boolean = 0)
 {
 	Merge tParams = pParams
+
 	Set tFullResourceName = ""
 	For {
 		Set tFullResourceName = $Order(pResourceArray(tFullResourceName),1,tSrcModule)
@@ -1732,6 +1733,11 @@ Method ExportSingleModule(
 		
 		Set tFullPath = ##class(%File).NormalizeFilename(pTargetDirectory_tRelativePath)
 		Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
+
+		// Handle FileCopy different --> set target directory from dependency graph
+		If ($FIND($GET(pResourceArray(tFullResourceName, "Processor")), "%IPM.ResourceProcessor.FileCopy")) {
+			Set tFullPath = pTargetDirectory_$GET(pDependencyGraph(tSrcModule, "Location"))
+		}
 		
 		#dim tProcessor As %IPM.ResourceProcessor.Abstract
 		If $Data(pResourceArray(tFullResourceName,"Processor"),tProcessor) && $IsObject(tProcessor) {
