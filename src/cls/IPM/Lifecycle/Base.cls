@@ -896,7 +896,7 @@ Method %Compile(ByRef pParams) As %Status
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
 				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject {
 					If tVerbose {
-						Write !, tResource.Name_" was loaded from studio project, skipping compilation."
+						Write !, tResource.Name_" was loaded as deployed code, so compilation isn't needed."
 					}
 				} ElseIf tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
 					Kill tOneResourceList
