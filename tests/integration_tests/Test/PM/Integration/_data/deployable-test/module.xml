@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="deployable-test.ZPM">
+    <Module>
+      <Name>deployable-test</Name>
+      <Version>0.0.1-alpha.1+build</Version>
+      <Packaging>module</Packaging>
+      <Resource Name="DeployableTest.Main.CLS" Deploy="true"/>
+      <Resource Name="DeployableTest.Routine.MAC" Deploy="true"/>
+      <Resource Name="DeployableTest.Undeployed.CLS"/>
+    </Module>
+  </Document>
+</Export>

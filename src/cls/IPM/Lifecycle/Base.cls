@@ -890,7 +890,11 @@ Method %Compile(ByRef pParams) As %Status
 			Quit:tKey=""
 			
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
-				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
+				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject {
+					If tVerbose {
+						Write !, tResource.Name_" was loaded as deployed code, so compilation isn't needed."
+					}
+				} ElseIf tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
 					Kill tOneResourceList
 					Set tOneResourceList(tResource.Name) = ""
 					Set tSC = tResource.ResolveChildren(.tOneResourceList)
@@ -1108,7 +1112,17 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			}
 		}
   
-		Set tModuleName = ""
+		// Deployed items should be exported as a studio project to a designated directory
+		Set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
+		Set tDeployedProject = ##class(%Studio.Project).%OpenId(tDeployedProjectName)
+		If '$IsObject(tDeployedProject) {
+			Set tDeployedProject = ##class(%Studio.Project).%New()
+			Set tDeployedProject.Name = tDeployedProjectName
+		}
+		Do tDeployedProject.Items.Clear()
+		Set tParams($$$DeployedProjectIndex) = tDeployedProject
+    
+    Set tModuleName = ""
 		For {
 			Set tModuleName = $Order(tResourceArray(tModuleName))
 			If (tModuleName = "") {
@@ -1117,6 +1131,13 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 			kill tSingleModuleArray
 			Merge tSingleModuleArray = tResourceArray(tModuleName)
 			do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
+		}
+
+		// Export the deployed project to the target directory, if it's non-empty
+		If tDeployedProject.Items.Count() > 0 {
+			// Intentionally not calling .%Save() on the project; we don't want to persist it.
+			Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
+			$$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $Select(tVerbose:"d",1:"-d")))
 		}
 
     /// Always keep these files
@@ -1571,48 +1592,47 @@ Method %MakeDeployed(ByRef pParams) As %Status
 				}
 			}
 		}
-		If $Data(tDeployClassArray) {
+		If ($Data(tDeployRtnArray) || $Data(tDeployClassArray)) {
 			Set ..HasDeployedResources = 1
-			If (tVerbose) {
-				Set tClass = ""
-				Write !,"The following classes are flagged for deployment:"
-				#; Write !,"The following classes "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+			Set ..Module.Deployed = 1
+			If '$IsObject(..Module.SystemRequirements) {
+				Set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
+			}
+			Set tSystemVersion = $System.Version.GetMajor() _ "." _ $System.Version.GetMinor()
+			Set ..Module.SystemRequirements.VersionString = tSystemVersion
+			$$$ThrowOnError(..Module.%Save())
+			If $Data(tDeployClassArray) {
+				If (tVerbose) {
+					Set tClass = ""
+					Write !,"The following classes are flagged for deployment:"
+					#; Write !,"The following classes "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+					For {
+						Set tClass = $Order(tDeployClassArray(tClass))
+						Quit:tClass=""
+						Write !,$Char(9),tClass
+					}
+				}
+				$$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
+			}
+			If $Data(tDeployRtnArray) {
+				If (tVerbose) {
+					Write !,"The following routines are flagged for deployment:"
+					#; Write !,"The following routines "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+				}
+				Set tRtn = ""
 				For {
-					Set tClass = $Order(tDeployClassArray(tClass))
-					Quit:tClass=""
-					Write !,$Char(9),tClass
-				}
-			}
-      $$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
-		} ElseIf tVerbose {
-			Write !,"No classes to mark as deployed."
-		}
-		If $Data(tDeployRtnArray) {
-			Set ..HasDeployedResources = 1
-      Set ..Module.Deployed = 1
-      If '$IsObject(..Module.SystemRequirements) {
-        Set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
-      }
-      Set tSystemVersion = $System.Version.GetMajor() _ "." _ $System.Version.GetMinor()
-      Set ..Module.SystemRequirements.VersionString = tSystemVersion
-      $$$ThrowOnError(..Module.%Save())
-			Set tRtn = ""
-			If (tVerbose) {
-				Write !,"The following routines are flagged for deployment:"
-				#; Write !,"The following routines "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
-			}
-			For {
-				Set tRtn = $Order(tDeployRtnArray(tRtn))
-				Quit:tRtn=""
-				If tVerbose {
-					Write !,$Char(9),tRtn
-				}
-				If 'tDev {
-					$$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
+					Set tRtn = $Order(tDeployRtnArray(tRtn))
+					Quit:tRtn=""
+					If tVerbose {
+						Write !,$Char(9),tRtn
+					}
+					If 'tDev {
+						$$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
+					}
 				}
 			}
 		} ElseIf tVerbose {
-			Write !,"No routines to deploy."
+			Write !,"No routines or classes to deploy."
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()

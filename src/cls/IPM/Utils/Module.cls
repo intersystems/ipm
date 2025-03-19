@@ -265,7 +265,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
-    Set tModRef.Deployed = pDeployed
+		Set tModRef.Deployed = pDeployed
+		Set tModRef.PlatformVersion = pPlatformVersion
+		If pDeployed {
+			$$$ThrowOnError(tModRef.PlatformVersions.Insert(pPlatformVersion))
+		}
 		
 		// Make sure we're not downgrading.
 		If '$Get(pParams("PermitDowngrade")) {
@@ -2362,6 +2366,17 @@ ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %Strin
 	Set tRegEx = "(?i)\$\{" _ pName _ "\}"
 	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
 	Quit tString
+}
+
+ClassMethod GetDeployedProjectPath(root As %String) As %String
+{
+	Set deployedDirectory = ##class(%File).NormalizeDirectory($$$DeployedXMLDir, root)
+	Quit deployedDirectory_$$$DeployedXMLName
+}
+
+ClassMethod GetDeployedProjectName(moduleName As %String) As %String [ CodeMode = expression ]
+{
+moduleName_$$$DeployedProjectSuffix
 }
 
 }

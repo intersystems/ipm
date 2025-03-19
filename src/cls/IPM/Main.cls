@@ -718,6 +718,17 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</example>
 </command>
 
+<command name="information" aliases="info">
+	<description>Output information about the current ZPM environment.</description>
+	<modifier name="verbose" aliases="v" description="Show more detailed information"/>
+	<example description="Show basic information about the current ZPM environment">
+		info
+	</example>
+	<example description="Show detailed information about the current ZPM environment">
+		info -verbose
+	</example>
+</command>
+
 </commands>
 }
 
@@ -940,6 +951,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..UnmapIPM(.tCommandInfo)
 			} ElseIf (tCommandInfo = "module-version") {
 				Do ..ModuleVersion(.tCommandInfo)
+			} ElseIf (tCommandInfo = "information") {
+				Do ..Information(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -2489,11 +2502,24 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
         "Root"
       )
     }
-		Set tDesc=+$Get(pCommandInfo("data","Desc"))
+	Set tDesc=+$Get(pCommandInfo("data","Desc"))
     Do ..GetListModules(,tSearchString, .list, showFields, $Get(pCommandInfo("modifiers", "repository")))
+	For i = 1:1:list {
+		Set entry = list(i)
+		Set name = $ListGet(entry,1)
+		Set externalName = $ListGet(entry,3)
+		Set displayName = $Select(externalName'= "":externalName, 1:name)
+		If (displayName '= name) {
+			Set displayName = displayName_" ("_name_")"
+		}
+		Set $List(list(i), 1) = displayName
+		If list("width") < $Length(displayName) {
+			Set list("width") = $Length(displayName)
+		}
 	}
-  Merge tModifiers = pCommandInfo("modifiers")
-  Do ..DisplayModules(.list,,,, .tModifiers)
+	Merge tModifiers = pCommandInfo("modifiers")
+	Do ..DisplayModules(.list,,,, .tModifiers)
+	}
 }
 
 /// Get module list in currently namespace
@@ -3672,6 +3698,61 @@ ClassMethod GetUpstreamPackageVersions(Output list)
       Set list(rs.%Get("Name"), r) = rs.%Get("Version")
     }
   }
+}
+
+ClassMethod Information(ByRef pCommandInfo)
+{
+	Set verbose = $$$HasModifier(pCommandInfo,"verbose")
+	// Get all dependency modules
+	$$$ThrowOnError(##class(%IPM.Utils.Module).BuildAllDependencyGraphs(, .graph))
+	Set sub = "" 
+	For {
+		Set sub = $Order(graph(sub))
+		If sub = "" {
+			Quit
+		}
+		Set dep= ""
+		For {
+			Set dep= $Order(graph(sub, dep))
+			If dep= "" {
+				Quit
+			}
+			Set dependencies(dep) = ""
+		}
+	}
+
+	Set messages = ..BuildIntroMessages(.outOfBoxMessage)
+	Set messages = messages _ $ListBuild(outOfBoxMessage)
+	Set ptr = 0
+	While $ListNext(messages, ptr, line) {
+		Write !, line
+	}
+	Write !!, "Currently installed top-level modules are listed below:", !
+	Do ..GetListModules(,,.list)
+	Set updatedList("width") = 0
+	For i = 1:1:list {
+		Set entry = list(i)
+		Set name = $ListGet(entry, 1)
+		// only list non-dependencies
+		If $Data(dependencies(name)) {
+			Continue
+		}
+		Set externalName = $List(entry, 3)
+		If (externalName '= "") && (externalName '= name) {
+			If verbose {
+				Set $List(entry, 1) = externalName_" (" _ name _ ")"
+			} Else {
+				Set $List(entry, 1) = externalName
+			}
+		}
+		If updatedList("width") < $Length($ListGet(entry)) {
+			Set updatedList("width") = $Length($ListGet(entry))
+		}
+		Set version = ##class(%IPM.General.SemanticVersion).FromString($List(entry, 2))
+		Set $List(entry, 2) = version.ToStringWithoutBuild()
+		Set updatedList($Increment(updatedList)) = entry
+	}
+	Do ..DisplayModules(.updatedList)
 }
 
 }
