@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Export generator="Cache" version="25">
+  <Document name="fc-dep-same-resource.ZPM">
+    <Module>
+      <Name>fc-dep-same-resource</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <FileCopy Name="/src/" Target="${mgrDir}/../fc-dep-same-resource-src/"/>
+      <FileCopy Name="abc.txt" Target="${mgrDir}/../fc-dep-same-resource-src/abc.txt"/>
+      <Dependencies>
+        <ModuleReference>
+          <Name>fc-dep-diff-resource</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>
