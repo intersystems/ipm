@@ -1082,7 +1082,6 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Quit
 			}
 		}
-		Set tParams("ModuleExportPath") = pTargetDirectory
 		
 		Set tExportDependencies = $Get(pParams("ExportDependencies"), ..#EXPORTDEPENDENCIES)
 		Set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,1,.pDependencyGraph)
@@ -1702,7 +1701,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		"ESD":"i14y/",
 		"DTL":"cls/",
 		"BPL":"cls/",
-		: $$$lcase(tExtension)_"/"
+		: ""
 		)
 		
 	Set tFile = $Case(tExtension,
@@ -1745,19 +1744,24 @@ Method ExportSingleModule(
 			Set tRelativePath = ..GetResourceRelativePath(tName,tExt)
 		}
 		
+		// Set full path for exporting module.xml
 		If (tExt = "ZPM") && (tName '= ..Module.Name) {
 			Set tRelativePath = pDependencyGraph(tName,"Location")_tRelativePath
 		} ElseIf (tSrcModule '= "") && (tSrcModule '= ..Module.Name) {
 			Set tRelativePath = pDependencyGraph(tSrcModule,"Location")_tRelativePath
 		}
-		
 		Set tFullPath = ##class(%File).NormalizeFilename(pTargetDirectory_tRelativePath)
 		Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
 
-		// Handle FileCopy different --> set target directory from dependency graph
-		If ($Get(pResourceArray(tFullResourceName, "Processor")) '= "") && $Get(pResourceArray(tFullResourceName, "Processor")).%IsA("%IPM.ResourceProcessor.FileCopy") {
-			Set tFullPath = pTargetDirectory_$GET(pDependencyGraph(tSrcModule, "Location"))
+		// Set path for exporting resource
+		If ($Extract(tName_tExt) = "/") {
+			Set tRelativePath = tFullResourceName
 		}
+		Set tNode = tSrcModule
+		If (tExt = "ZPM") {
+			Set tNode = tName
+		}
+		Set pParams("ModuleExportPath") = pTargetDirectory_$Get(pDependencyGraph(tNode, "Location"))_tRelativePath
 		
 		#dim tProcessor As %IPM.ResourceProcessor.Abstract
 		If $Data(pResourceArray(tFullResourceName,"Processor"),tProcessor) && $IsObject(tProcessor) {

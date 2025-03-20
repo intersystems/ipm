@@ -194,7 +194,7 @@ Method OnExportItem(
   Set pItemHandled = 1
   
   Set tSource = ..GetSource()
-  Set tTarget = pFullExportPath_..ResourceReference.Name
+  Set tTarget = pParams("ModuleExportPath")
 
 	Quit ..DoCopy(tSource, tTarget, .pParams)
 }
