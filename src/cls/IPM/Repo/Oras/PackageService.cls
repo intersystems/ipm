@@ -70,56 +70,16 @@ Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
 ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatformVersion As %String) As %List
 {
 	Set ptr = 0
-	Set sorter = ""
-	Set order = ""
 	While $ListNext(tagsList, ptr, tag) {
 		// aggregate
 		Set $ListBuild(version, platformVersion) = $ListFromString(tag, $$$OrasTagPlatformSeparator)
 		Set value = $Get(aggregatedPlatformVersion(version))
 		Set aggregatedPlatformVersion(version) = value _ $ListBuild(platformVersion) 
-
-		// prepare for sorting
-		Set semver = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(version))
-		Set sorter(+semver.Major, +semver.Minor, +semver.Patch, " "_semver.Prerelease, " "_semver.Build) = version
 	}
 
-	Set major = ""
-	For {
-		Set major = $Order(sorter(major), -1)
-		If major = "" {
-			Quit
-		}
-		Set minor = ""
-		For {
-			Set minor = $Order(sorter(major, minor), -1)
-			If minor = "" {
-				Quit
-			}
-			Set patch = ""
-			For {
-				Set patch = $Order(sorter(major, minor, patch), -1)
-				If patch = "" {
-					Quit
-				}
-				Set prerelease = ""
-				For {
-					Set prerelease = $Order(sorter(major, minor, patch, prerelease), -1)
-					If prerelease = "" {
-						Quit
-					}
-					Set build = ""
-					For {
-						Set build = $Order(sorter(major, minor, patch, prerelease, build), -1, version)
-						If build = "" {
-							Quit
-						}
-						Set order = order _ $ListBuild(version)
-					}
-				}
-			}
-		}
-	}
-	Return order
+	Set pyList = ##class(%SYS.Python).ToList(tagsList)
+	Set sortedTags = ##class(%IPM.Utils.EmbeddedPython).SortOCITags(pyList, 1)
+	Return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
 Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.General.SemanticVersionExpression, package As %String, client As %SYS.Python, moduleList As %ListOfObjects, searchCriteria As %IPM.Repo.SearchCriteria, name As %String)
@@ -430,7 +390,7 @@ ClassMethod GetAllTagsPy(registry As %String, package As %String, namespace As %
 		tags = client.get_tags(target)
 
 		# flip list so higher versions are first
-		tags.reverse()
+		tags = iris.cls("%IPM.Utils.EmbeddedPython").SortOCITags(tags, 1)
 		
 		# convert from list to comma separated string
 		return ", ".join(str(x) for x in tags)

@@ -8,6 +8,8 @@ ClassMethod CompareVersionTotalOrder(ver1 As %String, ver2 As %String) As %Integ
 {
     import iris
 
+    assert isinstance(ver1, str) and isinstance(ver2, str)
+
     semver1 = iris.cls("%IPM.General.SemanticVersion").FromString(ver1)
     semver2 = iris.cls("%IPM.General.SemanticVersion").FromString(ver2)
     mmp1 = (semver1.Major, semver1.Minor, semver1.Patch)
@@ -41,6 +43,8 @@ ClassMethod SortOCITags(tags As %SYS.Python, reverse As %SYS.Python = 0) As %SYS
     import iris
     from functools import cmp_to_key
 
+    assert isinstance(tags, list)
+
     # maps tag to its version. E.g., "1.2.3-alpha_build__2024.1" -> "1.2.3-alpha+build"
     OrasTagPlatformSeparator = "__"
     tag2ver = {t: t.split(OrasTagPlatformSeparator)[0].replace("_", "+") for t in tags}
@@ -48,6 +52,20 @@ ClassMethod SortOCITags(tags As %SYS.Python, reverse As %SYS.Python = 0) As %SYS
     keyfunc = cmp_to_key(iris.cls("%IPM.Utils.EmbeddedPython").CompareVersionTotalOrder)
     sorted_pairs = sorted(tag2ver.items(), key=lambda p: keyfunc(p[1]), reverse=bool(reverse))
     return [t for t, _ in sorted_pairs]
+}
+
+ClassMethod FromPythonList(list As %SYS.Python) As %List [ Language = objectscript ]
+{
+    Set builtins = ##class(%SYS.Python).Builtins()
+    Set output = ""
+    For i = 0:1:list."__len__"()-1 {
+        Set item = list."__getitem__"(i)
+        If builtins.isinstance(item, builtins.list){
+            Set item = ..FromPythonList(item)
+        }
+        Set output = output _ $ListBuild(item)
+    }
+    Quit output
 }
 
 }

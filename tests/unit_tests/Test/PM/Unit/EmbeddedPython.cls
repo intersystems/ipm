@@ -51,31 +51,26 @@ Method TestSortOCITags()
     Set expected = ##class(%SYS.Python).ToList(expected)
 
     Set output = ##class(%IPM.Utils.EmbeddedPython).SortOCITags(tags)
-    If '..AssertPythonListsEqual(output, expected) {
-        Do $$$LogMessage("Failed for ascending order. Expected: "_..FromPythonList(expected)_" but got: "_..FromPythonList(output))
-    }
+    Do ..AssertPythonListsEqual(output, expected) 
 
     Set expected = builtins.list(builtins.reversed(expected))
 
     Set output = ##class(%IPM.Utils.EmbeddedPython).SortOCITags(tags, 1)
-    If '..AssertPythonListsEqual(output, expected) {
-        Do $$$LogMessage("Failed for descending order. Expected: "_..FromPythonList(expected)_" but got: "_..FromPythonList(output))
-    }
+    Do ..AssertPythonListsEqual(output, expected)
 }
 
-ClassMethod FromPythonList(list As %SYS.Python) As %List
+Method TestFromPythonList(list As %SYS.Python) As %List
 {
-    Set output = ""
-    For i = 0:1:list."__len__"()-1 {
-       Set output = output _ $ListBuild(list."__getitem__"(i))
-    }
-    Return output
+    Set original = $ListBuild($ListBuild(1, 2, 3), $ListBuild(4, 5, 6), $ListBuild($ListBuild(7, 8, 9), 10, 11))
+    Set input = ##class(%SYS.Python).ToList(original)
+    Set output = ##class(%IPM.Utils.EmbeddedPython).FromPythonList(input)
+    Do $$$AssertEquals(output, original)
 }
 
 Method AssertPythonListsEqual(list1 As %SYS.Python, list2 As %SYS.Python) As %Boolean
 {
-    Set list1 = ..FromPythonList(list1)
-    Set list2 = ..FromPythonList(list2)
+    Set list1 = ##class(%IPM.Utils.EmbeddedPython).FromPythonList(list1)
+    Set list2 = ##class(%IPM.Utils.EmbeddedPython).FromPythonList(list2)
     Return $$$AssertEquals(list1, list2)
 }
 
