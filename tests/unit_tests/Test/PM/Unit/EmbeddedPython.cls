@@ -28,6 +28,36 @@ Method TestCompareVersionTotalOrder()
     }
 }
 
+Method TestSortVersions()
+{
+    Set builtins = ##class(%SYS.Python).Builtins()
+    Set versions = $ListBuild(
+        "1.3.0",
+        "1.2.3+build",
+        "2.3.1",
+        "1.2.4",
+        "1.2.3",
+        "1.2.3-alpha+build"
+    )
+    Set versions = ##class(%SYS.Python).ToList(versions)
+
+    Set expected = $ListBuild(
+        "1.2.3-alpha+build",
+        "1.2.3",
+        "1.2.3+build",
+        "1.2.4",
+        "1.3.0",
+        "2.3.1"
+    )
+    Set expected = ##class(%SYS.Python).ToList(expected)
+    Set output = ##class(%IPM.Utils.EmbeddedPython).SortVersions(versions)
+    Do ..AssertPythonListsEqual(output, expected)
+
+    Set expected = builtins.list(builtins.reversed(expected))
+    Set output = ##class(%IPM.Utils.EmbeddedPython).SortVersions(versions, 1)
+    Do ..AssertPythonListsEqual(output, expected)
+}
+
 Method TestSortOCITags()
 {
     Set builtins = ##class(%SYS.Python).Builtins()
