@@ -35,9 +35,23 @@ ClassMethod CompareVersionTotalOrder(ver1 As %String, ver2 As %String) As %Integ
     return -1 if build1 < build2 else 1
 }
 
+/// <parameter>versions</parameter> is a python `list` of strings.
+/// Sorts the versions and return a new python `list`.
+/// If <parameter>reverse</parameter> is a truthy value, sort in descending order
+ClassMethod SortVersions(versions As %SYS.Python, reverse As %SYS.Python = 0) As %SYS.Python
+{
+    import iris
+    from functools import cmp_to_key
+
+    assert isinstance(versions, list)
+
+    keyfunc = cmp_to_key(iris.cls("%IPM.Utils.EmbeddedPython").CompareVersionTotalOrder)
+    return list(sorted(versions, key=keyfunc, reverse=reverse))
+}
+
 /// <parameter>tags</parameter> is a python `list` of strings.
-/// Sorts the OCI tags and return in a new python `list`.
-/// If reverse is a truthy value, sort in descending order
+/// Sorts the OCI tags and return a new python `list`.
+/// If <parameter>reverse</parameter> is a truthy value, sort in descending order
 ClassMethod SortOCITags(tags As %SYS.Python, reverse As %SYS.Python = 0) As %SYS.Python
 {
     import iris
@@ -50,7 +64,7 @@ ClassMethod SortOCITags(tags As %SYS.Python, reverse As %SYS.Python = 0) As %SYS
     tag2ver = {t: t.split(OrasTagPlatformSeparator)[0].replace("_", "+") for t in tags}
 
     keyfunc = cmp_to_key(iris.cls("%IPM.Utils.EmbeddedPython").CompareVersionTotalOrder)
-    sorted_pairs = sorted(tag2ver.items(), key=lambda p: keyfunc(p[1]), reverse=bool(reverse))
+    sorted_pairs = sorted(tag2ver.items(), key=lambda p: keyfunc(p[1]), reverse=reverse)
     return [t for t, _ in sorted_pairs]
 }
 

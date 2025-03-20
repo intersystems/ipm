@@ -77,8 +77,17 @@ ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatfo
 		Set aggregatedPlatformVersion(version) = value _ $ListBuild(platformVersion) 
 	}
 
-	Set pyList = ##class(%SYS.Python).ToList(tagsList)
-	Set sortedTags = ##class(%IPM.Utils.EmbeddedPython).SortOCITags(pyList, 1)
+	Set version = "", versionList = ""
+	For {
+		Set version = $Order(aggregatedPlatformVersion(version))
+		If version = "" {
+			Quit
+		}
+		Set versionList = versionList _ $ListBuild(version)
+	}
+	
+	Set pyList = ##class(%SYS.Python).ToList(versionList)
+	Set sortedTags = ##class(%IPM.Utils.EmbeddedPython).SortVersions(pyList, 1)
 	Return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
