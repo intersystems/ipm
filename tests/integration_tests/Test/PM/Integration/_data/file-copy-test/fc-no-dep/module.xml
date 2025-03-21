@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Export generator="Cache" version="25">
+  <Document name="fc-no-dep.ZPM">
+    <Module>
+      <Name>fc-no-dep</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <FileCopy Name="/src/" Target="${mgrDir}/../fc-no-dep-src/"/>
+    </Module>
+  </Document>
+</Export>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Export generator="Cache" version="25">
+  <Document name="fc-dep-diff-resource.ZPM">
+    <Module>
+      <Name>fc-dep-diff-resource</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <FileCopy Name="/source/" Target="${mgrDir}/../fc-dep-diff-resource-src/"/>
+      <FileCopy Name="/source/text2.txt" Target="${mgrDir}/../fc-dep-diff-resource-src/also-text2.txt"/>
+      <Resource Name="Test.rest.CLS" />
+      <Dependencies>
+        <ModuleReference>
+          <Name>fc-no-dep</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

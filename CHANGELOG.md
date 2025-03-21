@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #757: Fixed a bug where mappings are not getting created when they should.
 - #722: Unified modifiers between ModuleAction and RunOnePhase
 - #735: Prerelease now properly allows alphanumeric tags with zeros
+- #736: Fixed a bug with FileCopy not handling a dependency's resource correctly
 
 ### Security
 -

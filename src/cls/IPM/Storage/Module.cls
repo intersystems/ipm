@@ -1007,7 +1007,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 			}
 		}
 		
-		Set pReferenceArray(..Name_".ZPM") = ""
+		Set pReferenceArray(..Name, ..Name_".ZPM") = ""
 		
 		Set tKey = ""
 		For {
@@ -1018,7 +1018,9 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 				Continue
 			}
 			
-			Set tSC = tResource.ResolveChildren(.pReferenceArray)
+			kill tempArray
+			Set tSC = tResource.ResolveChildren(.tempArray)
+			Merge pReferenceArray(..Name) = tempArray
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -1039,7 +1041,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 				}
 				
 				// Don't pass along the phase
-				Set pReferenceArray(tModName_".ZPM") = ..Name
+				Set pReferenceArray(tModName, tModName_".ZPM") = ..Name
 				
 				// pLockedDependencies=0 to avoid duplicating effort on nested dependencies;
 				// this loop will already get all of them.

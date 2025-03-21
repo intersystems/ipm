@@ -193,9 +193,8 @@ Method OnExportItem(
   Set tVerbose = $Get(pParams("Verbose"))
   Set pItemHandled = 1
   
-  Set tExportPath = $Get(pParams("ModuleExportPath"))
-  Set tSource = ..InstallDirectory
-  Set tTarget = tExportPath _ ..ResourceReference.Name
+  Set tSource = ..GetSource()
+  Set tTarget = pParams("ModuleExportPath")
 
 	Quit ..DoCopy(tSource, tTarget, .pParams)
 }

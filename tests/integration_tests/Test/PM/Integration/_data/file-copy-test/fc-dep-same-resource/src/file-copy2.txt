@@ -1,0 +1,3 @@
+file-copy two
+
+This file in ipm/ at tests/integration_tests/Test/PM/Integration/_data/file-copy-test/fc-dep-same-resource/src/
