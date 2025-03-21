@@ -277,9 +277,30 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 			If ($ListFind(tPhases, "Package") && tModule.HaveToDeploy()) {
 				Set tPhases = $ListBuild("PrepareDeploy") _ tPhases
 			}
+		} ElseIf pPhases = $ListBuild("Publish") {
+			// 'Publish' depends on 'Package', so we need to at least run 'Package' first.
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"'Publish' phase cannot be run with '-only'."))
 		} Else {
 			Set tPhases = $ListBuild(##class(%IPM.Lifecycle.Base).MatchSinglePhase($LISTTOSTRING(pPhases)))
 		}
+
+		// Skip the phases specified in pParams("SkipPhases")
+		Set skipPhases = $ListFromString($Get(pParams("SkipPhases")))
+		Set ptr = 0
+		While $ListNext(skipPhases, ptr, phase) {
+			Set phase = ##class(%IPM.Lifecycle.Base).MatchSinglePhase(phase)
+			Set skipPhases(phase) = ""
+		}
+		Set ptr = 0
+
+		Set tFilteredPhases = ""
+		While $ListNext(tPhases, ptr, phase) {
+			If $Data(skipPhases(phase)) {
+				Continue
+			}
+			Set tFilteredPhases = tFilteredPhases_ $ListBuild(phase)
+		}
+		Set tPhases = tFilteredPhases
 		
 		// Lifecycle-provided default parameters
 		Do tLifecycle.GetDefaultParameters(.tParams, tPhases)
