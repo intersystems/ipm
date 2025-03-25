@@ -1296,6 +1296,11 @@ Method %Publish(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
+		// Perform the "Package" phase to prepare the module for publishing
+		$$$ThrowOnError(..OnBeforePhase("Package", .pParams))
+		$$$ThrowOnError(..%Package(.pParams))
+		$$$ThrowOnError(..OnAfterPhase("Package", .pParams))
+
 		Set tVerbose = $Get(pParams("Verbose"))
 		Set tRelease = $Get(pParams("Release"),$Get(pParams("zpm","Release"),0))
 		Set tPublishTo = $Get(pParams("PublishTo"),$Get(pParams("zpm","PublishTo"),""))
