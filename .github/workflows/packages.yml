@@ -52,44 +52,6 @@ jobs:
           tags: zpm:latest
           build-args: Base=${{ env.IMAGE }}
           outputs: type=docker,dest=/tmp/zpmimage.tar
-      # - name: Run temporary registry
-      #   timeout-minutes: 15
-      #   run: |
-      #     echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
-      #     docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
-      #     docker network create zpm
-      #     REGISTRY=$(docker run --rm -d \
-      #       --network zpm \
-      #       --name registry \
-      #       -p 52773:52773 \
-      #       --network-alias registry \
-      #       docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
-      #       -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
-      #     sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
-      #     docker logs $REGISTRY
-      # - name: Run ORAS registry
-      #   timeout-minutes: 5
-      #   run: |
-      #     ORAS_IMAGE=ghcr.io/project-zot/zot-linux-amd64:latest
-      #     docker pull $ORAS_IMAGE
-      #     ORAS=$(docker run --rm -d \
-      #       --network zpm \
-      #       --name oras \
-      #       -p 5000:5000 \
-      #       --network-alias oras \
-      #       $ORAS_IMAGE)
-      #     sleep 5
-      #     docker logs $ORAS
-      # - name: Test Image
-      #   run: |
-      #     docker load -i /tmp/zpmimage.tar
-      #     CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
-      #     docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-      #     docker exec -i $CONTAINER iris session IRIS << EOF
-      #         zpm "list":1
-      #         zpm "test zpm -v -only":1:1
-      #     EOF
-      #     docker container stop $CONTAINER
       - name: Upload Image
         uses: actions/upload-artifact@v4
         with:
