@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #754 Deployed items are now exported together into a single `studio-project/Deployed.xml` instead of individual `.deploy` files.
 - #756 External name of packages are now unqiue and can no longer conflict with the real name of another packages.
 - #751: Blue terminal output replaced with default (white)
-0 #769: Lifecycle phase `Package` is now run as part of `Publish`.
+- #769: Lifecycle phase `Package` is now run as part of `Publish`.
 
 ### Fixed
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
