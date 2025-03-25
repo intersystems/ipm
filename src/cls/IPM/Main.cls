@@ -121,7 +121,6 @@ This command is an alias for `module-action module-name package`
 <parameter name="module" required="true" description="Name of module on which to perform package actions" />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="the specified path to export package." />
 <modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
-<modifier name="skip-reload" dataAlias="SkipPhases" dataValue="reload" description="Skip the 'Reload' lifecycle phase before publishing" />
 </command>
 
 <command name="verify" dataPrefix="D">
@@ -138,7 +137,6 @@ This command is an alias for `module-action module-name publish`
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
-<modifier name="skip-reload" dataAlias="SkipPhases" dataValue="reload" description="Skip the 'Reload' lifecycle phase before publishing" />
 </command>
 
 <command name="makedeployed">

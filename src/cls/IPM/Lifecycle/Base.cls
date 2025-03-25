@@ -53,13 +53,13 @@ Method OnAfterResourceProcessing(pPhase As %String, ByRef pParams) As %Status
 	Quit $$$OK
 }
 
-Method %DispatchMethod(pMethod As %String, ByRef pParams, Args...) [ ServerOnly = 1 ]
+Method %DispatchMethod(pMethod As %String, ByRef pParams, pIsComplete As %Boolean = 1, Args...) [ ServerOnly = 1 ]
 {
 	// Match method name with CamelCased lifecycle method
 	set convertedMethod = ..MatchSinglePhase(pMethod)
 
 	if $listfind(..#PHASES,convertedMethod)=0 do $zu(96,3,$$$ERNOMETHOD,1,"","method "_convertedMethod_" of class "_$classname())
-	quit ..Module.ExecutePhases(..Module.Name,$lb(convertedMethod),1,.pParams)
+	quit ..Module.ExecutePhases(..Module.Name,$lb(convertedMethod),pIsComplete,.pParams)
 }
 
 /// Merges default parameters into pParams
@@ -154,7 +154,7 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 		"package":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
 		"verify":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
 		"register":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
-		"publish":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
+		"publish":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
 		"configure":	$ListBuild("Configure"),
 		"unconfigure":	$ListBuild("Unconfigure"),
 		:				""
@@ -1296,6 +1296,12 @@ Method %Publish(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
+		// Perform the "Package" phase to prepare the module for publishing
+		// ..Payload is populated by %Package. So need to make sure it's using the same lifecycle object.
+		Set pParams("LifecycleObject") = $This
+		// The call to `..Package` will be routed to %IPM.Lifecycle.Base:%DispatchMethod() since `Package` is not a known method of this class.
+		$$$ThrowOnError(..Package(.pParams, 0))
+
 		Set tVerbose = $Get(pParams("Verbose"))
 		Set tRelease = $Get(pParams("Release"),$Get(pParams("zpm","Release"),0))
 		Set tPublishTo = $Get(pParams("PublishTo"),$Get(pParams("zpm","PublishTo"),""))

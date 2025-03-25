@@ -34,7 +34,7 @@ Method TestOrasVersionAnnotations()
 
     Do ..AssertVersion(..#UpdatedVersion)
 
-    Set sc = ##class(%IPM.Main).Shell("publish "_..#Module_" -r oras -verbose -skip-reload")
+    Set sc = ##class(%IPM.Main).Shell("publish "_..#Module_" -r oras -verbose -only")
     Do $$$AssertStatusOK(sc,"Published module successfully")
 
     Do ..AssertVersion(..#UpdatedVersion)
