@@ -154,7 +154,7 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 		"package":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
 		"verify":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
 		"register":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
-		"publish":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
+		"publish":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
 		"configure":	$ListBuild("Configure"),
 		"unconfigure":	$ListBuild("Unconfigure"),
 		:				""
