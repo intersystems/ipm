@@ -1297,6 +1297,8 @@ Method %Publish(ByRef pParams) As %Status
 	Set tSC = $$$OK
 	Try {
 		// Perform the "Package" phase to prepare the module for publishing
+		// ..Payload is populated by %Package. So need to make sure it's using the same lifecycle object.
+		Set pParams("LifecycleObject") = $This
 		// The call to `..Package` will be routed to %IPM.Lifecycle.Base:%DispatchMethod() since `Package` is not a known method of this class.
 		$$$ThrowOnError(..Package(.pParams, 0))
 

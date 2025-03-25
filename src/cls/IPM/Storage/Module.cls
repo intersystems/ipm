@@ -234,7 +234,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		}
 		
 		// Permit override of lifecycle class as either a class name or a file containing a lifecycle class (and possibly other bundled/related resources)
-		If $Data(pParams("Lifecycle"),tLifecycle) && ($Get(tLifecycle) '= "") {
+		If $Data(pParams("LifecycleObject"), tLifeCycle) # 2 {
+			Set tModule.Lifecycle = tLifeCycle
+		} ElseIf $Data(pParams("Lifecycle"),tLifecycle) && ($Get(tLifecycle) '= "") {
 			If $$$comClassDefined(tLifecycle) {
 				Set tModule.OverrideLifecycleClass = tLifecycle
 			} ElseIf $$$comClassDefined($$$DefaultLifecyclePackageDot_tLifecycle) {
