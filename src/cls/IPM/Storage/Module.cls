@@ -553,7 +553,7 @@ ClassMethod HasScope(pPhases As %List, pScope As %String) [ Private ]
 	Quit $ListFind(tPhases,pScope)
 }
 
-Method LoadDependencies( pPhaseList As %List, ByRef pParams) As %Status
+Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -1355,7 +1355,7 @@ ClassMethod ValidateStream(pManifest As %Stream.Object, pModuleReference As %IPM
 /// <var>pDefaultDeployedValue</var> specifies the default behavior for resources with the Deploy attribute left null.
 /// <var>pProjectSuffix</var> is appended to the project name (which defaults to the module name, with periods replaced by underscores).
 /// The project suffix may be used (for example) to distinguish between projects for deployed and undeployed code.
-Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Boolean = "", pDefaultDeployedValue As %Boolean = "",pProjectSuffix As %String = "") As %Status
+Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Boolean = "", pDefaultDeployedValue As %Boolean = "", pProjectSuffix As %String = "") As %Status
 {
 	Set tSC = $$$OK
 	Try {
