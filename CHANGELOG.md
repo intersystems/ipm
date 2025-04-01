@@ -49,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #722: Unified modifiers between ModuleAction and RunOnePhase
 - #735: Prerelease now properly allows alphanumeric tags with zeros
 - #736: Fixed a bug with FileCopy not handling a dependency's resource correctly
+- HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
 
 ### Security
 -
@@ -150,4 +151,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
-
