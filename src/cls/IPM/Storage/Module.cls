@@ -127,10 +127,7 @@ Method WriteAfterInstallMessage()
 
 /// Calls <method>%CompareTo</method> on this object and also calls it on any relationships in the class
 /// specifically <property>Mappings</property> and <property>Resources</property>. <br />
-Method CompareWithRelationships(
-	pModuleObj As %IPM.Storage.Module,
-	pIgnorePropertyList As %Library.List = "",
-	Output pDifferingPropertyArray As %Library.List) As %Boolean
+Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnorePropertyList As %Library.List = "", Output pDifferingPropertyArray As %Library.List) As %Boolean
 {
 	Kill pDifferingPropertyArray
 	Set isEqual = ..%CompareTo(pModuleObj, pIgnorePropertyList, .pDifferingPropertyArray)
@@ -208,11 +205,7 @@ Method GetCustomPhases(Output pPhases)
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
 /// Example: $ListBuild("Clean","Test") or $ListBuild("Test","Install")
 /// @API.Method
-ClassMethod ExecutePhases(
-	pModuleName As %String,
-	pPhases As %List,
-	pIsComplete As %Boolean = 0,
-	ByRef pParams) As %Status
+ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete As %Boolean = 0, ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -463,11 +456,7 @@ ClassMethod ExecutePhases(
 /// May optionally recurse to also uninstall dependencies that are not required by other modules if <var>pRecurse</var> is 1.
 /// If both <var>pForce</var> and <var>pRecurse</var> are 1, then dependencies will also be uninstalled forcibly.
 /// @API.Method
-ClassMethod Uninstall(
-	pModuleName As %String,
-	pForce As %Boolean = 0,
-	pRecurse As %Boolean = 0,
-	ByRef pParams) As %Status
+ClassMethod Uninstall(pModuleName As %String, pForce As %Boolean = 0, pRecurse As %Boolean = 0, ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -555,9 +544,7 @@ Method GetDefaultParameters(Output pParams)
 }
 
 /// Returns whether pScope is in the list of pPhases <br />
-ClassMethod HasScope(
-	pPhases As %List,
-	pScope As %String) [ Private ]
+ClassMethod HasScope(pPhases As %List, pScope As %String) [ Private ]
 {
 	If (pScope = "") {
 		Quit 1
@@ -566,9 +553,7 @@ ClassMethod HasScope(
 	Quit $ListFind(tPhases,pScope)
 }
 
-Method LoadDependencies(
-	pPhaseList As %List,
-	ByRef pParams) As %Status
+Method LoadDependencies( pPhaseList As %List, ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -625,21 +610,7 @@ Method LoadDependencies(
 	Quit tSC
 }
 
-Method BuildDependencyGraph(
-	ByRef pDependencyGraph,
-	pDepth As %Integer = 1,
-	pForceSnapshotReload As %Boolean = 0,
-	ByRef qstruct,
-	pPhases As %String = "",
-	ByRef pSubModules,
-	pPass As %Integer = 1,
-	pModulePath As %List = {$ListBuild(..Name)},
-	pIgnoreInstalledModules As %Boolean = 0,
-	pKnownDependencies As %List = {..GetKnownDependencies(..Name)},
-	pPermitDowngrade As %Boolean = 0,
-	pCheckNestedScoped As %Boolean = 0,
-	ByRef pSearchList,
-	pIncludeDisplayName As %Boolean = 0) As %Status
+Method BuildDependencyGraph(ByRef pDependencyGraph, pDepth As %Integer = 1, pForceSnapshotReload As %Boolean = 0, ByRef qstruct, pPhases As %String = "", ByRef pSubModules, pPass As %Integer = 1, pModulePath As %List = {$ListBuild(..Name)}, pIgnoreInstalledModules As %Boolean = 0, pKnownDependencies As %List = {..GetKnownDependencies(..Name)}, pPermitDowngrade As %Boolean = 0, pCheckNestedScoped As %Boolean = 0, ByRef pSearchList, pIncludeDisplayName As %Boolean = 0) As %Status
 {
 	#define EXACT 1
 	#define FUZZY 2
@@ -1017,12 +988,7 @@ ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 /// @Argument	pPhases				List of IPM lifecycle phases to be applied to the current module.<br />
 /// @Argument	pSkipDependencies	Whether to skip loading uninstalled dependency modules.<br />
 /// @Argument	pDependencyGraph 	Tree of module's dependencies.<br />
-Method GetResolvedReferences(
-	Output pReferenceArray,
-	pLockedDependencies As %Boolean = 0,
-	pPhases As %List = "",
-	pSkipDependencies As %Boolean = 0,
-	ByRef pDependencyGraph) As %Status
+Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boolean = 0, pPhases As %List = "", pSkipDependencies As %Boolean = 0, ByRef pDependencyGraph) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -1277,10 +1243,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 /// 
 /// <P>If this method returns an error status then %Save() will fail and the transaction
 /// will be rolled back.
-Method %OnAddToSaveSet(
-	depth As %Integer = 3,
-	insert As %Integer = 0,
-	callcount As %Integer = 0) As %Status [ Private, ServerOnly = 1 ]
+Method %OnAddToSaveSet(depth As %Integer = 3, insert As %Integer = 0, callcount As %Integer = 0) As %Status [ Private, ServerOnly = 1 ]
 {
 	Set tSC = $$$OK
 	Try {
@@ -1345,10 +1308,7 @@ Method %OnAddToSaveSet(
 ///         An %XML.Node object may be obtained for this node using document.GetNode(nodeId)<br>
 ///     containerOref is the containing object instance when called from XMLImport and
 ///         is "" when called from %XML.Reader for Correlate'd objects.<br>
-ClassMethod XMLNew(
-	document As %XML.Document,
-	node As %Integer,
-	containerOref As %RegisteredObject = "") As %RegisteredObject [ ServerOnly = 1 ]
+ClassMethod XMLNew(document As %XML.Document, node As %Integer, containerOref As %RegisteredObject = "") As %RegisteredObject [ ServerOnly = 1 ]
 {
 	// Coupled with %IPM.StudioDocument.Module to allow editing of the current module rather than matching an existing one.
 	Quit $Get($$$ZPMStudioDocumentModule,..%New())
@@ -1356,10 +1316,7 @@ ClassMethod XMLNew(
 
 /// Validates the module manifest in <var>pManifest</var> - both that it can be interpreted properly as XML, and also that the module it contains (returned in <var>pModule</var>) has
 /// a name and version matching the supplied <var>pModuleReference</var>.
-ClassMethod ValidateStream(
-	pManifest As %Stream.Object,
-	pModuleReference As %IPM.Storage.QualifiedModuleInfo,
-	Output pModule As %IPM.Storage.Module) As %Status
+ClassMethod ValidateStream(pManifest As %Stream.Object, pModuleReference As %IPM.Storage.QualifiedModuleInfo, Output pModule As %IPM.Storage.Module) As %Status
 {
 	Set pModule = $$$NULLOREF
 	Set tSC = $$$OK
@@ -1398,11 +1355,7 @@ ClassMethod ValidateStream(
 /// <var>pDefaultDeployedValue</var> specifies the default behavior for resources with the Deploy attribute left null.
 /// <var>pProjectSuffix</var> is appended to the project name (which defaults to the module name, with periods replaced by underscores).
 /// The project suffix may be used (for example) to distinguish between projects for deployed and undeployed code.
-Method GetStudioProject(
-	Output pProject As %Studio.Project,
-	pDeployedCode As %Boolean = "",
-	pDefaultDeployedValue As %Boolean = "",
-	pProjectSuffix As %String = "") As %Status
+Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Boolean = "", pDefaultDeployedValue As %Boolean = "",pProjectSuffix As %String = "") As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -1466,9 +1419,7 @@ Method GetStudioProject(
 	Quit tSC
 }
 
-ClassMethod AddItemToProject(
-	tProject As %Studio.Project,
-	pResourceName As %String) As %Status [ Internal ]
+ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %String) As %Status [ Internal ]
 {
 	Set tSC = $$$OK
 	Try {
@@ -1504,9 +1455,7 @@ Method Lock() As %Status
 	Quit $$$OK
 }
 
-Query VersionRequirements(
-	pOfModuleName As %String,
-	pExcludeModuleNames As %List = "") As %SQLQuery [ SqlProc ]
+Query VersionRequirements(pOfModuleName As %String, pExcludeModuleNames As %List = "") As %SQLQuery [ SqlProc ]
 {
 	select distinct %exact Dependencies_VersionString As Version,%DLIST(ModuleItem->Name) As ModuleNames
 	from %IPM_Storage.ModuleItem_Dependencies
@@ -1524,9 +1473,7 @@ Query VersionRequirements(
 /// </ul>
 /// In addition to these, look at expressions supported by %EvaluateSystemExpression
 /// in class <class>%IPM.Utils.Module</class>.
-Method %Evaluate(
-	pAttrValue As %String,
-	ByRef pParams) As %String [ Internal ]
+Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 {
 	Set tAttrValue = pAttrValue
 	If (tAttrValue '[ "{") {
