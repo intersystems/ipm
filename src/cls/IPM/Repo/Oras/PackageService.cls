@@ -91,7 +91,7 @@ ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatfo
 	Return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
-Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.General.SemanticVersionExpression, package As %String, client As %SYS.Python, moduleList As %ListOfObjects, searchCriteria As %IPM.Repo.SearchCriteria, name As %String)
+Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.General.SemanticVersionExpression, client As %SYS.Python, moduleList As %ListOfObjects, searchCriteria As %IPM.Repo.SearchCriteria, name As %String)
 {
 	Set allVersionsList = ..AggregatePlatformVersions($ListFromString(allTagsString, ", "), .aggregatedPlatformVersion)
 	Set pointer = 0
@@ -111,14 +111,16 @@ Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.Gen
 		}
 
 		#; get metadata from annotations
-		Set metadata = ..GetPackageMetadataPy(..Location, package, "", tag, client)
+		Set metadata = ..GetPackageMetadataPy(..Location, name, "", tag, client)
 		set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
 		$$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
 		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-		Set tModRef.Name = artifactMetadata.ImageTitle
+		// `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
+		Set tModRef.Name = name
+		// `artifactMetadata.ImageVersion` can be different from `moduleVersion`. E.g., when the module was simply "moved" from elsewhere under a different tag
+		Set tModRef.VersionString = moduleVersion 
 		Set tModRef.Repository = artifactMetadata.ImageSource
-		Set tModRef.VersionString = artifactMetadata.ImageVersion
 		Set tModRef.Description = artifactMetadata.ImageDescription
 		Set tModRef.Deployed = artifactMetadata.IPMDeployed
 		If artifactMetadata.IPMDeployed '= "" {
@@ -192,13 +194,13 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			}
 			#; get all versions
 			Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
-			Do ..ListModulesFromTagString(allTagsString, tVersionExpression, package, client, tList, pSearchCriteria, name)
+			Do ..ListModulesFromTagString(allTagsString, tVersionExpression, client, tList, pSearchCriteria, name)
 		}
 		Return tList
 	}
 
 	Set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
-	Do ..ListModulesFromTagString(allTagsString, tVersionExpression, package, client, tList, pSearchCriteria, name)
+	Do ..ListModulesFromTagString(allTagsString, tVersionExpression, client, tList, pSearchCriteria, name)
 	Return tList
 }
 
