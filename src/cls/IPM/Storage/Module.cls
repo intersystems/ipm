@@ -276,7 +276,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
   
 		If pIsComplete {
 			Set tPhases = tLifecycle.GetCompletePhases(pPhases)
-			If (($ListFind(tPhases, "Package") || $ListFind(tPhases, "Publish")) && tModule.HaveToDeploy()) {
+			If (($ListFind(tPhases, "Package") || $ListFind(tPhases, "Publish")) && tModule.HaveToDeploy() && tModule.DeveloperMode) {
 				Set tPhases = $ListBuild("PrepareDeploy") _ tPhases
 			}
 		} Else {
