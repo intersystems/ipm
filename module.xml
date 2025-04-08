@@ -4,7 +4,7 @@
   <Name>ZPM</Name>
   <Version>0.10.0-SNAPSHOT</Version>
   <ExternalName>IPM</ExternalName>
-  <Description>Provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
+  <Description>InterSystems Package Manager (IPM) provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
   <Keywords>Package Manager</Keywords>
   <Author>
     <Organization>InterSystems Corporation</Organization>
