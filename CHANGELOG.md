@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #755: Added an `info` command which prints external name (optionally including the real name) of top-level packages without the `build` part of semver. 
 - #756: Support running commands using external names of packages.
 - #769: Allow `publish <module> -only` to publish a module without running `reload`
+- #533: External name changed to IPM (which carries greater meaning in 0.10.0).
 
 ### Changed
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.

@@ -3,7 +3,7 @@
 <Document name="ZPM.ZPM"><Module>
   <Name>ZPM</Name>
   <Version>0.10.0-SNAPSHOT</Version>
-  <ExternalName>Package Management System</ExternalName>
+  <ExternalName>IPM</ExternalName>
   <Description>Provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
   <Keywords>Package Manager</Keywords>
   <Author>
@@ -24,6 +24,9 @@
   <Invoke Class="%IPM.Utils.Migration" Method="RunAll">
     <Arg>${verbose}</Arg>
   </Invoke>
+
+  <!-- Requires 2022.1+ due to Embedded Python -->
+  <SystemRequirements Version=">=2022.1" />
 
   <!-- List of python wheels for offline installation – oras and its transitive dependencies -->
   <PythonWheel Name="attrs-25.1.0-py3-none-any.whl" ExtraPipFlags="--no-deps"/>
