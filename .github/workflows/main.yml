@@ -166,6 +166,7 @@ jobs:
           CONTAINER=$(docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
+            do $System.OBJ.Load("/home/irisowner/zpm.xml","c")
             zpm "list":1
             zpm "install dsw":1
             zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1
@@ -209,13 +210,14 @@ jobs:
             write "After migration",!
             zpm "list"
             zpm "test ipm-migration-v0.7-to-v0.9 -only -verbose":1
+            zn "%SYS"
             zpm "test zpm -v -only":1
             zpm "verify zpm -v -only":1
             halt
           EOF
           docker logs $CONTAINER
           docker stop $CONTAINER
-      - name: Clean install and test
+      - name: Clean install and smoke test
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
