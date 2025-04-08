@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased - 0.10.0+snapshot]
+## [0.10.0] - 2025-04-07
 
 ### Added
 - #474 Added compatibility to load ".tar.gz" archives in addition to ".tgz"
@@ -52,16 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #775: Fixed a bug where incorrect name/version of ORAS packages is returned
 - HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
 
-### Security
--
-
-### Removed
-- 
-
-### Deprecated
--
-
-## [Unreleased - 0.9.2+snapshot]
+## [0.9.2] - 2025-02-24
 
 ### Added
 - #682 When downloading IPM via the `enable` command from a remote registry, allow user to pass in the registry name (or get the only existent one), instead of the deployment enabled registry.
