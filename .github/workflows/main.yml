@@ -167,6 +167,7 @@ jobs:
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
             do $System.OBJ.Load("/home/irisowner/zpm.xml","c")
+            zpm "enable -globally -map -repos -community"
             zpm "list":1
             zpm "install dsw":1
             zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1
