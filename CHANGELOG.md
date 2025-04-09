@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #736: Fixed a bug with FileCopy not handling a dependency's resource correctly
 - #775: Fixed a bug where incorrect name/version of ORAS packages is returned
 - HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
+- #781: Addressing an issue where file paths exceed 256 characters
 
 ## [0.9.2] - 2025-02-24
 
