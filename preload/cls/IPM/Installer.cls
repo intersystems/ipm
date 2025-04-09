@@ -129,9 +129,27 @@ ClassMethod MapIfLegacy()
 ClassMethod InstallORASIfMissing()
 {
   if '..ORASInstalled() {
-    Quit ##class(%IPM.Main).Shell("zpm initialize -only")
+    // Need to run in a background process to pick up new %IPM.Storage.Module definition
+    Write !,"Installing ORAS Python components..."
+    Job ..InitializeAndSignal()
+    Set result = $System.Event.WaitMsg("",30)
+    Set $ListBuild(msg,sc) = result
+    If (msg = 0) {
+      Write !,"ORAS installation timed out and may not have completed successfully."
+    } ElseIf $$$ISERR(sc) {
+      Write !,"An error occurred installing Python dependencies: ",$System.Status.GetErrorText(sc)
+    } Else {
+      Write " done."
+    }
   }
   Quit $$$OK
+}
+
+ClassMethod InitializeAndSignal()
+{
+  set parent = $ZParent
+  set sc = ##class(%IPM.Main).Shell("zpm initialize -only")
+  do $System.Event.Signal($zparent,sc)
 }
 
 ClassMethod ORASInstalled() [ Language = python ]
