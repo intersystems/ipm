@@ -566,8 +566,8 @@ Method %Reload(ByRef pParams) As %Status
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
 		}
-		If ($Order(tLoadedList(first)) '= "") {
-			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.")
+		If ($Order(tLoadedList("")) '= $Order(tLoadedList(""),-1)) {
+			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed; it may only contain one document.")
 			Quit
 		}
     	If ($Piece($$$ucase(first),".",*) '= "ZPM") {
@@ -1726,12 +1726,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 	Quit tDirectory_tFile
 }
 
-Method ExportSingleModule(
-	ByRef pResourceArray,
-	ByRef pTargetDirectory As %String,
-	ByRef pDependencyGraph,
-	ByRef pParams,
-	pVerbose As %Boolean = 0)
+Method ExportSingleModule(ByRef pResourceArray, ByRef pTargetDirectory As %String, ByRef pDependencyGraph, ByRef pParams, pVerbose As %Boolean = 0)
 {
 	Merge tParams = pParams
 
@@ -1851,9 +1846,7 @@ Method ExportSingleModule(
 	}
 }
 
-ClassMethod GetBaseClassForPackaging(
-	pPackaging As %String,
-	Output pBaseClass As %Dictionary.Classname) As %Status [ Final ]
+ClassMethod GetBaseClassForPackaging(pPackaging As %String, Output pBaseClass As %Dictionary.Classname) As %Status [ Final ]
 {
 	Set tSC = $$$OK
 	Set pBaseClass = ""
