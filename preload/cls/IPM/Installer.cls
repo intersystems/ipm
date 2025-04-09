@@ -110,7 +110,7 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
 
 ClassMethod ZPMLoad(pDirectoryName)
 {
-  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName)
+  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName_" -DDeveloperMode=0")
 }
 
 ClassMethod ZPMCompile()
