@@ -1,7 +1,7 @@
 # InterSystems Package Manager - IPM
 
 Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and front-end packages, and more into InterSystems IRIS, from a variety of sources:
-* InterSystems-official packages from [ipm.intersystems.com](https://ipm.intersystems.com/contents) and [pm.intersystems.com](https://pm.intersystems.com/#/packages)
+* InterSystems-official packages from [pm.intersystems.com](https://pm.intersystems.com/#/packages) or an upcoming [ORAS](https://oras.land/)-based registry
 * The [Community Package Registry](https://pm.community.intersystems.com/packages/-/all), driven by the [Open Exchange](https://openexchange.intersystems.com/)
 * Your own private [ORAS registry](https://oras.land/adopters) or IRIS-based [zpm-registry](https://github.com/intersystems-community/zpm-registry)
 
