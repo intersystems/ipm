@@ -179,6 +179,7 @@ jobs:
             zpm "install zpm -v":1
             write "After upgrade",!
             zpm "list"
+            set mod = ##class(%IPM.Storage.Module).NameOpen("zpm") set mod.Root="/home/irisowner/zpm/" set mod.DeveloperMode=1 d mod.%Save()
             zpm "test zpm -v -only":1
             zpm "verify zpm -v -only":1
             halt
@@ -210,6 +211,7 @@ jobs:
             zpm "list"
             zpm "test ipm-migration-v0.7-to-v0.9 -only -verbose":1
             zn "%SYS"
+            set mod = ##class(%IPM.Storage.Module).NameOpen("zpm") set mod.Root="/home/irisowner/zpm/" set mod.DeveloperMode=1 d mod.%Save()
             zpm "test zpm -v -only":1
             zpm "verify zpm -v -only":1
             halt
