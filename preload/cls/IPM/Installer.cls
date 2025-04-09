@@ -126,6 +126,23 @@ ClassMethod MapIfLegacy()
   Quit $$$OK
 }
 
+ClassMethod InstallORASIfMissing()
+{
+  if '..ORASInstalled() {
+    Quit ##class(%IPM.Main).Shell("zpm initialize -only")
+  }
+  Quit $$$OK
+}
+
+ClassMethod ORASInstalled() [ Language = python ]
+{
+  try:
+    import oras
+    return True
+  except:
+    return False
+}
+
 ClassMethod EndCompile(qstruct) As %Status
 {
   #; Behave as simple installer
