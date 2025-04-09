@@ -389,7 +389,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
 		
-		Set tTargetDirectory = ##class(%SYS.System).TempDirectory()
+		Set tTargetDirectory = ##class(%SYS.System).TempDirectory()_"/"_##class(%PopulateUtils).StringMin(5,5)
 		If ##class(%File).DirectoryExists(tTargetDirectory) {
 			// Delete it.
 			Set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
