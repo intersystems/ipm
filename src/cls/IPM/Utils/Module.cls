@@ -389,8 +389,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
 		
-		Set tTargetDirectory = ##class(%File).ManagerDirectory()_".modules\"_$Namespace_"\"_pModuleName_"\"_pModuleVersion_"\"
-		Set tTargetDirectory = ##class(%File).NormalizeDirectory(tTargetDirectory)
+		Set tTargetDirectory = ##class(%SYS.System).TempDirectory()_"/"_pModuleName
 		If ##class(%File).DirectoryExists(tTargetDirectory) {
 			// Delete it.
 			Set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
@@ -418,6 +417,13 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 		Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		If $$$ISERR(tSC) {
 			Quit
+		}
+		// Delete directory at the end of the run
+		If ##class(%File).DirectoryExists(tTargetDirectory) {
+			Set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
+			If $$$ISERR(tSC) {
+				Quit
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
