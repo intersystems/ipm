@@ -1,13 +1,16 @@
 # InterSystems Package Manager - IPM
 
-Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and Frontend packages, and any files into InterSystems IRIS published on the official [Registry](https://pm.community.intersystems.com/packages/-/all) or private registry of your own.
+Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and front-end packages, and more into InterSystems IRIS, from a variety of sources:
+* InterSystems-official packages from [ipm.intersystems.com](https://ipm.intersystems.com/contents) and [pm.intersystems.com](https://pm.intersystems.com/#/packages)
+* The [Community Package Registry](https://pm.community.intersystems.com/packages/-/all), driven by the [Open Exchange](https://openexchange.intersystems.com/)
+* Your own private [ORAS registry](https://oras.land/adopters) or IRIS-based [zpm-registry](https://github.com/intersystems-community/zpm-registry)
 
 ## Documentation
 * [The official documentation in the wiki](https://github.com/intersystems-community/zpm/wiki/)
 * [Articles on the InterSystems Developer Community](https://community.intersystems.com/tags/objectscript-package-manager-zpm)
 * [Videos on YouTube](https://www.youtube.com/playlist?list=PLKb2cBVphNQRcmxt4LtYDyLJEPfF4X4-4)
 
-## Installing ObjectScript Package Manager Client:
+## Installing the InterSystems Package Manager Client:
 
 0. Use one-liner in terminal call or programmatically:
 ```
@@ -18,7 +21,7 @@ s version="latest" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.i
 
 OR:
 
-1. Download the  [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
+1. Download the [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
 2. Import the zpm.xml into IRIS and compile via any desired way (Management Portal, Studio or Terminal)
  
  After that you can use PackageManager to install modules from [community repository](https://pm.community.intersystems.com) in any namespace.
