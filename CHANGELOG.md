@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #775: Fixed a bug where incorrect name/version of ORAS packages is returned
 - HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
 - #782: Installer no longer includes unit tests
+- #781: Addressing an issue where file paths exceed 256 characters
 
 ## [0.9.2] - 2025-02-24
 
@@ -145,6 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #607: Uninstall reports deletion of non-classes
 - #606: Don't put garbage folders in tar archive
 - #652: Don't create extra needless mappings (could cause deadlock with parallel installation of dependencies)
+- #776: Loading packages fails on 8-bit IRIS installations in certain locales
 
 ### Deprecated
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
