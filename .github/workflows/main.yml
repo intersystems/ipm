@@ -143,6 +143,7 @@ jobs:
           CONTAINER=$(docker run --network zpm -d --rm zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
+          echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
             zpm "repo -list":1
@@ -165,6 +166,7 @@ jobs:
           wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
           CONTAINER=$(docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
           docker cp . $CONTAINER:/home/irisowner/zpm/
+          echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
             do $System.OBJ.Load("/home/irisowner/zpm.xml","c")
