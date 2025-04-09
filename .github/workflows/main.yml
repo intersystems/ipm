@@ -164,6 +164,7 @@ jobs:
           curl http://localhost:52773/registry/packages/zpm/ | jq
           wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
           CONTAINER=$(docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
+          docker cp . $CONTAINER:/home/irisowner/zpm/
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
             do $System.OBJ.Load("/home/irisowner/zpm.xml","c")
@@ -194,6 +195,7 @@ jobs:
           curl http://localhost:52773/registry/packages/zpm/ | jq
           CONTAINER=$(docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
           docker cp tests/migration/v0.7-to-v0.9/. $CONTAINER:/tmp/test-package/
+          docker cp . $CONTAINER:/home/irisowner/zpm/
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session iris -UUSER << 'EOF' 
             s version="0.7.4" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/"_version_"/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
