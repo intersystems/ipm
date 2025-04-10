@@ -110,6 +110,7 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
 
 ClassMethod ZPMLoad(pDirectoryName)
 {
+  // Explicitly force DeveloperMode to 0 to avoid loading tests
   Quit ##class(%IPM.Main).Shell("load "_pDirectoryName_" -DDeveloperMode=0")
 }
 
