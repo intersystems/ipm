@@ -110,7 +110,8 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
 
 ClassMethod ZPMLoad(pDirectoryName)
 {
-  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName)
+  // Explicitly force DeveloperMode to 0 to avoid loading tests
+  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName_" -DDeveloperMode=0")
 }
 
 ClassMethod ZPMCompile()
@@ -124,6 +125,41 @@ ClassMethod MapIfLegacy()
     Quit ##class(%IPM.Main).Shell("enable -globally -map")
   }
   Quit $$$OK
+}
+
+ClassMethod InstallORASIfMissing()
+{
+  if '..ORASInstalled() {
+    // Need to run in a background process to pick up new %IPM.Storage.Module definition
+    Write !,"Installing ORAS Python components..."
+    Job ..InitializeAndSignal()
+    Set result = $System.Event.WaitMsg("",30)
+    Set $ListBuild(msg,sc) = result
+    If (msg = 0) {
+      Write !,"ORAS installation timed out and may not have completed successfully."
+    } ElseIf $$$ISERR(sc) {
+      Write !,"An error occurred installing Python dependencies: ",$System.Status.GetErrorText(sc)
+    } Else {
+      Write " done."
+    }
+  }
+  Quit $$$OK
+}
+
+ClassMethod InitializeAndSignal()
+{
+  set parent = $ZParent
+  set sc = ##class(%IPM.Main).Shell("zpm initialize -only")
+  do $System.Event.Signal($zparent,sc)
+}
+
+ClassMethod ORASInstalled() [ Language = python ]
+{
+  try:
+    import oras
+    return True
+  except:
+    return False
 }
 
 ClassMethod EndCompile(qstruct) As %Status

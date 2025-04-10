@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0] - 2025-04-07
+## [0.10.0] - 2025-04-10
+
+*Important*: The minimum supported InterSystems IRIS version is now *2022.1*. For earlier IRIS versions, use IPM 0.9.x.
 
 ### Added
 - #474 Added compatibility to load ".tar.gz" archives in addition to ".tgz"
@@ -27,8 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #755: Added an `info` command which prints external name (optionally including the real name) of top-level packages without the `build` part of semver. 
 - #756: Support running commands using external names of packages.
 - #769: Allow `publish <module> -only` to publish a module without running `reload`
+- #533: External name changed to IPM (which carries greater meaning in 0.10.0)
 
 ### Changed
+- The minimum supported IRIS version for this release is 2022.1.
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
 - #726 When running `zpm "load ..."` on a nonexistent path, it now returns an error instead of silently failing with a $$$OK status.
 - #754 Deployed items are now exported together into a single `studio-project/Deployed.xml` instead of individual `.deploy` files.
@@ -51,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #736: Fixed a bug with FileCopy not handling a dependency's resource correctly
 - #775: Fixed a bug where incorrect name/version of ORAS packages is returned
 - HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
+- #782: Installer no longer includes unit tests
 - #781: Addressing an issue where file paths exceed 256 characters
 
 ## [0.9.2] - 2025-02-24
