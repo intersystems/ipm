@@ -220,6 +220,9 @@ ClassMethod LoadQualifiedReference(pReference As %IPM.Storage.QualifiedModuleInf
 
 ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %Boolean, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
 {
+	// Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
+	Set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
+
 	// Suspend the error count to avoid spurious messages about errors being detected in load/compile.
 	$$$SuspendErrorCount
 	#dim tExpression As %IPM.General.SemanticVersionExpression
@@ -262,7 +265,11 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 		Set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
 		Set tModRef.Name = pModuleName
 		Set tModRef.VersionString = pVersion
-    Set tModRef.Deployed = pDeployed
+		Set tModRef.Deployed = pDeployed
+		Set tModRef.PlatformVersion = pPlatformVersion
+		If pDeployed {
+			$$$ThrowOnError(tModRef.PlatformVersions.Insert(pPlatformVersion))
+		}
 		
 		// Make sure we're not downgrading.
 		If '$Get(pParams("PermitDowngrade")) {
@@ -303,7 +310,10 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 				// This doesn't make sense if we're loading the dependency from a remote server.
 				Set tDeveloperMode = 1
 			}
+			Set dotModules = ##class(%File).NormalizeDirectory(".modules", tDirectory)
+			Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
 			Set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName)
+			Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		} Else {
 			Set tAsArchive = -1
 			Set tPayload = tClient.GetModule(tModRef, .tAsArchive)
@@ -379,8 +389,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
 		
-		Set tTargetDirectory = ##class(%File).ManagerDirectory()_".modules\"_$Namespace_"\"_pModuleName_"\"_pModuleVersion_"\"
-		Set tTargetDirectory = ##class(%File).NormalizeDirectory(tTargetDirectory)
+		Set tTargetDirectory = ##class(%SYS.System).TempDirectory()_"/"_pModuleName
 		If ##class(%File).DirectoryExists(tTargetDirectory) {
 			// Delete it.
 			Set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
@@ -402,9 +411,19 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 			Write:tVerbose !,tOutput(i)
 		}
 		
+		Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+		Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
 		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository)
+		Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		If $$$ISERR(tSC) {
 			Quit
+		}
+		// Delete directory at the end of the run
+		If ##class(%File).DirectoryExists(tTargetDirectory) {
+			Set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
+			If $$$ISERR(tSC) {
+				Quit
+			}
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -438,6 +457,7 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			Merge tParams("AngularBuild") = pParams("AngularBuild")
 			Merge tParams("Artifactory") = pParams("Artifactory")
 			Merge tParams("AngularArtifact") = pParams("AngularArtifact")
+			Merge tParams("EnvFiles") = pParams("EnvFiles")
 		}
 		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository)
 		If $$$ISERR(tSC) {
@@ -1220,17 +1240,6 @@ ClassMethod LoadNewModule(pDirectory As %String, ByRef pParams, pRepository As %
 			}
 		}
 		
-		Set tPath = pDirectory_"preload"
-		If ##class(%File).DirectoryExists(tPath) {
-			// Load first, update legacy superclasses, then compile
-			Set tSC = $system.OBJ.ImportDir(tPath,,$Select(tVerbose:"d",1:"-d")_$Select($TLevel:"/multicompile=0",1:""),,1,.tImported)
-			$$$ThrowOnError(tSC)
-			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
-			$$$ThrowOnError(tSC)
-		} Else {
-			Write:tVerbose !,"Skipping preload - directory does not exist."
-		}
-  
 		Set tSC = $system.OBJ.Load(pDirectory_"module.xml",$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
 		$$$ThrowOnError(tSC)
 		Set tSC = tModule.%Reload()
@@ -2363,6 +2372,17 @@ ClassMethod %RegExReplace(pString As %String, pName As %String, pValue As %Strin
 	Set tRegEx = "(?i)\$\{" _ pName _ "\}"
 	Set tString =  ##class(%Regex.Matcher).%New(tRegEx, tString).ReplaceAll($Replace(pValue,"\","\\"))
 	Quit tString
+}
+
+ClassMethod GetDeployedProjectPath(root As %String) As %String
+{
+	Set deployedDirectory = ##class(%File).NormalizeDirectory($$$DeployedXMLDir, root)
+	Quit deployedDirectory_$$$DeployedXMLName
+}
+
+ClassMethod GetDeployedProjectName(moduleName As %String) As %String [ CodeMode = expression ]
+{
+moduleName_$$$DeployedProjectSuffix
 }
 
 }

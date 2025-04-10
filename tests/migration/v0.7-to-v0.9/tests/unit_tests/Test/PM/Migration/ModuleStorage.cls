@@ -27,6 +27,8 @@ Method TestDSW()
 
 Method TestZPM()
 {
+    New $Namespace
+    Set $Namespace = "%SYS"
     Do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("zpm"))
     Do $$$AssertTrue(##class(%IPM.StudioDocument.Module).Exists("zpm.ZPM"))
 }

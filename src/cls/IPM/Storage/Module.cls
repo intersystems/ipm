@@ -18,6 +18,8 @@ Property Version As %IPM.General.SemanticVersion(ForceCodeGenerate = 0, XMLPROJE
 
 Property ExternalName As %String(MAXLEN = 255);
 
+Index ExternalName On ExternalName [ Unique ];
+
 Property Description As %String(MAXLEN = "");
 
 Property Keywords As %String(MAXLEN = "");
@@ -28,6 +30,8 @@ Property Author As %IPM.Storage.ModuleAuthorInfo;
 Property Packaging As %String [ Required ];
 
 Property Dependencies As list Of %IPM.Storage.ModuleReference(STORAGEDEFAULT = "array");
+
+Property LastUpdated As %TimeStamp;
 
 Relationship Resources As %IPM.Storage.ResourceReference(XMLIO = "IN", XMLITEMNAME = "Resource", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
 
@@ -164,6 +168,40 @@ Method CompareWithRelationships(pModuleObj As %IPM.Storage.Module, pIgnoreProper
 	Return isEqual
 }
 
+/// Returns a multidimensional array of custom phases defined by the module's invokes,
+/// where the keys are the custom phase names and the values are empty strings.
+/// Custom phases do not have corresponding %method implementation in the lifecycle class.
+/// Return the phases in lower case for case-insensitive lookup.
+Method GetCustomPhases(Output pPhases)
+{
+    Kill pPhases
+    Set pPhases = ""
+    Set key = ""
+    For {
+        Set tInvoke = ..Invokes.GetNext(.key)
+		If key = "" {
+			Quit
+		}
+        If (tInvoke.CustomPhase '= "") {
+            Set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
+        }
+    }
+	For {
+		Set tResource = ..Resources.GetNext(.key)
+		If key = "" {
+			Quit
+		}
+		Set tProcessor = tResource.Processor
+		// %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+		If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+			Set cp = tProcessor.CustomPhase
+			If cp '= "" {
+				Set pPhases($$$lcase(cp)) = cp
+			}
+		}
+	}
+}
+
 /// Execute multiple lifecycle phases in sequence. Execution is terminated if one fails.
 /// Example: $ListBuild("Clean","Test") or $ListBuild("Test","Install")
 /// @API.Method
@@ -173,10 +211,16 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"),0)
 		Set tModule = ..NameOpen(pModuleName,,.tSC)
-		If '$isobject(tModule) {
+		If '$Isobject(tModule) {
+			Set tModule = ..ExternalNameOpen(pModuleName,,.tSC)
+		}
+		If '$Isobject(tModule) {	
 			$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' not found.", pModuleName)))
 		}
 		$$$ThrowOnError(tSC)
+
+		// Regardless of whether the module was opened by name or external name, we want to use the name for the rest of the method.
+		Set pModuleName = tModule.Name
 		
 		// Ensure we reload and reinitialize transient properties.
 		// For example, prevents reuse of a previous OverrideLifecycleClass if the module object is in memory in the caller.
@@ -190,7 +234,9 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		}
 		
 		// Permit override of lifecycle class as either a class name or a file containing a lifecycle class (and possibly other bundled/related resources)
-		If $Data(pParams("Lifecycle"),tLifecycle) && ($Get(tLifecycle) '= "") {
+		If $Data(pParams("LifecycleObject"), tLifeCycle) # 2 {
+			Set tModule.Lifecycle = tLifeCycle
+		} ElseIf $Data(pParams("Lifecycle"),tLifecycle) && ($Get(tLifecycle) '= "") {
 			If $$$comClassDefined(tLifecycle) {
 				Set tModule.OverrideLifecycleClass = tLifecycle
 			} ElseIf $$$comClassDefined($$$DefaultLifecyclePackageDot_tLifecycle) {
@@ -230,7 +276,7 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
   
 		If pIsComplete {
 			Set tPhases = tLifecycle.GetCompletePhases(pPhases)
-			If ($ListFind(tPhases, "Package") && tModule.HaveToDeploy()) {
+			If (($ListFind(tPhases, "Package") || $ListFind(tPhases, "Publish")) && tModule.HaveToDeploy() && tModule.DeveloperMode) {
 				Set tPhases = $ListBuild("PrepareDeploy") _ tPhases
 			}
 		} Else {
@@ -269,7 +315,12 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
 		Set tLifecycle.PhaseList = tPhases
 		Set tPointer = 0
 		Set tFullStart = $zh
+		Do tModule.GetCustomPhases(.tCustomPhases)
 		While $ListNext(tPhases,tPointer,tOnePhase) {
+            Set tIsCustomPhase = $Data(tCustomPhases($$$lcase(tOnePhase)), tNormalizedPhaseName) # 2
+			If tIsCustomPhase {
+				Set tOnePhase = tNormalizedPhaseName
+			}
 			Set tStart = $zh
 			If tOnePhase="*" {
 				Kill tModule,tLifecycle
@@ -320,12 +371,28 @@ ClassMethod ExecutePhases(pModuleName As %String, pPhases As %List, pIsComplete 
           Quit:$$$ISERR(tSC)
         }
         Quit:$$$ISERR(tSC)
-				
-				// Lifecycle before / (phase) / after
-				$$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
-				$$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
-				$$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
-				
+
+        If tIsCustomPhase {
+            Set tKey = ""
+            For {
+                Set tResource = tModule.Resources.GetNext(.tKey)
+                If tKey = "" {
+                    Quit
+                }
+                Set tProcessor = tResource.Processor
+                // %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
+                If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+                    $$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
+                }
+            }
+        } Else {
+            // Lifecycle before / (phase) / after
+			New $$$DeployedProjectInstalled
+            $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
+            $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
+            $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
+        }
+
         #; Call Invoke Methods After Phase	
         Set tKey = ""
         For {
@@ -942,7 +1009,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 			}
 		}
 		
-		Set pReferenceArray(..Name_".ZPM") = ""
+		Set pReferenceArray(..Name, ..Name_".ZPM") = ""
 		
 		Set tKey = ""
 		For {
@@ -953,7 +1020,9 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 				Continue
 			}
 			
-			Set tSC = tResource.ResolveChildren(.pReferenceArray)
+			kill tempArray
+			Set tSC = tResource.ResolveChildren(.tempArray)
+			Merge pReferenceArray(..Name) = tempArray
 			If $$$ISERR(tSC) {
 				Quit
 			}
@@ -974,7 +1043,7 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 				}
 				
 				// Don't pass along the phase
-				Set pReferenceArray(tModName_".ZPM") = ..Name
+				Set pReferenceArray(tModName, tModName_".ZPM") = ..Name
 				
 				// pLockedDependencies=0 to avoid duplicating effort on nested dependencies;
 				// this loop will already get all of them.
@@ -1155,6 +1224,11 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 			If $$$ISERR(tSC) {
 				Quit
 			}
+		}
+		Set query = "SELECT COUNT(*) AS Conflict FROM %IPM_Storage.ModuleItem WHERE Name = ? AND Name <> ?"
+		Set rs = ##class(%SQL.Statement).%ExecDirect(,query, ..ExternalName, ..Name)
+		If rs.%Next() && (rs.%Get("Conflict") > 0) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("External name '%1' conflicts with the real name of another module", ..ExternalName)))
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -1345,7 +1419,7 @@ Method GetStudioProject(Output pProject As %Studio.Project, pDeployedCode As %Bo
 	Quit tSC
 }
 
-ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %String) As %Status [ Internal, Private ]
+ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %String) As %Status [ Internal ]
 {
 	Set tSC = $$$OK
 	Try {
@@ -1353,22 +1427,6 @@ ClassMethod AddItemToProject(tProject As %Studio.Project, pResourceName As %Stri
 		Set tExt = $Piece(pResourceName,".",*)
 		If ((tExt = "MAC") || (tExt = "INT")) && '##class(%Library.Routine).Exists(pResourceName) {
 			Do tProject.AddItem(tName_".OBJ")
-		} ElseIf (tExt = "CLS") {
-			// If Deployed = 0 (normal) or 3 (datatype), the source is present.
-			// If Deployed = 1 or 2, it is not.
-			Set tHasSource = $Case($$$comClassKeyGet(tName,$$$cCLASSdeployed),1:0,2:0,:1)
-			If 'tHasSource {
-				Set tRoutine = ""
-				For {
-					Set tRoutine = $$$comClassArrayNext(tName,$$$cCLASSroutines,tRoutine)
-					If (tRoutine = "") {
-						Quit
-					}
-					Do tProject.AddItem(tRoutine_".OBJ")
-				}
-			} Else {
-				Do tProject.AddItem(pResourceName)
-			}
 		} Else {
 			Do tProject.AddItem(pResourceName)
 		}
@@ -1448,6 +1506,19 @@ Method %Evaluate(pAttrValue As %String, ByRef pParams) As %String [ Internal ]
 	}
 
 	Return attrValue
+}
+
+/// This callback method is invoked by the <METHOD>%Save</METHOD> method to 
+/// provide notification that the object is being saved. It is called before 
+/// any data is written to disk.
+/// 
+/// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
+/// 
+/// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
+Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
+{
+	Set ..LastUpdated = $ZDateTime($Horolog, 3)
+	Quit $$$OK
 }
 
 Method %EvaluateExpression(pExpr) As %String [ Internal ]
@@ -1555,6 +1626,9 @@ Storage Default
 <Value name="27">
 <Value>AvailabilityClass</Value>
 </Value>
+<Value name="28">
+<Value>LastUpdated</Value>
+</Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
@@ -1565,4 +1639,3 @@ Storage Default
 }
 
 }
-

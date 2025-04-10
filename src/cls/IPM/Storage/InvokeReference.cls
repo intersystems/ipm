@@ -9,9 +9,12 @@ Property Class As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ Required 
 
 Property Method As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ Required ];
 
-Property Phase As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "Configure" ];
+Property Phase As %IPM.DataType.PhaseName(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "Configure" ];
 
-Property When As %String(MAXLEN = 255, VALUELIST = ",Before,After", XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "After", SqlFieldName = _WHEN ];
+/// If provided, the Phase property will be ignored. This CustomPhase will be used and no corresponding lifecycle is required.
+Property CustomPhase As %IPM.DataType.CustomPhaseName(XMLPROJECTION = "ATTRIBUTE");
+
+Property When As %IPM.DataType.PhaseWhen(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "After", SqlFieldName = _WHEN ];
 
 Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = 0 ];
 
@@ -44,7 +47,8 @@ Method GetArgsArray(pParams, Output args) As %Status
 
 Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 {
-  If (pPhase '= ..Phase) || ("Before" '= ..When) {
+  Set tPhase = $Select(..CustomPhase'="":..CustomPhase,1:..Phase)
+  If (pPhase '= tPhase) || ("Before" '= ..When) {
 	  Quit $$$OK
   }
 
@@ -53,7 +57,8 @@ Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
 
 Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
 {
-  If (pPhase '= ..Phase) || ("After" '= ..When) {
+  Set tPhase = $Select(..CustomPhase'="":..CustomPhase,1:..Phase)
+  If (pPhase '= tPhase) || ("After" '= ..When) {
 	  Quit $$$OK
   }
 
@@ -101,6 +106,9 @@ Storage Default
 </Value>
 <Value name="7">
 <Value>When</Value>
+</Value>
+<Value name="8">
+<Value>CustomPhase</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Invokes")</DataLocation>

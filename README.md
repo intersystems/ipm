@@ -1,22 +1,16 @@
 # InterSystems Package Manager - IPM
 
-Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and Frontend packages, and any files into InterSystems IRIS published on the official [Registry](https://pm.community.intersystems.com/packages/-/all) or private registry of your own.
+Helps to install ObjectScript classes and routines, globals, Embedded Python modules, CSP and front-end packages, and more into InterSystems IRIS, from a variety of sources:
+* InterSystems-official packages from [pm.intersystems.com](https://pm.intersystems.com/#/packages) or an upcoming [ORAS](https://oras.land/)-based registry
+* The [Community Package Registry](https://pm.community.intersystems.com/packages/-/all), driven by the [Open Exchange](https://openexchange.intersystems.com/)
+* Your own private [ORAS registry](https://oras.land/adopters) or IRIS-based [zpm-registry](https://github.com/intersystems-community/zpm-registry)
 
 ## Documentation
 * [The official documentation in the wiki](https://github.com/intersystems-community/zpm/wiki/)
 * [Articles on the InterSystems Developer Community](https://community.intersystems.com/tags/objectscript-package-manager-zpm)
 * [Videos on YouTube](https://www.youtube.com/playlist?list=PLKb2cBVphNQRcmxt4LtYDyLJEPfF4X4-4)
 
-## Compatibility Note
-With the release of IPM v0.9.0 on Dec 2024, IPM is no longer mapped across namespaces. 
-This is an intentional change so that users can have different IPM versions and configurations in different namespaces. 
-If you install IPM on an instance without the legacy 0.7.x version, IPM is only installed to the current namespace.
-
-* To retain the old behavior where %IPM routines and classes mapped across all namespaces, run `zpm "enable -map -globally`. This is automatically performed when upgrading from a legacy version and can be undone by running `zpm "unmap -globally"`.
-* You can optionally choose to map IPM repositories across namespaces with `zpm "enable -map -repos -namespaces NS1,NS2,NS3` or `zpm "enable -map -repos -globally`. Repositories are only mapped if %IPM classes and routines are also mapped from the same namespace.
-* As a convenience command, `zpm "enable -community"` will make IPM behave essentially the same as legacy versions (v0.7.x) by setting up the the community registry and maping %IPM routines and classes, as well IPM repository settings to all namespaces. 
-
-## Installing ObjectScript Package Manager Client:
+## Installing the InterSystems Package Manager Client:
 
 0. Use one-liner in terminal call or programmatically:
 ```
@@ -27,7 +21,7 @@ s version="latest" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.i
 
 OR:
 
-1. Download the  [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
+1. Download the [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
 2. Import the zpm.xml into IRIS and compile via any desired way (Management Portal, Studio or Terminal)
  
  After that you can use PackageManager to install modules from [community repository](https://pm.community.intersystems.com) in any namespace.
@@ -36,6 +30,24 @@ OR:
 USER>zpm
 
 zpm: USER>
+
+## InterSystems IRIS / IPM Compatibility Matrix
+
+| IPM Version    | IRIS Version               |
+|----------------|----------------------------|
+| 0.10.x         | >2022.1                    |
+| 0.9.x          | Any                        |
+| <0.9.x         | <2025.1                    |
+
+## Compatibility Notes
+
+With the release of IPM v0.9.0 on Dec 2024, IPM is no longer mapped across namespaces. 
+This is an intentional change so that users can have different IPM versions and configurations in different namespaces. 
+If you install IPM on an instance without the legacy 0.7.x version, IPM is only installed to the current namespace.
+
+* To retain the old behavior where %IPM routines and classes mapped across all namespaces, run `zpm "enable -map -globally`. This is automatically performed when upgrading from a legacy version and can be undone by running `zpm "unmap -globally"`.
+* You can optionally choose to map IPM repositories across namespaces with `zpm "enable -map -repos -namespaces NS1,NS2,NS3` or `zpm "enable -map -repos -globally`. Repositories are only mapped if %IPM classes and routines are also mapped from the same namespace.
+* As a convenience command, `zpm "enable -community"` will make IPM behave essentially the same as legacy versions (v0.7.x) by setting up the the community registry and maping %IPM routines and classes, as well IPM repository settings to all namespaces.
  
 ## How to Install a ZPM Module:
 

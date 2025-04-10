@@ -52,16 +52,6 @@ jobs:
           tags: zpm:latest
           build-args: Base=${{ env.IMAGE }}
           outputs: type=docker,dest=/tmp/zpmimage.tar
-      - name: Test Image
-        run: |
-          docker load -i /tmp/zpmimage.tar
-          CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
-          docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          docker exec -i $CONTAINER iris session IRIS << EOF
-              zpm "list":1
-              zpm "test zpm -v -only":1:1
-          EOF
-          docker container stop $CONTAINER
       - name: Upload Image
         uses: actions/upload-artifact@v4
         with:

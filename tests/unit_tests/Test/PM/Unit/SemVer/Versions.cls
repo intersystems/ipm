@@ -37,6 +37,8 @@ Method TestVersions()
 	Do ..AssertVersionValid("1.0.0+20130313144700", 1, 0, 0, , "20130313144700")
 	Do ..AssertVersionValid("1.0.0-beta+exp.sha.5114f85", 1, 0, 0, "beta", "exp.sha.5114f85")
 	Do ..AssertVersionValid("1.0.0-beta-alpha-delta+exp.sha-5114f85", 1, 0, 0, "beta-alpha-delta", "exp.sha-5114f85")
+	Do ..AssertVersionValid("1.0.0-test-C0008", 1, 0, 0, "test-C0008")
+	Do ..AssertVersionValid("1.0.0-0008ABC", 1, 0, 0, "0008ABC")
 	
 	Do ..AssertVersionNotValid("01.1.0")
 	Do ..AssertVersionNotValid("1.01.0")

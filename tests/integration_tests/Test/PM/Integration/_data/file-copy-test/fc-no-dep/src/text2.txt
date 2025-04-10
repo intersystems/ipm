@@ -1,0 +1,3 @@
+dependency text 2
+
+This file in ipm/ at tests/integration_tests/Test/PM/Integration/_data/file-copy-test/fc-no-dep/src/

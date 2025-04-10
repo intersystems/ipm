@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$ListBuild("Clean","Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
+Parameter PHASES = {$ListBuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -53,13 +53,13 @@ Method OnAfterResourceProcessing(pPhase As %String, ByRef pParams) As %Status
 	Quit $$$OK
 }
 
-Method %DispatchMethod(pMethod As %String, ByRef pParams, Args...) [ ServerOnly = 1 ]
+Method %DispatchMethod(pMethod As %String, ByRef pParams, pIsComplete As %Boolean = 1, Args...) [ ServerOnly = 1 ]
 {
 	// Match method name with CamelCased lifecycle method
 	set convertedMethod = ..MatchSinglePhase(pMethod)
 
 	if $listfind(..#PHASES,convertedMethod)=0 do $zu(96,3,$$$ERNOMETHOD,1,"","method "_convertedMethod_" of class "_$classname())
-	quit ..Module.ExecutePhases(..Module.Name,$lb(convertedMethod),1,.pParams)
+	quit ..Module.ExecutePhases(..Module.Name,$lb(convertedMethod),pIsComplete,.pParams)
 }
 
 /// Merges default parameters into pParams
@@ -120,6 +120,10 @@ ClassMethod GetDefaultResourceProcessorProc(pLifecycleClass As %Dictionary.Class
 /// This method defines what a complete phase means for a given list of phases
 ClassMethod GetCompletePhases(pPhases As %List) As %List
 {
+	// If there is only phase, and the phase is not found in standard phases, it is a custom phase. Return as-is.
+	If ($ListLength(pPhases) = 1) && ('$ListFind(..#PHASES, ..MatchSinglePhase($List(pPhases,1)))) {
+		Return pPhases
+	}
 	For i=1:1:$ListLength(pPhases) {
 		Set tPhasesList = ..GetCompletePhasesForOne($List(pPhases,i))
 		For j=1:1:$ListLength(tPhasesList) Set one = $List(tPhasesList,j) If one'="" Set tPhasesArray(one) = ""
@@ -138,18 +142,19 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 
 	Quit $Case(pOnePhase,
 		"clean":		$ListBuild("Clean"),
-		"reload":		$ListBuild("Reload","*"),
-		"validate":		$ListBuild("Reload","*","Validate"),
+		"initialize":   $ListBuild("Initialize"),
+		"reload":		$ListBuild("Initialize","Reload","*"),
+		"validate":		$ListBuild("Initialize","Reload","*","Validate"),
 		"exportdata":	$ListBuild("ExportData"),
-		"compile":		$ListBuild("Reload","*","Validate","Compile"),
-		"activate":		$ListBuild("Reload","*","Validate","Compile","Activate"),
+		"compile":		$ListBuild("Initialize","Reload","*","Validate","Compile"),
+		"activate":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate"),
 		"document":		$ListBuild("Document"),
 		"makedeployed":	$ListBuild("MakeDeployed"),
-		"test":			$ListBuild("Reload","*","Validate","Compile","Activate","Test"),
-		"package":		$ListBuild("Reload","*","Validate","Compile","Activate","Package"),
-		"verify":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Verify"),
-		"register":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register"),
-		"publish":		$ListBuild("Reload","*","Validate","Compile","Activate","Package","Register","Publish"),
+		"test":			$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
+		"package":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
+		"verify":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
+		"register":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
+		"publish":		$ListBuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
 		"configure":	$ListBuild("Configure"),
 		"unconfigure":	$ListBuild("Unconfigure"),
 		:				""
@@ -159,9 +164,10 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 /// Match single inputted phase to the correctly CamelCased lifecycle phase <br/>
 ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 {
-	set pOnePhase = $ZCONVERT(pOnePhase, "L")
-	Quit $Case(pOnePhase,
+	Set phase = $ZCONVERT(pOnePhase, "L")
+	Quit $Case(phase,
 		"clean":		"Clean",
+		"initialize":	"Initialize",
 		"reload":		"Reload",
 		"validate":		"Validate",
 		"exportdata":	"ExportData",
@@ -176,7 +182,7 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 		"publish":		"Publish",
 		"configure":	"Configure",
 		"unconfigure":	"Unconfigure",
-		:				""
+		:				pOnePhase // return the phase as-is if it's a custom phase name
 	)
 }
 
@@ -501,6 +507,35 @@ Method %Unconfigure(ByRef pParams) As %Status
 	Quit tSC
 }
 
+Method %Initialize(ByRef pParams) As %Status
+{
+	Set status = $$$OK
+	Try {
+		Set key = ""
+		For {
+			Set resource = ..Module.Resources.GetNext(.key)
+			Quit:key=""
+			If $IsObject(resource.Processor) {
+				Set status = $$$ADDSC(status,resource.Processor.OnPhase("Initialize",.pParams))
+			}
+		}
+
+		Set preloadRoot = $Get(pParams("RootDirectory"))_"preload"
+		Set verbose = $Get(pParams("Verbose"))
+		If ##class(%File).DirectoryExists(preloadRoot) {
+			Set tSC = $System.OBJ.ImportDir(preloadRoot, "*", $Select(verbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+			If $$$ISERR(tSC) { Quit }
+			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
+			If $$$ISERR(tSC) { Quit }
+		} ElseIf verbose {
+			Write !,"Skipping preload - directory does not exist."
+		}
+	} Catch ex {
+		Set status = ex.AsStatus()
+	}
+	Quit status
+}
+
 Method %Reload(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
@@ -517,6 +552,7 @@ Method %Reload(ByRef pParams) As %Status
 		If (tRoot = "") && tDeveloperMode {
 			Set tRoot = ..Module.Root
 		}
+		Do ..LoadEnvironmentConfig($Get(pParams("EnvFiles")))
 		
 		// For now, no-op if no root is configured.
 		Quit:tRoot=""
@@ -530,8 +566,8 @@ Method %Reload(ByRef pParams) As %Status
 			Set tSC = $$$ERROR($$$GeneralError,"No module definition found.")
 			Quit
 		}
-		If ($Order(tLoadedList(first)) '= "") {
-			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed.")
+		If ($Order(tLoadedList("")) '= $Order(tLoadedList(""),-1)) {
+			Set tSC = $$$ERROR($$$GeneralError,"module.xml is malformed; it may only contain one document.")
 			Quit
 		}
     	If ($Piece($$$ucase(first),".",*) '= "ZPM") {
@@ -575,16 +611,6 @@ Method %Reload(ByRef pParams) As %Status
 		}
 
     $$$ThrowOnError(..InstallPythonRequirements(tRoot, .pParams))
-		
-		Set tPreloadRoot = tRoot_"preload"
-		If ##class(%File).DirectoryExists(tPreloadRoot) {
-			Set tSC = $System.OBJ.ImportDir(tPreloadRoot, "*", $Select(tVerbose:"d",1:"-d")_$Select($Tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
-			If $$$ISERR(tSC) { Quit }
-			Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
-			If $$$ISERR(tSC) { Quit }
-		} ElseIf tVerbose {
-			Write !,"Skipping preload - directory does not exist."
-		}
 		
 		// Reload the module definition
 		Set tSC = ..Module.%Reload()
@@ -688,7 +714,7 @@ Method InstallPythonRequirements(pRoot As %String = "", ByRef pParams)
   Quit tSC
 }
 
-Method ResolvePipCaller(ByRef pParams) As %List
+ClassMethod ResolvePipCaller(ByRef pParams) As %List
 {
 	Set tUseStandalonePip = ##class(%IPM.Repo.UniversalSettings).GetValue("UseStandalonePip")
 	Set tPipCaller = ##class(%IPM.Repo.UniversalSettings).GetValue("PipCaller")
@@ -708,7 +734,7 @@ Method ResolvePipCaller(ByRef pParams) As %List
 	Return ..DetectPipCaller(tUseStandalonePip, $Get(pParams("Verbose"), 0))
 }
 
-Method DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
+ClassMethod DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean = 0) As %List
 {
 	If pVerbose {
 		Write !,"Detecting pip caller"
@@ -864,7 +890,11 @@ Method %Compile(ByRef pParams) As %Status
 			Quit:tKey=""
 			
 			If '$Data(tHandledMap(tResource.Name)) && $IsObject(tResource.Processor) {
-				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
+				If tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject {
+					If tVerbose {
+						Write !, tResource.Name_" was loaded as deployed code, so compilation isn't needed."
+					}
+				} ElseIf tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
 					Kill tOneResourceList
 					Set tOneResourceList(tResource.Name) = ""
 					Set tSC = tResource.ResolveChildren(.tOneResourceList)
@@ -1035,7 +1065,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 	Set tSC = $$$OK
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
-    Merge tParams = pParams
+		Merge tParams = pParams
 
 		Kill pDependencyGraph
 		If ($Get(pTargetDirectory) = "") {
@@ -1052,18 +1082,22 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Quit
 			}
 		}
-    Set tParams("ModuleExportPath") = pTargetDirectory
 		
-		Set tSC = ..Module.GetResolvedReferences(.tResourceArray,..#EXPORTDEPENDENCIES,..PhaseList,1,.pDependencyGraph)
+		Set tExportDependencies = $Get(pParams("ExportDependencies"), ..#EXPORTDEPENDENCIES)
+		Set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,1,.pDependencyGraph)
 		If $$$ISERR(tSC) {
 			Quit
 		}
 		
 		// First pass: if we're exporting dependencies, build an array of modules from which we are deriving things.
-		If ..#EXPORTDEPENDENCIES {
+		If tExportDependencies {
+			Set tModuleName = ""
+			For {
+				Set tModuleName = $Order(tResourceArray(tModuleName))
+				Quit:(tModuleName="")
 			Set tFullResourceName = ""
 			For {
-				Set tFullResourceName = $Order(tResourceArray(tFullResourceName))
+					Set tFullResourceName = $Order(tResourceArray(tModuleName, tFullResourceName))
 				Quit:(tFullResourceName="")
 				
 				Set tExt = $Piece(tFullResourceName,".",*)
@@ -1071,117 +1105,40 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				If ($$$ucase(tExt) = "ZPM") {
 					If (tName '= ..Module.Name) {
 						Set pDependencyGraph(tName,"Location") = ".modules/"_tName_"/"
+						}
 					}
 				}
 			}
 		}
   
-		Set tFullResourceName = ""
+		// Deployed items should be exported as a studio project to a designated directory
+		Set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
+		Set tDeployedProject = ##class(%Studio.Project).%OpenId(tDeployedProjectName)
+		If '$IsObject(tDeployedProject) {
+			Set tDeployedProject = ##class(%Studio.Project).%New()
+			Set tDeployedProject.Name = tDeployedProjectName
+		}
+		Do tDeployedProject.Items.Clear()
+		Set tParams($$$DeployedProjectIndex) = tDeployedProject
+    
+    Set tModuleName = ""
 		For {
-			Set tFullResourceName = $Order(tResourceArray(tFullResourceName),1,tSrcModule)
-			If (tFullResourceName = "") {
+			Set tModuleName = $Order(tResourceArray(tModuleName))
+			If (tModuleName = "") {
 				Quit
 			}
-			
-			If $Get(tResourceArray(tFullResourceName,"Generated")) Continue
-			
-			Set tName = $Piece(tFullResourceName,".",1,*-1)
-			Set tExt = $Piece(tFullResourceName,".",*)
-			
-			If '$Data(tResourceArray(tFullResourceName,"RelativePath"),tRelativePath) {
-				Set tRelativePath = ..GetResourceRelativePath(tName,tExt)
-			}
-			
-			If (tExt = "ZPM") && (tName '= ..Module.Name) {
-				Set tRelativePath = pDependencyGraph(tName,"Location")_tRelativePath
-			} ElseIf (tSrcModule '= "") && (tSrcModule '= ..Module.Name) {
-				Set tRelativePath = pDependencyGraph(tSrcModule,"Location")_tRelativePath
-			}
-			
-			Set tFullPath = ##class(%File).NormalizeFilename(pTargetDirectory_tRelativePath)
-			Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
-			
-			#dim tProcessor As %IPM.ResourceProcessor.Abstract
-			If $Data(tResourceArray(tFullResourceName,"Processor"),tProcessor) && $IsObject(tProcessor) {
-				Kill tItemParams
-				Merge tItemParams = tResourceArray(tFullResourceName)
-				Set tItemHandled = 0
-				Set tSC = tProcessor.OnExportItem(tFullPath,tFullResourceName,.tItemParams,.tParams,.tItemHandled)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-				If tItemHandled {
-					Continue
-				}
-			}
-			
-			If ($Extract(tFullResourceName) = "/") {
-				// Resources with paths are relative to the module root and are simply copied to the export directory.
-				Set tModule = ##class(%IPM.Storage.Module).NameOpen(tSrcModule,,.tSC)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-				
-				If (tModule.Root = "") {
-					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No module root configured for '%1'",tSrcModule))
-					Quit
-				}
-				
-				If '##class(%File).DirectoryExists(tModule.Root) {
-					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Directory %2, listed as root for module '%1', does not exist.",tSrcModule,tModule.Root))
-					Quit
-				}
-				
-				Set tSourcePath = ##class(%File).NormalizeFilename(tModule.Root_tFullResourceName)
-				Set tSourcePath = ##class(%File).NormalizeFilenameWithSpaces(tSourcePath)
-				Set tExportPath = ##class(%File).NormalizeFilename(tFullPath_tFullResourceName)
-				Set tExportPath = ##class(%File).NormalizeFilenameWithSpaces(tExportPath)
-				Set tSC = $$$OK
-				Set tDirectory = ##class(%File).GetDirectory(tExportPath,1)
-				If '##class(%File).DirectoryExists(tDirectory) {
-					Set tGood = ##class(%File).CreateDirectoryChain(tDirectory,.tReturn)
-					If 'tGood {
-						Set tLastErr = $Get(%objlasterror)
-						Set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,$$$FormatText("Error creating directory '%1': %2",tDirectory,tReturn)),tLastErr)
-						Quit
-					}
-					Write:tVerbose !,"Created ",tDirectory
-				}
-				If ##class(%File).DirectoryExists(tSourcePath) {
-					// NOTE: Does not overlay directories.
-					Set tSourcePath = ##class(%File).NormalizeDirectory(tSourcePath)
-					Set tExportPath = ##class(%File).NormalizeDirectory(tExportPath)
-					Set tSC = ##class(%IPM.Utils.File).CopyDir(tSourcePath,tExportPath, , tVerbose)
-					If $$$ISERR(tSC) {
-						Quit
-					}
-					Write:tVerbose !,tSourcePath," -> ",tExportPath
-				} ElseIf ##class(%File).Exists(tSourcePath) {
-					Set tGood = ##class(%File).CopyFile(tSourcePath,tExportPath,1,.tReturn)
-					If 'tGood {
-						Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error copying file '%1' to '%2': %3",tSourcePath,tExportPath,tReturn))
-						Quit
-					}
-					Write:tVerbose !,tSourcePath," -> ",tExportPath
-				}
-			} ElseIf (tExt = "CLS") || (tExt = "DFI") || (tExt = "PRJ") || ($ZConvert($Extract(tFullPath,$Length(tFullPath)-2,*),"l")="xml") || (##class(%RoutineMgr).UserType(tFullResourceName)) {
-				If '##class(%File).Exists(tFullPath) {
-					Do ##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath))
-				}
-				Set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport",tFullResourceName)
-				$$$ThrowOnError(tSC)
-				If tVerbose {
-					Write !,"Exported to ",tFullPath
-				}
-			} Else {
-				Set tSC = $$Export^%apiRTN(tFullResourceName,tFullPath,"","WNSK\UTF8\","-d /diffexport")
-				$$$ThrowOnError(tSC)
-				If tVerbose {
-					Write !,"Exported to ",tFullPath
-				}
-			}
-			$$$ThrowOnError(tSC)
+			kill tSingleModuleArray
+			Merge tSingleModuleArray = tResourceArray(tModuleName)
+			do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
 		}
+
+		// Export the deployed project to the target directory, if it's non-empty
+		If tDeployedProject.Items.Count() > 0 {
+			// Intentionally not calling .%Save() on the project; we don't want to persist it.
+			Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
+			$$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $Select(tVerbose:"d",1:"-d")))
+		}
+
     /// Always keep these files
      Set staticFiles = $ListBuild(
        "readme.md",
@@ -1339,20 +1296,31 @@ Method %Publish(ByRef pParams) As %Status
 {
 	Set tSC = $$$OK
 	Try {
+		// Perform the "Package" phase to prepare the module for publishing
+		// ..Payload is populated by %Package. So need to make sure it's using the same lifecycle object.
+		Set pParams("LifecycleObject") = $This
+		// The call to `..Package` will be routed to %IPM.Lifecycle.Base:%DispatchMethod() since `Package` is not a known method of this class.
+		$$$ThrowOnError(..Package(.pParams, 0))
+
 		Set tVerbose = $Get(pParams("Verbose"))
 		Set tRelease = $Get(pParams("Release"),$Get(pParams("zpm","Release"),0))
 		Set tPublishTo = $Get(pParams("PublishTo"),$Get(pParams("zpm","PublishTo"),""))
 		Set tNewVersion = $Get(pParams("NewVersion"),$Get(pParams("zpm","NewVersion"),""))
+		Set tUseExternalName = $Get(pParams("UseExternalName"),$Get(pParams("zpm","UseExternalName"),0))
 
+		// Determine which server/registry to publish to
 		Set tServer =  ""
 		If tPublishTo '= "" {
 			Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tPublishTo,,.tSC)
-		} Else {
-			Set tRS = ##class(%IPM.Repo.Remote.Definition).PublishingServerFunc()
+		}
+
+		If '$IsObject(tServer) {
+			Set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
 			If (tRS.%SQLCODE = 0) && tRS.%Next() {
-				Set tServer = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRS.ID)
+				Set tServer = $ClassMethod(tRS.Class,"%OpenId", tRS.ID)
 			}
 		}
+
 		If $$$ISERR(tSC)||'$IsObject(tServer) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError, "No server found to publish to."))
 		}
@@ -1370,7 +1338,14 @@ Method %Publish(ByRef pParams) As %Status
 			$$$ThrowStatus(tSC)
 		}
 		Set tModule = ##class(%IPM.Repo.Remote.ModuleInfo).%New()
-		Set tModule.Name = ..Module.Name
+		Set tModule.Name = $Select(tUseExternalName: ..Module.ExternalName, 1: ..Module.Name)
+		// Apparently, an empty name can pass the %IPM.DataType.ModuleName:IsValid check
+		If tModule.Name = "" {
+			$$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot publish module with empty name."))
+		}
+		If '##class(%IPM.DataType.ModuleName).IsValid(tModule.Name) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module name '%1' is invalid for publishing",tModule.Name)))
+		}
 		If tRelease && ('..Module.IsLocked()) {
 			Set tSC = ..Module.Lock()
 			If $$$ISERR(tSC) {
@@ -1382,12 +1357,12 @@ Method %Publish(ByRef pParams) As %Status
 			Quit
 		}
 		Set tModule.VersionString = ..Module.VersionString
-    If (..Module.Deployed) {
-      Set tModule.Deployed = 1
-      If $IsObject(..Module.SystemRequirements) {
-        Set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
-      }
-    }
+		If (..Module.Deployed) {
+			Set tModule.Deployed = 1
+			If $IsObject(..Module.SystemRequirements) {
+				Set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
+			}
+		}
 		Set tSC = ..Module.XMLExportToStream(tModule.Manifest)
 		If $$$ISERR(tSC) {
 			Quit
@@ -1585,9 +1560,13 @@ Method %MakeDeployed(ByRef pParams) As %Status
 		// Build an array of those, then mark them as deployed.
 		$$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,1,.pDependencyGraph))
 		
+		Set tModuleKey = ""
+		For {
+			Set tModuleKey = $Order(tResourceArray(tModuleKey))
+			Quit:(tModuleKey="")
 		Set tResourceKey = ""
 		For {
-			Set tResourceKey = $Order(tResourceArray(tResourceKey))
+				Set tResourceKey = $Order(tResourceArray(tModuleKey, tResourceKey))
 			Quit:(tResourceKey="")
 			
 			// Skip file resources - these are handled separately;
@@ -1597,7 +1576,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 			}
 			
 			Kill tResourceInfo
-			Merge tResourceInfo = tResourceArray(tResourceKey)
+				Merge tResourceInfo = tResourceArray(tModuleKey, tResourceKey)
 			// TODO: Refactor tResourceInfo to be an object.
 			Set tResourceInfo("Name") = tResourceKey
 			Set tSC = ..OnDetermineResourceDeployability(.pParams,.tResourceInfo,.tDeploy)
@@ -1614,51 +1593,51 @@ Method %MakeDeployed(ByRef pParams) As %Status
 					// For other types, if deployment has meaning, the associated resource processor
 					// class should handle it in OnBeforePhase/OnAfterPhase.
 					Continue
+					}
 				}
 			}
 		}
-		If $Data(tDeployClassArray) {
+		If ($Data(tDeployRtnArray) || $Data(tDeployClassArray)) {
 			Set ..HasDeployedResources = 1
-			If (tVerbose) {
-				Set tClass = ""
-				Write !,"The following classes are flagged for deployment:"
-				#; Write !,"The following classes "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+			Set ..Module.Deployed = 1
+			If '$IsObject(..Module.SystemRequirements) {
+				Set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
+			}
+			Set tSystemVersion = $System.Version.GetMajor() _ "." _ $System.Version.GetMinor()
+			Set ..Module.SystemRequirements.VersionString = tSystemVersion
+			$$$ThrowOnError(..Module.%Save())
+			If $Data(tDeployClassArray) {
+				If (tVerbose) {
+					Set tClass = ""
+					Write !,"The following classes are flagged for deployment:"
+					#; Write !,"The following classes "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+					For {
+						Set tClass = $Order(tDeployClassArray(tClass))
+						Quit:tClass=""
+						Write !,$Char(9),tClass
+					}
+				}
+				$$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
+			}
+			If $Data(tDeployRtnArray) {
+				If (tVerbose) {
+					Write !,"The following routines are flagged for deployment:"
+					#; Write !,"The following routines "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
+				}
+				Set tRtn = ""
 				For {
-					Set tClass = $Order(tDeployClassArray(tClass))
-					Quit:tClass=""
-					Write !,$Char(9),tClass
-				}
-			}
-      $$$ThrowOnError($System.OBJ.MakeClassDeployed(.tDeployClassArray))
-		} ElseIf tVerbose {
-			Write !,"No classes to mark as deployed."
-		}
-		If $Data(tDeployRtnArray) {
-			Set ..HasDeployedResources = 1
-      Set ..Module.Deployed = 1
-      If '$IsObject(..Module.SystemRequirements) {
-        Set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
-      }
-      Set tSystemVersion = $System.Version.GetMajor() _ "." _ $System.Version.GetMinor()
-      Set ..Module.SystemRequirements.VersionString = tSystemVersion
-      $$$ThrowOnError(..Module.%Save())
-			Set tRtn = ""
-			If (tVerbose) {
-				Write !,"The following routines are flagged for deployment:"
-				#; Write !,"The following routines "_$Select(tDev:"would be flagged",1:"are flagged")_" for deployment:"
-			}
-			For {
-				Set tRtn = $Order(tDeployRtnArray(tRtn))
-				Quit:tRtn=""
-				If tVerbose {
-					Write !,$Char(9),tRtn
-				}
-				If 'tDev {
-					$$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
+					Set tRtn = $Order(tDeployRtnArray(tRtn))
+					Quit:tRtn=""
+					If tVerbose {
+						Write !,$Char(9),tRtn
+					}
+					If 'tDev {
+						$$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
+					}
 				}
 			}
 		} ElseIf tVerbose {
-			Write !,"No routines to deploy."
+			Write !,"No routines or classes to deploy."
 		}
 	} Catch e {
 		Set tSC = e.AsStatus()
@@ -1728,7 +1707,7 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		"ESD":"i14y/",
 		"DTL":"cls/",
 		"BPL":"cls/",
-		: $$$lcase(tExtension)_"/"
+		: ""
 		)
 		
 	Set tFile = $Case(tExtension,
@@ -1745,6 +1724,126 @@ Method GetResourceRelativePath(pResource As %String, pExtension As %String) As %
 		)
 	
 	Quit tDirectory_tFile
+}
+
+Method ExportSingleModule(ByRef pResourceArray, ByRef pTargetDirectory As %String, ByRef pDependencyGraph, ByRef pParams, pVerbose As %Boolean = 0)
+{
+	Merge tParams = pParams
+
+	Set tFullResourceName = ""
+	For {
+		Set tFullResourceName = $Order(pResourceArray(tFullResourceName),1,tSrcModule)
+		If (tFullResourceName = "") {
+			Quit
+		}
+		
+		If $Get(pResourceArray(tFullResourceName,"Generated")) Continue
+		
+		Set tName = $Piece(tFullResourceName,".",1,*-1)
+		Set tExt = $Piece(tFullResourceName,".",*)
+		If '$Data(pResourceArray(tFullResourceName,"RelativePath"),tRelativePath) {
+			Set tRelativePath = ..GetResourceRelativePath(tName,tExt)
+		}
+		
+		// Set full path for exporting module.xml
+		If (tExt = "ZPM") && (tName '= ..Module.Name) {
+			Set tRelativePath = pDependencyGraph(tName,"Location")_tRelativePath
+		} ElseIf (tSrcModule '= "") && (tSrcModule '= ..Module.Name) {
+			Set tRelativePath = pDependencyGraph(tSrcModule,"Location")_tRelativePath
+		}
+		Set tFullPath = ##class(%File).NormalizeFilename(pTargetDirectory_tRelativePath)
+		Set tFullPath = ##class(%File).NormalizeFilenameWithSpaces(tFullPath)
+
+		// Set path for exporting resource
+		If ($Extract(tName_tExt) = "/") {
+			Set tRelativePath = tFullResourceName
+		}
+		Set tNode = tSrcModule
+		If (tExt = "ZPM") {
+			Set tNode = tName
+		}
+		Set pParams("ModuleExportPath") = pTargetDirectory_$Get(pDependencyGraph(tNode, "Location"))_tRelativePath
+		
+		#dim tProcessor As %IPM.ResourceProcessor.Abstract
+		If $Data(pResourceArray(tFullResourceName,"Processor"),tProcessor) && $IsObject(tProcessor) {
+			Kill tItemParams
+			Merge tItemParams = pResourceArray(tFullResourceName)
+			Set tItemHandled = 0
+			Set tSC = tProcessor.OnExportItem(tFullPath,tFullResourceName,.tItemParams,.pParams,.tItemHandled)
+			If $$$ISERR(tSC) {
+				Quit
+			}
+			If tItemHandled {
+				Continue
+			}
+		}
+		If ($Extract(tFullResourceName) = "/") {
+			// Resources with paths are relative to the module root and are simply copied to the export directory.
+			Set tModule = ##class(%IPM.Storage.Module).NameOpen(tSrcModule,,.tSC)
+			If $$$ISERR(tSC) {
+				Quit
+			}
+			
+			If (tModule.Root = "") {
+				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No module root configured for '%1'",tSrcModule))
+				Quit
+			}
+			
+			If '##class(%File).DirectoryExists(tModule.Root) {
+				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Directory %2, listed as root for module '%1', does not exist.",tSrcModule,tModule.Root))
+				Quit
+			}
+			
+			Set tSourcePath = ##class(%File).NormalizeFilename(tModule.Root_tFullResourceName)
+			Set tSourcePath = ##class(%File).NormalizeFilenameWithSpaces(tSourcePath)
+			Set tExportPath = ##class(%File).NormalizeFilename(tFullPath_tFullResourceName)
+			Set tExportPath = ##class(%File).NormalizeFilenameWithSpaces(tExportPath)
+			Set tSC = $$$OK
+			Set tDirectory = ##class(%File).GetDirectory(tExportPath,1)
+			If '##class(%File).DirectoryExists(tDirectory) {
+				Set tGood = ##class(%File).CreateDirectoryChain(tDirectory,.tReturn)
+				If 'tGood {
+					Set tLastErr = $Get(%objlasterror)
+					Set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,$$$FormatText("Error creating directory '%1': %2",tDirectory,tReturn)),tLastErr)
+					Quit
+				}
+				Write:pVerbose !,"Created ",tDirectory
+			}
+			If ##class(%File).DirectoryExists(tSourcePath) {
+				// NOTE: Does not overlay directories.
+				Set tSourcePath = ##class(%File).NormalizeDirectory(tSourcePath)
+				Set tExportPath = ##class(%File).NormalizeDirectory(tExportPath)
+				Set tSC = ##class(%IPM.Utils.File).CopyDir(tSourcePath,tExportPath, , pVerbose)
+				If $$$ISERR(tSC) {
+					Quit
+				}
+				Write:pVerbose !,tSourcePath," -> ",tExportPath
+			} ElseIf ##class(%File).Exists(tSourcePath) {
+				Set tGood = ##class(%File).CopyFile(tSourcePath,tExportPath,1,.tReturn)
+				If 'tGood {
+					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error copying file '%1' to '%2': %3",tSourcePath,tExportPath,tReturn))
+					Quit
+				}
+				Write:pVerbose !,tSourcePath," -> ",tExportPath
+			}
+		} ElseIf (tExt = "CLS") || (tExt = "DFI") || (tExt = "PRJ") || ($ZConvert($Extract(tFullPath,$Length(tFullPath)-2,*),"l")="xml") || (##class(%RoutineMgr).UserType(tFullResourceName)) {
+			If '##class(%File).Exists(tFullPath) {
+				Do ##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath))
+			}
+			Set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport",tFullResourceName)
+			$$$ThrowOnError(tSC)
+			If pVerbose {
+				Write !,"Exported to ",tFullPath
+			}
+		} Else {
+			Set tSC = $$Export^%apiRTN(tFullResourceName,tFullPath,"","WNSK\UTF8\","-d /diffexport")
+			$$$ThrowOnError(tSC)
+			If pVerbose {
+				Write !,"Exported to ",tFullPath
+			}
+		}
+		$$$ThrowOnError(tSC)
+	}
 }
 
 ClassMethod GetBaseClassForPackaging(pPackaging As %String, Output pBaseClass As %Dictionary.Classname) As %Status [ Final ]
@@ -1784,6 +1883,19 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 		and cp.Final = 1
 		and cp.Origin = cd.Name
 		and (:pPackaging is null or cp._default = :pPackaging)
+}
+
+ClassMethod LoadEnvironmentConfig(paths As %String)
+{
+	#dim config As %IPM.General.EnvironmentConfig
+	Set config = ##class(%IPM.General.EnvironmentConfig).%Get()
+	Do config.Clear()
+	Set paths = $ListFromString(paths, ";")
+	Set ptr = 0
+	While $ListNext(paths, ptr, file) {
+		Set file = $ZStrip(file, "<>WC")
+		Do config.Load(file)
+	}
 }
 
 }

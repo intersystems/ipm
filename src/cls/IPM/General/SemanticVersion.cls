@@ -32,6 +32,14 @@ _ $Case(..Prerelease, "": "", : "-" _ ..Prerelease)
 _ $Case(..Build, "": "", : "+" _ ..Build)
 }
 
+Method ToStringWithoutBuild() As %String [ CodeMode = expression ]
+{
+..Major 
+_ "." _ ..Minor 
+_ $Case(..Patch, "": "", : "." _ ..Patch) 
+_ $Case(..Prerelease, "": "", : "-" _ ..Prerelease)
+}
+
 ClassMethod FromString(pString As %String) As %IPM.General.SemanticVersion
 {
   Set tVer = ..%New()
@@ -87,8 +95,8 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 	Set tPointer = 0
 	Set tPreIdentifiers = $ListFromString(..Prerelease,".")
 	While $ListNext(tPreIdentifiers,tPointer,tIdentifier) {
-		Set tNumeric = $ZStrip(tIdentifier, "*ACPW")
-		If (+tNumeric > 0) && (+tNumeric '= tNumeric) {
+		// Cannot have a numeric identifier with a leading zeroes (leading zeroes in an alphanumeric are OK)
+		if ($locate(tIdentifier,"^0[0-9]+$")) {
 			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Numeric identifier (%1) in version's prerelease (%2) cannot contain leading zeros.",tIdentifier,..Prerelease))
 		}
 	}
@@ -204,6 +212,61 @@ Method CompareDotSeparatedStrings(pThis As %String, pOther As %String) As %Boole
 Method Satisfies(pExpression As %IPM.General.SemanticVersionExpression) As %Boolean
 {
 	Quit pExpression.IsSatisfiedBy($this)
+}
+
+Method WithBumpMajor() As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major + 1
+	Set tVer.Minor = 0
+	Set tVer.Patch = 0
+	Set tVer.Prerelease = ""
+	Set tVer.Build = ""
+	Quit tVer
+}
+
+Method WithBumpMinor() As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major
+	Set tVer.Minor = ..Minor + 1
+	Set tVer.Patch = 0
+	Set tVer.Prerelease = ""
+	Set tVer.Build = ""
+	Quit tVer
+}
+
+Method WithBumpPatch() As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major
+	Set tVer.Minor = ..Minor
+	Set tVer.Patch = ..Patch + 1
+	Set tVer.Prerelease = ""
+	Set tVer.Build = ""
+	Quit tVer
+}
+
+Method WithPrerelease(pPrerelease As %String) As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major
+	Set tVer.Minor = ..Minor
+	Set tVer.Patch = ..Patch
+	Set tVer.Prerelease = pPrerelease
+	Set tVer.Build = ..Build
+	Quit tVer
+}
+
+Method WithBuild(pBuild As %String) As %IPM.General.SemanticVersion
+{
+	Set tVer = ..%New()
+	Set tVer.Major = ..Major
+	Set tVer.Minor = ..Minor
+	Set tVer.Patch = ..Patch
+	Set tVer.Prerelease = ..Prerelease
+	Set tVer.Build = pBuild
+	Quit tVer
 }
 
 Storage Default
