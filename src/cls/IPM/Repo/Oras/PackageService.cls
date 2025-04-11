@@ -91,6 +91,9 @@ ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatfo
 	Return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
+/// <var>allTagsString</var> is as returned by <method>GetAllTagsPy</method> (comma + space separated)
+/// <var>moduleList</var> is a list of objects of type <class>%IPM.Storage.ModuleInfo</class> to which this method adds entries
+/// <var>name</var> is the name of the package for which we are enumerating versions
 Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.General.SemanticVersionExpression, client As %SYS.Python, moduleList As %ListOfObjects, searchCriteria As %IPM.Repo.SearchCriteria, name As %String)
 {
 	Set allVersionsList = ..AggregatePlatformVersions($ListFromString(allTagsString, ", "), .aggregatedPlatformVersion)
@@ -210,6 +213,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 		Return tList
 	}
 
+	// TODO: Make this work properly for the case where name is empty (searching in a repo with a namespace)
 	Set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
 	Do ..ListModulesFromTagString(allTagsString, tVersionExpression, client, tList, pSearchCriteria, name)
 	Return tList
