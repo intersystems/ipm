@@ -208,12 +208,15 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 		Set tResourceInfo("Generated") = 0
 		Set tResourceInfo("Preload") = 0
 		Set tResourceInfo("Scope") = $ListToString(..Phase, ",")
+		zw tResourceInfo
+		break
 		Set tResourceInfo("Deploy") = 0
 		Set tResourceInfo("Processor") = $This
 		Set tResourceInfo("UnitTest") = 1
 		Set tResource = $Case(..Package '= "", 1: ..Package, : ..Class)_..Extension
 		$$$ThrowOnError(##class(%IPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.pResourceArray))
 		$$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.pResourceArray))
+		Merge pResourceArray = tResourceInfo
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
