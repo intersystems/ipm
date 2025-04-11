@@ -8,7 +8,7 @@ Parameter DESCRIPTION As STRING = "Loads unit tests (extending %UnitTest.TestCas
 Parameter ATTRIBUTES As STRING = "Phase,Package,Class,ManagerClass,Format,ExportFlags";
 
 /// Phase in which the unit tests run - "test" (dev namespace), "verify" (separate, clean namespace), or "test,verify" (to run in both cases).
-Property Phase As %String [ InitialExpression = "test", Required ];
+Property Phase As %IPM.DataType.ListOfOptions(VALUELIST = ",test,verify") [ InitialExpression = {$ListBuild("test")}, Required ];
 
 // NOTE: Either Package or Class MUST be defined.
 
@@ -83,7 +83,7 @@ Method TestsShouldRun(pPhase As %String, ByRef pParams) As %Boolean
 			// always equals 1
 		}
 	}
-	Quit tPathMatch && ($Find(..Phase,$ZConvert(pPhase,"L")) > 0)
+	Quit tPathMatch && ($ListFind(..Phase,$ZConvert(pPhase,"L")) > 0)
 }
 
 Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
@@ -207,7 +207,7 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 		Set tResourceInfo = tModuleName
 		Set tResourceInfo("Generated") = 0
 		Set tResourceInfo("Preload") = 0
-		Set tResourceInfo("Scope") = ..Phase
+		Set tResourceInfo("Scope") = $ListToString(..Phase, ",")
 		Set tResourceInfo("Deploy") = 0
 		Set tResourceInfo("Processor") = $This
 		Set tResourceInfo("UnitTest") = 1

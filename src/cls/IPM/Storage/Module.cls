@@ -550,7 +550,19 @@ ClassMethod HasScope(pPhases As %List, pScope As %String) [ Private ]
 		Quit 1
 	}
 	Set tPhases = $zcvt(pPhases,"L")
-	Quit $ListFind(tPhases,pScope)
+	// If pScope contains a comma, treat it as a comma-separated list
+    If $Find(pScope, ",") {
+        For i = 1:1:$Length(pScope, ",") {
+            Set scopeItem = $ZConvert($Piece(pScope, ",", i), "L")
+            If $ListFind(tPhases, scopeItem) {
+				Return 1
+            }
+        }
+        Quit 0
+    }
+    // If not a list, treat it as a single item
+    Set pScope = $ZConvert(pScope, "L")
+    Quit $ListFind(tPhases, pScope) > 0
 }
 
 Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
@@ -1017,13 +1029,16 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 			Set tResource = ..Resources.GetNext(.tKey)
 			Quit:tKey=""
 			Set tPhases = tResource.Attributes.GetAt("Phase")
-			If ('..HasScope(pPhases,tResource.Scope)) || ('..HasScope(pPhases,$Piece(tPhases, ",", 1))) || ('..HasScope(pPhases,$Piece(tPhases, ",", 2))) {
+			If ('..HasScope(pPhases,tResource.Scope)) || ('..HasScope(pPhases,tPhases)) {
 				Continue
 			}
 			
 			kill tempArray
 			Set tSC = tResource.ResolveChildren(.tempArray)
-			Merge pReferenceArray(..Name) = tempArray
+			Set Scope = $Get(tempArray("Scope"))
+			If (Scope = "") || ..HasScope(pPhases, Scope) {
+				Merge pReferenceArray(..Name) = tempArray
+			}
 			If $$$ISERR(tSC) {
 				Quit
 			}
