@@ -52,6 +52,7 @@ Method GetPublishService() As %IPM.Repo.IPublishService
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
 	Set tClient.Token = ..Token
+	Set tClient.TokenAuthMethod = ..TokenAuthMethod
 	Quit tClient
 }
 
@@ -70,6 +71,13 @@ ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Bool
 			If (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
 			}
+		}
+		
+		If ( $$$lcase(tUrl) '= $$$lcase(pInstance.URL) ) {
+			// when repo URL changing - clear all existing credentials
+			Set pInstance.Username = ""
+			Set pInstance.Password = ""
+			Set pInstance.Token = ""
 		}
 		
 		If $Data(pModifiers("username"), tUsername) {

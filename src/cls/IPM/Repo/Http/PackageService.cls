@@ -13,7 +13,7 @@ Property Password As %String(MAXLEN = "");
 
 Property Token As %String(MAXLEN = "");
 
-Property TokenAuthMethod As %Boolean [ InitialExpression = 0 ];
+Property TokenAuthMethod As %Boolean [ InitialExpression = "apiKey" ];
 
 ClassMethod GetSSLConfiguration(name As %String) As %String
 {
@@ -68,7 +68,7 @@ Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As
 		If (..Token '= "") {
 			If ..TokenAuthMethod = "basic"{
 				Do tRequest.SetHeader("Authorization","Basic " _ ..Token)
-			} ElseIf ..TokenAuthMethod = "apiKey" {
+			} ElseIf (..TokenAuthMethod = "apiKey") || (..TokenAuthMethod = "") {
 				Do tRequest.SetHeader("apikey",..Token)
 			} ElseIf ..TokenAuthMethod = "bearer" {
 				Do tRequest.SetHeader("Authorization","Bearer " _ ..Token)
