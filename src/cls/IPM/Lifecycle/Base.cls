@@ -1104,7 +1104,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 				Set tName = $Piece(tFullResourceName,".",1,*-1)
 				If ($$$ucase(tExt) = "ZPM") {
 					If (tName '= ..Module.Name) {
-						Set pDependencyGraph(tName,"Location") = ".modules/m"_$increment(dependencyCount)_"/"
+						Set pDependencyGraph(tName,"Location") = ".modules/"_tName_"/"
 						}
 					}
 				}

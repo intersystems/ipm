@@ -389,8 +389,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 	Try {
 		Set tVerbose = $Get(pParams("Verbose"))
 		
-		Set randomDir = $Translate($System.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
-		Set tTargetDirectory = ##class(%SYS.System).TempDirectory()_"/"_randomDir
+		Set tTargetDirectory = ##class(%SYS.System).TempDirectory()_"/"_pModuleName
 		If ##class(%File).DirectoryExists(tTargetDirectory) {
 			// Delete it.
 			Set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
