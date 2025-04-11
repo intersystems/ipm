@@ -208,8 +208,6 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 		Set tResourceInfo("Generated") = 0
 		Set tResourceInfo("Preload") = 0
 		Set tResourceInfo("Scope") = $ListToString(..Phase, ",")
-		zw tResourceInfo
-		break
 		Set tResourceInfo("Deploy") = 0
 		Set tResourceInfo("Processor") = $This
 		Set tResourceInfo("UnitTest") = 1
