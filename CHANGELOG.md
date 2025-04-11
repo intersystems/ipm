@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
 - #782: Installer no longer includes unit tests
 - #781: Addressing an issue where file paths exceed 256 characters
+- #788: Further reducing likelihood of file paths exceeding 256 characters
 - #787: Publishing/unpublishing to remote registry broken
 - #649: Clear existing credentials when changing URL on remote HTTP registry
 - Reduced timeout when checking HTTP registry availability (fails faster rather than hanging for a long time and then failing)
