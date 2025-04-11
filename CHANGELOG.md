@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #782: Installer no longer includes unit tests
 - #781: Addressing an issue where file paths exceed 256 characters
 - #788: Further reducing likelihood of file paths exceeding 256 characters
+- Issue installing with ORAS registries with specific builds listed; consistencies in repo -list-modules and -search with ORAS registries
 - #787: Publishing/unpublishing to remote registry broken
 - #649: Clear existing credentials when changing URL on remote HTTP registry
 - Reduced timeout when checking HTTP registry availability (fails faster rather than hanging for a long time and then failing)
