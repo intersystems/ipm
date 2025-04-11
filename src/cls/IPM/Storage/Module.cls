@@ -1016,7 +1016,8 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 			#dim tResource As %IPM.Storage.ResourceReference
 			Set tResource = ..Resources.GetNext(.tKey)
 			Quit:tKey=""
-			If '..HasScope(pPhases,tResource.Scope) {
+			Set tPhases = tResource.Attributes.GetAt("Phase")
+			If ('..HasScope(pPhases,tResource.Scope)) || ('..HasScope(pPhases,$Piece(tPhases, ",", 1))) || ('..HasScope(pPhases,$Piece(tPhases, ",", 2))) {
 				Continue
 			}
 			
