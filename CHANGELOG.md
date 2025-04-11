@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
 - #782: Installer no longer includes unit tests
 - #781: Addressing an issue where file paths exceed 256 characters
+- #788: Further reducing likelihood of file paths exceeding 256 characters
 - Issue installing with ORAS registries with specific builds listed; consistencies in repo -list-modules and -search with ORAS registries
 
 ## [0.9.2] - 2025-02-24
@@ -87,6 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #663 Improved error output and instructions in the language extension when "zpm" is run from a namespace without IPM
+- #757: Fixed a bug where mappings are not getting created when they should.
 
 ## [0.9.0] - 2024-12-16
 
