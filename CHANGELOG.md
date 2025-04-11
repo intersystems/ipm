@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
 - #782: Installer no longer includes unit tests
 - #781: Addressing an issue where file paths exceed 256 characters
+- #786: Resources with scope should not be exported
 
 ## [0.9.2] - 2025-02-24
 
