@@ -54,6 +54,7 @@ Method GetPublishService() As %IPM.Repo.IPublishService
 	Set tClient.Username = ..Username
 	Set tClient.Password = ..Password
 	Set tClient.Token = ..Token
+	Set tClient.TokenAuthMethod = ..TokenAuthMethod
 	Quit tClient
 }
 

@@ -266,7 +266,11 @@ Method IsAvailable() As %Boolean
   Set tAvailable = 0
   Set tRequest = ..GetHttpRequest()
   
-  Set tRequest.Timeout = 30
+  // The three second timeout here is somewhat arbitrary, but reasonable:
+  // a well-behaving/stable registry will certainly respond within that time,
+  // and an unhealthy registry shouldn't be given e.g. 30 seconds (the default)
+  // which more likely indicates a setup issue on the client, like using the wrong URL.
+  Set tRequest.Timeout = 3
   Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"_ping"))
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode = 401 {
      $$$ThrowStatus($$$ERROR($$$GeneralError, "Registry "_..Location_": authorization required."))
