@@ -266,7 +266,7 @@ Method IsAvailable() As %Boolean
   Set tAvailable = 0
   Set tRequest = ..GetHttpRequest()
   
-  Set tRequest.Timeout = 30
+  Set tRequest.Timeout = 3
   Set tSC = tRequest.Get($$$URLENCODE(tRequest.Location_"_ping"))
   If $$$ISOK(tSC), tRequest.HttpResponse.StatusCode = 401 {
      $$$ThrowStatus($$$ERROR($$$GeneralError, "Registry "_..Location_": authorization required."))
