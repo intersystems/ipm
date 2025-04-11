@@ -552,12 +552,8 @@ ClassMethod HasScope(pPhases As %List, pScope As %String) [ Private ]
 	Set tPhases = $ZConvert(pPhases, "L")
 	If $ListValid(pScope) {
 		// Iterate through each item in pScope list
-		Set i = 0
-		For {
-			Set i = $ListNext(pScope, i, scopeItem)
-			If i = 0 {
-				Return 0
-			}
+		Set pointer = 0
+		While $ListNext(pScope, pointer, scopeItem) {
 			If $ListFind(tPhases, $ZConvert(scopeItem, "L")) {
 				Return 1
 			}
@@ -1032,7 +1028,6 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 			#dim tResource As %IPM.Storage.ResourceReference
 			Set tResource = ..Resources.GetNext(.tKey)
 			Quit:tKey=""
-			Set tPhases = tResource.Attributes.GetAt("Phase")
 			If '..HasScope(pPhases,tResource.Scope) {
 				Continue
 			}
