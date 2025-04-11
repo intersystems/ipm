@@ -138,6 +138,13 @@ ClassMethod OnConfigure(pInstance As %ZPM.PackageManager.Client.ServerDefinition
 				$$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
 			}
 		}
+        
+        if ( $$$lcase(tUrl) '= $$$lcase(pInstance.URL) ) {
+            // when repo URL changing - clear all existing credentials
+            Set pInstance.Username = ""
+            Set pInstance.Password = ""
+            Set pInstance.Token = ""
+        }
 		
 		If $Data(pModifiers("username"), tUsername) {
 			Set pInstance.Username = tUsername
