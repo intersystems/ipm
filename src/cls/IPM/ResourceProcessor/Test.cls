@@ -214,6 +214,7 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
 		Set tResource = $Case(..Package '= "", 1: ..Package, : ..Class)_..Extension
 		$$$ThrowOnError(##class(%IPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.pResourceArray))
 		$$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.pResourceArray))
+		Merge pResourceArray = tResourceInfo
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

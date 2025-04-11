@@ -549,8 +549,20 @@ ClassMethod HasScope(pPhases As %List, pScope As %String) [ Private ]
 	If (pScope = "") {
 		Quit 1
 	}
-	Set tPhases = $zcvt(pPhases,"L")
-	Quit $ListFind(tPhases,pScope)
+	Set tPhases = $ZConvert(pPhases, "L")
+	If $ListValid(pScope) {
+		// Iterate through each item in pScope list
+		Set pointer = 0
+		While $ListNext(pScope, pointer, scopeItem) {
+			If $ListFind(tPhases, $ZConvert(scopeItem, "L")) {
+				Return 1
+			}
+		}
+		Quit 0
+	}
+	// Single string
+	Set scopeItem = $ZConvert(pScope, "L")
+	Quit $ListFind(tPhases, scopeItem) > 0
 }
 
 Method LoadDependencies(pPhaseList As %List, ByRef pParams) As %Status
@@ -1022,7 +1034,11 @@ Method GetResolvedReferences(Output pReferenceArray, pLockedDependencies As %Boo
 			
 			kill tempArray
 			Set tSC = tResource.ResolveChildren(.tempArray)
-			Merge pReferenceArray(..Name) = tempArray
+			Set resourceScope = tResource.Scope
+			Set attrScope = $Get(tempArray("Scope"))
+			If ..HasScope(pPhases, resourceScope) && ..HasScope(pPhases, attrScope) {
+				Merge pReferenceArray(..Name) = tempArray
+			}
 			If $$$ISERR(tSC) {
 				Quit
 			}

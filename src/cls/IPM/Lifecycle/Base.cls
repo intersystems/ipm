@@ -1770,9 +1770,7 @@ Method ExportSingleModule(ByRef pResourceArray, ByRef pTargetDirectory As %Strin
 			Merge tItemParams = pResourceArray(tFullResourceName)
 			Set tItemHandled = 0
 			Set tSC = tProcessor.OnExportItem(tFullPath,tFullResourceName,.tItemParams,.pParams,.tItemHandled)
-			If $$$ISERR(tSC) {
-				Quit
-			}
+			$$$ThrowOnError(tSC)
 			If tItemHandled {
 				Continue
 			}
@@ -1780,18 +1778,16 @@ Method ExportSingleModule(ByRef pResourceArray, ByRef pTargetDirectory As %Strin
 		If ($Extract(tFullResourceName) = "/") {
 			// Resources with paths are relative to the module root and are simply copied to the export directory.
 			Set tModule = ##class(%IPM.Storage.Module).NameOpen(tSrcModule,,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
+			$$$ThrowOnError(tSC)
 			
 			If (tModule.Root = "") {
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No module root configured for '%1'",tSrcModule))
-				Quit
+				$$$ThrowOnError(tSC)
 			}
 			
 			If '##class(%File).DirectoryExists(tModule.Root) {
 				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Directory %2, listed as root for module '%1', does not exist.",tSrcModule,tModule.Root))
-				Quit
+				$$$ThrowOnError(tSC)
 			}
 			
 			Set tSourcePath = ##class(%File).NormalizeFilename(tModule.Root_tFullResourceName)
@@ -1805,7 +1801,7 @@ Method ExportSingleModule(ByRef pResourceArray, ByRef pTargetDirectory As %Strin
 				If 'tGood {
 					Set tLastErr = $Get(%objlasterror)
 					Set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,$$$FormatText("Error creating directory '%1': %2",tDirectory,tReturn)),tLastErr)
-					Quit
+					$$$ThrowOnError(tSC)
 				}
 				Write:pVerbose !,"Created ",tDirectory
 			}
@@ -1814,15 +1810,13 @@ Method ExportSingleModule(ByRef pResourceArray, ByRef pTargetDirectory As %Strin
 				Set tSourcePath = ##class(%File).NormalizeDirectory(tSourcePath)
 				Set tExportPath = ##class(%File).NormalizeDirectory(tExportPath)
 				Set tSC = ##class(%IPM.Utils.File).CopyDir(tSourcePath,tExportPath, , pVerbose)
-				If $$$ISERR(tSC) {
-					Quit
-				}
+				$$$ThrowOnError(tSC)
 				Write:pVerbose !,tSourcePath," -> ",tExportPath
 			} ElseIf ##class(%File).Exists(tSourcePath) {
 				Set tGood = ##class(%File).CopyFile(tSourcePath,tExportPath,1,.tReturn)
 				If 'tGood {
 					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error copying file '%1' to '%2': %3",tSourcePath,tExportPath,tReturn))
-					Quit
+					$$$ThrowOnError(tSC)
 				}
 				Write:pVerbose !,tSourcePath," -> ",tExportPath
 			}
