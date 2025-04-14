@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #756: Support running commands using external names of packages.
 - #769: Allow `publish <module> -only` to publish a module without running `reload`
 - #533: External name changed to IPM (which carries greater meaning in 0.10.0)
+- #793: Add support for -synchronous flag to install command (added to load in #746)
 
 ### Changed
 - The minimum supported IRIS version for this release is 2022.1.

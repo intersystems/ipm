@@ -385,6 +385,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
+<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
 
 </command>
 
@@ -2172,6 +2173,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 
 	Set tVersion = $Get(pCommandInfo("parameters","version"))
 	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
+	Set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
 	
 	Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
 	Set tSearchCriteria.Registry = tRegistry
@@ -2216,7 +2218,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
           $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
         }
       }
-			$$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
+      $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous))
     
     }
 	} Else {
