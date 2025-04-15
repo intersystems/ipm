@@ -205,20 +205,20 @@ ClassMethod LoadCompleted(pServerName As %String, pModuleName As %String, pVersi
 	Quit tSC
 }
 
-ClassMethod LoadQualifiedReference(pReference As %IPM.Storage.QualifiedModuleInfo, ByRef pParams, ByRef pDependencyGraph) As %Status
+ClassMethod LoadQualifiedReference(pReference As %IPM.Storage.QualifiedModuleInfo, ByRef pParams, ByRef pDependencyGraph, pSynchronous As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Try {
 		#dim tReference As %IPM.Storage.QualifiedModuleInfo
 		Set tReference = pReference.%ConstructClone()
-		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph)
+		Set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pSynchronous)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}
 	Quit tSC
 }
 
-ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %Boolean, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph) As %Status
+ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, pVersion As %String, pDeployed As %Boolean, pPlatformVersion As %String, ByRef pParams, ByRef pDependencyGraph, pSynchronous As %Boolean = 0) As %Status
 {
 	// Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
 	Set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
@@ -312,7 +312,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			}
 			Set dotModules = ##class(%File).NormalizeDirectory(".modules", tDirectory)
 			Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-			Set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName)
+			Set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName,pSynchronous)
 			Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		} Else {
 			Set tAsArchive = -1
@@ -346,7 +346,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 			Do tTmpStream.CopyFromAndSave(tPayload)
 			
 			If (tAsArchive) {
-				Set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName)
+				Set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName,pSynchronous)
 			} Else {
 				// Old format (TODO: officially deprecate): try loading a .xml file
 
@@ -383,7 +383,7 @@ ClassMethod LoadModuleReference(pServerName As %String, pModuleName As %String, 
 	Quit tSC
 }
 
-ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %String, pArchiveStream As %Stream.Object, ByRef pParams, pRepository As %String = "") As %Status
+ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %String, pArchiveStream As %Stream.Object, ByRef pParams, pRepository As %String = "", pSynchronous As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -414,7 +414,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 		
 		Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
 		Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository)
+		Set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository,pSynchronous)
 		Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 		If $$$ISERR(tSC) {
 			Quit
@@ -432,7 +432,7 @@ ClassMethod LoadModuleFromArchive(pModuleName As %String, pModuleVersion As %Str
 	Quit tSC
 }
 
-ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverrideDeveloperMode As %Boolean = 0, pRepository As %String = "") As %Status
+ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverrideDeveloperMode As %Boolean = 0, pRepository As %String = "", pSynchronous As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Try {
@@ -460,7 +460,7 @@ ClassMethod LoadModuleFromDirectory(pDirectory As %String, ByRef pParams, pOverr
 			Merge tParams("AngularArtifact") = pParams("AngularArtifact")
 			Merge tParams("EnvFiles") = pParams("EnvFiles")
 		}
-		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository)
+		Set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pSynchronous)
 		If $$$ISERR(tSC) {
 			Quit
 		}
