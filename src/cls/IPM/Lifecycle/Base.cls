@@ -747,7 +747,7 @@ ClassMethod DetectPipCaller(pUseStandalonePip As %Boolean, pVerbose As %Boolean 
 			Write !, "Attempting to find flexible python... "
 		}
 		Do ##class(%SYS.Python).GetPythonInfo(.info)
-		If $Data(info("CPF_PythonRuntimeLibrary"), tPyDylib) && tPyDylib {
+		If $Data(info("CPF_PythonRuntimeLibrary"), tPyDylib) && (tPyDylib '= "") {
 			// TODO: try `../bin/python3` or `../bin/python` in case the .so is in subfolder `lib`
 			// TODO: try to find `pip3` or `pip` if pUseStandalonePip is 1
 			For filename = "python3", "python" {
