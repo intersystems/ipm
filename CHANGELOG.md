@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.1] - 2024-04-24
 
 ### Fixed
-- #797 DetectPipCaller now correctly uses Python Runtime Library path from IRIS cpf if defined
+- #797 Windows: IPM now uses the Python Runtime Library path from iris.cpf if defined
 
 ## [0.10.0] - 2025-04-16
 
