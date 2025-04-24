@@ -29,9 +29,13 @@ jobs:
             tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]' | awk '!/(-linux)|([1-4]-preview)|(-em)|(-cd)/' | awk '!/\.[1-4]\./' | sort | uniq)
             for tag in $tags
             do
-              # Skip irishealth-community due to bad interaction with ZPM document type
-              # Also skip 2023.2 because the license has expired
+              # Skip 2023.3 and 2023.2 because the license has expired
               if [ "$tag" = "2023.3" -o "$tag" = "2023.2" ];
+                then
+                  continue
+              fi
+              # Skip latest-preview due to #778
+              if [ "$tag" = "latest-preview" ];
                 then
                   continue
               fi
