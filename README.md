@@ -16,6 +16,8 @@ Helps to install ObjectScript classes and routines, globals, Embedded Python mod
 ```
 s version="latest" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/"_version_"/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
 ```
+** NB: [InterSystems Community packages](https://openexchange.intersystems.com/?zpm=1)) are not available by default. connect to Community registry via: `repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass ""`**
+
 **If you want the legacy behavior of mapping IPM classes, routines, and repository settings to all namespaces, run `zpm "enable -community"` after installing IPM. See `zpm "help enable"` for details.**
 **In a CI script, for deterministic behavior, you should replace version="latest" with the IPM version you wish to use.**
 
