@@ -3,3 +3,7 @@ out
 .buildpath
 .project
 /packages
+
+/tests/sandbox/durable-sys/irishealth/shared/iris/**
+/tests/sandbox/durable-sys/irishealth/shared/iris.key
+/tests/sandbox/durable-sys/webgateway/shared/durable/**

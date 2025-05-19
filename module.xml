@@ -2,7 +2,7 @@
 <Export generator="Cache" version="25">
 <Document name="ZPM.ZPM"><Module>
   <Name>ZPM</Name>
-  <Version>0.10.1-SNAPSHOT</Version>
+  <Version>0.10.2-SNAPSHOT</Version>
   <ExternalName>IPM</ExternalName>
   <Description>InterSystems Package Manager (IPM) provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
   <Keywords>Package Manager</Keywords>
@@ -17,7 +17,6 @@
   <Resource Name="IPM.Installer.CLS" Preload="true" />
   <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test"/>
   <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify"/>
-  <Resource Name="/doc/README.txt"/>
   <Invoke Class="IPM.Installer" Method="Map" Phase="Reload" When="Before" />
   <Invoke Class="IPM.Installer" Method="MapIfLegacy" Phase="Compile" When="After" />
   <Invoke Class="IPM.Installer" Method="InstallORASIfMissing" Phase="Activate" When="After" />
@@ -43,8 +42,8 @@
   <PythonWheel Name="urllib3-2.3.0-py3-none-any.whl" ExtraPipFlags="--no-deps"/>
 
   <!-- Pure python implementation of rpds-py for offline installation or behind a firewall. 
-    It will be overriden at import-time if user installs the real rpds-py package.
-    This is because mgr/python appears before lib/python in sys.path -->
-  <FileCopy Name="modules/python/rpds.py" Target="${libdir}python/rpds.py"/>
+    This intentionally and necessarily masks possible installation of the real rpds-py package
+    for the sake of working in a container environment with durable %SYS. -->
+  <FileCopy Name="modules/python/rpds.py" Target="${mgrdir}python/rpds.py"/>
 </Module>
 </Document></Export>
