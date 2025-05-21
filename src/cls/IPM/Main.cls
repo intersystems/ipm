@@ -1083,7 +1083,12 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
       Set ns = $Order(listNS(ns)) 
       Quit:ns=""
       Kill listModules
-      Do ..GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
+      Try {
+        // It is possible that GetListModules will fail in some namespaces. Allow it to do so silently.
+        Do ..GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
+      } Catch e {
+        Kill listModules
+      }
       Continue:(pSearch'="")&&('$Get(listModules))
       If width < $Length(ns) {
         Set width = $Length(ns)

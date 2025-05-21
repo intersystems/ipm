@@ -65,6 +65,7 @@ ClassMethod setup(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.I
   Do %code.WriteLine(" Set sc = ##class(Config.Namespaces).Get(prevNS, .properties)")
   Do %code.WriteLine(" Set pVars(""CURNSRoutineDB"")=$Get(properties(""Routines""))")
   Do %code.WriteLine(" Set pVars(""CURNSGlobalDB"")=$Get(properties(""Globals""))")
+  Do %code.WriteLine(" Set $Namespace = prevNS")
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "PM")
 }
 
@@ -79,7 +80,8 @@ ClassMethod Map(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.Ins
   Do %code.WriteLine(" Set sc = ##class(Config.Namespaces).Get(prevNS, .properties)")
   Do %code.WriteLine(" Set pVars(""CURNSRoutineDB"")=$Get(properties(""Routines""))")
   Do %code.WriteLine(" Set pVars(""CURNSGlobalDB"")=$Get(properties(""Globals""))")
-  Do %code.WriteLine(" If ##class(Config.MapPackages).Exists(prevNS,""%IPM"") { Quit $$$OK }")
+  Do %code.WriteLine(" If ##class(Config.MapPackages).Exists(prevNS,""%IPM"") && ##class(Config.MapRoutines).Exists(prevNS,""%IPM.*"") { Quit $$$OK }")
+  Do %code.WriteLine(" Set $Namespace = prevNS")
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "MapOnly")
 }
 
