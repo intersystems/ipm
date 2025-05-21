@@ -1,4 +1,4 @@
-ARG BASE=containers.intersystems.com/intersystems/iris-community:2024.1
+ARG BASE=irepo.intersystems.com/intersystems/iris-community:2025.1
 FROM ${BASE}
 ARG IPM_VERSION=zpm-0.7.2.xml
 
