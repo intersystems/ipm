@@ -3,6 +3,7 @@ out
 .buildpath
 .project
 /packages
+zpm.xml
 
 /tests/sandbox/durable-sys/irishealth/shared/iris/**
 /tests/sandbox/durable-sys/irishealth/shared/iris.key
