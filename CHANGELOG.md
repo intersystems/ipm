@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #809: Fixed installation of rpds.py in containers using durable %SYS
+- #811: Issues when upgrading from earlier IPM versions with cross-namespace differences
+- #796: Installation on environments without Flexible Python Runtime
 
 ## [0.10.1] - 2024-04-24
 
