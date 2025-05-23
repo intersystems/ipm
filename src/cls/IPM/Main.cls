@@ -1085,7 +1085,7 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
       Kill listModules
       Try {
         // It is possible that GetListModules will fail in some namespaces. Allow it to do so silently.
-        Do ..GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
+        Do ##class(%IPM.Main).GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
       } Catch e {
         Kill listModules
       }

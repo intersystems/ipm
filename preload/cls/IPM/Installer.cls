@@ -147,7 +147,7 @@ ClassMethod InstallORASIfMissing()
       }
     }
   } else {
-    Write !!,"WARNING: Flexible Python Runtime is not configured on this instance. Not all IPM features will work. If you wish to use ORAS registries, configure Flexible Python Runtime then reinstall IPM.",!
+    Write !!,"WARNING: Flexible Python Runtime is not configured on this instance. Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
   }
   Quit $$$OK
 }
