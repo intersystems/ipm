@@ -1230,7 +1230,7 @@ Method %Verify(ByRef pParams) As %Status
 				
 				// If the module being verified is not the package manager, map the package manager itself equivalently in the VERIFY namespace.
 				If (..Module.Name '= "ZHSLIB") {
-					$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM*",tInitNS,,tNewNamespace))
+					$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",tInitNS,,tNewNamespace))
 					$$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",tInitNS,tNewNamespace))
 				}
 				

@@ -79,7 +79,7 @@ ClassMethod Map(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.Ins
   Do %code.WriteLine(" Set sc = ##class(Config.Namespaces).Get(prevNS, .properties)")
   Do %code.WriteLine(" Set pVars(""CURNSRoutineDB"")=$Get(properties(""Routines""))")
   Do %code.WriteLine(" Set pVars(""CURNSGlobalDB"")=$Get(properties(""Globals""))")
-  Do %code.WriteLine(" If ##class(Config.MapPackages).Exists(prevNS,""%IPM"") { Quit $$$OK }")
+  Do %code.WriteLine(" If ##class(Config.MapPackages).Exists(prevNS,""%IPM"") && ##class(Config.MapRoutines).Exists(prevNS,""%IPM.*"") { Quit $$$OK }")
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "MapOnly")
 }
 
@@ -129,19 +129,23 @@ ClassMethod MapIfLegacy()
 
 ClassMethod InstallORASIfMissing()
 {
-  if '..ORASInstalled() {
-    // Need to run in a background process to pick up new %IPM.Storage.Module definition
-    Write !,"Installing ORAS Python components..."
-    Job ..InitializeAndSignal()
-    Set result = $System.Event.WaitMsg("",30)
-    Set $ListBuild(msg,sc) = result
-    If (msg = 0) {
-      Write !,"ORAS installation timed out and may not have completed successfully."
-    } ElseIf $$$ISERR(sc) {
-      Write !,"An error occurred installing Python dependencies: ",$System.Status.GetErrorText(sc)
-    } Else {
-      Write " done."
+  if ..ValidatePythonRuntime() {
+    if '..ORASInstalled() {
+      // Need to run in a background process to pick up new %IPM.Storage.Module definition
+      Write !,"Installing ORAS Python components..."
+      Job ..InitializeAndSignal()
+      Set result = $System.Event.WaitMsg("",30)
+      Set $ListBuild(msg,sc) = result
+      If (msg = 0) {
+        Write !,"ORAS installation timed out and may not have completed successfully."
+      } ElseIf $$$ISERR(sc) {
+        Write !,"An error occurred installing Python dependencies: ",$System.Status.GetErrorText(sc)
+      } Else {
+        Write " done."
+      }
     }
+  } else {
+    Write !!,"WARNING: Flexible Python Runtime is not configured on this instance. Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
   }
   Quit $$$OK
 }
@@ -151,6 +155,17 @@ ClassMethod InitializeAndSignal()
   set parent = $ZParent
   set sc = ##class(%IPM.Main).Shell("zpm initialize -only")
   do $System.Event.Signal($zparent,sc)
+}
+
+ClassMethod ValidatePythonRuntime() As %Boolean
+{
+  try {
+    // The only way this throws an exception is if there's no Python.
+    set test = ..ORASInstalled()
+  } catch e {
+    return 0
+  }
+  return 1
 }
 
 ClassMethod ORASInstalled() [ Language = python ]

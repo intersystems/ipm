@@ -1083,7 +1083,14 @@ ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %Str
       Set ns = $Order(listNS(ns)) 
       Quit:ns=""
       Kill listModules
-      Do ..GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
+      Try {
+        // It is possible that GetListModules will fail in some namespaces. Allow it to do without failing the whole operation.
+        // Most likely cases: incorrect mappings, corrupt installation of IPM in IRISSYS after upgrade.
+        Do ##class(%IPM.Main).GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
+      } Catch e {
+        Write !,"WARNING: Failed to list packages in namespace "_ns_": "_e.DisplayString(),!
+        Kill listModules
+      }
       Continue:(pSearch'="")&&('$Get(listModules))
       If width < $Length(ns) {
         Set width = $Length(ns)

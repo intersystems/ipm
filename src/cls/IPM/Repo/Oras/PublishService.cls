@@ -102,8 +102,14 @@ ClassMethod Push(registry As %String, package As %String, namespace As %String, 
 
 	Try {
 		Do ..PushPy(registry, repo, namespace, tags, path, metadata, username, password, token, tokenAuthMethod)
-	} Catch sc {
-		$$$ThrowStatus($$$ERROR($$$GeneralError,"Unable to push: " _ sc.DisplayString()))
+	} Catch e {
+		If e.Name = "<OBJECT DISPATCH>" {
+			Set eStatus = e.AsStatus()
+			Set usrStatus = $$$ERROR($$$GeneralError,$$$OrasRequiresFlexiblePython)
+			$$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))
+		} Else {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"Unable to push: " _ e.DisplayString()))
+		}
 	}
     Return $$$OK
 }
