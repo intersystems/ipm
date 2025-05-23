@@ -12,24 +12,34 @@ Helps to install ObjectScript classes and routines, globals, Embedded Python mod
 
 ## Installing the InterSystems Package Manager Client:
 
-0. Use one-liner in terminal call or programmatically:
+The simplest way to install the latest version of IPM is to run the following ObjectScript snippet.
+
+_In CI/CD scripts, for deterministic behavior, replace `version="latest"` with the specific IPM version desired._
+
 ```
 s version="latest" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/"_version_"/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
 ```
-**If you want the legacy behavior of mapping IPM classes, routines, and repository settings to all namespaces, run `zpm "enable -community"` after installing IPM. See `zpm "help enable"` for details.**
-**In a CI script, for deterministic behavior, you should replace version="latest" with the IPM version you wish to use.**
 
-OR:
+**IPM 0.9.0+ can be installed with different versions and registry settings per namespace, and does not have the [community package registry](https://openexchange.intersystems.com/?zpm=1) enabled by default. If you want the legacy (<=0.7.x) behavior of a system-wide installation and access to community packages in all namespaces, run `zpm "enable -community"` after installing IPM. See `zpm "help enable"` for details.**
+
+To enable the community package registry without the rest of the legacy behavior, run:
+
+```
+zpm
+repo -r -n registry -url https://pm.community.intersystems.com/ -user "" -pass ""
+```
+
+As an alternative installation method, if IRIS does not have access to the internet:
 
 1. Download the [latest version](https://pm.community.intersystems.com/packages/zpm/latest/installer) of zpm from the registry
-2. Import the zpm.xml into IRIS and compile via any desired way (Management Portal, Studio or Terminal)
- 
- After that you can use PackageManager to install modules from [community repository](https://pm.community.intersystems.com) in any namespace.
+2. Import `zpm.xml` into IRIS and compile via any available method (Management Portal, Studio or Terminal - `do $System.OBJ.Load("/path/to/zpm.xml","ck")`)
+3. (optional) Run `zpm "enable -community"` to enable instance-wide and with a connection to the [community package registry](https://pm.community.intersystems.com)
+4. To verify the installation, ensure that you can run `zpm` in Terminal/`iris session` and get the following:
 
-3. Check if you call a zpm in command line and get the following:
+```
 USER>zpm
-
 zpm: USER>
+```
 
 ## InterSystems IRIS / IPM Compatibility Matrix
 
@@ -41,7 +51,7 @@ zpm: USER>
 
 ## Compatibility Notes
 
-With the release of IPM v0.9.0 on Dec 2024, IPM is no longer mapped across namespaces. 
+With the release of IPM v0.9.0 on December 2024, IPM is no longer mapped across namespaces. 
 This is an intentional change so that users can have different IPM versions and configurations in different namespaces. 
 If you install IPM on an instance without the legacy 0.7.x version, IPM is only installed to the current namespace.
 

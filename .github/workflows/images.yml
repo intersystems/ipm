@@ -34,11 +34,6 @@ jobs:
                 then
                   continue
               fi
-              # Skip latest-preview due to #778
-              if [ "$tag" = "latest-preview" ];
-                then
-                  continue
-              fi
               images+='"'${n}:${tag}'",';
             done
           done;
