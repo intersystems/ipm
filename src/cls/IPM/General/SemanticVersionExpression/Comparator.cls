@@ -92,6 +92,10 @@ Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
       Quit:((val1 = "*")||(val2 = "*"))
       Set tEquals = tEquals && (val1 = val2)
     }
+	// Compare build if both versions specify it
+  	If (pVersion.Build '= "") && (..Build '= "") {
+    	Set tEquals = tEquals && (pVersion.Build = ..Build)
+  	}
   }
 	If (+##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease") = 0) || ($Extract(..Operator,1) = "=")  {
 		// If SemVerPostRelease is disabled, then we should not consider post-release versions as equal to the base version
