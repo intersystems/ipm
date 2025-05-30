@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #778 CI - avoid deadlock on 2025.2 preview due to cached query regeneration bug
+- #816 Fixed zpm "install" command not pulling specified versions of artifacts
 
 ## [0.10.1] - 2024-04-24
 
