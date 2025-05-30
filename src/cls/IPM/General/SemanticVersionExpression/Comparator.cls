@@ -85,7 +85,7 @@ Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
 	Set tEquals = (..Operator [ "=")
   If tEquals {
-    For part = "Major", "Minor", "Patch", "Prerelease" {
+    For part = "Major", "Minor", "Patch", "Prerelease", "Build" {
       Set val1 = $Property(pVersion, part)
       Set val2 = $Property($this, part)
       Quit:((val1 = "")||(val2 = ""))
