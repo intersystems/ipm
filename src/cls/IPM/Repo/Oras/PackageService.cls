@@ -91,6 +91,9 @@ ClassMethod AggregatePlatformVersions(tagsList As %List, Output aggregatedPlatfo
 	Return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
+/// <var>allTagsString</var> is as returned by <method>GetAllTagsPy</method> (comma + space separated)
+/// <var>moduleList</var> is a list of objects of type <class>%IPM.Storage.ModuleInfo</class> to which this method adds entries
+/// <var>name</var> is the name of the package for which we are enumerating versions
 Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.General.SemanticVersionExpression, client As %SYS.Python, moduleList As %ListOfObjects, searchCriteria As %IPM.Repo.SearchCriteria, name As %String)
 {
 	Set allVersionsList = ..AggregatePlatformVersions($ListFromString(allTagsString, ", "), .aggregatedPlatformVersion)
@@ -102,19 +105,9 @@ Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.Gen
 			Continue
 		}
 
-		// If build metadata is provided in the version expression, require exact match
-		If (semverExpr.Options.Count() > 0) {
-			#dim range As %IPM.General.SemanticVersionExpression.Range
-			Set range = semverExpr.Options.GetAt(1)
-			If range.Comparators.Count() > 0 {
-				#dim comp As %IPM.General.SemanticVersionExpression.Comparator
-				Set comp = range.Comparators.GetAt(1)
-				If comp.Build '= "" {
-					If tVersion.Build '= comp.Build {
-						Continue
-					}
-				}
-			}
+		#; Special case: if we provided an explicit build number, require it.
+		If ##class(%IPM.General.SemanticVersion).IsValid(searchCriteria.VersionExpression,.specificVersion) && (specificVersion.Build '= "") && (specificVersion.Build '= tVersion.Build) {
+			Continue
 		}
 
 		// If there are multiple platform versions for a given package version, we only want to use the metadata of one of them
@@ -134,7 +127,7 @@ Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.Gen
 		// `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
 		Set tModRef.Name = name
 		// `artifactMetadata.ImageVersion` can be different from `moduleVersion`. E.g., when the module was simply "moved" from elsewhere under a different tag
-		Set tModRef.VersionString = moduleVersion 
+		Set tModRef.VersionString = tVersion.ToString()
 		Set tModRef.Repository = artifactMetadata.ImageSource
 		Set tModRef.Description = artifactMetadata.ImageDescription
 		Set tModRef.Deployed = artifactMetadata.IPMDeployed
@@ -144,12 +137,18 @@ Method ListModulesFromTagString(allTagsString As %String, semverExpr As %IPM.Gen
 				$$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))
 			}
 		}
-		Set tModRef.AllVersions = allTagsString
+		If searchCriteria.AllVersions {
+			// TODO: Convert these to semvers. This is just for display so OK not to for now.
+			Set tModRef.AllVersions = allTagsString
+		}
 		Set tModRef.Origin = artifactMetadata.IPMOrigin
 		Do moduleList.Insert(tModRef)
 
-		#; If not all versions are requested, return the latest one
-		If 'searchCriteria.AllVersions, name="" {
+		If searchCriteria.AllVersions '= "" {
+			// This is a tri-state.
+			// 0: don't show them.
+			// 1: do show them
+			// empty: we're resolving dependencies so DON'T QUIT.
 			Quit
 		}
 	}
@@ -209,11 +208,12 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 			}
 			#; get all versions
 			Set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
-			Do ..ListModulesFromTagString(allTagsString, tVersionExpression, client, tList, pSearchCriteria, name)
+			Do ..ListModulesFromTagString(allTagsString, tVersionExpression, client, tList, pSearchCriteria, package)
 		}
 		Return tList
 	}
 
+	// TODO: Make this work properly for the case where name is empty (searching in a repo with a namespace)
 	Set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
 	Do ..ListModulesFromTagString(allTagsString, tVersionExpression, client, tList, pSearchCriteria, name)
 	Return tList
