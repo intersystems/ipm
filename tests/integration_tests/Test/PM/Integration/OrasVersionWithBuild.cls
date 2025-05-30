@@ -40,9 +40,14 @@ Method TestInstallSpecificBuildVersion()
     // Install the version with build explicitly
     Set sc = ##class(%IPM.Main).Shell("install oras/"_..#Module_" "_..#BuildVersion)
     Do $$$AssertStatusOK(sc, "Installed build version explicitly")
-
     // Verify correct version was installed
     Do ..AssertVersion(..#BuildVersion)
+
+    // Install without build specified
+    Do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall "_..#Module))
+    Do $$$AssertStatusOK(##class(%IPM.Main).Shell("install oras/"_..#Module_" "_..#CleanVersion))
+    // Verify correct version was installed
+    Do ..AssertVersion(..#CleanVersion)
 
     // Clean up
     Do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"))
