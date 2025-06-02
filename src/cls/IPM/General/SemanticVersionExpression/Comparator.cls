@@ -88,9 +88,11 @@ Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
     For part = "Major", "Minor", "Patch", "Prerelease", "Build" {
       Set val1 = $Property(pVersion, part)
       Set val2 = $Property($this, part)
-      Quit:((val1 = "")||(val2 = ""))
       Quit:((val1 = "*")||(val2 = "*"))
-      Set tEquals = tEquals && (val1 = val2)
+	  // Enforce exact match if comparator specifies the part (e.g., Prerelease or Build)
+	  If val2 '= "" {
+	    Set tEquals = tEquals && (val1 = val2)
+	  }
     }
   }
 	If (+##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease") = 0) || ($Extract(..Operator,1) = "=")  {

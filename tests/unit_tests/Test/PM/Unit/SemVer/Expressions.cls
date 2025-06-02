@@ -25,6 +25,18 @@ Method TestEvaluate()
 	Do ..AssertSatisfied(tExpression,"1.4.6")
 	Do ..AssertNotSatisfied(tExpression,"1.2.8")
 	Do ..AssertNotSatisfied(tExpression,"2.0.0")
+
+	// Build metadata: should match only if explicitly requested
+	Do ..AssertSatisfied("=1.0.0+build123", "1.0.0+build123")
+	Do ..AssertNotSatisfied("=1.0.0+build123", "1.0.0+build456")
+	Do ..AssertNotSatisfied("=1.0.0+build123", "1.0.0")
+	Do ..AssertSatisfied("=1.0.0", "1.0.0+build123")
+
+	// Build should be ignored with comparators
+	Do ..AssertSatisfied(">=1.0.0", "1.0.0+build123")
+	Do ..AssertSatisfied(">=1.0.0-alpha", "1.0.0-alpha+buildXYZ")
+	Do ..AssertSatisfied("<2.0.0", "1.5.0+something")
+	Do ..AssertNotSatisfied("<1.0.0", "1.0.0+build999")
 }
 
 Method TestPrerelease()
@@ -129,6 +141,12 @@ Method TestEquivalenceCaretRanges()
 	Do ..AssertEquivalent("^0.0", ">=0.0.0 <0.1.0-0")
 	Do ..AssertEquivalent("^1.x", ">=1.0.0 <2.0.0-0")
 	Do ..AssertEquivalent("^0.x", ">=0.0.0 <1.0.0-0")
+}
+
+Method TestEquivalenceBuildMetadata()
+{
+	Do ..AssertEquivalent("=1.0.0+build.123", "=1.0.0+build.123")
+	Do ..AssertNotSatisfied("=1.0.0+build.123", "1.0.0+build.abc")
 }
 
 Method TestIRISVersions()
