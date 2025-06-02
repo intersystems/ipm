@@ -37,6 +37,9 @@ Method TestEvaluate()
 	Do ..AssertSatisfied(">=1.0.0-alpha", "1.0.0-alpha+buildXYZ")
 	Do ..AssertSatisfied("<2.0.0", "1.5.0+something")
 	Do ..AssertNotSatisfied("<1.0.0", "1.0.0+build999")
+	Do ..AssertSatisfied("<2.0.0+build", "1.5.0")
+	Do ..AssertNotSatisfied("<1.0.0+build", "1.0.0+build999")
+	Do ..AssertNotSatisfied("<3.0.1+something", "4.1.0")
 }
 
 Method TestPrerelease()
