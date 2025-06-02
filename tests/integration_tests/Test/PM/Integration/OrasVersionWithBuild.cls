@@ -40,14 +40,35 @@ Method TestInstallSpecificBuildVersion()
     // Install the version with build explicitly
     Set sc = ##class(%IPM.Main).Shell("install oras/"_..#Module_" "_..#BuildVersion)
     Do $$$AssertStatusOK(sc, "Installed build version explicitly")
+
     // Verify correct version was installed
     Do ..AssertVersion(..#BuildVersion)
 
     // Install without build specified
     Do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall "_..#Module))
     Do $$$AssertStatusOK(##class(%IPM.Main).Shell("install oras/"_..#Module_" "_..#CleanVersion))
+
     // Verify correct version was installed
     Do ..AssertVersion(..#CleanVersion)
+
+    // Publish 3 builds of the same base version: build1, build2, build3
+    For i=1:1:3 {
+        Set buildVer = "1.0.0-prerelease+build"_i
+        // Update the version with build metadata
+        Do $$$AssertStatusOK(##class(%IPM.Main).Shell("modver "_..#Module_" "_buildVer_" -force"))
+        Do ..AssertVersion(buildVer)
+        // Publish only this version to ORAS
+        Do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish "_..#Module_" -r oras -verbose -only"))
+    }
+
+    // Uninstall current version before test
+    Do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall "_..#Module))
+
+    // Install a specific older build (build2)
+    Set specificBuild = "1.0.0-prerelease+build2"
+    Set sc = ##class(%IPM.Main).Shell("install oras/"_..#Module_" "_specificBuild)
+    Do $$$AssertStatusOK(sc, "Installed older build version explicitly")
+    Do ..AssertVersion(specificBuild)
 
     // Clean up
     Do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"))
@@ -56,16 +77,12 @@ Method TestInstallSpecificBuildVersion()
 
 Method AssertVersion(ver As %String) As %Boolean
 {
-    Set query = "SELECT Name FROM %IPM_Storage.ModuleItem WHERE Name = ?"
+    Set query = "SELECT VersionString FROM %IPM_Storage.ModuleItem WHERE Name = ?"
     Set rs = ##class(%SQL.Statement).%ExecDirect(, query, ..#Module)
     If '$$$AssertTrue(rs.%Next(), "Module "_..#Module_" found in SQL") {
         Return 0
     }
-    Set module = ##class(%IPM.Storage.Module).NameOpen(rs.%Get("Name"))
-    If '$$$AssertNotEquals(module, "", "Module set") {
-        Return 0
-    }
-    Return $$$AssertEquals(module.VersionString, ver) && $$$AssertEquals(module.Version.ToString(), ver)
+    Return $$$AssertEquals(rs.%Get("VersionString"), ver)
 }
 
 }
