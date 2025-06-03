@@ -19,14 +19,20 @@ XData PM [ XMLNamespace = INSTALLER ]
 <Default Name="TRACKINGID" Value="UA-126752118-1" />
 
 <Namespace Name="${CURNS}" Code="${CURNSRoutineDB}" Data="${CURNSGlobalDB}" Create="no" Ensemble="0">
-  <Configuration>
-      <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
-      <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" /> 
-  </Configuration>
+  <!-- Support use in a bootstrapped ^INSTALL context, detected by presence of %Log -->
+  <If Condition="($Data(%Log)#2)">
+   <Configuration>
+    <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
+    <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" /> 
+   </Configuration>
+  </If>
 
   <Import File="${SRCDIR}" Recurse="1"/>
 
-  <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
+  <!-- Don't try to update language extensions in a bootstrapped ^INSTALL context -->
+  <If Condition="($Data(%Log)#2)">
+    <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
+  </If>
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/> 
     <Arg Value="${TRACKINGID}"/>
@@ -34,7 +40,6 @@ XData PM [ XMLNamespace = INSTALLER ]
   <Invoke Class="IPM.Installer" Method="ZPMLoad" CheckStatus="true">
     <Arg Value="${MODDIR}"/>
   </Invoke>
-  <Invoke Class="IPM.Installer" Method="ZPMCompile" CheckStatus="true" />
 </Namespace>
 
 </Manifest>
@@ -72,6 +77,8 @@ ClassMethod Map(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.Ins
 {
   #; Let our XGL document generate code for this method.
   Do %code.WriteLine(" Set pVars(""CURNS"")=$namespace")
+  #; Special case: if we're in %SYS and have an alternative mapping set up, keep it.
+  Do %code.WriteLine(" If ($Namespace = ""%SYS"") && (##class(%SYS.Namespace).GetPackageDest(""%SYS"",""%IPM"") '[ ""irislib"") { Quit $$$OK }")
   Do %code.WriteLine(" Set prevNS = $namespace")
   Do %code.WriteLine(" New $Namespace")
   Do %code.WriteLine(" Set $Namespace = ""%SYS"" ")
@@ -95,9 +102,6 @@ ClassMethod AsyncSetup(Args...)
 
 ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
-    //If (pRegistry'="") {
-    //  $$$QuitOnError(##class(%IPM.Main).Shell("repo -t registry -name registry -url "_ pRegistry))
-    //}
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
@@ -111,12 +115,8 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
 ClassMethod ZPMLoad(pDirectoryName)
 {
   // Explicitly force DeveloperMode to 0 to avoid loading tests
-  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName_" -DDeveloperMode=0")
-}
-
-ClassMethod ZPMCompile()
-{
-  Quit ##class(%IPM.Main).Shell("ZPM compile")
+  // Do not map here when installed from installer; that's handled via Installer XDatas if/when needed
+  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName_" -DDeveloperMode=0 -DNoMapping=1")
 }
 
 ClassMethod MapIfLegacy()
