@@ -65,8 +65,7 @@ zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username a
 zpm "publish zpm -verbose"
 halt
 
-cd /home/irisowner/zpm
-wget http://registry:52773/registry/packages/zpm/latest/installer -O zpm.xml
+cd /home/irisowner/zpm && wget http://registry:52773/registry/packages/zpm/latest/installer -O zpm.xml
 ```
 
 Now you have zpm.xml at the top level of your git repo and can test installation from e.g. a full IRIS instance on your host environment. (Don't worry, it's in .gitignore!)

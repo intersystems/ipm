@@ -19,20 +19,12 @@ XData PM [ XMLNamespace = INSTALLER ]
 <Default Name="TRACKINGID" Value="UA-126752118-1" />
 
 <Namespace Name="${CURNS}" Code="${CURNSRoutineDB}" Data="${CURNSGlobalDB}" Create="no" Ensemble="0">
-  <!-- Support use in a bootstrapped ^INSTALL context, detected by presence of %Log -->
-  <If Condition="($Data(%Log)#2)">
-   <Configuration>
+  <Configuration>
     <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
     <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" /> 
-   </Configuration>
-  </If>
-
+  </Configuration>
   <Import File="${SRCDIR}" Recurse="1"/>
-
-  <!-- Don't try to update language extensions in a bootstrapped ^INSTALL context -->
-  <If Condition="($Data(%Log)#2)">
-    <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
-  </If>
+  <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/> 
     <Arg Value="${TRACKINGID}"/>
@@ -145,7 +137,7 @@ ClassMethod InstallORASIfMissing()
       }
     }
   } else {
-    Write !!,"WARNING: Flexible Python Runtime is not configured on this instance. Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
+    Write !!,"WARNING: Flexible Python Runtime is not configured on this instance with a valid Python version (>=3.10). Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
   }
   Quit $$$OK
 }
@@ -160,8 +152,11 @@ ClassMethod InitializeAndSignal()
 ClassMethod ValidatePythonRuntime() As %Boolean
 {
   try {
-    // The only way this throws an exception is if there's no Python.
-    set test = ..ORASInstalled()
+    set version = ..PythonMajorMinorVersion()
+    if (+version < 3.10) {
+      Write !!,"WARNING: Python version "_version_" is not supported. IPM requires Python 3.10 or higher.",!
+      return 0
+    }
   } catch e {
     return 0
   }
@@ -175,6 +170,12 @@ ClassMethod ORASInstalled() [ Language = python ]
     return True
   except:
     return False
+}
+
+ClassMethod PythonMajorMinorVersion() [ Language = python ]
+{
+  import sys
+  return f"{sys.version_info.major}.{sys.version_info.minor}"
 }
 
 ClassMethod EndCompile(qstruct) As %Status
