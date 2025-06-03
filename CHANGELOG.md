@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #811: Issues when upgrading from earlier IPM versions with cross-namespace differences
 - #796: Installation on environments without Flexible Python Runtime
 - #778: CI - avoid deadlock on 2025.2 preview due to cached query regeneration bug
+- #816: Fixed zpm "install" command not pulling specified versions of artifacts
 
 ## [0.10.1] - 2024-04-24
 

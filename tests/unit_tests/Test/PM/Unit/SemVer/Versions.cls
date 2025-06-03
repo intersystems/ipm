@@ -12,6 +12,11 @@ Method TestPrereleaseComparison()
 	Do ..AssertNotFollows("1.0.0-alpha", "1.0.0-alpha.beta")
 	Do ..AssertNotFollows("1.0.0-beta", "1.0.0")
 	Do ..AssertNotFollows("2.0.0-alpha", "1.0.0-alpha")
+
+	// Build metadata should not affect order precedence
+	Do ..AssertNotFollows("1.0.0+build1", "1.0.0+build2")
+	Do ..AssertNotFollows("1.0.0+build1", "1.0.0")
+	Do ..AssertNotFollows("1.0.0", "1.0.0+build2")
 }
 
 Method TestPostreleaseComparison()
@@ -46,6 +51,10 @@ Method TestVersions()
 	Do ..AssertVersionNotValid("1.1.1-007.alpha")
 	Do ..AssertVersionNotValid("1.1.1-bond...james-bond")
 	Do ..AssertVersionNotValid("1.1.1-alpha?")
+
+	// Valid versions with only build metadata
+	Do ..AssertVersionValid("1.2.3+build.meta", 1, 2, 3, "", "build.meta")
+	Do ..AssertVersionValid("0.0.1+001", 0, 0, 1, "", "001")
 }
 
 Method AssertVersionValid(pVersion As %String, pMajor As %String = "", pMinor As %String = "", pPatch As %String = "", pPrerelease As %String = "", pBuild As %String = "")
