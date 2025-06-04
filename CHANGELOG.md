@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.3] - Unreleased
 
 ### Fixed
+- #829: Fixed export of resources with null Directory attribute
 
 ## [0.10.2] - 2025-06-04
 
@@ -17,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #796: Installation on environments without Flexible Python Runtime
 - #778: CI - avoid deadlock on 2025.2 preview due to cached query regeneration bug
 - #816: Fixed zpm "install" command not pulling specified versions of artifacts
-- #829: Fixed export of resources with null Directory attribute
 
 ## [0.10.1] - 2025-04-24
 
