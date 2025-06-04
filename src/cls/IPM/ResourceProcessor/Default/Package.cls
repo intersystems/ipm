@@ -68,7 +68,7 @@ Method OnItemRelativePath(pItemName As %String, pIsUnitTest As %Boolean = 0) As 
   set directory = ..Directory
   #; set directory = fileNameExtension
   set fileName = $tr($Piece(pItemName, ".", 1, *-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator) _ "." _ fileNameExtension
-	Quit $Select(..ResourceReference.Preload:"preload/",1:"") _ tSourceRoot _ directory _ "/" _ fileName
+	Quit $Select(..ResourceReference.Preload:"preload/",1:"") _ tSourceRoot _ $select(directory=$c(0):"", 1:directory _ "/") _ fileName
 }
 
 Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
@@ -78,3 +78,4 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 }
 
 }
+
