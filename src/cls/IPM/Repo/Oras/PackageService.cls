@@ -224,29 +224,39 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 /// Returns an authenticated ORAS client
 ClassMethod GetClient(registry As %String, username As %String = "", password As %String = "", token As %String = "", tokenAuthMethod As %String) As %SYS.Python
 {
-	Set orasProvider = ##class(%SYS.Python).Import("oras.provider")
-	
-	Set args = {}
-	Set args.hostname = registry
-	#; assume everything not specified is using https
-	Set args.insecure = registry [ "http://"
-	Set client = orasProvider.Registry(args...)
+	Try {
+		Set orasProvider = ##class(%SYS.Python).Import("oras.provider")
+		
+		Set args = {}
+		Set args.hostname = registry
+		#; assume everything not specified is using https
+		Set args.insecure = registry [ "http://"
+		Set client = orasProvider.Registry(args...)
 
-	If username '= "", password '= "" {
-		Do client."set_basic_auth"(username, password)
-	} Elseif token '= "" {
-		If tokenAuthMethod = "basic" {
-			#; AWS tokens are essentially username:password in one string
-			Set client."_basic_auth" = token
-			Do client."reset_basic_auth"()
-		} ElseIf tokenAuthMethod = "bearer" {
-			#; Bearer token
-			Do client."set_token_auth"(token)
-		} ElseIf tokenAuthMethod = "apiKey" {
-			#; API key
-			Do client."set_header"("apikey", token)
+		If username '= "", password '= "" {
+			Do client."set_basic_auth"(username, password)
+		} Elseif token '= "" {
+			If tokenAuthMethod = "basic" {
+				#; AWS tokens are essentially username:password in one string
+				Set client."_basic_auth" = token
+				Do client."reset_basic_auth"()
+			} ElseIf tokenAuthMethod = "bearer" {
+				#; Bearer token
+				Do client."set_token_auth"(token)
+			} ElseIf tokenAuthMethod = "apiKey" {
+				#; API key
+				Do client."set_header"("apikey", token)
+			} Else {
+				$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Unknown token auth method: ""%1""", tokenAuthMethod)))
+			}
+		}
+	} Catch e {
+		If e.Name = "<OBJECT DISPATCH>" {
+			Set eStatus = e.AsStatus()
+			Set usrStatus = $$$ERROR($$$GeneralError,$$$OrasRequiresFlexiblePython)
+			$$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))
 		} Else {
-			$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Unknown token auth method: ""%1""", tokenAuthMethod)))
+			Throw e
 		}
 	}
 	Return client
@@ -304,7 +314,13 @@ ClassMethod Pull(registry As %String, package As %String, namespace As %String, 
 			$$$ThrowStatus($$$ERROR($$$GeneralError, "Module size and/or hash failed validation!"))
 		}
 	} Catch e {
-		Set tSC = e.AsStatus()
+		If e.Name = "<OBJECT DISPATCH>" {
+			Set eStatus = e.AsStatus()
+			Set usrStatus = $$$ERROR($$$GeneralError,$$$OrasRequiresFlexiblePython)
+			Set tSC = $$$EMBEDSC(usrStatus,eStatus)
+		} Else {
+			Set tSC = e.AsStatus()
+		}
 	}
 	Quit tSC
 }

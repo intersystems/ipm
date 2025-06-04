@@ -20,12 +20,10 @@ XData PM [ XMLNamespace = INSTALLER ]
 
 <Namespace Name="${CURNS}" Code="${CURNSRoutineDB}" Data="${CURNSGlobalDB}" Create="no" Ensemble="0">
   <Configuration>
-      <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
-      <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" /> 
+    <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
+    <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" /> 
   </Configuration>
-
   <Import File="${SRCDIR}" Recurse="1"/>
-
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/> 
@@ -34,7 +32,6 @@ XData PM [ XMLNamespace = INSTALLER ]
   <Invoke Class="IPM.Installer" Method="ZPMLoad" CheckStatus="true">
     <Arg Value="${MODDIR}"/>
   </Invoke>
-  <Invoke Class="IPM.Installer" Method="ZPMCompile" CheckStatus="true" />
 </Namespace>
 
 </Manifest>
@@ -72,6 +69,8 @@ ClassMethod Map(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.Ins
 {
   #; Let our XGL document generate code for this method.
   Do %code.WriteLine(" Set pVars(""CURNS"")=$namespace")
+  #; Special case: if we're in %SYS and have an alternative mapping set up, keep it.
+  Do %code.WriteLine(" If ($Namespace = ""%SYS"") && (##class(%SYS.Namespace).GetPackageDest(""%SYS"",""%IPM"") '[ ""irislib"") { Quit $$$OK }")
   Do %code.WriteLine(" Set prevNS = $namespace")
   Do %code.WriteLine(" New $Namespace")
   Do %code.WriteLine(" Set $Namespace = ""%SYS"" ")
@@ -79,7 +78,7 @@ ClassMethod Map(ByRef pVars, pLogLevel As %Integer, pInstaller As %Installer.Ins
   Do %code.WriteLine(" Set sc = ##class(Config.Namespaces).Get(prevNS, .properties)")
   Do %code.WriteLine(" Set pVars(""CURNSRoutineDB"")=$Get(properties(""Routines""))")
   Do %code.WriteLine(" Set pVars(""CURNSGlobalDB"")=$Get(properties(""Globals""))")
-  Do %code.WriteLine(" If ##class(Config.MapPackages).Exists(prevNS,""%IPM"") { Quit $$$OK }")
+  Do %code.WriteLine(" If ##class(Config.MapPackages).Exists(prevNS,""%IPM"") && ##class(Config.MapRoutines).Exists(prevNS,""%IPM.*"") { Quit $$$OK }")
   Quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "MapOnly")
 }
 
@@ -95,9 +94,6 @@ ClassMethod AsyncSetup(Args...)
 
 ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String = "")
 {
-    //If (pRegistry'="") {
-    //  $$$QuitOnError(##class(%IPM.Main).Shell("repo -t registry -name registry -url "_ pRegistry))
-    //}
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
@@ -111,12 +107,8 @@ ClassMethod ZPMInit(pRegistry As %String = "", pAnalyticsTrackingID As %String =
 ClassMethod ZPMLoad(pDirectoryName)
 {
   // Explicitly force DeveloperMode to 0 to avoid loading tests
-  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName_" -DDeveloperMode=0")
-}
-
-ClassMethod ZPMCompile()
-{
-  Quit ##class(%IPM.Main).Shell("ZPM compile")
+  // Do not map here when installed from installer; that's handled via Installer XDatas if/when needed
+  Quit ##class(%IPM.Main).Shell("load "_pDirectoryName_" -DDeveloperMode=0 -DNoMapping=1")
 }
 
 ClassMethod MapIfLegacy()
@@ -129,19 +121,23 @@ ClassMethod MapIfLegacy()
 
 ClassMethod InstallORASIfMissing()
 {
-  if '..ORASInstalled() {
-    // Need to run in a background process to pick up new %IPM.Storage.Module definition
-    Write !,"Installing ORAS Python components..."
-    Job ..InitializeAndSignal()
-    Set result = $System.Event.WaitMsg("",30)
-    Set $ListBuild(msg,sc) = result
-    If (msg = 0) {
-      Write !,"ORAS installation timed out and may not have completed successfully."
-    } ElseIf $$$ISERR(sc) {
-      Write !,"An error occurred installing Python dependencies: ",$System.Status.GetErrorText(sc)
-    } Else {
-      Write " done."
+  if ..ValidatePythonRuntime() {
+    if '..ORASInstalled() {
+      // Need to run in a background process to pick up new %IPM.Storage.Module definition
+      Write !,"Installing ORAS Python components..."
+      Job ..InitializeAndSignal()
+      Set result = $System.Event.WaitMsg("",30)
+      Set $ListBuild(msg,sc) = result
+      If (msg = 0) {
+        Write !,"ORAS installation timed out and may not have completed successfully."
+      } ElseIf $$$ISERR(sc) {
+        Write !,"An error occurred installing Python dependencies: ",$System.Status.GetErrorText(sc)
+      } Else {
+        Write " done."
+      }
     }
+  } else {
+    Write !!,"WARNING: Flexible Python Runtime is not configured on this instance with a valid Python version (>=3.10). Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
   }
   Quit $$$OK
 }
@@ -153,6 +149,20 @@ ClassMethod InitializeAndSignal()
   do $System.Event.Signal($zparent,sc)
 }
 
+ClassMethod ValidatePythonRuntime() As %Boolean
+{
+  try {
+    set version = ..PythonMajorMinorVersion()
+    if (+version < 3.10) {
+      Write !!,"WARNING: Python version "_version_" is not supported. IPM requires Python 3.10 or higher.",!
+      return 0
+    }
+  } catch e {
+    return 0
+  }
+  return 1
+}
+
 ClassMethod ORASInstalled() [ Language = python ]
 {
   try:
@@ -160,6 +170,12 @@ ClassMethod ORASInstalled() [ Language = python ]
     return True
   except:
     return False
+}
+
+ClassMethod PythonMajorMinorVersion() [ Language = python ]
+{
+  import sys
+  return f"{sys.version_info.major}.{sys.version_info.minor}"
 }
 
 ClassMethod EndCompile(qstruct) As %Status

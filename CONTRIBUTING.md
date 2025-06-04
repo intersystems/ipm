@@ -54,6 +54,22 @@ where the `-v` is an optional verbosity flag.
 
 Some tests involve publishing to test registries, such as the ones in `ipm-registry-1` and `ipm-oras-1`. If those tests fail, check if those 2 containers are running on the correct ports and endpoints. Tests can also fail for other reasons. Typically, you can run both tests on an unchanged codebase to establish a baseline first. After development, if it doesn't incur new failures beyond the baseline, then your changes should be fine. We also have CI to double-check all unit/integration tests when you open a pull request.
 
+### Installer testing
+It may be handy to test creation of an IPM installer as part of your workflow. Here's how to do that locally:
+
+```
+docker-compose exec iris bash
+
+iris session iris
+zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS"
+zpm "publish zpm -verbose"
+halt
+
+cd /home/irisowner/zpm && wget http://registry:52773/registry/packages/zpm/latest/installer -O zpm.xml
+```
+
+Now you have zpm.xml at the top level of your git repo and can test installation from e.g. a full IRIS instance on your host environment. (Don't worry, it's in .gitignore!)
+
 ### Pull Request
 Before creating a PR, make sure you document the changes involved in `CHANGELOG.md` and add unit/integration tests in the `tests/` folder.
 

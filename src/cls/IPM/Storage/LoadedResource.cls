@@ -21,7 +21,7 @@ Index ModuleNameIndex On ModuleName [ Type = bitmap ];
 
 Index ResourceUniqueNameIndex On ResourceUniqueName [ Type = bitmap ];
 
-Index LoadedResource On LoadedResource As Exact;
+Index LoadedResourceIndex On LoadedResource As Exact;
 
 ClassMethod TrackResourceNames(pModuleName As %String, pResourceName As %String, pResourceList As %String, pNamespace As %String = {$Namespace}) As %Status
 {

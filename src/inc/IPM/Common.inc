@@ -74,6 +74,7 @@ ROUTINE %IPM.Common [Type=INC]
 
 #; Separator for package version and platform version in OCI tag , e.g. "1.0.0__2024.1"
 #Define OrasTagPlatformSeparator "__"
+#Define OrasRequiresFlexiblePython "Flexible Python Runtime is not configured. You must configure it with Python 3.10+ and reinstall IPM to use ORAS registries." 
 
 #; Place where Deployed.xml is stored
 #Define DeployedXMLDir "studio-project"
