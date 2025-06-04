@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #829: Fixed export of resources with null Directory attribute
+- #832: Fixed places that export to possibly-nonexistent directories by adding /createdirs (needed in 2025.2+)
 
 ## [0.10.2] - 2025-06-04
 

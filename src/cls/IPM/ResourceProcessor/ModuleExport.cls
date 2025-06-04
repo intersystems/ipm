@@ -25,7 +25,7 @@ ClassMethod Export(pModule As %IPM.Storage.Module, pTargetFile As %String, ByRef
 		#dim tProject As %Studio.Project
 		Set tSC = pModule.GetStudioProject(.tProject)
 		$$$ThrowOnError(tSC)
-		Set tSC = tProject.Export(pTargetFile,,0)
+		Set tSC = tProject.Export(pTargetFile,"/createdirs",0)
 	} Catch e {
 		Set tSC = e.AsStatus()
 	}

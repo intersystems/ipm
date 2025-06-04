@@ -1824,13 +1824,13 @@ Method ExportSingleModule(ByRef pResourceArray, ByRef pTargetDirectory As %Strin
 			If '##class(%File).Exists(tFullPath) {
 				Do ##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath))
 			}
-			Set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport",tFullResourceName)
+			Set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport/createdirs",tFullResourceName)
 			$$$ThrowOnError(tSC)
 			If pVerbose {
 				Write !,"Exported to ",tFullPath
 			}
 		} Else {
-			Set tSC = $$Export^%apiRTN(tFullResourceName,tFullPath,"","WNSK\UTF8\","-d /diffexport")
+			Set tSC = $$Export^%apiRTN(tFullResourceName,tFullPath,"","WNSK\UTF8\","-d /diffexport/createdirs")
 			$$$ThrowOnError(tSC)
 			If pVerbose {
 				Write !,"Exported to ",tFullPath
