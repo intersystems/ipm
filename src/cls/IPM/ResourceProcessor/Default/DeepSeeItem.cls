@@ -36,9 +36,9 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
 	Set tSC = $$$OK
 	Set tVerbose = $Get(pParams("Verbose"))
 	If ..Format = "XML" {
-        Set tSC = $System.OBJ.Export(pItemName,pFullExportPath,"-d")
+        Set tSC = $System.OBJ.Export(pItemName,pFullExportPath,"-d"_"/createdirs")
 	} ElseIf (..Format = "UDL") {
-	    Set tSC = $System.OBJ.ExportUDL(pItemName,pFullExportPath,"-d")
+	    Set tSC = $System.OBJ.ExportUDL(pItemName,pFullExportPath,"-d"_"/createdirs")
 	}
 	Set pItemHandled = 1
 	If $$$ISOK(tSC),tVerbose {

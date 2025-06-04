@@ -226,7 +226,7 @@ Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pIte
     Quit tSC	
   }
 	Set tSC = $$$OK
-  Set tExportFlags = "-d /diffexport"_..ExportFlags
+  Set tExportFlags = "-d /diffexport/createdirs"_..ExportFlags
   Set tVerbose = $Get(pParams("Verbose"),0)
 	Try {
 		If ..Format = "UDL" {
@@ -536,4 +536,3 @@ ClassMethod ResourceIsMappedToDefaultDB(pResourceName As %String) As %Boolean
 }
 
 }
-

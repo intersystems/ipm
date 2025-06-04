@@ -1136,7 +1136,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 		If tDeployedProject.Items.Count() > 0 {
 			// Intentionally not calling .%Save() on the project; we don't want to persist it.
 			Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
-			$$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $Select(tVerbose:"d",1:"-d")))
+			$$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $Select(tVerbose:"d",1:"-d")_"/createdirs"))
 		}
 
     /// Always keep these files
@@ -1824,13 +1824,13 @@ Method ExportSingleModule(ByRef pResourceArray, ByRef pTargetDirectory As %Strin
 			If '##class(%File).Exists(tFullPath) {
 				Do ##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath))
 			}
-			Set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport",tFullResourceName)
+			Set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport/createdirs",tFullResourceName)
 			$$$ThrowOnError(tSC)
 			If pVerbose {
 				Write !,"Exported to ",tFullPath
 			}
 		} Else {
-			Set tSC = $$Export^%apiRTN(tFullResourceName,tFullPath,"","WNSK\UTF8\","-d /diffexport")
+			Set tSC = $$Export^%apiRTN(tFullResourceName,tFullPath,"","WNSK\UTF8\","-d /diffexport/createdirs")
 			$$$ThrowOnError(tSC)
 			If pVerbose {
 				Write !,"Exported to ",tFullPath
