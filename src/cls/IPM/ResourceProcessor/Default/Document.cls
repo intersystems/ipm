@@ -491,7 +491,7 @@ Method OnItemRelativePath(pItemName As %String) As %String
 		Set tSourceRoot = tSourceRoot _ "/"
 	}  
   set directory = ..Directory
-	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_ tSourceRoot _ directory_"/"_$Translate($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
+	Quit $Select(..ResourceReference.Preload:"preload/",1:"")_ tSourceRoot _ $select(directory=$c(0):"", 1:directory _ "/") _ $Translate($Piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 }
 
 Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.ResourceInfo) As %Status
@@ -536,3 +536,4 @@ ClassMethod ResourceIsMappedToDefaultDB(pResourceName As %String) As %Boolean
 }
 
 }
+
