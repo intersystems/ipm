@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.2] - Unreleased
+## [0.10.3] - Unreleased
+
+### Fixed
+
+## [0.10.2] - 2025-06-04
 
 ### Fixed
 - #809: Fixed installation of rpds.py in containers using durable %SYS
@@ -14,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #778: CI - avoid deadlock on 2025.2 preview due to cached query regeneration bug
 - #816: Fixed zpm "install" command not pulling specified versions of artifacts
 
-## [0.10.1] - 2024-04-24
+## [0.10.1] - 2025-04-24
 
 ### Fixed
 - #797 Windows: IPM now uses the Python Runtime Library path from iris.cpf if defined
