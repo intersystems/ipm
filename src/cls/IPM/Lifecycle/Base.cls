@@ -1136,7 +1136,7 @@ Method %Export(ByRef pParams, ByRef pTargetDirectory As %String, Output pDepende
 		If tDeployedProject.Items.Count() > 0 {
 			// Intentionally not calling .%Save() on the project; we don't want to persist it.
 			Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
-			$$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $Select(tVerbose:"d",1:"-d")))
+			$$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $Select(tVerbose:"d",1:"-d")_"/createdirs"))
 		}
 
     /// Always keep these files

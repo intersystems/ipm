@@ -112,7 +112,7 @@ Method %Package(ByRef pParams) As %Status
 			Write !!,"Wrapper project:",!
 		}
 		
-		$$$ThrowOnError(tMainProject.DeployToFile(tTargetFile,$Select(tVerbose:"d",1:"-d")))
+		$$$ThrowOnError(tMainProject.DeployToFile(tTargetFile,$Select(tVerbose:"d",1:"-d")_"/createdirs"))
 		
 		Set tPayloadStream = ##class(%Stream.FileCharacter).%OpenId(tTargetFile,,.tSC)
 		$$$ThrowOnError(tSC)
@@ -280,4 +280,3 @@ Method OnInstallFromPayload(ByRef pParams) As %Status
 }
 
 }
-
