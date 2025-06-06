@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - #829: Fixed export of resources with null Directory attribute
 - #832: Fixed places that export to possibly-nonexistent directories by adding /createdirs (needed in 2025.2+)
-- #834: Fixed selectively undeploying classes within a package
+- #823: Fixed selectively undeploying classes within a package
 
 ## [0.10.2] - 2025-06-04
 
@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #756: Support running commands using external names of packages.
 - #769: Allow `publish <module> -only` to publish a module without running `reload`
 - #533: External name changed to IPM (which carries greater meaning in 0.10.0)
+- #793: Add support for -synchronous flag to install command (added to load in #746)
 
 ### Changed
 - The minimum supported IRIS version for this release is 2022.1.
@@ -78,6 +79,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - HSIEO-12012: Publishing modules with deployed code only run PrepareDeploy phase if module is in dev mode.
 - #782: Installer no longer includes unit tests
 - #781: Addressing an issue where file paths exceed 256 characters
+- #786: Resources with scope should not be exported
+- #788: Further reducing likelihood of file paths exceeding 256 characters
+- Issue installing with ORAS registries with specific builds listed; consistencies in repo -list-modules and -search with ORAS registries
+- #787: Publishing/unpublishing to remote registry broken
+- #649: Clear existing credentials when changing URL on remote HTTP registry
+- Reduced timeout when checking HTTP registry availability (fails faster rather than hanging for a long time and then failing)
 
 ## [0.9.2] - 2025-02-24
 
