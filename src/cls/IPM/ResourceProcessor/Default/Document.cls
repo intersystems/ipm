@@ -170,10 +170,6 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   }	
                 }
               }
-              If ##class(%IPM.Utils.File).Exists(.tResourcePath) {
-                Set tSC = $$$OK
-                Quit
-              }
               If ..ResourceReference.Deploy {
                 If tVerbose {
                   Write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
@@ -188,6 +184,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
                 }
                 Return $$$OK
+              }
+              If ##class(%IPM.Utils.File).Exists(.tResourcePath) {
+                Set tSC = $$$OK
+                Quit
               }
               Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
             }
