@@ -5,7 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.0] - 2025-04-10
+## [0.10.3] - Unreleased
+
+### Fixed
+- #829: Fixed export of resources with null Directory attribute
+- #832: Fixed places that export to possibly-nonexistent directories by adding /createdirs (needed in 2025.2+)
+- #834: Fixed selectively undeploying classes within a package
+
+## [0.10.2] - 2025-06-04
+
+### Fixed
+- #809: Fixed installation of rpds.py in containers using durable %SYS
+- #811: Issues when upgrading from earlier IPM versions with cross-namespace differences
+- #796: Installation on environments without Flexible Python Runtime
+- #778: CI - avoid deadlock on 2025.2 preview due to cached query regeneration bug
+- #816: Fixed zpm "install" command not pulling specified versions of artifacts
+
+## [0.10.1] - 2025-04-24
+
+### Fixed
+- #797 Windows: IPM now uses the Python Runtime Library path from iris.cpf if defined
+
+## [0.10.0] - 2025-04-16
 
 *Important*: The minimum supported InterSystems IRIS version is now *2022.1*. For earlier IRIS versions, use IPM 0.9.x.
 
