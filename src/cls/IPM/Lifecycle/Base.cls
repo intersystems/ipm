@@ -642,10 +642,29 @@ Method %Reload(ByRef pParams) As %Status
 		
 		// Standard resource processing
 		Set tSC = $$$OK
+		Set deployedResources = []
+		Set nonDeployedResources = []
 		Set tKey = ""
 		For {
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:tKey=""
+			If tResource.Deploy {
+				do deployedResources.%Push(tResource)
+			}
+			Else {
+				do nonDeployedResources.%Push(tResource)
+			}
+		}
+		// Process deployed resources first
+		set iter = deployedResources.%GetIterator()
+		while iter.%GetNext(, .tResource) {
+			If $IsObject(tResource.Processor) {
+				Set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
+			}
+		}
+		// Then process non deployed resources
+		set iter = nonDeployedResources.%GetIterator()
+		while iter.%GetNext(, .tResource) {
 			If $IsObject(tResource.Processor) {
 				Set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
 			}
