@@ -170,12 +170,16 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   }	
                 }
               }
+              Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
+              If ##class(%IPM.Utils.File).Exists(.tResourcePath) && '($FIND(..ResourceReference.Name, ".PKG") && ##class(%IPM.Utils.File).Exists(tDeployedProjectPath) && ..ResourceReference.Deploy) {
+                Set tSC = $$$OK
+                Quit
+              }
               If ..ResourceReference.Deploy {
                 If tVerbose {
                   Write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
                 }
                 Set ..CompileFromProject = 1
-                Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
                 If '$Data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
                   Set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
                   If $$$ISERR(sc) {
@@ -184,10 +188,6 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
                 }
                 Return $$$OK
-              }
-              If ##class(%IPM.Utils.File).Exists(.tResourcePath) {
-                Set tSC = $$$OK
-                Quit
               }
               Set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
             }
