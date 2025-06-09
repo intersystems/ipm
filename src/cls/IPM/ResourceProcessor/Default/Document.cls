@@ -171,7 +171,8 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 }
               }
               Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
-              If ##class(%IPM.Utils.File).Exists(.tResourcePath) && '($FIND(..ResourceReference.Name, ".PKG") && ##class(%IPM.Utils.File).Exists(tDeployedProjectPath) && ..ResourceReference.Deploy) {
+              // If resource path exists and the resource is not deployed with a deployed.xml existing
+              If ##class(%IPM.Utils.File).Exists(.tResourcePath) && '(##class(%IPM.Utils.File).Exists(tDeployedProjectPath) && ..ResourceReference.Deploy) {
                 Set tSC = $$$OK
                 Quit
               }
@@ -183,7 +184,7 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                 If '$Data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
                   Set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
                   If $$$ISERR(sc) {
-                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found"))
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Resource path '" _ tDeployedProjectPath _ "' not found"))
                   }
                   Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
                 }
