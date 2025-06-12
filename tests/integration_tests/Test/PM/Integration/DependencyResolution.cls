@@ -115,6 +115,8 @@ Method TestEverything()
 				Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
       }
 		}
+
+    Do ..SubTestInstallAndUpgrade()
 	} Catch e {
 		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
 	}
@@ -124,11 +126,34 @@ Method TestEverything()
 	Do $$$AssertStatusOK(..TearDown())
 }
 
+Method SubTestInstallAndUpgrade()
+{
+
+	#dim tModule As %IPM.Storage.Module
+	New $Namespace
+	Set tOrigNS = $Namespace
+	Try {
+		Set $Namespace = ..#CLIENTNS
+    Do ..UtilUninstallAll()
+
+    Do $$$AssertStatusOK(##class(%IPM.Main).Shell("install hs.everything 1.0.0 -quiet"))
+    zpm "list"
+    Do $$$AssertStatusOK(##class(%IPM.Main).Shell("install hs.everything 1.0.1 -quiet"))
+    zpm "list"
+    Do $$$AssertStatusNotOK(##class(%IPM.Main).Shell("install hs.everything 1.0.0 -quiet"))
+    zpm "list"
+    Do $$$AssertStatusOK(##class(%IPM.Main).Shell("install hs.everything 1.0.0 -DPermitDowngrade=1 -quiet"))
+    zpm "list"
+	} Catch e {
+		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+	}
+}
+
 Method PublishModules()
 {
   Set tOrigNS = $Namespace
   // Publish modules
-  For i=1:1:11,100:1:103 {
+  For i=1:1:13,100:1:104,200:1:202 {
     // If we're loading a module with dependencies, clear out things that might have conflicting dependencies first.
     Do ..UtilUninstallAll()
     
@@ -141,7 +166,7 @@ Method PublishModules()
 
 Method UtilUninstallAll()
 {
-	For tModName = "Demo","HS.REST","HS.MDM","HS.JSON" {
+	For tModName = "Demo","hs.rest","hs.mdm","hs.json","hs.everything","hs.bar","hs.foo" {
 		If ##class(%IPM.Storage.Module).NameExists($$$lcase(tModName)) {
 			Do $$$AssertStatusOK(##class(%IPM.Storage.Module).Uninstall(tModName))
 		}
@@ -152,7 +177,7 @@ XData ServerModule1 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>0.0.1</Version>
 </Module>
 }
@@ -161,7 +186,7 @@ XData ServerModule2 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>0.1.0</Version>
 </Module>
 }
@@ -170,7 +195,7 @@ XData ServerModule3 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.0.0</Version>
 </Module>
 }
@@ -179,7 +204,7 @@ XData ServerModule4 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.1.0</Version>
 </Module>
 }
@@ -188,7 +213,7 @@ XData ServerModule5 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.1.1</Version>
 </Module>
 }
@@ -197,7 +222,7 @@ XData ServerModule6 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.1.2</Version>
 </Module>
 }
@@ -206,7 +231,7 @@ XData ServerModule7 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.1.3</Version>
 </Module>
 }
@@ -215,7 +240,7 @@ XData ServerModule8 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.1.4</Version>
 </Module>
 }
@@ -224,7 +249,7 @@ XData ServerModule9 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.0.1</Version>
 </Module>
 }
@@ -233,7 +258,7 @@ XData ServerModule10 [ XMLNamespace = "http://www.intersystems.com/PackageManage
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.0.2</Version>
 </Module>
 }
@@ -242,8 +267,38 @@ XData ServerModule11 [ XMLNamespace = "http://www.intersystems.com/PackageManage
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>2.0.0</Version>
+</Module>
+}
+
+XData ServerModule12 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
+{
+<?xml version="1.0"?>
+<Module>
+  <Name>hs.foo</Name>
+  <Version>1.0.0</Version>
+  <Dependencies>
+    <ModuleReference>
+      <Name>hs.mdm</Name>
+      <Version>1.0.0</Version>
+    </ModuleReference>
+  </Dependencies>
+</Module>
+}
+
+XData ServerModule13 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
+{
+<?xml version="1.0"?>
+<Module>
+  <Name>hs.bar</Name>
+  <Version>1.0.0</Version>
+  <Dependencies>
+    <ModuleReference>
+      <Name>hs.foo</Name>
+      <Version>1.0.0</Version>
+    </ModuleReference>
+  </Dependencies>
 </Module>
 }
 
@@ -251,11 +306,11 @@ XData ServerModule100 [ XMLNamespace = "http://www.intersystems.com/PackageManag
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.0</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.0.0</Version>
   </ModuleReference>
   </Dependencies>
@@ -266,11 +321,11 @@ XData ServerModule101 [ XMLNamespace = "http://www.intersystems.com/PackageManag
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.1.x</Version>
   </ModuleReference>
   </Dependencies>
@@ -281,11 +336,11 @@ XData ServerModule102 [ XMLNamespace = "http://www.intersystems.com/PackageManag
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.REST</Name>
+  <Name>hs.rest</Name>
   <Version>1.0.0</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.0.x</Version>
   </ModuleReference>
   </Dependencies>
@@ -296,19 +351,114 @@ XData ServerModule103 [ XMLNamespace = "http://www.intersystems.com/PackageManag
 {
 <?xml version="1.0"?>
 <Module>
-  <Name>HS.REST</Name>
+  <Name>hs.rest</Name>
   <Version>1.0.1</Version>
   <Dependencies>
-  <ModuleReference>
-  <Name>HS.JSON</Name>
-  <Version>1.1.3</Version>
-  </ModuleReference>
+    <ModuleReference>
+      <Name>hs.json</Name>
+      <Version>1.1.3</Version>
+    </ModuleReference>
+  </Dependencies>
+  <Invoke Class="%IPM.Utils.Build" Method="Hang" />
+</Module>
+}
+
+XData ServerModule104 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
+{
+<?xml version="1.0"?>
+<Module>
+  <Name>hs.everything</Name>
+  <Version>1.0.0</Version>
+  <Dependencies>
+    <ModuleReference>
+      <Name>hs.rest</Name>
+      <Version>1.0.0</Version>
+    </ModuleReference>
+    <ModuleReference>
+      <Name>hs.json</Name>
+      <Version>1.0.0</Version>
+    </ModuleReference>
+    <ModuleReference>
+      <Name>hs.mdm</Name>
+      <Version>1.0.0</Version>
+    </ModuleReference>
+    <ModuleReference>
+      <Name>hs.foo</Name>
+      <Version>1.0.0</Version>
+    </ModuleReference>
+    <ModuleReference>
+      <Name>hs.bar</Name>
+      <Version>1.0.0</Version>
+    </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.MDM 1.0.1")
-/// @AssertDependsOn("HS.JSON 1.1.4")
+XData ServerModule200 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
+{
+<?xml version="1.0"?>
+<Module>
+  <Name>hs.bar</Name>
+  <Version>2.0.0</Version>
+  <Dependencies>
+    <ModuleReference>
+      <Name>hs.foo</Name>
+      <Version>2.0.0</Version>
+    </ModuleReference>
+  </Dependencies>
+  <Invoke Class="%IPM.Utils.Build" Method="Hang" />
+</Module>
+}
+
+XData ServerModule201 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
+{
+<?xml version="1.0"?>
+<Module>
+  <Name>hs.foo</Name>
+  <Version>2.0.0</Version>
+  <Dependencies>
+    <ModuleReference>
+      <Name>hs.mdm</Name>
+      <Version>1.0.1</Version>
+    </ModuleReference>
+  </Dependencies>
+  <Invoke Class="%IPM.Utils.Build" Method="Hang" />
+</Module>
+}
+
+XData ServerModule202 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
+{
+<?xml version="1.0"?>
+<Module>
+  <Name>hs.everything</Name>
+  <Version>1.0.1</Version>
+  <Dependencies>
+    <ModuleReference>
+      <Name>hs.rest</Name>
+      <Version>1.0.1</Version>
+    </ModuleReference>
+    <ModuleReference>
+      <Name>hs.json</Name>
+      <Version>1.1.3</Version>
+    </ModuleReference>
+    <ModuleReference>
+      <Name>hs.mdm</Name>
+      <Version>1.0.1</Version>
+    </ModuleReference>
+    <ModuleReference>
+      <Name>hs.foo</Name>
+      <Version>2.0.0</Version>
+    </ModuleReference>
+    <ModuleReference>
+      <Name>hs.bar</Name>
+      <Version>2.0.0</Version>
+    </ModuleReference>
+  </Dependencies>
+</Module>
+}
+
+/// @AssertDependsOn("hs.mdm 1.0.1")
+/// @AssertDependsOn("hs.json 1.1.4")
 /// @AssertCompileOK
 XData LocalModule1 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -318,15 +468,15 @@ XData LocalModule1 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>*</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.MDM 1.0.0")
-/// @AssertDependsOn("HS.JSON 1.0.0")
+/// @AssertDependsOn("hs.mdm 1.0.0")
+/// @AssertDependsOn("hs.json 1.0.0")
 /// @AssertCompileOK
 XData LocalModule2 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -336,15 +486,15 @@ XData LocalModule2 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.0</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.MDM 1.0.1")
-/// @AssertDependsOn("HS.JSON 1.1.4")
+/// @AssertDependsOn("hs.mdm 1.0.1")
+/// @AssertDependsOn("hs.json 1.1.4")
 /// @AssertCompileOK
 XData LocalModule3 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -354,15 +504,15 @@ XData LocalModule3 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.MDM 1.0.1")
-/// @AssertDependsOn("HS.JSON 1.1.1")
+/// @AssertDependsOn("hs.mdm 1.0.1")
+/// @AssertDependsOn("hs.json 1.1.1")
 /// @AssertCompileOK
 XData LocalModule4 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -372,11 +522,11 @@ XData LocalModule4 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.1.1</Version>
   </ModuleReference>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   </Dependencies>
@@ -393,20 +543,20 @@ XData LocalModule5 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.0.0</Version>
   </ModuleReference>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.REST 1.0.1")
-/// @AssertDependsOn("HS.MDM 1.0.1")
-/// @AssertDependsOn("HS.JSON 1.1.3")
+/// @AssertDependsOn("hs.rest 1.0.1")
+/// @AssertDependsOn("hs.mdm 1.0.1")
+/// @AssertDependsOn("hs.json 1.1.3")
 /// @AssertCompileOK
 XData LocalModule6 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -416,20 +566,20 @@ XData LocalModule6 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.REST</Name>
+  <Name>hs.rest</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.REST 1.0.1")
-/// @AssertDependsOn("HS.MDM 1.0.1")
-/// @AssertDependsOn("HS.JSON 1.1.3")
+/// @AssertDependsOn("hs.rest 1.0.1")
+/// @AssertDependsOn("hs.mdm 1.0.1")
+/// @AssertDependsOn("hs.json 1.1.3")
 /// @AssertCompileOK
 XData LocalModule7 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -439,26 +589,26 @@ XData LocalModule7 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.REST</Name>
+  <Name>hs.rest</Name>
   <Version>1.*</Version>
   </ModuleReference>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.*</Version>
   </ModuleReference>
   
-  <!-- The below ModuleReference is required in order for the HS.REST/HS.MDM combination above to be resolved. Ideally it would not be, but with the same result. -->
+  <!-- The below ModuleReference is required in order for the hs.rest/hs.mdm combination above to be resolved. Ideally it would not be, but with the same result. -->
   <ModuleReference>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.1.3</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.REST 1.0.0")
-/// @AssertDependsOn("HS.MDM 1.0.0")
-/// @AssertDependsOn("HS.JSON 1.0.0")
+/// @AssertDependsOn("hs.rest 1.0.0")
+/// @AssertDependsOn("hs.mdm 1.0.0")
+/// @AssertDependsOn("hs.json 1.0.0")
 /// @AssertCompileOK
 XData LocalModule8 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -468,20 +618,20 @@ XData LocalModule8 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.0</Version>
   </ModuleReference>
   <ModuleReference>
-  <Name>HS.REST</Name>
+  <Name>hs.rest</Name>
   <Version>1.*</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.REST 1.0.0")
-/// @AssertDependsOn("HS.MDM 1.0.0")
-/// @AssertDependsOn("HS.JSON 1.0.0")
+/// @AssertDependsOn("hs.rest 1.0.0")
+/// @AssertDependsOn("hs.mdm 1.0.0")
+/// @AssertDependsOn("hs.json 1.0.0")
 /// @AssertCompileOK
 XData LocalModule9 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -491,20 +641,20 @@ XData LocalModule9 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.*</Version>
   </ModuleReference>
   <ModuleReference>
-  <Name>HS.REST</Name>
+  <Name>hs.rest</Name>
   <Version>1.0.0</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertDependsOn("HS.REST 1.0.0")
-/// @AssertDependsOn("HS.MDM 1.0.0")
-/// @AssertDependsOn("HS.JSON 1.0.0")
+/// @AssertDependsOn("hs.rest 1.0.0")
+/// @AssertDependsOn("hs.mdm 1.0.0")
+/// @AssertDependsOn("hs.json 1.0.0")
 /// @AssertCompileOK
 XData LocalModule10 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -514,15 +664,15 @@ XData LocalModule10 [ XMLNamespace = "http://www.intersystems.com/PackageManager
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.*</Version>
   </ModuleReference>
   <ModuleReference>
-  <Name>HS.REST</Name>
+  <Name>hs.rest</Name>
   <Version>1.0.x</Version>
   </ModuleReference>
   <ModuleReference>
-  <Name>HS.JSON</Name>
+  <Name>hs.json</Name>
   <Version>1.0.0</Version>
   </ModuleReference>
   </Dependencies>
@@ -546,8 +696,8 @@ XData LocalModule11 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 </Module>
 }
 
-/// @AssertInstalledBefore("HS.JSON 1.1.1")
-/// @AssertDependsOn("HS.JSON 1.1.1")
+/// @AssertInstalledBefore("hs.json 1.1.1")
+/// @AssertDependsOn("hs.json 1.1.1")
 /// @AssertCompileOK
 XData LocalModule12 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -558,15 +708,15 @@ XData LocalModule12 [ XMLNamespace = "http://www.intersystems.com/PackageManager
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   </Dependencies>
 </Module>
 }
 
-/// @AssertInstalledBefore("HS.JSON 1.0.0")
-/// @AssertDependsOn("HS.JSON 1.1.4")
+/// @AssertInstalledBefore("hs.json 1.0.0")
+/// @AssertDependsOn("hs.json 1.1.4")
 /// @AssertCompileOK
 XData LocalModule13 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
@@ -577,7 +727,7 @@ XData LocalModule13 [ XMLNamespace = "http://www.intersystems.com/PackageManager
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   </Dependencies>
@@ -586,7 +736,7 @@ XData LocalModule13 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 
 /// @AssertUnresolvable
 /// @AssertCompileNotOK
-/// @AssertInstalledBefore("HS.REST 1.0.0")
+/// @AssertInstalledBefore("hs.rest 1.0.0")
 XData LocalModule14 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
 <?xml version="1.0"?>
@@ -596,7 +746,7 @@ XData LocalModule14 [ XMLNamespace = "http://www.intersystems.com/PackageManager
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   </Dependencies>
@@ -604,9 +754,9 @@ XData LocalModule14 [ XMLNamespace = "http://www.intersystems.com/PackageManager
 }
 
 /// @AssertCompileNotOK
-/// @AssertInstalledBefore("HS.JSON 2.0.0")
-/// @AssertDependsOn("HS.JSON 1.1.4")
-/// @AssertDependsOn("HS.MDM 1.0.1")
+/// @AssertInstalledBefore("hs.json 2.0.0")
+/// @AssertDependsOn("hs.json 1.1.4")
+/// @AssertDependsOn("hs.mdm 1.0.1")
 XData LocalModule15 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
 <?xml version="1.0"?>
@@ -616,7 +766,7 @@ XData LocalModule15 [ XMLNamespace = "http://www.intersystems.com/PackageManager
   <Version>0.0.1+snapshot</Version>
   <Dependencies>
   <ModuleReference>
-  <Name>HS.MDM</Name>
+  <Name>hs.mdm</Name>
   <Version>1.0.1</Version>
   </ModuleReference>
   </Dependencies>

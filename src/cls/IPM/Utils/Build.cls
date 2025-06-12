@@ -718,4 +718,9 @@ ClassMethod Backup() As %Status [ Internal ]
 	Quit tSC
 }
 
+ClassMethod Hang(pTime As %Integer = 2)
+{
+	Hang pTime
+}
+
 }
