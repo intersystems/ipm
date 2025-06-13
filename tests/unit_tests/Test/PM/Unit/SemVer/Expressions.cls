@@ -163,6 +163,16 @@ Method TestIRISVersions()
 	Do ..AssertNotSatisfied(">=2022.1", "2021.2")
 }
 
+Method TestAndedOr()
+{
+	do ##class(%IPM.General.SemanticVersionExpression).FromString("^3.0.0",.sve1)
+	do ##class(%IPM.General.SemanticVersionExpression).FromString("^2.0.1 || ^3.0.0",.sve2)
+	set sve3 = sve1.And(sve2)
+	do $$$AssertTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("3.2.1")))
+	do $$$AssertNotTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("2.0.0")))
+	do $$$AssertNotTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("4.0.0")))
+}
+
 Method AssertEquivalent(pVersionExpression1 As %String, pVersionExpression2 As %String, pVerbose As %Boolean = 0) As %Boolean [ Internal, Private ]
 {
 	Set tEquivalent = 0
