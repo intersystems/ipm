@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #810: Fixed `<SystemRequirements Interoperability="enabled"/>` in module.xml not enabling interoperability for deployed code namespaces
 - #836: Fixed FileCopy (and other resource processors) not checking scope
 - #688: `uninstall -f -all` will no longer attempt to uninstall IPM
+- #839: SemVer expression "And" (as in dependency resolution) fixed for complex ranges
 
 ### Changed
 - Format all files and add consistent formatting settings, format on save etc.
