@@ -1,4 +1,4 @@
-Class %IPM.General.SemanticVersionExpression.Comparator Extends %SerialObject
+Class %IPM.General.SemanticVersionExpression.Comparator Extends (%SerialObject, %IPM.General.SemanticVersionExpression.IComparable)
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVer.Comp";
@@ -127,6 +127,11 @@ Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
     }
 
     quit 1
+}
+
+Method IsSatsifiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean [ Abstract ]
+{
+	Quit ..Evaluate(pVersion)
 }
 
 Storage Default

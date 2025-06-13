@@ -1,9 +1,11 @@
-Class %IPM.General.SemanticVersionExpression Extends (%SerialObject, %XML.Adaptor) [ StorageStrategy = "" ]
+Class %IPM.General.SemanticVersionExpression Extends (%SerialObject, %XML.Adaptor, %IPM.General.SemanticVersionExpression.IComparable) [ StorageStrategy = "" ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVerExpression";
 
-Property Options As list Of %IPM.General.SemanticVersionExpression.Range;
+Property AnyOf As list Of %IPM.General.SemanticVersionExpression.IComparable;
+
+Property AllOf As list Of %IPM.General.SemanticVersionExpression.IComparable;
 
 Property Expression As %String(MAXLEN = "");
 
@@ -25,7 +27,7 @@ Method ExpressionSet(pValue As %String) As %Status
             if $$$ISERR(tSC) {
                 quit
             }
-            do ..Options.Insert(tOption)
+            do ..AnyOf.Insert(tOption)
         }
         set i%Expression = pValue
     } catch e {
@@ -41,12 +43,22 @@ Method ToString() As %String [ CodeMode = expression ]
 
 Method ToResolvedString() As %String
 {
-    set tOptList = ""
-    for i=1:1:..Options.Count() {
-        set tOpt = ..Options.GetAt(i)
-        set tOptList = tOptList_$listbuild(tOpt.ToResolvedString())
-    }
-    quit $listtostring(tOptList," || ")
+	set tOptList = ""
+	if ..AnyOf.Count() {
+		for i=1:1:..AnyOf.Count() {
+			set tOpt = ..AnyOf.GetAt(i)
+			set tOptList = tOptList_$listbuild(tOpt.ToResolvedString())
+		}
+		quit $listtostring(tOptList," || ")
+	}
+	if ..AllOf.Count() {
+		for i=1:1:..AllOf.Count() {
+			set tOpt = ..AllOf.GetAt(i)
+			set tOptList = tOptList_$listbuild("("_tOpt.ToResolvedString()_")")
+		}
+		quit $listtostring(tOptList," && ")
+	}
+	quit ""
 }
 
 ClassMethod FromString(
@@ -64,7 +76,7 @@ ClassMethod FromString(
             if $$$ISERR(tSC) {
                 quit
             }
-            do pExpr.Options.Insert(tOption)
+            do pExpr.AnyOf.Insert(tOption)
         }
     } catch e {
         set tSC = e.AsStatus()
@@ -74,41 +86,46 @@ ClassMethod FromString(
 
 Method IsSatisfiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
-    set tSatisfied = (..Options.Count() = 0)
-    for i=1:1:..Options.Count() {
-        if ..Options.GetAt(i).InRange(pVersion) {
-            set tSatisfied = 1
-            quit
-        }
-    }
-    quit tSatisfied
+	set tSatisfied = (..AnyOf.Count() = 0)
+	for i=1:1:..AnyOf.Count() {
+		if ..AnyOf.GetAt(i).IsSatisfiedBy(pVersion) {
+			set tSatisfied = 1
+			quit
+		}
+	}
+
+	set tAllSatisfied = (..AllOf.Count() = 0)
+	for i=1:1:..AllOf.Count() {
+		if ..AllOf.GetAt(i).IsSatisfiedBy(pVersion) {
+			set tAllSatisfied = 1
+			quit
+		}
+	}
+
+	set tSatisfied = tSatisfied && tAllSatisfied
+	quit tSatisfied
 }
 
 Method And(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
-    for i=1:1:pVersionExpression.Options.Count() {
-        set tOption = pVersionExpression.Options.GetAt(i)
-        if (..Options.Count() = 0) {
-            do ..Options.Insert(tOption)
-        } else {
-            for j=1:1:..Options.Count() {
-                for k=1:1:tOption.Comparators.Count() {
-                    do ..Options.GetAt(j).Comparators.Insert(tOption.Comparators.GetAt(k))
-                }
-            }
-        }
-    }
-    set i%Expression = ..ToResolvedString()
-    quit $this
+	set expr1 = ..%ConstructClone()
+	do ..AnyOf.Clear()
+	do ..AllOf.Clear()
+	do ..AllOf.Insert(expr1)
+	do ..AllOf.Insert(pVersionExpression)
+	set i%Expression = ..ToResolvedString()
+	quit $this
 }
 
 Method Or(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
-    for i=1:1:pVersionExpression.Options.Count() {
-        do ..Options.Insert(pVersionExpression.Options.GetAt(i))
-    }
-    set i%Expression = ..ToResolvedString()
-    quit $this
+	set expr1 = ..%ConstructClone()
+	do ..AnyOf.Clear()
+	do ..AllOf.Clear()
+	do ..AnyOf.Insert(expr1)
+	do ..AnyOf.Insert(pVersionExpression)
+	set i%Expression = ..ToResolvedString()
+	quit $this
 }
 
 Storage Default
@@ -119,6 +136,12 @@ Storage Default
 </Value>
 <Value name="2">
 <Value>Options</Value>
+</Value>
+<Value name="3">
+<Value>AnyOf</Value>
+</Value>
+<Value name="4">
+<Value>AllOf</Value>
 </Value>
 </Data>
 <State>SemanticVersionExpressionState</State>
