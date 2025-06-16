@@ -44,24 +44,24 @@ Method TestSelectivelyUndeploy()
         // Uninstall module
         Set tSC = ##class(%IPM.Main).Shell("uninstall selectively-undeploy")
         Do $$$AssertStatusOK(tSC,"Uninstalled selectively-undeploy successfully.")
-        Set tSC=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyUndeploy.D1")
-        Do $$$AssertNotTrue(tSC, "Class SelectivelyUndeploy.D1 DNE")
-        Set tSC=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyUndeploy.D2")
-        Do $$$AssertNotTrue(tSC, "Class SelectivelyUndeploy.D2 DNE")
+        Set isClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyUndeploy.D1")
+        Do $$$AssertNotTrue(isClassExist, "Class SelectivelyUndeploy.D1 DNE")
+        Set isClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyUndeploy.D2")
+        Do $$$AssertNotTrue(isClassExist, "Class SelectivelyUndeploy.D2 DNE")
 
         // Load module from package
         Set tSC = ##class(%IPM.Main).Shell("load -v "_packageDir_".tgz")
-        Do $$$AssertStatusOK(tSC,"Installed selectively-undeploy successfully.")
+        Do $$$AssertStatusOK(tSC,"Loaded selectively-undeploy successfully.")
         Set tSC = ##class(SelectivelyUndeploy.D1).Main()
         Do $$$AssertStatusOK(tSC, "Class SelectivelyUndeploy.D1 installed correctly")
         Set tSC = ##class(SelectivelyUndeploy.D2).Main()
         Do $$$AssertStatusOK(tSC, "Class SelectivelyUndeploy.D2 installed correctly")
         
         // Check deployed status after loading
-        Set tSC = ##class(%Dictionary.CompiledClass).%OpenId("SelectivelyUndeploy.D1").Deployed
-        Do $$$AssertTrue(tSC, "Class SelectivelyUndeploy.D1 is deployed")
-        Set tSC = ##class(%Dictionary.CompiledClass).%OpenId("SelectivelyUndeploy.D2").Deployed
-        Do $$$AssertNotTrue(tSC, "Class SelectivelyUndeploy.D2 is NOT deployed")
+        Set isDeployed = ##class(%Dictionary.CompiledClass).%OpenId("SelectivelyUndeploy.D1").Deployed
+        Do $$$AssertTrue(isDeployed, "Class SelectivelyUndeploy.D1 is deployed")
+        Set isDeployed = ##class(%Dictionary.CompiledClass).%OpenId("SelectivelyUndeploy.D2").Deployed
+        Do $$$AssertNotTrue(isDeployed, "Class SelectivelyUndeploy.D2 is NOT deployed")
     } Catch e {
         Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestSelectivelyUndeploy.")
     }
@@ -87,24 +87,24 @@ Method TestSelectivelyDeploy()
         // Uninstall module
         Set tSC = ##class(%IPM.Main).Shell("uninstall selectively-deploy")
         Do $$$AssertStatusOK(tSC,"Uninstalled selectively-deploy successfully.")
-        Set tSC=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyDeploy.D1")
-        Do $$$AssertNotTrue(tSC, "Class SelectivelyDeploy.D1 DNE")
-        Set tSC=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyDeploy.D2")
-        Do $$$AssertNotTrue(tSC, "Class SelectivelyDeploy.D2 DNE")
+        Set isClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyDeploy.D1")
+        Do $$$AssertNotTrue(isClassExist, "Class SelectivelyDeploy.D1 DNE")
+        Set isClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyDeploy.D2")
+        Do $$$AssertNotTrue(isClassExist, "Class SelectivelyDeploy.D2 DNE")
 
         // Load module from package
         Set tSC = ##class(%IPM.Main).Shell("load -v "_packageDir_".tgz")
-        Do $$$AssertStatusOK(tSC,"Installed selectively-deploy successfully.")
+        Do $$$AssertStatusOK(tSC,"Loaded selectively-deploy successfully.")
         Set tSC = ##class(SelectivelyDeploy.D1).Main()
         Do $$$AssertStatusOK(tSC, "Class SelectivelyDeploy.D1 installed correctly")
         Set tSC = ##class(SelectivelyDeploy.D2).Main()
         Do $$$AssertStatusOK(tSC, "Class SelectivelyDeploy.D2 installed correctly")
 
         // Check deployed status after loading
-        Set tSC = ##class(%Dictionary.CompiledClass).%OpenId("SelectivelyDeploy.D1").Deployed
-        Do $$$AssertNotTrue(tSC, "Class SelectivelyUndeploy.D1 is NOT deployed")
-        Set tSC = ##class(%Dictionary.CompiledClass).%OpenId("SelectivelyDeploy.D2").Deployed
-        Do $$$AssertTrue(tSC, "Class SelectivelyUndeploy.D2 is deployed")
+        Set isDeployed = ##class(%Dictionary.CompiledClass).%OpenId("SelectivelyDeploy.D1").Deployed
+        Do $$$AssertNotTrue(isDeployed, "Class SelectivelyUndeploy.D1 is NOT deployed")
+        Set isDeployed = ##class(%Dictionary.CompiledClass).%OpenId("SelectivelyDeploy.D2").Deployed
+        Do $$$AssertTrue(isDeployed, "Class SelectivelyUndeploy.D2 is deployed")
     } Catch e {
         Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestSelectivelyDeploy.")
     }
