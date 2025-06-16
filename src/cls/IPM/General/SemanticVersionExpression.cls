@@ -135,12 +135,9 @@ Storage Default
 <Value>Expression</Value>
 </Value>
 <Value name="2">
-<Value>Options</Value>
-</Value>
-<Value name="3">
 <Value>AnyOf</Value>
 </Value>
-<Value name="4">
+<Value name="3">
 <Value>AllOf</Value>
 </Value>
 </Data>
