@@ -35,7 +35,7 @@ Method CheckRequirements() As %Status
 
 Method CheckVersion() As %Status
 {
-  Set tSystemVersion = +$System.Version.GetMajor() _ "." _ +$System.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
+	Set tSystemVersion = +$System.Version.GetMajor() _ "." _ +$System.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
 	If (..VersionString = "") { Return $$$OK } 
 	Try {
 		Set CurrentSystemVersion = ##class(%IPM.General.SemanticVersion).FromString(tSystemVersion)
