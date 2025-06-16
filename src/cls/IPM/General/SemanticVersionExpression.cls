@@ -3,9 +3,9 @@ Class %IPM.General.SemanticVersionExpression Extends (%SerialObject, %XML.Adapto
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVerExpression";
 
-Property AnyOf As list Of %IPM.General.SemanticVersionExpression.IComparable;
+Property AnyOf As list Of %IPM.General.SemanticVersionExpression.IComparable(CLASSNAME = 1);
 
-Property AllOf As list Of %IPM.General.SemanticVersionExpression.IComparable;
+Property AllOf As list Of %IPM.General.SemanticVersionExpression.IComparable(CLASSNAME = 1);
 
 Property Expression As %String(MAXLEN = "");
 
@@ -126,6 +126,23 @@ Method Or(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.
 	do ..AnyOf.Insert(pVersionExpression)
 	set i%Expression = ..ToResolvedString()
 	quit $this
+}
+
+Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
+{
+	// On-the-fly data migration to tack on list-of-serial CLASSNAME=1 with default classname of %IPM.General.SemanticVersionExpression.Range
+	Set key = ""
+	For {
+		Set key = $order(i%AnyOf(key),1,data)
+		If key="" {
+			Quit
+		}
+		If $ListLength(data) = 1 {
+			Set $List(data,2) = "%IPM.General.SemanticVersionExpression.Range"
+		}
+		Set i%AnyOf(key) = data
+	}
+	Quit $$$OK
 }
 
 Storage Default
