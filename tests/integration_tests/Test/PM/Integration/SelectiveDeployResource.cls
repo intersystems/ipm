@@ -44,10 +44,10 @@ Method TestSelectivelyUndeploy()
         // Uninstall module
         Set tSC = ##class(%IPM.Main).Shell("uninstall selectively-undeploy")
         Do $$$AssertStatusOK(tSC,"Uninstalled selectively-undeploy successfully.")
-        Set isClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyUndeploy.D1")
-        Do $$$AssertNotTrue(isClassExist, "Class SelectivelyUndeploy.D1 DNE")
-        Set isClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyUndeploy.D2")
-        Do $$$AssertNotTrue(isClassExist, "Class SelectivelyUndeploy.D2 DNE")
+        Set doesClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyUndeploy.D1")
+        Do $$$AssertNotTrue(doesClassExist, "Class SelectivelyUndeploy.D1 DNE")
+        Set doesClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyUndeploy.D2")
+        Do $$$AssertNotTrue(doesClassExist, "Class SelectivelyUndeploy.D2 DNE")
 
         // Load module from package
         Set tSC = ##class(%IPM.Main).Shell("load -v "_packageDir_".tgz")
@@ -87,10 +87,10 @@ Method TestSelectivelyDeploy()
         // Uninstall module
         Set tSC = ##class(%IPM.Main).Shell("uninstall selectively-deploy")
         Do $$$AssertStatusOK(tSC,"Uninstalled selectively-deploy successfully.")
-        Set isClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyDeploy.D1")
-        Do $$$AssertNotTrue(isClassExist, "Class SelectivelyDeploy.D1 DNE")
-        Set isClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyDeploy.D2")
-        Do $$$AssertNotTrue(isClassExist, "Class SelectivelyDeploy.D2 DNE")
+        Set doesClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyDeploy.D1")
+        Do $$$AssertNotTrue(doesClassExist, "Class SelectivelyDeploy.D1 DNE")
+        Set doesClassExist=##class(%Dictionary.CompiledClass).%ExistsId("SelectivelyDeploy.D2")
+        Do $$$AssertNotTrue(doesClassExist, "Class SelectivelyDeploy.D2 DNE")
 
         // Load module from package
         Set tSC = ##class(%IPM.Main).Shell("load -v "_packageDir_".tgz")

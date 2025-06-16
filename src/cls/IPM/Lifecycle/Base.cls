@@ -640,7 +640,7 @@ Method %Reload(ByRef pParams) As %Status
 			Set ^Sources("MODULE",..Module.Name) = tAbsolutePrefix_tRoot
 		}
 		
-		// Process resources based on their package depth
+		// Process resources based on their package depth (higher level first so more granular resource will override)
 		// e.g. <Resource Name="Depth1.PKG"/> will be processed before <Resource Name="Depth1.Depth2.CLS"/>
 		Set tKey = ""
 		For {
