@@ -640,13 +640,29 @@ Method %Reload(ByRef pParams) As %Status
 			Set ^Sources("MODULE",..Module.Name) = tAbsolutePrefix_tRoot
 		}
 		
-		// Standard resource processing
-		Set tSC = $$$OK
+		// Process resources based on their package depth (higher level first so more granular resource will override)
+		// e.g. <Resource Name="Depth1.PKG"/> will be processed before <Resource Name="Depth1.Depth2.CLS"/>
 		Set tKey = ""
 		For {
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:tKey=""
 			If $IsObject(tResource.Processor) {
+				Set depth = $LENGTH(tResource.Name, ".")
+				If $GET(resourceList(depth)) = "" {
+					Set resourceList(depth) = []
+				}
+				Do resourceList(depth).%Push(tResource)
+			}
+		}
+
+		set tSC = $$$OK
+		Set tKey = ""
+		For {
+			Set tKey = $ORDER(resourceList(tKey))
+			Quit:tKey=""
+			set processList = resourceList(tKey)
+			Set iter = processList.%GetIterator()
+			While iter.%GetNext(, .tResource) {
 				Set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
 			}
 		}
