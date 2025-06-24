@@ -640,15 +640,49 @@ Method %Reload(ByRef pParams) As %Status
 			Set ^Sources("MODULE",..Module.Name) = tAbsolutePrefix_tRoot
 		}
 		
-		// Standard resource processing
-		Set tSC = $$$OK
+		// Process resources based on their package depth (higher level first so more granular resource will override)
+		// e.g. <Resource Name="Depth1.PKG"/> will be processed before <Resource Name="Depth1.Depth2.CLS"/>
+		Set nonDocumentResources = []
 		Set tKey = ""
 		For {
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:tKey=""
 			If $IsObject(tResource.Processor) {
+				// Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
+				Set tProcessorClassName = tResource.Module.Lifecycle.GetDefaultResourceProcessor(tResource.Name)
+				if (tProcessorClassName '= "") {
+				Set tProcessorClass = ##class(%Dictionary.CompiledClass).%OpenId(tProcessorClassName)
+					Set extendsDefaultDocument = $FIND(tProcessorClass.Super, "%IPM.ResourceProcessor.Default.Document")
+				}
+				else {
+					Set extendsDefaultDocument = "0"
+				}
+				if (extendsDefaultDocument) {
+					Set tResourceName = $Piece(tResource.Name,".",1,*-1)
+					Set:tResourceName="" tResourceName = tResource.Name
+					Set resourceList(tResourceName) = tResource
+				}
+				else {
+					Do nonDocumentResources.%Push(tResource)
+			}
+		}
+		}
+		// Process document resources by depth order
+		set tSC = $$$OK
+		Set tKey = ""
+		For {
+			Set tKey = $ORDER(resourceList(tKey))
+			Quit:tKey=""
+			Set tResource = resourceList(tKey)
 				Set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
 			}
+		If $$$ISERR(tSC) {
+			Quit
+		}
+		// Process non-document resources sequentially
+		Set iter = nonDocumentResources.%GetIterator()
+		While iter.%GetNext(, .tResource,) {
+			Set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
 		}
 		If $$$ISERR(tSC) {
 			Quit

@@ -170,7 +170,9 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   }	
                 }
               }
-              If ##class(%IPM.Utils.File).Exists(.tResourcePath) {
+              Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
+              // If resource path exists and the resource is not deployed with a deployed.xml existing
+              If ##class(%IPM.Utils.File).Exists(.tResourcePath) && '(##class(%IPM.Utils.File).Exists(tDeployedProjectPath) && ..ResourceReference.Deploy) {
                 Set tSC = $$$OK
                 Quit
               }
@@ -179,11 +181,10 @@ Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boo
                   Write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
                 }
                 Set ..CompileFromProject = 1
-                Set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
                 If '$Data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
                   Set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
                   If $$$ISERR(sc) {
-                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found"))
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Resource path '" _ tDeployedProjectPath _ "' not found"))
                   }
                   Set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
                 }
