@@ -650,14 +650,14 @@ Method %Reload(ByRef pParams) As %Status
 			If $IsObject(tResource.Processor) {
 				// Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
 				Set tProcessorClassName = tResource.Module.Lifecycle.GetDefaultResourceProcessor(tResource.Name)
-				if (tProcessorClassName) {
+				if (tProcessorClassName '= "") {
 				Set tProcessorClass = ##class(%Dictionary.CompiledClass).%OpenId(tProcessorClassName)
 					Set extendsDefaultDocument = $FIND(tProcessorClass.Super, "%IPM.ResourceProcessor.Default.Document")
 				}
 				else {
 					Set extendsDefaultDocument = "0"
 				}
-				if extendsDefaultDocument {
+				if (extendsDefaultDocument) {
 					Set tResourceName = $Piece(tResource.Name,".",1,*-1)
 					Set:tResourceName="" tResourceName = tResource.Name
 					Set resourceList(tResourceName) = tResource
