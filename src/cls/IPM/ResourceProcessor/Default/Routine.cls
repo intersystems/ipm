@@ -17,33 +17,38 @@ Property FilenameExtension As %String [ InitialExpression = "rtn" ];
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-		Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
-		If 'tGlobalScope && '..LoadAsDirectory {
-			Set tNeedExplicitMapping = '..ResourceIsMappedToDefaultDB(..ResourceReference.Name)
-			If tNeedExplicitMapping {
-				Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
-				Set tSC = ##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,,tSourceDB)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-			}
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tName = $piece(..ResourceReference.Name,".",1,*-1)
+        set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$get(pParams("Reload","ForceLocalScope"),0)
+        if 'tGlobalScope && '..LoadAsDirectory {
+            set tNeedExplicitMapping = '..ResourceIsMappedToDefaultDB(..ResourceReference.Name)
+            if tNeedExplicitMapping {
+                set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($namespace)
+                set tSC = ##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,,tSourceDB)
+                if $$$ISERR(tSC) {
+                    quit
+                }
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+Method OnExportItem(
+	pFullExportPath As %String,
+	pItemName As %String,
+	ByRef pItemParams,
+	ByRef pParams,
+	Output pItemHandled As %Boolean = 0) As %Status
 {
-	If (..Format = "") {
-		// Default handling
-		Set ..Format = "UDL"
-	}
-	Quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
+    if (..Format = "") {
+        // Default handling
+        set ..Format = "UDL"
+    }
+    quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
 }
 
 }

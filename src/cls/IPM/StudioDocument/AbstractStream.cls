@@ -18,85 +18,96 @@ Property LastModifiedTimestamp As %TimeStamp;
 /// 
 /// <P>If this method returns an error status then %Save() will fail and the transaction
 /// will be rolled back.
-Method %OnAddToSaveSet(depth As %Integer = 3, insert As %Integer = 0, callcount As %Integer = 0) As %Status [ Private, ServerOnly = 1 ]
+Method %OnAddToSaveSet(
+	depth As %Integer = 3,
+	insert As %Integer = 0,
+	callcount As %Integer = 0) As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tSC = $$$OK
-	Try {
-		// See if the module definition has actually changed
-		Set tHash = $System.Encryption.SHA1HashStream(..Contents,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		If (..Hash '= tHash) {
-			Set ..Hash = tHash
-			Set ..LastModifiedTimestamp = $zdt($h,3)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        // See if the module definition has actually changed
+        set tHash = $system.Encryption.SHA1HashStream(..Contents,.tSC)
+        if $$$ISERR(tSC) {
+            quit
+        }
+        if (..Hash '= tHash) {
+            set ..Hash = tHash
+            set ..LastModifiedTimestamp = $zdatetime($horolog,3)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// Ensures that <var>pName</var> is a valid Studio document name (including / based on extension) for this stream class.
-ClassMethod %ValidateName(pName As %String, Output pLogicalName As %String) As %Status
+ClassMethod %ValidateName(
+	pName As %String,
+	Output pLogicalName As %String) As %Status
 {
-	Set tSC = $$$OK
-	Set pLogicalName = ""
-	Try {
-		If '##class(%Library.RoutineMgr).UserType(pName,.tDocumentClass) || ($parameter(tDocumentClass,"STREAMCLASS") '= $classname()) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid document name for stream class %1: '%2'",$classname(),pName))
-			Quit
-		}
-		Set pLogicalName = $Piece(pName,".",1,*-1)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    set pLogicalName = ""
+    try {
+        if '##class(%Library.RoutineMgr).UserType(pName,.tDocumentClass) || ($parameter(tDocumentClass,"STREAMCLASS") '= $classname()) {
+            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid document name for stream class %1: '%2'",$classname(),pName))
+            quit
+        }
+        set pLogicalName = $piece(pName,".",1,*-1)
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// Given a document name (including extension), lock it and report a descriptive error if the lock fails.
-ClassMethod %LockName(pName As %String, pShared As %Boolean = 0, pTimeout As %Integer) As %Status
+ClassMethod %LockName(
+	pName As %String,
+	pShared As %Boolean = 0,
+	pTimeout As %Integer) As %Status
 {
-	Set tSC = ..%ValidateName(pName,.tLogicalName)
-	If $$$ISERR(tSC) {
-		Quit
-	}
-	
-	If ..NameExists(tLogicalName,.tID) {
-		Set tSC = ..%LockId(tID,pShared,.pTimeout)
-	}
-	If $$$ISOK(tSC) {
-		Quit $$$OK
-	}
-	
-	// Error handling: convert to descriptive error message
-	// Taken from $$lockfail^%occLock, to provide equivalent behavior to classes.
-	Set tGlobal = $Extract($$$EXTADDRglobal($$$pMAP,$classname(),"IDKEY"),2,*) //Remove leading "^" - $$FindLockOwner adds it back in.
-	Set tEscalate = 0
-	Set tLockType = $$FindLockOwner^%SYS.cspServer2($Namespace,tGlobal,tID,.tJob,.tUser,.tEscalate)
-	If (tLockType = 2) {
-		Quit $$$ERROR($$$ClassLockTableFull,pName)
-	} Else {
-		If tEscalate {
-			Quit $$$ERROR($$$ClassLockEscalate,pName,tUser,tJob)
-		} Else {
-			Quit $$$ERROR($$$CanNotLockRoutineInfo,pName,tUser,tJob)
-		}
-	}
+    set tSC = ..%ValidateName(pName,.tLogicalName)
+    if $$$ISERR(tSC) {
+        quit
+    }
+
+    if ..NameExists(tLogicalName,.tID) {
+        set tSC = ..%LockId(tID,pShared,.pTimeout)
+    }
+    if $$$ISOK(tSC) {
+        quit $$$OK
+    }
+
+    // Error handling: convert to descriptive error message
+    // Taken from $$lockfail^%occLock, to provide equivalent behavior to classes.
+    set tGlobal = $extract($$$EXTADDRglobal($$$pMAP,$classname(),"IDKEY"),2,*) //Remove leading "^" - $$FindLockOwner adds it back in.
+    set tEscalate = 0
+    set tLockType = $$FindLockOwner^%SYS.cspServer2($namespace,tGlobal,tID,.tJob,.tUser,.tEscalate)
+    if (tLockType = 2) {
+        quit $$$ERROR($$$ClassLockTableFull,pName)
+    } else {
+        if tEscalate {
+            quit $$$ERROR($$$ClassLockEscalate,pName,tUser,tJob)
+        } else {
+            quit $$$ERROR($$$CanNotLockRoutineInfo,pName,tUser,tJob)
+        }
+    }
 }
 
 /// Given a document name (including extension), unlock it
-ClassMethod %UnlockName(pName As %String, pShared As %Boolean = 0, pImmediate As %Boolean = 0) As %Status
+ClassMethod %UnlockName(
+	pName As %String,
+	pShared As %Boolean = 0,
+	pImmediate As %Boolean = 0) As %Status
 {
-	Set tSC = ..%ValidateName(pName,.tLogicalName)
-	If $$$ISERR(tSC) {
-		Quit
-	}
-	
-	If ..NameExists(tLogicalName,.tID) {
-		Set tSC = ..%UnlockId(tID,pShared,pImmediate)
-	}
-	Quit tSC
+    set tSC = ..%ValidateName(pName,.tLogicalName)
+    if $$$ISERR(tSC) {
+        quit
+    }
+
+    if ..NameExists(tLogicalName,.tID) {
+        set tSC = ..%UnlockId(tID,pShared,pImmediate)
+    }
+    quit tSC
 }
 
 }

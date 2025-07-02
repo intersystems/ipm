@@ -1,8 +1,8 @@
 {
-  "recommendations": [
-    "intersystems.language-server",
-    "intersystems-community.testingmanager",
-    "intersystems-community.vscode-objectscript",
-    "ms-azuretools.vscode-docker"
-  ]
+    "recommendations": [
+        "intersystems.language-server",
+        "intersystems-community.testingmanager",
+        "intersystems-community.vscode-objectscript",
+        "ms-azuretools.vscode-docker"
+    ]
 }

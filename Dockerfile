@@ -1,4 +1,5 @@
-ARG BASE=irepo.intersystems.com/intersystems/iris-community:2025.1
+ARG BASE=irepo.intersystems.com/intersystems/iris-community:latest-cd
+
 FROM ${BASE}
 
 ARG REGISTRY=https://pm.community.intersystems.com

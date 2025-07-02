@@ -17,85 +17,85 @@ Property TokenAuthMethod As %Boolean [ InitialExpression = "apiKey" ];
 
 ClassMethod GetSSLConfiguration(name As %String) As %String
 {
-	New $NAMESPACE
-	Set $NAMESPACE = "%SYS"
-	
-	If '##class(Security.SSLConfigs).Exists(name) {
-		Do ##class(Security.SSLConfigs).Create(name)
-	}
-	Quit name
+    new $namespace
+    set $namespace = "%SYS"
+
+    if '##class(Security.SSLConfigs).Exists(name) {
+        do ##class(Security.SSLConfigs).Create(name)
+    }
+    quit name
 }
 
 Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As %Net.HttpRequest
 {
-	Set tRequest = ##class(%Net.HttpRequest).%New()
+    set tRequest = ##class(%Net.HttpRequest).%New()
 
-	Set tRequest.FollowRedirect = 1
+    set tRequest.FollowRedirect = 1
 
-	Set tLocation = $$$URLDECODE(tLocation)
-	If ($piece(tLocation, "://")'["http") {
-		Set tLocation = "https://" _ tLocation
-	}
-	
-	Do ##class(%Net.URLParser).Parse(tLocation,.tComponents)
+    set tLocation = $$$URLDECODE(tLocation)
+    if ($piece(tLocation, "://")'["http") {
+        set tLocation = "https://" _ tLocation
+    }
 
-	If ($$$lcase(tComponents("scheme")) [ "http") {
-		If ($Data(tComponents("host"))#2) {
-			Set tRequest.Server = tComponents("host")
-		}
-		If ($Data(tComponents("port"))#2) {
-			Set tRequest.Port = tComponents("port")
-		}
-		If ($$$lcase(tComponents("scheme")) = "https") {
-			Set tRequest.Https = 1
-		}
-		If ($Get(tComponents("path"))'="") {
-			If '..#ALLOWPREFIXINLOCATION {
-				$$$ThrowStatus($$$ERROR($$$GeneralError,"Location should not contain a prefix"))
-			}
-			Set path = tComponents("path")
-			If ($Extract(path,1,1)="/") {
-				Set path = $Extract(path,2,*)	
-			}
-			Set tRequest.Location = path
-		}
-		If $Extract(tRequest.Location, *) '= "/" {
-			Set tRequest.Location = tRequest.Location _ "/"
-		}
-		#; in case of redirection
-		Set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
+    do ##class(%Net.URLParser).Parse(tLocation,.tComponents)
 
-		If (..Token '= "") {
-			If ..TokenAuthMethod = "basic"{
-				Do tRequest.SetHeader("Authorization","Basic " _ ..Token)
-			} ElseIf (..TokenAuthMethod = "apiKey") || (..TokenAuthMethod = "") {
-				Do tRequest.SetHeader("apikey",..Token)
-			} ElseIf ..TokenAuthMethod = "bearer" {
-				Do tRequest.SetHeader("Authorization","Bearer " _ ..Token)
-			} Else {
-				$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Unknown token auth method: ""%1""", ..TokenAuthMethod)))
-			}
-		}
-		If (..Username '= "") && (..Password '= "") {
-			// basic auth
-			Set tRequest.Username = ..Username
-			Set tRequest.Password = ..Password
-		}
-		Set proxy=$System.Util.GetEnviron("https_proxy")
-		If proxy'="" {
-			Do ##class(%Net.URLParser).Parse(proxy,.pr)
-			If (tRequest.Https) {
-				Set tRequest.ProxyHTTPS=1
-				Set tRequest.ProxyTunnel=1
-			}
-			Set tRequest.ProxyPort=pr("port")
-			Set tRequest.ProxyServer=pr("host")
-			If $Get(pr("username"))'="",$Get(pr("password"))'="" {
-				Set tRequest.ProxyAuthorization="Basic "_$system.Encryption.Base64Encode(pr("username")_":"_pr("password"))
-			}
-		}
-	}
-	Return tRequest
+    if ($$$lcase(tComponents("scheme")) [ "http") {
+        if ($data(tComponents("host"))#2) {
+            set tRequest.Server = tComponents("host")
+        }
+        if ($data(tComponents("port"))#2) {
+            set tRequest.Port = tComponents("port")
+        }
+        if ($$$lcase(tComponents("scheme")) = "https") {
+            set tRequest.Https = 1
+        }
+        if ($get(tComponents("path"))'="") {
+            if '..#ALLOWPREFIXINLOCATION {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Location should not contain a prefix"))
+            }
+            set path = tComponents("path")
+            if ($extract(path,1,1)="/") {
+                set path = $extract(path,2,*)
+            }
+            set tRequest.Location = path
+        }
+        if $extract(tRequest.Location, *) '= "/" {
+            set tRequest.Location = tRequest.Location _ "/"
+        }
+        #; in case of redirection
+        set tRequest.SSLConfiguration = ..GetSSLConfiguration(tRequest.Server)
+
+        if (..Token '= "") {
+            if ..TokenAuthMethod = "basic"{
+                do tRequest.SetHeader("Authorization","Basic " _ ..Token)
+            } elseif (..TokenAuthMethod = "apiKey") || (..TokenAuthMethod = "") {
+                do tRequest.SetHeader("apikey",..Token)
+            } elseif ..TokenAuthMethod = "bearer" {
+                do tRequest.SetHeader("Authorization","Bearer " _ ..Token)
+            } else {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Unknown token auth method: ""%1""", ..TokenAuthMethod)))
+            }
+        }
+        if (..Username '= "") && (..Password '= "") {
+            // basic auth
+            set tRequest.Username = ..Username
+            set tRequest.Password = ..Password
+        }
+        set proxy=$system.Util.GetEnviron("https_proxy")
+        if proxy'="" {
+            do ##class(%Net.URLParser).Parse(proxy,.pr)
+            if (tRequest.Https) {
+                set tRequest.ProxyHTTPS=1
+                set tRequest.ProxyTunnel=1
+            }
+            set tRequest.ProxyPort=pr("port")
+            set tRequest.ProxyServer=pr("host")
+            if $get(pr("username"))'="",$get(pr("password"))'="" {
+                set tRequest.ProxyAuthorization="Basic "_$system.Encryption.Base64Encode(pr("username")_":"_pr("password"))
+            }
+        }
+    }
+    return tRequest
 }
 
 }

@@ -21,19 +21,19 @@ Property DisplayName As %String(MAXLEN = 255) [ Internal ];
 
 Method VersionStringSet(tValue) As %Status
 {
-	Set i%VersionString = tValue
-	Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tValue,.tExpression)
-	If $$$ISOK(tSC) {
-		Set ..Version = tExpression
-	}
-	Quit tSC
+    set i%VersionString = tValue
+    set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tValue,.tExpression)
+    if $$$ISOK(tSC) {
+        set ..Version = tExpression
+    }
+    quit tSC
 }
 
 Method NameSet(val As %RawString) As %Status
 {
-	Set i%DisplayName = val
-	Set i%Name = $$$lcase(val)
-	QUIT $$$OK
+    set i%DisplayName = val
+    set i%Name = $$$lcase(val)
+    quit $$$OK
 }
 
 Storage Default
@@ -61,4 +61,3 @@ Storage Default
 }
 
 }
-

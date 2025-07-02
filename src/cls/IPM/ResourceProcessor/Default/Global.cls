@@ -17,77 +17,80 @@ Property Preserve As %Boolean [ InitialExpression = 0 ];
 /// Defaults to the resource's extension (lower-case) if unspecified.
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "gbl/" ];
 
-Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
+Method OnPhase(
+	pPhase As %String,
+	ByRef pParams,
+	Output pResourceHandled As %Boolean = 0) As %Status
 {
-	Set tSC = $$$OK
-	Set pResourceHandled = 0
-	Try {
-		Set tVerbose = $Get(pParams("Verbose"),0)
-		Set tDeveloperMode = $Get(pParams("DeveloperMode"),0)
-		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-		Set tRoot = ..ResourceReference.Module.Root
-		If (pPhase = "Reload") {
-			Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
-			Set tSourcesPrefix = $c($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
-			
-			// Format: ^^directory (to which the global is currently mapped)
-			Set tGlobalDBDir = $$$GBLDB(@("^"_$Piece(..ResourceReference.Name,".",1,*-1)))
-			Set tGlobalDB = ##class(%IPM.Utils.Module).GetGlobalDatabase($Namespace)
-			Set tExpectedDir = "^^"_##class(%IPM.Utils.Module).GetDatabaseDirectory(tGlobalDB)
-			
-			// Normalize the directory name in case of case-insensitivity
-			Set tGlobalDBDir = ##class(%File).NormalizeDirectory($e(tGlobalDBDir,3,*))
-			Set tExpectedDir = ##class(%File).NormalizeDirectory($e(tExpectedDir,3,*))
-			
-			// See if global must be mapped to be loaded into the current default DB for globals
-			If 'tGlobalScope && (tGlobalDBDir '= tExpectedDir) && '$Get(pParams("NoMapping"),0) {
-				Set tSC = ##class(%IPM.Utils.Module).AddGlobalMapping($Namespace,tName,tGlobalDB)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-			}
-			
-			If '..ResourceReference.Generated {
-				Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
-				Set tResourceDirectory = tRoot _ "/" _ tSubDirectory
-				
-        Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-				If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
-					Set tSourceRoot = tSourceRoot _ "/"
-				}
+    set tSC = $$$OK
+    set pResourceHandled = 0
+    try {
+        set tVerbose = $get(pParams("Verbose"),0)
+        set tDeveloperMode = $get(pParams("DeveloperMode"),0)
+        set tName = $piece(..ResourceReference.Name,".",1,*-1)
+        set tRoot = ..ResourceReference.Module.Root
+        if (pPhase = "Reload") {
+            set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$get(pParams("Reload","ForceLocalScope"),0)
+            set tSourcesPrefix = $char($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 
-				Set tDirectory = ..Directory
-				If tDirectory'="","\/"'[$EXTRACT(tDirectory, *) {
-					Set tDirectory = tDirectory _ "/"
-				} Else {
-					Set tDirectory = "gbl/"
-				}
+            // Format: ^^directory (to which the global is currently mapped)
+            set tGlobalDBDir = $$$GBLDB(@("^"_$piece(..ResourceReference.Name,".",1,*-1)))
+            set tGlobalDB = ##class(%IPM.Utils.Module).GetGlobalDatabase($namespace)
+            set tExpectedDir = "^^"_##class(%IPM.Utils.Module).GetDatabaseDirectory(tGlobalDB)
 
-        Set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
+            // Normalize the directory name in case of case-insensitivity
+            set tGlobalDBDir = ##class(%File).NormalizeDirectory($extract(tGlobalDBDir,3,*))
+            set tExpectedDir = ##class(%File).NormalizeDirectory($extract(tExpectedDir,3,*))
 
-				If tDeveloperMode {
-					Set ^Sources("GBL",tName) = tSourcesPrefix_tResourceDirectory
-				}
-				
-				If '..ResourceReference.Preload {
-					Set tResourcePath = tResourceDirectory_$tr(tName,"%,("")","___")_".xml"
-					Set tSC = $System.OBJ.Load(tResourcePath,$Select(tVerbose:"/display",1:"/nodisplay")_"/nocompile")
-					If $$$ISERR(tSC) {
-						Quit
-					}
-				}
-			}
-			Set pResourceHandled = 1
-		} ElseIf (pPhase = "Clean") {
-			Set pResourceHandled = 1
-			If (..Global '= "") && ('..Preserve) {
-				Kill @..Global
-			}
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+            // See if global must be mapped to be loaded into the current default DB for globals
+            if 'tGlobalScope && (tGlobalDBDir '= tExpectedDir) && '$get(pParams("NoMapping"),0) {
+                set tSC = ##class(%IPM.Utils.Module).AddGlobalMapping($namespace,tName,tGlobalDB)
+                if $$$ISERR(tSC) {
+                    quit
+                }
+            }
+
+            if '..ResourceReference.Generated {
+                set tSubDirectory = $select(..ResourceReference.Preload:"preload/",1:"")
+                set tResourceDirectory = tRoot _ "/" _ tSubDirectory
+
+                set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+                if tSourceRoot'="","\/"'[$extract(tSourceRoot, *) {
+                    set tSourceRoot = tSourceRoot _ "/"
+                }
+
+                set tDirectory = ..Directory
+                if tDirectory'="","\/"'[$extract(tDirectory, *) {
+                    set tDirectory = tDirectory _ "/"
+                } else {
+                    set tDirectory = "gbl/"
+                }
+
+                set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
+
+                if tDeveloperMode {
+                    set ^Sources("GBL",tName) = tSourcesPrefix_tResourceDirectory
+                }
+
+                if '..ResourceReference.Preload {
+                    set tResourcePath = tResourceDirectory_$translate(tName,"%,("")","___")_".xml"
+                    set tSC = $system.OBJ.Load(tResourcePath,$select(tVerbose:"/display",1:"/nodisplay")_"/nocompile")
+                    if $$$ISERR(tSC) {
+                        quit
+                    }
+                }
+            }
+            set pResourceHandled = 1
+        } elseif (pPhase = "Clean") {
+            set pResourceHandled = 1
+            if (..Global '= "") && ('..Preserve) {
+                kill @..Global
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 }

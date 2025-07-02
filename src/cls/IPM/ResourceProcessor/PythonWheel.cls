@@ -13,85 +13,95 @@ Property Directory As %IPM.DataType.ResourceDirectory [ InitialExpression = "whe
 
 Property ExtraPipFlags As %IPM.DataType.CommandLineArgs;
 
-Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
+Method OnPhase(
+	pPhase As %String,
+	ByRef pParams,
+	Output pResourceHandled As %Boolean = 0) As %Status
 {
-    If (pPhase '= "Initialize") {
-        Set pResourceHandled = 0
-        Quit $$$OK
+    if (pPhase '= "Initialize") {
+        set pResourceHandled = 0
+        quit $$$OK
     }
 
-    Try {
-        Set pResourceHandled = 1
-        Set verbose = $GET(pParams("Verbose"))
-        Set root = ..ResourceReference.Module.Root
-        Set wheel = ##class(%File).NormalizeDirectory(..Directory, root)
-        Set wheel = ##class(%File).NormalizeFilename(..Name, wheel)
+    try {
+        set pResourceHandled = 1
+        set verbose = $get(pParams("Verbose"))
+        set root = ..ResourceReference.Module.Root
+        set wheel = ##class(%File).NormalizeDirectory(..Directory, root)
+        set wheel = ##class(%File).NormalizeFilename(..Name, wheel)
 
-        If '##class(%File).Exists(wheel) {
+        if '##class(%File).Exists(wheel) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheel file """_wheel_""" not found."))
         }
 
-        If verbose {
-            Write !,"Installing wheel package """_wheel_"""..."
+        if verbose {
+            write !,"Installing wheel package """_wheel_"""..."
         }
 
-        Set pipCaller = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.pParams)
-        Set target = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
-        Set command = pipCaller _ $ListBuild("install", wheel, "-t", target) _ $ListFromString(..ExtraPipFlags, " ")
-        If verbose {
-            Write !,"Running command: ",command
+        set pipCaller = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.pParams)
+        set target = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
+        set command = pipCaller _ $listbuild("install", wheel, "-t", target) _ $listfromstring(..ExtraPipFlags, " ")
+        if verbose {
+            write !,"Running command: ",command
         }
         $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommand(, command))
-    } Catch ex {
-        Set pResourceHandled = 0
+    } catch ex {
+        set pResourceHandled = 0
         // Special case: we want the installation of IPM to continue, even if the wheel package fails to install
-        If ..ResourceReference.Module.Name = $$$IPMModuleName {
-            Set errMsg = $$$FormatText("Skipping installation of python wheel '%1' due to error: '%2'. ", ..Name, ex.AsStatus())
-            Set errMsg = errMsg _ "You may need to install this wheel manually or from PyPI to use certain features of IPM."
-            Write !, $$$FormattedLine($$$Red, errMsg)
-            Return $$$OK
+        if ..ResourceReference.Module.Name = $$$IPMModuleName {
+            set errMsg = $$$FormatText("Skipping installation of python wheel '%1' due to error: '%2'. ", ..Name, ex.AsStatus())
+            set errMsg = errMsg _ "You may need to install this wheel manually or from PyPI to use certain features of IPM."
+            write !, $$$FormattedLine($$$Red, errMsg)
+            return $$$OK
         }
-        Return ex.AsStatus()
+        return ex.AsStatus()
     }
-    Return $$$OK
+    return $$$OK
 }
 
-Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+Method OnExportItem(
+	pFullExportPath As %String,
+	pItemName As %String,
+	ByRef pItemParams,
+	ByRef pParams,
+	Output pItemHandled As %Boolean = 0) As %Status
 {
-    Set pItemHandled = 0
-    Set verbose = $Get(pParams("Verbose"))
+    set pItemHandled = 0
+    set verbose = $get(pParams("Verbose"))
 
-    Set source = ##class(%File).NormalizeDirectory(..Directory, ..ResourceReference.Module.Root)
-    Set source = ##class(%File).NormalizeFilename(..Name, source)
-    Set source = ##class(%File).NormalizeFilenameWithSpaces(source)
+    set source = ##class(%File).NormalizeDirectory(..Directory, ..ResourceReference.Module.Root)
+    set source = ##class(%File).NormalizeFilename(..Name, source)
+    set source = ##class(%File).NormalizeFilenameWithSpaces(source)
 
-    Set dir = ##class(%File).GetDirectory(pFullExportPath)
-    If (##class(%File).Exists(dir)) && ('##class(%File).DirectoryExists(dir)) {
-        Return $$$ERROR($$$GeneralError, "File """_dir_""" exists and is not a directory. Failed to export item: "_..Name)
+    set dir = ##class(%File).GetDirectory(pFullExportPath)
+    if (##class(%File).Exists(dir)) && ('##class(%File).DirectoryExists(dir)) {
+        return $$$ERROR($$$GeneralError, "File """_dir_""" exists and is not a directory. Failed to export item: "_..Name)
     }
-    If '##class(%File).DirectoryExists(dir) {
-        If '##class(%File).CreateDirectoryChain(dir, .return) {
-            Return $$$ERROR($$$GeneralError, "Failed to create directory "_dir_", OS returned code: "_-return)
+    if '##class(%File).DirectoryExists(dir) {
+        if '##class(%File).CreateDirectoryChain(dir, .return) {
+            return $$$ERROR($$$GeneralError, "Failed to create directory "_dir_", OS returned code: "_-return)
         }
     }
-    If verbose {
-        Write !,"Copying wheel item '"_source_"' to '"_pFullExportPath_"'"
+    if verbose {
+        write !,"Copying wheel item '"_source_"' to '"_pFullExportPath_"'"
     }
-    Set pItemHandled = ##class(%File).CopyFile(source, pFullExportPath, 1, .return)
-    If 'pItemHandled {
-        Return $$$ERROR($$$GeneralError, "Failed to copy "_source_" to "_pFullExportPath_", OS returned code: "_-return)
+    set pItemHandled = ##class(%File).CopyFile(source, pFullExportPath, 1, .return)
+    if 'pItemHandled {
+        return $$$ERROR($$$GeneralError, "Failed to copy "_source_" to "_pFullExportPath_", OS returned code: "_-return)
     }
-    Quit $$$OK
+    quit $$$OK
 }
 
-Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean) As %Status
+Method OnResolveChildren(
+	ByRef pResourceArray,
+	pCheckModuleOwnership As %Boolean) As %Status
 {
-    Set key = $Order(pResourceArray(""))
-    If key = "" {
-        Quit $$$ERROR($$$GeneralError, "Empty resource array for PythonWheel resource processor: "_..Name)
+    set key = $order(pResourceArray(""))
+    if key = "" {
+        quit $$$ERROR($$$GeneralError, "Empty resource array for PythonWheel resource processor: "_..Name)
     }
-    Set pResourceArray(key, "RelativePath") = ..Directory _"/"_..Name
-    Quit $$$OK
+    set pResourceArray(key, "RelativePath") = ..Directory _"/"_..Name
+    quit $$$OK
 }
 
 }
