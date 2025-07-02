@@ -648,6 +648,25 @@ Method %Reload(ByRef pParams) As %Status
 			Set tResource = ..Module.Resources.GetNext(.tKey)
 			Quit:tKey=""
 			If $IsObject(tResource.Processor) {
+				// Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
+				Set tProcessorClassName = tResource.Module.Lifecycle.GetDefaultResourceProcessor(tResource.Name)
+				if (tProcessorClassName '= "") {
+				Set tProcessorClass = ##class(%Dictionary.CompiledClass).%OpenId(tProcessorClassName)
+					Set extendsDefaultDocument = $FIND(tProcessorClass.Super, "%IPM.ResourceProcessor.Default.Document")
+				}
+				else {
+					Set extendsDefaultDocument = "0"
+				}
+				if (extendsDefaultDocument) {
+					Set tResourceName = $Piece(tResource.Name,".",1,*-1)
+					Set resourceList(tResourceName) = tResource
+				}
+				else {
+					Do nonDocumentResources.%Push(tResource)
+				}
+			}
+			/*
+			If $IsObject(tResource.Processor) {
 				If tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
 				// Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
 					Set tResourceName = $Piece(tResource.Name,".",1,*-1)
@@ -657,6 +676,7 @@ Method %Reload(ByRef pParams) As %Status
 					Do nonDocumentResources.%Push(tResource)
 			}
 		}
+			*/
 		}
 		// Process document resources by depth order
 		set tSC = $$$OK
