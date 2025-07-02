@@ -651,6 +651,9 @@ Method %Reload(ByRef pParams) As %Status
 				If tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
 				// Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
 					Set tResourceName = $Piece(tResource.Name,".",1,*-1)
+					If (tResourceName = "") {
+						Set tResourceName = tResource.Name
+					}
 					Set resourceList(tResourceName) = tResource
 				}
 				Else {
