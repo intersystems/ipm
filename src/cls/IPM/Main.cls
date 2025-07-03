@@ -2189,28 +2189,60 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
-    w !
-    w "JACOLDLOAD"
-    w !
-    Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
-    Merge tParams = pCommandInfo("data")
-    Set tParams("cmd") = "load"
-    Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
-    If $G(tComponents("scheme")) [ "http" {
-        set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
+	w !
+	w "JACNEWLOAD"
+	w !
+	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
+	Set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
+	Merge tParams = pCommandInfo("data")
+	Set tParams("cmd") = "load"
+	Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
+	If $G(tComponents("scheme")) [ "http" {
+		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
+	}
+	If ##class(%File).DirectoryExists(tDirectoryName) {
+		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
+	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
+		Set tTargetDirectory = $$$FileTempDirSys
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Extracting archive to ",tTargetDirectory
+		}
+		$$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
+		// Try to locate the top-level module.xml file
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Trying to locate module.xml file in ", tTargetDirectory
+		}
+		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
+		If (tCount = 0) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
+		}
 
-    }
-    If ##class(%File).DirectoryExists(tDirectoryName) {
-        Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-        $$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tDirectoryName,.tParams))
-    } ElseIf ##class(%File).Exists(tDirectoryName),$$$lcase($Piece(tDirectoryName, ".", *)) = "tgz" {
-        Set tTargetDirectory = $$$FileTempDirSys
-        Set tSC = ##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory)
-        $$$ThrowOnError(##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams))
-    }
-    w !
-    w "JACLOADCOMPLETE"
-    w !
+		// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+		Set tModuleFilePath = $ListGet(tList(tCount), *)
+		Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+		If $Get(pCommandInfo("data", "Verbose")) {
+			Write !,"Found "_tCount_" results. They are: "
+			Set idx = ""
+			For {
+				Set idx = $Order(tList(idx))
+				Quit:(idx="")
+				Write !, $Char(9), $List(tList(idx), *)
+			}
+			Write !, "Using module.xml file at ", tModuleFilePath
+		}
+	}
+
+	// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
+	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
+	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+	Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
+	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
+	Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
+	$$$ThrowOnError(tSC)
+	w !
+	w "JACNEWLOADCOMPLETE"
+	w !
 }
 
 ClassMethod CheckModuleNamespace() As %Status
