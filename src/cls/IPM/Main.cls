@@ -808,11 +808,23 @@ ClassMethod GetVersion(ModuleName, ByRef out, list)
 
 ClassMethod GetSystemMode()
 {
+	w !
+	w "JACGETSYSTEMMODE"
+	w !
 	New $Namespace
 	Set $Namespace = "%SYS"
+	w !
+	w "JACGSM2"
+	w !
 	If $$$ISOK(##class(Config.Startup).Get(.tProperties)) {
+		w !
+	w "JACGSM3"
+	w !
 		Quit $Get(tProperties("SystemMode")) 
 	}
+	w !
+	w "JACGSM4"
+	w !
 	Quit ""
 }
 
@@ -820,28 +832,58 @@ ClassMethod GetSystemMode()
 /// For messages that are too long to fit in a box, they should be returned in the outOfBoxMessage parameter
 ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
 {
+	w !
+	w "JACBuildIntroMessages"
+	w !
 	Set cls = "%ZHSLIB.HealthShareMgr", mthd = "VersionInfo"
 	If $System.CLS.IsMthd(cls, mthd) {
+		w !
+		w "JACBIM2"
+		w !
 		Set outOfBoxMessage = $ClassMethod(cls, mthd)
 	} Else {
+		w !
+		w "JACBIM3"
+		w !
 		Set outOfBoxMessage = $ZVersion
 	}
-
+	w !
+		w "JACBIM4"
+		w !
 	Do ##class(%IPM.Main).GetVersion("zpm",.out)	
+	w !
+		w "JACBIM5"
+		w !
 	If $Get(out) = "" {
+		w !
+		w "JACBIM6"
+		w !
 		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
 	} Else {
+		w !
+		w "JACBIM7"
+		w !
 		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
 	}
-
+	w !
+		w "JACBIM8"
+		w !
 	Set systemMode = ..GetSystemMode()
+	w !
+		w "JACBIM9"
+		w !
 	If systemMode = "" {
 		Set systemMode = "System Mode: <unset>"
 	} Else {
 		Set systemMode = "System Mode: " _ systemMode
 	}
-
+	w !
+		w "JACBIM10"
+		w !	
 	Set mirrorStatus = $System.Mirror.GetStatus()
+	w !
+		w "JACBIM11"
+		w !
 	Set mirrorStatus = "Mirror Status: " _ mirrorStatus
 
 	Set list = $ListBuild(
@@ -851,6 +893,9 @@ ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
 		systemMode,
 		mirrorStatus
 	)
+	w !
+		w "JACBIM12"
+		w !
 	Quit list
 }
 
