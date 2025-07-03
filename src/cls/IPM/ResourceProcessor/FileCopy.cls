@@ -31,55 +31,53 @@ Method OnBeforePhase(
 	pPhase As %String,
 	ByRef pParams) As %Status
 {
-  Set tVerbose = $Get(pParams("Verbose"))
-	// Default implementation: call %ValidateObject to validate attributes
-	Set tSC = $$$OK
-	Try {
-		Set tSC = ##super(pPhase,.pParams)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+    set tVerbose = $get(pParams("Verbose"))
+    // Default implementation: call %ValidateObject to validate attributes
+    set tSC = $$$OK
+    try {
+        set tSC = ##super(pPhase,.pParams)
+        if $$$ISERR(tSC) {
+            quit
+        }
 
-		If (pPhase = "Activate") && (..InstallDirectory '= "") && ('..Defer) {
-      Set tSource = ..GetSource()
-      Set tTarget = ..InstallDirectory
-      Set tSC = ..DoCopy(tSource, tTarget, .pParams)
-      If $$$ISERR(tSC) {
-        Quit
-      }
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+        if (pPhase = "Activate") && (..InstallDirectory '= "") && ('..Defer) {
+            set tSource = ..GetSource()
+            set tTarget = ..InstallDirectory
+            set tSC = ..DoCopy(tSource, tTarget, .pParams)
+            if $$$ISERR(tSC) {
+                quit
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Method OnAfterPhase(
 	pPhase As %String,
 	ByRef pParams) As %Status
 {
-  Set tVerbose = $Get(pParams("Verbose"))
-	// Default implementation: call %ValidateObject to validate attributes
-	Set tSC = $$$OK
-	Try {
-    
-		Set tSC = ##super(pPhase,.pParams)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+    set tVerbose = $get(pParams("Verbose"))
+    set tSC = $$$OK
+    try {
+        set tSC = ##super(pPhase,.pParams)
+        if $$$ISERR(tSC) {
+            quit
+        }
 
-		If (pPhase = "Activate") && (..InstallDirectory '= "") && (..Defer) {
-      Set tSource = ..GetSource()
-      Set tTarget = ..InstallDirectory
-      Set tSC = ..DoCopy(tSource, tTarget, .pParams)
-      If $$$ISERR(tSC) {
-        Quit
-      }
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+        if (pPhase = "Activate") && (..InstallDirectory '= "") && (..Defer) {
+            set tSource = ..GetSource()
+            set tTarget = ..InstallDirectory
+            set tSC = ..DoCopy(tSource, tTarget, .pParams)
+            if $$$ISERR(tSC) {
+                quit
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Method OnBeforeArtifact(
@@ -87,22 +85,22 @@ Method OnBeforeArtifact(
 	pWorkingDirectory As %String,
 	ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		If (pExportDirectory = pWorkingDirectory) {
-			Quit
-		}
+    set tSC = $$$OK
+    try {
+        if (pExportDirectory = pWorkingDirectory) {
+            quit
+        }
 
-		Write !,"[OnBeforeArtifact] "_..ResourceReference.Name
-		If '..ResourceReference.Deploy {
-			Set tSC = ##class(%IPM.Utils.File).CopyDir(
-				pExportDirectory_..ResourceReference.Name,
-				pWorkingDirectory_..ResourceReference.Name)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+        write !,"[OnBeforeArtifact] "_..ResourceReference.Name
+        if '..ResourceReference.Deploy {
+            set tSC = ##class(%IPM.Utils.File).CopyDir(
+                pExportDirectory_..ResourceReference.Name,
+                pWorkingDirectory_..ResourceReference.Name)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Method NormalizeNames(
@@ -111,36 +109,42 @@ Method NormalizeNames(
 	Output pTargetDir,
 	Output pAsFile As %Boolean)
 {
-  Set pAsFile = 0
-  If ("\/"[$Extract(pSource, *))
-    ||(
-      (##class(%File).NormalizeDirectory(pSource)'="")
-      &&##class(%File).DirectoryExists(##class(%File).NormalizeDirectory(pSource))) {
-    Set pSource = ##class(%File).NormalizeDirectory(pSource)
-    Set pTarget = ##class(%File).NormalizeDirectory(pTarget)
-    Set pTargetDir = pTarget
-  } Else {
-    Set pAsFile = 1
-    Set pSource = ##class(%File).NormalizeFilename(pSource)
-    If ("\/"[$Extract(pTarget, *)) {
-      Set pTargetDir = ##class(%File).NormalizeDirectory(pTarget)
-      Set pTarget = ##class(%File).NormalizeFilename(##class(%File).GetFilename(pSource), pTargetDir)
-    } Else {
-      Set pTarget = ##class(%File).NormalizeFilename(pTarget)
-      Set pTargetDir = ##class(%File).ParentDirectoryName(pTarget)
+    set pAsFile = 0
+    set normalizedSourceDir = ##class(%File).NormalizeDirectory(pSource)
+    if ("\/"[$extract(pSource, *))
+        || ((normalizedSourceDir'="")
+        && ##class(%File).DirectoryExists(normalizedSourceDir)) {
+        set pSource = normalizedSourceDir
+        set pTarget = ##class(%File).NormalizeDirectory(pTarget)
+        set pTargetDir = pTarget
+    } else {
+        set pAsFile = 1
+        set pSource = ##class(%File).NormalizeFilename(pSource)
+        if ("\/"[$extract(pTarget, *)) {
+            set pTargetDir = ##class(%File).NormalizeDirectory(pTarget)
+            set pTarget = ##class(%File).NormalizeFilename(##class(%File).GetFilename(pSource), pTargetDir)
+        } else {
+            set pTarget = ##class(%File).NormalizeFilename(pTarget)
+            set pTargetDir = ##class(%File).ParentDirectoryName(pTarget)
+        }
     }
-  }
 }
 
 /// Prefixes the path to the module root if it does not start with a $ variable
 Method GetSource()
 {
-  if (($Extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2) = "{$") || ($Extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2) = "${")) {
-    return $Case(..SourceDirectory, "": ..ResourceReference.Module.Root _ ..ResourceReference.Name,: ..SourceDirectory)
-  }
-  else {
-    return ..ResourceReference.Module.Root _ $Case(..SourceDirectory, "": ..ResourceReference.Name,: ..SourceDirectory)
-  }
+    set prefix = $extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2)
+    if ((prefix = "{$") || (prefix = "${")) {
+        return $case(..SourceDirectory,
+            "": ..ResourceReference.Module.Root _ ..ResourceReference.Name,
+            : ..SourceDirectory
+        )
+    }
+    return ..ResourceReference.Module.Root _
+        $case(..SourceDirectory,
+            "": ..ResourceReference.Name,
+            : ..SourceDirectory
+        )
 }
 
 Method DoCopy(
@@ -148,38 +152,36 @@ Method DoCopy(
 	tTarget,
 	pParams)
 {
-  Set tVerbose = $Get(pParams("Verbose"))
-  Set tSC = $$$OK
-  Try {
-    Do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
+    set tVerbose = $get(pParams("Verbose"))
+    set tSC = $$$OK
+    try {
+        do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
 
-    If '##class(%File).DirectoryExists(tTargetDir) {
-      If '##class(%File).CreateDirectoryChain(tTargetDir,.tReturn) {
-        Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tTargetDir,$ZUtil(209,tReturn)))
-        Quit
-      }
-    }
+        if '##class(%File).DirectoryExists(tTargetDir) {
+            if '##class(%File).CreateDirectoryChain(tTargetDir,.tReturn) {
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tTargetDir,$zutil(209,tReturn)))
+                quit
+            }
+        }
 
-    Write:tVerbose !,"Copying ",tSource," to ",tTarget
-    If (copyAsFile) {
-      If '##class(%File).Exists(tSource) {
-        Set tSC = $$$ERROR($$$GeneralError, "Source file does not exist: "_tSource)
-        Quit
-      }
-      If '##class(%File).CopyFile(tSource, tTarget, 1, .return) {
-        Set tSC = $$$ERROR($$$GeneralError, "File not copied: " _ return)
-        Quit
-      }
+        write:tVerbose !,"Copying ",tSource," to ",tTarget
+        if (copyAsFile) {
+            if '##class(%File).Exists(tSource) {
+                set tSC = $$$ERROR($$$GeneralError, "Source file does not exist: "_tSource)
+                quit
+            }
+            if '##class(%File).CopyFile(tSource, tTarget, 1, .return) {
+                set tSC = $$$ERROR($$$GeneralError, "File not copied: " _ return)
+                quit
+            }
+        } else {
+            write:tVerbose " as directory "
+            set tSC = ##class(%IPM.Utils.File).CopyDir(tSource,tTarget,'..Overlay)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
     }
-    Else {
-      Write:tVerbose " as directory "
-      Set tSC = ##class(%IPM.Utils.File).CopyDir(tSource,tTarget,'..Overlay)
-    }
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-
-  Quit tSC
+    quit tSC
 }
 
 Method OnExportItem(
@@ -189,14 +191,11 @@ Method OnExportItem(
 	ByRef pParams,
 	Output pItemHandled As %Boolean = 0) As %Status
 {
-  
-  Set tVerbose = $Get(pParams("Verbose"))
-  Set pItemHandled = 1
-  
-  Set tSource = ..GetSource()
-  Set tTarget = pParams("ModuleExportPath")
-
-	Quit ..DoCopy(tSource, tTarget, .pParams)
+    set tVerbose = $get(pParams("Verbose"))
+    set pItemHandled = 1
+    set tSource = ..GetSource()
+    set tTarget = pParams("ModuleExportPath")
+    quit ..DoCopy(tSource, tTarget, .pParams)
 }
 
 Method OnPhase(
@@ -204,20 +203,20 @@ Method OnPhase(
 	ByRef pParams,
 	Output pResourceHandled As %Boolean = 0) As %Status
 {
-  Set tVerbose = $Get(pParams("Verbose"))
-  If (pPhase = "Clean") {
-    Set pResourceHandled = 1
-    Set tSource = ..ResourceReference.Module.Root _ ..Name
-    Set tTarget = ..InstallDirectory
-    Do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
-    Write:tVerbose !,"Deleting ",tTarget
-    If copyAsFile {
-      Do ##class(%File).Delete(tTarget)
-    } Else {
-      Do ##class(%File).RemoveDirectoryTree(tTarget)
+    set tVerbose = $get(pParams("Verbose"))
+    if (pPhase = "Clean") {
+        set pResourceHandled = 1
+        set tSource = ..ResourceReference.Module.Root _ ..Name
+        set tTarget = ..InstallDirectory
+        do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
+        write:tVerbose !,"Deleting ",tTarget
+        if copyAsFile {
+            do ##class(%File).Delete(tTarget)
+        } else {
+            do ##class(%File).RemoveDirectoryTree(tTarget)
+        }
     }
-  }
-	Quit $$$OK
+    quit $$$OK
 }
 
 }

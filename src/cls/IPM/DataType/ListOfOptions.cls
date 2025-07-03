@@ -11,77 +11,77 @@ Parameter DISPLAYLIST;
 /// Overridden to generate even in non-XML enabled classes (implementation copied from parent and minimally modified)
 ClassMethod XSDToLogical(val As %String) As %List [ CodeMode = generator ]
 {
-	Set odbcdelim=%parameter("ODBCDELIMITER")
-	If odbcdelim="," Set odbcdelim=""
-	Set odbcdelim=$select(odbcdelim'="":","""_odbcdelim_"""",1:"")
-	$$$GENERATE("	Quit $listfromstring(val"_odbcdelim_")")
+    set odbcdelim=%parameter("ODBCDELIMITER")
+    if odbcdelim="," set odbcdelim=""
+    set odbcdelim=$select(odbcdelim'="":","""_odbcdelim_"""",1:"")
+    $$$GENERATE("	Quit $listfromstring(val"_odbcdelim_")")
 }
 
 /// Converts the Cache $list value to the canonical SOAP encoded value.
 /// Overridden to generate even in non-XML enabled classes (implementation copied from parent and minimally modified)
 ClassMethod LogicalToXSD(val As %List) As %String [ CodeMode = generator ]
 {
-	Set odbcdelim=%parameter("ODBCDELIMITER")
-	If odbcdelim="," Set odbcdelim=""
-	Set odbcdelim=$select(odbcdelim'="":","""_odbcdelim_"""",1:",")
-	$$$GENERATE("	Quit $zcvt($listtostring(val"_odbcdelim_",1),""O"",""XML"")")
+    set odbcdelim=%parameter("ODBCDELIMITER")
+    if odbcdelim="," set odbcdelim=""
+    set odbcdelim=$select(odbcdelim'="":","""_odbcdelim_"""",1:",")
+    $$$GENERATE("	Quit $zcvt($listtostring(val"_odbcdelim_",1),""O"",""XML"")")
 }
 
 /// Converts the input value <var>%val</var>, which is a string, into the logical string format,  based on <parameter>VALUELIST</parameter> and <parameter>DISPLAYLIST</parameter>.
 /// Returns the logical value of the input string <var>%val</var>.
 ClassMethod DisplayToLogical(%val As %String) As %String [ CodeMode = objectgenerator ]
 {
-	Set tDelimiter = %parameter("ODBCDELIMITER")
-	Set tDelimiterCode = $Case(tDelimiter, ",":"", "":"", :","_$$$QUOTE(tDelimiter))
-	If (%parameter("VALUELIST") '= "") && (%parameter("DISPLAYLIST") '= "") {
-		Set tValuePointer = 0
-		Set tDisplayPointer = 0
-		Set tValueList = $ListFromString(%parameter("VALUELIST"))
-		Set tDisplayList = $ListFromString(%parameter("DISPLAYLIST"))
-		
-		Do %code.WriteLine(" Set tLogicalList = """"")
-		Do %code.WriteLine(" Set tPointer = 0")
-		Do %code.WriteLine(" Set tVal = $ListFromString(%val"_tDelimiterCode_")")
-		Do %code.WriteLine(" While $ListNext(tVal,tPointer,tValue) {")
-		Do %code.WriteLine("  Set tLogicalList = tLogicalList_$ListBuild($Case(tValue")
-		While $ListNext(tValueList,tValuePointer,tValue) && $ListNext(tDisplayList,tDisplayPointer,tDisplay) {
-			Do %code.WriteLine("  ,"_$$$QUOTE(tDisplay)_":"_$$$QUOTE(tValue))
-		}
-		Do %code.WriteLine("  ))")
-		Do %code.WriteLine(" }")
-		Do %code.WriteLine(" Quit tLogicalList")
-	} Else {
-		Do %code.WriteLine(" Quit $ListFromString(%val"_tDelimiterCode_")")
-	}
-	Quit $$$OK
+    set tDelimiter = %parameter("ODBCDELIMITER")
+    set tDelimiterCode = $case(tDelimiter, ",":"", "":"", :","_$$$QUOTE(tDelimiter))
+    if (%parameter("VALUELIST") '= "") && (%parameter("DISPLAYLIST") '= "") {
+        set tValuePointer = 0
+        set tDisplayPointer = 0
+        set tValueList = $listfromstring(%parameter("VALUELIST"))
+        set tDisplayList = $listfromstring(%parameter("DISPLAYLIST"))
+
+        do %code.WriteLine(" Set tLogicalList = """"")
+        do %code.WriteLine(" Set tPointer = 0")
+        do %code.WriteLine(" Set tVal = $ListFromString(%val"_tDelimiterCode_")")
+        do %code.WriteLine(" While $ListNext(tVal,tPointer,tValue) {")
+        do %code.WriteLine("  Set tLogicalList = tLogicalList_$ListBuild($Case(tValue")
+        while $listnext(tValueList,tValuePointer,tValue) && $listnext(tDisplayList,tDisplayPointer,tDisplay) {
+            do %code.WriteLine("  ,"_$$$QUOTE(tDisplay)_":"_$$$QUOTE(tValue))
+        }
+        do %code.WriteLine("  ))")
+        do %code.WriteLine(" }")
+        do %code.WriteLine(" Quit tLogicalList")
+    } else {
+        do %code.WriteLine(" Quit $ListFromString(%val"_tDelimiterCode_")")
+    }
+    quit $$$OK
 }
 
 /// Converts the value of <var>%val</var>, which is in logical format, into a display string, based on <parameter>VALUELIST</parameter> and <parameter>DISPLAYLIST</parameter>.
 /// <p>Returns the string value of <var>%val</var>.
 ClassMethod LogicalToDisplay(%val As %String) As %String [ CodeMode = objectgenerator ]
 {
-	Set tDelimiter = %parameter("ODBCDELIMITER")
-	Set tDelimiterCode = $Case(tDelimiter, ",":"", "":"", :","_$$$QUOTE(tDelimiter))
-	If (%parameter("VALUELIST") '= "") && (%parameter("DISPLAYLIST") '= "") {
-		Set tValuePointer = 0
-		Set tDisplayPointer = 0
-		Set tValueList = $ListFromString(%parameter("VALUELIST"))
-		Set tDisplayList = $ListFromString(%parameter("DISPLAYLIST"))
-		
-		Do %code.WriteLine(" Set tDisplayList = """"")
-		Do %code.WriteLine(" Set tPointer = 0")
-		Do %code.WriteLine(" While $ListNext(%val,tPointer,tValue) {")
-		Do %code.WriteLine("  Set tDisplayList = tDisplayList_$ListBuild($Case(tValue")
-		While $ListNext(tValueList,tValuePointer,tValue) && $ListNext(tDisplayList,tDisplayPointer,tDisplay) {
-			Do %code.WriteLine("  ,"_$$$QUOTE(tValue)_":"_$$$QUOTE(tDisplay))
-		}
-		Do %code.WriteLine("  ))")
-		Do %code.WriteLine(" }")
-		Do %code.WriteLine(" Quit $ListToString(tDisplayList"_tDelimiterCode_")")
-	} Else {
-		Do %code.WriteLine(" Quit $ListToString(%val"_tDelimiterCode_")")
-	}
-	Quit $$$OK
+    set tDelimiter = %parameter("ODBCDELIMITER")
+    set tDelimiterCode = $case(tDelimiter, ",":"", "":"", :","_$$$QUOTE(tDelimiter))
+    if (%parameter("VALUELIST") '= "") && (%parameter("DISPLAYLIST") '= "") {
+        set tValuePointer = 0
+        set tDisplayPointer = 0
+        set tValueList = $listfromstring(%parameter("VALUELIST"))
+        set tDisplayList = $listfromstring(%parameter("DISPLAYLIST"))
+
+        do %code.WriteLine(" Set tDisplayList = """"")
+        do %code.WriteLine(" Set tPointer = 0")
+        do %code.WriteLine(" While $ListNext(%val,tPointer,tValue) {")
+        do %code.WriteLine("  Set tDisplayList = tDisplayList_$ListBuild($Case(tValue")
+        while $listnext(tValueList,tValuePointer,tValue) && $listnext(tDisplayList,tDisplayPointer,tDisplay) {
+            do %code.WriteLine("  ,"_$$$QUOTE(tValue)_":"_$$$QUOTE(tDisplay))
+        }
+        do %code.WriteLine("  ))")
+        do %code.WriteLine(" }")
+        do %code.WriteLine(" Quit $ListToString(tDisplayList"_tDelimiterCode_")")
+    } else {
+        do %code.WriteLine(" Quit $ListToString(%val"_tDelimiterCode_")")
+    }
+    quit $$$OK
 }
 
 /// Tests if the logical value <var>%val</var>, which is a string, is valid.
@@ -89,24 +89,24 @@ ClassMethod LogicalToDisplay(%val As %String) As %String [ CodeMode = objectgene
 /// In this case, <a href="#MINLEN">MINLEN</a>, <a href="#MAXLEN">MAXLEN</a>, <a href="#VALUELIST">VALUELIST</a>, and <a href="#PATTERN">PATTERN</a>.
 ClassMethod IsValid(%val As %CacheString) As %Status [ CodeMode = objectgenerator ]
 {
-	Do %code.WriteLine(" If '$ListValid(%val) {")
-	Do %code.WriteLine("  Quit $$$ERROR($$$DTFailure,%val)")
-	Do %code.WriteLine(" }")
-	If (%parameter("VALUELIST") '= "") {
-		Set tValueList = $ListFromString(%parameter("VALUELIST"))
-		Set tValuePointer = 0
-		Do %code.WriteLine(" Set tPointer = 0, tIsValid = 1")
-		Do %code.WriteLine(" While tIsValid && $ListNext(%val,tPointer,tValue) {")
-		Do %code.WriteLine("  Set tIsValid = tIsValid && $Case(tValue")
-		While $ListNext(tValueList,tValuePointer,tValue) {
-			Do %code.WriteLine("  ,"_$$$QUOTE(tValue)_":1")
-		}
-		Do %code.WriteLine("  ,:0)")
-		Do %code.WriteLine(" }")
-		Do %code.WriteLine(" If 'tIsValid { Quit $$$ERROR($$$DTValueList,tValue,"_$$$quote(%parameter("VALUELIST"))_") }")
-	}
-	Do %code.WriteLine(" Quit $$$OK")
-	Quit $$$OK
+    do %code.WriteLine(" If '$ListValid(%val) {")
+    do %code.WriteLine("  Quit $$$ERROR($$$DTFailure,%val)")
+    do %code.WriteLine(" }")
+    if (%parameter("VALUELIST") '= "") {
+        set tValueList = $listfromstring(%parameter("VALUELIST"))
+        set tValuePointer = 0
+        do %code.WriteLine(" Set tPointer = 0, tIsValid = 1")
+        do %code.WriteLine(" While tIsValid && $ListNext(%val,tPointer,tValue) {")
+        do %code.WriteLine("  Set tIsValid = tIsValid && $Case(tValue")
+        while $listnext(tValueList,tValuePointer,tValue) {
+            do %code.WriteLine("  ,"_$$$QUOTE(tValue)_":1")
+        }
+        do %code.WriteLine("  ,:0)")
+        do %code.WriteLine(" }")
+        do %code.WriteLine(" If 'tIsValid { Quit $$$ERROR($$$DTValueList,tValue,"_$$$quote(%parameter("VALUELIST"))_") }")
+    }
+    do %code.WriteLine(" Quit $$$OK")
+    quit $$$OK
 }
 
 }

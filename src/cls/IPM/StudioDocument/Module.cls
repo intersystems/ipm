@@ -14,210 +14,216 @@ Parameter STREAMCLASS = "%IPM.StudioDocument.ModuleStream";
 /// Save the module definition document.
 Method Save() As %Status
 {
-	Set tName = ..Name
-	Set tSC = ..ImportStream(.tName,..Code)
-	If $$$ISERR(tSC) {
-		Quit tSC
-	}
-	Set ..Name = tName
-	Quit ..Load()
+    set tName = ..Name
+    set tSC = ..ImportStream(.tName,..Code)
+    if $$$ISERR(tSC) {
+        quit tSC
+    }
+    set ..Name = tName
+    quit ..Load()
 }
 
-ClassMethod UpdatePersistentFromStream(pStream As %IPM.StudioDocument.ModuleStream, Output pModule As %IPM.Storage.Module) As %Status
+ClassMethod UpdatePersistentFromStream(
+	pStream As %IPM.StudioDocument.ModuleStream,
+	Output pModule As %IPM.Storage.Module) As %Status
 {
-	Set tSC = $$$OK
-	Set pModule = $$$NULLOREF
-	Try {
-		New $$$ZPMStudioDocumentModule
-		New $$$ZPMDeferModifyResources
-		Set $$$ZPMDeferModifyResources = 1
-		If ##class(%IPM.Storage.Module).NameExists(pStream.Name) {
-			Set pModule = ##class(%IPM.Storage.Module).NameOpen(pStream.Name,,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		} Else {
-			Set pModule = ##class(%IPM.Storage.Module).%New()
-		}
-		
-		If (pStream.Contents.Size = 0) {
-			Set pModule.Name = pStream.Name
-			Set pModule.VersionString = "0.0.1+snapshot"
-		} Else {
-			Set tReader = ##class(%XML.Reader).%New()
-			Do pStream.Contents.Rewind()
-			// Preprocess the pStream contents to apply InternalXSL
-			Set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
-			Set tTransformedStream = ##class(%Stream.GlobalCharacter).%New()
-			Set tTransformedStream.LineTerminator = $Char(10)
-			Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(pStream.Contents, tXSL, .tTransformedStream)
-			If $$$ISERR(tSC) {
-				Quit
-			}
+    set tSC = $$$OK
+    set pModule = $$$NULLOREF
+    try {
+        new $$$ZPMStudioDocumentModule
+        new $$$ZPMDeferModifyResources
+        set $$$ZPMDeferModifyResources = 1
+        if ##class(%IPM.Storage.Module).NameExists(pStream.Name) {
+            set pModule = ##class(%IPM.Storage.Module).NameOpen(pStream.Name,,.tSC)
+            if $$$ISERR(tSC) {
+                quit
+            }
+        } else {
+            set pModule = ##class(%IPM.Storage.Module).%New()
+        }
 
-			Set tSC = tReader.OpenStream(tTransformedStream)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			
-			// Dependencies and Resources will be re-populated upon import.
-			Do pModule.Dependencies.Clear()
-			Do pModule.Resources.Clear()
-			Do pModule.Defaults.Clear()
-			Do pModule.Mappings.Clear()
-			Do pModule.Invokes.Clear()
-			
-			If (pModule.%Id() '= "") {
-				// Save to prevent unique index violations on re-insert of things that weren't actually removed.
-				// At some point a more robust approach would be to match existing items in collections/relationships by such unique indices.
-				Set tSC = pModule.%Save()
-				If $$$ISERR(tSC) {
-					Quit
-				}
-			}
-			
-			Set $$$ZPMStudioDocumentModule = pModule //Stash for use in %IPM.Storage.Module:XMLNew
-			Do tReader.Correlate("Module","%IPM.Storage.Module")
-			Do tReader.Next(.pModule,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			
-			If ($$$lcase(pStream.Name) '= $$$lcase(pModule.Name)) {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module document name '%1' and module name in manifest '%2' must be the same.",pStream.Name,tModule.Name))
-				Quit
-			}
-		}
-		
-		Set tSC = pModule.%Save()
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnModifyResources(pModule)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+        if (pStream.Contents.Size = 0) {
+            set pModule.Name = pStream.Name
+            set pModule.VersionString = "0.0.1+snapshot"
+        } else {
+            set tReader = ##class(%XML.Reader).%New()
+            do pStream.Contents.Rewind()
+            // Preprocess the pStream contents to apply InternalXSL
+            set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
+            set tTransformedStream = ##class(%Stream.GlobalCharacter).%New()
+            set tTransformedStream.LineTerminator = $char(10)
+            set tSC = ##class(%XML.XSLT.Transformer).TransformStream(pStream.Contents, tXSL, .tTransformedStream)
+            if $$$ISERR(tSC) {
+                quit
+            }
+
+            set tSC = tReader.OpenStream(tTransformedStream)
+            if $$$ISERR(tSC) {
+                quit
+            }
+
+            // Dependencies and Resources will be re-populated upon import.
+            do pModule.Dependencies.Clear()
+            do pModule.Resources.Clear()
+            do pModule.Defaults.Clear()
+            do pModule.Mappings.Clear()
+            do pModule.Invokes.Clear()
+
+            if (pModule.%Id() '= "") {
+                // Save to prevent unique index violations on re-insert of things that weren't actually removed.
+                // At some point a more robust approach would be to match existing items in collections/relationships by such unique indices.
+                set tSC = pModule.%Save()
+                if $$$ISERR(tSC) {
+                    quit
+                }
+            }
+
+            set $$$ZPMStudioDocumentModule = pModule //Stash for use in %IPM.Storage.Module:XMLNew
+            do tReader.Correlate("Module","%IPM.Storage.Module")
+            do tReader.Next(.pModule,.tSC)
+            if $$$ISERR(tSC) {
+                quit
+            }
+
+            if ($$$lcase(pStream.Name) '= $$$lcase(pModule.Name)) {
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module document name '%1' and module name in manifest '%2' must be the same.",pStream.Name,pModule.Name))
+                quit
+            }
+        }
+
+        set tSC = pModule.%Save()
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnModifyResources(pModule)
+        if $$$ISERR(tSC) {
+            quit
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Method OnCompileDocument(ByRef qstruct As %String) As %Status
 {
-	#dim tModule As %IPM.Storage.Module
-	#dim tGeneralSettings As %IPM.General.Settings
-	Set tSC = $$$OK
-	Try {
-		Set tNameNoExt = $Piece(..Name,".",1,*-1)
-		Set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tNameNoExt,,.tSC)
-		$$$ThrowOnError(tSC)
-		
-		Do tModStream.Contents.Clear()
-		Set tSC = tModStream.Contents.CopyFrom(..Code)
-		$$$ThrowOnError(tSC)
-		Set tSC = tModStream.%Save()
-		$$$ThrowOnError(tSC)
-		
-		Set tSC = ..UpdatePersistentFromStream(tModStream,.tModule)
-		$$$ThrowOnError(tSC)
-		
-		Set ..Name = tModule.Name_..#EXTENSION
-		
-		// Determine whether to suppress compilation from settings
-		Set tGeneralSettings = ##class(%IPM.General.Settings).%Get(.tSC)
-		$$$ThrowOnError(tSC)
-		Set tSuppressCompilation = tGeneralSettings.SuppressCompilation
-		If tSuppressCompilation {
-			Write !, "Module compilation suppressed due to user settings."
-		} Else {
-			Set tSC = tModule.%Compile(.qstruct)
-			$$$ThrowOnError(tSC)
-		}
-		
-		Set @..#INFOGLOBAL@("compile",tModStream.Name) = $zdt($zts,3)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    #dim tModule As %IPM.Storage.Module
+    #dim tGeneralSettings As %IPM.General.Settings
+    set tSC = $$$OK
+    try {
+        set tNameNoExt = $piece(..Name,".",1,*-1)
+        set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tNameNoExt,,.tSC)
+        $$$ThrowOnError(tSC)
+
+        do tModStream.Contents.Clear()
+        set tSC = tModStream.Contents.CopyFrom(..Code)
+        $$$ThrowOnError(tSC)
+        set tSC = tModStream.%Save()
+        $$$ThrowOnError(tSC)
+
+        set tSC = ..UpdatePersistentFromStream(tModStream,.tModule)
+        $$$ThrowOnError(tSC)
+
+        set ..Name = tModule.Name_..#EXTENSION
+
+        // Determine whether to suppress compilation from settings
+        set tGeneralSettings = ##class(%IPM.General.Settings).%Get(.tSC)
+        $$$ThrowOnError(tSC)
+        set tSuppressCompilation = tGeneralSettings.SuppressCompilation
+        if tSuppressCompilation {
+            write !, "Module compilation suppressed due to user settings."
+        } else {
+            set tSC = tModule.%Compile(.qstruct)
+            $$$ThrowOnError(tSC)
+        }
+
+        set @..#INFOGLOBAL@("compile",tModStream.Name) = $zdatetime($ztimestamp,3)
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// Save the module definition document from stream to database.
-ClassMethod ImportStream(pName As %String, pStream As %GlobalCharacterStream) As %Status
+ClassMethod ImportStream(
+	pName As %String,
+	pStream As %GlobalCharacterStream) As %Status
 {
-	Set tSC = $$$OK
-	Set tInitTLevel = $TLevel
-	Try {
-		Set tSC = ..%ValidateName(pName)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tName = $Piece(pName,".",1,*-1)
-		If ##class(%IPM.StudioDocument.ModuleStream).NameExists(tName) {
-			Set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tName,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		} Else {
-			Set tModStream = ##class(%IPM.StudioDocument.ModuleStream).%New()
-			Set tModStream.Name = tName
-		}
-		
-		Do tModStream.Contents.Clear()
-		Do pStream.Rewind()
-		While '(pStream.AtEnd) {
-			Set tSC = tModStream.Contents.Write(pStream.Read(16000))
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		}
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		TSTART
-		Set tSC = tModStream.%Save()
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tSC = ..UpdatePersistentFromStream(tModStream,.tModule)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		TCOMMIT
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	While ($TLevel > tInitTLevel) { TROLLBACK 1 }
-	Quit tSC
+    set tSC = $$$OK
+    set tInitTLevel = $tlevel
+    try {
+        set tSC = ..%ValidateName(pName)
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        set tName = $piece(pName,".",1,*-1)
+        if ##class(%IPM.StudioDocument.ModuleStream).NameExists(tName) {
+            set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tName,.tSC)
+            if $$$ISERR(tSC) {
+                quit
+            }
+        } else {
+            set tModStream = ##class(%IPM.StudioDocument.ModuleStream).%New()
+            set tModStream.Name = tName
+        }
+
+        do tModStream.Contents.Clear()
+        do pStream.Rewind()
+        while '(pStream.AtEnd) {
+            set tSC = tModStream.Contents.Write(pStream.Read(16000))
+            if $$$ISERR(tSC) {
+                quit
+            }
+        }
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        tstart
+        set tSC = tModStream.%Save()
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        set tSC = ..UpdatePersistentFromStream(tModStream,.tModule)
+        if $$$ISERR(tSC) {
+            quit
+        }
+        tcommit
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    while ($tlevel > tInitTLevel) {
+        trollback 1
+    }
+    quit tSC
 }
 
 /// Delete the module definition <var>name</var>.
 ClassMethod Delete(name As %String) As %Status
 {
-	Set tSC = $$$OK
-	Set tInitTLevel = $TLevel
-	Try {
-		Set tSC = ..%ValidateName(name)
-		$$$ThrowOnError(tSC)
-		
-		Set tModuleName = $Piece(name,".",1,*-1)
-		TSTART
-		Set tSC = ##class(%IPM.StudioDocument.ModuleStream).NameDelete(tModuleName)
-		$$$ThrowOnError(tSC)
-		Set tSC = ##class(%IPM.Storage.Module).NameDelete(tModuleName)
-		$$$ThrowOnError(tSC)
-		TCOMMIT
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	While ($TLevel > tInitTLevel) {
-		TROLLBACK 1
-	}
-	Quit tSC
+    set tSC = $$$OK
+    set tInitTLevel = $tlevel
+    try {
+        set tSC = ..%ValidateName(name)
+        $$$ThrowOnError(tSC)
+
+        set tModuleName = $piece(name,".",1,*-1)
+        tstart
+        set tSC = ##class(%IPM.StudioDocument.ModuleStream).NameDelete(tModuleName)
+        $$$ThrowOnError(tSC)
+        set tSC = ##class(%IPM.Storage.Module).NameDelete(tModuleName)
+        $$$ThrowOnError(tSC)
+        tcommit
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    while ($tlevel > tInitTLevel) {
+        trollback 1
+    }
+    quit tSC
 }
 
 /// Return the timestamp of schema category 'name' in %TimeStamp format, i.e. $zdatetime($horolog,3).
@@ -225,123 +231,131 @@ ClassMethod Delete(name As %String) As %Status
 /// So the format should be $zdatetime($horolog,3), or "" if the category does not exist.
 ClassMethod TimeStamp(name As %String) As %TimeStamp [ SqlProc ]
 {
-	If '..%ValidateName(name) {
-		Quit ""
-	}
-	
-	Set tStamp = ""
-	Set tNameNoExt = $Piece(name,".",1,*-1)
-	Set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tNameNoExt)
-	If $IsObject(tModStream) {
-		Set tStamp = tModStream.LastModifiedTimestamp
-	} Else {
-		Set tModule = ##class(%IPM.Storage.Module).NameOpen(tNameNoExt)
-		If $IsObject(tModule) {
-			Set tStamp = tModule.LastModifiedTimestamp
-		}
-	}
-	Quit tStamp
+    if '..%ValidateName(name) {
+        quit ""
+    }
+
+    set tStamp = ""
+    set tNameNoExt = $piece(name,".",1,*-1)
+    set tModStream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(tNameNoExt)
+    if $isobject(tModStream) {
+        set tStamp = tModStream.LastModifiedTimestamp
+    } else {
+        set tModule = ##class(%IPM.Storage.Module).NameOpen(tNameNoExt)
+        if $isobject(tModule) {
+            set tStamp = tModule.LastModifiedTimestamp
+        }
+    }
+    quit tStamp
 }
 
 /// Return 1 if the given document exists and 0 if it does not.
 ClassMethod Exists(name As %String) As %Boolean
 {
-	Set tExists = 0
-	Try {
-		Set tSC = ..%ValidateName(name)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		Set tName = $Piece(name,".",1,*-1)
-		Set tExists = ##class(%IPM.StudioDocument.ModuleStream).NameExists(tName) 
-						|| ##class(%IPM.Storage.Module).NameExists(tName)
-	} Catch e {
-		Set tExists = 0
-	}
-	Quit tExists
+    set tExists = 0
+    try {
+        set tSC = ..%ValidateName(name)
+        if $$$ISERR(tSC) {
+            quit
+        }
+        set tName = $piece(name,".",1,*-1)
+        set tExists = ##class(%IPM.StudioDocument.ModuleStream).NameExists(tName)
+                        || ##class(%IPM.Storage.Module).NameExists(tName)
+    } catch e {
+        set tExists = 0
+    }
+    quit tExists
 }
 
 /// Subclasses must override
 Query ItemList() As %SQLQuery(ROWSPEC = "name:%String,modified:%TimeStamp") [ SqlProc ]
 {
-	select Name, LastModifiedTimestamp from %IPM_StudioDocument.ModuleStream
-	union
-	select Name, LastModifiedTimestamp from %IPM_Storage.ModuleItem
-		where Name not in (select Name from %IPM_StudioDocument.ModuleStream)
+    select Name, LastModifiedTimestamp from %IPM_StudioDocument.ModuleStream
+    union
+    select Name, LastModifiedTimestamp from %IPM_Storage.ModuleItem
+        where Name not in (select Name from %IPM_StudioDocument.ModuleStream)
 }
 
 /// Returns a comma-separated list of *individual* resources listed in the module manifest.
 /// This does not include packages or CSP/filesystem resources.
 ClassMethod GetOther(Name As %String) As %String
 {
-	Set tOtherDocs = ""
-	Try {
-		Set tExt = $Piece(Name,".",*)
-		If (tExt = "ZPM") {
-			Set tModuleName = $Piece(Name,".",1,*-1)
-			Set tResources = ##class(%SQL.Statement).%ExecDirect(,
-				"select UniqueName from %IPM_Storage.ResourceReference where ""Module""->Name = ?",
-				tModuleName)
-			If (tResources.%SQLCODE < 0) {
-				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResources.%SQLCODE,tResources.%Message)
-			}
-			While (tResources.%Next(.tSC)) {
-				$$$ThrowOnError(tSC)
-				Set tName = tResources.%Get("UniqueName")
-				If (tName = "") || ($Extract(tName) = "/") {
-					// Skip CSP/filesystem resources, and resources without a corresponding server document name.
-					Continue
-				}
-				Set tExt = $Piece(tName,".",*)
-				If (tExt = "PKG") {
-					// Cannot open packages directly.
-					// Perhaps we could call ResolveChildren or expand these if there's interest.
-					Continue
-				}
-				Set tOtherDocs = tOtherDocs _ $ListBuild(tName)
-			}
-			$$$ThrowOnError(tSC)
-		}
-	} Catch e {
-		Set tOtherDocs = ""
-		// No way to report exceptions, so just Log it.
-		Do e.Log()
-	}
-	Quit $ListToString(tOtherDocs)
+    set tOtherDocs = ""
+    try {
+        set tExt = $piece(Name,".",*)
+        if (tExt = "ZPM") {
+            set tModuleName = $piece(Name,".",1,*-1)
+            set tResources = ##class(%SQL.Statement).%ExecDirect(,
+                "select UniqueName from %IPM_Storage.ResourceReference where ""Module""->Name = ?",
+                tModuleName)
+            if (tResources.%SQLCODE < 0) {
+                throw ##class(%Exception.SQL).CreateFromSQLCODE(tResources.%SQLCODE,tResources.%Message)
+            }
+            while (tResources.%Next(.tSC)) {
+                $$$ThrowOnError(tSC)
+                set tName = tResources.%Get("UniqueName")
+                if (tName = "") || ($extract(tName) = "/") {
+                    // Skip CSP/filesystem resources, and resources without a corresponding server document name.
+                    continue
+                }
+                set tExt = $piece(tName,".",*)
+                if (tExt = "PKG") {
+                    // Cannot open packages directly.
+                    // Perhaps we could call ResolveChildren or expand these if there's interest.
+                    continue
+                }
+                set tOtherDocs = tOtherDocs _ $listbuild(tName)
+            }
+            $$$ThrowOnError(tSC)
+        }
+    } catch e {
+        set tOtherDocs = ""
+        // No way to report exceptions, so just Log it.
+        do e.Log()
+    }
+    quit $listtostring(tOtherDocs)
 }
 
 /// Export this document to the current device in XML format
 Method ExportToXML(flags As %String) As %Status
 {
-  if ('..Code.Size) {
-    quit $$$OK
-  }
-	Set tXSL=##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||ExternalXSL").Data
+    if ('..Code.Size) {
+        quit $$$OK
+    }
+    set tXSL=##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||ExternalXSL").Data
 
-	Set tSC = ##class(%XML.XSLT.Transformer).TransformStream(..Code, tXSL, .tOutput)
-	If $$$ISERR(tSC) Quit tSC
-	
-	Set tSC = ##class(%XML.Document).GetDocumentFromStream(tOutput, .tDoc)
-	If $$$ISERR(tSC) Quit tSC
-	Set tXML = ##class(%XML.Writer).%New()
-	Set tXML.NoXMLDeclaration = 1
-	Set tXML.Indent = 2
-	Set tSC = tXML.Document(tDoc)
-	If $$$ISERR(tSC) Quit tSC
-	Do tXML.OutputToDevice()
-	Quit $$$OK
+    set tSC = ##class(%XML.XSLT.Transformer).TransformStream(..Code, tXSL, .tOutput)
+    if $$$ISERR(tSC) {
+        quit tSC
+    }
+
+    set tSC = ##class(%XML.Document).GetDocumentFromStream(tOutput, .tDoc)
+    if $$$ISERR(tSC) {
+        quit tSC
+    }
+    set tXML = ##class(%XML.Writer).%New()
+    set tXML.NoXMLDeclaration = 1
+    set tXML.Indent = 2
+    set tSC = tXML.Document(tDoc)
+    if $$$ISERR(tSC) {
+        quit tSC
+    }
+    do tXML.OutputToDevice()
+    quit $$$OK
 }
 
 /// Import from the stream in XML format
-Method ImportFromXML(stream As %RegisteredObject, flags As %String) As %Status
+Method ImportFromXML(
+	stream As %RegisteredObject,
+	flags As %String) As %Status
 {
-	if ('stream.Size) {
-		quit $$$OK
-	}
-	Do ..Code.Clear()
-	Do ..Code.Write("<?xml version=""1.0""?>")
-	Do ..Code.CopyFrom(stream)
-	Quit $$$OK
+    if ('stream.Size) {
+        quit $$$OK
+    }
+    do ..Code.Clear()
+    do ..Code.Write("<?xml version=""1.0""?>")
+    do ..Code.CopyFrom(stream)
+    quit $$$OK
 }
 
 /// XSLT to replace the top-level module version with a new value
@@ -369,38 +383,40 @@ XData UpdateVersionTransform [ XMLNamespace = "http://www.intersystems.com/studi
 /// Returns a compiled XSLT to update a module's version to the specified <var>semver</var> in its XML representation
 ClassMethod CompiledUpdateVersionXSLT(semver As %IPM.General.SemanticVersion) As %XML.XSLT.CompiledStyleSheet
 {
-	Set tXData = ##class(%Dictionary.CompiledXData).IDKEYOpen($ClassName(), "UpdateVersionTransform",,.tSC)
-	$$$ThrowOnError(tSC)
-	Set s = ""
-	While 'tXData.Data.AtEnd {
-		Set s = s _ tXData.Data.Read()
-	}
-	Set s = $REPLACE(s, "replacementValue", semver.ToString())
-	Set stream = ##class(%Stream.TmpCharacter).%New()
-	$$$ThrowOnError(stream.Write(s))
-	$$$ThrowOnError(stream.Rewind())
-	Set tSC = ##class(%XML.XSLT.CompiledStyleSheet).CreateFromStream(stream, .compiledStyleSheet)
-	$$$ThrowOnError(tSC)
+    set tXData = ##class(%Dictionary.CompiledXData).IDKEYOpen($classname(), "UpdateVersionTransform",,.tSC)
+    $$$ThrowOnError(tSC)
+    set s = ""
+    while 'tXData.Data.AtEnd {
+        set s = s _ tXData.Data.Read()
+    }
+    set s = $replace(s, "replacementValue", semver.ToString())
+    set stream = ##class(%Stream.TmpCharacter).%New()
+    $$$ThrowOnError(stream.Write(s))
+    $$$ThrowOnError(stream.Rewind())
+    set tSC = ##class(%XML.XSLT.CompiledStyleSheet).CreateFromStream(stream, .compiledStyleSheet)
+    $$$ThrowOnError(tSC)
 
-	Quit compiledStyleSheet
+    quit compiledStyleSheet
 }
 
 /// Updates the version of <var>moduleName</var> to <var>semver</var>
-ClassMethod UpdateVersion(moduleName As %String, semver As %IPM.General.SemanticVersion)
+ClassMethod UpdateVersion(
+	moduleName As %String,
+	semver As %IPM.General.SemanticVersion)
 {
-	// Can't use %IPM.Repo.XSLTProvider because we need to pass a parameter
-	Set compiledTransform = ..CompiledUpdateVersionXSLT(semver)
-	Set document = ##class(%Library.RoutineMgr).%OpenId(moduleName_".ZPM")
-	If '$IsObject(document) {
-		// %Library.RoutineMgr:%OpenId doesn't have a byref status arg.
-		$$$ThrowStatus($Get(%objlasterror,$$$ERROR($$$GeneralError,"Unknown error occurred.")))
-	}
+    // Can't use %IPM.Repo.XSLTProvider because we need to pass a parameter
+    set compiledTransform = ..CompiledUpdateVersionXSLT(semver)
+    set document = ##class(%Library.RoutineMgr).%OpenId(moduleName_".ZPM")
+    if '$isobject(document) {
+        // %Library.RoutineMgr:%OpenId doesn't have a byref status arg.
+        $$$ThrowStatus($get(%objlasterror,$$$ERROR($$$GeneralError,"Unknown error occurred.")))
+    }
 
-	$$$ThrowOnError(document.Code.Rewind())
-	$$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(document.Code, compiledTransform, .updatedContents))
-	$$$ThrowOnError(document.Code.Clear())
-	$$$ThrowOnError(document.Code.CopyFrom(updatedContents))
-	$$$ThrowOnError(document.%Save())
+    $$$ThrowOnError(document.Code.Rewind())
+    $$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(document.Code, compiledTransform, .updatedContents))
+    $$$ThrowOnError(document.Code.Clear())
+    $$$ThrowOnError(document.Code.CopyFrom(updatedContents))
+    $$$ThrowOnError(document.%Save())
 }
 
 XData ExternalXSL

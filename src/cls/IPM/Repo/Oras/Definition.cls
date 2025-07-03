@@ -15,8 +15,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 
 <modifier name="oras" aliases="o" description="Create/update an ORAS server repository" />
 <modifier name="namespace" aliases="ns" value="true" description="For ORAS repositories, specifies the registry namespace, i.e. the fully specified path to a package is &lt;url>/&lt;namespace>/&lt;package>.
-	Note, this is not the IRIS namespace, but a namespace in the sense of a (sub)directory in the registry's storage system. For example, if in a custom managed registry, the base url is 'registry.company.com',
-	and the package is 'objectscript-example', but it will be stored at 'registry.company.com/packages/ipm/objectscript-example', then the namespace will be 'packages/ipm'." />
+Note, this is not the IRIS namespace, but a namespace in the sense of a (sub)directory in the registry's storage system. For example, if in a custom managed registry, the base url is 'registry.company.com', and the package is 'objectscript-example', but it will be stored at 'registry.company.com/packages/ipm/objectscript-example', then the namespace will be 'packages/ipm'." />
 </group>
 </command>
 </commands>
@@ -25,117 +24,120 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 /// Returns a REST client to interact with this server.
 Method GetPackageService() As %IPM.Repo.IPackageService
 {
-	Set tClient = ##class(%IPM.Repo.Oras.PackageService).%New()
-	// We want to preprend the prefix to the "GET"/"POST"/etc. requests
-	// Otherwise, it will be overwritten
-	Do ##class(%Net.URLParser).Decompose(..URL,.comp)
-	If $Data(comp("path"), path) && (path '= "") {
-		If $Extract(path, *) '= "/" {
-			Set path = path _ "/"
-		}
-		Set tClient.PathPrefix = path
-	}
-	Kill comp("path")
-	Set tClient.Location = ##class(%Net.URLParser).Compose(.comp)
-	Set tClient.Namespace = ..Namespace
-	Set tClient.Username = ..Username
-	Set tClient.Password = ..Password
-	Set tClient.Token = ..Token
-	Set tClient.TokenAuthMethod = ..TokenAuthMethod
-	Quit tClient
+    set tClient = ##class(%IPM.Repo.Oras.PackageService).%New()
+    // We want to preprend the prefix to the "GET"/"POST"/etc. requests
+    // Otherwise, it will be overwritten
+    do ##class(%Net.URLParser).Decompose(..URL,.comp)
+    if $data(comp("path"), path) && (path '= "") {
+        if $extract(path, *) '= "/" {
+            set path = path _ "/"
+        }
+        set tClient.PathPrefix = path
+    }
+    kill comp("path")
+    set tClient.Location = ##class(%Net.URLParser).Compose(.comp)
+    set tClient.Namespace = ..Namespace
+    set tClient.Username = ..Username
+    set tClient.Password = ..Password
+    set tClient.Token = ..Token
+    set tClient.TokenAuthMethod = ..TokenAuthMethod
+    quit tClient
 }
 
 /// Returns a REST client to publish modules/applications to this server.
 Method GetPublishService() As %IPM.Repo.IPublishService
 {
-	Set tClient = ##class(%IPM.Repo.Oras.PublishService).%New()
-	Set tClient.Location = ..URL
-	Set tClient.Namespace = ..Namespace
-	Set tClient.Username = ..Username
-	Set tClient.Password = ..Password
-	Set tClient.Token = ..Token
-	Set tClient.TokenAuthMethod = ..TokenAuthMethod
-	Quit tClient
+    set tClient = ##class(%IPM.Repo.Oras.PublishService).%New()
+    set tClient.Location = ..URL
+    set tClient.Namespace = ..Namespace
+    set tClient.Username = ..Username
+    set tClient.Password = ..Password
+    set tClient.Token = ..Token
+    set tClient.TokenAuthMethod = ..TokenAuthMethod
+    quit tClient
 }
 
 /// Outputs information about this server to the current device.
 /// Subclasses may override to show additional information.
 Method Display()
 {
-	Do ##super()
-
-	If (..Namespace '= "") {
-		Write !,$c(9),"Namespace: ",..Padding(1),..Namespace
-	}
+    do ##super()
+    if (..Namespace '= "") {
+        write !,$char(9),"Namespace: ",..Padding(1),..Namespace
+    }
 }
 
 /// Handles modifiers/data attributes provided from the package manager shell.
-ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status
+ClassMethod OnConfigure(
+	pInstance As %IPM.Repo.Definition,
+	pInteractive As %Boolean = 1,
+	ByRef pModifiers,
+	ByRef pData) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tUrl = $Get(pModifiers("url"), pInstance.URL)
-		If (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
-			$$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new ORAS server with non-unique URL."))
-		}
-		If (pInteractive && (tUrl = "")) {
-			Set tPrompt = ..#URLPromptString
-			Set tResponse = ##class(%Library.Prompt).GetString(tPrompt, .tUrl)
-			If (tResponse '= $$$SuccessResponse) {
-				$$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
-			}
-		}
-		If $Data(pModifiers("username"), tUsername) {
-			Set pInstance.Username = tUsername
-		}
-		If $Data(pModifiers("password"), tPassword) {
-			Set pInstance.Password = tPassword
-		}
-		If $Data(pModifiers("token"), tToken) {
-			Set pInstance.Token = tToken
-		}
-		If $Data(pModifiers("token-auth-method"), tokenAuthMethod) # 2 { 
-			Set pInstance.TokenAuthMethod = tokenAuthMethod
-		}
-		If $Data(pModifiers("publish"), tPublish) {
-			Set pInstance.DeploymentEnabled = tPublish
-		}
-		If tUrl'="" {
-			Set pInstance.URL = tUrl
-		}
-		If (pInstance.DeploymentEnabled = 1) {
-			Set tServer = ##class(%IPM.Repo.Oras.Definition).DeploymentServerOpen(1)
-			If $Isobject(tServer),tServer.URL'=pInstance.URL {
-				Set tServer.DeploymentEnabled = 0
-				$$$ThrowOnError(tServer.%Save())
-			}
-		}
-		If $Data(pModifiers("namespace"), tNamespace) {
-			Set pInstance.Namespace = tNamespace
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tUrl = $get(pModifiers("url"), pInstance.URL)
+        if (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new ORAS server with non-unique URL."))
+        }
+        if (pInteractive && (tUrl = "")) {
+            set tPrompt = ..#URLPromptString
+            set tResponse = ##class(%Library.Prompt).GetString(tPrompt, .tUrl)
+            if (tResponse '= $$$SuccessResponse) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
+            }
+        }
+        if $data(pModifiers("username"), tUsername) {
+            set pInstance.Username = tUsername
+        }
+        if $data(pModifiers("password"), tPassword) {
+            set pInstance.Password = tPassword
+        }
+        if $data(pModifiers("token"), tToken) {
+            set pInstance.Token = tToken
+        }
+        if $data(pModifiers("token-auth-method"), tokenAuthMethod) # 2 {
+            set pInstance.TokenAuthMethod = tokenAuthMethod
+        }
+        if $data(pModifiers("publish"), tPublish) {
+            set pInstance.DeploymentEnabled = tPublish
+        }
+        if tUrl'="" {
+            set pInstance.URL = tUrl
+        }
+        if (pInstance.DeploymentEnabled = 1) {
+            set tServer = ##class(%IPM.Repo.Oras.Definition).DeploymentServerOpen(1)
+            if $isobject(tServer),tServer.URL'=pInstance.URL {
+                set tServer.DeploymentEnabled = 0
+                $$$ThrowOnError(tServer.%Save())
+            }
+        }
+        if $data(pModifiers("namespace"), tNamespace) {
+            set pInstance.Namespace = tNamespace
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Query PublishingServer() As %SQLQuery
 {
-	SELECT 
-		CASE 
-			WHEN DeploymentEnabled = 1 THEN 1
-			WHEN Token IS NOT NULL THEN 2
-			WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
-			ELSE 999 
-		END PublishOrder,
-		ID, Name, URL
-	FROM %IPM_Repo_Oras.Definition 
-	WHERE Enabled = 1
+    SELECT
+        CASE
+            WHEN DeploymentEnabled = 1 THEN 1
+            WHEN Token IS NOT NULL THEN 2
+            WHEN Username IS NOT NULL AND Password IS NOT NULL THEN 3
+            ELSE 999
+        END PublishOrder,
+        ID, Name, URL
+    FROM %IPM_Repo_Oras.Definition
+    WHERE Enabled = 1
 }
 
 Method GetPublishingManager(ByRef status)
 {
-	Return ##class(%IPM.Repo.Oras.PublishManager).%Get(.status)
+    return ##class(%IPM.Repo.Oras.PublishManager).%Get(.status)
 }
 
 Storage Default

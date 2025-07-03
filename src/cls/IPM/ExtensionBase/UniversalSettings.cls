@@ -16,18 +16,18 @@ Property Key As %String [ InitialExpression = {$classname()}, ReadOnly ];
 /// If enabled, source control behavior (including menu item enable/disable) follows mapped resources.
 /// That is, if a class is mapped from the default routine database of another namespace that has source control enabled,
 /// the source control behavior from that namespace will be used rather than that of the current namespace.
-Property MappedSourceControl As %Boolean [ InitialExpression = {($Get(^%SYS("SourceControlClass")) = "%IPM.ExtensionBase.Composite")} ];
+Property MappedSourceControl As %Boolean [ InitialExpression = {($get(^%SYS("SourceControlClass")) = "%IPM.ExtensionBase.Composite")} ];
 
 /// Updates an additional ^%SYS flag to enforce mapped source control
 Method %OnAfterSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
-	If (..MappedSourceControl) {
-		Set ^%SYS("SourceControlClass") = "%IPM.ExtensionBase.Composite"
-	} ElseIf $Get(^%SYS("SourceControlClass")) = "%IPM.ExtensionBase.Composite" {
-		// ZKill because nodes underneath may have namespace-specific settings, in theory.
-		ZKill ^%SYS("SourceControlClass")
-	}
-	Quit $$$OK
+    if (..MappedSourceControl) {
+        set ^%SYS("SourceControlClass") = "%IPM.ExtensionBase.Composite"
+    } elseif $get(^%SYS("SourceControlClass")) = "%IPM.ExtensionBase.Composite" {
+        // ZKill because nodes underneath may have namespace-specific settings, in theory.
+        zkill ^%SYS("SourceControlClass")
+    }
+    quit $$$OK
 }
 
 /// This class has storage mapped to the global that stores other namespace-specific source control-related settings. The index and stream globals are expected to never be used.
