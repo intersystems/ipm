@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #829: Fixed export of resources with null Directory attribute
 - #832: Fixed places that export to possibly-nonexistent directories by adding /createdirs (needed in 2025.2+)
 
+### Changed
+- Format all files and add consistent formatting settings, format on save etc.
+
 ## [0.10.2] - 2025-06-04
 
 ### Fixed
@@ -46,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #746: Added support for loading modules synchronously without multiprocessing
 - #749: Added more debugging information in the welcome banner
 - #754: Support publishing and installing deployed items for ORAS repository
-- #755: Added an `info` command which prints external name (optionally including the real name) of top-level packages without the `build` part of semver. 
+- #755: Added an `info` command which prints external name (optionally including the real name) of top-level packages without the `build` part of semver.
 - #756: Support running commands using external names of packages.
 - #769: Allow `publish <module> -only` to publish a module without running `reload`
 - #533: External name changed to IPM (which carries greater meaning in 0.10.0)
