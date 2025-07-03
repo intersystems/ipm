@@ -3317,7 +3317,6 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
         if $isobject(server) {
             set packageService = server.GetPackageService()
             set ipmRef = ##class(%IPM.Storage.ModuleInfo).%New()
-            // TODO: Make this ipm eventually once the package name is changed
             set ipmRef.Name = $$$IPMModuleName
             if (targetVersion = "latest") {
                 // convert latest to semantic version so that it can be undestood by ModuleInfo class

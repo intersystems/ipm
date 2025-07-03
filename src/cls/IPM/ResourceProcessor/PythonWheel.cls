@@ -48,7 +48,7 @@ Method OnPhase(
     } catch ex {
         set pResourceHandled = 0
         // Special case: we want the installation of IPM to continue, even if the wheel package fails to install
-        if ..ResourceReference.Module.Name = $$$IPMModuleName {
+        if (..ResourceReference.Module.Name = $$$IPMModuleName) {
             set errMsg = $$$FormatText("Skipping installation of python wheel '%1' due to error: '%2'. ", ..Name, ex.AsStatus())
             set errMsg = errMsg _ "You may need to install this wheel manually or from PyPI to use certain features of IPM."
             write !, $$$FormattedLine($$$Red, errMsg)
