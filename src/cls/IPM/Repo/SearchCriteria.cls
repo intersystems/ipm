@@ -23,20 +23,20 @@ Property AllVersions As %Boolean;
 
 Method KeywordsSet(%value) As %Status
 {
-	If $IsObject(%value) {
-		Set i%Keywords = %value
-	} Else {
-		Do ..Keywords.Clear()
-		If '$ListValid(%value) {
-			Set %value = $ListFromString(%value," ")
-		}
-		Set tPointer = 0
-		While $ListNext(%value,tPointer,tValue) {
-			If ($Get(tValue) '= "") {
-				Do ..Keywords.Insert(tValue)
-			}
-		}
-	}
+    if $isobject(%value) {
+        set i%Keywords = %value
+    } else {
+        do ..Keywords.Clear()
+        if '$listvalid(%value) {
+            set %value = $listfromstring(%value," ")
+        }
+        set tPointer = 0
+        while $listnext(%value,tPointer,tValue) {
+            if ($get(tValue) '= "") {
+                do ..Keywords.Insert(tValue)
+            }
+        }
+    }
 }
 
 }

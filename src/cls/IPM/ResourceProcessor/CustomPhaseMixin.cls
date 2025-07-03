@@ -6,9 +6,11 @@ Class %IPM.ResourceProcessor.CustomPhaseMixin
 
 Property CustomPhase As %IPM.DataType.CustomPhaseName;
 
-Method OnCustomPhase(pCustomPhase As %String, ByRef pParams) As %Status
+Method OnCustomPhase(
+	pCustomPhase As %String,
+	ByRef pParams) As %Status
 {
-	Quit $$$OK
+    quit $$$OK
 }
 
 }

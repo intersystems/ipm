@@ -10,42 +10,49 @@ Property Name As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE");
 
 Property Value As %String(MAXLEN = 1000, XMLPROJECTION = "ATTRIBUTE");
 
-ClassMethod GetCustomParameters(Output customParams, module As %IPM.Storage.Module, ByRef pParams) As %Status
+ClassMethod GetCustomParameters(
+	Output customParams,
+	module As %IPM.Storage.Module,
+	ByRef pParams) As %Status
 {
-    Kill customParams
-    Set customParams = ""
-    Set key = ""
-    For {
-        Set default = module.Defaults.GetNext(.key)
-        Quit:(key="")
-        If (default.%ClassName(1)="%IPM.Storage.ModuleSetting.Default") {
-            Set customParams(default.Name) = default.Value
-            If ($Data(pParams(default.Name))) {
-                Set customParams(default.Name) = $Get(pParams(default.Name))
+    kill customParams
+    set customParams = ""
+    set key = ""
+    for {
+        set default = module.Defaults.GetNext(.key)
+        quit:(key="")
+        if (default.%ClassName(1)="%IPM.Storage.ModuleSetting.Default") {
+            set customParams(default.Name) = default.Value
+            if ($data(pParams(default.Name))) {
+                set customParams(default.Name) = $get(pParams(default.Name))
             }
         }
     }
     return $$$OK
 }
 
-ClassMethod EvaluateArgs(ByRef args, ByRef customParams) As %Status
+ClassMethod EvaluateArgs(
+	ByRef args,
+	ByRef customParams) As %Status
 {
-    Set key = ""
-    For {
-        Set key = $Order(args(key))
-        Quit:(key="")
-        Set args(key) = ..EvaluateAttribute(args(key),.customParams)
+    set key = ""
+    for {
+        set key = $order(args(key))
+        quit:(key="")
+        set args(key) = ..EvaluateAttribute(args(key),.customParams)
     }
     return $$$OK
 }
 
-ClassMethod EvaluateAttribute(attribute As %String, ByRef customParams) As %String
+ClassMethod EvaluateAttribute(
+	attribute As %String,
+	ByRef customParams) As %String
 {
-    Set name=""
-    For {
-        Set name = $Order(customParams(name), 1, value)
-        Quit:(name="")
-        Set attribute = ##class(%IPM.Utils.Module).%RegExReplace(attribute, name, value)
+    set name=""
+    for {
+        set name = $order(customParams(name), 1, value)
+        quit:(name="")
+        set attribute = ##class(%IPM.Utils.Module).%RegExReplace(attribute, name, value)
     }
     return attribute
 }

@@ -4,7 +4,9 @@ Class %IPM.Utils.EmbeddedPython [ Language = python ]
 
 /// This method returns a total order, instead of a partial order.
 /// In other words, v1.2.3-alpha and v4.5.6-beta should be comparable.
-ClassMethod CompareVersionTotalOrder(ver1 As %String, ver2 As %String) As %Integer
+ClassMethod CompareVersionTotalOrder(
+	ver1 As %String,
+	ver2 As %String) As %Integer
 {
     import iris
 
@@ -18,7 +20,7 @@ ClassMethod CompareVersionTotalOrder(ver1 As %String, ver2 As %String) As %Integ
         return -1
     if mmp1 > mmp2:
         return 1
-    
+
     # empty prerelease indicates higher version
     pre1, pre2 = semver1.Prerelease, semver2.Prerelease
     if pre1 != pre2:
@@ -27,7 +29,7 @@ ClassMethod CompareVersionTotalOrder(ver1 As %String, ver2 As %String) As %Integ
         if pre2 == "":
             return -1
         return -1 if pre1 < pre2 else 1
-    
+
     # Unlike for prerelease, treat empty build as lower (alphabetical order)
     build1, build2 = semver1.Build, semver2.Build
     if build1 == build2:
@@ -38,7 +40,9 @@ ClassMethod CompareVersionTotalOrder(ver1 As %String, ver2 As %String) As %Integ
 /// <parameter>versions</parameter> is a python `list` of strings.
 /// Sorts the versions and return a new python `list`.
 /// If <parameter>reverse</parameter> is a truthy value, sort in descending order
-ClassMethod SortVersions(versions As %SYS.Python, reverse As %SYS.Python = 0) As %SYS.Python
+ClassMethod SortVersions(
+	versions As %SYS.Python,
+	reverse As %SYS.Python = 0) As %SYS.Python
 {
     import iris
     from functools import cmp_to_key
@@ -52,7 +56,9 @@ ClassMethod SortVersions(versions As %SYS.Python, reverse As %SYS.Python = 0) As
 /// <parameter>tags</parameter> is a python `list` of strings.
 /// Sorts the OCI tags and return a new python `list`.
 /// If <parameter>reverse</parameter> is a truthy value, sort in descending order
-ClassMethod SortOCITags(tags As %SYS.Python, reverse As %SYS.Python = 0) As %SYS.Python
+ClassMethod SortOCITags(
+	tags As %SYS.Python,
+	reverse As %SYS.Python = 0) As %SYS.Python
 {
     import iris
     from functools import cmp_to_key
@@ -70,16 +76,16 @@ ClassMethod SortOCITags(tags As %SYS.Python, reverse As %SYS.Python = 0) As %SYS
 
 ClassMethod FromPythonList(list As %SYS.Python) As %List [ Language = objectscript ]
 {
-    Set builtins = ##class(%SYS.Python).Builtins()
-    Set output = ""
-    For i = 0:1:list."__len__"()-1 {
-        Set item = list."__getitem__"(i)
-        If builtins.isinstance(item, builtins.list){
-            Set item = ..FromPythonList(item)
+    set builtins = ##class(%SYS.Python).Builtins()
+    set output = ""
+    for i = 0:1:list."__len__"()-1 {
+        set item = list."__getitem__"(i)
+        if builtins.isinstance(item, builtins.list){
+            set item = ..FromPythonList(item)
         }
-        Set output = output _ $ListBuild(item)
+        set output = output _ $listbuild(item)
     }
-    Quit output
+    quit output
 }
 
 }

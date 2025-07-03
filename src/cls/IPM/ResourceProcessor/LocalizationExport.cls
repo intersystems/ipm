@@ -17,124 +17,128 @@ Property Domains As %String(MAXLEN = "");
 /// Filename to export to. For .LOC documents, this is required; otherwise, this is set to the resource name and is not overridable.
 Property Filename As %String(MAXLEN = 255);
 
-Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
+Method OnBeforePhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tVerbose = $Get(pParams("Verbose"))
-		Set tIsLoc = ($Piece(..ResourceReference.Name,".",*) = "LOC")
-		If tIsLoc {
-			Set ..Domains = ..GetDomainsForResource()
-		} Else {
-			Set ..Filename = ..ResourceReference.Name
-		}
-		
-		Set tSC = ##super(pPhase,.pParams)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		If (pPhase = "Activate") {
-			Set tExportDir = ..ResourceReference.Module.Root
-			If (tExportDir = "") {
-				// No-op in this case.
-				Quit
-			}
-			
-			// This is only an error at this stage.
-			If (..Domains = "") {
-				If tIsLoc {
-					// No-op
-					Quit
-				}
-				Set tSC = $$$ERROR($$$PropertyRequired,"Domains")
-				Quit
-			}
-			If (..Filename '= "") {
-				Set tExportFile = ##class(%File).NormalizeFilename(tExportDir_"/"_..Filename)
-			} ElseIf ($Extract(..ResourceReference.Name) = "/") {
-				Set tExportFile = ##class(%File).NormalizeFilename(tExportDir_..ResourceReference.Name)
-			} Else {
-				$$$ThrowStatus($$$ERROR($$$PropertyRequired,"Filename"))
-			}
-			If tVerbose {
-				Write !,"Exporting messages for '",..Domains,"' domain(s) to ",tExportFile
-			}
-			Set tDirectory = ##class(%Library.File).GetDirectory(tExportFile)
-			If '##class(%Library.File).DirectoryExists(tDirectory) {
-				$$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tDirectory))
-			}
-			Set tSC=$$ExportDomainList^%occMessages(tExportFile,..Domains)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tVerbose = $get(pParams("Verbose"))
+        set tIsLoc = ($piece(..ResourceReference.Name,".",*) = "LOC")
+        if tIsLoc {
+            set ..Domains = ..GetDomainsForResource()
+        } else {
+            set ..Filename = ..ResourceReference.Name
+        }
+
+        set tSC = ##super(pPhase,.pParams)
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        if (pPhase = "Activate") {
+            set tExportDir = ..ResourceReference.Module.Root
+            if (tExportDir = "") {
+                // No-op in this case.
+                quit
+            }
+
+            // This is only an error at this stage.
+            if (..Domains = "") {
+                if tIsLoc {
+                    // No-op
+                    quit
+                }
+                set tSC = $$$ERROR($$$PropertyRequired,"Domains")
+                quit
+            }
+            if (..Filename '= "") {
+                set tExportFile = ##class(%File).NormalizeFilename(tExportDir_"/"_..Filename)
+            } elseif ($extract(..ResourceReference.Name) = "/") {
+                set tExportFile = ##class(%File).NormalizeFilename(tExportDir_..ResourceReference.Name)
+            } else {
+                $$$ThrowStatus($$$ERROR($$$PropertyRequired,"Filename"))
+            }
+            if tVerbose {
+                write !,"Exporting messages for '",..Domains,"' domain(s) to ",tExportFile
+            }
+            set tDirectory = ##class(%Library.File).GetDirectory(tExportFile)
+            if '##class(%Library.File).DirectoryExists(tDirectory) {
+                $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tDirectory))
+            }
+            set tSC=$$ExportDomainList^%occMessages(tExportFile,..Domains)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-/// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to 
+/// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to
 /// provide notification that the current object is being validated.
 /// 
 /// <P>If this method returns an error then <METHOD>%ValidateObject</METHOD> will fail.
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tSC = $$$OK
-	If (..Filename = "") && ($Extract(..ResourceReference.Name) '= "/") {
-		// If we're using a database resource as a source, Filename is required.
-		Set tSC = $$$ERROR($$$PropertyRequired,"Filename")
-	}
-	Quit tSC
+    set tSC = $$$OK
+    if (..Filename = "") && ($extract(..ResourceReference.Name) '= "/") {
+        // If we're using a database resource as a source, Filename is required.
+        set tSC = $$$ERROR($$$PropertyRequired,"Filename")
+    }
+    quit tSC
 }
 
 /// Returns a comma-separated list of domains for the specified resource.
 Method GetDomainsForResource() As %String
 {
-	Set tDomains = ""
-	Set tExt = $Piece(..ResourceReference.Name,".",*)
-	If ($Extract(..ResourceReference.Name) '= "/") && (tExt = "LOC") {
-		// Get list of domains in .LOC file. We'll ignore errors, since the file may not be loaded yet.
-		#dim tMsgFile As %IPM.ResourceProcessor.LocalizationExport.MsgFile
-		Set tSC = ..GetMessageFile(..ResourceReference.Name,.tMsgFile)
-		If $$$ISOK(tSC) {
-			Set tDomain = ""
-			For {
-				Do tMsgFile.Domains.GetNext(.tDomain)
-				If (tDomain = "") {
-					Quit
-				}
-				Set tDomains = tDomains_$ListBuild(tDomain)
-			}
-		}
-	}
-	Quit $ListToString(tDomains)
+    set tDomains = ""
+    set tExt = $piece(..ResourceReference.Name,".",*)
+    if ($extract(..ResourceReference.Name) '= "/") && (tExt = "LOC") {
+        // Get list of domains in .LOC file. We'll ignore errors, since the file may not be loaded yet.
+        #dim tMsgFile As %IPM.ResourceProcessor.LocalizationExport.MsgFile
+        set tSC = ..GetMessageFile(..ResourceReference.Name,.tMsgFile)
+        if $$$ISOK(tSC) {
+            set tDomain = ""
+            for {
+                do tMsgFile.Domains.GetNext(.tDomain)
+                if (tDomain = "") {
+                    quit
+                }
+                set tDomains = tDomains_$listbuild(tDomain)
+            }
+        }
+    }
+    quit $listtostring(tDomains)
 }
 
 /// <var>pDocName</var> is the full document name (including the .LOC extension) <br />
 /// <var>pFileObject</var> is an instance of %IPM.ResourceProcessor.LocalizationExport.MsgFile corresponding to the document's content. <br />
 /// @API.Method
 /// @Modifier Availability InterSystems
-ClassMethod GetMessageFile(pDocName As %String, Output pFileObject As %IPM.ResourceProcessor.LocalizationExport.MsgFile) As %Status
+ClassMethod GetMessageFile(
+	pDocName As %String,
+	Output pFileObject As %IPM.ResourceProcessor.LocalizationExport.MsgFile) As %Status
 {
-	Set tSC = $$$OK
-	Set pFileObject = $$$NULLOREF
-	Try {
-		Set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName)
-		If (tRtn = $$$NULLOREF) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
-			Quit
-		}
-		
-		Set tReader = ##class(%XML.Reader).%New()
-		Do tReader.Correlate("MsgFile","%IPM.ResourceProcessor.LocalizationExport.MsgFile")
-		$$$ThrowOnError(tReader.OpenStream(tRtn.Code))
-		
-		Do tReader.Next(.pFileObject,.tSC)
-		$$$ThrowOnError(tSC)
-	} Catch e {
-		Set pFileObject = $$$NULLOREF
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    set pFileObject = $$$NULLOREF
+    try {
+        set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName)
+        if (tRtn = $$$NULLOREF) {
+            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
+            quit
+        }
+
+        set tReader = ##class(%XML.Reader).%New()
+        do tReader.Correlate("MsgFile","%IPM.ResourceProcessor.LocalizationExport.MsgFile")
+        $$$ThrowOnError(tReader.OpenStream(tRtn.Code))
+
+        do tReader.Next(.pFileObject,.tSC)
+        $$$ThrowOnError(tSC)
+    } catch e {
+        set pFileObject = $$$NULLOREF
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// <var>pDocName</var> is the full document name (including the .LOC extension) <br />
@@ -143,79 +147,86 @@ ClassMethod GetMessageFile(pDocName As %String, Output pFileObject As %IPM.Resou
 /// <var>pConsoleOutput</var> is an integer-subscripted array of lines of output from everything that happened. <br />
 /// @API.Method
 /// @Modifier Availability InterSystems
-ClassMethod SaveMessageFile(pDocName As %String, pFileObject As %IPM.ResourceProcessor.LocalizationExport.MsgFile, pCompile As %Boolean = 1, Output pConsoleOutput) As %Status
+ClassMethod SaveMessageFile(
+	pDocName As %String,
+	pFileObject As %IPM.ResourceProcessor.LocalizationExport.MsgFile,
+	pCompile As %Boolean = 1,
+	Output pConsoleOutput) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tSC = ..Export(pDocName, pFileObject, .pConsoleOutput)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		If (pCompile) {
-			Set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName)
-			If (tRtn = $$$NULLOREF) {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
-				Quit
-			}
-			Do ##class(%IPM.Utils.Module).BeginCaptureOutput(.tCookie)
-			Set tSC = tRtn.Compile("ckvd")
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	If $Data(tCookie) {
-		Do ##class(%IPM.Utils.Module).EndCaptureOutput(tCookie,.pConsoleOutput)
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tSC = ..Export(pDocName, pFileObject, .pConsoleOutput)
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        if (pCompile) {
+            set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName)
+            if (tRtn = $$$NULLOREF) {
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
+                quit
+            }
+            do ##class(%IPM.Utils.Module).BeginCaptureOutput(.tCookie)
+            set tSC = tRtn.Compile("ckvd")
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    if $data(tCookie) {
+        do ##class(%IPM.Utils.Module).EndCaptureOutput(tCookie,.pConsoleOutput)
+    }
+    quit tSC
 }
 
 /// Utility method to export an error message document (with a given name).
-ClassMethod Export(pDocName As %String, pSource As %IPM.ResourceProcessor.LocalizationExport.MsgFile, Output pSourceControlOutput) As %Status [ Private ]
+ClassMethod Export(
+	pDocName As %String,
+	pSource As %IPM.ResourceProcessor.LocalizationExport.MsgFile,
+	Output pSourceControlOutput) As %Status [ Private ]
 {
-	Set tSC = $$$OK
-	Try {
-		New %SourceControl
-		
-		Do ##class(%IPM.Utils.Module).BeginCaptureOutput(.tCookie)
-		
-		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
-		
-		Set tSC = ##class(%Studio.SourceControl.Interface).GetStatus(pDocName,,.tIsEditable)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		If 'tIsEditable {
-			Set tSC = $$$ERROR($$$ItemNotCheckedOut,tDocName)
-			Quit
-		}
-		
-		// Use document API
-		#dim tExportStream As %Stream.Object
-		Set tSC = pSource.XMLExportToStream(.tExportStream,,"literal,indent")
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName)
-		If (tRtn = $$$NULLOREF) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
-			Quit
-		}
-		Do tRtn.Code.ImportFromXML(tExportStream)
-		
-		Set tSC = tRtn.%Save()
-		If $$$ISERR(tSC) {
-			Quit
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	
-	// Ensure I/O redirection ends.
-	Do ##class(%IPM.Utils.Module).EndCaptureOutput(tCookie,.pSourceControlOutput)
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        new %SourceControl
+
+        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.tCookie)
+
+        do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+
+        set tSC = ##class(%Studio.SourceControl.Interface).GetStatus(pDocName,,.tIsEditable)
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        if 'tIsEditable {
+            set tSC = $$$ERROR($$$ItemNotCheckedOut,tDocName)
+            quit
+        }
+
+        // Use document API
+        #dim tExportStream As %Stream.Object
+        set tSC = pSource.XMLExportToStream(.tExportStream,,"literal,indent")
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName)
+        if (tRtn = $$$NULLOREF) {
+            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
+            quit
+        }
+        do tRtn.Code.ImportFromXML(tExportStream)
+
+        set tSC = tRtn.%Save()
+        if $$$ISERR(tSC) {
+            quit
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+
+    // Ensure I/O redirection ends.
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(tCookie,.pSourceControlOutput)
+    quit tSC
 }
 
 }

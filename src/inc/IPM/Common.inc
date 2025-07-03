@@ -54,7 +54,9 @@ ROUTINE %IPM.Common [Type=INC]
 /// OS corresponding slash
 #define SLASH $Select($$$isWINDOWS: "\", 1: "/")
 
+/// Name of IPM module
 #define IPMModuleName "zpm"
+/// Name of IPM registry module
 #define IPMServerRegistryModuleName "zpm-registry"
 
 #; Macros used in language extension generation
@@ -74,7 +76,7 @@ ROUTINE %IPM.Common [Type=INC]
 
 #; Separator for package version and platform version in OCI tag , e.g. "1.0.0__2024.1"
 #Define OrasTagPlatformSeparator "__"
-#Define OrasRequiresFlexiblePython "Flexible Python Runtime is not configured. You must configure it with Python 3.10+ and reinstall IPM to use ORAS registries." 
+#Define OrasRequiresFlexiblePython "Flexible Python Runtime is not configured. You must configure it with Python 3.10+ and reinstall IPM to use ORAS registries."
 
 #; Place where Deployed.xml is stored
 #Define DeployedXMLDir "studio-project"
