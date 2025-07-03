@@ -744,8 +744,14 @@ ClassMethod %GetCommandStructure(Output pCommandStructure)
 /// @API.Method
 ClassMethod Shell(pCommand As %String = "", pTerminateOnError As %Boolean = 0, pHaltOnComplete As %Boolean = 0) As %Status
 {
+	w !
+	w "JACSHELL"
+	w !
 	Set tSC = $$$OK
 	Do ..ShellInternal(pCommand,.tException)
+	w !
+	w "JACSHELLAFTERINTERNAL"
+	w !
 	If $IsObject(tException) {
 		If pTerminateOnError {
 			Do $System.Process.Terminate($Job,1)
@@ -851,9 +857,15 @@ ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
 /// For use in unit tests that need to test if a command threw any exceptions.
 ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
 {
+	w !
+	w "JACSHELLINTERNAL"
+	w !
 	New $$$DeprecationWarned
 	// Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
 	Set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
+	w !
+	w "JACSHELLEnvironmentConfig"
+	w !
 
 	Set pException = $$$NULLOREF
 	Set tOneCommand = 0
@@ -861,21 +873,36 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 	If (tCommand '= "") {
 		Set tOneCommand = 1
 	}
+	w !
+	w "JACSHELL2"
+	w !
 	Set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
+	w !
+	w "JACSHELL3"
+	w !
 	Set tInShell = 0
 	For {
+		w !
+	w "JACSHELL4"
+	w !
 		Kill $$$DeprecationWarned
 		Try {
 			
 			// Have intro message just for first entrance to shell
 			// Ensure not displayed if its just one command
 			If 'tInShell && 'tOneCommand {
+				w !
+				w "JACSHELL5"
+				w !
 				Do ..DrawBorder(introMessageList, ..TerminalPromptColor())
 				Write $Get(outOfBoxMessage),! // Display long messages outside of the box
 				Set tInShell = 1
 			}
 			
 			If (tCommand = "") {
+				w !
+	w "JACSHELL6"
+	w !
 				Write ..TerminalPrompt()
 				Read tCommand
 				Write !
@@ -887,13 +914,25 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			}
 			
 			Kill tCommandInfo
+			w !
+	w "JACSHELL7"
+	w !
 			// Parse command
 			$$$ThrowOnError(..%ParseCommandInput(tCommand,.tParsedCommandInfo))
+			w !
+	w "JACSHELL8"
+	w !
 			
 			// Merge defaults first so they can be overwritten by commands
 			Do ..GetNamespaceDefaultModifiers(.tDefaultArray)
+			w !
+	w "JACSHELL9"
+	w !
 			Merge tCommandInfo("data") = tDefaultArray
 			Merge tCommandInfo = tParsedCommandInfo
+			w !
+	w "JACSHELL10"
+	w !
 			
 			If (tCommandInfo = "quit") {
 				Return
@@ -906,7 +945,13 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "repo") {
 				Do ..Repository(.tCommandInfo)
 			} ElseIf (tCommandInfo = "load") {
+				w !
+				w "JACCALLLOAD"
+				w !
 				Do ..Load(.tCommandInfo)
+				w !
+				w "JACCALLLOADDONE"
+				w !
 			} ElseIf (tCommandInfo = "exec") {
 				Write !
 				Xecute tCommandInfo("parameters","expression")
@@ -955,6 +1000,9 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			} ElseIf (tCommandInfo = "information") {
 				Do ..Information(.tCommandInfo)
 			}
+			w !
+	w "JACSHELL11"
+	w !
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
 				Set pException = $$$NULLOREF
@@ -963,6 +1011,9 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 			Do ..DisplayError(pException.AsStatus())
 		}
 		Set tCommand = ""
+		w !
+	w "JACSHELL12"
+	w !
 		If tOneCommand {
 			Quit	
 		}
@@ -2094,7 +2145,7 @@ ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     w !
-    w "JACNEWLOAD"
+    w "JACOLDLOAD"
     w !
     Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
     Merge tParams = pCommandInfo("data")
@@ -2102,6 +2153,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
     Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
     If $G(tComponents("scheme")) [ "http" {
         set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
+
     }
     If ##class(%File).DirectoryExists(tDirectoryName) {
         Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
