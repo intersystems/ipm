@@ -1267,11 +1267,9 @@ Method %Verify(ByRef pParams) As %Status
                 // Map ^UnitTest* from its home in the original namespace to the VERIFY namespace.
                 $$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("UnitTest*",tInitNS,tNewNamespace))
 
-                // If the module being verified is not the package manager, map the package manager itself equivalently in the VERIFY namespace.
-                if (..Module.Name '= $$$IPMModuleName) {
-                    $$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",tInitNS,,tNewNamespace))
-                    $$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",tInitNS,tNewNamespace))
-                }
+                // Map the package manager itself equivalently in the VERIFY namespace.
+                $$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",tInitNS,,tNewNamespace))
+                $$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",tInitNS,tNewNamespace))
 
                 // Map globals for %IPM.Repo.Definition and %IPM.Repo.Filesystem.Cache
                 // from the original namespace to the VERIFY namespace
