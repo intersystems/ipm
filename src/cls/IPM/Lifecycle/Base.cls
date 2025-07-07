@@ -186,6 +186,55 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
     )
 }
 
+/// This method iterates over resources of a module and returns a list of objects in the correct order that resources should be processed
+/// Process resources based on their package depth (higher level first so more granular resource will override)
+/// e.g. <Resource Name="Depth1.PKG"/> should be processed before <Resource Name="Depth1.Depth2.CLS"/>
+ClassMethod GetOrderedResourceList(ByRef module) As %ListOfObjects
+{
+    set nonDocumentResourceList = ##class(%ListOfObjects).%New()
+    set tKey = ""
+    for {
+        set tResource = module.Resources.GetNext(.tKey)
+        quit:tKey=""
+        if $isobject(tResource.Processor) && tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
+            // Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
+            set tResourceName = $piece(tResource.Name,".",1,*-1)
+            if ($get(documentResourceList(tResourceName)) = "") {
+                set documentResourceList(tResourceName) = ##class(%ListOfObjects).%New()
+            }
+            do documentResourceList(tResourceName).Insert(tResource)
+        }
+        else {
+            do nonDocumentResourceList.Insert(tResource)
+        }
+    }
+    set orderedResourceList = ##class(%ListOfObjects).%New()
+
+    // Combine all objects into one larger list
+    // First document resources
+    set tKey = ""
+    for {
+        set tKey = $order(documentResourceList(tKey))
+        quit:tKey=""
+        set tResourceList = documentResourceList(tKey)
+        set tKey2 = ""
+        for {
+            set tResource = tResourceList.GetNext(.tKey2)
+            quit:tKey2=""
+            do orderedResourceList.Insert(tResource)
+        }
+    }
+    // Then non-document resources
+    set tKey = ""
+    for {
+        set tResource = nonDocumentResourceList.GetNext(.tKey)
+        quit:tKey=""
+        do orderedResourceList.Insert(tResource)
+    }
+
+    return orderedResourceList
+}
+
 /// Match single inputted phase to the correctly CamelCased lifecycle phase <br/>
 ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 {
@@ -672,53 +721,19 @@ Method %Reload(ByRef pParams) As %Status
             set ^Sources("MODULE",..Module.Name) = tAbsolutePrefix_tRoot
         }
 
-        // Process resources based on their package depth (higher level first so more granular resource will override)
-        // e.g. <Resource Name="Depth1.PKG"/> will be processed before <Resource Name="Depth1.Depth2.CLS"/>
-        set nonDocumentResourceList = ##class(%ListOfObjects).%New()
-        set tKey = ""
-        for {
-            set tResource = ..Module.Resources.GetNext(.tKey)
-            quit:tKey=""
-            if $isobject(tResource.Processor) {
-                if tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
-                    // Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
-                    set tResourceName = $piece(tResource.Name,".",1,*-1)
-                    if ($get(documentResourceList(tResourceName)) = "") {
-                        set documentResourceList(tResourceName) = ##class(%ListOfObjects).%New()
-                    }
-                    do documentResourceList(tResourceName).Insert(tResource)
-                }
-                else {
-                    do nonDocumentResourceList.Insert(tResource)
-                }
-            }
-        }
-        // Process document resources by depth order
+        // Resource processing
+        set orderedResourceList = ..GetOrderedResourceList(..Module)
         set tSC = $$$OK
         set tKey = ""
         for {
-            set tKey = $order(documentResourceList(tKey))
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
-            set tResourceList = documentResourceList(tKey)
-            set tKey2 = ""
-            for {
-                set tResource = tResourceList.GetNext(.tKey2)
-                quit:tKey2=""
+            if $isobject(tResource.Processor) {
                 set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
-                if $$$ISERR(tSC) {
-                    quit
-                }
             }
         }
-        // Process non-document resources sequentially
-        set tKey = ""
-        for {
-            set tResource = nonDocumentResourceList.GetNext(.tKey)
-            quit:tKey=""
-            set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
-            if $$$ISERR(tSC) {
-                quit
-            }
+        if $$$ISERR(tSC) {
+            quit
         }
 
         // call %OnModifyResources to let the source control class do any other mapping it needs to
