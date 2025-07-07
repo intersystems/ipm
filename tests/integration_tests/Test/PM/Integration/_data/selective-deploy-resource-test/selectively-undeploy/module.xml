@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="selectively-undeploy.ZPM">
+    <Module>
+      <Name>selectively-undeploy</Name>
+      <Version>0.0.1</Version>
+      <Resource Name="SelectivelyUndeploy.D2.CLS" Deploy="false" />
+      <Resource Name="SelectivelyUndeploy.PKG" Deploy="true" />
+    </Module>
+  </Document>
+</Export>
