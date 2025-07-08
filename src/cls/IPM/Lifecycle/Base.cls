@@ -186,55 +186,6 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
     )
 }
 
-/// This method iterates over resources of a module and returns a list of objects in the correct order that resources should be processed
-/// Process resources based on their package depth (higher level first so more granular resource will override)
-/// e.g. <Resource Name="Depth1.PKG"/> should be processed before <Resource Name="Depth1.Depth2.CLS"/>
-Method GetOrderedResourceList() As %ListOfObjects
-{
-    set nonDocumentResourceList = ##class(%ListOfObjects).%New()
-    set tKey = ""
-    for {
-        set tResource = ..Module.Resources.GetNext(.tKey)
-        quit:tKey=""
-        if $isobject(tResource.Processor) && tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
-            // Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
-            set tResourceName = $piece(tResource.Name,".",1,*-1)
-            if ($get(documentResourceList(tResourceName)) = "") {
-                set documentResourceList(tResourceName) = ##class(%ListOfObjects).%New()
-            }
-            do documentResourceList(tResourceName).Insert(tResource)
-        }
-        else {
-            do nonDocumentResourceList.Insert(tResource)
-        }
-    }
-    set orderedResourceList = ##class(%ListOfObjects).%New()
-
-    // Combine all objects into one larger list
-    // First document resources
-    set tKey = ""
-    for {
-        set tKey = $order(documentResourceList(tKey))
-        quit:tKey=""
-        set tResourceList = documentResourceList(tKey)
-        set tKey2 = ""
-        for {
-            set tResource = tResourceList.GetNext(.tKey2)
-            quit:tKey2=""
-            do orderedResourceList.Insert(tResource)
-        }
-    }
-    // Then non-document resources
-    set tKey = ""
-    for {
-        set tResource = nonDocumentResourceList.GetNext(.tKey)
-        quit:tKey=""
-        do orderedResourceList.Insert(tResource)
-    }
-
-    return orderedResourceList
-}
-
 /// Match single inputted phase to the correctly CamelCased lifecycle phase <br/>
 ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 {
@@ -268,7 +219,7 @@ Method OnBeforeArtifact(
     set tSC = $$$OK
     try {
         // Notify resource processors
-        set orderedResourceList = ..GetOrderedResourceList()
+        set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
@@ -372,7 +323,7 @@ Method %Clean(ByRef pParams) As %Status
         }
 
         if (tLevel > 0) {
-            set orderedResourceList = ..GetOrderedResourceList()
+            set orderedResourceList = ..Module.GetOrderedResourceList()
             set tKey = ""
             for {
                 #dim tResource As %IPM.Storage.ResourceReference
@@ -594,7 +545,7 @@ Method %Initialize(ByRef pParams) As %Status
 {
     set status = $$$OK
     try {
-        set orderedResourceList = ..GetOrderedResourceList()
+        set orderedResourceList = ..Module.GetOrderedResourceList()
         set key = ""
         for {
             set resource = orderedResourceList.GetNext(.key)
@@ -725,7 +676,7 @@ Method %Reload(ByRef pParams) As %Status
         }
 
         // Resource processing
-        set orderedResourceList = ..GetOrderedResourceList()
+        set orderedResourceList = ..Module.GetOrderedResourceList()
         set tSC = $$$OK
         set tKey = ""
         for {
@@ -954,7 +905,7 @@ Method %Compile(ByRef pParams) As %Status
         $$$ThrowOnError(tSC)
 
         // Compile items within the module that are compilable using OnPhase
-        set orderedResourceList = ..GetOrderedResourceList()
+        set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
@@ -1131,7 +1082,7 @@ Method %Test(ByRef pParams) As %Status
         set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
         $$$ThrowOnError(tSC)
 
-        set orderedResourceList = ..GetOrderedResourceList()
+        set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
             set tResource = orderedResourceList.GetNext(.tKey)
@@ -1371,10 +1322,10 @@ Method %Verify(ByRef pParams) As %Status
         set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
         $$$ThrowOnError(tSC)
 
-        set orderedResourceList = ..GetOrderedResourceList()
+        set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
-        #dim tResource As %IPM.Storage.ResourceReference
+            #dim tResource As %IPM.Storage.ResourceReference
             set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
 

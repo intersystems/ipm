@@ -85,6 +85,55 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
+/// This method iterates over resources of a module and returns a list of objects in the correct order that resources should be processed
+/// Process resources based on their package depth (higher level first so more granular resource will override)
+/// e.g. <Resource Name="Depth1.PKG"/> should be processed before <Resource Name="Depth1.Depth2.CLS"/>
+Method GetOrderedResourceList() As %ListOfObjects
+{
+    set nonDocumentResourceList = ##class(%ListOfObjects).%New()
+    set tKey = ""
+    for {
+        set tResource = ..Resources.GetNext(.tKey)
+        quit:tKey=""
+        if $isobject(tResource.Processor) && tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
+            // Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
+            set tResourceName = $piece(tResource.Name,".",1,*-1)
+            if ($get(documentResourceList(tResourceName)) = "") {
+                set documentResourceList(tResourceName) = ##class(%ListOfObjects).%New()
+            }
+            do documentResourceList(tResourceName).Insert(tResource)
+        }
+        else {
+            do nonDocumentResourceList.Insert(tResource)
+        }
+    }
+    set orderedResourceList = ##class(%ListOfObjects).%New()
+
+    // Combine all objects into one larger list
+    // First document resources
+    set tKey = ""
+    for {
+        set tKey = $order(documentResourceList(tKey))
+        quit:tKey=""
+        set tResourceList = documentResourceList(tKey)
+        set tKey2 = ""
+        for {
+            set tResource = tResourceList.GetNext(.tKey2)
+            quit:tKey2=""
+            do orderedResourceList.Insert(tResource)
+        }
+    }
+    // Then non-document resources
+    set tKey = ""
+    for {
+        set tResource = nonDocumentResourceList.GetNext(.tKey)
+        quit:tKey=""
+        do orderedResourceList.Insert(tResource)
+    }
+
+    return orderedResourceList
+}
+
 Method HaveToDeploy() As %Boolean
 {
     set deploy = 0
