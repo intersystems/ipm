@@ -189,12 +189,12 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 /// This method iterates over resources of a module and returns a list of objects in the correct order that resources should be processed
 /// Process resources based on their package depth (higher level first so more granular resource will override)
 /// e.g. <Resource Name="Depth1.PKG"/> should be processed before <Resource Name="Depth1.Depth2.CLS"/>
-ClassMethod GetOrderedResourceList(ByRef module) As %ListOfObjects
+Method GetOrderedResourceList() As %ListOfObjects
 {
     set nonDocumentResourceList = ##class(%ListOfObjects).%New()
     set tKey = ""
     for {
-        set tResource = module.Resources.GetNext(.tKey)
+        set tResource = ..Module.Resources.GetNext(.tKey)
         quit:tKey=""
         if $isobject(tResource.Processor) && tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
             // Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
@@ -268,10 +268,11 @@ Method OnBeforeArtifact(
     set tSC = $$$OK
     try {
         // Notify resource processors
+        set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
-            set tResource = ..Module.Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:(tKey="")
 
             if $isobject(tResource.Processor) {
@@ -371,10 +372,11 @@ Method %Clean(ByRef pParams) As %Status
         }
 
         if (tLevel > 0) {
+            set orderedResourceList = ..GetOrderedResourceList()
             set tKey = ""
             for {
                 #dim tResource As %IPM.Storage.ResourceReference
-                set tResource = ..Module.Resources.GetNext(.tKey)
+                set tResource = orderedResourceList.GetNext(.tKey)
                 quit:tKey=""
 
                 if $isobject(tResource.Processor) {
@@ -592,9 +594,10 @@ Method %Initialize(ByRef pParams) As %Status
 {
     set status = $$$OK
     try {
+        set orderedResourceList = ..GetOrderedResourceList()
         set key = ""
         for {
-            set resource = ..Module.Resources.GetNext(.key)
+            set resource = orderedResourceList.GetNext(.key)
             quit:key=""
             if $isobject(resource.Processor) {
                 set status = $$$ADDSC(status,resource.Processor.OnPhase("Initialize",.pParams))
@@ -722,7 +725,7 @@ Method %Reload(ByRef pParams) As %Status
         }
 
         // Resource processing
-        set orderedResourceList = ..GetOrderedResourceList(..Module)
+        set orderedResourceList = ..GetOrderedResourceList()
         set tSC = $$$OK
         set tKey = ""
         for {
@@ -951,10 +954,11 @@ Method %Compile(ByRef pParams) As %Status
         $$$ThrowOnError(tSC)
 
         // Compile items within the module that are compilable using OnPhase
+        set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
-            set tResource = ..Module.Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
 
             set tHandled = 0
@@ -970,7 +974,7 @@ Method %Compile(ByRef pParams) As %Status
         // Build maps of other compilable things
         set tKey = ""
         for {
-            set tResource = ..Module.Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
 
             if '$data(tHandledMap(tResource.Name)) && $isobject(tResource.Processor) {
@@ -1127,8 +1131,11 @@ Method %Test(ByRef pParams) As %Status
         set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
         $$$ThrowOnError(tSC)
 
-        for i=1:1:..Module.Resources.Count() {
-            set tResource = ..Module.Resources.GetAt(i)
+        set orderedResourceList = ..GetOrderedResourceList()
+        set tKey = ""
+        for {
+            set tResource = orderedResourceList.GetNext(.tKey)
+            quit:tKey=""
             if $isobject(tResource.Processor) {
                 set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Test",.pParams))
             }
@@ -1364,9 +1371,12 @@ Method %Verify(ByRef pParams) As %Status
         set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
         $$$ThrowOnError(tSC)
 
+        set orderedResourceList = ..GetOrderedResourceList()
+        set tKey = ""
+        for {
         #dim tResource As %IPM.Storage.ResourceReference
-        for i=1:1:..Module.Resources.Count() {
-            set tResource = ..Module.Resources.GetAt(i)
+            set tResource = orderedResourceList.GetNext(.tKey)
+            quit:tKey=""
 
             set tHandled = 0
             if $isobject(tResource.Processor) {
