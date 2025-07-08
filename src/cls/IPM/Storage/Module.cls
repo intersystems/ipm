@@ -86,7 +86,7 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
 /// This method iterates over resources of a module and returns a list of objects in the correct order that resources should be processed
-/// Process resources based on their package depth (higher level first so more granular resource will override)
+/// Process document resources based on their package depth first, followed by the order things are defined in the module.xml for the rest
 /// e.g. <Resource Name="Depth1.PKG"/> should be processed before <Resource Name="Depth1.Depth2.CLS"/>
 Method GetOrderedResourceList() As %ListOfObjects
 {
