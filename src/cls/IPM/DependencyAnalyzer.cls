@@ -237,10 +237,11 @@ ClassMethod FindReferenceHelper(
 
     // If we are running for a module, get references for all module resources
     if pIsModule {
+        set orderedResourceList = tModule.GetOrderedResourceList()
         set tResourceKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
-            set tResource = tModule.Resources.GetNext(.tResourceKey)
+            set tResource = orderedResourceList.GetNext(.tResourceKey)
             if (tResourceKey = "") {
                 quit
             }

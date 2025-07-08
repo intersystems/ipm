@@ -237,8 +237,9 @@ Method GetCustomPhases(Output pPhases)
             set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
         }
     }
+    set orderedResourceList = ..GetOrderedResourceList()
     for {
-        set tResource = ..Resources.GetNext(.key)
+        set tResource = orderedResourceList.GetNext(.key)
         if key = "" {
             quit
         }
@@ -403,10 +404,11 @@ ClassMethod ExecutePhases(
                 $$$ThrowOnError(tSC)
                 $$$ThrowOnError(tLifecycle.OnBeforeResourceProcessing(tOnePhase, .pParams))
                 // Notify resource processors
+                set orderedResourceList = tModule.GetOrderedResourceList()
                 set tKey = ""
                 for {
                     #dim tResource As %IPM.Storage.ResourceReference
-                    set tResource = tModule.Resources.GetNext(.tKey)
+                    set tResource = orderedResourceList.GetNext(.tKey)
                     if (tKey = "") {
                         quit
                     }
@@ -430,7 +432,7 @@ ClassMethod ExecutePhases(
                 if tIsCustomPhase {
                     set tKey = ""
                     for {
-                        set tResource = tModule.Resources.GetNext(.tKey)
+                        set tResource = orderedResourceList.GetNext(.tKey)
                         if tKey = "" {
                             quit
                         }
@@ -461,9 +463,10 @@ ClassMethod ExecutePhases(
                 quit:$$$ISERR(tSC)
 
                 // Notify resource processors
+                set orderedResourceList = tModule.GetOrderedResourceList()
                 set tKey=""
                 for {
-                    set tResource = tModule.Resources.GetNext(.tKey)
+                    set tResource = orderedResourceList.GetNext(.tKey)
                     if (tKey = "") {
                         quit
                     }
@@ -1107,10 +1110,11 @@ Method GetResolvedReferences(
 
         set pReferenceArray(..Name, ..Name_".ZPM") = ""
 
+        set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
-            set tResource = ..Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
             if '..HasScope(pPhases,tResource.Scope) {
                 continue
@@ -1291,9 +1295,10 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
         $$$ThrowOnError(tSC)
 
         set tSC = $$$OK
+        set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
         for {
-            set tResource = ..Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:(tKey="")
 
             // If it hasn't been saved yet (to account for module renames)...
@@ -1373,9 +1378,10 @@ Method %OnAddToSaveSet(
         $$$ThrowOnError(tSC)
 
         set tSC = $$$OK
+        set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
         for {
-            set tResource = ..Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:(tKey="")
 
             // If it hasn't been saved yet (to account for module renames)...
@@ -1488,10 +1494,11 @@ Method GetStudioProject(
             do pProject.AddItem(..Name_".ZPM")
         }
 
+        set orderedResourceList = ..GetOrderedResourceList()
         set tResourceKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
-            set tResource = ..Resources.GetNext(.tResourceKey)
+            set tResource = orderedResourceList.GetNext(.tResourceKey)
             if (tResourceKey = "") {
                 quit
             }
