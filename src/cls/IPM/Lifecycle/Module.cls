@@ -81,7 +81,7 @@ Method %PrepareDeploy(ByRef pParams) As %Status
         $$$ThrowOnError(..Module.%Reload())
 
         set tSource = tPackageDeployNamespace _ "-CODE"
-        set orderedResourceList = ..GetOrderedResourceList()
+        set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
             set tResource = orderedResourceList.GetNext(.tKey)
