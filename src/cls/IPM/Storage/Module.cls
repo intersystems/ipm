@@ -85,6 +85,55 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
+/// This method iterates over resources of a module and returns a list of objects in the correct order that resources should be processed
+/// Process document resources based on their package depth first, followed by the order things are defined in the module.xml for the rest
+/// e.g. <Resource Name="Depth1.PKG"/> should be processed before <Resource Name="Depth1.Depth2.CLS"/>
+Method GetOrderedResourceList() As %ListOfObjects
+{
+    set nonDocumentResourceList = ##class(%ListOfObjects).%New()
+    set tKey = ""
+    for {
+        set tResource = ..Resources.GetNext(.tKey)
+        quit:tKey=""
+        if $isobject(tResource.Processor) && tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
+            // Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
+            set tResourceName = $piece(tResource.Name,".",1,*-1)
+            if ($get(documentResourceList(tResourceName)) = "") {
+                set documentResourceList(tResourceName) = ##class(%ListOfObjects).%New()
+            }
+            do documentResourceList(tResourceName).Insert(tResource)
+        }
+        else {
+            do nonDocumentResourceList.Insert(tResource)
+        }
+    }
+    set orderedResourceList = ##class(%ListOfObjects).%New()
+
+    // Combine all objects into one larger list
+    // First document resources
+    set tKey = ""
+    for {
+        set tKey = $order(documentResourceList(tKey))
+        quit:tKey=""
+        set tResourceList = documentResourceList(tKey)
+        set tKey2 = ""
+        for {
+            set tResource = tResourceList.GetNext(.tKey2)
+            quit:tKey2=""
+            do orderedResourceList.Insert(tResource)
+        }
+    }
+    // Then non-document resources
+    set tKey = ""
+    for {
+        set tResource = nonDocumentResourceList.GetNext(.tKey)
+        quit:tKey=""
+        do orderedResourceList.Insert(tResource)
+    }
+
+    return orderedResourceList
+}
+
 Method HaveToDeploy() As %Boolean
 {
     set deploy = 0
@@ -188,8 +237,9 @@ Method GetCustomPhases(Output pPhases)
             set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
         }
     }
+    set orderedResourceList = ..GetOrderedResourceList()
     for {
-        set tResource = ..Resources.GetNext(.key)
+        set tResource = orderedResourceList.GetNext(.key)
         if key = "" {
             quit
         }
@@ -354,10 +404,11 @@ ClassMethod ExecutePhases(
                 $$$ThrowOnError(tSC)
                 $$$ThrowOnError(tLifecycle.OnBeforeResourceProcessing(tOnePhase, .pParams))
                 // Notify resource processors
+                set orderedResourceList = tModule.GetOrderedResourceList()
                 set tKey = ""
                 for {
                     #dim tResource As %IPM.Storage.ResourceReference
-                    set tResource = tModule.Resources.GetNext(.tKey)
+                    set tResource = orderedResourceList.GetNext(.tKey)
                     if (tKey = "") {
                         quit
                     }
@@ -381,7 +432,7 @@ ClassMethod ExecutePhases(
                 if tIsCustomPhase {
                     set tKey = ""
                     for {
-                        set tResource = tModule.Resources.GetNext(.tKey)
+                        set tResource = orderedResourceList.GetNext(.tKey)
                         if tKey = "" {
                             quit
                         }
@@ -412,9 +463,10 @@ ClassMethod ExecutePhases(
                 quit:$$$ISERR(tSC)
 
                 // Notify resource processors
+                set orderedResourceList = tModule.GetOrderedResourceList()
                 set tKey=""
                 for {
-                    set tResource = tModule.Resources.GetNext(.tKey)
+                    set tResource = orderedResourceList.GetNext(.tKey)
                     if (tKey = "") {
                         quit
                     }
@@ -1058,10 +1110,11 @@ Method GetResolvedReferences(
 
         set pReferenceArray(..Name, ..Name_".ZPM") = ""
 
+        set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
-            set tResource = ..Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
             if '..HasScope(pPhases,tResource.Scope) {
                 continue
@@ -1242,9 +1295,10 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
         $$$ThrowOnError(tSC)
 
         set tSC = $$$OK
+        set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
         for {
-            set tResource = ..Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:(tKey="")
 
             // If it hasn't been saved yet (to account for module renames)...
@@ -1324,9 +1378,10 @@ Method %OnAddToSaveSet(
         $$$ThrowOnError(tSC)
 
         set tSC = $$$OK
+        set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
         for {
-            set tResource = ..Resources.GetNext(.tKey)
+            set tResource = orderedResourceList.GetNext(.tKey)
             quit:(tKey="")
 
             // If it hasn't been saved yet (to account for module renames)...
@@ -1439,10 +1494,11 @@ Method GetStudioProject(
             do pProject.AddItem(..Name_".ZPM")
         }
 
+        set orderedResourceList = ..GetOrderedResourceList()
         set tResourceKey = ""
         for {
             #dim tResource As %IPM.Storage.ResourceReference
-            set tResource = ..Resources.GetNext(.tResourceKey)
+            set tResource = orderedResourceList.GetNext(.tResourceKey)
             if (tResourceKey = "") {
                 quit
             }

@@ -167,10 +167,11 @@ Method PackageOneModule(
     set tWorkingDirectory = tTempFileManager.GetTempFolderName()
 
     // Notify resource processors for harvest of static files from module root
+    set orderedResourceList = pModule.GetOrderedResourceList()
     set tKey = ""
     for {
         #dim tResource As %IPM.Storage.ResourceReference
-        set tResource = pModule.Resources.GetNext(.tKey)
+        set tResource = orderedResourceList.GetNext(.tKey)
         quit:(tKey="")
 
         if $isobject(tResource.Processor) {
