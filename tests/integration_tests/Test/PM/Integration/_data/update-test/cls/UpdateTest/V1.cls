@@ -1,4 +1,4 @@
-Class UpgradeTest.V1 Extends %IPM.Utils.Upgrade.VersionBase
+Class UpdateTest.V1 Extends %IPM.Utils.Update.VersionBase
 {
 
 ClassMethod MethodA() As %Status

@@ -85,19 +85,19 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
-// Relationship UpgradeSteps As %IPM.Storage.UpgradeStep(XMLPROJECTION = "NONE") [ Cardinality = many, Inverse = oneProp ];
+Relationship UpdateSteps As %IPM.Storage.UpdateStep(XMLPROJECTION = "NONE") [ Cardinality = one, Inverse = manyProp, OnDelete = cascade ];
 
-Property UpgradePackage As %String(MAXLEN = 255);
+Property UpdatePackage As %String(MAXLEN = 255);
 
-ClassMethod AddUpgradeStep(
+ClassMethod AddUpdateStep(
 	className As %String,
 	methodName As %String,
 	timestamp As %Library.DateTime) As %Status
 {
-	Return ##class(%IPM.Storage.UpgradeStep).%New(className, methodName, timestamp)
+	return ##class(%IPM.Storage.UpdateStep).%New(className, methodName, timestamp)
 }
 
-ClassMethod SeedUpgradeSteps() As %Status
+ClassMethod SeedUpdateSteps() As %Status
 {
 }
 
