@@ -1,13 +1,16 @@
 Class %IPM.Utils.Update.Controller
 {
 
-ClassMethod ApplyUpdatesInOrder(verbose As %Boolean = 0)
+ClassMethod ApplyUpdatesInOrder(
+	moduleName As %String,
+	toVersion As %String,
+	verbose As %Boolean = 0)
 {
     ///////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////// Hard-Coding Values During Development //////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////
-    set moduleName = "fc-dep-same-resource"
-    set toVersion = "1"
+    //set moduleName = "update-test"
+    //set toVersion = "3"  // say current version is 1
     set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
     ///////////////////////////////////////////////////////////////////////////////////////////
 
@@ -32,20 +35,22 @@ ClassMethod ApplyUpdatesInOrder(verbose As %Boolean = 0)
             set dependency = dependencyList.GetAt(index)
             quit:dependency=""
             set depModule = ##class(%IPM.Storage.Module).NameOpen(dependency.Name,, .tSC)
-            If depModule.UpgradePackage '= "" {
-                // Loop through each of the versions (<Upgrade Package>.V#) between current version and desired module version
-                // Call their ApplySteps() methods
-                // Skips methods that have already been run
-                // Jimmy note: Probably an edge case where it's not upgrading dependency but installing a new one
-                set depVersion = depModule.VersionString
-            }
+            // Call phase "update" on dependent module
+
             set index = index + 1
         }
+
         // Followed by the base module itself
-        do ##class(%IPM.Utils.Update.VersionBase).ApplyStepsInOrder()
+        set index = tModule.Version.Major
+        while index <= toVersion {
+            w !, index
+            do ##class(%IPM.Utils.Update.VersionBase).ApplyStepsInOrder(moduleName, index, verbose, )  // TODO: Add log file
+            set index = index + 1
+        }
         tcommit
     } catch (ex) {
         set sc = ex.AsStatus()
+        zw sc
     }
     while ($TLevel > tInitTLevel) {
         trollback 1

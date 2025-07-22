@@ -1,6 +1,16 @@
 Class UpdateTest.V1 Extends %IPM.Utils.Update.VersionBase
 {
 
+ClassMethod GetOrderedMirrorMethodNames() As %Library.DynamicArray
+{
+    return ["MethodA", "MethodC"]
+}
+
+ClassMethod GetOrderedNonMirroredMethodNames() As %Library.DynamicArray
+{
+    return ["MethodB", "Jest"]
+}
+
 ClassMethod MethodA() As %Status
 {
     w !, "This is MethodA()"
@@ -19,14 +29,10 @@ ClassMethod MethodC() As %Status
     return $$$OK
 }
 
-ClassMethod Jest()
+ClassMethod Jest() As %Status
 {
     w !, "THIS IS METHOD JEST()"
-}
-
-ClassMethod GetMethodNameList() As %Library.DynamicArray
-{
-    return [["MethodA", 1], ["MethodB", 0], ["MethodC", 0]]
+    return $$$OK
 }
 
 }

@@ -85,20 +85,45 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
-Relationship UpdateSteps As %IPM.Storage.UpdateStep(XMLPROJECTION = "NONE") [ Cardinality = one, Inverse = manyProp, OnDelete = cascade ];
+// Relationship UpdateSteps As %IPM.Storage.UpdateStep(XMLPROJECTION = "NONE") [ Cardinality = one, Inverse = manyProp, OnDelete = cascade ];
 
 Property UpdatePackage As %String(MAXLEN = 255);
 
 ClassMethod AddUpdateStep(
 	className As %String,
-	methodName As %String,
-	timestamp As %Library.DateTime) As %Status
+	methodName As %String) As %Status
 {
-	return ##class(%IPM.Storage.UpdateStep).%New(className, methodName, timestamp)
+	return ##class(%IPM.Storage.UpdateStep).%New(className, methodName)
 }
 
-ClassMethod SeedUpdateSteps() As %Status
+Method SeedUpdateSteps() As %Status
 {
+	set majorVersion = ..Version.Major
+	set uniqueInstanceName = ##class(%SYS.System).GetUniqueInstanceName()
+    set mirroredHostName = $piece(uniqueInstanceName, ":", 1)
+    set mirroredInstanceName = $piece(uniqueInstanceName, ":", 2)
+
+	for version=1:1:majorVersion {
+		set className = ..UpdatePackage_".V"_version
+
+		// Seed MirrorMethodNames steps
+		set mirroredMethodNames = $ClassMethod(className, "GetOrderedMirrorMethodNames")
+		set iter = mirroredMethodNames.%GetIterator()
+		while iter.%GetNext(, .methodName) {
+			set stepObj = ##class(%IPM.Utils.Update.VersionBase).GetUpdateStepObject(className, methodName, 1, mirroredHostName, mirroredInstanceName)
+			set stepObj.TimeStampEnd = $zdt($h,3)
+			do stepObj.%Save()
+		}
+
+		// Seed NonMirroredMethodNames steps
+		set nonMirroredMethodNames = $ClassMethod(className, "GetOrderedNonMirroredMethodNames")
+		set iter = nonMirroredMethodNames.%GetIterator()
+		while iter.%GetNext(, .methodName) {
+			set stepObj = ##class(%IPM.Utils.Update.VersionBase).GetUpdateStepObject(className, methodName, 0, mirroredHostName, mirroredInstanceName)
+			set stepObj.TimeStampEnd = $zdt($h,3)
+			do stepObj.%Save()
+		}
+	}
 }
 
 Method HaveToDeploy() As %Boolean
@@ -1716,6 +1741,12 @@ Storage Default
 </Value>
 <Value name="29">
 <Value>UpgradePackage</Value>
+</Value>
+<Value name="30">
+<Value>UpdatePackage</Value>
+</Value>
+<Value name="31">
+<Value>UpdateSteps</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>

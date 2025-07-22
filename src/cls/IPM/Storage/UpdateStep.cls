@@ -19,20 +19,24 @@ Index UpdateClassMethodIdx On (MethodName, ClassName, MirroredHostName, Mirrored
 
 Property Status As %Status;
 
-Relationship ModuleHome As %IPM.Storage.Module [ Cardinality = many, Inverse = oneProp ];
+// Relationship ModuleHome As %IPM.Storage.Module [ Cardinality = many, Inverse = oneProp ];
 
 Method %OnNew(
 	className As %String = "",
-	methodName As %String = "") As %Status
+	methodName As %String = "",
+	mirrored As %Boolean = 1,
+	mirroredHostName As %String = "",
+	mirroredInstanceName As %String = "") As %Status
 {
     set ..ClassName = className
     set ..MethodName = methodName
+    set ..Mirrored = mirrored
     set uniqueInstanceName = ##class(%SYS.System).GetUniqueInstanceName()
     set ..MirroredHostName = $piece(uniqueInstanceName, ":", 1)
     set ..MirroredInstanceName = $piece(uniqueInstanceName, ":", 2)
     set ..Status = $$$OK
 
-    Return $$$OK
+    return $$$OK
 }
 
 Storage Default

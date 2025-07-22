@@ -21,20 +21,14 @@ ClassMethod GetOrderedNonMirroredMethodNames() As %Library.DynamicArray [ Abstra
 }
 
 ClassMethod ApplyStepsInOrder(
-	toVersion As %String,
-	verbose As %Boolean = 0,
-	logFile As %Library.File) As %Status
+	moduleName As %String,
+	version As %String,
+	logFile As %Library.File,
+	verbose As %Boolean = 0) As %Status
 {
-    ///////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////// Hard-Coding Values During Development //////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////
-    set moduleName = "update-test"
-    set toVersion = "1"
-    set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
-    ///////////////////////////////////////////////////////////////////////////////////////////
-    
-    if verbose { w !, "Attempting to acquire lock on ^IPM("_moduleName_", "_toVersion_")" }
-    lock +^IPM(moduleName, toVersion):3
+    // Attempt to acquire lock, quit if we cannot
+    if verbose { w !, "Attempting to acquire lock on ^IPM("_moduleName_", "_version_")" }
+    lock +^IPM(moduleName, version):3
     if ('$test) {
         // TODO: Should this actually return $$$OK?
         if verbose { w !, "This is locked, skipping" }
@@ -42,47 +36,52 @@ ClassMethod ApplyStepsInOrder(
     }
     if verbose { w !, "SUCCESS"}
 
-    set className = tModule.UpdatePackage_".V"_toVersion
-    set isPrimary = $System.Mirror.IsPrimary()
-    set mirroredHostName = ""
-    set mirroredInstanceName = ##class(%SYS.System).GetUniqueInstanceName()
+    set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
+    set className = tModule.UpdatePackage_".V"_version
+    set uniqueInstanceName = ##class(%SYS.System).GetUniqueInstanceName()
+    set mirroredHostName = $piece(uniqueInstanceName, ":", 1)
+    set mirroredInstanceName = $piece(uniqueInstanceName, ":", 2)
 
-    set mirroredMethodNames = ..GetOrderedMirroredMethodNames()
-    do ..ExecuteMethodList(.mirroredMethodNames, className, mirroredHostName, mirroredInstanceName)
+    // Regardless of mirror status, run these methods first
+    set mirroredMethodNames = $ClassMethod(className, "GetOrderedMirrorMethodNames")
+    do ..ExecuteMethodList(.mirroredMethodNames, className, 1, mirroredHostName, mirroredInstanceName, verbose, .newStepAdded)
 
-    set nonMirroredMethodNames = ..GetOrderedNonMirroredMethodNames()
-    do ..ExecuteMethodList(.nonMirroredMethodNames, className, mirroredHostName, mirroredInstanceName)
+    // Don't run these steps on mirror members that are not primary
+    if '($System.Mirror.IsMember() && '$System.Mirror.IsPrimary()) {
+        set nonMirroredMethodNames = $ClassMethod(className, "GetOrderedNonMirroredMethodNames")
+        do ..ExecuteMethodList(.nonMirroredMethodNames, className, 0, mirroredHostName, mirroredInstanceName, verbose, .newStepAdded)
+    }
 
-    if verbose { w !, "Releasing lock on ^IPM("_moduleName_", "_toVersion_")" }
-    lock -^IPM(moduleName, toVersion)
+    if verbose { w !, "Releasing lock on ^IPM("_moduleName_", "_version_")" }
+    lock -^IPM(moduleName, version)
     return $$$OK
 }
 
 ClassMethod ExecuteMethodList(
-	verbose As %Boolean = 0,
 	ByRef methodList As %Library.DynamicArray,
 	className As %String,
+	mirrored As %Boolean,
 	mirroredHostName As %String,
-	mirroredInstanceName As %String) [ Private ]
+	mirroredInstanceName As %String,
+	verbose As %Boolean = 0,
+	ByRef newStepAdded As %Boolean = 0) [ Private ]
 {
-    set runRest = "0"
     set iter = methodList.%GetIterator()
     while iter.%GetNext(, .methodName) {
-        set stepObj = ..GetUpdateStepObject(className, methodName, mirroredHostName, mirroredInstanceName)
-        if 'runRest {
-            // TODO: Check if method has been run on this mirror instance
-            set runRest = ""
+        set stepObj = ..GetUpdateStepObject(className, methodName, mirrored, mirroredHostName, mirroredInstanceName)
+        if 'newStepAdded && 'stepObj.TimeStampEnd {
+            set newStepAdded = 1
         }
-        if runRest {
+        if newStepAdded {
             set stepObj.TimeStampStart = $zdt($h,3)
             do stepObj.%Save()
             // TODO: Logging method invocation
             if verbose { w !, "Running "_className_"::"_methodName_"()" }
-            $$$ThrowOnError($ClassMethod(className, methodName))
+            set stepObj.Status = $ClassMethod(className, methodName)
             if verbose { w !, className_"::"_methodName_"() Finished" }
             // TODO: Logging method done
             set stepObj.TimeStampEnd = $zdt($h,3)
-            do stepObj.%Save()
+            $$$ThrowOnError(stepObj.%Save())
         }
     }
 }
@@ -90,6 +89,7 @@ ClassMethod ExecuteMethodList(
 ClassMethod GetUpdateStepObject(
 	className As %String,
 	methodName As %String,
+	mirrored As %Boolean,
 	mirroredHostName As %String,
 	mirroredInstanceName As %String) As %IPM.Storage.UpdateStep
 {
@@ -106,7 +106,7 @@ ClassMethod GetUpdateStepObject(
     do tRes.%Next()
     set stepObj = ##class(%IPM.Storage.UpdateStep).%OpenId(tRes.%Get("Id"))
     if '$IsObject(stepObj) {
-        set stepObj = ##class(%IPM.Storage.UpdateStep).%New()
+        set stepObj = ##class(%IPM.Storage.UpdateStep).%New(className, methodName, mirrored)
     }
     return stepObj
 }
