@@ -27,14 +27,13 @@ ClassMethod ApplyStepsInOrder(
 	verbose As %Boolean = 0) As %Status
 {
     // Attempt to acquire lock, quit if we cannot
-    if verbose { w !, "Attempting to acquire lock on ^IPM("_moduleName_", "_version_")" }
+    if verbose { w !, "Acquiring lock on ^IPM("_moduleName_", "_version_")" }
     lock +^IPM(moduleName, version):3
     if ('$test) {
         // TODO: Should this actually return $$$OK?
         if verbose { w !, "This is locked, skipping" }
         return $$$OK
     }
-    if verbose { w !, "SUCCESS"}
 
     set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
     set className = tModule.UpdatePackage_".V"_version
@@ -44,12 +43,12 @@ ClassMethod ApplyStepsInOrder(
 
     // Regardless of mirror status, run these methods first
     set mirroredMethodNames = $ClassMethod(className, "GetOrderedMirrorMethodNames")
-    do ..ExecuteMethodList(.mirroredMethodNames, className, 1, mirroredHostName, mirroredInstanceName, verbose, .newStepAdded)
+    do ..ExecuteMethodList(.mirroredMethodNames, className, 1, mirroredHostName, mirroredInstanceName, logFile, verbose, .newStepAdded)
 
     // Don't run these steps on mirror members that are not primary
     if '($System.Mirror.IsMember() && '$System.Mirror.IsPrimary()) {
         set nonMirroredMethodNames = $ClassMethod(className, "GetOrderedNonMirroredMethodNames")
-        do ..ExecuteMethodList(.nonMirroredMethodNames, className, 0, mirroredHostName, mirroredInstanceName, verbose, .newStepAdded)
+        do ..ExecuteMethodList(.nonMirroredMethodNames, className, 0, mirroredHostName, mirroredInstanceName, logFile, verbose, .newStepAdded)
     }
 
     if verbose { w !, "Releasing lock on ^IPM("_moduleName_", "_version_")" }
@@ -63,52 +62,35 @@ ClassMethod ExecuteMethodList(
 	mirrored As %Boolean,
 	mirroredHostName As %String,
 	mirroredInstanceName As %String,
+	logfile As %Library.File,
 	verbose As %Boolean = 0,
 	ByRef newStepAdded As %Boolean = 0) [ Private ]
 {
     set iter = methodList.%GetIterator()
     while iter.%GetNext(, .methodName) {
-        set stepObj = ..GetUpdateStepObject(className, methodName, mirrored, mirroredHostName, mirroredInstanceName)
+        set stepObj = ##class(%IPM.Storage.UpdateStep).GetUpdateStepObject(className, methodName, mirrored, mirroredHostName, mirroredInstanceName)
         if 'newStepAdded && 'stepObj.TimeStampEnd {
             set newStepAdded = 1
         }
         if newStepAdded {
             set stepObj.TimeStampStart = $zdt($h,3)
             do stepObj.%Save()
-            // TODO: Logging method invocation
             if verbose { w !, "Running "_className_"::"_methodName_"()" }
             set stepObj.Status = $ClassMethod(className, methodName)
             if verbose { w !, className_"::"_methodName_"() Finished" }
-            // TODO: Logging method done
+            // TODO: Logging method status
             set stepObj.TimeStampEnd = $zdt($h,3)
             $$$ThrowOnError(stepObj.%Save())
         }
     }
 }
 
-ClassMethod GetUpdateStepObject(
-	className As %String,
-	methodName As %String,
-	mirrored As %Boolean,
-	mirroredHostName As %String,
-	mirroredInstanceName As %String) As %IPM.Storage.UpdateStep
+ClassMethod LogToFile(
+	logFile As %Library.File,
+	verbose As %Boolean = 0)
 {
-    set tRes = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT ID "_
-        "FROM %IPM_Storage.UpdateStep "_
-        "WHERE ClassName = '"_className_
-        "' AND MethodName = '"_methodName_
-        "' AND MirroredHostName = '"_mirroredHostName_
-        "' AND MirroredInstanceName = '"_mirroredInstanceName_"'")
-    if (tRes.%SQLCODE < 0) {
-        Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-    }
-    do tRes.%Next()
-    set stepObj = ##class(%IPM.Storage.UpdateStep).%OpenId(tRes.%Get("Id"))
-    if '$IsObject(stepObj) {
-        set stepObj = ##class(%IPM.Storage.UpdateStep).%New(className, methodName, mirrored)
-    }
-    return stepObj
+    // TODO: Implement logging function
+    // non-verbose: only the status of UpdateStep.Status
 }
 
 }

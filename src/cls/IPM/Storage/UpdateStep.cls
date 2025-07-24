@@ -19,7 +19,7 @@ Index UpdateClassMethodIdx On (MethodName, ClassName, MirroredHostName, Mirrored
 
 Property Status As %Status;
 
-// Relationship ModuleHome As %IPM.Storage.Module [ Cardinality = many, Inverse = oneProp ];
+Relationship ModuleHome As %IPM.Storage.Module [ Cardinality = one, Inverse = UpdateSteps, OnDelete = cascade ];
 
 Method %OnNew(
 	className As %String = "",
@@ -37,6 +37,34 @@ Method %OnNew(
     set ..Status = $$$OK
 
     return $$$OK
+}
+
+/// Returns %IPM.Storage.UpdateStep object corresponding to unique index in storage table
+/// If object does not exist, creates a new one based on the given parameters and returns it (not yet saved to table)
+ClassMethod GetUpdateStepObject(
+	className As %String,
+	methodName As %String,
+	mirrored As %Boolean,
+	mirroredHostName As %String,
+	mirroredInstanceName As %String) As %IPM.Storage.UpdateStep
+{
+    set tRes = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT ID "_
+        "FROM %IPM_Storage.UpdateStep "_
+        "WHERE ClassName = '"_className_
+        "' AND MethodName = '"_methodName_
+        "' AND MirroredHostName = '"_mirroredHostName_
+        "' AND MirroredInstanceName = '"_mirroredInstanceName_"'")
+    if (tRes.%SQLCODE < 0) {
+        Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+    }
+    do tRes.%Next()
+    set stepObj =  ..%OpenId(tRes.%Get("Id"))
+    if '$IsObject(stepObj) {
+        // TODO: If we're creating object here, we need to figure out a way to connect it to the module
+        set stepObj = ..%New(className, methodName, mirrored)
+    }
+    return stepObj
 }
 
 Storage Default

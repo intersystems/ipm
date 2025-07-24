@@ -1,27 +1,21 @@
 Class %IPM.Utils.Update.Controller
 {
 
+/// TODO: Remove toVersion. I put that in for some manual testing cases (V1,V2 classes but only V1 module). Will use current module version for toVersion
 ClassMethod ApplyUpdatesInOrder(
 	moduleName As %String,
+	fromVersion As %String,
 	toVersion As %String,
+	logFile As %Library.File,
 	verbose As %Boolean = 0)
 {
-    ///////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////// Hard-Coding Values During Development //////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////
-    //set moduleName = "update-test"
-    //set toVersion = "3"  // say current version is 1
-    set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
-    ///////////////////////////////////////////////////////////////////////////////////////////
-
-    if verbose { w !, "Attempting to acquire lock on ^IPM("_moduleName_")" }
+    if verbose { w !, "Acquiring lock on ^IPM("_moduleName_")" }
     lock +^IPM(moduleName):3
     if ('$test) {
         // TODO: Should this actually return $$$OK?
         if verbose { w !, "This is locked, skipping" }
         return $$$OK
     }
-    if verbose { w !, "SUCCESS"}
 
     set tSC = $$$OK
     set tInitTLevel = $tlevel
@@ -29,28 +23,22 @@ ClassMethod ApplyUpdatesInOrder(
         tstart
         // For each base module dependency
         set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
-        set dependencyList = tModule.Dependencies
-        set index = 1
-        for {
-            set dependency = dependencyList.GetAt(index)
-            quit:dependency=""
-            set depModule = ##class(%IPM.Storage.Module).NameOpen(dependency.Name,, .tSC)
-            // Call phase "update" on dependent module
+        set processList = ..GetProcessModuleList(moduleName)
 
-            set index = index + 1
+        set ptr = 0
+        while $listnext(processList, ptr, moduleName) {
+            set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+            // TODO: Uncomment this line and use it as toVersion instead of parameter sent in
+            //set toVersion = tModule.Version.Major
+            for version=fromVersion:1:toVersion {
+                if verbose { w !, "Calling ApplyStepsInOrder() for module="_moduleName_" version="_version }
+                do ##class(%IPM.Utils.Update.VersionBase).ApplyStepsInOrder(moduleName, version, logFile, verbose)
+            }
         }
 
-        // Followed by the base module itself
-        set index = tModule.Version.Major
-        while index <= toVersion {
-            w !, index
-            do ##class(%IPM.Utils.Update.VersionBase).ApplyStepsInOrder(moduleName, index, verbose, )  // TODO: Add log file
-            set index = index + 1
-        }
         tcommit
     } catch (ex) {
-        set sc = ex.AsStatus()
-        zw sc
+        set tSC = ex.AsStatus()
     }
     while ($TLevel > tInitTLevel) {
         trollback 1
@@ -59,6 +47,42 @@ ClassMethod ApplyUpdatesInOrder(
     if verbose { w !, "Releasing lock on ^IPM("_moduleName_")" }
     lock -^IPM(moduleName)
     quit tSC
+}
+
+ClassMethod ApplySingleModuleUpdatesInOrder(moduleName As %String) As %Status [ Private ]
+{
+}
+
+/// Get list of dependency modules in order of how we want to update them.
+/// We want to perform updates in reverse order of dependencies depth.
+/// i.e. Call update steps for highest depth dependent module all the way up back the base module being updated
+ClassMethod GetProcessModuleList(moduleName As %String) As %List [ Private ]
+{
+    set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
+    do tModule.BuildDependencyGraph(.pDependencyGraph)
+    set key = ""
+    for {
+        set key = $order(pDependencyGraph(key))
+        quit:key=""
+        // Order elements based on dependency depth
+        set depth = $list(pDependencyGraph(key), 1)
+        set depths(depth, key) = ""
+    }
+
+    // Reverse the order so we process most dependent modules first
+    set processList = $listbuild(tModule.Name)
+    set depthKey = ""
+    for {
+        set depthKey = $order(depths(depthKey))
+        quit:depthKey=""
+        set modKey = ""
+        for {
+            set modKey = $order(depths(depthKey, modKey))
+            quit:modKey=""
+            set processList = $listbuild(modKey) _ processList
+        }
+    }
+    return processList
 }
 
 }

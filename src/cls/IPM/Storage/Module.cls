@@ -85,43 +85,53 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
-// Relationship UpdateSteps As %IPM.Storage.UpdateStep(XMLPROJECTION = "NONE") [ Cardinality = one, Inverse = manyProp, OnDelete = cascade ];
+Relationship UpdateSteps As %IPM.Storage.UpdateStep(XMLPROJECTION = "NONE") [ Cardinality = many, Inverse = ModuleHome ];
 
 Property UpdatePackage As %String(MAXLEN = 255);
 
-ClassMethod AddUpdateStep(
+/// Add an update step and connect it to this module
+Method AddUpdateStep(
 	className As %String,
 	methodName As %String) As %Status
 {
-	return ##class(%IPM.Storage.UpdateStep).%New(className, methodName)
+	set newStep = ##class(%IPM.Storage.UpdateStep).%New(className, methodName)
+	do ..UpdateSteps.Insert(newStep)
+	return ..%Save()
 }
 
+/// Seed update steps for all versions prior to the current major version by setting TimeStampEnd to current time
+/// Steps that already have TimeStampEnd defined (already been run) will be skipped
 Method SeedUpdateSteps() As %Status
 {
-	set majorVersion = ..Version.Major
 	set uniqueInstanceName = ##class(%SYS.System).GetUniqueInstanceName()
-    set mirroredHostName = $piece(uniqueInstanceName, ":", 1)
-    set mirroredInstanceName = $piece(uniqueInstanceName, ":", 2)
+	set mirroredHostName = $piece(uniqueInstanceName, ":", 1)
+	set mirroredInstanceName = $piece(uniqueInstanceName, ":", 2)
 
-	for version=1:1:majorVersion {
+	for version=1:1:..Version.Major-1 {
 		set className = ..UpdatePackage_".V"_version
 
 		// Seed MirrorMethodNames steps
 		set mirroredMethodNames = $ClassMethod(className, "GetOrderedMirrorMethodNames")
 		set iter = mirroredMethodNames.%GetIterator()
 		while iter.%GetNext(, .methodName) {
-			set stepObj = ##class(%IPM.Utils.Update.VersionBase).GetUpdateStepObject(className, methodName, 1, mirroredHostName, mirroredInstanceName)
-			set stepObj.TimeStampEnd = $zdt($h,3)
-			do stepObj.%Save()
+			set stepObj = ##class(%IPM.Storage.UpdateStep).GetUpdateStepObject(className, methodName, 1, mirroredHostName, mirroredInstanceName)
+			// Only seed steps that haven't already been run
+			if 'stepObj.TimeStampEnd {
+				set stepObj.TimeStampEnd = $zdt($h,3)
+				do stepObj.%Save()
+			}
 		}
 
 		// Seed NonMirroredMethodNames steps
 		set nonMirroredMethodNames = $ClassMethod(className, "GetOrderedNonMirroredMethodNames")
 		set iter = nonMirroredMethodNames.%GetIterator()
 		while iter.%GetNext(, .methodName) {
-			set stepObj = ##class(%IPM.Utils.Update.VersionBase).GetUpdateStepObject(className, methodName, 0, mirroredHostName, mirroredInstanceName)
-			set stepObj.TimeStampEnd = $zdt($h,3)
-			do stepObj.%Save()
+			set stepObj = ##class(%IPM.Storage.UpdateStep).GetUpdateStepObject(className, methodName, 0, mirroredHostName, mirroredInstanceName)
+			// Only seed steps that haven't already been run
+			if 'stepObj.TimeStampEnd {
+				set stepObj.TimeStampEnd = $zdt($h,3)
+				do stepObj.%Save()
+			}
 		}
 	}
 }
