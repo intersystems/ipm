@@ -13,6 +13,9 @@ Method TestSimpleApp()
   } Catch e {
     Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
   }
+
+  // Check that the UpdateStep is seeded, if UpdateSteps exist
+  // Check that error is thrown if the module is already installed
 }
 
 }
