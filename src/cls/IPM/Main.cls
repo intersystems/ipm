@@ -7,7 +7,7 @@ Class %IPM.Main Extends %IPM.CLI
 
 Parameter DOMAIN = "ZPM";
 
-Parameter STANDARDPHASES = {$ListBuild("reload","compile","test","package","verify","publish","makedeployed")};
+Parameter STANDARDPHASES = {$ListBuild("reload","compile","test","package","verify","publish","makedeployed","update")};
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -55,6 +55,7 @@ This is accessible to other instances configured to look at the current namespac
 module repository.
 * publish: saves that artifact to the repository for which deployment is enabled.
 Currently, there may only be one of these per namespace.
+* update: run any update steps for the module to become updated to the specified version.
 </description>
 
 <!-- Examples -->
@@ -730,6 +731,26 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	</example>
 </command>
 
+<command name="update">
+<summary>Updates a module to a specified version.</summary>
+<description>
+	Updates a module to a specified version. Runs all of the update steps from the current version to the newer version.
+</description>
+
+<!-- Examples -->
+<example description="Updates HS.JSON from the current version to version 3.0.0.">
+	update HS.JSON 3.0.0
+</example>
+
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module to update" />
+<parameter name="version" required="true" description="Version to update module to" />
+
+<!-- Modifiers -->
+<modifier name="force" aliases="f" description="If specified, the module will be updated even if there are warnings." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 </commands>
 }
 
@@ -954,6 +975,8 @@ ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.A
 				Do ..ModuleVersion(.tCommandInfo)
 			} ElseIf (tCommandInfo = "information") {
 				Do ..Information(.tCommandInfo)
+			} ElseIf (tCommandInfo = "update") {
+				Do ..Update(.tCommandInfo)
 			}
 		} Catch pException {
 			If (pException.Code = $$$ERCTRLC) {
@@ -3762,6 +3785,11 @@ ClassMethod Information(ByRef pCommandInfo)
 		Set updatedList($Increment(updatedList)) = entry
 	}
 	Do ..DisplayModules(.updatedList)
+}
+
+ClassMethod Update(ByRef pCommandInfo)
+{
+	Set verbose = $$$HasModifier(pCommandInfo,"verbose")
 }
 
 }
