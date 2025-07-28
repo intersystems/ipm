@@ -92,11 +92,12 @@ Property UpdatePackage As %String(MAXLEN = 255);
 /// Add an update step and connect it to this module
 Method AddUpdateStep(
 	className As %String,
-	methodName As %String) As %Status
+	methodName As %String) As %IPM.Storage.UpdateStep
 {
 	set newStep = ##class(%IPM.Storage.UpdateStep).%New(className, methodName)
 	do ..UpdateSteps.Insert(newStep)
-	return ..%Save()
+	do ..%Save()
+	return newStep
 }
 
 /// Seed update steps for all versions prior to the current major version by setting TimeStampEnd to current time

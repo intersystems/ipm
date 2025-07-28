@@ -21,43 +21,43 @@ ClassMethod GetOrderedNonMirroredMethodNames() As %Library.DynamicArray [ Abstra
 }
 
 ClassMethod ApplyStepsInOrder(
-	moduleName As %String,
+	module As %IPM.Storage.Module,
 	version As %String,
 	logFile As %Library.File,
 	verbose As %Boolean = 0) As %Status
 {
     // Attempt to acquire lock, quit if we cannot
-    if verbose { w !, "Acquiring lock on ^IPM("_moduleName_", "_version_")" }
-    lock +^IPM(moduleName, version):3
+    if verbose { w !, "Acquiring lock on ^IPM("_module.Name_", "_version_")" }
+    lock +^IPM(module.Name, version):3
     if ('$test) {
         // TODO: Should this actually return $$$OK?
         if verbose { w !, "This is locked, skipping" }
         return $$$OK
     }
 
-    set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
-    set className = tModule.UpdatePackage_".V"_version
+    set className = module.UpdatePackage_".V"_version
     set uniqueInstanceName = ##class(%SYS.System).GetUniqueInstanceName()
     set mirroredHostName = $piece(uniqueInstanceName, ":", 1)
     set mirroredInstanceName = $piece(uniqueInstanceName, ":", 2)
 
     // Regardless of mirror status, run these methods first
     set mirroredMethodNames = $ClassMethod(className, "GetOrderedMirrorMethodNames")
-    do ..ExecuteMethodList(.mirroredMethodNames, className, 1, mirroredHostName, mirroredInstanceName, logFile, verbose, .newStepAdded)
+    do ..ExecuteMethodList(module, mirroredMethodNames, className, 1, mirroredHostName, mirroredInstanceName, logFile, verbose, .newStepAdded)
 
     // Don't run these steps on mirror members that are not primary
     if '($System.Mirror.IsMember() && '$System.Mirror.IsPrimary()) {
         set nonMirroredMethodNames = $ClassMethod(className, "GetOrderedNonMirroredMethodNames")
-        do ..ExecuteMethodList(.nonMirroredMethodNames, className, 0, mirroredHostName, mirroredInstanceName, logFile, verbose, .newStepAdded)
+        do ..ExecuteMethodList(module, nonMirroredMethodNames, className, 0, mirroredHostName, mirroredInstanceName, logFile, verbose, .newStepAdded)
     }
 
-    if verbose { w !, "Releasing lock on ^IPM("_moduleName_", "_version_")" }
-    lock -^IPM(moduleName, version)
+    if verbose { w !, "Releasing lock on ^IPM("_module.Name_", "_version_")" }
+    lock -^IPM(module.Name, version)
     return $$$OK
 }
 
 ClassMethod ExecuteMethodList(
-	ByRef methodList As %Library.DynamicArray,
+	module As %IPM.Storage.Module,
+	methodList As %Library.DynamicArray,
 	className As %String,
 	mirrored As %Boolean,
 	mirroredHostName As %String,
@@ -69,6 +69,9 @@ ClassMethod ExecuteMethodList(
     set iter = methodList.%GetIterator()
     while iter.%GetNext(, .methodName) {
         set stepObj = ##class(%IPM.Storage.UpdateStep).GetUpdateStepObject(className, methodName, mirrored, mirroredHostName, mirroredInstanceName)
+        if '$IsObject(stepObj) {
+            set stepObj = module.AddUpdateStep(className, methodName)
+        }
         if 'newStepAdded && 'stepObj.TimeStampEnd {
             set newStepAdded = 1
         }

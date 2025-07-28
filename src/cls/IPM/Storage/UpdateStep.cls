@@ -40,7 +40,7 @@ Method %OnNew(
 }
 
 /// Returns %IPM.Storage.UpdateStep object corresponding to unique index in storage table
-/// If object does not exist, creates a new one based on the given parameters and returns it (not yet saved to table)
+/// If object does not exist, this will return an empty object
 ClassMethod GetUpdateStepObject(
 	className As %String,
 	methodName As %String,
@@ -60,10 +60,6 @@ ClassMethod GetUpdateStepObject(
     }
     do tRes.%Next()
     set stepObj =  ..%OpenId(tRes.%Get("Id"))
-    if '$IsObject(stepObj) {
-        // TODO: If we're creating object here, we need to figure out a way to connect it to the module
-        set stepObj = ..%New(className, methodName, mirrored)
-    }
     return stepObj
 }
 
