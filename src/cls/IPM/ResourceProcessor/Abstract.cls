@@ -254,6 +254,7 @@ Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.Res
 /// <ul>
 /// 	<li>{$root} - the resource's module's root directory </li>
 /// 	<li>{name} - the name of the resource </li>
+/// 	<li>{packagename} - the name of the package </li>
 /// </ul>
 /// In addition to these, look at expressions supported by %EvaluateSystemExpression
 /// in class <class>%IPM.Utils.Module</class>.
@@ -270,6 +271,8 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
     }
     set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
     set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
+    set customParams("packagename") = ..ResourceReference.Module.Name
+    set attrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(attrValue,.customParams)
     set root = ..ResourceReference.Module.Root
     if (root '= "") {
         set root = ##class(%Library.File).NormalizeDirectory(root)
