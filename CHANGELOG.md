@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #678 Only update comment-flagged part of the language extension, allowing users to keep their custom code when upgrading
 - #680, #683 Always export static files (README.md, LICENSE, requirements.txt, CHANGELOG.md) if existent
 - #745 Allow publishing of deployments without developer mode
+- #820 Fixed `${packagename}` not working for FileCopy
 
 ### Security
 - #697 When publishing modules, will get an status with error message (instead of just a boolean) in case of failures.
