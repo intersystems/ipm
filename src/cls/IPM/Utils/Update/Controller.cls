@@ -4,7 +4,6 @@ Class %IPM.Utils.Update.Controller
 ClassMethod ApplyUpdatesInOrder(
 	module As %IPM.Storage.Module,
 	fromVersion As %String,
-	toVersion As %String,
 	logFile As %Library.File = "",
 	verbose As %Boolean = 0)
 {
