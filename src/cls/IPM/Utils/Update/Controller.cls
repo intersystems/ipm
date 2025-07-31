@@ -1,18 +1,21 @@
+Include %IPM.Common
+
 Class %IPM.Utils.Update.Controller
 {
 
+/// Iterates through a module and its dependencies and applies their update steps that haven't been run up through the current version
+/// Starts with the most dependent module and works its way backwards to the base module we are calling "update" on
 ClassMethod ApplyUpdatesInOrder(
 	module As %IPM.Storage.Module,
-	fromVersion As %String,
 	logFile As %Library.File = "",
 	verbose As %Boolean = 0)
 {
-    if verbose { w !, "Acquiring lock on ^IPM("_module.Name_")" }
-    lock +^IPM(module.Name):3
+    if verbose {
+        write !, "Acquiring lock on ^%IPM.Update("_module.Name_")"
+    }
+    $$$LockUpdateModule(module.Name)
     if ('$test) {
-        // TODO: Should this actually return $$$OK?
-        if verbose { w !, "This is locked, skipping" }
-        return $$$OK
+        quit
     }
 
     set tSC = $$$OK
@@ -20,40 +23,40 @@ ClassMethod ApplyUpdatesInOrder(
     try {
         tstart
         // For each base module dependency
-        set processList = ..GetProcessModuleList(module)
+        set processList = ..GetModulesToUpdateOrderedList(module)
 
         set ptr = 0
         while $listnext(processList, ptr, moduleName) {
-            set tModule = ##class(%IPM.Storage.Module).NameOpen(moduleName)
-            set toVersion = tModule.Version.Major
-            for version=fromVersion:1:toVersion {
-                if verbose { w !, "Calling ApplyStepsInOrder() for module="_tModule.Name_" version="_version }
-                do ##class(%IPM.Utils.Update.VersionBase).ApplyStepsInOrder(tModule, version, logFile, verbose)
+            set nextModule = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+            set toVersion = nextModule.Version.Major
+            for version=1:1:toVersion {
+                if verbose {
+                    write !, "Starting to run update steps for module="_nextModule.Name_" version="_version
+                }
+                set tSC = ##class(%IPM.Utils.Update.VersionBase).ApplyStepsInOrder(nextModule, version, logFile, verbose)
             }
         }
         tcommit
     } catch (ex) {
         set tSC = ex.AsStatus()
     }
-    while ($TLevel > tInitTLevel) {
+    while ($tlevel > tInitTLevel) {
         trollback 1
     }
 
-    if verbose { w !, "Releasing lock on ^IPM("_moduleName_")" }
-    lock -^IPM(moduleName)
+    if verbose {
+        write !, "Releasing lock on ^IPM.Update("_module.Name_")"
+    }
+    $$$UnlockUpdateModule(module.Name)
     quit tSC
-}
-
-ClassMethod ApplySingleModuleUpdatesInOrder(moduleName As %String) As %Status [ Private ]
-{
 }
 
 /// Get list of dependency modules in order of how we want to update them.
 /// We want to perform updates in reverse order of dependencies depth.
 /// i.e. Call update steps for highest depth dependent module all the way up back the base module being updated
-ClassMethod GetProcessModuleList(module As %IPM.Storage.Module) As %List [ Private ]
+ClassMethod GetModulesToUpdateOrderedList(module As %IPM.Storage.Module) As %List [ Private ]
 {
-    do module.BuildDependencyGraph(.pDependencyGraph)
+    $$$ThrowOnError(module.BuildDependencyGraph(.pDependencyGraph))
     set key = ""
     for {
         set key = $order(pDependencyGraph(key))

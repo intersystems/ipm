@@ -1,21 +1,21 @@
 Class %IPM.Storage.UpdateStep Extends %Persistent
 {
 
-Property ClassName As %Dictionary.Classname;
+Property ClassName As %Dictionary.Classname [ Required ];
 
-Property MethodName As %Dictionary.Identifier;
+Property MethodName As %Dictionary.Identifier [ Required ];
+
+Property HostName As %String(MAXLEN = 255) [ Required ];
+
+Property InstanceName As %String(MAXLEN = 255) [ Required ];
+
+Index UpdateClassMethodIdx On (ClassName, MethodName, HostName, InstanceName) [ Unique ];
 
 Property Mirrored As %Boolean;
 
 Property TimeStampStart As %Library.DateTime;
 
 Property TimeStampEnd As %Library.DateTime;
-
-Property MirroredHostName As %String(MAXLEN = 255);
-
-Property MirroredInstanceName As %String(MAXLEN = 255);
-
-Index UpdateClassMethodIdx On (MethodName, ClassName, MirroredHostName, MirroredInstanceName) [ Unique ];
 
 Property Status As %Status;
 
@@ -25,15 +25,18 @@ Method %OnNew(
 	className As %String = "",
 	methodName As %String = "",
 	mirrored As %Boolean = 1,
-	mirroredHostName As %String = "",
-	mirroredInstanceName As %String = "") As %Status
+	hostName As %String = "",
+	instanceName As %String = "") As %Status
 {
     set ..ClassName = className
     set ..MethodName = methodName
     set ..Mirrored = mirrored
-    set uniqueInstanceName = ##class(%SYS.System).GetUniqueInstanceName()
-    set ..MirroredHostName = $piece(uniqueInstanceName, ":", 1)
-    set ..MirroredInstanceName = $piece(uniqueInstanceName, ":", 2)
+    if hostName = "" {
+        set ..HostName = ##class(%SYS.System).GetNodeName()
+    }
+    if instanceName = "" {
+        set ..InstanceName = ##class(%SYS.System).GetInstanceName()
+    }
     set ..Status = $$$OK
 
     return $$$OK
@@ -41,26 +44,14 @@ Method %OnNew(
 
 /// Returns %IPM.Storage.UpdateStep object corresponding to unique index in storage table
 /// If object does not exist, this will return an empty object
-ClassMethod GetUpdateStepObject(
+ClassMethod GetUpdateStep(
 	className As %String,
 	methodName As %String,
-	mirrored As %Boolean,
-	mirroredHostName As %String,
-	mirroredInstanceName As %String) As %IPM.Storage.UpdateStep
+	hostName As %String,
+	instanceName As %String) As %IPM.Storage.UpdateStep
 {
-    set tRes = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT ID "_
-        "FROM %IPM_Storage.UpdateStep "_
-        "WHERE ClassName = '"_className_
-        "' AND MethodName = '"_methodName_
-        "' AND MirroredHostName = '"_mirroredHostName_
-        "' AND MirroredInstanceName = '"_mirroredInstanceName_"'")
-    if (tRes.%SQLCODE < 0) {
-        Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-    }
-    do tRes.%Next()
-    set stepObj =  ..%OpenId(tRes.%Get("Id"))
-    return stepObj
+    do ..UpdateClassMethodIdxExists(className, methodName, hostName, instanceName, .stepId)
+    return ..%OpenId(stepId)
 }
 
 Storage Default
@@ -79,10 +70,10 @@ Storage Default
 <Value>TimeStamp</Value>
 </Value>
 <Value name="5">
-<Value>MirroredHostName</Value>
+<Value>HostName</Value>
 </Value>
 <Value name="6">
-<Value>MirroredInstanceName</Value>
+<Value>InstanceName</Value>
 </Value>
 <Value name="7">
 <Value>Status</Value>

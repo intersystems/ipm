@@ -1,12 +1,8 @@
+Include %IPM.Common
+
 /// Class %IPM.Utils.Update.VersionBase [ Abstract ]
 Class %IPM.Utils.Update.VersionBase
 {
-
-/// Returns dynamic array of update method names to apply in order and whether or not they contain data changes. No base implementation.
-/// Example output list: [["methodA", 1], ["methodB", 0], ["methodC", 0]]
-ClassMethod GetMethodNameList() As %Library.DynamicArray [ Abstract ]
-{
-}
 
 /// Returns dynamic array of update method names to apply in order that can be run on both primary and backup
 /// Example output list: ["methodA", "methodB", "methodC"]
@@ -27,65 +23,99 @@ ClassMethod ApplyStepsInOrder(
 	verbose As %Boolean = 0) As %Status
 {
     // Attempt to acquire lock, quit if we cannot
-    if verbose { w !, "Acquiring lock on ^IPM("_module.Name_", "_version_")" }
-    lock +^IPM(module.Name, version):3
+    if verbose {
+        write !, "Acquiring lock on ^%IPM.Update("_module.Name_", "_version_")"
+    }
+    $$$LockUpdateModuleVersion(module.Name, version)
     if ('$test) {
-        // TODO: Should this actually return $$$OK?
-        if verbose { w !, "This is locked, skipping" }
-        return $$$OK
+        quit
     }
 
-    set className = module.UpdatePackage_".V"_version
-    set uniqueInstanceName = ##class(%SYS.System).GetUniqueInstanceName()
-    set mirroredHostName = $piece(uniqueInstanceName, ":", 1)
-    set mirroredInstanceName = $piece(uniqueInstanceName, ":", 2)
+    set sc = $$$OK
+    try {
+        set className = module.UpdatePackage_".V"_version
+        if '##class(%Dictionary.ClassDefinition).%ExistsId(className) {
+            if verbose {
+                write !, "Class """_className_""" does not exist. Skipping running its update steps"
+            }
+            quit
+        }
+        set hostName = ##class(%SYS.System).GetNodeName()
+        set instanceName = ##class(%SYS.System).GetInstanceName()
 
-    // Regardless of mirror status, run these methods first
-    set mirroredMethodNames = $ClassMethod(className, "GetOrderedMirrorMethodNames")
-    do ..ExecuteMethodList(module, mirroredMethodNames, className, 1, mirroredHostName, mirroredInstanceName, logFile, verbose, .newStepAdded)
+        // Regardless of mirror status, run these methods first
+        set mirroredMethodNames = $classmethod(className, "GetOrderedMirroredMethodNames")
+        set sc = ..ExecuteMethodList(module, mirroredMethodNames, className, hostName, instanceName, 1, logFile, verbose, .newStepToApply)
 
-    // Don't run these steps on mirror members that are not primary
-    if '($System.Mirror.IsMember() && '$System.Mirror.IsPrimary()) {
-        set nonMirroredMethodNames = $ClassMethod(className, "GetOrderedNonMirroredMethodNames")
-        do ..ExecuteMethodList(module, nonMirroredMethodNames, className, 0, mirroredHostName, mirroredInstanceName, logFile, verbose, .newStepAdded)
+        // Don't run these steps on mirror members that are not primary (changes to DBs that are RO on non-primary members)
+        if '($system.Mirror.IsMember() && '$system.Mirror.IsPrimary()) {
+            set nonMirroredMethodNames = $classmethod(className, "GetOrderedNonMirroredMethodNames")
+            set sc = ..ExecuteMethodList(module, nonMirroredMethodNames, className, hostName, instanceName, 0, logFile, verbose, .newStepToApply)
+        }
+    } catch (ex) {
+        set sc = ex.AsStatus()
     }
 
-    if verbose { w !, "Releasing lock on ^IPM("_module.Name_", "_version_")" }
-    lock -^IPM(module.Name, version)
-    return $$$OK
+    if verbose {
+        write !, "Releasing lock on ^%IPM.Update("_module.Name_", "_version_")"
+    }
+    $$$UnlockUpdateModuleVersion(module.Name, version)
+
+    quit sc
 }
 
+/// Helper method for ApplyStepsInOrder()
+/// Iterates over a method name list and calls their update steps.
+/// If an update step does not already exist, a new one gets created.
+/// Once reaching the first method that hasn't been run on the instance (no TimeStampEnd value),
+/// newStepToApply gets marked as true to tell us to run all remaining steps in the list
+/// Can carry this over to subsequent calls by passing the newStepToApply variable to those ExecuteMethodList() calls
+/// i.e. We find a new step to apply in the mirroredMethodNames list so we know to execute all steps in the nonMirroredMethodNames list
 ClassMethod ExecuteMethodList(
 	module As %IPM.Storage.Module,
 	methodList As %Library.DynamicArray,
 	className As %String,
+	hostName As %String,
+	instanceName As %String,
 	mirrored As %Boolean,
-	mirroredHostName As %String,
-	mirroredInstanceName As %String,
 	logfile As %Library.File,
 	verbose As %Boolean = 0,
-	ByRef newStepAdded As %Boolean = 0) [ Private ]
+	ByRef newStepToApply As %Boolean = 0) As %Status [ Private ]
 {
-    set iter = methodList.%GetIterator()
-    while iter.%GetNext(, .methodName) {
-        set stepObj = ##class(%IPM.Storage.UpdateStep).GetUpdateStepObject(className, methodName, mirrored, mirroredHostName, mirroredInstanceName)
-        if '$IsObject(stepObj) {
-            set stepObj = module.AddUpdateStep(className, methodName)
+    set sc = $$$OK
+    try {
+        set iter = methodList.%GetIterator()
+        while iter.%GetNext(, .methodName) {
+            set stepObj = ##class(%IPM.Storage.UpdateStep).GetUpdateStep(className, methodName, hostName, instanceName)
+            if '$isobject(stepObj) {
+                set stepObj = module.AddUpdateStep(className, methodName, mirrored)
+            }
+            if 'newStepToApply && 'stepObj.TimeStampEnd {
+                set newStepToApply = 1
+            }
+            if newStepToApply {
+                set stepObj.TimeStampStart = $zdatetime($horolog,3)
+                if verbose {
+                    write !, "Running "_className_"::"_methodName_"()"
+                }
+                set stepObj.Status = $$$OK
+                try {
+                    do $classmethod(className, methodName)
+                    set stepObj.TimeStampEnd = $zdatetime($horolog,3)
+                } catch (ex) {
+                    set stepObj.Status = ex.AsStatus()
+                }
+                // TODO: Logging method status
+                if verbose {
+                    write !, className_"::"_methodName_"() Finished"
+                }
+                $$$ThrowOnError(stepObj.%Save())
+            }
         }
-        if 'newStepAdded && 'stepObj.TimeStampEnd {
-            set newStepAdded = 1
-        }
-        if newStepAdded {
-            set stepObj.TimeStampStart = $zdt($h,3)
-            do stepObj.%Save()
-            if verbose { w !, "Running "_className_"::"_methodName_"()" }
-            set stepObj.Status = $ClassMethod(className, methodName)
-            if verbose { w !, className_"::"_methodName_"() Finished" }
-            // TODO: Logging method status
-            set stepObj.TimeStampEnd = $zdt($h,3)
-            $$$ThrowOnError(stepObj.%Save())
-        }
+    } catch (ex) {
+        set sc = ex.AsStatus()
     }
+    quit sc
 }
 
 ClassMethod LogToFile(
