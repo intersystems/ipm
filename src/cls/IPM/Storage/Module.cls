@@ -85,6 +85,69 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
+Relationship UpdateSteps As %IPM.Storage.UpdateStep(XMLPROJECTION = "NONE") [ Cardinality = many, Inverse = ModuleHome ];
+
+Property UpdatePackage As %String(MAXLEN = 255);
+
+/// Add an update step and connect it to this module via relationship
+Method AddUpdateStep(
+	className As %String,
+	methodName As %String,
+	mirrored As %Boolean) As %IPM.Storage.UpdateStep
+{
+	set newStep = ##class(%IPM.Storage.UpdateStep).%New(className, methodName, mirrored)
+	$$$ThrowOnError(..UpdateSteps.Insert(newStep))
+	$$$ThrowOnError(..%Save())
+	return newStep
+}
+
+/// Seed update steps for all versions prior to the current major version by setting TimeStampEnd to current time
+/// Steps that already have TimeStampEnd defined (already been run) will be skipped
+Method SeedUpdateSteps() As %Status [ Internal ]
+{
+    set sc = $$$OK
+    try {
+        set hostName = ##class(%SYS.System).GetNodeName()
+        set instanceName = ##class(%SYS.System).GetInstanceName()
+
+        for version=1:1:..Version.Major {
+            set className = ..UpdatePackage_".V"_version
+            if '##class(%Dictionary.ClassDefinition).%ExistsId(className) {
+                // TODO: Log that this class is being skipped?
+                continue
+            }
+
+            // Seed MirrorMethodNames steps
+            set mirroredMethodNames = $classmethod(className, "GetOrderedMirroredMethodNames")
+            set iter = mirroredMethodNames.%GetIterator()
+            while iter.%GetNext(, .methodName) {
+                set stepObj = ##class(%IPM.Storage.UpdateStep).GetUpdateStep(className, methodName, hostName, instanceName)
+                // Only seed steps that haven't already been run
+                if 'stepObj.TimeStampEnd {
+                    set stepObj.TimeStampEnd = $zdatetime($horolog,3)
+                    $$$ThrowOnError(stepObj.%Save())
+                }
+            }
+
+            // TODO: Only seed the steps if mirrrored and primary? i.e. Only create the step under same conditions as VersionBase::ApplyStepsInOrder()
+            // Seed NonMirroredMethodNames steps
+            set nonMirroredMethodNames = $classmethod(className, "GetOrderedNonMirroredMethodNames")
+            set iter = nonMirroredMethodNames.%GetIterator()
+            while iter.%GetNext(, .methodName) {
+                set stepObj = ##class(%IPM.Storage.UpdateStep).GetUpdateStep(className, methodName, hostName, instanceName)
+                // Only seed steps that haven't already been run
+                if 'stepObj.TimeStampEnd {
+                    set stepObj.TimeStampEnd = $zdatetime($horolog,3)
+                    $$$ThrowOnError(stepObj.%Save())
+                }
+            }
+        }
+    } catch (ex) {
+        set sc = ex.AsStatus()
+    }
+    quit sc
+}
+
 /// This method iterates over resources of a module and returns a list of objects in the correct order that resources should be processed
 /// Process document resources based on their package depth first, followed by the order things are defined in the module.xml for the rest
 /// e.g. <Resource Name="Depth1.PKG"/> should be processed before <Resource Name="Depth1.Depth2.CLS"/>
@@ -1753,6 +1816,9 @@ Storage Default
 </Value>
 <Value name="28">
 <Value>LastUpdated</Value>
+</Value>
+<Value name="29">
+<Value>UpdatePackage</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>
