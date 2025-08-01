@@ -25,8 +25,8 @@ Method %OnNew(
 	className As %String = "",
 	methodName As %String = "",
 	mirrored As %Boolean = 1,
-	hostName As %String = "",
-	instanceName As %String = "") As %Status
+	mirroredHostName As %String = "",
+	mirroredInstanceName As %String = "") As %Status
 {
     set ..ClassName = className
     set ..MethodName = methodName
@@ -44,11 +44,12 @@ Method %OnNew(
 
 /// Returns %IPM.Storage.UpdateStep object corresponding to unique index in storage table
 /// If object does not exist, this will return an empty object
-ClassMethod GetUpdateStep(
+ClassMethod GetUpdateStepObject(
 	className As %String,
 	methodName As %String,
-	hostName As %String,
-	instanceName As %String) As %IPM.Storage.UpdateStep
+	mirrored As %Boolean,
+	mirroredHostName As %String,
+	mirroredInstanceName As %String) As %IPM.Storage.UpdateStep
 {
     do ..UpdateClassMethodIdxExists(className, methodName, hostName, instanceName, .stepId)
     return ..%OpenId(stepId)

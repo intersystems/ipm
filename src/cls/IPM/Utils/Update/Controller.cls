@@ -7,6 +7,7 @@ Class %IPM.Utils.Update.Controller
 /// Starts with the most dependent module and works its way backwards to the base module we are calling "update" on
 ClassMethod ApplyUpdatesInOrder(
 	module As %IPM.Storage.Module,
+	fromVersion As %String,
 	logFile As %Library.File = "",
 	verbose As %Boolean = 0)
 {

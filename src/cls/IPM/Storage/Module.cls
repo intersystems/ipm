@@ -41,9 +41,9 @@ Property CalculatedResources As list Of %IPM.Storage.ResourceReference(XMLIO = "
 
 Method CalculatedResourcesGet() As %Collection.AbstractListOfObj [ CodeMode = objectgenerator ]
 {
- 	Set tCodeStream = %code
- 	Do ##class(%IPM.Utils.CodeGeneration).BuildRelationshipSorter(tCodeStream, "Resources", "GetSortKey()")
- 	Quit $$$OK
+ 	set tCodeStream = %code
+ 	do ##class(%IPM.Utils.CodeGeneration).BuildRelationshipSorter(tCodeStream, "Resources", "GetSortKey()")
+ 	quit $$$OK
 }
 
 Relationship Mappings As %IPM.Storage.MappingReference(XMLITEMNAME = "Mapping", XMLPROJECTION = "WRAPPED", XMLREFERENCE = "COMPLETE") [ Cardinality = children, Inverse = Module ];
@@ -65,7 +65,7 @@ Property Lifecycle As %IPM.Lifecycle.Base(XMLPROJECTION = "NONE") [ Transient ];
 
 Property Hash As %Binary(ForceCodeGenerate = 0, XMLPROJECTION = "NONE");
 
-Property LastModifiedTimestamp As %TimeStamp(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ InitialExpression = {$ZDateTime($Horolog,3)} ];
+Property LastModifiedTimestamp As %TimeStamp(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ InitialExpression = {$zdatetime($horolog,3)} ];
 
 /// Root directory on the filesystem from which this module was loaded.
 Property Root As %String(ForceCodeGenerate = 0, MAXLEN = "", XMLPROJECTION = "NONE");
@@ -89,11 +89,10 @@ Relationship UpdateSteps As %IPM.Storage.UpdateStep(XMLPROJECTION = "NONE") [ Ca
 
 Property UpdatePackage As %String(MAXLEN = 255);
 
-/// Add an update step and connect it to this module via relationship
+/// Add an update step and connect it to this module
 Method AddUpdateStep(
 	className As %String,
-	methodName As %String,
-	mirrored As %Boolean) As %IPM.Storage.UpdateStep
+	methodName As %String) As %IPM.Storage.UpdateStep
 {
 	set newStep = ##class(%IPM.Storage.UpdateStep).%New(className, methodName, mirrored)
 	$$$ThrowOnError(..UpdateSteps.Insert(newStep))
@@ -150,41 +149,41 @@ Method SeedUpdateSteps() As %Status [ Internal ]
 
 Method HaveToDeploy() As %Boolean
 {
-	Set deploy = 0
-	Set key = ""
-	For {
-		Set ref = ..Resources.GetNext(.key)
-		Quit:key=""
-		Set deploy = +ref.Deploy
-		Quit:deploy
+	set deploy = 0
+	set key = ""
+	for {
+		set ref = ..Resources.GetNext(.key)
+		quit:key=""
+		set deploy = +ref.Deploy
+		quit:deploy
 	}
-	Quit ''deploy
+	quit ''deploy
 }
 
 ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set pModuleName = $$$lcase(pModuleName)
-		Set tModule = ..NameOpen(pModuleName,,.tSC)
-		If '$isobject(tModule) {
+	set tSC = $$$OK
+	try {
+		set pModuleName = $$$lcase(pModuleName)
+		set tModule = ..NameOpen(pModuleName,,.tSC)
+		if '$isobject(tModule) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError, "Module '"_pModuleName_"' not found."))
 		}
 		$$$ThrowOnError(tSC)
 
-		If ($IsObject(tModule.SystemRequirements)) {
+		if ($isobject(tModule.SystemRequirements)) {
 			$$$ThrowOnError(tModule.SystemRequirements.CheckRequirements())
 		}
-	} Catch ex {
-		Set tSC = ex.AsStatus()
+	} catch ex {
+		set tSC = ex.AsStatus()
 	}
-	Return tSC
+	return tSC
 }
 
 Method WriteAfterInstallMessage()
 {
-	If ..AfterInstallMessage '= "" {
-		Write !,..%Evaluate(..AfterInstallMessage),!
+	if ..AfterInstallMessage '= "" {
+		write !,..%Evaluate(..AfterInstallMessage),!
 	}
 }
 
@@ -195,43 +194,43 @@ Method CompareWithRelationships(
 	pIgnorePropertyList As %Library.List = "",
 	Output pDifferingPropertyArray As %Library.List) As %Boolean
 {
-	Kill pDifferingPropertyArray
-	Set isEqual = ..%CompareTo(pModuleObj, pIgnorePropertyList, .pDifferingPropertyArray)
+	kill pDifferingPropertyArray
+	set isEqual = ..%CompareTo(pModuleObj, pIgnorePropertyList, .pDifferingPropertyArray)
 	// Mappings
-	If '$ListFind(pIgnorePropertyList, "Mappings") {
-		Set count1 = ..Mappings.Count()
-		Set count2 = pModuleObj.Mappings.Count()
-		If (count1 '= count2) {
-			Set pDifferingPropertyArray("Mappings") = $ListBuild(count1, count2)
-		} Else {
-			For i=1:1:..Mappings.Count() {
-				Set item1 = ..Mappings.GetAt(i)
-				Set item2 = pModuleObj.Mappings.GetAt(i)
-				Set isEqual = item1.%CompareTo(item2, , .diffInfo)
-				If 'isEqual {
-					Merge pDifferingPropertyArray("Mappings", i) = diffInfo
+	if '$listfind(pIgnorePropertyList, "Mappings") {
+		set count1 = ..Mappings.Count()
+		set count2 = pModuleObj.Mappings.Count()
+		if (count1 '= count2) {
+			set pDifferingPropertyArray("Mappings") = $listbuild(count1, count2)
+		} else {
+			for i=1:1:..Mappings.Count() {
+				set item1 = ..Mappings.GetAt(i)
+				set item2 = pModuleObj.Mappings.GetAt(i)
+				set isEqual = item1.%CompareTo(item2, , .diffInfo)
+				if 'isEqual {
+					merge pDifferingPropertyArray("Mappings", i) = diffInfo
 				}
 			}
 		}
 	}
 	// Resources
-	If '$ListFind(pIgnorePropertyList, "Resources") {
-		Set count1 = ..Resources.Count()
-		Set count2 = pModuleObj.Resources.Count()
-		If (count1 '= count2) {
-			Set pDifferingPropertyArray("Resources") = $ListBuild(count1, count2)
-		} Else {
-			For i=1:1:..Resources.Count() {
-				Set item1 = ..Resources.GetAt(i)
-				Set item2 = pModuleObj.Resources.GetAt(i)
-				Set isEqual = item1.%CompareTo(item2, , .diffInfo)
-				If 'isEqual {
-					Merge pDifferingPropertyArray("Resources", i) = diffInfo
+	if '$listfind(pIgnorePropertyList, "Resources") {
+		set count1 = ..Resources.Count()
+		set count2 = pModuleObj.Resources.Count()
+		if (count1 '= count2) {
+			set pDifferingPropertyArray("Resources") = $listbuild(count1, count2)
+		} else {
+			for i=1:1:..Resources.Count() {
+				set item1 = ..Resources.GetAt(i)
+				set item2 = pModuleObj.Resources.GetAt(i)
+				set isEqual = item1.%CompareTo(item2, , .diffInfo)
+				if 'isEqual {
+					merge pDifferingPropertyArray("Resources", i) = diffInfo
 				}
 			}
 		}
 	}
-	Return isEqual
+	return isEqual
 }
 
 /// Returns a multidimensional array of custom phases defined by the module's invokes,
@@ -240,29 +239,29 @@ Method CompareWithRelationships(
 /// Return the phases in lower case for case-insensitive lookup.
 Method GetCustomPhases(Output pPhases)
 {
-    Kill pPhases
-    Set pPhases = ""
-    Set key = ""
-    For {
-        Set tInvoke = ..Invokes.GetNext(.key)
-		If key = "" {
-			Quit
+    kill pPhases
+    set pPhases = ""
+    set key = ""
+    for {
+        set tInvoke = ..Invokes.GetNext(.key)
+		if key = "" {
+			quit
 		}
-        If (tInvoke.CustomPhase '= "") {
-            Set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
+        if (tInvoke.CustomPhase '= "") {
+            set pPhases($$$lcase(tInvoke.CustomPhase)) = tInvoke.CustomPhase
         }
     }
-	For {
-		Set tResource = ..Resources.GetNext(.key)
-		If key = "" {
-			Quit
+	for {
+		set tResource = ..Resources.GetNext(.key)
+		if key = "" {
+			quit
 		}
-		Set tProcessor = tResource.Processor
+		set tProcessor = tResource.Processor
 		// %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
-		If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
-			Set cp = tProcessor.CustomPhase
-			If cp '= "" {
-				Set pPhases($$$lcase(cp)) = cp
+		if $isobject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+			set cp = tProcessor.CustomPhase
+			if cp '= "" {
+				set pPhases($$$lcase(cp)) = cp
 			}
 		}
 	}
@@ -277,246 +276,246 @@ ClassMethod ExecutePhases(
 	pIsComplete As %Boolean = 0,
 	ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tVerbose = $Get(pParams("Verbose"),0)
-		Set tModule = ..NameOpen(pModuleName,,.tSC)
-		If '$Isobject(tModule) {
-			Set tModule = ..ExternalNameOpen(pModuleName,,.tSC)
+	set tSC = $$$OK
+	try {
+		set tVerbose = $get(pParams("Verbose"),0)
+		set tModule = ..NameOpen(pModuleName,,.tSC)
+		if '$isobject(tModule) {
+			set tModule = ..ExternalNameOpen(pModuleName,,.tSC)
 		}
-		If '$Isobject(tModule) {	
+		if '$isobject(tModule) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' not found.", pModuleName)))
 		}
 		$$$ThrowOnError(tSC)
 
 		// Regardless of whether the module was opened by name or external name, we want to use the name for the rest of the method.
-		Set pModuleName = tModule.Name
-		
+		set pModuleName = tModule.Name
+
 		// Ensure we reload and reinitialize transient properties.
 		// For example, prevents reuse of a previous OverrideLifecycleClass if the module object is in memory in the caller.
-		Set tSC = tModule.%Reload()
+		set tSC = tModule.%Reload()
 		$$$ThrowOnError(tSC)
-		
+
 		// Allow per-command customization of root directory
 		// Useful primarily for non-module packaging installation
-		If $Data(pParams("RootDirectory"),tRoot) {
-			Set tModule.Root = tRoot
+		if $data(pParams("RootDirectory"),tRoot) {
+			set tModule.Root = tRoot
 		}
-		
+
 		// Permit override of lifecycle class as either a class name or a file containing a lifecycle class (and possibly other bundled/related resources)
-		If $Data(pParams("LifecycleObject"), tLifeCycle) # 2 {
-			Set tModule.Lifecycle = tLifeCycle
-		} ElseIf $Data(pParams("Lifecycle"),tLifecycle) && ($Get(tLifecycle) '= "") {
-			If $$$comClassDefined(tLifecycle) {
-				Set tModule.OverrideLifecycleClass = tLifecycle
-			} ElseIf $$$comClassDefined($$$DefaultLifecyclePackageDot_tLifecycle) {
-				Set tModule.OverrideLifecycleClass = $$$DefaultLifecyclePackageDot_tLifecycle
-			} ElseIf ##class(%Library.File).Exists(tLifecycle) {
-				Set tSC = $System.OBJ.Load(tLifecycle,"k"_$Select(tVerbose:"d",1:"-d"),,.tLoadedList)
+		if $data(pParams("LifecycleObject"), tLifeCycle) # 2 {
+			set tModule.Lifecycle = tLifeCycle
+		} elseif $data(pParams("Lifecycle"),tLifecycle) && ($get(tLifecycle) '= "") {
+			if $$$comClassDefined(tLifecycle) {
+				set tModule.OverrideLifecycleClass = tLifecycle
+			} elseif $$$comClassDefined($$$DefaultLifecyclePackageDot_tLifecycle) {
+				set tModule.OverrideLifecycleClass = $$$DefaultLifecyclePackageDot_tLifecycle
+			} elseif ##class(%Library.File).Exists(tLifecycle) {
+				set tSC = $system.OBJ.Load(tLifecycle,"k"_$select(tVerbose:"d",1:"-d"),,.tLoadedList)
 				$$$ThrowOnError(tSC)
-				Set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoadedList)
+				set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoadedList)
 				$$$ThrowOnError(tSC)
-				Set tLoadedList = $ListFromString(tLoadedList)
-				Set tLifecycleClassFound = 0
-				Set tPointer = 0
-				While $ListNext(tLoadedList,tPointer,tLoadedItem) {
-					Set tClass = $Piece(tLoadedItem,".cls",1,*-1)
-					If (tClass '= "") && $$$comClassDefined(tClass) && $ClassMethod(tClass,"%Extends",$$$DefaultLifecyclePackageDot_"Base") {
-						Set tLifecycleClassFound = 1
-						Set tModule.OverrideLifecycleClass = tClass
+				set tLoadedList = $listfromstring(tLoadedList)
+				set tLifecycleClassFound = 0
+				set tPointer = 0
+				while $listnext(tLoadedList,tPointer,tLoadedItem) {
+					set tClass = $piece(tLoadedItem,".cls",1,*-1)
+					if (tClass '= "") && $$$comClassDefined(tClass) && $classmethod(tClass,"%Extends",$$$DefaultLifecyclePackageDot_"Base") {
+						set tLifecycleClassFound = 1
+						set tModule.OverrideLifecycleClass = tClass
 					}
 				}
-				If 'tLifecycleClassFound {
-					Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("File '%1' did not contain a valid lifecycle class.",tLifecycle))
+				if 'tLifecycleClassFound {
+					set tSC = $$$ERROR($$$GeneralError,$$$FormatText("File '%1' did not contain a valid lifecycle class.",tLifecycle))
 					$$$ThrowStatus(tSC)
 				}
-			} Else {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("'%1' is neither a valid filename nor a valid lifecycle class name.",tLifecycle))
+			} else {
+				set tSC = $$$ERROR($$$GeneralError,$$$FormatText("'%1' is neither a valid filename nor a valid lifecycle class name.",tLifecycle))
 				$$$ThrowStatus(tSC)
 			}
-			
+
 			// Note: this is used later if the module object is reloaded.
-			Set tOverrideClass = $Classname(tModule.Lifecycle)
-			If tVerbose {
-				Write !,"Using lifecycle class ",tOverrideClass,"; override class is "_tModule.OverrideLifecycleClass
+			set tOverrideClass = $classname(tModule.Lifecycle)
+			if tVerbose {
+				write !,"Using lifecycle class ",tOverrideClass,"; override class is "_tModule.OverrideLifecycleClass
 			}
 		}
-		
-		Set tLifecycle = tModule.Lifecycle
-  
-		If pIsComplete {
-			Set tPhases = tLifecycle.GetCompletePhases(pPhases)
-			If (($ListFind(tPhases, "Package") || $ListFind(tPhases, "Publish")) && tModule.HaveToDeploy() && tModule.DeveloperMode) {
-				Set tPhases = $ListBuild("PrepareDeploy") _ tPhases
+
+		set tLifecycle = tModule.Lifecycle
+
+		if pIsComplete {
+			set tPhases = tLifecycle.GetCompletePhases(pPhases)
+			if (($listfind(tPhases, "Package") || $listfind(tPhases, "Publish")) && tModule.HaveToDeploy() && tModule.DeveloperMode) {
+				set tPhases = $listbuild("PrepareDeploy") _ tPhases
 			}
-		} Else {
-			Set tPhases = $ListBuild(##class(%IPM.Lifecycle.Base).MatchSinglePhase($LISTTOSTRING(pPhases)))
+		} else {
+			set tPhases = $listbuild(##class(%IPM.Lifecycle.Base).MatchSinglePhase($listtostring(pPhases)))
 		}
-		
+
 		// Lifecycle-provided default parameters
-		Do tLifecycle.GetDefaultParameters(.tParams, tPhases)
-		
+		do tLifecycle.GetDefaultParameters(.tParams, tPhases)
+
 		// Module manifest Defaults/Parameter default parameters
-		Do tModule.GetDefaultParameters(.tModuleParams)
-		Merge tParams = tModuleParams
-		
+		do tModule.GetDefaultParameters(.tModuleParams)
+		merge tParams = tModuleParams
+
 		// Overwrite with actual specified parameters
-		Merge tParams = pParams
-		
+		merge tParams = pParams
+
 		// Move back to pParams
-		Kill pParams
-		Merge pParams = tParams
-		
+		kill pParams
+		merge pParams = tParams
+
 		// Report timing subject to parameter; overall timing if only one phase has yet been tracked in context
 		// (e.g., set up in multithreaded load) and more than one phase is to be executed.
-		Set tTiming = $Get(pParams("Timing"),0)
-		Set tOverallTiming = tTiming && ($ListLength(tPhases) > 1) && ($ListLength($Get($$$ZPMHandledModules($Namespace,pModuleName))) < 2)
-		
+		set tTiming = $get(pParams("Timing"),0)
+		set tOverallTiming = tTiming && ($listlength(tPhases) > 1) && ($listlength($get($$$ZPMHandledModules($namespace,pModuleName))) < 2)
+
 		// Subscript by namespace to handle application build and integration testing processes, which may
 		// load a module in a different namespace (and call ExecutePhases there) at a lower stack level than the
 		// initial call to ExecutePhases
-		If '$Data($$$ZPMHandledModules($Namespace)) {
-			New $$$ZPMHandledModules
-		} Else {
-			Set $$$ZPMHandledModules($Namespace,pModuleName) = $Get($$$ZPMHandledModules($Namespace,pModuleName))_tPhases
+		if '$data($$$ZPMHandledModules($namespace)) {
+			new $$$ZPMHandledModules
+		} else {
+			set $$$ZPMHandledModules($namespace,pModuleName) = $get($$$ZPMHandledModules($namespace,pModuleName))_tPhases
 		}
-		
+
 		// Execute resolved phases in sequence
-		Set tLifecycle.PhaseList = tPhases
-		Set tPointer = 0
-		Set tFullStart = $zh
-		Do tModule.GetCustomPhases(.tCustomPhases)
-		While $ListNext(tPhases,tPointer,tOnePhase) {
-            Set tIsCustomPhase = $Data(tCustomPhases($$$lcase(tOnePhase)), tNormalizedPhaseName) # 2
-			If tIsCustomPhase {
-				Set tOnePhase = tNormalizedPhaseName
+		set tLifecycle.PhaseList = tPhases
+		set tPointer = 0
+		set tFullStart = $zhorolog
+		do tModule.GetCustomPhases(.tCustomPhases)
+		while $listnext(tPhases,tPointer,tOnePhase) {
+            set tIsCustomPhase = $data(tCustomPhases($$$lcase(tOnePhase)), tNormalizedPhaseName) # 2
+			if tIsCustomPhase {
+				set tOnePhase = tNormalizedPhaseName
 			}
-			Set tStart = $zh
-			If tOnePhase="*" {
-				Kill tModule,tLifecycle
-				Set tModule = ..NameOpen(pModuleName,,.tSC)
+			set tStart = $zhorolog
+			if tOnePhase="*" {
+				kill tModule,tLifecycle
+				set tModule = ..NameOpen(pModuleName,,.tSC)
 				$$$ThrowOnError(tSC)
-				If ($Get(tOverrideClass) '= "") {
-					Set tModule.OverrideLifecycleClass = tOverrideClass
+				if ($get(tOverrideClass) '= "") {
+					set tModule.OverrideLifecycleClass = tOverrideClass
 				}
-				Set tLifecycle = tModule.Lifecycle
-				Set tLifecycle.PhaseList = tPhases
-				Write !,"["_tModule.DisplayName_"]",$c(9),"Module object refreshed."
-				Continue
+				set tLifecycle = tModule.Lifecycle
+				set tLifecycle.PhaseList = tPhases
+				write !,"["_tModule.DisplayName_"]",$char(9),"Module object refreshed."
+				continue
 			}
-			
-			Set tSC = $$$OK
-			Try {
-				Write !,"["_$Namespace_"|"_tModule.DisplayName_"]",$c(9),tOnePhase," START"
+
+			set tSC = $$$OK
+			try {
+				write !,"["_$namespace_"|"_tModule.DisplayName_"]",$char(9),tOnePhase," START"
 				// for the reload phase, print root from which module is being loaded
-				If tOnePhase = "Reload" {
-					Write " ("_tModule.Root_")"
+				if tOnePhase = "Reload" {
+					write " ("_tModule.Root_")"
 				}
-				
+
 				// Notify source control (no-op if not configured)
-				Set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnBeforePhase(tModule,tOnePhase,.pParams)
+				set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnBeforePhase(tModule,tOnePhase,.pParams)
 				$$$ThrowOnError(tSC)
 				$$$ThrowOnError(tLifecycle.OnBeforeResourceProcessing(tOnePhase, .pParams))
 				// Notify resource processors
-				Set tKey = ""
-				For {
+				set tKey = ""
+				for {
 					#dim tResource As %IPM.Storage.ResourceReference
-					Set tResource = tModule.Resources.GetNext(.tKey)
-					If (tKey = "") {
-						Quit
+					set tResource = tModule.Resources.GetNext(.tKey)
+					if (tKey = "") {
+						quit
 					}
-					If $IsObject(tResource.Processor) {
-            			Do tResource.Processor.SetParams(.pParams)
-						Set tSC = $Method(tResource.Processor,"OnBeforePhase",tOnePhase,.pParams)
+					if $isobject(tResource.Processor) {
+            			do tResource.Processor.SetParams(.pParams)
+						set tSC = $method(tResource.Processor,"OnBeforePhase",tOnePhase,.pParams)
 						$$$ThrowOnError(tSC)
 					}
 				}
 
         #; Call Invoke Methods Before Phase
-        Set tKey = ""
-        For {
-          Set tInvoke = tModule.Invokes.GetNext(.tKey)
-          Quit:(tKey = "")
-          Set tSC = tInvoke.OnBeforePhase(tOnePhase,.pParams)
-          Quit:$$$ISERR(tSC)
+        set tKey = ""
+        for {
+          set tInvoke = tModule.Invokes.GetNext(.tKey)
+          quit:(tKey = "")
+          set tSC = tInvoke.OnBeforePhase(tOnePhase,.pParams)
+          quit:$$$ISERR(tSC)
         }
-        Quit:$$$ISERR(tSC)
+        quit:$$$ISERR(tSC)
 
-        If tIsCustomPhase {
-            Set tKey = ""
-            For {
-                Set tResource = tModule.Resources.GetNext(.tKey)
-                If tKey = "" {
-                    Quit
+        if tIsCustomPhase {
+            set tKey = ""
+            for {
+                set tResource = tModule.Resources.GetNext(.tKey)
+                if tKey = "" {
+                    quit
                 }
-                Set tProcessor = tResource.Processor
+                set tProcessor = tResource.Processor
                 // %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
-                If $IsObject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+                if $isobject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
                     $$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
                 }
             }
-        } Else {
+        } else {
             // Lifecycle before / (phase) / after
-			New $$$DeployedProjectInstalled
+			new $$$DeployedProjectInstalled
             $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
-            $$$ThrowOnError($Method(tLifecycle,"%"_tOnePhase,.pParams))
+            $$$ThrowOnError($method(tLifecycle,"%"_tOnePhase,.pParams))
             $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
         }
 
-        #; Call Invoke Methods After Phase	
-        Set tKey = ""
-        For {
-          Set tInvoke = tModule.Invokes.GetNext(.tKey)
-          If (tKey = "") || '$IsObject(tInvoke) {
-            Quit // '$IsObject can happen reasonably after namespace changes
+        #; Call Invoke Methods After Phase
+        set tKey = ""
+        for {
+          set tInvoke = tModule.Invokes.GetNext(.tKey)
+          if (tKey = "") || '$isobject(tInvoke) {
+            quit // '$IsObject can happen reasonably after namespace changes
           }
-          Set tSC = tInvoke.OnAfterPhase(tOnePhase,.pParams)
-          Quit:$$$ISERR(tSC)
+          set tSC = tInvoke.OnAfterPhase(tOnePhase,.pParams)
+          quit:$$$ISERR(tSC)
         }
-        Quit:$$$ISERR(tSC)
+        quit:$$$ISERR(tSC)
 
 				// Notify resource processors
-				Set tKey=""
-				For {
-					Set tResource = tModule.Resources.GetNext(.tKey)
-					If (tKey = "") {
-						Quit
-					}		
-					If $IsObject(tResource.Processor) {
-            Do tResource.Processor.SetParams(.pParams)
-						Set tSC = $Method(tResource.Processor,"OnAfterPhase",tOnePhase,.pParams)
+				set tKey=""
+				for {
+					set tResource = tModule.Resources.GetNext(.tKey)
+					if (tKey = "") {
+						quit
+					}
+					if $isobject(tResource.Processor) {
+            do tResource.Processor.SetParams(.pParams)
+						set tSC = $method(tResource.Processor,"OnAfterPhase",tOnePhase,.pParams)
 						$$$ThrowOnError(tSC)
 					}
 				}
 				///Works after resource processing
 				$$$ThrowOnError(tLifecycle.OnAfterResourceProcessing(tOnePhase, .pParams))
 				// Notify source control (no-op if not configured)
-				Set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnAfterPhase(tModule,tOnePhase,.pParams)
+				set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnAfterPhase(tModule,tOnePhase,.pParams)
 				$$$ThrowOnError(tSC)
-			} Catch e {
-				Set tSC = e.AsStatus()
+			} catch e {
+				set tSC = e.AsStatus()
 			}
-			
-			If $$$ISERR(tSC) {
-				Write !,"["_tModule.DisplayName_"]",$c(9),tOnePhase," FAILURE"
+
+			if $$$ISERR(tSC) {
+				write !,"["_tModule.DisplayName_"]",$char(9),tOnePhase," FAILURE"
 			} else {
-				Write !,"["_$Namespace_"|"_tModule.DisplayName_"]",$c(9),tOnePhase," SUCCESS"
+				write !,"["_$namespace_"|"_tModule.DisplayName_"]",$char(9),tOnePhase," SUCCESS"
 			}
-			If tTiming {
-				Write " ("_($zh-tStart)_" s)"
+			if tTiming {
+				write " ("_($zhorolog-tStart)_" s)"
 			}
 			$$$ThrowOnError(tSC)
 		}
-		If tOverallTiming {
-			Write !,"["_tModule.DisplayName_"]",$c(9),"(total time: ",($zh-tFullStart)," s)"
+		if tOverallTiming {
+			write !,"["_tModule.DisplayName_"]",$char(9),"(total time: ",($zhorolog-tFullStart)," s)"
 		}
 	} catch e {
 		set tSC = e.AsStatus()
 	}
-	If $$$ISERR(tSC),$Data(pParams("PackageDeployNamespace"),tPackageDeployNamespace),tPackageDeployNamespace'="" {
-  Set $Namespace = $Get(pParams("InitNamespace"))
-		Do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
-		Kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
+	if $$$ISERR(tSC),$data(pParams("PackageDeployNamespace"),tPackageDeployNamespace),tPackageDeployNamespace'="" {
+  set $namespace = $get(pParams("InitNamespace"))
+		do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
+		kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
 	}
 	quit tSC
 }
@@ -532,87 +531,87 @@ ClassMethod Uninstall(
 	pRecurse As %Boolean = 0,
 	ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Merge tParams = pParams
-		Set tParams("Clean","Level") = 1 // Simulate clean of module as dependency.
-		Set tParams("Clean","Force") = pForce
-		Set tParams("Clean","Recurse") = pRecurse
-		Set tSC = ##class(%IPM.Storage.Module).ExecutePhases(pModuleName,$ListBuild("Clean"),,.tParams)
-	} Catch e {
-		Set tSC = e.AsStatus()
+	set tSC = $$$OK
+	try {
+		merge tParams = pParams
+		set tParams("Clean","Level") = 1 // Simulate clean of module as dependency.
+		set tParams("Clean","Force") = pForce
+		set tParams("Clean","Recurse") = pRecurse
+		set tSC = ##class(%IPM.Storage.Module).ExecutePhases(pModuleName,$listbuild("Clean"),,.tParams)
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
 Method GetNamespaceConfig(ByRef pCheckedModules) As %IPM.Storage.ModuleSetting.NamespaceConfig
 {
-	Set tNSConfig = ##class(%IPM.Storage.ModuleSetting.NamespaceConfig).%New()
-	
+	set tNSConfig = ##class(%IPM.Storage.ModuleSetting.NamespaceConfig).%New()
+
 	// See if this module has any settings.
-	Set tCount = ..Defaults.Count()
-	For tDefaultIndex = 1:1:tCount {
-		Set tDefault = ..Defaults.GetAt(tDefaultIndex)
-		If (tDefault.%IsA("%IPM.Storage.ModuleSetting.NamespaceConfig")) {
-			Set tNSConfig = tDefault
-			Quit
+	set tCount = ..Defaults.Count()
+	for tDefaultIndex = 1:1:tCount {
+		set tDefault = ..Defaults.GetAt(tDefaultIndex)
+		if (tDefault.%IsA("%IPM.Storage.ModuleSetting.NamespaceConfig")) {
+			set tNSConfig = tDefault
+			quit
 		}
 	}
-	
+
 	// Recursively merge in settings from installed dependencies.
-	Set tDependencyKey = ""
-	For {
+	set tDependencyKey = ""
+	for {
 		#dim tDependency As %IPM.Storage.ModuleReference
-		Set tDependency = ..Dependencies.GetNext(.tDependencyKey)
-		If (tDependencyKey = "") {
-			Quit
+		set tDependency = ..Dependencies.GetNext(.tDependencyKey)
+		if (tDependencyKey = "") {
+			quit
 		}
-		
-		If $Data(pCheckedModules(tDependency.Name)) {
-			Continue
+
+		if $data(pCheckedModules(tDependency.Name)) {
+			continue
 		}
-		Set pCheckedModules(tDependency.Name) = ""
-		
+		set pCheckedModules(tDependency.Name) = ""
+
 		// If installed...
-		If ..NameExists(tDependency.Name,.tID) {
-			Set tModule = ..%OpenId(tID,,.tSC)
+		if ..NameExists(tDependency.Name,.tID) {
+			set tModule = ..%OpenId(tID,,.tSC)
 			$$$ThrowOnError(tSC)
-			
-			Do tNSConfig.MergeFrom(tModule.GetNamespaceConfig(.pCheckedModules))
+
+			do tNSConfig.MergeFrom(tModule.GetNamespaceConfig(.pCheckedModules))
 		}
 	}
-	Quit tNSConfig
+	quit tNSConfig
 }
 
 Method GetDefaultParameters(Output pParams)
 {
-	Set tReferenceLifecycle = $ClassName(..Lifecycle)
-	Set tDefaultKey = ""
-	For {
-		Set tDefault = ..Defaults.GetNext(.tDefaultKey)
-		If (tDefaultKey = "") {
-			Quit
+	set tReferenceLifecycle = $classname(..Lifecycle)
+	set tDefaultKey = ""
+	for {
+		set tDefault = ..Defaults.GetNext(.tDefaultKey)
+		if (tDefaultKey = "") {
+			quit
 		}
-		If tDefault.%IsA("%IPM.Storage.ModuleSetting.Parameter") {
+		if tDefault.%IsA("%IPM.Storage.ModuleSetting.Parameter") {
 			#dim tDefault As %IPM.Storage.ModuleSetting.Parameter
-			
+
 			// Filter out defaults for other lifecycle classes
-			If (tDefault.LifecycleClass '= "") {
-				If '((tDefault.LifecycleClass = tReferenceLifecycle) || ($$$DefaultLifecyclePackageDot_tDefault.LifecycleClass = tReferenceLifecycle)) {
-					Continue
+			if (tDefault.LifecycleClass '= "") {
+				if '((tDefault.LifecycleClass = tReferenceLifecycle) || ($$$DefaultLifecyclePackageDot_tDefault.LifecycleClass = tReferenceLifecycle)) {
+					continue
 				}
 			}
-			
+
 			// Convert "."-delimited pieces to subscripts in pParams
-			Set tPieces = $ListFromString(tDefault.Name,".")
-			Set tValue = tDefault.Value
-			For tSubscript=$ListLength(tPieces):-1:1 {
-				Kill tData
-				Merge tData($ListGet(tPieces,tSubscript)) = tValue
-				Kill tValue
-				Merge tValue = tData
+			set tPieces = $listfromstring(tDefault.Name,".")
+			set tValue = tDefault.Value
+			for tSubscript=$listlength(tPieces):-1:1 {
+				kill tData
+				merge tData($listget(tPieces,tSubscript)) = tValue
+				kill tValue
+				merge tValue = tData
 			}
-			Merge pParams = tValue
+			merge pParams = tValue
 		}
 	}
 }
@@ -622,82 +621,82 @@ ClassMethod HasScope(
 	pPhases As %List,
 	pScope As %String) [ Private ]
 {
-	If (pScope = "") {
-		Quit 1
+	if (pScope = "") {
+		quit 1
 	}
-	Set tPhases = $ZConvert(pPhases, "L")
-	If $ListValid(pScope) {
+	set tPhases = $zconvert(pPhases, "L")
+	if $listvalid(pScope) {
 		// Iterate through each item in pScope list
-		Set pointer = 0
-		While $ListNext(pScope, pointer, scopeItem) {
-			If $ListFind(tPhases, $ZConvert(scopeItem, "L")) {
-				Return 1
+		set pointer = 0
+		while $listnext(pScope, pointer, scopeItem) {
+			if $listfind(tPhases, $zconvert(scopeItem, "L")) {
+				return 1
 			}
 		}
-		Quit 0
+		quit 0
 	}
 	// Single string
-	Set scopeItem = $ZConvert(pScope, "L")
-	Quit $ListFind(tPhases, scopeItem) > 0
+	set scopeItem = $zconvert(pScope, "L")
+	quit $listfind(tPhases, scopeItem) > 0
 }
 
 Method LoadDependencies(
 	pPhaseList As %List,
 	ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tVerbose = $Get(pParams("Verbose"))
-		
-		If '$Data(pParams("qstruct")) {
-			Set qstruct = "ck"_$Select(tVerbose:"d",1:"-d")
-		} Else {
-			Merge qstruct = pParams("qstruct")
+	set tSC = $$$OK
+	try {
+		set tVerbose = $get(pParams("Verbose"))
+
+		if '$data(pParams("qstruct")) {
+			set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
+		} else {
+			merge qstruct = pParams("qstruct")
 		}
-		
+
 		// Resolve and validate dependencies
-		Set tReloadSnapshots = +$Get(pParams("UpdateSnapshots"))
-		Set tPermitDowngrade = +$Get(pParams("PermitDowngrade"))
-		Set tSC = ..BuildDependencyGraph(.tDependencyGraph,,tReloadSnapshots,.qstruct,pPhaseList,,,,,,tPermitDowngrade)
-		If $$$ISERR(tSC) {
-			Quit
+		set tReloadSnapshots = +$get(pParams("UpdateSnapshots"))
+		set tPermitDowngrade = +$get(pParams("PermitDowngrade"))
+		set tSC = ..BuildDependencyGraph(.tDependencyGraph,,tReloadSnapshots,.qstruct,pPhaseList,,,,,,tPermitDowngrade)
+		if $$$ISERR(tSC) {
+			quit
 		}
-		
-		If $Data(tDependencyGraph) {
-			Set tOptimizeInstalled = 'tReloadSnapshots
-			Write:tVerbose !,"Dependencies:"
-			Set tModuleLoop = ""
-			For {
-				Set tModuleLoop = $Order(tDependencyGraph(tModuleLoop),1,tValue)
-				Quit:tModuleLoop=""
-				
-				If (tOptimizeInstalled) && '$Data($$$ZPMHandledModules($Namespace,tModuleLoop)) {
+
+		if $data(tDependencyGraph) {
+			set tOptimizeInstalled = 'tReloadSnapshots
+			write:tVerbose !,"Dependencies:"
+			set tModuleLoop = ""
+			for {
+				set tModuleLoop = $order(tDependencyGraph(tModuleLoop),1,tValue)
+				quit:tModuleLoop=""
+
+				if (tOptimizeInstalled) && '$data($$$ZPMHandledModules($namespace,tModuleLoop)) {
 					// Optimize for exact version matches that are already installed.
-					If ##class(%IPM.Storage.Module).NameExists(tModuleLoop) {
-						Set tMod = ##class(%IPM.Storage.Module).NameOpen(tModuleLoop,,.tSC)
+					if ##class(%IPM.Storage.Module).NameExists(tModuleLoop) {
+						set tMod = ##class(%IPM.Storage.Module).NameOpen(tModuleLoop,,.tSC)
 						$$$ThrowOnError(tSC)
-						If (tMod.VersionString = $ListGet(tValue,3)) {
-							Set $List(tValue,2) = ""
-							Set $List(tDependencyGraph(tModuleLoop),2) = ""
+						if (tMod.VersionString = $listget(tValue,3)) {
+							set $list(tValue,2) = ""
+							set $list(tDependencyGraph(tModuleLoop),2) = ""
 						}
 					}
 				}
-				
-				Set tServer = $Case($ListGet(tValue,2),"":" (installed)",:" @ "_$ListGet(tValue,2))
-				Write:tVerbose !,tModuleLoop," ",$ListGet(tValue,3),tServer
+
+				set tServer = $case($listget(tValue,2),"":" (installed)",:" @ "_$listget(tValue,2))
+				write:tVerbose !,tModuleLoop," ",$listget(tValue,3),tServer
 			}
-		
+
 			// Download dependencies.
-			Kill tParams
-			Merge tParams("qstruct") = qstruct
-			Merge tParams = pParams
-			Set tSC = ##class(%IPM.Utils.Module).LoadDependencies(.tDependencyGraph,.tParams)
-			If $$$ISERR(tSC) { Quit }
+			kill tParams
+			merge tParams("qstruct") = qstruct
+			merge tParams = pParams
+			set tSC = ##class(%IPM.Utils.Module).LoadDependencies(.tDependencyGraph,.tParams)
+			if $$$ISERR(tSC) { quit }
 		}
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
 Method BuildDependencyGraph(
@@ -708,7 +707,7 @@ Method BuildDependencyGraph(
 	pPhases As %String = "",
 	ByRef pSubModules,
 	pPass As %Integer = 1,
-	pModulePath As %List = {$ListBuild(..Name)},
+	pModulePath As %List = {$listbuild(..Name)},
 	pIgnoreInstalledModules As %Boolean = 0,
 	pKnownDependencies As %List = {..GetKnownDependencies(..Name)},
 	pPermitDowngrade As %Boolean = 0,
@@ -719,370 +718,370 @@ Method BuildDependencyGraph(
 	#define EXACT 1
 	#define FUZZY 2
 	#define SCOPE "Scope"
-	
-	Set tSC = $$$OK
-	Try {
-		Kill tSubModules
+
+	set tSC = $$$OK
+	try {
+		kill tSubModules
 		// Create an instance of the repository manager singleton (or get the existing one)
 		// This makes it available at lower stack levels, which helps
 		// to avoid significant duplicate work in dependency resolution.
-		Set tRepositoryManager = ##class(%IPM.Repo.Manager).%Get(.tSC)
+		set tRepositoryManager = ##class(%IPM.Repo.Manager).%Get(.tSC)
 		$$$ThrowOnError(tSC)
-		
+
 		// Disregard violation of dependencies of pending modules
-		Set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
+		set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
-		
+
 		// May want to pass phases to subsequent calls
-		Set tPhases = $Case(pCheckNestedScoped, 1: pPhases, : "")
-		For i=1:1:..Dependencies.Count() {
+		set tPhases = $case(pCheckNestedScoped, 1: pPhases, : "")
+		for i=1:1:..Dependencies.Count() {
 			#dim tDep As %IPM.Storage.ModuleReference
-			Set tDep = ..Dependencies.GetAt(i)
-			Set tModulePath = pModulePath
-			If '..HasScope(pPhases,tDep.Scope) {
-				Continue
-			} ElseIf (tDep.Scope '= "") && (pModulePath = $ListBuild(..Name)) {
+			set tDep = ..Dependencies.GetAt(i)
+			set tModulePath = pModulePath
+			if '..HasScope(pPhases,tDep.Scope) {
+				continue
+			} elseif (tDep.Scope '= "") && (pModulePath = $listbuild(..Name)) {
 				// Exclude the root module from cyclic dependency checking if the dependency is scoped.
-				Set tModulePath = ""
+				set tModulePath = ""
 			}
-			
+
 			// Ensure this dependency is not an ancestor in the chain of dependencies getting to this point
-			If $ListFind(tModulePath,tDep.Name) {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cyclic dependency detected in module '%1': %2",..Name,$ListToString(tModulePath_$ListBuild(tDep.Name)," -> ")))
-				Quit
+			if $listfind(tModulePath,tDep.Name) {
+				set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cyclic dependency detected in module '%1': %2",..Name,$listtostring(tModulePath_$listbuild(tDep.Name)," -> ")))
+				quit
 			}
-			
+
 			// Test whether dependency version is a valid semantic version. These are handled in the first pass only.
 			// Other cases are handled in the second pass only.
-			Set tIsExactVersion = +##class(%IPM.General.SemanticVersion).IsValid(tDep.VersionString) kill %objlasterror
-			If ((pPass = $$$EXACT) && 'tIsExactVersion) || ((pPass = $$$FUZZY) && tIsExactVersion) {
-				Continue
+			set tIsExactVersion = +##class(%IPM.General.SemanticVersion).IsValid(tDep.VersionString) kill %objlasterror
+			if ((pPass = $$$EXACT) && 'tIsExactVersion) || ((pPass = $$$FUZZY) && tIsExactVersion) {
+				continue
 			}
-			
+
 			// Build cumulative version requirement string
 			#dim tSearchExpr As %IPM.General.SemanticVersionExpression
-			Set tSearchExpr = tDep.Version.%ConstructClone(1)
-			Set tConstraintList = $ListBuild(..Name_": "_tDep.VersionString)
-			Set tSourcePath = ""
-			For {
-				Set tSourcePath = $Order(pDependencyGraph(tDep.Name,tSourcePath),1,tOtherReq)
-				Quit:tSourcePath=""
-				
-				Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tOtherReq,.tExpr)
-				If $$$ISERR(tSC) {
-					Quit
+			set tSearchExpr = tDep.Version.%ConstructClone(1)
+			set tConstraintList = $listbuild(..Name_": "_tDep.VersionString)
+			set tSourcePath = ""
+			for {
+				set tSourcePath = $order(pDependencyGraph(tDep.Name,tSourcePath),1,tOtherReq)
+				quit:tSourcePath=""
+
+				set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tOtherReq,.tExpr)
+				if $$$ISERR(tSC) {
+					quit
 				}
-				Set tSearchExpr = tSearchExpr.And(tExpr)
-				Set tConstraintList = tConstraintList_$ListBuild(tSourcePath_": "_tOtherReq)
+				set tSearchExpr = tSearchExpr.And(tExpr)
+				set tConstraintList = tConstraintList_$listbuild(tSourcePath_": "_tOtherReq)
 			}
-			If $$$ISERR(tSC) {
-				Quit
+			if $$$ISERR(tSC) {
+				quit
 			}
-			
-			If 'pIgnoreInstalledModules {
+
+			if 'pIgnoreInstalledModules {
 				// Also apply requirements presented by other installed modules, with the exception of those that are:
 				//	* Known as dependencies of the root module being installed (and thus eligible for upgrade)
 				//	* Pending (re)installation
 				//  * Already in the dependency graph
-				Set tOtherDeps = pKnownDependencies_tInstallContext.GetPendingModuleList()
-				Set tExistingDepKey = ""
-				For {
-					Set tExistingDepKey = $Order(pDependencyGraph(tExistingDepKey))
-					If (tExistingDepKey = "") {
-						Quit
+				set tOtherDeps = pKnownDependencies_tInstallContext.GetPendingModuleList()
+				set tExistingDepKey = ""
+				for {
+					set tExistingDepKey = $order(pDependencyGraph(tExistingDepKey))
+					if (tExistingDepKey = "") {
+						quit
 					}
-					Set tOtherDeps = tOtherDeps_$ListBuild(tExistingDepKey)
+					set tOtherDeps = tOtherDeps_$listbuild(tExistingDepKey)
 				}
-				
-				Set tSC = ##class(%IPM.Utils.Module).GetRequiredVersionExpression(tDep.Name,tOtherDeps,.tInstalledReqExpr,.tInstalledConstraintList)
-				If $$$ISERR(tSC) {
-					Quit
+
+				set tSC = ##class(%IPM.Utils.Module).GetRequiredVersionExpression(tDep.Name,tOtherDeps,.tInstalledReqExpr,.tInstalledConstraintList)
+				if $$$ISERR(tSC) {
+					quit
 				}
-				Set tSearchExpr = tSearchExpr.And(tInstalledReqExpr)
-				Set tConstraintList = tConstraintList_tInstalledConstraintList
+				set tSearchExpr = tSearchExpr.And(tInstalledReqExpr)
+				set tConstraintList = tConstraintList_tInstalledConstraintList
 			}
-			
+
 			// See if we already have a version that satisfies the dependency:
-			Set tDepFound = $Data(pDependencyGraph(tDep.Name),tDepInfo)
-			Set tPreviousDepth = 0
-			Set tServerName = ""
-			Set tVersion = ""
-			If tDepFound {
-				Set $ListBuild(tPreviousDepth,tServerName,tVersion) = tDepInfo
+			set tDepFound = $data(pDependencyGraph(tDep.Name),tDepInfo)
+			set tPreviousDepth = 0
+			set tServerName = ""
+			set tVersion = ""
+			if tDepFound {
+				set $listbuild(tPreviousDepth,tServerName,tVersion) = tDepInfo
 			}
-			
+
 			// See if a satisfactory version already exists in the current namespace.
 			// If it does, always use it
 			// Particularly relevant for compilation of dependencies
 			// The "clean" phase can be used to bypass this (by removing modules from the current namespace)
 			// Forcing an update from disk can also override this, although we ensure that the same module is
 			// not loaded multiple times in a given operation.
-			Set tForceSnapshotReload = pForceSnapshotReload
-			If tForceSnapshotReload && $Data($$$ZPMHandledModules($Namespace,tDep.Name),tHandled) {
-				If $ListFind(tHandled,"Activate") {
+			set tForceSnapshotReload = pForceSnapshotReload
+			if tForceSnapshotReload && $data($$$ZPMHandledModules($namespace,tDep.Name),tHandled) {
+				if $listfind(tHandled,"Activate") {
 					// If we have already activated the given module, don't do so again.
-					Set tForceSnapshotReload = 0
+					set tForceSnapshotReload = 0
 				}
 			}
-			If ('pIgnoreInstalledModules) && ..NameExists(tDep.Name) {
-				Set tLocalObj = ..NameOpen(tDep.Name,,.tSC)
-				If $$$ISERR(tSC) {
-					Quit
+			if ('pIgnoreInstalledModules) && ..NameExists(tDep.Name) {
+				set tLocalObj = ..NameOpen(tDep.Name,,.tSC)
+				if $$$ISERR(tSC) {
+					quit
 				}
-				
-				Set tInstalledVersionValid = tLocalObj.Version.Satisfies(tSearchExpr) && ((tVersion = "") || (tVersion = tLocalObj.VersionString))
-				If tInstalledVersionValid && '(tLocalObj.Version.IsSnapshot() && tForceSnapshotReload) {
-					Set tLocalMod = 1
-					Set tDepth = $Select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
-					Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth,"",tLocalObj.VersionString)
-					If (pIncludeDisplayName) {
-						Set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$ListBuild(tDep.DisplayName)
+
+				set tInstalledVersionValid = tLocalObj.Version.Satisfies(tSearchExpr) && ((tVersion = "") || (tVersion = tLocalObj.VersionString))
+				if tInstalledVersionValid && '(tLocalObj.Version.IsSnapshot() && tForceSnapshotReload) {
+					set tLocalMod = 1
+					set tDepth = $select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
+					set pDependencyGraph(tDep.Name) = $listbuild(pDepth,"",tLocalObj.VersionString)
+					if (pIncludeDisplayName) {
+						set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$listbuild(tDep.DisplayName)
 					}
-					Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
-					Set pSubModules(tDepth,tDep.Name) = tLocalObj
-					Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
-					Continue
+					set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
+					set pSubModules(tDepth,tDep.Name) = tLocalObj
+					set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
+					continue
 				}
-				
-				If 'pPermitDowngrade {
+
+				if 'pPermitDowngrade {
 					// Add a minimum of the currently-installed version as a constraint.
-					Set tRangeString = ">="_tLocalObj.VersionString
-					Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tRangeString,.tCurrentlyInstalledExpr)
+					set tRangeString = ">="_tLocalObj.VersionString
+					set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tRangeString,.tCurrentlyInstalledExpr)
 					$$$ThrowOnError(tSC)
-					Set tSearchExpr = tSearchExpr.And(tCurrentlyInstalledExpr)
-					Set tConstraintList = tConstraintList_$ListBuild(tLocalObj.Name_": "_tRangeString_" (currently installed, downgrade not permitted)")
+					set tSearchExpr = tSearchExpr.And(tCurrentlyInstalledExpr)
+					set tConstraintList = tConstraintList_$listbuild(tLocalObj.Name_": "_tRangeString_" (currently installed, downgrade not permitted)")
 				}
 			}
-			
-			Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-			Set tSearchCriteria.Name = tDep.Name
-			Set searchExprStr = tSearchExpr.ToString()
-			Set tSearchCriteria.VersionExpression = searchExprStr
+
+			set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+			set tSearchCriteria.Name = tDep.Name
+			set searchExprStr = tSearchExpr.ToString()
+			set tSearchCriteria.VersionExpression = searchExprStr
 			// If the dependencyname has not been visited, actually do the search;
 			// otherwise, see if the stored search expression contains the current search expression or the other way
 			// If former, then use the stored qualifiedref; if latter, then need to do new search
-			
-			If ($Data(pSearchList(tDep.Name)) '= 10) {
-				Set tSC = tRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
-				If $$$ISERR(tSC) {
-					Quit
+
+			if ($data(pSearchList(tDep.Name)) '= 10) {
+				set tSC = tRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
+				if $$$ISERR(tSC) {
+					quit
 				}
-				Set pSearchList(tDep.Name, tSearchExpr) = tQualifiedReferences
-				Set pSearchList(tDep.Name, tSearchExpr, "SearchString") = searchExprStr
-			} Else {
-				Set key = ""
-				While 1 {
-					Set key = $Order(pSearchList(tDep.Name, key))
-					If (key = "") {
-						Quit
+				set pSearchList(tDep.Name, tSearchExpr) = tQualifiedReferences
+				set pSearchList(tDep.Name, tSearchExpr, "SearchString") = searchExprStr
+			} else {
+				set key = ""
+				while 1 {
+					set key = $order(pSearchList(tDep.Name, key))
+					if (key = "") {
+						quit
 					}
-					If (pSearchList(tDep.Name, key, "SearchString") = searchExprStr) {
-						Set tQualifiedReferences = pSearchList(tDep.Name, key)
-						Quit
+					if (pSearchList(tDep.Name, key, "SearchString") = searchExprStr) {
+						set tQualifiedReferences = pSearchList(tDep.Name, key)
+						quit
 					}
 				}
-				If (key = "") {
+				if (key = "") {
 					// no satisfied searchExpr found
-					Set tSC = tRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
-					If $$$ISERR(tSC) {
-						Quit
+					set tSC = tRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
+					if $$$ISERR(tSC) {
+						quit
 					}
-					Set pSearchList(tDep.Name, tSearchExpr) = tQualifiedReferences
-					Set pSearchList(tDep.Name, tSearchExpr, "SearchString") = searchExprStr
+					set pSearchList(tDep.Name, tSearchExpr) = tQualifiedReferences
+					set pSearchList(tDep.Name, tSearchExpr, "SearchString") = searchExprStr
 				}
 			}
-			If (tQualifiedReferences.Count() = 0) {
-				Set tMsg = $$$FormatText("Could not find satisfactory version of %1 in any repositories. Required by: %2",tDep.Name,$ListToString(tConstraintList,"; "))
-				Set tSC = $$$ERROR($$$GeneralError,tMsg)
-				Quit
-			} Else {
-				Set tResultFound = 0
-				For j=1:1:tQualifiedReferences.Count() {
-					Kill tDependencyGraph,tSubModules
-					Merge tDependencyGraph = pDependencyGraph
-					Merge tSubModules = pSubModules
-					Set tQualifiedReference = tQualifiedReferences.GetAt(j)
-					Set tSC = tRepositoryManager.RetrieveModuleManifest(tQualifiedReference,.tManifest)
-					If $$$ISERR(tSC) {
-						Quit
+			if (tQualifiedReferences.Count() = 0) {
+				set tMsg = $$$FormatText("Could not find satisfactory version of %1 in any repositories. Required by: %2",tDep.Name,$listtostring(tConstraintList,"; "))
+				set tSC = $$$ERROR($$$GeneralError,tMsg)
+				quit
+			} else {
+				set tResultFound = 0
+				for j=1:1:tQualifiedReferences.Count() {
+					kill tDependencyGraph,tSubModules
+					merge tDependencyGraph = pDependencyGraph
+					merge tSubModules = pSubModules
+					set tQualifiedReference = tQualifiedReferences.GetAt(j)
+					set tSC = tRepositoryManager.RetrieveModuleManifest(tQualifiedReference,.tManifest)
+					if $$$ISERR(tSC) {
+						quit
 					}
-					
+
 					// Recursively process dependencies.
-					Set tMsg = "Error reading module manifest for %1 %2 from repository %3"
-					Set tOuterSC = $$$ERROR($$$GeneralError,$$$FormatText(tMsg,tQualifiedReference.Name,tQualifiedReference.VersionString,tQualifiedReference.ServerName))
-					
+					set tMsg = "Error reading module manifest for %1 %2 from repository %3"
+					set tOuterSC = $$$ERROR($$$GeneralError,$$$FormatText(tMsg,tQualifiedReference.Name,tQualifiedReference.VersionString,tQualifiedReference.ServerName))
+
 					#dim tModule As %IPM.Storage.Module
-					Set tReader = ##class(%XML.Reader).%New()
-					Set tSC = tReader.OpenStream(tManifest)
-					If $$$ISERR(tSC) {
-						Set tSC = $System.Status.EmbedStatus(tOuterSC,tSC)
-						Quit
+					set tReader = ##class(%XML.Reader).%New()
+					set tSC = tReader.OpenStream(tManifest)
+					if $$$ISERR(tSC) {
+						set tSC = $system.Status.EmbedStatus(tOuterSC,tSC)
+						quit
 					}
-					Do tReader.Correlate("Module","%IPM.Storage.Module")
-					Do tReader.Next(.tModule,.tSC)
-					If $$$ISERR(tSC) {
-						Set tSC = $System.Status.EmbedStatus(tOuterSC,tSC)
-						Quit
+					do tReader.Correlate("Module","%IPM.Storage.Module")
+					do tReader.Next(.tModule,.tSC)
+					if $$$ISERR(tSC) {
+						set tSC = $system.Status.EmbedStatus(tOuterSC,tSC)
+						quit
 					}
-					
-					Set tDepth = $Select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
-					
-					If (pPass = $$$EXACT) {	
-						Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth, tQualifiedReference.ServerName, tModule.VersionString, tQualifiedReference.Deployed, tQualifiedReference.PlatformVersion)
-						If (pIncludeDisplayName) {
-							Set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$ListBuild(tDep.DisplayName)
+
+					set tDepth = $select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
+
+					if (pPass = $$$EXACT) {
+						set pDependencyGraph(tDep.Name) = $listbuild(pDepth, tQualifiedReference.ServerName, tModule.VersionString, tQualifiedReference.Deployed, tQualifiedReference.PlatformVersion)
+						if (pIncludeDisplayName) {
+							set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$listbuild(tDep.DisplayName)
 						}
-						Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
-						Set pSubModules(tDepth,tDep.Name) = tModule
-						Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
-				
+						set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
+						set pSubModules(tDepth,tDep.Name) = tModule
+						set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
+
 						// If we have an exact match, attempt to resolve exact dependencies recursively.
-						Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
-						
+						set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$listbuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
+
 						// Failure to resolve any of these dependencies is an immediate failure, and can be descriptive.
-						If $$$ISERR(tSC) {
-							Quit
+						if $$$ISERR(tSC) {
+							quit
 						}
-						
-						Set tResultFound = 1
-						Quit
+
+						set tResultFound = 1
+						quit
 					}
-					
-					If (pPass = $$$FUZZY) {	
-						Set tDependencyGraph(tDep.Name) = $ListBuild(tDepth,tQualifiedReference.ServerName,tModule.VersionString)
-						If (pIncludeDisplayName) {
-							Set tDependencyGraph(tDep.Name) = tDependencyGraph(tDep.Name)_$ListBuild(tDep.DisplayName)
+
+					if (pPass = $$$FUZZY) {
+						set tDependencyGraph(tDep.Name) = $listbuild(tDepth,tQualifiedReference.ServerName,tModule.VersionString)
+						if (pIncludeDisplayName) {
+							set tDependencyGraph(tDep.Name) = tDependencyGraph(tDep.Name)_$listbuild(tDep.DisplayName)
 						}
-						Set tDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
-				
-						Set tSubModules(tDepth,tDep.Name) = tModule
-					
+						set tDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
+
+						set tSubModules(tDepth,tDep.Name) = tModule
+
 						// For fuzzy version matching, preview the next graph step; move to the next version if it would lead to failure.
 						// If not, update.
-						Set tPossibleSC = tModule.BuildDependencyGraph(.tDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.tSubModules,,tModulePath_$ListBuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
-						If $$$ISOK(tPossibleSC) {
+						set tPossibleSC = tModule.BuildDependencyGraph(.tDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.tSubModules,,tModulePath_$listbuild(tDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
+						if $$$ISOK(tPossibleSC) {
 							// We have a match - let's go with it. Actually dependency resolution will be done later, breadth-first.
 							// TODO: Caching of results to avoid duplicate web service calls.
-							Set tResultFound = 1
-							Quit
+							set tResultFound = 1
+							quit
 						}
 					}
 				}
-				If $$$ISERR(tSC) {
-					Quit
+				if $$$ISERR(tSC) {
+					quit
 				}
-				
-				If (pPass = $$$FUZZY) {
+
+				if (pPass = $$$FUZZY) {
 					// We don't actually care if a valid result was found.
 					// There will always be something in here, it just might lead to a descriptive error later on in the case of fuzzy matching with no valid option.
-					Set pDependencyGraph(tDep.Name) = $ListBuild(pDepth,tQualifiedReference.ServerName,tModule.VersionString)
-					If (pIncludeDisplayName) {
-						Set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$ListBuild(tDep.DisplayName)
+					set pDependencyGraph(tDep.Name) = $listbuild(pDepth,tQualifiedReference.ServerName,tModule.VersionString)
+					if (pIncludeDisplayName) {
+						set pDependencyGraph(tDep.Name) = pDependencyGraph(tDep.Name)_$listbuild(tDep.DisplayName)
 					}
-					Set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
-					Set pSubModules(tDepth,tDep.Name) = tModule
-					Set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
+					set pDependencyGraph(tDep.Name,..Name_" "_..VersionString) = tDep.VersionString
+					set pSubModules(tDepth,tDep.Name) = tModule
+					set pSubModules(tDepth,tDep.Name,$$$SCOPE) = tDep.Scope
 				}
 			}
 		}
-		If $$$ISERR(tSC) {
-			Quit
+		if $$$ISERR(tSC) {
+			quit
 		}
-		
-		If (pPass = $$$EXACT) {	
+
+		if (pPass = $$$EXACT) {
 			// Call for second pass (fuzzy version matching)
-			Set tSC = ..BuildDependencyGraph(.pDependencyGraph,pDepth,pForceSnapshotReload,.qstruct,pPhases,.pSubModules,$$$FUZZY,pModulePath,pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
-			If $$$ISERR(tSC) {
-				Quit
+			set tSC = ..BuildDependencyGraph(.pDependencyGraph,pDepth,pForceSnapshotReload,.qstruct,pPhases,.pSubModules,$$$FUZZY,pModulePath,pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
+			if $$$ISERR(tSC) {
+				quit
 			}
 		}
-		
+
 		// Breadth-first dependency resolution for depth 1, pass 1.
 		// Things to resolve have been accumulated in previous passes and/or will continue to be accumulated.
-		If (pDepth = 1) && (pPass = $$$EXACT) {
-			 While $Data(pSubModules(pDepth)) {	
-				Set tModName = ""
-				For {
-					Set tModName = $Order(pSubModules(pDepth,tModName),1,tModule)
-					Quit:tModName=""
-					Set tModulePath = $Case(pSubModules(pDepth,tModName,$$$SCOPE),"":pModulePath,:"")
-					Set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$ListBuild(tModName),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
-					If $$$ISERR(tSC) {
-						Quit
+		if (pDepth = 1) && (pPass = $$$EXACT) {
+			 while $data(pSubModules(pDepth)) {
+				set tModName = ""
+				for {
+					set tModName = $order(pSubModules(pDepth,tModName),1,tModule)
+					quit:tModName=""
+					set tModulePath = $case(pSubModules(pDepth,tModName,$$$SCOPE),"":pModulePath,:"")
+					set tSC = tModule.BuildDependencyGraph(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,,tModulePath_$listbuild(tModName),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName)
+					if $$$ISERR(tSC) {
+						quit
 					}
 				}
-				If $$$ISERR(tSC) {
-					Quit
+				if $$$ISERR(tSC) {
+					quit
 				}
-				Set pDepth = pDepth + 1
+				set pDepth = pDepth + 1
 			}
-			If $$$ISERR(tSC) {
-				Quit
+			if $$$ISERR(tSC) {
+				quit
 			}
-			
+
 			// Ensure cyclic dependencies (possible with scopes) are removed from the graph; otherwise, not everything will be installed.
-			Kill pDependencyGraph(..Name)
-			Set tDependencyKey = ""
-			For {
-				Set tDependencyKey = $Order(pDependencyGraph(tDependencyKey))
-				If (tDependencyKey = "") {
-					Quit
+			kill pDependencyGraph(..Name)
+			set tDependencyKey = ""
+			for {
+				set tDependencyKey = $order(pDependencyGraph(tDependencyKey))
+				if (tDependencyKey = "") {
+					quit
 				}
-				
-				Set tDependencySource = $Order(pDependencyGraph(tDependencyKey,..Name))
-				If ($Piece(tDependencySource," ") = ..Name) {
-					Kill pDependencyGraph(tDependencyKey,tDependencySource)
+
+				set tDependencySource = $order(pDependencyGraph(tDependencyKey,..Name))
+				if ($piece(tDependencySource," ") = ..Name) {
+					kill pDependencyGraph(tDependencyKey,tDependencySource)
 				}
 			}
 		}
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
 /// This method builds a list of any direct/indirect dependencies of the module named <var>pModuleName</var> in a breadth-first manner.
 ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 {
-	Set tStatement = ##class(%SQL.Statement).%New()
+	set tStatement = ##class(%SQL.Statement).%New()
 	$$$ThrowOnError(tStatement.%Prepare("select Dependencies_Name as ModuleName from %IPM_Storage.ModuleItem_Dependencies where ModuleItem->Name = ?"))
-	
-	Set tKnownDependencyList = ""
-	Set tSearchList = $ListBuild(pModuleName)
-	
+
+	set tKnownDependencyList = ""
+	set tSearchList = $listbuild(pModuleName)
+
 	// For each tree level (starting out at the top level node)...
-	While (tSearchList '= "") {
-		Set tNewSearchList = ""
-		Set tPointer = 0
-		
+	while (tSearchList '= "") {
+		set tNewSearchList = ""
+		set tPointer = 0
+
 		// Iterate over modules at the current tree level.
-		While $ListNext(tSearchList,tPointer,tModule) {
+		while $listnext(tSearchList,tPointer,tModule) {
 			// If we have already seen the module at this level (earlier in the list), skip it.
-			If $Data(tKnownDependencies(tModule)) {
-				Continue
+			if $data(tKnownDependencies(tModule)) {
+				continue
 			}
-			Set tKnownDependencyList = tKnownDependencyList_$ListBuild(tModule)
-			Set tKnownDependencies(tModule) = ""
-			
+			set tKnownDependencyList = tKnownDependencyList_$listbuild(tModule)
+			set tKnownDependencies(tModule) = ""
+
 			// Find all dependencies of the module.
-			Set tResult = tStatement.%Execute(tModule)
-			If (tResult.%SQLCODE < 0) {
-				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE,tResult.%Message)
+			set tResult = tStatement.%Execute(tModule)
+			if (tResult.%SQLCODE < 0) {
+				throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE,tResult.%Message)
 			}
-			While tResult.%Next(.tSC) {
+			while tResult.%Next(.tSC) {
 				$$$ThrowOnError(tSC)
-				If $Data(tKnownDependencies(tResult.%Get("ModuleName"))) {
+				if $data(tKnownDependencies(tResult.%Get("ModuleName"))) {
 					// If we have already seen the module at a higher level in the tree, skip it.
-					Continue
+					continue
 				}
 				// Flag this module so its dependencies are checked (and it is added to the list itself) in the iteration for the next tree level.
-				Set tNewSearchList = tNewSearchList_$ListBuild(tResult.%Get("ModuleName"))
+				set tNewSearchList = tNewSearchList_$listbuild(tResult.%Get("ModuleName"))
 			}
 			$$$ThrowOnError(tSC)
 		}
-		Set tSearchList = tNewSearchList
+		set tSearchList = tNewSearchList
 	}
-	Quit tKnownDependencyList
+	quit tKnownDependencyList
 }
 
 /// Builds a module's immediate dependency graph and array of resources.<br />
@@ -1099,116 +1098,116 @@ Method GetResolvedReferences(
 	pSkipDependencies As %Boolean = 0,
 	ByRef pDependencyGraph) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		If '$Data(pDependencyGraph) {
-			Set tSC = ..BuildDependencyGraph(.pDependencyGraph,,,,pPhases)
-			If $$$ISERR(tSC) {
-				Quit
+	set tSC = $$$OK
+	try {
+		if '$data(pDependencyGraph) {
+			set tSC = ..BuildDependencyGraph(.pDependencyGraph,,,,pPhases)
+			if $$$ISERR(tSC) {
+				quit
 			}
 		}
-		
-		If 'pSkipDependencies {
-			Kill tParams
-			Set tParams("Verbose") = 0
-			Set tParams("qstruct") = "k"
-			Set tSC = ##class(%IPM.Utils.Module).LoadDependencies(.pDependencyGraph,.tParams)
-			If $$$ISERR(tSC) {
-				Quit
+
+		if 'pSkipDependencies {
+			kill tParams
+			set tParams("Verbose") = 0
+			set tParams("qstruct") = "k"
+			set tSC = ##class(%IPM.Utils.Module).LoadDependencies(.pDependencyGraph,.tParams)
+			if $$$ISERR(tSC) {
+				quit
 			}
 		}
-		
-		Set pReferenceArray(..Name, ..Name_".ZPM") = ""
-		
-		Set tKey = ""
-		For {
+
+		set pReferenceArray(..Name, ..Name_".ZPM") = ""
+
+		set tKey = ""
+		for {
 			#dim tResource As %IPM.Storage.ResourceReference
-			Set tResource = ..Resources.GetNext(.tKey)
-			Quit:tKey=""
-			If '..HasScope(pPhases,tResource.Scope) {
-				Continue
+			set tResource = ..Resources.GetNext(.tKey)
+			quit:tKey=""
+			if '..HasScope(pPhases,tResource.Scope) {
+				continue
 			}
-			
+
 			kill tempArray
-			Set tSC = tResource.ResolveChildren(.tempArray)
-			Set resourceScope = tResource.Scope
-			Set attrScope = $Get(tempArray("Scope"))
-			If ..HasScope(pPhases, resourceScope) && ..HasScope(pPhases, attrScope) {
-				Merge pReferenceArray(..Name) = tempArray
+			set tSC = tResource.ResolveChildren(.tempArray)
+			set resourceScope = tResource.Scope
+			set attrScope = $get(tempArray("Scope"))
+			if ..HasScope(pPhases, resourceScope) && ..HasScope(pPhases, attrScope) {
+				merge pReferenceArray(..Name) = tempArray
 			}
-			If $$$ISERR(tSC) {
-				Quit
+			if $$$ISERR(tSC) {
+				quit
 			}
 		}
-		If $$$ISERR(tSC) {
-			Quit
+		if $$$ISERR(tSC) {
+			quit
 		}
-		
-		If pLockedDependencies {
-			Set tModName = ""
-			For {
-				Set tModName = $Order(pDependencyGraph(tModName))
-				Quit:tModName=""
-				
-				Set tModule = ##class(%IPM.Storage.Module).NameOpen(tModName,,.tSC)
-				If $$$ISERR(tSC) {
-					Quit
+
+		if pLockedDependencies {
+			set tModName = ""
+			for {
+				set tModName = $order(pDependencyGraph(tModName))
+				quit:tModName=""
+
+				set tModule = ##class(%IPM.Storage.Module).NameOpen(tModName,,.tSC)
+				if $$$ISERR(tSC) {
+					quit
 				}
-				
+
 				// Don't pass along the phase
-				Set pReferenceArray(tModName, tModName_".ZPM") = ..Name
-				
+				set pReferenceArray(tModName, tModName_".ZPM") = ..Name
+
 				// pLockedDependencies=0 to avoid duplicating effort on nested dependencies;
 				// this loop will already get all of them.
-				Set tSC = tModule.GetResolvedReferences(.pReferenceArray,0,,1)
-				If $$$ISERR(tSC) {
-					Quit
+				set tSC = tModule.GetResolvedReferences(.pReferenceArray,0,,1)
+				if $$$ISERR(tSC) {
+					quit
 				}
 			}
-			If $$$ISERR(tSC) {
-				Quit
+			if $$$ISERR(tSC) {
+				quit
 			}
 		}
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
 Method LifecycleGet() As %IPM.Lifecycle.Base
 {
-	If $IsObject(r%Lifecycle) {
-		Quit r%Lifecycle
+	if $isobject(r%Lifecycle) {
+		quit r%Lifecycle
 	}
-	For tBasis = ..OverrideLifecycleClass,..LifecycleClass {
-		If (tBasis '= "") && ($Length(tBasis,".") = 1) {
-			Set tLifecycleClass = $$$DefaultLifecyclePackageDot_tBasis
-		} Else {
-			Set tLifecycleClass = tBasis
+	for tBasis = ..OverrideLifecycleClass,..LifecycleClass {
+		if (tBasis '= "") && ($length(tBasis,".") = 1) {
+			set tLifecycleClass = $$$DefaultLifecyclePackageDot_tBasis
+		} else {
+			set tLifecycleClass = tBasis
 		}
-		
-		If (tLifecycleClass '= "") && $$$comClassDefined(tLifecycleClass) {
-			Quit
+
+		if (tLifecycleClass '= "") && $$$comClassDefined(tLifecycleClass) {
+			quit
 		}
 	}
-	If (tLifecycleClass = "") || '$$$comClassDefined(tLifecycleClass) {
-		Set ..LifecycleClass = "Module"
-		Set tLifecycleClass = $$$DefaultLifecyclePackageDot_..LifecycleClass
+	if (tLifecycleClass = "") || '$$$comClassDefined(tLifecycleClass) {
+		set ..LifecycleClass = "Module"
+		set tLifecycleClass = $$$DefaultLifecyclePackageDot_..LifecycleClass
 	}
-	Set r%Lifecycle = $ClassMethod(tLifecycleClass,"%New",$this)
-	Quit r%Lifecycle
+	set r%Lifecycle = $classmethod(tLifecycleClass,"%New",$this)
+	quit r%Lifecycle
 }
 
 Method OverrideLifecycleClassSet(pValue As %Dictionary.Classname) As %Status
 {
-	If (..OverrideLifecycleClass '= pValue) && $IsObject(..Lifecycle) {
-		Set ..Lifecycle = ""
-		Set i%OverrideLifecycleClass = pValue
+	if (..OverrideLifecycleClass '= pValue) && $isobject(..Lifecycle) {
+		set ..Lifecycle = ""
+		set i%OverrideLifecycleClass = pValue
 	}
-	Quit $$$OK
+	quit $$$OK
 }
 
-/// This callback method is invoked by the <METHOD>%New</METHOD> method to 
+/// This callback method is invoked by the <METHOD>%New</METHOD> method to
 /// provide notification that a new instance of an object is being created.
 /// 
 /// <P>If this method returns an error then the object will not be created.
@@ -1220,133 +1219,133 @@ Method OverrideLifecycleClassSet(pValue As %Dictionary.Classname) As %Status
 /// class then this oref will be the one returned to the caller of %New method.
 Method %OnNew() As %Status [ Private, ServerOnly = 1 ]
 {
-	Set ..Version = ##class(%IPM.General.SemanticVersion).FromString(i%VersionString)
-  Quit $$$OK
+	set ..Version = ##class(%IPM.General.SemanticVersion).FromString(i%VersionString)
+  quit $$$OK
 }
 
-/// This callback method is invoked by the <METHOD>%Open</METHOD> method to 
+/// This callback method is invoked by the <METHOD>%Open</METHOD> method to
 /// provide notification that the object specified by <VAR>oid</VAR> is being opened.
 /// 
 /// <P>If this method returns an error then the object will not be opened.
 Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tSC = $$$OK
-	Try {
+	set tSC = $$$OK
+	try {
 		// In Studio, use the existing %SourceControl object.
 		// From other contexts, create a new one.
-		If '$IsObject($Get(%SourceControl)) {
-			New %SourceControl
-			Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		if '$isobject($get(%SourceControl)) {
+			new %SourceControl
+			do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
 		}
-		Set tExternalName = ##class(%Studio.SourceControl.Interface).ExternalName(..Name_".ZPM")
-		If (tExternalName '= "") {
-			Set tDirectory = ##class(%File).GetDirectory(tExternalName, 0)
-			If (tDirectory '= "") {
-				Set ..Root = tDirectory
+		set tExternalName = ##class(%Studio.SourceControl.Interface).ExternalName(..Name_".ZPM")
+		if (tExternalName '= "") {
+			set tDirectory = ##class(%File).GetDirectory(tExternalName, 0)
+			if (tDirectory '= "") {
+				set ..Root = tDirectory
 			}
 		}
-    If ..Deployed,..DeveloperMode {
-      Set ..DeveloperMode = 0
+    if ..Deployed,..DeveloperMode {
+      set ..DeveloperMode = 0
     }
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
-/// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to 
+/// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to
 /// provide notification that the current object is being validated.
 /// 
 /// <P>If this method returns an error then <METHOD>%ValidateObject</METHOD> will fail.
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tSC = $$$OK
-	Try {
+	set tSC = $$$OK
+	try {
 		// Ensure packaging property is set to the correct value.
 		// This validation only runs if the lifecycle class exists.
-		If (..LifecycleClass '= "") && $$$comClassDefined(..LifecycleClass) {
-			Set tBaseClass = "%IPM.Lifecycle.Base"
-			Set legacyBaseClass = "%ZPM.PackageManager.Developer.Lifecycle.Base"
-			If '$ClassMethod(..LifecycleClass,"%Extends",tBaseClass) && '$ClassMethod(..LifecycleClass,"%Extends",legacyBaseClass) {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid lifecycle class '%1' - must extend %2",..LifecycleClass,tBaseClass))
-				Quit
+		if (..LifecycleClass '= "") && $$$comClassDefined(..LifecycleClass) {
+			set tBaseClass = "%IPM.Lifecycle.Base"
+			set legacyBaseClass = "%ZPM.PackageManager.Developer.Lifecycle.Base"
+			if '$classmethod(..LifecycleClass,"%Extends",tBaseClass) && '$classmethod(..LifecycleClass,"%Extends",legacyBaseClass) {
+				set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid lifecycle class '%1' - must extend %2",..LifecycleClass,tBaseClass))
+				quit
 			}
-			Set tPackaging = $Parameter(..LifecycleClass,"PACKAGING")
-			If (..Packaging = "") {
-				Set ..Packaging = tPackaging
-			} ElseIf (..Packaging '= tPackaging) {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
-				Quit
+			set tPackaging = $parameter(..LifecycleClass,"PACKAGING")
+			if (..Packaging = "") {
+				set ..Packaging = tPackaging
+			} elseif (..Packaging '= tPackaging) {
+				set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
+				quit
 			}
-		} ElseIf (..LifecycleClass = "") && (..Packaging '= "") {
-      		Set ..LifecycleClass = $Case(..Packaging,"application": "Application", : "Module")
-		} ElseIf (..Packaging = "") {
+		} elseif (..LifecycleClass = "") && (..Packaging '= "") {
+      		set ..LifecycleClass = $case(..Packaging,"application": "Application", : "Module")
+		} elseif (..Packaging = "") {
 			// Default to "module"
-			Set ..Packaging = "module"
+			set ..Packaging = "module"
 		}
 
 		// Can have only one NamespaceConfig module setting.
-		Set tNSConfigCount = 0
-		Set tDefaultCount = ..Defaults.Count()
-		For tDefaultIndex=1:1:tDefaultCount {
-			Set tDefault = ..Defaults.GetAt(tDefaultIndex)
-			If tDefault.%IsA("%IPM.Storage.ModuleSetting.NamespaceConfig") {
-				Set tNSConfigCount = tNSConfigCount + 1
+		set tNSConfigCount = 0
+		set tDefaultCount = ..Defaults.Count()
+		for tDefaultIndex=1:1:tDefaultCount {
+			set tDefault = ..Defaults.GetAt(tDefaultIndex)
+			if tDefault.%IsA("%IPM.Storage.ModuleSetting.NamespaceConfig") {
+				set tNSConfigCount = tNSConfigCount + 1
 			}
 		}
-		If (tNSConfigCount > 1) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Only one NamespaceConfig may be specified per module."))
-			Quit
+		if (tNSConfigCount > 1) {
+			set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Only one NamespaceConfig may be specified per module."))
+			quit
 		}
-		
+
 		// Pre-check for uniqueness among resources (make sure there are no collisions and report descriptive errors if there are).
 		// This is simpler than trying to interpret a unique index violation later, and will work in all cases where we're updating modules.
-		Set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
+		set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
-		
-		Set tSC = $$$OK
-		Set tKey = ""
-		For {
-			Set tResource = ..Resources.GetNext(.tKey)
-			Quit:(tKey="")
-			
+
+		set tSC = $$$OK
+		set tKey = ""
+		for {
+			set tResource = ..Resources.GetNext(.tKey)
+			quit:(tKey="")
+
 			// If it hasn't been saved yet (to account for module renames)...
-			If (tResource.%Id() = "") && (tResource.UniqueName '= "") {
+			if (tResource.%Id() = "") && (tResource.UniqueName '= "") {
 				// ... see if some other resource exists with the same name.
-				If ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
-					Set tOtherResource = ##class(%IPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
-					If $$$ISERR(tSC) {
-						Quit
+				if ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
+					set tOtherResource = ##class(%IPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
+					if $$$ISERR(tSC) {
+						quit
 					}
-					If tInstallContext.ModuleIsPending(tOtherResource.Module.Name) {
+					if tInstallContext.ModuleIsPending(tOtherResource.Module.Name) {
 						// %OnAddToSaveSet will correct for this condition.
-						Continue
+						continue
 					}
-					If (tResource.Name = tResource.UniqueName) {
+					if (tResource.Name = tResource.UniqueName) {
 						// Common case: classes, packages, include files, etc.
-						Set tMsg = $$$FormatText("Resource '%1' is already defined as part of module '%2'; cannot also be listed in module '%3'",tResource.Name,tOtherResource.Module.Name,..Name)
-					} Else {
+						set tMsg = $$$FormatText("Resource '%1' is already defined as part of module '%2'; cannot also be listed in module '%3'",tResource.Name,tOtherResource.Module.Name,..Name)
+					} else {
 						// Handle the case where resources with different names are uniquely identified the same way.
-						Set tResourceName = tResource.Name_" ("_tResource.UniqueName_")"
-						Set tMsg = $$$FormatText("Resource '%1' is already defined as part of module '%2' as '%4'; cannot also be listed in module '%3'",tResourceName,tOtherResource.Module.Name,..Name,tOtherResource.Name)
+						set tResourceName = tResource.Name_" ("_tResource.UniqueName_")"
+						set tMsg = $$$FormatText("Resource '%1' is already defined as part of module '%2' as '%4'; cannot also be listed in module '%3'",tResourceName,tOtherResource.Module.Name,..Name,tOtherResource.Name)
 					}
-					Set tSC = $$$ERROR($$$GeneralError,tMsg)
-					Quit
+					set tSC = $$$ERROR($$$GeneralError,tMsg)
+					quit
 				}
 			}
-			If $$$ISERR(tSC) {
-				Quit
+			if $$$ISERR(tSC) {
+				quit
 			}
 		}
-		Set query = "SELECT COUNT(*) AS Conflict FROM %IPM_Storage.ModuleItem WHERE Name = ? AND Name <> ?"
-		Set rs = ##class(%SQL.Statement).%ExecDirect(,query, ..ExternalName, ..Name)
-		If rs.%Next() && (rs.%Get("Conflict") > 0) {
+		set query = "SELECT COUNT(*) AS Conflict FROM %IPM_Storage.ModuleItem WHERE Name = ? AND Name <> ?"
+		set rs = ##class(%SQL.Statement).%ExecDirect(,query, ..ExternalName, ..Name)
+		if rs.%Next() && (rs.%Get("Conflict") > 0) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("External name '%1' conflicts with the real name of another module", ..ExternalName)))
 		}
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
 /// This callback method is invoked when the current object is added to the SaveSet,
@@ -1361,56 +1360,56 @@ Method %OnAddToSaveSet(
 	insert As %Integer = 0,
 	callcount As %Integer = 0) As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tSC = $$$OK
-	Try {
+	set tSC = $$$OK
+	try {
 		// Ensure Version serial object is up to date.
-		If (..VersionString '= ..Version.ToString()) {
-			Set ..Version = ##class(%IPM.General.SemanticVersion).FromString(..VersionString)
+		if (..VersionString '= ..Version.ToString()) {
+			set ..Version = ##class(%IPM.General.SemanticVersion).FromString(..VersionString)
 		}
-		Set tSC = ..XMLExportToStream(.tStream)
-		If $$$ISERR(tSC) {
-			Quit
+		set tSC = ..XMLExportToStream(.tStream)
+		if $$$ISERR(tSC) {
+			quit
 		}
-		
+
 		// See if the module definition has actually changed
-		Set tHash = $System.Encryption.SHA1HashStream(tStream,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
+		set tHash = $system.Encryption.SHA1HashStream(tStream,.tSC)
+		if $$$ISERR(tSC) {
+			quit
 		}
-		If (..Hash '= tHash) {
-			Set ..Hash = tHash
-			Set ..LastModifiedTimestamp = $zdt($h,3)
+		if (..Hash '= tHash) {
+			set ..Hash = tHash
+			set ..LastModifiedTimestamp = $zdatetime($horolog,3)
 		}
-		
+
 		// Deal with resources moving from a module dependent on the current module that hasn't been reloaded yet
-		Set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
+		set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
 		$$$ThrowOnError(tSC)
-		
-		Set tSC = $$$OK
-		Set tKey = ""
-		For {
-			Set tResource = ..Resources.GetNext(.tKey)
-			Quit:(tKey="")
-			
+
+		set tSC = $$$OK
+		set tKey = ""
+		for {
+			set tResource = ..Resources.GetNext(.tKey)
+			quit:(tKey="")
+
 			// If it hasn't been saved yet (to account for module renames)...
-			If (tResource.%Id() = "") && (tResource.UniqueName '= "") {
+			if (tResource.%Id() = "") && (tResource.UniqueName '= "") {
 				// ... see if some other resource exists with the same name.
-				If ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
-					Set tOtherResource = ##class(%IPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
+				if ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
+					set tOtherResource = ##class(%IPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
 					$$$ThrowOnError(tSC)
-					
-					If tInstallContext.ModuleIsPending(tOtherResource.Module.Name) {
+
+					if tInstallContext.ModuleIsPending(tOtherResource.Module.Name) {
 						// Delete the resource. If the pending module still contains it, there will be an error when that module is loaded.
-						Set tSC = ##class(%IPM.Storage.ResourceReference).%DeleteId(tResourceId)
+						set tSC = ##class(%IPM.Storage.ResourceReference).%DeleteId(tResourceId)
 						$$$ThrowOnError(tSC)
 					}
 				}
 			}
 		}
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
 /// Get an instance of an XML enabled class.<br><br>
@@ -1430,7 +1429,7 @@ ClassMethod XMLNew(
 	containerOref As %RegisteredObject = "") As %RegisteredObject [ ServerOnly = 1 ]
 {
 	// Coupled with %IPM.StudioDocument.Module to allow editing of the current module rather than matching an existing one.
-	Quit $Get($$$ZPMStudioDocumentModule,..%New())
+	quit $get($$$ZPMStudioDocumentModule,..%New())
 }
 
 /// Validates the module manifest in <var>pManifest</var> - both that it can be interpreted properly as XML, and also that the module it contains (returned in <var>pModule</var>) has
@@ -1440,36 +1439,36 @@ ClassMethod ValidateStream(
 	pModuleReference As %IPM.Storage.QualifiedModuleInfo,
 	Output pModule As %IPM.Storage.Module) As %Status
 {
-	Set pModule = $$$NULLOREF
-	Set tSC = $$$OK
-	Try {
-		Set tModName = pModuleReference.Name
-		Set tModVersion = pModuleReference.VersionString
-		Set tModSource = pModuleReference.ServerName
-			
-		Set pModule = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(pManifest, .tModuleFound)
-		Set tCorrSC = $$$OK
-		If tModuleFound {
+	set pModule = $$$NULLOREF
+	set tSC = $$$OK
+	try {
+		set tModName = pModuleReference.Name
+		set tModVersion = pModuleReference.VersionString
+		set tModSource = pModuleReference.ServerName
+
+		set pModule = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(pManifest, .tModuleFound)
+		set tCorrSC = $$$OK
+		if tModuleFound {
 			// Ensure that module name and version match.
-			If (tModName '= pModule.Name) {
-				Set tCorrSC = $$$ERROR($$$GeneralError,$$$FormatText("Incorrect module name in manifest: %1",pModule.Name))
+			if (tModName '= pModule.Name) {
+				set tCorrSC = $$$ERROR($$$GeneralError,$$$FormatText("Incorrect module name in manifest: %1",pModule.Name))
 			}
-			If (tModVersion '= pModule.VersionString) {
+			if (tModVersion '= pModule.VersionString) {
 				// Append the status in case neither matches.
-				Set tCorrSC = $$$ADDSC(tCorrSC,$$$ERROR($$$GeneralError,$$$FormatText("Incorrect module version in manifest: %1",pModule.Name)))
+				set tCorrSC = $$$ADDSC(tCorrSC,$$$ERROR($$$GeneralError,$$$FormatText("Incorrect module version in manifest: %1",pModule.Name)))
 			}
-		} Else {
+		} else {
 			// Treat as an error if no element is found.
-			Set tCorrSC = $$$ERROR($$$GeneralError,"No root <Module> element found in manifest.")
+			set tCorrSC = $$$ERROR($$$GeneralError,"No root <Module> element found in manifest.")
 		}
 		$$$ThrowOnError(tCorrSC)
-	} Catch e {
-		Set pModule = $$$NULLOREF
-		Set tMsg = $$$FormatText("Error parsing module manifest for '%1 %2' from repository '%3'",$Get(tModName),$Get(tModVersion),$Get(tModSource))
-		Set tOuterSC = $$$ERROR($$$GeneralError,tMsg)
-		Set tSC = $System.Status.EmbedStatus(tOuterSC,e.AsStatus())
+	} catch e {
+		set pModule = $$$NULLOREF
+		set tMsg = $$$FormatText("Error parsing module manifest for '%1 %2' from repository '%3'",$get(tModName),$get(tModVersion),$get(tModSource))
+		set tOuterSC = $$$ERROR($$$GeneralError,tMsg)
+		set tSC = $system.Status.EmbedStatus(tOuterSC,e.AsStatus())
 	}
-	Quit tSC
+	quit tSC
 }
 
 /// By default (first byref argument only), creates a Studio project containing all of the module's resources.
@@ -1483,104 +1482,104 @@ Method GetStudioProject(
 	pDefaultDeployedValue As %Boolean = "",
 	pProjectSuffix As %String = "") As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tProjectName = $Replace(..DisplayName,".","_")_$Case(pProjectSuffix,"":"",:"_"_pProjectSuffix)
-		If ##class(%Studio.Project).%ExistsId(tProjectName) {
-			Set pProject = ##class(%Studio.Project).%OpenId(tProjectName,,.tSC)
+	set tSC = $$$OK
+	try {
+		set tProjectName = $replace(..DisplayName,".","_")_$case(pProjectSuffix,"":"",:"_"_pProjectSuffix)
+		if ##class(%Studio.Project).%ExistsId(tProjectName) {
+			set pProject = ##class(%Studio.Project).%OpenId(tProjectName,,.tSC)
 			$$$ThrowOnError(tSC)
-		} Else {
-			Set pProject = ##class(%Studio.Project).%New()
-			Set pProject.Name = tProjectName
+		} else {
+			set pProject = ##class(%Studio.Project).%New()
+			set pProject.Name = tProjectName
 		}
-		
-		Do pProject.Items.Clear()
-		
-		If (pDeployedCode = 0) {
+
+		do pProject.Items.Clear()
+
+		if (pDeployedCode = 0) {
 			// Include module manifest in project with non-deployed code. Caller will call once with pDeployedCode = 1,
 			// once with pDeployedCode = 0 to get separate Studio projects; only want this in one of them.
-			Do pProject.AddItem(..Name_".ZPM")
+			do pProject.AddItem(..Name_".ZPM")
 		}
-		
-		Set tResourceKey = ""
-		For {
+
+		set tResourceKey = ""
+		for {
 			#dim tResource As %IPM.Storage.ResourceReference
-			Set tResource = ..Resources.GetNext(.tResourceKey)
-			If (tResourceKey = "") {
-				Quit
+			set tResource = ..Resources.GetNext(.tResourceKey)
+			if (tResourceKey = "") {
+				quit
 			}
-			
-			If (pDeployedCode '= "") {
-				If (tResource.Deploy '= "") && (tResource.Deploy '= pDeployedCode) {
-					Continue
+
+			if (pDeployedCode '= "") {
+				if (tResource.Deploy '= "") && (tResource.Deploy '= pDeployedCode) {
+					continue
 				}
-				If (tResource.Deploy = "") && (pDefaultDeployedValue '= pDeployedCode) {
-					Continue
+				if (tResource.Deploy = "") && (pDefaultDeployedValue '= pDeployedCode) {
+					continue
 				}
 			}
 
-			If $IsObject(tResource.Processor) {
-				Do tResource.Processor.OnGetStudioProject(pProject,.handled)
-				Continue:handled
+			if $isobject(tResource.Processor) {
+				do tResource.Processor.OnGetStudioProject(pProject,.handled)
+				continue:handled
 			}
-			
-			Kill tResourceArray
+
+			kill tResourceArray
 			$$$ThrowOnError(tResource.ResolveChildren(.tResourceArray))
-			
-			Set tChildResourceKey = ""
-			For {
-				Set tChildResourceKey = $Order(tResourceArray(tChildResourceKey))
-				If (tChildResourceKey = "") {
-					Quit
+
+			set tChildResourceKey = ""
+			for {
+				set tChildResourceKey = $order(tResourceArray(tChildResourceKey))
+				if (tChildResourceKey = "") {
+					quit
 				}
-				
+
 				// Add object code for deployed items, since source is unavailable.
 				$$$ThrowOnError(..AddItemToProject(pProject,tChildResourceKey))
 			}
 		}
 		$$$ThrowOnError(pProject.%Save())
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
 ClassMethod AddItemToProject(
 	tProject As %Studio.Project,
 	pResourceName As %String) As %Status [ Internal ]
 {
-	Set tSC = $$$OK
-	Try {
-		Set tName = $Piece(pResourceName,".",1,*-1)
-		Set tExt = $Piece(pResourceName,".",*)
-		If ((tExt = "MAC") || (tExt = "INT")) && '##class(%Library.Routine).Exists(pResourceName) {
-			Do tProject.AddItem(tName_".OBJ")
-		} Else {
-			Do tProject.AddItem(pResourceName)
+	set tSC = $$$OK
+	try {
+		set tName = $piece(pResourceName,".",1,*-1)
+		set tExt = $piece(pResourceName,".",*)
+		if ((tExt = "MAC") || (tExt = "INT")) && '##class(%Library.Routine).Exists(pResourceName) {
+			do tProject.AddItem(tName_".OBJ")
+		} else {
+			do tProject.AddItem(pResourceName)
 		}
 		$$$ThrowOnError(tProject.Check())
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
 
 Method %Compile(ByRef qstruct As %String) As %Status
 {
-	Quit ..Lifecycle.Compile(.qstruct)
+	quit ..Lifecycle.Compile(.qstruct)
 }
 
 Method IsLocked() As %Boolean
 {
-	Quit ($ZConvert(..Version.Build,"L") '= "snapshot")
+	quit ($zconvert(..Version.Build,"L") '= "snapshot")
 }
 
 Method Lock() As %Status
 {
-	If '..IsLocked() {
-		Set ..Version.Build = ""
+	if '..IsLocked() {
+		set ..Version.Build = ""
 	}
-	Quit $$$OK
+	quit $$$OK
 }
 
 Query VersionRequirements(
@@ -1607,41 +1606,41 @@ Method %Evaluate(
 	pAttrValue As %String,
 	ByRef pParams) As %String [ Internal ]
 {
-	Set tAttrValue = pAttrValue
-	If (tAttrValue '[ "{") {
-		Return tAttrValue
+	set tAttrValue = pAttrValue
+	if (tAttrValue '[ "{") {
+		return tAttrValue
 	}
-	Merge tParams = pParams
-	Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, $this, .tParams)
-	Set root = ..Root
-	If (root '= "") {
-		Set root = ##class(%Library.File).NormalizeDirectory(root)
+	merge tParams = pParams
+	do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams, $this, .tParams)
+	set root = ..Root
+	if (root '= "") {
+		set root = ##class(%Library.File).NormalizeDirectory(root)
 	}
-	Set customParams("root") = root
-	Set customParams("packagename") = ..Name
-	Set customParams("version") = ..VersionString
-	Set customParams("verbose") = +$Get(pParams("Verbose"))
-	Set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
-	Set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
-	Set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
-	
+	set customParams("root") = root
+	set customParams("packagename") = ..Name
+	set customParams("version") = ..VersionString
+	set customParams("verbose") = +$get(pParams("Verbose"))
+	set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
+	set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
+	set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
+
 	// {name} expression does not contain dollar sign; handle separately
-	Set name = ..Name
-	Set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($Replace(name,"\","\\"))
+	set name = ..Name
+	set attrValue = ##class(%Regex.Matcher).%New("(?i)\{name\}", attrValue).ReplaceAll($replace(name,"\","\\"))
 
-	Set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", attrValue)
-	While regex.Locate() {
-		Set expr = regex.Group(1)
-		Set value = ..%EvaluateExpression(expr)
-		Set $Extract(attrValue, regex.Start, regex.End - 1) = value
-		Set regex.Text = attrValue
+	set regex = ##class(%Regex.Matcher).%New("#\{([^}]+)\}", attrValue)
+	while regex.Locate() {
+		set expr = regex.Group(1)
+		set value = ..%EvaluateExpression(expr)
+		set $extract(attrValue, regex.Start, regex.End - 1) = value
+		set regex.Text = attrValue
 	}
 
-	Return attrValue
+	return attrValue
 }
 
-/// This callback method is invoked by the <METHOD>%Save</METHOD> method to 
-/// provide notification that the object is being saved. It is called before 
+/// This callback method is invoked by the <METHOD>%Save</METHOD> method to
+/// provide notification that the object is being saved. It is called before
 /// any data is written to disk.
 /// 
 /// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
@@ -1649,19 +1648,19 @@ Method %Evaluate(
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
-	Set ..LastUpdated = $ZDateTime($Horolog, 3)
-	Quit $$$OK
+	set ..LastUpdated = $zdatetime($horolog, 3)
+	quit $$$OK
 }
 
 Method %EvaluateExpression(pExpr) As %String [ Internal ]
 {
-  Try {
+  try {
 	// Remove leading whitespace because there can only be 1 whitespace between "return" and its argument
-	set pExpr = $Zstrip(pExpr, "<W") 
+	set pExpr = $zstrip(pExpr, "<W")
     return @pExpr
-  } Catch ex {
+  } catch ex {
   }
-  Return ""
+  return ""
 }
 
 Storage Default

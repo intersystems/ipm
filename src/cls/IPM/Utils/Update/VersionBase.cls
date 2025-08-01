@@ -56,31 +56,21 @@ ClassMethod ApplyStepsInOrder(
         set sc = ex.AsStatus()
     }
 
-    if verbose {
-        write !, "Releasing lock on ^%IPM.Update("_module.Name_", "_version_")"
-    }
-    $$$UnlockUpdateModuleVersion(module.Name, version)
-
-    quit sc
+    if verbose { write !, "Releasing lock on ^IPM("_module.Name_", "_version_")" }
+    lock -^IPM(module.Name, version)
+    return $$$OK
 }
 
-/// Helper method for ApplyStepsInOrder()
-/// Iterates over a method name list and calls their update steps.
-/// If an update step does not already exist, a new one gets created.
-/// Once reaching the first method that hasn't been run on the instance (no TimeStampEnd value),
-/// newStepToApply gets marked as true to tell us to run all remaining steps in the list
-/// Can carry this over to subsequent calls by passing the newStepToApply variable to those ExecuteMethodList() calls
-/// i.e. We find a new step to apply in the mirroredMethodNames list so we know to execute all steps in the nonMirroredMethodNames list
 ClassMethod ExecuteMethodList(
 	module As %IPM.Storage.Module,
 	methodList As %Library.DynamicArray,
 	className As %String,
-	hostName As %String,
-	instanceName As %String,
 	mirrored As %Boolean,
+	mirroredHostName As %String,
+	mirroredInstanceName As %String,
 	logfile As %Library.File,
 	verbose As %Boolean = 0,
-	ByRef newStepToApply As %Boolean = 0) As %Status [ Private ]
+	ByRef newStepAdded As %Boolean = 0) [ Private ]
 {
     set sc = $$$OK
     try {
