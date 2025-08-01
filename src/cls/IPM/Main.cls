@@ -763,7 +763,10 @@ ClassMethod %GetCommandStructure(Output pCommandStructure)
 }
 
 /// @API.Method
-ClassMethod Shell(pCommand As %String = "", pTerminateOnError As %Boolean = 0, pHaltOnComplete As %Boolean = 0) As %Status
+ClassMethod Shell(
+	pCommand As %String = "",
+	pTerminateOnError As %Boolean = 0,
+	pHaltOnComplete As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Do ..ShellInternal(pCommand,.tException)
@@ -800,7 +803,10 @@ ClassMethod TerminalPrompt() As %String
 /// @API.Method
 /// Get Version modules and current registry
 /// example do ##class(%IPM.Main).GetVersion("zpm,zpm-registry",.out,.list)
-ClassMethod GetVersion(ModuleName, ByRef out, list)
+ClassMethod GetVersion(
+	ModuleName,
+	ByRef out,
+	list)
 {
 	Do ..GetListModules("*", ModuleName, .list)
 	for i=1:1 { quit:'$d(list(i),ns)
@@ -870,7 +876,9 @@ ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
 }
 
 /// For use in unit tests that need to test if a command threw any exceptions.
-ClassMethod ShellInternal(pCommand As %String, Output pException As %Exception.AbstractException) [ Internal ]
+ClassMethod ShellInternal(
+	pCommand As %String,
+	Output pException As %Exception.AbstractException) [ Internal ]
 {
 	New $$$DeprecationWarned
 	// Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
@@ -1041,7 +1049,9 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 }
 
 /// Get list Namespace, example do ##class(%IPM.Main).GetListNamespace(.ns)
-ClassMethod GetListNamespace(Output list, pSearch As %String = "")
+ClassMethod GetListNamespace(
+	Output list,
+	pSearch As %String = "")
 {
   Kill list
   Set list = 0
@@ -1094,7 +1104,12 @@ ClassMethod SwitchToNamespace(pNamespace As %String = {$Namespace}) As %Status
 
 /// Get List Modules
 /// example d ##class(%IPM.Main).GetListModules("%SYS","zpm",.list)
-ClassMethod GetListModules(pNamespace As %String = {$Namespace}, pSearch As %String = "", ByRef list, pExtraFields As %String = "", pRepository As %String = "") [ Internal ]
+ClassMethod GetListModules(
+	pNamespace As %String = {$Namespace},
+	pSearch As %String = "",
+	ByRef list,
+	pExtraFields As %String = "",
+	pRepository As %String = "") [ Internal ]
 {
   Set list = 0
   If (pNamespace="") || (pNamespace["*") {
@@ -1325,7 +1340,9 @@ ClassMethod GetDefaultCommandRegistry()
 }
 
 /// Get Version Module
-ClassMethod GetVersionModule(name, namespace = {$namespace})
+ClassMethod GetVersionModule(
+	name,
+	namespace = {$namespace})
 {
 	New $Namespace
 	Set $Namespace=namespace
@@ -1409,7 +1426,10 @@ ClassMethod AddIPMMappedNamespaces(ByRef list) [ Private ]
 }
 
 /// @API.Method
-ClassMethod IsAvailable(pModuleName As %String, pNamespace As %String = "", pArgs...) As %Boolean
+ClassMethod IsAvailable(
+	pModuleName As %String,
+	pNamespace As %String = "",
+	pArgs...) As %Boolean
 {
 	New $NAMESPACE
 	If pNamespace'="" {
@@ -1441,7 +1461,9 @@ ClassMethod DeleteNamespaceDefaultModifiers() [ Internal ]
 	Kill $$$ZPMDefaultModifiers
 }
 
-ClassMethod AccumulateDefaultModifierList(ByRef pDefaultArray, pNameParts As %Library.List = "") As %Library.List [ Internal ]
+ClassMethod AccumulateDefaultModifierList(
+	ByRef pDefaultArray,
+	pNameParts As %Library.List = "") As %Library.List [ Internal ]
 {
 	Set returnList = ""
 	Set key = ""
@@ -2032,7 +2054,12 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 	}
 }
 
-ClassMethod ShowModulesForRepository(pRepoName As %String, pShowRepo As %Boolean = 0, pShowDesc As %Boolean = 0, pSearchString As %String = "", pShowAllVersions As %Boolean = 0) [ Private ]
+ClassMethod ShowModulesForRepository(
+	pRepoName As %String,
+	pShowRepo As %Boolean = 0,
+	pShowDesc As %Boolean = 0,
+	pSearchString As %String = "",
+	pShowAllVersions As %Boolean = 0) [ Private ]
 {
   #define gn "^||tmpDesc"
 	Kill @$$$gn
@@ -2088,7 +2115,9 @@ Query ServerMenuExtensionClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%Stri
 	select Name as ID,Name from %Dictionary.ClassDefinition_SubclassOf('%IPM.ExtensionBase.ServerMenu.Interface')
 }
 
-ClassMethod LoadFromRepo(tDirectoryName, ByRef tParams) [ Internal ]
+ClassMethod LoadFromRepo(
+	tDirectoryName,
+	ByRef tParams) [ Internal ]
 {
 	Set slash=$Select($ZVersion(1)=3:"/",1:"\")
 	Set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($ZUtil(86))_"mgr"_slash_"Temp"_slash_$Translate($ZTimestamp,".,")_slash)
@@ -2473,7 +2502,10 @@ ClassMethod ActiveNamespacesExecute(qHandle As %Binary) As %Status
   Return $$$OK
 }
 
-ClassMethod ActiveNamespacesFetch(qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = ActiveNamespacesExecute ]
+ClassMethod ActiveNamespacesFetch(
+	qHandle As %Binary,
+	ByRef Row As %List,
+	ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = ActiveNamespacesExecute ]
 {
   Try {
     If $Data(qHandle($Increment(qHandle)), nsp) # 2 {
@@ -2555,7 +2587,10 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 }
 
 /// Get module list in currently namespace
-ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status [ Deprecated ]
+ClassMethod GetListModule(
+	ns = {$Namespace},
+	ByRef Mod,
+	OnlyName = 1) As %Status [ Deprecated ]
 {
 	new $Namespace
 	set $Namespace=ns
@@ -2595,7 +2630,11 @@ ClassMethod GetListModule(ns = {$Namespace}, ByRef Mod, OnlyName = 1) As %Status
 	Quit $$$OK
 }
 
-ClassMethod AccumulateTreeRecursive(pModName As %String, ByRef pModMap, ByRef pTree, pLevel As %Integer = 0) [ Private ]
+ClassMethod AccumulateTreeRecursive(
+	pModName As %String,
+	ByRef pModMap,
+	ByRef pTree,
+	pLevel As %Integer = 0) [ Private ]
 {
 	If (pLevel = 0) && $Data(pVisitedMap(pModName)) {
 		Quit
@@ -2902,7 +2941,11 @@ ClassMethod Import(ByRef pCommandInfo)
 	}
 }
 
-ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Boolean = 0, Output pFound As %Boolean = 0, ByRef tGenLines) As %Status
+ClassMethod UpdateLanguageExtensionsOne(
+	RoutineName As %String,
+	pTestOnly As %Boolean = 0,
+	Output pFound As %Boolean = 0,
+	ByRef tGenLines) As %Status
 {
 	Set tRtn = ##class(%Routine).%New(RoutineName)
 	If ##class(%Routine).Exists(RoutineName) {
@@ -2942,7 +2985,10 @@ ClassMethod UpdateLanguageExtensionsOne(RoutineName As %String, pTestOnly As %Bo
 	Quit $$$OK
 }
 
-ClassMethod UpdateLanguageExtensions(pVerbose As %Boolean = 0, pTestOnly As %Boolean = 0, Output pFound As %Boolean = 0) As %Status
+ClassMethod UpdateLanguageExtensions(
+	pVerbose As %Boolean = 0,
+	pTestOnly As %Boolean = 0,
+	Output pFound As %Boolean = 0) As %Status
 {
 	Set tSC = $$$OK
 	Set tInitTLevel = $TLevel
@@ -3552,7 +3598,9 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
 /// <li>pIsMappedFrom(destinationNamespace) = sourceNamespace</li>
 /// <li>pIsMappedTo(sourceNamespace, destinationNamespace) = ""</li>
 /// </ul>
-ClassMethod GetMapInfo(Output pIsMappedFrom, Output pIsMappedTo)
+ClassMethod GetMapInfo(
+	Output pIsMappedFrom,
+	Output pIsMappedTo)
 {
 	Kill pIsMappedFrom, pIsMappedTo 
 	Do ..GetListModules("*", $$$IPMModuleName, .list)	
@@ -3574,7 +3622,10 @@ $$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameEx
 /// Runs package manager commands in a way that is friendly to the OS-level shell.
 /// Creates <var>pOutputLogFile</var> if it does not exist.
 /// If it does, and <var>pAppendToLog</var> is true, appends to it; otherwise, deletes the file before outputting to it.
-ClassMethod ShellScript(pCommand As %String, pOutputLogFile As %String = "", pAppendToLog As %Boolean = 0)
+ClassMethod ShellScript(
+	pCommand As %String,
+	pOutputLogFile As %String = "",
+	pAppendToLog As %Boolean = 0)
 {
 	Set tSC = $$$OK
 	Set tFileOpen = 0
@@ -3612,7 +3663,12 @@ ClassMethod ShellScript(pCommand As %String, pOutputLogFile As %String = "", pAp
 	}
 }
 
-ClassMethod DisplayModules(ByRef pList, pNumbered As %Boolean = 0, pWithNamespace As %Boolean = 0, pIndent As %Integer = 0, ByRef pModifiers)
+ClassMethod DisplayModules(
+	ByRef pList,
+	pNumbered As %Boolean = 0,
+	pWithNamespace As %Boolean = 0,
+	pIndent As %Integer = 0,
+	ByRef pModifiers)
 {
   If '$Data(pList) {
     Quit
