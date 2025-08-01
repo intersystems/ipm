@@ -16,45 +16,48 @@ XData Export
 
 ClassMethod Unpack() As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tXData = ##class(%Dictionary.XDataDefinition).IDKEYOpen($classname(),"Export",,.tSC)
-		$$$ThrowOnError(tSC)
-		$$$ThrowOnError($System.OBJ.LoadStream(tXData.Data,,,.tLoaded))
-		$$$ThrowOnError($System.OBJ.Delete($classname()))
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tXData = ##class(%Dictionary.XDataDefinition).IDKEYOpen($classname(),"Export",,.tSC)
+        $$$ThrowOnError(tSC)
+        $$$ThrowOnError($system.OBJ.LoadStream(tXData.Data,,,.tLoaded))
+        $$$ThrowOnError($system.OBJ.Delete($classname()))
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-ClassMethod Create(pTargetClassName As %Dictionary.Classname, ByRef pItems, pVerbose As %Boolean = 0) As %Status
+ClassMethod Create(
+	pTargetClassName As %Dictionary.Classname,
+	ByRef pItems,
+	pVerbose As %Boolean = 0) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		If ##class(%Dictionary.ClassDefinition).%ExistsId(pTargetClassName) {
-			$$$ThrowOnError(##class(%Dictionary.ClassDefinition).%DeleteId(pTargetClassName))
-		}
-		Set tClassDefinition = ##class(%Dictionary.ClassDefinition).%New()
-		Set tClassDefinition.Name = pTargetClassName
-		Set tClassDefinition.ProcedureBlock = 1
-		
-		Set tMethodDefinition = ##class(%Dictionary.MethodDefinition).IDKEYOpen($classname(),"Unpack",,.tSC)
-		$$$ThrowOnError(tSC)
-		Set tClone = tMethodDefinition.%ConstructClone()
-		Do tClassDefinition.Methods.Insert(tClone)
-		
-		Set tXDataDefinition = ##class(%Dictionary.XDataDefinition).%New()
-		Set tXDataDefinition.Name = "Export"
-		$$$ThrowOnError($System.OBJ.ExportToStream(.pItems,tXDataDefinition.Data,$Select(pVerbose:"d",1:"-d")))
-		Do tClassDefinition.XDatas.Insert(tXDataDefinition)
-		
-		$$$ThrowOnError(tClassDefinition.%Save())
-		$$$ThrowOnError($System.OBJ.Compile(pTargetClassName,"c-k-d"))
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        if ##class(%Dictionary.ClassDefinition).%ExistsId(pTargetClassName) {
+            $$$ThrowOnError(##class(%Dictionary.ClassDefinition).%DeleteId(pTargetClassName))
+        }
+        set tClassDefinition = ##class(%Dictionary.ClassDefinition).%New()
+        set tClassDefinition.Name = pTargetClassName
+        set tClassDefinition.ProcedureBlock = 1
+
+        set tMethodDefinition = ##class(%Dictionary.MethodDefinition).IDKEYOpen($classname(),"Unpack",,.tSC)
+        $$$ThrowOnError(tSC)
+        set tClone = tMethodDefinition.%ConstructClone()
+        do tClassDefinition.Methods.Insert(tClone)
+
+        set tXDataDefinition = ##class(%Dictionary.XDataDefinition).%New()
+        set tXDataDefinition.Name = "Export"
+        $$$ThrowOnError($system.OBJ.ExportToStream(.pItems,tXDataDefinition.Data,$select(pVerbose:"d",1:"-d")))
+        do tClassDefinition.XDatas.Insert(tXDataDefinition)
+
+        $$$ThrowOnError(tClassDefinition.%Save())
+        $$$ThrowOnError($system.OBJ.Compile(pTargetClassName,"c-k-d"))
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 }

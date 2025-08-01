@@ -22,65 +22,67 @@ Property Arg As list Of %String(MAXLEN = 255, XMLNAME = "Arg", XMLPROJECTION = "
 
 Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes, SqlFieldName = ModuleItem ];
 
-Method GetArgsArray(pParams, Output args) As %Status
+Method GetArgsArray(
+	pParams,
+	Output args) As %Status
 {
-  Set args = ..Arg.Count()
-  For i=1:1:..Arg.Count() {
-    Set args(i) = ..Module.%Evaluate(..Arg.GetAt(i), .pParams)
-    If (args(i)=$Char(0)) { Set args(i) = "" }
-  }
-  
-  /// Add custom parameters support for Invoke args
-  Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..Module,.pParams)
-  Do ##class(%IPM.Storage.ModuleSetting.Default).EvaluateArgs(.args,.customParams)
-  /// Perform a second pass to manage embeded vars, ex:
-  /// <Default Name="MyDir" Value="${mgrdir}MySubDir"></Default>
-  Set i = ""
-  For  {
-  	Set i = $Order(args(i),1,value)
-  	Quit:i=""
-  	Set args(i) = ..Module.%Evaluate(value, .pParams)
-  }
-  	
-  Quit $$$OK
+    set args = ..Arg.Count()
+    for i=1:1:..Arg.Count() {
+        set args(i) = ..Module.%Evaluate(..Arg.GetAt(i), .pParams)
+        if (args(i)=$char(0)) {
+            set args(i) = ""
+        }
+    }
+    // Add custom parameters support for Invoke args
+    do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..Module,.pParams)
+    do ##class(%IPM.Storage.ModuleSetting.Default).EvaluateArgs(.args,.customParams)
+    // Perform a second pass to manage embeded vars, ex:
+    // <Default Name="MyDir" Value="${mgrdir}MySubDir"></Default>
+    set i = ""
+    for  {
+        set i = $order(args(i),1,value)
+        quit:i=""
+        set args(i) = ..Module.%Evaluate(value, .pParams)
+    }
+    quit $$$OK
 }
 
-Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
+Method OnBeforePhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-  Set tPhase = $Select(..CustomPhase'="":..CustomPhase,1:..Phase)
-  If (pPhase '= tPhase) || ("Before" '= ..When) {
-	  Quit $$$OK
-  }
-
-	Quit ..doInvoke(.pParams)
+    set tPhase = $select(..CustomPhase'="":..CustomPhase,1:..Phase)
+    if (pPhase '= tPhase) || ("Before" '= ..When) {
+        quit $$$OK
+    }
+    quit ..doInvoke(.pParams)
 }
 
-Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+Method OnAfterPhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-  Set tPhase = $Select(..CustomPhase'="":..CustomPhase,1:..Phase)
-  If (pPhase '= tPhase) || ("After" '= ..When) {
-	  Quit $$$OK
-  }
-
-	Quit ..doInvoke(.pParams)
+    set tPhase = $select(..CustomPhase'="":..CustomPhase,1:..Phase)
+    if (pPhase '= tPhase) || ("After" '= ..When) {
+        quit $$$OK
+    }
+    quit ..doInvoke(.pParams)
 }
 
 Method doInvoke(ByRef pParams) As %Status
 {
-  Set tSC = $$$OK
-  Do ..GetArgsArray(.pParams, .args)
-
-  Try {
-    If ..CheckStatus {
-      Set tSC = $ClassMethod(..Class, ..Method, args...)
-    } Else {
-      Do $ClassMethod(..Class, ..Method, args...)
+    set tSC = $$$OK
+    do ..GetArgsArray(.pParams, .args)
+    try {
+        if ..CheckStatus {
+            set tSC = $classmethod(..Class, ..Method, args...)
+        } else {
+            do $classmethod(..Class, ..Method, args...)
+        }
+    } catch ex {
+        set tSC = ex.AsStatus()
     }
-  } Catch ex {
-    Set tSC = ex.AsStatus()
-  }
-
-  Quit tSC
+    quit tSC
 }
 
 Storage Default

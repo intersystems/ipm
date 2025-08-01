@@ -6,43 +6,45 @@ Property Config As %Library.DynamicObject [ InitialExpression = {{}}, Private ];
 /// Load the configuration from the specified path into <property>Config</property>
 Method Load(path As %String)
 {
-    Try {
-        Set stream = ##class(%Stream.FileCharacter).%New()
-        Set stream.TranslateTable = "UTF8"
+    try {
+        set stream = ##class(%Stream.FileCharacter).%New()
+        set stream.TranslateTable = "UTF8"
         $$$ThrowOnError(stream.LinkToFile(path))
-        Set jsonString = ""
-        While 'stream.AtEnd {
-            Set jsonString = jsonString _ stream.Read()
+        set jsonString = ""
+        while 'stream.AtEnd {
+            set jsonString = jsonString _ stream.Read()
         }
-        Try {
-            Set newConfig = {}.%FromJSON(jsonString)
-        } Catch Ex {
+        try {
+            set newConfig = {}.%FromJSON(jsonString)
+        } catch Ex {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file: " _ path))
         }
 
-        If newConfig.%IsA("%Library.DynamicArray") {
+        if newConfig.%IsA("%Library.DynamicArray") {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file. Expected a JSON object, not a JSON array"))
         }
-        Do ..MergeDynamicObjects(..Config, newConfig)
-        Set ..Config = ..%Evaluate(..Config)
-    } Catch ex {
-        Do ..Clear()
-        Throw ex
+        do ..MergeDynamicObjects(..Config, newConfig)
+        set ..Config = ..%Evaluate(..Config)
+    } catch ex {
+        do ..Clear()
+        throw ex
     }
 }
 
 /// Get the specified argument for the specified package
-Method GetArg(package As %String, args... As %String) As %IPM.DataType.Any
+Method GetArg(
+	package As %String,
+	args... As %String) As %IPM.DataType.Any
 {
-    Set obj = ..Config.%Get(package)
+    set obj = ..Config.%Get(package)
 
-    For i = 1:1:$Get(args) {
-        If '($IsObject(obj) && obj.%IsA("%Library.DynamicAbstractObject")) {
-            Return ""
+    for i = 1:1:$get(args) {
+        if '($isobject(obj) && obj.%IsA("%Library.DynamicAbstractObject")) {
+            return ""
         }
-        Set obj = obj.%Get(args(i))
+        set obj = obj.%Get(args(i))
     }
-    Return obj
+    return obj
 }
 
 /// The input could be a primitive type, a dynamic object, or a dynamic array
@@ -50,76 +52,80 @@ Method GetArg(package As %String, args... As %String) As %IPM.DataType.Any
 /// If the environment variable is not set, it will be empty string
 ClassMethod %Evaluate(obj As %IPM.DataType.Any) As %IPM.DataType.Any
 {
-    Return ..%EvaluateHelper(obj, 0)
+    return ..%EvaluateHelper(obj, 0)
 }
 
 /// Acutal implementation of %Evaluate
-ClassMethod %EvaluateHelper(obj As %IPM.DataType.Any, copyCreated As %Boolean) As %IPM.DataType.Any [ Internal, Private ]
+ClassMethod %EvaluateHelper(
+	obj As %IPM.DataType.Any,
+	copyCreated As %Boolean) As %IPM.DataType.Any [ Internal, Private ]
 {
-    If '$IsObject(obj) {
-        Set regex= "\$\{([a-zA-Z0-9_]+)\}"
-        For {
-            Set matcher = ##class(%Regex.Matcher).%New(regex, obj)
-            If 'matcher.Locate() {
-                Quit
+    if '$isobject(obj) {
+        set regex= "\$\{([a-zA-Z0-9_]+)\}"
+        for {
+            set matcher = ##class(%Regex.Matcher).%New(regex, obj)
+            if 'matcher.Locate() {
+                quit
             }
-            Set varName = $Extract(matcher.Group, 3, *-1)
-            Set obj = matcher.ReplaceFirst($System.Util.GetEnviron(varName))
+            set varName = $extract(matcher.Group, 3, *-1)
+            set obj = matcher.ReplaceFirst($system.Util.GetEnviron(varName))
         }
-        Return obj
+        return obj
     }
 
     // If the object is already a copy, we don't need to create a new copy recursively
-    If 'copyCreated {
-        Set obj = obj.%FromJSON(obj.%ToJSON())
+    if 'copyCreated {
+        set obj = obj.%FromJSON(obj.%ToJSON())
     }
-    Set iter = obj.%GetIterator()
-    While iter.%GetNext(.key, .value, .type) {
+    set iter = obj.%GetIterator()
+    while iter.%GetNext(.key, .value, .type) {
         // type cannot be set for array / object
-        If (type = "object") || (type = "array") {
-            Set type = ""
+        if (type = "object") || (type = "array") {
+            set type = ""
         }
         // since we are already in a recursive call, we don't need to create a new copy
-        Do obj.%Set(key, ..%EvaluateHelper(value, 1), type) 
+        do obj.%Set(key, ..%EvaluateHelper(value, 1), type)
     }
-    Return obj
+    return obj
 }
 
 Method Clear()
 {
-    Set ..Config = {}
-    Quit $$$OK
+    set ..Config = {}
+    quit $$$OK
 }
 
 Method IsEmpty()
 {
-    Return ..Config.%Size() = 0
+    return ..Config.%Size() = 0
 }
 
 /// Merge the source dynamic object into the destination dynamic object
 /// The desination object will be updated in-place, with no reference to the source object, i.e., make deep copies wherever possible
-ClassMethod MergeDynamicObjects(dest As %DynamicAbstractObject, src As %DynamicAbstractObject)
+ClassMethod MergeDynamicObjects(
+	dest As %DynamicAbstractObject,
+	src As %DynamicAbstractObject)
 {
-    If '($IsObject(dest) && $IsObject(src)) {
-        Set errorText = $$$FormatText("Invalid arguments. Expected two dynamic objects. Got %1 and %2", dest, src)
+    if '($isobject(dest) && $isobject(src)) {
+        set errorText = $$$FormatText("Invalid arguments. Expected two dynamic objects. Got %1 and %2", dest, src)
         $$$ThrowStatus($$$ERROR($$$GeneralError, errorText))
     }
 
-    If (dest.%IsA("%Library.DynamicObject") '= src.%IsA("%Library.DynamicObject")) {
-        Set errorText = $$$FormatText("Invalid arguments. Expected two dynamic objects or two dynamic arrays. Got %1 and %2", $classname(dest), $classname(src))
+    if (dest.%IsA("%Library.DynamicObject") '= src.%IsA("%Library.DynamicObject")) {
+        set errorText = $$$FormatText("Invalid arguments. Expected two dynamic objects or two dynamic arrays. Got %1 and %2", $classname(dest), $classname(src))
         $$$ThrowStatus($$$ERROR($$$GeneralError, errorText))
     }
 
-    Set iter = src.%GetIterator()
-    While iter.%GetNext(.key, .value, .type) {
-        If (type = "object") || (type = "array") {
-            If dest.%GetTypeOf(key) = "unassigned" {
-                Do dest.%Set(key, value.%New())
+    set iter = src.%GetIterator()
+    while iter.%GetNext(.key, .value, .type) {
+        if (type = "object") || (type = "array") {
+            if dest.%GetTypeOf(key) = "unassigned" {
+                do dest.%Set(key, value.%New())
             }
-            Do ..MergeDynamicObjects(dest.%Get(key), src.%Get(key))
-        } Else {
+            do ..MergeDynamicObjects(dest.%Get(key), src.%Get(key))
+        } else {
             // primitive types can be directly set
-            Do dest.%Set(key, value, type)
+            do dest.%Set(key, value, type)
         }
     }
 }

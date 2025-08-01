@@ -9,7 +9,7 @@ Property available As %Boolean [ InitialExpression = 1 ];
 
 Method ToString() As %String
 {
-    Quit $Select(..available:..version,1:"currently unavailable")
+    quit $select(..available:..version,1:"currently unavailable")
 }
 
 }

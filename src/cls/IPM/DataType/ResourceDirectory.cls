@@ -8,17 +8,17 @@ Parameter MAXLEN = 255;
 /// In this case, <a href="#MINLEN">MINLEN</a>, <a href="#MAXLEN">MAXLEN</a>, <a href="#VALUELIST">VALUELIST</a>, and <a href="#PATTERN">PATTERN</a>.
 ClassMethod IsValid(%val As %RawString) As %Status [ ServerOnly = 0 ]
 {
-    If $Extract(%val) = "/" {
-        Return $$$ERROR($$$GeneralError, "Resource directory cannot start with a slash.")
+    if $extract(%val) = "/" {
+        return $$$ERROR($$$GeneralError, "Resource directory cannot start with a slash.")
     }
-    Set segments = $ListFromString(%val, "/")
-    Set ptr = 0
-    While $ListNext(segments, ptr, seg) {
-        If seg = ".." {
-            Return $$$ERROR($$$GeneralError, "For security reasons, resource directory cannot contain '..'.")
+    set segments = $listfromstring(%val, "/")
+    set ptr = 0
+    while $listnext(segments, ptr, seg) {
+        if seg = ".." {
+            return $$$ERROR($$$GeneralError, "For security reasons, resource directory cannot contain '..'.")
         }
     }
-    Return $$$OK
+    return $$$OK
 }
 
 }

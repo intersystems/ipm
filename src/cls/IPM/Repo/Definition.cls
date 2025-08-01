@@ -25,7 +25,7 @@ Property Name As %String(MAXLEN = 100) [ Required ];
 
 Property Enabled As %Boolean [ InitialExpression = 1 ];
 
-Property Details As %String(MAXLEN = "") [ SqlComputeCode = {Set {*} = ""}, SqlComputed ];
+Property Details As %String(MAXLEN = "") [ SqlComputeCode = {set {*} = ""}, SqlComputed ];
 
 Property Snapshots As %Boolean [ InitialExpression = 0 ];
 
@@ -38,32 +38,31 @@ Property OverriddenSortOrder As %Integer [ Internal ];
 
 ClassMethod %GetCommandStructure(Output pCommandStructure)
 {
-  Kill pCommandStructure
-  Set tRes = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
-  While tRes.%Next(.tSC) {
-    Do $ClassMethod(tRes.Name, "%GetOneCommandStructure", .tCommandStructure)
-    Merge pCommandStructure("repo") = tCommandStructure("repo")
-  }
+    kill pCommandStructure
+    set tRes = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
+    while tRes.%Next(.tSC) {
+        do $classmethod(tRes.Name, "%GetOneCommandStructure", .tCommandStructure)
+        merge pCommandStructure("repo") = tCommandStructure("repo")
+    }
 }
 
 ClassMethod CollectServerTypes(Output types) As %Status
 {
-  Set rs = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
+    set rs = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
 
-  While rs.%Next() {
-    Set name = rs.Name
-    Set moniker = $Parameter(name, "MONIKER")
-    Continue:moniker=""
-    Set types(moniker) = name
-    
-    Set aliasList = $ListFromString($Parameter(name, "MONIKERALIAS"))
-    Set ptr = 0
-    While $ListNext(aliasList, ptr, alias) {
-      Merge types(alias) = types(moniker)
+    while rs.%Next() {
+        set name = rs.Name
+        set moniker = $parameter(name, "MONIKER")
+        continue:moniker=""
+        set types(moniker) = name
+        set aliasList = $listfromstring($parameter(name, "MONIKERALIAS"))
+        set ptr = 0
+        while $listnext(aliasList, ptr, alias) {
+            merge types(alias) = types(moniker)
+        }
     }
-  }
-  
-  Return $$$OK
+
+    return $$$OK
 }
 
 /// Boolean flag indicating that modules installed from this repository
@@ -84,11 +83,11 @@ Method GetPublishService() As %IPM.Repo.IPublishService [ Abstract ]
 
 ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 {
-	Set tServer = ..%OpenId(pID)
-	If tServer.OverriddenSortOrder '= "" {
-		Quit tServer.OverriddenSortOrder
-	}
-	Quit tServer.GetSortOrder()
+    set tServer = ..%OpenId(pID)
+    if tServer.OverriddenSortOrder '= "" {
+        quit tServer.OverriddenSortOrder
+    }
+    quit tServer.GetSortOrder()
 }
 
 /// Get a number of TABs (ascii 9) for display padding purposes.
@@ -97,25 +96,25 @@ ClassMethod SortOrder(pID As %String) As %Integer [ SqlProc ]
 /// If a new option is added to the display, only the parameter `#MaxDisplayTabCount` needs to be changed.
 ClassMethod Padding(pDecrement As %Integer = 0) As %String [ Internal ]
 {
-	Set pDecrement = ..#MaxDisplayTabCount - pDecrement
-	Set tTabs = ""
-	For i = 1:1:pDecrement {
-		Set tTabs = tTabs_$Char(9)
-	}
-	Return tTabs
+    set pDecrement = ..#MaxDisplayTabCount - pDecrement
+    set tTabs = ""
+    for i = 1:1:pDecrement {
+        set tTabs = tTabs_$char(9)
+    }
+    return tTabs
 }
 
 /// Outputs information about this server to the current device.
 /// Subclasses may override to show additional information, but should typically call ##super() at the beginning.
 Method Display()
 {
-	Write !,..Name
-	Write !,$c(9),"Source: ",..Padding(1),..Details
-	Write !,$c(9),"Enabled?",..Padding(1),$$$YesNo(..Enabled)
-	Write !,$c(9),"Available?",..Padding(1),$$$YesNo(..GetPackageService().IsAvailable())
-	Write !,$c(9),"Use for Snapshots?",..Padding(2),$$$YesNo(..Snapshots)
-	Write !,$c(9),"Use for Prereleases?",..Padding(2),$$$YesNo(..Prereleases)
-	Write !,$c(9),"Is Read-Only?",..Padding(1),$$$YesNo(..ReadOnly)
+    write !,..Name
+    write !,$char(9),"Source: ",..Padding(1),..Details
+    write !,$char(9),"Enabled?",..Padding(1),$$$YesNo(..Enabled)
+    write !,$char(9),"Available?",..Padding(1),$$$YesNo(..GetPackageService().IsAvailable())
+    write !,$char(9),"Use for Snapshots?",..Padding(2),$$$YesNo(..Snapshots)
+    write !,$char(9),"Use for Prereleases?",..Padding(2),$$$YesNo(..Prereleases)
+    write !,$char(9),"Is Read-Only?",..Padding(1),$$$YesNo(..ReadOnly)
 }
 
 /// Called from package manager shell to create or update an instance of this class.
@@ -124,72 +123,80 @@ Method Display()
 /// For a full list of modifiers, see the Commands XDATA block in <class>%IPM.Main</class>.
 /// If specified, <var>pExpectedType</var> will be compared against the full classname of the existing
 /// instance matched by <var>pModifiers("name")</var>; an error will be returned if they do not match.
-ClassMethod Configure(pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData, pExpectedType As %Dictionary.Classname = "") As %Status [ Final ]
+ClassMethod Configure(
+	pInteractive As %Boolean = 1,
+	ByRef pModifiers,
+	ByRef pData,
+	pExpectedType As %Dictionary.Classname = "") As %Status [ Final ]
 {
-	Set tSC = $$$OK
-	Try {
-		Set tName = $Get(pModifiers("name"))
-		
-		If (pInteractive && (tName = "")) {
-			Set tResponse = ##class(%Library.Prompt).GetString("Name: ",.tName)
-			If (tResponse '= $$$SuccessResponse) {
-				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-			}
-		}
-		
-		Set tIsNew = 0
-		Set tInstance = $$$NULLOREF
-		If ..ServerDefinitionKeyExists(tName) {
-			Set tInstance = ..ServerDefinitionKeyOpen(tName,,.tSC)
-			$$$ThrowOnError(tSC)
-			
-			If (pExpectedType '= "") && (pExpectedType '= $classname(tInstance)) {
-				Set tMessage = "Repository '%1' is configured as a different type. Use a different name, or delete it (repo -n %1 -delete) and run the previous command again."
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText(tMessage,tName))
-				$$$ThrowStatus(tSC)
-			}
-		}
-		
-		If '$IsObject(tInstance) {
-			Set tInstance = ..%New()
-			Set tIsNew = 1
-			Set tInstance.Name = tName
-		}
-		
-		If $Data(pModifiers("disable")) {
-			Set tInstance.Enabled = 0
-		} ElseIf (tIsNew || $Data(pModifiers("enable"))) {
-			Set tInstance.Enabled = 1
-		}
-		
-		If $Data(pModifiers("snapshots"),tSnapshots) {
-			Set tInstance.Snapshots = tSnapshots
-		} ElseIf (tIsNew) {
-			Set tInstance.Snapshots = 1
-		}
-		If $Data(pModifiers("prereleases"),tPrereleases) {
-			Set tInstance.Prereleases = tPrereleases
-		} ElseIf (tIsNew) {
-			Set tInstance.Prereleases = 1
-		}
-		If $Data(pModifiers("read-only"),tReadOnly) {
-			Set tInstance.ReadOnly = tReadOnly
-		} ElseIf (tIsNew) {
-			Set tInstance.ReadOnly = 0
-		}
-		
-		$$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
-		
-		$$$ThrowOnError(tInstance.%Save())
-    Do tInstance.Display()
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tName = $get(pModifiers("name"))
+
+        if (pInteractive && (tName = "")) {
+            set tResponse = ##class(%Library.Prompt).GetString("Name: ",.tName)
+            if (tResponse '= $$$SuccessResponse) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+            }
+        }
+
+        set tIsNew = 0
+        set tInstance = $$$NULLOREF
+        if ..ServerDefinitionKeyExists(tName) {
+            set tInstance = ..ServerDefinitionKeyOpen(tName,,.tSC)
+            $$$ThrowOnError(tSC)
+
+            if (pExpectedType '= "") && (pExpectedType '= $classname(tInstance)) {
+                set tMessage = "Repository '%1' is configured as a different type. Use a different name, or delete it (repo -n %1 -delete) and run the previous command again."
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText(tMessage,tName))
+                $$$ThrowStatus(tSC)
+            }
+        }
+
+        if '$isobject(tInstance) {
+            set tInstance = ..%New()
+            set tIsNew = 1
+            set tInstance.Name = tName
+        }
+
+        if $data(pModifiers("disable")) {
+            set tInstance.Enabled = 0
+        } elseif (tIsNew || $data(pModifiers("enable"))) {
+            set tInstance.Enabled = 1
+        }
+
+        if $data(pModifiers("snapshots"),tSnapshots) {
+            set tInstance.Snapshots = tSnapshots
+        } elseif (tIsNew) {
+            set tInstance.Snapshots = 1
+        }
+        if $data(pModifiers("prereleases"),tPrereleases) {
+            set tInstance.Prereleases = tPrereleases
+        } elseif (tIsNew) {
+            set tInstance.Prereleases = 1
+        }
+        if $data(pModifiers("read-only"),tReadOnly) {
+            set tInstance.ReadOnly = tReadOnly
+        } elseif (tIsNew) {
+            set tInstance.ReadOnly = 0
+        }
+
+        $$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
+
+        $$$ThrowOnError(tInstance.%Save())
+        do tInstance.Display()
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// Subclasses must override. Allows handling of any custom modifiers/data attributes provided from the package manager shell.
-ClassMethod OnConfigure(pInstance As %IPM.Repo.Definition, pInteractive As %Boolean = 1, ByRef pModifiers, ByRef pData) As %Status [ Abstract ]
+ClassMethod OnConfigure(
+	pInstance As %IPM.Repo.Definition,
+	pInteractive As %Boolean = 1,
+	ByRef pModifiers,
+	ByRef pData) As %Status [ Abstract ]
 {
 }
 
@@ -204,31 +211,34 @@ Query Catalog() As %Query(ROWSPEC = "Classname:%String,Moniker:%String,Descripti
 
 ClassMethod CatalogExecute(ByRef qHandle As %Binary) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tRes = ##class(%SQL.Statement).%New()
-		Set tSC = tRes.%PrepareClassQuery("%Dictionary.ClassDefinition","SubclassOf")
-		$$$ThrowOnError(tSC)
-		Set qHandle = tRes.%Execute($classname())
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tRes = ##class(%SQL.Statement).%New()
+        set tSC = tRes.%PrepareClassQuery("%Dictionary.ClassDefinition","SubclassOf")
+        $$$ThrowOnError(tSC)
+        set qHandle = tRes.%Execute($classname())
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-ClassMethod CatalogFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = CatalogExecute ]
+ClassMethod CatalogFetch(
+	ByRef qHandle As %Binary,
+	ByRef Row As %List,
+	ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = CatalogExecute ]
 {
-	Set AtEnd = 'qHandle.%Next(.tSC)
-	If 'AtEnd {
-		Set tClass = qHandle.%Get("Name")
-		Set Row = $ListBuild(tClass,$parameter(tClass,"MONIKER"),$parameter(tClass,"DISPLAYNAME"))
-	}
-	Quit tSC
+    set AtEnd = 'qHandle.%Next(.tSC)
+    if 'AtEnd {
+        set tClass = qHandle.%Get("Name")
+        set Row = $listbuild(tClass,$parameter(tClass,"MONIKER"),$parameter(tClass,"DISPLAYNAME"))
+    }
+    quit tSC
 }
 
 ClassMethod CatalogClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = CatalogExecute ]
 {
-	Quit $$$OK
+    quit $$$OK
 }
 
 Query List() As %SQLQuery
@@ -240,24 +250,26 @@ ORDER BY %IPM_Repo.Definition_SortOrder(ID) DESC
 /// If a name is provided, return the repo of this type with the name
 /// Otherwise, return the only repo of this type in the system
 /// If there are multiple repos (or no repos) of this type, return an error
-ClassMethod GetOne(name As %String = "", Output sc As %Status) As %IPM.Repo.Definition
+ClassMethod GetOne(
+	name As %String = "",
+	Output sc As %Status) As %IPM.Repo.Definition
 {
-	If $Get(name) '= "" {
-		Quit ..ServerDefinitionKeyOpen(name, , .sc)
-	}
-	Set tablename = $$$comClassKeyGet($classname(), $$$cCLASSsqlqualifiednameQ)
-	Set query = "SELECT id FROM " _ tablename  // should be safe from SQL injection, since $classname() is safe
-	Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
-	$$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-	Set list = ""
-	While rs.%Next() {
-		Set list = list _ $lb(rs.%Get("id"))
-	}
-	If $ListLength(list) = 1 {
-		Quit ..%OpenId($ListGet(list, 1), , .sc)
-	}
-	Set sc = $$$ERROR($$$GeneralError, "Unable to find a unique repo of type " _ $CLASSNAME())
-	Quit ""
+    if $get(name) '= "" {
+        quit ..ServerDefinitionKeyOpen(name, , .sc)
+    }
+    set tablename = $$$comClassKeyGet($classname(), $$$cCLASSsqlqualifiednameQ)
+    set query = "SELECT id FROM " _ tablename  // should be safe from SQL injection, since $classname() is safe
+    set rs = ##class(%SQL.Statement).%ExecDirect(, query)
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    set list = ""
+    while rs.%Next() {
+        set list = list _ $listbuild(rs.%Get("id"))
+    }
+    if $listlength(list) = 1 {
+        quit ..%OpenId($listget(list, 1), , .sc)
+    }
+    set sc = $$$ERROR($$$GeneralError, "Unable to find a unique repo of type " _ $classname())
+    quit ""
 }
 
 Storage Default

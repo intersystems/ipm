@@ -22,239 +22,260 @@ Property ImmediateReleaseOnClose As %Boolean [ Private ];
 /// until the end of the current transaction even once the instance goes out of scope.
 Method %OnNew(pImmediateRelease As %Boolean = 1) As %Status [ Private, ServerOnly = 1 ]
 {
-	Set ..ImmediateReleaseOnClose = pImmediateRelease
-	Quit $$$OK
+    set ..ImmediateReleaseOnClose = pImmediateRelease
+    quit $$$OK
 }
 
-Method Lock(pGlobalName As %String, pFlags As %String = "", pTimeout As %Integer = {$$$LockTimeout}) As %Status
+Method Lock(
+	pGlobalName As %String,
+	pFlags As %String = "",
+	pTimeout As %Integer = {$$$LockTimeout}) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Lock +@pGlobalName#pFlags:pTimeout
-		If '$Test {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Failed to lock %1",pGlobalName))
-			Quit
-		}
-		
-		If $Increment(i%Cache(pGlobalName,$Case(pFlags,"":$c(0),:pFlags)))
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        lock +@pGlobalName#pFlags:pTimeout
+        if '$test {
+            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Failed to lock %1",pGlobalName))
+            quit
+        }
+
+        do $increment(i%Cache(pGlobalName,$case(pFlags,"":$char(0),:pFlags)))
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-Method Unlock(pGlobalName As %String, pFlags As %String = "", pImmediate As %Boolean = 0, pUpdateCache As %Boolean = 1)
+Method Unlock(
+	pGlobalName As %String,
+	pFlags As %String = "",
+	pImmediate As %Boolean = 0,
+	pUpdateCache As %Boolean = 1)
 {
-	If (pFlags = $c(0)) {
-		Set pFlags = ""
-	}
-	Lock -@pGlobalName#pFlags_$Select(pImmediate:"I",1:"")
-	If pUpdateCache {
-		Set i%Cache(pGlobalName,$Case(pFlags,"":$c(0),:pFlags)) = $Get(i%Cache(pGlobalName,$Case(pFlags,"":$c(0),:pFlags)),0) - 1
-		If (i%Cache(pGlobalName,$Case(pFlags,"":$c(0),:pFlags)) <= 0) {
-			Kill i%Cache(pGlobalName,$Case(pFlags,"":$c(0),:pFlags))
-		}
-	}
+    if (pFlags = $char(0)) {
+        set pFlags = ""
+    }
+    lock -@pGlobalName#pFlags_$select(pImmediate:"I",1:"")
+    if pUpdateCache {
+        set i%Cache(pGlobalName,$case(pFlags,"":$char(0),:pFlags)) = $get(i%Cache(pGlobalName,$case(pFlags,"":$char(0),:pFlags)),0) - 1
+        if (i%Cache(pGlobalName,$case(pFlags,"":$char(0),:pFlags)) <= 0) {
+            kill i%Cache(pGlobalName,$case(pFlags,"":$char(0),:pFlags))
+        }
+    }
 }
 
-Method LockClassId(pClassName As %Dictionary.Classname, pID As %String, pShared As %Boolean = 0, pTimeout As %Integer) As %Status
+Method LockClassId(
+	pClassName As %Dictionary.Classname,
+	pID As %String,
+	pShared As %Boolean = 0,
+	pTimeout As %Integer) As %Status
 {
-	Set tSC = $classmethod(pClassName,"%LockId",pID,pShared,.pTimeout)
-	If $$$ISOK(tSC) {
-		Set tOID = $$$oidCompose(pID,pClassName)
-		Set i%OIDCache(tOID,pShared) = $Get(i%OIDCache(tOID,pShared)) + 1
-	}
-	Quit tSC
+    set tSC = $classmethod(pClassName,"%LockId",pID,pShared,.pTimeout)
+    if $$$ISOK(tSC) {
+        set tOID = $$$oidCompose(pID,pClassName)
+        set i%OIDCache(tOID,pShared) = $get(i%OIDCache(tOID,pShared)) + 1
+    }
+    quit tSC
 }
 
-Method UnlockClassId(pClassName As %Dictionary.Classname, pID As %String, pShared As %Boolean = 0, pImmediate As %Boolean = 0)
+Method UnlockClassId(
+	pClassName As %Dictionary.Classname,
+	pID As %String,
+	pShared As %Boolean = 0,
+	pImmediate As %Boolean = 0)
 {
-	Set tOID = $$$oidCompose(pID,pClassName)
-	If $Data(i%OIDCache(tOID,pShared),tLockCount) {
-		Do $classmethod(pClassName,"%UnlockId",pID,pShared,pImmediate)
-		Set i%OIDCache(tOID,pShared) = tLockCount - 1
-	}
+    set tOID = $$$oidCompose(pID,pClassName)
+    if $data(i%OIDCache(tOID,pShared),tLockCount) {
+        do $classmethod(pClassName,"%UnlockId",pID,pShared,pImmediate)
+        set i%OIDCache(tOID,pShared) = tLockCount - 1
+    }
 }
 
 Method UnlockAll(pImmediate As %Boolean = 1) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tGlobalName = ""
-		For {
-			Set tGlobalName = $Order(i%Cache(tGlobalName))
-			If (tGlobalName = "") {
-				Quit
-			}
-			Set tFlags = ""
-			For {
-				Set tFlags = $Order(i%Cache(tGlobalName,tFlags),1,tLockCount)
-				If (tFlags = "") {
-					Quit
-				}
-				For i=1:1:tLockCount {
-					Do ..Unlock(tGlobalName,tFlags,pImmediate,0)
-				}
-			}
-		}
-		Kill i%Cache
-		
-		Set tOID = ""
-		For {
-			Set tOID = $Order(i%OIDCache(tOID))
-			If (tOID = "") {
-				Quit
-			}
-			Set tShared = ""
-			For {
-				Set tShared = $Order(i%OIDCache(tOID,tShared),1,tLockCount)
-				If (tShared = "") {
-					Quit
-				}
-				Set tID = $$$oidPrimary(tOID)
-				Set tClassName = $$$oidClassName(tOID)
-				For i=1:1:tLockCount {
-					Do ..UnlockClassId(tClassName,tID,tShared,pImmediate)
-				}
-			}
-		}
-		Kill i%OIDCache
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tGlobalName = ""
+        for {
+            set tGlobalName = $order(i%Cache(tGlobalName))
+            if (tGlobalName = "") {
+                quit
+            }
+            set tFlags = ""
+            for {
+                set tFlags = $order(i%Cache(tGlobalName,tFlags),1,tLockCount)
+                if (tFlags = "") {
+                    quit
+                }
+                for i=1:1:tLockCount {
+                    do ..Unlock(tGlobalName,tFlags,pImmediate,0)
+                }
+            }
+        }
+        kill i%Cache
+
+        set tOID = ""
+        for {
+            set tOID = $order(i%OIDCache(tOID))
+            if (tOID = "") {
+                quit
+            }
+            set tShared = ""
+            for {
+                set tShared = $order(i%OIDCache(tOID,tShared),1,tLockCount)
+                if (tShared = "") {
+                    quit
+                }
+                set tID = $$$oidPrimary(tOID)
+                set tClassName = $$$oidClassName(tOID)
+                for i=1:1:tLockCount {
+                    do ..UnlockClassId(tClassName,tID,tShared,pImmediate)
+                }
+            }
+        }
+        kill i%OIDCache
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-/// Performs an immediate unlock 
+/// Performs an immediate unlock
 Method %OnClose() As %Status [ Private, ServerOnly = 1 ]
 {
-	Quit ..UnlockAll(..ImmediateReleaseOnClose)
+    quit ..UnlockAll(..ImmediateReleaseOnClose)
 }
 
-ClassMethod LockClassesRecursive(ByRef pLockManager = {..%New()}, ByRef pClasses, ByRef pSharedLockedClasses) As %Status
+ClassMethod LockClassesRecursive(
+	ByRef pLockManager = {..%New()},
+	ByRef pClasses,
+	ByRef pSharedLockedClasses) As %Status
 {
-	// Based on LockClassesRecursive^%occLock.
-	// This method (and the rest of the class to support it) is really just a workaround for PL 149632
-	Set tSC = $$$OK
-	Try {
-		Set tLockManager = ..%New()
-		Merge tVisited = pSharedLockedClasses
-		Set tClassKey = ""
-		For {
-			Set tClassKey = $Order(pClasses(tClassKey))
-			If (tClassKey = "") {
-				Quit
-			}
-			
-			Set tClassName = tClassKey
-			If ($ZConvert($Extract(tClassKey,*-3,*),"U") = ".CLS") {
-				// This isn't actually a legal classname - must be class with extension included.
-				Set tClassName = $Extract(tClassKey,1,*-4)
-			}
-			
-			// Based on lockoneclassrecursive^%occLock, but locks each dependency in shared mode.
-			// We always lock the top-level class, because it may need to be locked exclusively; pVisited is just for
-			// classes locked in shared mode.
-			$$$ThrowOnError(tLockManager.LockClassDefinition(tClassName))
-			If $Data(tVisited(tClassName)) {
-				Continue
-			}
-			
-			// It would be nice if there was an API for this that accepted tVisited.
-			Kill tDependencies
-			Do getalldependencyclasses^%occDepend(tClassName,.tDependencies,.tVisited,,,,,1)
-			
-			Set tDependencyKey = "A" //Start at 'A' to skip % classes.
-			For {
-				Set tDependencyKey = $Order(tDependencies(tDependencyKey))
-				If (tDependencyKey = "") {
-					Quit
-				}
-				
-				$$$ThrowOnError(tLockManager.LockClassDefinition(tDependencyKey,1))
-			}
-		}
-		
-		// If all classes were locked successfully, record that they were,
-		// and move ownership of the locks from tLockManager to pLockManager.
-		// If an error occurred, any locks taken out will be released when tLockManager
-		// goes out of scope.
-		Merge pSharedLockedClasses = tVisited
-		Do tLockManager.MergeTo(pLockManager)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    // Based on LockClassesRecursive^%occLock.
+    // This method (and the rest of the class to support it) is really just a workaround for PL 149632
+    set tSC = $$$OK
+    try {
+        set tLockManager = ..%New()
+        merge tVisited = pSharedLockedClasses
+        set tClassKey = ""
+        for {
+            set tClassKey = $order(pClasses(tClassKey))
+            if (tClassKey = "") {
+                quit
+            }
+
+            set tClassName = tClassKey
+            if ($zconvert($extract(tClassKey,*-3,*),"U") = ".CLS") {
+                // This isn't actually a legal classname - must be class with extension included.
+                set tClassName = $extract(tClassKey,1,*-4)
+            }
+
+            // Based on lockoneclassrecursive^%occLock, but locks each dependency in shared mode.
+            // We always lock the top-level class, because it may need to be locked exclusively; pVisited is just for
+            // classes locked in shared mode.
+            $$$ThrowOnError(tLockManager.LockClassDefinition(tClassName))
+            if $data(tVisited(tClassName)) {
+                continue
+            }
+
+            // It would be nice if there was an API for this that accepted tVisited.
+            kill tDependencies
+            do getalldependencyclasses^%occDepend(tClassName,.tDependencies,.tVisited,,,,,1)
+
+            set tDependencyKey = "A" //Start at 'A' to skip % classes.
+            for {
+                set tDependencyKey = $order(tDependencies(tDependencyKey))
+                if (tDependencyKey = "") {
+                    quit
+                }
+
+                $$$ThrowOnError(tLockManager.LockClassDefinition(tDependencyKey,1))
+            }
+        }
+
+        // If all classes were locked successfully, record that they were,
+        // and move ownership of the locks from tLockManager to pLockManager.
+        // If an error occurred, any locks taken out will be released when tLockManager
+        // goes out of scope.
+        merge pSharedLockedClasses = tVisited
+        do tLockManager.MergeTo(pLockManager)
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-Method LockClassDefinition(pClass As %String, pShared As %Boolean = 0, pTimeout As %Integer = 0) As %Status
+Method LockClassDefinition(
+	pClass As %String,
+	pShared As %Boolean = 0,
+	pTimeout As %Integer = 0) As %Status
 {
-	// Based on ^%occLock (particularly, the error handling and $$Function^%SYS.* calls are taken from there).
-	Set tSourceNamespace = $$GetClassLockDatabase^%SYS.SECURITY(pClass,"")
-	If tSourceNamespace = "" {
-		Quit $$$OK
-	}
-	Set tLockGlobal = $Name(^|tSourceNamespace|oddDEF(pClass))
-	Set tSC = ..Lock(tLockGlobal,$Select(pShared:"SE",1:"E"),pTimeout)
-	If $$$ISERR(tSC) {
-		Set tEscalate = 0
-		Set tType = $$FindLockOwner^%SYS.cspServer2(tSourceNamespace,"^oddDEF",pClass,.tJob,.tUser,.tEscalate)
-		If (tType = 2) {
-			Quit $$$ERROR($$$ClassLockTableFull,pClass)
-		} ElseIf (tType = 1) {
-			If tEscalate {
-				Quit $$$ERROR($$$ClassLockEscalate,pClass,tUser,tJob)
-			} Else {
-				Quit $$$ERROR($$$CanNotLockRoutineInfo,pClass_".cls",tUser,tJob)
-			}
-		}
-		If pShared {
-			Quit $$$ERROR($$$ClassSharedLockFailed,pClass)
-		} Else {
-			Quit $$$ERROR($$$ClassExclusiveLockFailed,pClass)
-		}
-	}
-	Quit tSC
+    // Based on ^%occLock (particularly, the error handling and $$Function^%SYS.* calls are taken from there).
+    set tSourceNamespace = $$GetClassLockDatabase^%SYS.SECURITY(pClass,"")
+    if tSourceNamespace = "" {
+        quit $$$OK
+    }
+    set tLockGlobal = $name(^|tSourceNamespace|oddDEF(pClass))
+    set tSC = ..Lock(tLockGlobal,$select(pShared:"SE",1:"E"),pTimeout)
+    if $$$ISERR(tSC) {
+        set tEscalate = 0
+        set tType = $$FindLockOwner^%SYS.cspServer2(tSourceNamespace,"^oddDEF",pClass,.tJob,.tUser,.tEscalate)
+        if (tType = 2) {
+            quit $$$ERROR($$$ClassLockTableFull,pClass)
+        } elseif (tType = 1) {
+            if tEscalate {
+                quit $$$ERROR($$$ClassLockEscalate,pClass,tUser,tJob)
+            } else {
+                quit $$$ERROR($$$CanNotLockRoutineInfo,pClass_".cls",tUser,tJob)
+            }
+        }
+        if pShared {
+            quit $$$ERROR($$$ClassSharedLockFailed,pClass)
+        } else {
+            quit $$$ERROR($$$ClassExclusiveLockFailed,pClass)
+        }
+    }
+    quit tSC
 }
 
 Method MergeTo(pTargetLockManager As %IPM.Utils.LockManager)
 {
-	Set tGlobalName = ""
-	For {
-		Set tGlobalName = $Order(i%Cache(tGlobalName))
-		If (tGlobalName = "") {
-			Quit
-		}
-		
-		Set tFlags = ""
-		For {
-			Set tFlags = $Order(i%Cache(tGlobalName,tFlags),1,tLockCount)
-			If (tFlags = "") {
-				Quit
-			}
-			If $Increment(pTargetLockManager.Cache(tGlobalName,tFlags),tLockCount)
-		}
-	}
-		
-	Kill i%Cache
-		
-	Set tOID = ""
-	For {
-		Set tOID = $Order(i%OIDCache(tOID))
-		If (tOID = "") {
-			Quit
-		}
-		Set tShared = ""
-		For {
-			Set tShared = $Order(i%OIDCache(tOID,tShared),1,tLockCount)
-			If (tShared = "") {
-				Quit
-			}
-			If $Increment(pTargetLockManager.OIDCache(tOID,tShared),tLockCount)
-		}
-	}
-	
-	Kill i%OIDCache
+    set tGlobalName = ""
+    for {
+        set tGlobalName = $order(i%Cache(tGlobalName))
+        if (tGlobalName = "") {
+            quit
+        }
+
+        set tFlags = ""
+        for {
+            set tFlags = $order(i%Cache(tGlobalName,tFlags),1,tLockCount)
+            if (tFlags = "") {
+                quit
+            }
+            if $increment(pTargetLockManager.Cache(tGlobalName,tFlags),tLockCount)
+        }
+    }
+
+    kill i%Cache
+
+    set tOID = ""
+    for {
+        set tOID = $order(i%OIDCache(tOID))
+        if (tOID = "") {
+            quit
+        }
+        set tShared = ""
+        for {
+            set tShared = $order(i%OIDCache(tOID,tShared),1,tLockCount)
+            if (tShared = "") {
+                quit
+            }
+            if $increment(pTargetLockManager.OIDCache(tOID,tShared),tLockCount)
+        }
+    }
+
+    kill i%OIDCache
 }
 
 }

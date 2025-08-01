@@ -3,16 +3,21 @@
 Class %IPM.StudioDocument.Projection Extends %Projection.StudioDocument
 {
 
-ClassMethod CreateProjection(classname As %String, ByRef parameters As %String) As %Status
+ClassMethod CreateProjection(
+	classname As %String,
+	ByRef parameters As %String) As %Status
 {
-	Set tSC = ##super(classname,.parameters)
-	Quit $$$ADDSC(tSC,..AddToManifest(classname,"^oddStudioDocument("_$$$QUOTE(classname)_").GBL"))
+    set tSC = ##super(classname,.parameters)
+    quit $$$ADDSC(tSC,..AddToManifest(classname,"^oddStudioDocument("_$$$QUOTE(classname)_").GBL"))
 }
 
-ClassMethod RemoveProjection(classname As %String, ByRef parameters As %String, recompile As %Boolean) As %Status
+ClassMethod RemoveProjection(
+	classname As %String,
+	ByRef parameters As %String,
+	recompile As %Boolean) As %Status
 {
-	Set tSC = ##super(classname,.parameters,recompile)
-	Quit $$$ADDSC(tSC,..RemoveFromManifest(classname,"^oddStudioDocument("_$$$QUOTE(classname)_").GBL"))
+    set tSC = ##super(classname,.parameters,recompile)
+    quit $$$ADDSC(tSC,..RemoveFromManifest(classname,"^oddStudioDocument("_$$$QUOTE(classname)_").GBL"))
 }
 
 }

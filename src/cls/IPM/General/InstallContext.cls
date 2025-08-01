@@ -12,61 +12,61 @@ Property CacheTempIndex As %Integer [ Private ];
 
 Method SetGraph(ByRef pDependencyGraph)
 {
-	Kill ..DependencyGraph
-	Merge ..DependencyGraph = pDependencyGraph
+    kill ..DependencyGraph
+    merge ..DependencyGraph = pDependencyGraph
 }
 
 Method SetCacheTempIndex(pIndex As %Integer = "")
 {
-	Set ..CacheTempIndex = pIndex
+    set ..CacheTempIndex = pIndex
 }
 
 Method GetModuleList() As %List
 {
-	Set tList = ""
-	Set tModuleName = ""
-	For {
-		Set tModuleName = $Order(..DependencyGraph(tModuleName))
-		If (tModuleName = "") {
-			Quit
-		}
-		Set tList = tList_$ListBuild(tModuleName)
-	}
-	Quit tList
+    set tList = ""
+    set tModuleName = ""
+    for {
+        set tModuleName = $order(..DependencyGraph(tModuleName))
+        if (tModuleName = "") {
+            quit
+        }
+        set tList = tList_$listbuild(tModuleName)
+    }
+    quit tList
 }
 
 Method ModuleIsDependency(pModuleName As %String) As %Boolean
 {
-	Quit ($Data(..DependencyGraph(pModuleName)) > 0)
+    quit ($data(..DependencyGraph(pModuleName)) > 0)
 }
 
 Method GetPendingModuleList() As %List
 {
-	If (..CacheTempIndex = "") {
-		Quit ""
-	}
-	
-	// The caller should have the temp global locked, but just in case...
-	Merge tGraph = $$$ZPMTempLoadGraph(..CacheTempIndex)
-	
-	Set tList = ""
-	Set tModuleName = ""
-	For {
-		Set tModuleName = $Order(tGraph(tModuleName))
-		If (tModuleName = "") {
-			Quit
-		}
-		Set tList = tList_$ListBuild(tModuleName)
-	}
-	Quit tList
+    if (..CacheTempIndex = "") {
+        quit ""
+    }
+
+    // The caller should have the temp global locked, but just in case...
+    merge tGraph = $$$ZPMTempLoadGraph(..CacheTempIndex)
+
+    set tList = ""
+    set tModuleName = ""
+    for {
+        set tModuleName = $order(tGraph(tModuleName))
+        if (tModuleName = "") {
+            quit
+        }
+        set tList = tList_$listbuild(tModuleName)
+    }
+    quit tList
 }
 
 Method ModuleIsPending(pModuleName As %String) As %Boolean
 {
-	If (..CacheTempIndex = "") {
-		Quit 0
-	}
-	Quit ($Data($$$ZPMTempLoadGraph(..CacheTempIndex,pModuleName)) > 0)
+    if (..CacheTempIndex = "") {
+        quit 0
+    }
+    quit ($data($$$ZPMTempLoadGraph(..CacheTempIndex,pModuleName)) > 0)
 }
 
 }

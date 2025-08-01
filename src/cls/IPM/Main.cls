@@ -7,7 +7,7 @@ Class %IPM.Main Extends %IPM.CLI
 
 Parameter DOMAIN = "ZPM";
 
-Parameter STANDARDPHASES = {$ListBuild("reload","compile","test","package","verify","publish","makedeployed","update")};
+Parameter STANDARDPHASES = {$listbuild("reload","compile","test","package","verify","publish","makedeployed","update")};
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -569,9 +569,9 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 		Computes references to other items/modules for a given module/item.
 	</summary>
     <description>
-        For a module, inspects all items in the provided module and checks for invalid references to items 
+        For a module, inspects all items in the provided module and checks for invalid references to items
         that are not in the module and not in any of the module's dependencies.
-		For an item, finds all its references to other items, or optionally list 
+		For an item, finds all its references to other items, or optionally list
 		just the invalid references of the item as well.
 		Dependency analyzer supports .cls and .inc items. Other item types are not yet supported.
 		The references are written to the current device.
@@ -631,7 +631,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 <example description="Shows a description of all modules in the name of which there is a context">find -d *tools*</example>
 </command>
 
-<command name="namespace" aliases="zn"> 
+<command name="namespace" aliases="zn">
 <description>See list modules in namespace and go to the namespace</description>
 <example description="Show all modules in all namespaces">zn *</example>
 <example description="Show all modules in namespaces by context">zn sql*</example>
@@ -756,10 +756,10 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 
 ClassMethod %GetCommandStructure(Output pCommandStructure)
 {
-  Do ..%GetOneCommandStructure(.pCommandStructure)
+  do ..%GetOneCommandStructure(.pCommandStructure)
 
-  Do ##class(%IPM.Repo.Definition).%GetCommandStructure(.tCommandStructure)
-  Merge pCommandStructure("repo") = tCommandStructure("repo")
+  do ##class(%IPM.Repo.Definition).%GetCommandStructure(.tCommandStructure)
+  merge pCommandStructure("repo") = tCommandStructure("repo")
 }
 
 /// @API.Method
@@ -768,36 +768,36 @@ ClassMethod Shell(
 	pTerminateOnError As %Boolean = 0,
 	pHaltOnComplete As %Boolean = 0) As %Status
 {
-	Set tSC = $$$OK
-	Do ..ShellInternal(pCommand,.tException)
-	If $IsObject(tException) {
-		If pTerminateOnError {
-			Do $System.Process.Terminate($Job,1)
+	set tSC = $$$OK
+	do ..ShellInternal(pCommand,.tException)
+	if $isobject(tException) {
+		if pTerminateOnError {
+			do $system.Process.Terminate($job,1)
 		}
-		Set tSC = tException.AsStatus()
+		set tSC = tException.AsStatus()
 	}
-	If pHaltOnComplete {
-		Halt
+	if pHaltOnComplete {
+		halt
 	}
-	Quit tSC
+	quit tSC
 }
 
 ClassMethod TerminalPrompt() As %String
 {
-	Set tp=##class(%SYSTEM.Process).TerminalPrompt()
-	Set prompt="zpm:"
-	Set del=$$$FormattedLine(..TerminalPromptColor(),">")
-	If ..TerminalPromptColor()=$$$Default { Set tp=2 }
-	For i=1:1:$Length(tp,",") {
-		If $Piece(tp,",",i)=1 {	Set prompt=prompt_$Piece($System,":")_del Continue}
-		ElseIf $Piece(tp,",",i)=2 {	Set prompt=prompt_$Namespace_del Continue}
-		ElseIf $Piece(tp,",",i)=3 {	Set prompt=prompt_$Piece($System,":",2)_del Continue}
-		ElseIf $Piece(tp,",",i)=4 {	Set prompt=prompt_$ZTime(+$Piece($Horolog,",",2),1)_del Continue}
-		ElseIf $Piece(tp,",",i)=5 {	Set prompt=prompt_$Job_del Continue}
-    Elseif $Piece(tp,",",i)=8,$Tlevel { Set prompt=prompt_"TL"_$Tlevel_del Continue}
-        // for zpm shell 7 do not need to be implemented	
+	set tp=##class(%SYSTEM.Process).TerminalPrompt()
+	set prompt="zpm:"
+	set del=$$$FormattedLine(..TerminalPromptColor(),">")
+	if ..TerminalPromptColor()=$$$Default { set tp=2 }
+	for i=1:1:$length(tp,",") {
+		if $piece(tp,",",i)=1 {	set prompt=prompt_$piece($system,":")_del continue}
+		elseif $piece(tp,",",i)=2 {	set prompt=prompt_$namespace_del continue}
+		elseif $piece(tp,",",i)=3 {	set prompt=prompt_$piece($system,":",2)_del continue}
+		elseif $piece(tp,",",i)=4 {	set prompt=prompt_$ztime(+$piece($horolog,",",2),1)_del continue}
+		elseif $piece(tp,",",i)=5 {	set prompt=prompt_$job_del continue}
+    elseif $piece(tp,",",i)=8,$tlevel { set prompt=prompt_"TL"_$tlevel_del continue}
+        // for zpm shell 7 do not need to be implemented
     }
-	Quit prompt
+	quit prompt
 }
 
 /// @API.Method
@@ -808,71 +808,71 @@ ClassMethod GetVersion(
 	ByRef out,
 	list)
 {
-	Do ..GetListModules("*", ModuleName, .list)
-	for i=1:1 { quit:'$d(list(i),ns)
-	 	set ns=$lg(ns,1)
-	 	for ii=1:1 { quit:'$d(list(i,"modules",ii),module)
-	 		set out($lg(module,1))=$lb(ns,$lg(module,2))
+	do ..GetListModules("*", ModuleName, .list)
+	for i=1:1 { quit:'$data(list(i),ns)
+	 	set ns=$listget(ns,1)
+	 	for ii=1:1 { quit:'$data(list(i,"modules",ii),module)
+	 		set out($listget(module,1))=$listbuild(ns,$listget(module,2))
 	 	}
 	}
 	set sc=$$$OK
 	set sql="select URL from %IPM_Repo_Remote.Definition where Enabled = 1"
 		,rs=##class(%ResultSet).%New()
 		,sc=rs.Prepare(sql)
-	Set:sc sc=rs.Execute("")
-	If sc {
-		Quit:'rs.%Next()  
+	set:sc sc=rs.Execute("")
+	if sc {
+		quit:'rs.%Next()
 		set out=rs.Get("URL")
 	}
-	Quit sc
+	quit sc
 }
 
 ClassMethod GetSystemMode()
 {
-	New $Namespace
-	Set $Namespace = "%SYS"
-	If $$$ISOK(##class(Config.Startup).Get(.tProperties)) {
-		Quit $Get(tProperties("SystemMode")) 
+	new $namespace
+	set $namespace = "%SYS"
+	if $$$ISOK(##class(Config.Startup).Get(.tProperties)) {
+		quit $get(tProperties("SystemMode"))
 	}
-	Quit ""
+	quit ""
 }
 
 /// Return a list of messages to display when the shell is first started
 /// For messages that are too long to fit in a box, they should be returned in the outOfBoxMessage parameter
 ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
 {
-	Set cls = "%ZHSLIB.HealthShareMgr", mthd = "VersionInfo"
-	If $System.CLS.IsMthd(cls, mthd) {
-		Set outOfBoxMessage = $ClassMethod(cls, mthd)
-	} Else {
-		Set outOfBoxMessage = $ZVersion
+	set cls = "%ZHSLIB.HealthShareMgr", mthd = "VersionInfo"
+	if $system.CLS.IsMthd(cls, mthd) {
+		set outOfBoxMessage = $classmethod(cls, mthd)
+	} else {
+		set outOfBoxMessage = $zversion
 	}
 
-	Do ##class(%IPM.Main).GetVersion("zpm",.out)	
-	If $Get(out) = "" {
-		Set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
-	} Else {
-		Set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
+	do ##class(%IPM.Main).GetVersion("zpm",.out)
+	if $get(out) = "" {
+		set registryInfo = $$$FormattedLine($$$Cyan, "No registry configured")
+	} else {
+		set registryInfo = "Current registry "_$$$FormattedLine($$$Cyan, out)
 	}
 
-	Set systemMode = ..GetSystemMode()
-	If systemMode = "" {
-		Set systemMode = "System Mode: <unset>"
-	} Else {
-		Set systemMode = "System Mode: " _ systemMode
+	set systemMode = ..GetSystemMode()
+	if systemMode = "" {
+		set systemMode = "System Mode: <unset>"
+	} else {
+		set systemMode = "System Mode: " _ systemMode
 	}
 
-	Set mirrorStatus = $System.Mirror.GetStatus()
-	Set mirrorStatus = "Mirror Status: " _ mirrorStatus
+	set mirrorStatus = $system.Mirror.GetStatus()
+	set mirrorStatus = "Mirror Status: " _ mirrorStatus
 
-	Set list = $ListBuild(
+	set list = $listbuild(
 		"Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule("zpm")),
 		"Enter q/quit to exit the shell. Enter ?/help to view available commands",
 		registryInfo,
 		systemMode,
 		mirrorStatus
 	)
-	Quit list
+	quit list
 }
 
 /// For use in unit tests that need to test if a command threw any exceptions.
@@ -880,172 +880,170 @@ ClassMethod ShellInternal(
 	pCommand As %String,
 	Output pException As %Exception.AbstractException) [ Internal ]
 {
-	New $$$DeprecationWarned
+	new $$$DeprecationWarned
 	// Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
-	Set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
+	set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
 
-	Set pException = $$$NULLOREF
-	Set tOneCommand = 0
-	Set tCommand = $Get(pCommand)
-	If (tCommand '= "") {
-		Set tOneCommand = 1
+	set pException = $$$NULLOREF
+	set tOneCommand = 0
+	set tCommand = $get(pCommand)
+	if (tCommand '= "") {
+		set tOneCommand = 1
 	}
-	Set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
-	Set tInShell = 0
-	For {
-		Kill $$$DeprecationWarned
-		Try {
-			
+	set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
+	set tInShell = 0
+	for {
+		kill $$$DeprecationWarned
+		try {
+
 			// Have intro message just for first entrance to shell
 			// Ensure not displayed if its just one command
-			If 'tInShell && 'tOneCommand {
-				Do ..DrawBorder(introMessageList, ..TerminalPromptColor())
-				Write $Get(outOfBoxMessage),! // Display long messages outside of the box
-				Set tInShell = 1
+			if 'tInShell && 'tOneCommand {
+				do ..DrawBorder(introMessageList, ..TerminalPromptColor())
+				write $get(outOfBoxMessage),! // Display long messages outside of the box
+				set tInShell = 1
 			}
-			
-			If (tCommand = "") {
-				Write ..TerminalPrompt()
-				Read tCommand
-				Write !
+
+			if (tCommand = "") {
+				write ..TerminalPrompt()
+				read tCommand
+				write !
 			}
-			
-			If (tCommand = "") {
+
+			if (tCommand = "") {
 				#; Do ..%Help()
-				Quit
+				quit
 			}
-			
-			Kill tCommandInfo
+
+			kill tCommandInfo
 			// Parse command
 			$$$ThrowOnError(..%ParseCommandInput(tCommand,.tParsedCommandInfo))
-			
+
 			// Merge defaults first so they can be overwritten by commands
-			Do ..GetNamespaceDefaultModifiers(.tDefaultArray)
-			Merge tCommandInfo("data") = tDefaultArray
-			Merge tCommandInfo = tParsedCommandInfo
-			
-			If (tCommandInfo = "quit") {
-				Return
-			} ElseIf (tCommandInfo = "help") {
-				Do ..%Help(.tCommandInfo)
-			} ElseIf (tCommandInfo = "init") {
-				Do ..Init(.tCommandInfo)
-			} ElseIf (tCommandInfo = "search") {
-				Do ..Search(.tCommandInfo)
-			} ElseIf (tCommandInfo = "repo") {
-				Do ..Repository(.tCommandInfo)
-			} ElseIf (tCommandInfo = "load") {
-				Do ..Load(.tCommandInfo)
-			} ElseIf (tCommandInfo = "exec") {
-				Write !
-				Xecute tCommandInfo("parameters","expression")
-			} ElseIf (tCommandInfo = "install") {
-				Do ..Install(.tCommandInfo)
-			} ElseIf (tCommandInfo = "reinstall") {
-				Do ..Reinstall(.tCommandInfo)
-			} ElseIf (tCommandInfo = "uninstall") {
-				Do ..Uninstall(.tCommandInfo)
-			} ElseIf (tCommandInfo = "list-installed") {
-				Do ..ListInstalled(.tCommandInfo)
-			} ElseIf (tCommandInfo = "list-dependents") {
-				Do ..ListDependents(.tCommandInfo)
-			} ElseIf (tCommandInfo = "orphans") {
-				Do ..ListOrphans(.tCommandInfo)
-			} ElseIf (tCommandInfo = "default-modifiers") {
-				Do ..ProcessDefaultModifiers(.tCommandInfo)
-			} ElseIf (tCommandInfo = "arrange") {
-				Do ..Arrange(.tCommandInfo)
-			} ElseIf (tCommandInfo = "import") {
-				Do ..Import(.tCommandInfo)
-			} ElseIf (tCommandInfo = "run-from-file") {
-				Do ..ProcessRunFromFile(.tCommandInfo)
-			} ElseIf (tCommandInfo = "dependency-analyzer") {
-				Do ..RunDependencyAnalyzer(.tCommandInfo)
-			} ElseIf (tCommandInfo = "config") {
-				Do ..Config(.tCommandInfo)
-			} ElseIf (tCommandInfo = "unpublish") {
-				Do ..Unpublish(.tCommandInfo)
-			} ElseIf ($Listfind(..#STANDARDPHASES,tCommandInfo)) {
-				Do ..RunOnePhase(.tCommandInfo)
-			} ElseIf (tCommandInfo = "generate") {
-				Do ..GenerateModuleXML(.tCommandInfo)
-			} ElseIf (tCommandInfo = "module-action") {
-				Do ..ModuleAction(.tCommandInfo)
-			} ElseIf (tCommandInfo = "version") {
-				Do ..Version(.tCommandInfo)
-			} ElseIf (tCommandInfo = "namespace") {
-				Do ..Namespace(.tCommandInfo)			
-			} ElseIf (tCommandInfo = "enable") {
-				Do ..EnableIPM(.tCommandInfo)
-			} ElseIf (tCommandInfo = "unmap") {
-				Do ..UnmapIPM(.tCommandInfo)
-			} ElseIf (tCommandInfo = "module-version") {
-				Do ..ModuleVersion(.tCommandInfo)
-			} ElseIf (tCommandInfo = "information") {
-				Do ..Information(.tCommandInfo)
-			} ElseIf (tCommandInfo = "update") {
-				Do ..Update(.tCommandInfo)
+			do ..GetNamespaceDefaultModifiers(.tDefaultArray)
+			merge tCommandInfo("data") = tDefaultArray
+			merge tCommandInfo = tParsedCommandInfo
+
+			if (tCommandInfo = "quit") {
+				return
+			} elseif (tCommandInfo = "help") {
+				do ..%Help(.tCommandInfo)
+			} elseif (tCommandInfo = "init") {
+				do ..Init(.tCommandInfo)
+			} elseif (tCommandInfo = "search") {
+				do ..Search(.tCommandInfo)
+			} elseif (tCommandInfo = "repo") {
+				do ..Repository(.tCommandInfo)
+			} elseif (tCommandInfo = "load") {
+				do ..Load(.tCommandInfo)
+			} elseif (tCommandInfo = "exec") {
+				write !
+				xecute tCommandInfo("parameters","expression")
+			} elseif (tCommandInfo = "install") {
+				do ..Install(.tCommandInfo)
+			} elseif (tCommandInfo = "reinstall") {
+				do ..Reinstall(.tCommandInfo)
+			} elseif (tCommandInfo = "uninstall") {
+				do ..Uninstall(.tCommandInfo)
+			} elseif (tCommandInfo = "list-installed") {
+				do ..ListInstalled(.tCommandInfo)
+			} elseif (tCommandInfo = "list-dependents") {
+				do ..ListDependents(.tCommandInfo)
+			} elseif (tCommandInfo = "orphans") {
+				do ..ListOrphans(.tCommandInfo)
+			} elseif (tCommandInfo = "default-modifiers") {
+				do ..ProcessDefaultModifiers(.tCommandInfo)
+			} elseif (tCommandInfo = "arrange") {
+				do ..Arrange(.tCommandInfo)
+			} elseif (tCommandInfo = "import") {
+				do ..Import(.tCommandInfo)
+			} elseif (tCommandInfo = "run-from-file") {
+				do ..ProcessRunFromFile(.tCommandInfo)
+			} elseif (tCommandInfo = "dependency-analyzer") {
+				do ..RunDependencyAnalyzer(.tCommandInfo)
+			} elseif (tCommandInfo = "config") {
+				do ..Config(.tCommandInfo)
+			} elseif (tCommandInfo = "unpublish") {
+				do ..Unpublish(.tCommandInfo)
+			} elseif ($listfind(..#STANDARDPHASES,tCommandInfo)) {
+				do ..RunOnePhase(.tCommandInfo)
+			} elseif (tCommandInfo = "generate") {
+				do ..GenerateModuleXML(.tCommandInfo)
+			} elseif (tCommandInfo = "module-action") {
+				do ..ModuleAction(.tCommandInfo)
+			} elseif (tCommandInfo = "version") {
+				do ..Version(.tCommandInfo)
+			} elseif (tCommandInfo = "namespace") {
+				do ..Namespace(.tCommandInfo)
+			} elseif (tCommandInfo = "enable") {
+				do ..EnableIPM(.tCommandInfo)
+			} elseif (tCommandInfo = "unmap") {
+				do ..UnmapIPM(.tCommandInfo)
+			} elseif (tCommandInfo = "module-version") {
+				do ..ModuleVersion(.tCommandInfo)
+			} elseif (tCommandInfo = "information") {
+				do ..Information(.tCommandInfo)
 			}
-		} Catch pException {
-			If (pException.Code = $$$ERCTRLC) {
-				Set pException = $$$NULLOREF
-				Return
+		} catch pException {
+			if (pException.Code = $$$ERCTRLC) {
+				set pException = $$$NULLOREF
+				return
 			}
-			Do ..DisplayError(pException.AsStatus())
+			do ..DisplayError(pException.AsStatus())
 		}
-		Set tCommand = ""
-		If tOneCommand {
-			Quit	
+		set tCommand = ""
+		if tOneCommand {
+			quit
 		}
-		Write !
+		write !
 	}
 }
 
 ClassMethod DisplayError(pStatus As %Status)
 {
-  If $$$ISERR(pStatus) {
-    Write !,$$$FormattedLine($$$Red, "ERROR!")
-    Write " ",$System.Status.GetOneStatusText(pStatus)
+  if $$$ISERR(pStatus) {
+    write !,$$$FormattedLine($$$Red, "ERROR!")
+    write " ",$system.Status.GetOneStatusText(pStatus)
   }
 }
 
 /// Show modules in Namespace and to go namespace
 ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
 {
-  Set name = $Translate($Get(pCommandInfo("parameters","name"),"*"),$Char(34))
-	If name'["*" {
-    Try {
-      Set $Namespace = name
-    } Catch ex {
+  set name = $translate($get(pCommandInfo("parameters","name"),"*"),$char(34))
+	if name'["*" {
+    try {
+      set $namespace = name
+    } catch ex {
       $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to switch to namespace: " _ name))
     }
-    Quit
+    quit
   }
 
-	Set currentns = $Namespace
-  Set showFields = ""
-  If $Get(pCommandInfo("data","Description")) {
-    Set showFields = $ListBuild("Description")
+	set currentns = $namespace
+  set showFields = ""
+  if $get(pCommandInfo("data","Description")) {
+    set showFields = $listbuild("Description")
   }
 
-  Do ..GetListModules(name, , .list, showFields)
-  Do ..DisplayModules(.list, 1, 1)
+  do ..GetListModules(name, , .list, showFields)
+  do ..DisplayModules(.list, 1, 1)
 
-  Write !
-  Set prompt = "Enter number or name where to go:"
-  Do {
-    Set value = ""
-    Do ##class(%Library.Prompt).GetString(prompt, .value)
-    Quit:value=""
-    Try { 
-      Set $Namespace = $Select($Data(list(value), ns): $ListGet(ns), 1: value)
-    } Catch e {
-      Write $Char(13),*27,"[K",*27,"[A"
-      Continue
+  write !
+  set prompt = "Enter number or name where to go:"
+  do {
+    set value = ""
+    do ##class(%Library.Prompt).GetString(prompt, .value)
+    quit:value=""
+    try {
+      set $namespace = $select($data(list(value), ns): $listget(ns), 1: value)
+    } catch e {
+      write $char(13),*27,"[K",*27,"[A"
+      continue
     }
-    Quit
-  } While 1
-  Write $Char(13),*27,"[K",prompt, " ", $Namespace,!
+    quit
+  } while 1
+  write $char(13),*27,"[K",prompt, " ", $namespace,!
 }
 
 /// Get list Namespace, example do ##class(%IPM.Main).GetListNamespace(.ns)
@@ -1053,26 +1051,26 @@ ClassMethod GetListNamespace(
 	Output list,
 	pSearch As %String = "")
 {
-  Kill list
-  Set list = 0
+  kill list
+  set list = 0
 
-  // Build regex for matching outside of SQL. 
-  // Directly using `where Nsp LIKE ?` causes a bug described in https://github.com/intersystems/ipm/issues/579 
-  Set pSearch = $Zstrip(pSearch, "<>WC")
-  If pSearch = "" {
-    Set pSearch = "*"
+  // Build regex for matching outside of SQL.
+  // Directly using `where Nsp LIKE ?` causes a bug described in https://github.com/intersystems/ipm/issues/579
+  set pSearch = $zstrip(pSearch, "<>WC")
+  if pSearch = "" {
+    set pSearch = "*"
   }
-  Set regex = ##class(%IPM.DataType.RegExString).FromWildCard(pSearch)
+  set regex = ##class(%IPM.DataType.RegExString).FromWildCard(pSearch)
 
-  Set width = 0
-  Set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
-  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery) 
+  set width = 0
+  set tQuery = "SELECT Nsp FROM %SYS.Namespace_List()"
+  set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
   $$$ThrowSQLIfError(tRes.%SQLCODE, tRes.%Message)
-  While tRes.%Next(.tSC) {
+  while tRes.%Next(.tSC) {
     $$$ThrowOnError(tSC)
-    Set nsp = tRes.Nsp
-    If $Match(nsp, regex) {
-      Set list(nsp) = ""
+    set nsp = tRes.Nsp
+    if $match(nsp, regex) {
+      set list(nsp) = ""
     }
   }
 }
@@ -1080,262 +1078,271 @@ ClassMethod GetListNamespace(
 /// draw description
 ClassMethod DrawColumn(desc) As %String
 {
-	Set dx=$X
-	For d=1:1:$Length(desc," ") {
- 		Set wd=$Piece(desc," ",d) 
-		If $X+$Length(wd)>80 Write !,?dx
-		Write wd," " 
+	set dx=$x
+	for d=1:1:$length(desc," ") {
+ 		set wd=$piece(desc," ",d)
+		if $x+$length(wd)>80 write !,?dx
+		write wd," "
 	}
- 	Quit ""
+ 	quit ""
 }
 
-ClassMethod SwitchToNamespace(pNamespace As %String = {$Namespace}) As %Status
+ClassMethod SwitchToNamespace(pNamespace As %String = {$namespace}) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-    If pNamespace'=$Namespace {
-		  Set $Namespace = pNamespace
+	set tSC = $$$OK
+	try {
+    if pNamespace'=$namespace {
+		  set $namespace = pNamespace
     }
-	} Catch e {
-		Set tSC = e.AsStatus()
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	Quit tSC
+	quit tSC
 }
+<<<<<<< Updated upstream
+ClassMethod GetListModules(
+<<<<<<< Updated upstream
+	pNamespace As %String = {$namespace},
+=======
+	pNamespace As %String = {$Namespace},
+>>>>>>> Stashed changes
+=======
 
 /// Get List Modules
 /// example d ##class(%IPM.Main).GetListModules("%SYS","zpm",.list)
 ClassMethod GetListModules(
 	pNamespace As %String = {$Namespace},
+>>>>>>> Stashed changes
 	pSearch As %String = "",
 	ByRef list,
 	pExtraFields As %String = "",
 	pRepository As %String = "") [ Internal ]
 {
-  Set list = 0
-  If (pNamespace="") || (pNamespace["*") {
-    Do ..GetListNamespace(.listNS, pNamespace)
-    Set list("ns") = pNamespace
-    Set width = 0
-    Set ns = ""
-    For { 
-      Set ns = $Order(listNS(ns)) 
-      Quit:ns=""
-      Kill listModules
-      Try {
+  set list = 0
+  if (pNamespace="") || (pNamespace["*") {
+    do ..GetListNamespace(.listNS, pNamespace)
+    set list("ns") = pNamespace
+    set width = 0
+    set ns = ""
+    for {
+      set ns = $order(listNS(ns))
+      quit:ns=""
+      kill listModules
+      try {
         // It is possible that GetListModules will fail in some namespaces. Allow it to do without failing the whole operation.
         // Most likely cases: incorrect mappings, corrupt installation of IPM in IRISSYS after upgrade.
-        Do ##class(%IPM.Main).GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
-      } Catch e {
-        Write !,"WARNING: Failed to list packages in namespace "_ns_": "_e.DisplayString(),!
-        Kill listModules
+        do ##class(%IPM.Main).GetListModules(ns, pSearch, .listModules, pExtraFields, pRepository)
+      }catch e {
+        write !,"WARNING: Failed to list packages in namespace "_ns_": "_e.DisplayString(),!
+        kill listModules
       }
-      Continue:(pSearch'="")&&('$Get(listModules))
-      If width < $Length(ns) {
-        Set width = $Length(ns)
+continue:(pSearch'="")&&('$get(listModules))
+      if width < $length(ns) {
+        set width = $length(ns)
       }
-      Set list = list + 1 
-      Set list(list) = $ListBuild(ns)
+set list = list + 1
+      set list(list) = $listbuild(ns)
 
-      Merge list(list, "modules") = listModules
+      merge list(list, "modules") = listModules
     }
-    Merge list("width") = width
+merge list("width") = width
 
-    Quit
+    quit
   }
-  If pNamespace'=$Namespace {
-    New $Namespace
-    If $$$ISERR(..SwitchToNamespace(pNamespace)) {
-      Quit
+if pNamespace'=$namespace {
+    new $namespace
+    if $$$ISERR(..SwitchToNamespace(pNamespace)) {
+      quit
     }
-  }
-  If '$$$comClassDefined("%IPM.Storage.Module") {
+}
+  if '$$$comClassDefined("%IPM.Storage.Module") {
     // Don't error in namespaces without IPM enabled
-    Quit
+    quit
   }
-  Set tArgs = 0
+  set tArgs = 0
   // HACK: Certain IRIS kit, e.g., irishealth-community 2024.1 comes with %IPM in HSLIB and HSSYS namespaces
   // The caveat is that the %IPM.Storage.Module doesn't have an "LastUpdated" property
   // So, we need to check if the property exists before querying it
   $$$ThrowOnError(##class(%SYSTEM.SQL.Schema).GetAllColumns("%IPM_Storage.ModuleItem", .columns))
-  Set checkUpdateTime = $Data(columns("LastUpdated"))
-  Set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root"
-  If checkUpdateTime {
-	Set tQuery = tQuery _ ",LastUpdated"
+  set checkUpdateTime = $data(columns("LastUpdated"))
+  set tQuery = "SELECT Name,VersionString,Description,ExternalName,DeveloperMode,Root"
+  if checkUpdateTime {
+	set tQuery = tQuery _ ",LastUpdated"
   }
-  Set tQuery = tQuery _ " FROM %IPM_Storage.ModuleItem WHERE 1=1 "
-  Set pSearch = $ZStrip(pSearch, "<>WC")
-  If pSearch'="" {
-    If pSearch["," {
-      Set tList = $ListFromString(pSearch, ",")
-      Set tParams = ""
-      Set ptr = 0
-      While $ListNext(tList, ptr, tItem) {
-        Set tItem = $ZStrip(tItem, "<>WC")
-        Continue:tItem=""
-        Set tParams = tParams _ $ListBuild("?")
-        Set tArgs($Increment(tArgs)) = tItem
+  set tQuery = tQuery _ " FROM %IPM_Storage.ModuleItem WHERE 1=1 "
+  set pSearch = $zstrip(pSearch, "<>WC")
+  if pSearch'="" {
+    if pSearch["," {
+      set tList = $listfromstring(pSearch, ",")
+      set tParams = ""
+      set ptr = 0
+      while $listnext(tList, ptr, tItem) {
+        set tItem = $zstrip(tItem, "<>WC")
+        continue:tItem=""
+        set tParams = tParams _ $listbuild("?")
+        set tArgs($increment(tArgs)) = tItem
       }
-      Set tQuery = tQuery _ " AND name IN (" _ $ListToString(tParams, ", ") _ ")"
-    } ElseIf pSearch'="*" {
-      Set tQuery = tQuery _ " AND name " _ $Select(pSearch["*": "like ?", 1: "= ?")
-      Set tArgs($Increment(tArgs)) = $Translate(pSearch, "*", "%")
+      set tQuery = tQuery _ " AND name IN (" _ $listtostring(tParams, ", ") _ ")"
+    } elseif pSearch'="*" {
+      set tQuery = tQuery _ " AND name " _ $select(pSearch["*": "like ?", 1: "= ?")
+      set tArgs($increment(tArgs)) = $translate(pSearch, "*", "%")
     }
   }
-  If pRepository'="" {
-    Set tQuery = tQuery _ " AND Repository = ?"
-    Set tArgs($Increment(tArgs)) = pRepository
+  if pRepository'="" {
+    set tQuery = tQuery _ " AND Repository = ?"
+    set tArgs($increment(tArgs)) = pRepository
   }
-  Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+  set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery, tArgs...)
+	if (tRes.%SQLCODE < 0) {
+		throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
-  Set maxWidth = 0
-  Set list = 0
-	While tRes.%Next(.tSC) {
+  set maxWidth = 0
+  set list = 0
+	while tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-    Set name = tRes.Name
-    Set list = list + 1
-		Set list(list) = $ListBuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
-		If checkUpdateTime {
-			Set list(list) = list(list) _ $ListBuild(tRes.LastUpdated)
+    set name = tRes.Name
+    set list = list + 1
+		set list(list) = $listbuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
+		if checkUpdateTime {
+			set list(list) = list(list) _ $listbuild(tRes.LastUpdated)
 		}
-		If maxWidth<$Length(name) {
-      Set maxWidth = $Length(name)
+		if maxWidth<$length(name) {
+      set maxWidth = $length(name)
     }
-    Continue:pExtraFields=""
-    Set obj = ##class(%IPM.Storage.Module).NameOpen(name, .tSC)
-    Continue:$$$ISERR(tSC)
-    Set ptr = 0 
-    While $ListNext(pExtraFields, ptr, field) {
-      Continue:field=""
-      Set tObj = obj
-      Set tValue = ""
-      For j=1:1:$Length(field, ".") {
-        Set tField = $Piece(field, ".", j)
-        Set tValue = $Property(tObj, tField)
-        Quit:'$IsObject(tValue)
-        Set tObj = tValue
+    continue:pExtraFields=""
+    set obj = ##class(%IPM.Storage.Module).NameOpen(name, .tSC)
+    continue:$$$ISERR(tSC)
+    set ptr = 0
+    while $listnext(pExtraFields, ptr, field) {
+      continue:field=""
+      set tObj = obj
+      set tValue = ""
+      for j=1:1:$length(field, ".") {
+        set tField = $piece(field, ".", j)
+        set tValue = $property(tObj, tField)
+        quit:'$isobject(tValue)
+        set tObj = tValue
       }
-      Continue:tValue=""
-      Set list(list, field) = tValue
+      continue:tValue=""
+      set list(list, field) = tValue
     }
 	}
-  Set list("width") = maxWidth
+  set list("width") = maxWidth
 }
 
 /// generates module.xml
 ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 {
-	Set tPath = $Get(pCommandInfo("parameters","path"))
-	If (tPath="") {
-		Set tHelp(1) = "Enter path to the module folder (where module.xml will be generated)"
-		Set tHelp(2) = "Enter "" null string to quit"
-		Do ##class(%Library.Prompt).GetString("Enter module folder:", .tPath, , ,.tHelp)
-		Return:(tPath="") $$$OK
+	set tPath = $get(pCommandInfo("parameters","path"))
+	if (tPath="") {
+		set tHelp(1) = "Enter path to the module folder (where module.xml will be generated)"
+		set tHelp(2) = "Enter "" null string to quit"
+		do ##class(%Library.Prompt).GetString("Enter module folder:", .tPath, , ,.tHelp)
+		return:(tPath="") $$$OK
 	}
-	Set tPath = ##class(%File).NormalizeDirectory(tPath)
+	set tPath = ##class(%File).NormalizeDirectory(tPath)
 
-	If ($$$HasModifier(pCommandInfo,"template")) {
-		Return ##class(%IPM.Storage.ModuleTemplate).GenerateTemplate(tPath)
-	} 
-	While (1) {
-		Set tHelp(1) = "Enter module name"
-		Set tHelp(2) = "Enter "" null string to quit"
-		Do ##class(%Library.Prompt).GetString("Enter module name:", .tName, , ,.tHelp)
-		Return:(tName="") $$$OK
-		If ('##class(%IPM.Storage.ModuleTemplate).NameIsValid(tName)) {
-			Write !,"Module name """_tName_""" is invalid" 
-			Set tName=""
-			Continue 
+	if ($$$HasModifier(pCommandInfo,"template")) {
+		return ##class(%IPM.Storage.ModuleTemplate).GenerateTemplate(tPath)
+	}
+	while (1) {
+		set tHelp(1) = "Enter module name"
+		set tHelp(2) = "Enter "" null string to quit"
+		do ##class(%Library.Prompt).GetString("Enter module name:", .tName, , ,.tHelp)
+		return:(tName="") $$$OK
+		if ('##class(%IPM.Storage.ModuleTemplate).NameIsValid(tName)) {
+			write !,"Module name """_tName_""" is invalid"
+			set tName=""
+			continue
 		}
-		Quit 
+		quit
 	}
 
-	While (1) {
-		Set tVersion = "1.0.0"
-		Do ##class(%Library.Prompt).GetString("Enter module version:", .tVersion)
-		Return:(tVersion="") $$$OK
-		If ('##class(%IPM.General.SemanticVersion).IsValid(tVersion)) {
-			Write !,"Module version """_tVersion_""" is invalid" 
-			Set tVersion=""
-			Continue 
+	while (1) {
+		set tVersion = "1.0.0"
+		do ##class(%Library.Prompt).GetString("Enter module version:", .tVersion)
+		return:(tVersion="") $$$OK
+		if ('##class(%IPM.General.SemanticVersion).IsValid(tVersion)) {
+			write !,"Module version """_tVersion_""" is invalid"
+			set tVersion=""
+			continue
 		}
-		Quit
+		quit
 	}
 
-	Do ##class(%Library.Prompt).GetString("Enter module description:", .tDescription)
+	do ##class(%Library.Prompt).GetString("Enter module description:", .tDescription)
 
-	Do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)	
+	do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)
 
-	Set tTemplate = ##class(%IPM.Storage.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
-	Return:'$IsObject(tTemplate) 
+	set tTemplate = ##class(%IPM.Storage.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
+	return:'$isobject(tTemplate)
 
-	If ($$$HasModifier(pCommandInfo,"author")) {
-		Write !,"Author:"
-		Do ##class(%Library.Prompt).GetString("    Enter Author name:", .tAuthorPerson)	
-		Do ##class(%Library.Prompt).GetString("    Enter Organization name:", .tAuthorOrg)
-		Do ##class(%Library.Prompt).GetString("    Enter License:", .tAuthorLicense)
-		Do ##class(%Library.Prompt).GetString("    Enter Copyright Date:", .tAuthorCopy)
-		Do ##class(%Library.Prompt).GetString("    Enter Notes:", .tAuthorNotes)
-		Do tTemplate.SetAuthorProps(tAuthorPerson, tAuthorOrg, tAuthorLicense, tAuthorCopy, tAuthorNotes)
-		Write !
+	if ($$$HasModifier(pCommandInfo,"author")) {
+		write !,"Author:"
+		do ##class(%Library.Prompt).GetString("    Enter Author name:", .tAuthorPerson)
+		do ##class(%Library.Prompt).GetString("    Enter Organization name:", .tAuthorOrg)
+		do ##class(%Library.Prompt).GetString("    Enter License:", .tAuthorLicense)
+		do ##class(%Library.Prompt).GetString("    Enter Copyright Date:", .tAuthorCopy)
+		do ##class(%Library.Prompt).GetString("    Enter Notes:", .tAuthorNotes)
+		do tTemplate.SetAuthorProps(tAuthorPerson, tAuthorOrg, tAuthorLicense, tAuthorCopy, tAuthorNotes)
+		write !
 	}
-	
-	Set tSrc = "src"
-	Do ##class(%Library.Prompt).GetString("Enter module source folder:", .tSrc)	
-	Set tExp = $$$GetModifier(pCommandInfo,"export")
-	If tExp'="" {
+
+	set tSrc = "src"
+	do ##class(%Library.Prompt).GetString("Enter module source folder:", .tSrc)
+	set tExp = $$$GetModifier(pCommandInfo,"export")
+	if tExp'="" {
 		set tPathSrc=##class(%File).NormalizeDirectory(tPath_"\"_tSrc)
-		Do ##class(%IPM.Storage.ModuleTemplate).ExportResources(tPathSrc,tExp)
+		do ##class(%IPM.Storage.ModuleTemplate).ExportResources(tPathSrc,tExp)
 	}
-	Do tTemplate.ReadResources(tSrc)
+	do tTemplate.ReadResources(tSrc)
 
 	// web applications
-	Do ##class(%IPM.Storage.ModuleTemplate).GetCSPApplications(.apps)
-	If ($ListLength(apps)>0 ) {
-		Write !!,"Existing Web Applications:"
-		For i=1:1:$ListLength(apps) {
-			Write !,"    "_$ListGet(apps,i)
+	do ##class(%IPM.Storage.ModuleTemplate).GetCSPApplications(.apps)
+	if ($listlength(apps)>0 ) {
+		write !!,"Existing Web Applications:"
+		for i=1:1:$listlength(apps) {
+			write !,"    "_$listget(apps,i)
 		}
-		Do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
+		do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
 
-		Do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps) 
-		For i=1:1:$ListLength(tCSPapps) {
-			Set tCSPPath = ""
-			Do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$ListGet(tCSPapps,i)_": ", .tCSPPath)
-			If (tCSPPath'="") {
-				Do tTemplate.SetSourcePathForCSPApp($ListGet(tCSPapps,i),tCSPPath)
+		do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps)
+		for i=1:1:$listlength(tCSPapps) {
+			set tCSPPath = ""
+			do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$listget(tCSPapps,i)_": ", .tCSPPath)
+			if (tCSPPath'="") {
+				do tTemplate.SetSourcePathForCSPApp($listget(tCSPapps,i),tCSPPath)
 			}
 		}
 	}
 
 	// dependencies
-	Write !,"Dependencies:"
-	While 1 {
-		Set tDependant = ""
-		Set tResponse = ##class(%Library.Prompt).GetString("    Enter module:version or empty string to continue:", .tDependant)
-		Set tDependant = $ZStrip(tDependant,"<>W")
-		Quit:(tDependant="")
-		Do tTemplate.AddDependant(tDependant)
+	write !,"Dependencies:"
+	while 1 {
+		set tDependant = ""
+		set tResponse = ##class(%Library.Prompt).GetString("    Enter module:version or empty string to continue:", .tDependant)
+		set tDependant = $zstrip(tDependant,"<>W")
+		quit:(tDependant="")
+		do tTemplate.AddDependant(tDependant)
 	}
 
-	Do tTemplate.ProcessResources()
-	Return tTemplate.SaveFile(tPath)
+	do tTemplate.ProcessResources()
+	return tTemplate.SaveFile(tPath)
 }
 
 /// Get Default Command of Registry
 /// example d ##class(%IPM.Main).GetDefaultCommandRegistry()
 ClassMethod GetDefaultCommandRegistry()
 {
-	New $Namespace
-	Set $Namespace="%SYS"
-	Set Status=##Class(Config.Startup).Get(.Properties)
-	If Status {
-		Set ServerPort="http://"_$ZUtil(110)_":"_$Get(Properties("WebServerPort"),52773)
-		Write !,"Default commands for the registry"
-		Write !,"View all packets in the browser:",!,"  ",ServerPort_"/registry/packages/-/all"
-		Write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
-		
+	new $namespace
+	set $namespace="%SYS"
+	set Status=##Class(Config.Startup).Get(.Properties)
+	if Status {
+		set ServerPort="http://"_$zutil(110)_":"_$get(Properties("WebServerPort"),52773)
+		write !,"Default commands for the registry"
+		write !,"View all packets in the browser:",!,"  ",ServerPort_"/registry/packages/-/all"
+		write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
+
 	}
 }
 
@@ -1344,13 +1351,13 @@ ClassMethod GetVersionModule(
 	name,
 	namespace = {$namespace})
 {
-	New $Namespace
-	Set $Namespace=namespace
-	Try {
-		Do ..GetListModules(,name,.list)
-		Return $ListGet(list(1), 2)
-	} Catch ex {
-		Return ""
+	new $namespace
+	set $namespace=namespace
+	try {
+		do ..GetListModules(,name,.list)
+		return $listget(list(1), 2)
+	} catch ex {
+		return ""
 	}
 }
 
@@ -1358,23 +1365,23 @@ ClassMethod GetVersionModule(
 /// Version client and registry
 ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 {
-	Do ..GetListModules("*", $$$IPMModuleName_","_$$$IPMServerRegistryModuleName, .list)
-	Do ..AddIPMMappedNamespaces(.list)
-	Do ..DisplayModules(.list)
+	do ..GetListModules("*", $$$IPMModuleName_","_$$$IPMServerRegistryModuleName, .list)
+	do ..AddIPMMappedNamespaces(.list)
+	do ..DisplayModules(.list)
 
 	// Get URL current registry
-	Set tRes = ##class(%IPM.Repo.Remote.Definition).ExtentFunc()
-	While tRes.%Next(.tSC) {
+	set tRes = ##class(%IPM.Repo.Remote.Definition).ExtentFunc()
+	while tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
 
 		#dim tRepository As %IPM.Repo.Remote.Definition
-		Set tRepository = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRes.ID,,.tSC)
+		set tRepository = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRes.ID,,.tSC)
 		$$$ThrowOnError(tSC)
-		Set tService = tRepository.GetPackageService()
-		Set tInfo = tService.GetInfo()
-		Write !,$$$FormattedLine($$$Default,tRepository.URL)," - ",tInfo.ToString()
+		set tService = tRepository.GetPackageService()
+		set tInfo = tService.GetInfo()
+		write !,$$$FormattedLine($$$Default,tRepository.URL)," - ",tInfo.ToString()
 	}
-	Quit $$$OK
+	quit $$$OK
 }
 
 /// Argument `list` is a multidimensional array where `list` contains the a numeric value `n`, indicating the length of the list
@@ -1393,33 +1400,33 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
 /// list("width")=4
 ClassMethod AddIPMMappedNamespaces(ByRef list) [ Private ]
 {
-	Do ..GetListNamespace(.allNS,"*")
-	For i=1:1:+$Get(list) {
-		Set namespace = $ListGet(list(i))
-		If (namespace '= "") {
-			Kill allNS(namespace)
+	do ..GetListNamespace(.allNS,"*")
+	for i=1:1:+$get(list) {
+		set namespace = $listget(list(i))
+		if (namespace '= "") {
+			kill allNS(namespace)
 		}
-		Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
-		Set mappedFrom(sourceDB) = namespace
-		Merge mappedFrom(sourceDB,"info") = list(i)
+		set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
+		set mappedFrom(sourceDB) = namespace
+		merge mappedFrom(sourceDB,"info") = list(i)
 	}
 
-	Set namespace = ""
-	For {
-		Set namespace = $Order(allNS(namespace))
-		If namespace = "" {
-			Quit
+	set namespace = ""
+	for {
+		set namespace = $order(allNS(namespace))
+		if namespace = "" {
+			quit
 		}
 
-		Set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
-		If $Data(mappedFrom(sourceDB),sourceNamespace) {
-			Kill info
-			Merge info = mappedFrom(sourceDB,"info")
-			Set info = $lb(namespace)
-			Set info("modules",1,"Installed In") = sourceNamespace
-			Merge list($i(list)) = info
-			If $Length(namespace) > +$Get(list("width")) {
-				Set list("width") = $Length(namespace)
+		set sourceDB = ##class(%SYS.Namespace).GetPackageDest(namespace,"%IPM")
+		if $data(mappedFrom(sourceDB),sourceNamespace) {
+			kill info
+			merge info = mappedFrom(sourceDB,"info")
+			set info = $listbuild(namespace)
+			set info("modules",1,"Installed In") = sourceNamespace
+			merge list($increment(list)) = info
+			if $length(namespace) > +$get(list("width")) {
+				set list("width") = $length(namespace)
 			}
 		}
 	}
@@ -1431,305 +1438,305 @@ ClassMethod IsAvailable(
 	pNamespace As %String = "",
 	pArgs...) As %Boolean
 {
-	New $NAMESPACE
-	If pNamespace'="" {
-		Set $namespace = pNamespace
+	new $namespace
+	if pNamespace'="" {
+		set $namespace = pNamespace
 	}
-	If '##class(%IPM.Storage.Module).NameExists(pModuleName,.id) {
-		Return 0
+	if '##class(%IPM.Storage.Module).NameExists(pModuleName,.id) {
+		return 0
 	}
-	Set availabilityClass = ##class(%IPM.Storage.Module).AvailabilityClassGetStored(id)
-	If availabilityClass = "" {
-		Return 1
+	set availabilityClass = ##class(%IPM.Storage.Module).AvailabilityClassGetStored(id)
+	if availabilityClass = "" {
+		return 1
 	}
-	Quit $ClassMethod(availabilityClass,"IsAvailable",pNamespace,pArgs...)
+	quit $classmethod(availabilityClass,"IsAvailable",pNamespace,pArgs...)
 }
 
 ClassMethod GetNamespaceDefaultModifiers(Output pDefaultArray) [ Internal ]
 {
-	Kill pDefaultArray
-	Merge pDefaultArray = $$$ZPMDefaultModifiers
+	kill pDefaultArray
+	merge pDefaultArray = $$$ZPMDefaultModifiers
 }
 
 ClassMethod SetNamespaceDefaultModifiers(ByRef pDefaultArray) [ Internal ]
 {
-	Merge $$$ZPMDefaultModifiers = pDefaultArray
+	merge $$$ZPMDefaultModifiers = pDefaultArray
 }
 
 ClassMethod DeleteNamespaceDefaultModifiers() [ Internal ]
 {
-	Kill $$$ZPMDefaultModifiers
+	kill $$$ZPMDefaultModifiers
 }
 
 ClassMethod AccumulateDefaultModifierList(
 	ByRef pDefaultArray,
 	pNameParts As %Library.List = "") As %Library.List [ Internal ]
 {
-	Set returnList = ""
-	Set key = ""
-	While 1 {
-		Set key = $Order(pDefaultArray(key))
-		If (key = "") {
-			Quit
+	set returnList = ""
+	set key = ""
+	while 1 {
+		set key = $order(pDefaultArray(key))
+		if (key = "") {
+			quit
 		}
-		Set nameParts = pNameParts _ $ListBuild(key)
-		If $Data(pDefaultArray(key),value)#2 {
+		set nameParts = pNameParts _ $listbuild(key)
+		if $data(pDefaultArray(key),value)#2 {
 			// Only add to return list if top level node contains value
-			Set returnList = returnList _ $ListBuild("-D"_$ListToString(nameParts,".")_"="_value)
+			set returnList = returnList _ $listbuild("-D"_$listtostring(nameParts,".")_"="_value)
 		}
-		If ($Data(pDefaultArray(key)) >= 10) {
+		if ($data(pDefaultArray(key)) >= 10) {
 			// Contains subscripts so call recursively
-			Kill childArray
-			Merge childArray = pDefaultArray(key)
-			Set childList = ..AccumulateDefaultModifierList(.childArray, nameParts)
-			Set returnList = returnList _ childList
+			kill childArray
+			merge childArray = pDefaultArray(key)
+			set childList = ..AccumulateDefaultModifierList(.childArray, nameParts)
+			set returnList = returnList _ childList
 		}
 	}
-	Return returnList
+	return returnList
 }
 
 ClassMethod ProcessDefaultModifiers(ByRef pCommandInfo) [ Internal ]
 {
-	Set shouldSet = $$$HasModifier(pCommandInfo,"set")
-	Set shouldGet = $$$HasModifier(pCommandInfo,"get")
-	Set shouldDelete = $$$HasModifier(pCommandInfo,"delete")
-	If ((shouldSet + shouldGet + shouldDelete) '= 1) {
+	set shouldSet = $$$HasModifier(pCommandInfo,"set")
+	set shouldGet = $$$HasModifier(pCommandInfo,"get")
+	set shouldDelete = $$$HasModifier(pCommandInfo,"delete")
+	if ((shouldSet + shouldGet + shouldDelete) '= 1) {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"MUST use EXACTLY one of the available modifiers. View available modifiers by running the following command: help default-modifiers"))
 	}
-	If shouldGet {
-		Do ..GetNamespaceDefaultModifiers(.defaultArray)
-		Set modList = ..AccumulateDefaultModifierList(.defaultArray)
-		If ($ListLength(modList) = 0) {
-			Write !, "No default modifiers currently set for this namespace", !
-			Return
+	if shouldGet {
+		do ..GetNamespaceDefaultModifiers(.defaultArray)
+		set modList = ..AccumulateDefaultModifierList(.defaultArray)
+		if ($listlength(modList) = 0) {
+			write !, "No default modifiers currently set for this namespace", !
+			return
 		}
-		Write !!, $$$FormattedLine($$$Underlined,"Available default modifiers:"), !
-		Set ptr = 0
-		While $ListNext(modList, ptr, modName) {
-			Write !, modName
+		write !!, $$$FormattedLine($$$Underlined,"Available default modifiers:"), !
+		set ptr = 0
+		while $listnext(modList, ptr, modName) {
+			write !, modName
 		}
-		Write !
-	} ElseIf shouldSet {
-		Merge dataArray = pCommandInfo("data")
-		Do ..SetNamespaceDefaultModifiers(.dataArray)
-		Write !, "Successfully updated default modifiers!", !
-	} ElseIf shouldDelete {
-		Do ..DeleteNamespaceDefaultModifiers()
-		Write !, "Successfully deleted default modifiers!", !
+		write !
+	} elseif shouldSet {
+		merge dataArray = pCommandInfo("data")
+		do ..SetNamespaceDefaultModifiers(.dataArray)
+		write !, "Successfully updated default modifiers!", !
+	} elseif shouldDelete {
+		do ..DeleteNamespaceDefaultModifiers()
+		write !, "Successfully deleted default modifiers!", !
 	}
 }
 
 ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 {
 	// In quiet mode, no prompts should be shown.
-	Set tQuiet = $$$HasModifier(pCommandInfo,"noprompt")
-	
+	set tQuiet = $$$HasModifier(pCommandInfo,"noprompt")
+
 	// Reindex tables with semantic version indices
-	For tClass = "%IPM.Repo.Filesystem.Cache" {
-		Write !,"Reindexing ",tClass,"... "
-		$$$ThrowOnError($ClassMethod(tClass,"%BuildIndices",,1,1))
-		Write "done."
+	for tClass = "%IPM.Repo.Filesystem.Cache" {
+		write !,"Reindexing ",tClass,"... "
+		$$$ThrowOnError($classmethod(tClass,"%BuildIndices",,1,1))
+		write "done."
 	}
-	
+
 	// Package Manager Settings
-	If tQuiet {
-		Set tResult = 0
-	} Else {
-		Write !
-		Set tResult = 0
-		Set tHelp = "Enter ""Yes"" to configure settings for third-party tools that the package manager needs. These are all optional, "_
+	if tQuiet {
+		set tResult = 0
+	} else {
+		write !
+		set tResult = 0
+		set tHelp = "Enter ""Yes"" to configure settings for third-party tools that the package manager needs. These are all optional, "_
 			"with the possible exception of JAVA_HOME, which must be configured to enable packaging of modules or extraction of packages."
-		Set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to configure general package manager settings?",.tResult,.tHelp)
-		If (tResponse '= $$$SuccessResponse) {
+		set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to configure general package manager settings?",.tResult,.tHelp)
+		if (tResponse '= $$$SuccessResponse) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 		}
 	}
-	If (tResult) {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"call %IPM_General.IConfigurable_ListSettings()")
-		If (tRes.%SQLCODE < 0) {
+	if (tResult) {
+		set tRes = ##class(%SQL.Statement).%ExecDirect(,"call %IPM_General.IConfigurable_ListSettings()")
+		if (tRes.%SQLCODE < 0) {
 			$$$ThrowStatus($$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message))
 		}
-		Set tLastSource = ""
-		While tRes.%Next(.tSC) {
+		set tLastSource = ""
+		while tRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			
-			Set tSource = tRes.%Get("Source")
-			If (tSource '= tLastSource) {
-				Set tLastSource = tSource
-				Set tSourceDesc = tRes.%Get("SourceDescription")
-				Write !!,tSourceDesc
+
+			set tSource = tRes.%Get("Source")
+			if (tSource '= tLastSource) {
+				set tLastSource = tSource
+				set tSourceDesc = tRes.%Get("SourceDescription")
+				write !!,tSourceDesc
 			}
-			Set tSetting = tRes.%Get("Name")
-			Set tSettingDesc = tRes.%Get("Description")
-			Set tSettingValue = tRes.%Get("Value")
-			
-			Write !,tSetting,": ",tSettingDesc
-			Set tResponse = ##class(%Library.Prompt).GetString("Value:",.tSettingValue,,,tSettingDesc)
-			If (tResponse '= $$$SuccessResponse) {
+			set tSetting = tRes.%Get("Name")
+			set tSettingDesc = tRes.%Get("Description")
+			set tSettingValue = tRes.%Get("Value")
+
+			write !,tSetting,": ",tSettingDesc
+			set tResponse = ##class(%Library.Prompt).GetString("Value:",.tSettingValue,,,tSettingDesc)
+			if (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
-			
-			If (tSettingValue '= tRes.%Get("Value")) {
-				$$$ThrowOnError($ClassMethod(tSource,"SetSettingValue",tSetting,tSettingValue))
-				Write !,tSetting," updated."
+
+			if (tSettingValue '= tRes.%Get("Value")) {
+				$$$ThrowOnError($classmethod(tSource,"SetSettingValue",tSetting,tSettingValue))
+				write !,tSetting," updated."
 			}
 		}
 		$$$ThrowOnError(tSC)
 	}
-	
-	
-	If tQuiet {
-		Set tConfigureZPM = $$$HasModifier(pCommandInfo,"zpm")
-	} Else {
+
+
+	if tQuiet {
+		set tConfigureZPM = $$$HasModifier(pCommandInfo,"zpm")
+	} else {
 		// Update of language extension - see if one is already configured.
 		$$$ThrowOnError(..UpdateLanguageExtensions(0,1,.tHasZPM))
-		Set tConfigureZPM = 'tHasZPM // Default to "yes" if command is missing.
-		
-		Write !
-		Set tHelp = "The 'ZPM' command allows quick command line access to many features of the package manager. Extensive documentation is available via:"_$Char(13,10,9)_" zpm ""help""."
-		Set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to enable/update the 'ZPM' command?",.tConfigureZPM,.tHelp)
-		If (tResponse '= $$$SuccessResponse) {
+		set tConfigureZPM = 'tHasZPM // Default to "yes" if command is missing.
+
+		write !
+		set tHelp = "The 'ZPM' command allows quick command line access to many features of the package manager. Extensive documentation is available via:"_$char(13,10,9)_" zpm ""help""."
+		set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to enable/update the 'ZPM' command?",.tConfigureZPM,.tHelp)
+		if (tResponse '= $$$SuccessResponse) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 		}
 	}
-	If tConfigureZPM {
+	if tConfigureZPM {
 		$$$ThrowOnError(..UpdateLanguageExtensions())
 	}
-	
+
 	// Source Control settings
-	Write !
-	Set tSCClassChanged = 0
-	
-	Set tPrimaryClass = ""
-	Set tCompositeSCClass = "%IPM.ExtensionBase.Composite"
-	Set tServerMenuExtClass = ""
+	write !
+	set tSCClassChanged = 0
+
+	set tPrimaryClass = ""
+	set tCompositeSCClass = "%IPM.ExtensionBase.Composite"
+	set tServerMenuExtClass = ""
 
 	// set server menu extension class (tServerMenuExtClass)
-	If tQuiet {
-		If $$$HasModifier(pCommandInfo,"menuextension") {
-			Set tServerMenuExtClass = $$$GetModifier(pCommandInfo,"menuextension")
+	if tQuiet {
+		if $$$HasModifier(pCommandInfo,"menuextension") {
+			set tServerMenuExtClass = $$$GetModifier(pCommandInfo,"menuextension")
 		}
-	} Else {
-		Set tValue = ""
-		Set tStatement = ##class(%SQL.Statement).%New()
+	} else {
+		set tValue = ""
+		set tStatement = ##class(%SQL.Statement).%New()
 		$$$ThrowOnError(tStatement.%PrepareClassQuery($classname(), "ServerMenuExtensionClasses"))
-		Set tResultSet=tStatement.%Execute()
+		set tResultSet=tStatement.%Execute()
 		$$$ThrowSQLIfError(tResultSet.%SQLCODE, tResultSet.%Message)
-		While tResultSet.%Next(.tSC) {
+		while tResultSet.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
 			// if there's only one satisfied subclass, directly set it
 			// if not, tServerMenuExtClass will be overwritten by user input to the prompt below
-			Set tServerMenuExtClass = tResultSet.%Get("Name")
+			set tServerMenuExtClass = tResultSet.%Get("Name")
 		}
 		$$$ThrowOnError(tSC)
-		If (tResultSet.%ROWCOUNT > 1) {
+		if (tResultSet.%ROWCOUNT > 1) {
 			// if has more than one satisfied subclass, let user choose which server menu extension class to set
-			Set tHelp = "Note: only subclasses of %IPM.ExtensionBase.ServerMenu.Interface are listed."
-			Set tResponse = ##class(%Library.Prompt).GetArray("Which class to set as the server menu extension class?",.tValue, $ListBuild($ClassName()_":ServerMenuExtensionClasses"),,,.tHelp,$$$InitialDisplayMask)
-			If (tResponse '= $$$SuccessResponse) {
+			set tHelp = "Note: only subclasses of %IPM.ExtensionBase.ServerMenu.Interface are listed."
+			set tResponse = ##class(%Library.Prompt).GetArray("Which class to set as the server menu extension class?",.tValue, $listbuild($classname()_":ServerMenuExtensionClasses"),,,.tHelp,$$$InitialDisplayMask)
+			if (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
-			If (tValue '= "") {
-				Set tServerMenuExtClass = tValue
+			if (tValue '= "") {
+				set tServerMenuExtClass = tValue
 			}
 		}
-		If (tServerMenuExtClass '= "") {
-			Write !, "Setting "_tServerMenuExtClass_" as the server menu extension class."
+		if (tServerMenuExtClass '= "") {
+			write !, "Setting "_tServerMenuExtClass_" as the server menu extension class."
 		}
 	}
 
-	Set tSCInterface = "%IPM.ExtensionBase.SourceControl.Interface"
-	Set tOldSourceControlClass = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
-	
-	If (tOldSourceControlClass '= "") && '$$$comClassDefined(tOldSourceControlClass) {
-		Write !,"Source control class ",tOldSourceControlClass," does not exist - disabling it."
+	set tSCInterface = "%IPM.ExtensionBase.SourceControl.Interface"
+	set tOldSourceControlClass = ##class(%Studio.SourceControl.Interface).SourceControlClassGet()
+
+	if (tOldSourceControlClass '= "") && '$$$comClassDefined(tOldSourceControlClass) {
+		write !,"Source control class ",tOldSourceControlClass," does not exist - disabling it."
 		$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet())
-		Set tOldSourceControlClass = ""
+		set tOldSourceControlClass = ""
 	}
-	
-	If (tOldSourceControlClass '= "") && (tOldSourceControlClass '= tCompositeSCClass) && (tOldSourceControlClass '= tServerMenuExtClass) {
-		Write !,"Enabling package manager extension if present... "
-		$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tOldSourceControlClass,$ListBuild(tServerMenuExtClass)))
-		Write "done."
-		Set tOldSourceControlClass = tCompositeSCClass
+
+	if (tOldSourceControlClass '= "") && (tOldSourceControlClass '= tCompositeSCClass) && (tOldSourceControlClass '= tServerMenuExtClass) {
+		write !,"Enabling package manager extension if present... "
+		$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tOldSourceControlClass,$listbuild(tServerMenuExtClass)))
+		write "done."
+		set tOldSourceControlClass = tCompositeSCClass
 	}
-	
-	If (tOldSourceControlClass = "") {
-		Write !,"No Studio extension is currently configured for this namespace."
-	} ElseIf (tOldSourceControlClass = tCompositeSCClass) {
-		Set tPrimaryClass = ##class(%IPM.ExtensionBase.Composite).GetPrimaryExtensionClass()
-		Set tExtensionClasses = ##class(%IPM.ExtensionBase.Composite).GetSubExtensionClasses()
-		Write !,"Currently configured to use the following extension classes: "
-		Set tPtr = 0
-		While $ListNext(tExtensionClasses,tPtr,tClass) {
-			Write !,$Char(9),tClass,$Case(tClass,tPrimaryClass:" (primary)",:"")
+
+	if (tOldSourceControlClass = "") {
+		write !,"No Studio extension is currently configured for this namespace."
+	} elseif (tOldSourceControlClass = tCompositeSCClass) {
+		set tPrimaryClass = ##class(%IPM.ExtensionBase.Composite).GetPrimaryExtensionClass()
+		set tExtensionClasses = ##class(%IPM.ExtensionBase.Composite).GetSubExtensionClasses()
+		write !,"Currently configured to use the following extension classes: "
+		set tPtr = 0
+		while $listnext(tExtensionClasses,tPtr,tClass) {
+			write !,$char(9),tClass,$case(tClass,tPrimaryClass:" (primary)",:"")
 		}
-	} Else {
-		Write !,"Currently configured with the package manager extension, but no source control class."
+	} else {
+		write !,"Currently configured with the package manager extension, but no source control class."
 	}
-	
-	If tQuiet {
-		Set tResult = $$$HasModifier(pCommandInfo,"extension")
-	} Else {
-		Write !
-		Set tHelp = "The source control class is a namespace-specific setting, controlling export of files to the filesystem / source control on the server."
-		Set tResult = (tPrimaryClass = "") || '$$$comClassDefined(tPrimaryClass) || '$ClassMethod(tPrimaryClass,"%Extends",tSCInterface)
-		Set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to change the source control class for this namespace?",.tResult,.tHelp)
-		If (tResponse '= $$$SuccessResponse) {
+
+	if tQuiet {
+		set tResult = $$$HasModifier(pCommandInfo,"extension")
+	} else {
+		write !
+		set tHelp = "The source control class is a namespace-specific setting, controlling export of files to the filesystem / source control on the server."
+		set tResult = (tPrimaryClass = "") || '$$$comClassDefined(tPrimaryClass) || '$classmethod(tPrimaryClass,"%Extends",tSCInterface)
+		set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to change the source control class for this namespace?",.tResult,.tHelp)
+		if (tResponse '= $$$SuccessResponse) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 		}
 	}
-	
-	If (tResult) {
+
+	if (tResult) {
 		// Provide list of options for source control classes to overlay.
-		If tQuiet {
-			Set tValue = $$$GetModifier(pCommandInfo,"extension")
-		} Else {
-			Set tValue = ""
-			Set tHelp = "Note: only subclasses of %IPM.ExtensionBase.SourceControl.Interface are listed."
-			Set tResponse = ##class(%Library.Prompt).GetArray("Which class?",.tValue,$ListBuild($ClassName()_":SourceControlClasses"),,,.tHelp,$$$InitialDisplayMask)
-			If (tResponse '= $$$SuccessResponse) {
+		if tQuiet {
+			set tValue = $$$GetModifier(pCommandInfo,"extension")
+		} else {
+			set tValue = ""
+			set tHelp = "Note: only subclasses of %IPM.ExtensionBase.SourceControl.Interface are listed."
+			set tResponse = ##class(%Library.Prompt).GetArray("Which class?",.tValue,$listbuild($classname()_":SourceControlClasses"),,,.tHelp,$$$InitialDisplayMask)
+			if (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
 		}
-		
-		If (tValue = "") {
+
+		if (tValue = "") {
 			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tServerMenuExtClass))
-			Write !,!,"Removed source control class. Package manager extension still enabled if present."
-		} Else {
-			Write !,!,"Setting ",tValue," as the source control class for this namespace..."
+			write !,!,"Removed source control class. Package manager extension still enabled if present."
+		} else {
+			write !,!,"Setting ",tValue," as the source control class for this namespace..."
 			// Just configure the package manager source control class. (Gaining the "Package Manager" menu.)
 			$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tCompositeSCClass))
-			Set tSecondaryExtension = $ListBuild(tServerMenuExtClass)
+			set tSecondaryExtension = $listbuild(tServerMenuExtClass)
 			$$$ThrowOnError(##class(%IPM.ExtensionBase.Composite).SetExtensionClasses(tValue,tSecondaryExtension))
-			Write " done."
-			
+			write " done."
+
 			// To see if it changed, compare to primary class (if found earlier) or old source control class (if we weren't combining extensions before)
-			If (tValue '= tPrimaryClass) {
-				Set tSCClassChanged = 1
+			if (tValue '= tPrimaryClass) {
+				set tSCClassChanged = 1
 			}
 		}
-	} ElseIf (tOldSourceControlClass = "") {
+	} elseif (tOldSourceControlClass = "") {
 		// Just configure the package manager source control class. (Gaining the "Package Manager" menu.)
 		$$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlClassSet(tServerMenuExtClass))
-		Write !,!,"Enabled package manager extension if present."
+		write !,!,"Enabled package manager extension if present."
 	}
-	
+
 	// If we're not just using the package manager, check for configuration method on primary source control class
 	// (by seeing if it implements the additional package manager source control interface)
-	If (##class(%Studio.SourceControl.Interface).SourceControlClassGet() = tCompositeSCClass) {
+	if (##class(%Studio.SourceControl.Interface).SourceControlClassGet() = tCompositeSCClass) {
 		// Default to having the user configure the extension after changing it.
-		Set tResult = tSCClassChanged
-		Set tPrimaryClass = ##class(%IPM.ExtensionBase.Composite).GetPrimaryExtensionClass()
-		If $ClassMethod(tPrimaryClass,"%Extends",tSCInterface) && 'tQuiet {
-			Set tHelp = "Enter 'Yes' to configure settings for the selected source control class. Some of these may be namespace-specific, and some may be instance-wide."
-			Set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to configure source control options?",.tResult,.tHelp)
-			If (tResponse '= $$$SuccessResponse) {
+		set tResult = tSCClassChanged
+		set tPrimaryClass = ##class(%IPM.ExtensionBase.Composite).GetPrimaryExtensionClass()
+		if $classmethod(tPrimaryClass,"%Extends",tSCInterface) && 'tQuiet {
+			set tHelp = "Enter 'Yes' to configure settings for the selected source control class. Some of these may be namespace-specific, and some may be instance-wide."
+			set tResponse = ##class(%Library.Prompt).GetYesNo("Do you want to configure source control options?",.tResult,.tHelp)
+			if (tResponse '= $$$SuccessResponse) {
 				$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
 			}
-			If (tResult) {
-				$$$ThrowOnError($ClassMethod(tPrimaryClass,"Configure"))
-				Write !,"Configuration complete."
+			if (tResult) {
+				$$$ThrowOnError($classmethod(tPrimaryClass,"Configure"))
+				write !,"Configuration complete."
 			}
 		}
 	}
@@ -1737,90 +1744,90 @@ ClassMethod Init(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod ProcessRunFromFile(ByRef pCommandInfo) [ Internal ]
 {
-	Set filename = $Get(pCommandInfo("parameters","file"))
-	Set dryRun = $$$HasModifier(pCommandInfo,"dry-run")
-	
-	If '##class(%Library.File).Exists(filename) {
+	set filename = $get(pCommandInfo("parameters","file"))
+	set dryRun = $$$HasModifier(pCommandInfo,"dry-run")
+
+	if '##class(%Library.File).Exists(filename) {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Provided file does not exist"))
 	}
-	Set fileStream = ##class(%Stream.FileCharacter).%New()
+	set fileStream = ##class(%Stream.FileCharacter).%New()
 	$$$ThrowOnError(fileStream.LinkToFile(filename))
-	
+
 	// Accumulate list of commands to execute
-	Set commandList = ""
-	
-	Set extension = $Piece(filename, ".", *)
-	If (extension = "txt") {
+	set commandList = ""
+
+	set extension = $piece(filename, ".", *)
+	if (extension = "txt") {
 		// Read line by line, adding each line to command list
-		While 'fileStream.AtEnd {
-			Set line = fileStream.ReadLine(, .sc)
+		while 'fileStream.AtEnd {
+			set line = fileStream.ReadLine(, .sc)
 			$$$ThrowOnError(sc)
 			// Strip leading and trailing white space + control characters
-			Set line = $ZStrip(line,"<>CW")
-			If (line '= "") {
-				Set commandList = commandList _ $ListBuild(line)
+			set line = $zstrip(line,"<>CW")
+			if (line '= "") {
+				set commandList = commandList _ $listbuild(line)
 			}
 		}
-	} ElseIf (extension = "json") {
+	} elseif (extension = "json") {
 		// Will be an array so read file into it
 		#dim jsonInput As %Library.DynamicObject
 		#dim commandsArray As %Library.DynamicArray
-		Set jsonInput = ##class(%Library.DynamicAbstractObject).%FromJSON(fileStream)
-		If 'jsonInput.%IsA("%Library.DynamicObject") {
+		set jsonInput = ##class(%Library.DynamicAbstractObject).%FromJSON(fileStream)
+		if 'jsonInput.%IsA("%Library.DynamicObject") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Unexpected format of file. Expected JSON object at root level but not found."))
 		}
-		Set commandsArray = jsonInput.%Get("commands")
-		If '$IsObject(commandsArray) || 'commandsArray.%IsA("%Library.DynamicArray") {
+		set commandsArray = jsonInput.%Get("commands")
+		if '$isobject(commandsArray) || 'commandsArray.%IsA("%Library.DynamicArray") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"'commands' property MUST be a JSON array"))
 		}
 		#dim arrayIter As %Iterator.Array
-		Set arrayIter = commandsArray.%GetIterator()
-		While arrayIter.%GetNext(, .commandJson) {
-			Set command = ..ParseJsonToCommand(commandJson)
-			Set commandList = commandList _ $ListBuild(command)
+		set arrayIter = commandsArray.%GetIterator()
+		while arrayIter.%GetNext(, .commandJson) {
+			set command = ..ParseJsonToCommand(commandJson)
+			set commandList = commandList _ $listbuild(command)
 		}
-	} Else {
+	} else {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Unsupported file extension: "_extension))
 	}
-	
-	Set message = $Case(dryRun,
+
+	set message = $case(dryRun,
 		1: "The following commands will be run in the shell if the -dry-run flag is not used:",
 		: "Running commands found in file:"
 	)
-	Write !, message, !	
-	Set ptr = 0
-	While $ListNext(commandList,ptr,command) {
-    Write !,..TerminalPrompt()
-		Write command
-		If 'dryRun {
+	write !, message, !
+	set ptr = 0
+	while $listnext(commandList,ptr,command) {
+    write !,..TerminalPrompt()
+		write command
+		if 'dryRun {
 			$$$ThrowOnError(..Shell(command))
 		}
-		Write !
+		write !
 	}
-	Write !
+	write !
 }
 
 ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 {
-	Set tRepo = $Get(pCommandInfo("data","Repo"),0)
-	Set tDesc = $Get(pCommandInfo("data","Description"),0)
-	Set tAllVersions = $Get(pCommandInfo("data","AllVersions"),0)
-	Set tSearchString = $Get(pCommandInfo("parameters","searchString"),"")
-	Set tName = $$$GetModifier(pCommandInfo,"name")
-	If (tName '= "") {
-		Do ..ShowModulesForRepository(tName, tRepo, tDesc, tSearchString, tAllVersions)
-	} Else {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %IPM_Repo.Definition")
-		If (tRes.%SQLCODE < 0) {
-			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	set tRepo = $get(pCommandInfo("data","Repo"),0)
+	set tDesc = $get(pCommandInfo("data","Description"),0)
+	set tAllVersions = $get(pCommandInfo("data","AllVersions"),0)
+	set tSearchString = $get(pCommandInfo("parameters","searchString"),"")
+	set tName = $$$GetModifier(pCommandInfo,"name")
+	if (tName '= "") {
+		do ..ShowModulesForRepository(tName, tRepo, tDesc, tSearchString, tAllVersions)
+	} else {
+		set tRes = ##class(%SQL.Statement).%ExecDirect(,"select Name, Details from %IPM_Repo.Definition")
+		if (tRes.%SQLCODE < 0) {
+			throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 		}
-		While tRes.%Next(.tSC) {
+		while tRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			If ($Increment(tCount) > 1) {
-				Write !!
+			if ($increment(tCount) > 1) {
+				write !!
 			}
-			Write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
-			Do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo, tDesc, tSearchString, tAllVersions)
+			write tRes.%Get("Name")," ", tRes.%Get("Details"),":"
+			do ..ShowModulesForRepository(tRes.%Get("Name"), tRepo, tDesc, tSearchString, tAllVersions)
 		}
 		$$$ThrowOnError(tSC)
 	}
@@ -1828,229 +1835,229 @@ ClassMethod Search(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod Config(ByRef pCommandInfo) [ Internal ]
 {
-	Set action = $Get(pCommandInfo("parameters","action"))
-	Set key = $Get(pCommandInfo("parameters","key"))
-	Set value = $Get(pCommandInfo("parameters","value"))
+	set action = $get(pCommandInfo("parameters","action"))
+	set key = $get(pCommandInfo("parameters","key"))
+	set value = $get(pCommandInfo("parameters","value"))
 
-	If (action="") { 
-		Set action = "list"	
+	if (action="") {
+		set action = "list"
 	}
-	If (action="list") {
-		Do ##class(%IPM.Repo.UniversalSettings).PrintList()
-	} ElseIf (action="set") {
-		If ( (key = "") || (value="") ) {
-			Write "Key and Value required. Use config set <key> <value>",!
-			Quit
-		} 
-		Do ##class(%IPM.Repo.UniversalSettings).UpdateOne(key,value)
-	} ElseIf (action="get") {
-		If (key = "") {
-			Do ##class(%IPM.Repo.UniversalSettings).PrintList()
-		} Else {
-			Do ##class(%IPM.Repo.UniversalSettings).PrintOne(key)
+	if (action="list") {
+		do ##class(%IPM.Repo.UniversalSettings).PrintList()
+	} elseif (action="set") {
+		if ( (key = "") || (value="") ) {
+			write "Key and Value required. Use config set <key> <value>",!
+			quit
 		}
-	} ElseIf (action="delete") {
-		If (key = "") {
-			Write "Key required. Use config delete <key>",!
-			Quit
+		do ##class(%IPM.Repo.UniversalSettings).UpdateOne(key,value)
+	} elseif (action="get") {
+		if (key = "") {
+			do ##class(%IPM.Repo.UniversalSettings).PrintList()
+		} else {
+			do ##class(%IPM.Repo.UniversalSettings).PrintOne(key)
 		}
-		Do ##class(%IPM.Repo.UniversalSettings).ResetToDefault(key)
+	} elseif (action="delete") {
+		if (key = "") {
+			write "Key required. Use config delete <key>",!
+			quit
+		}
+		do ##class(%IPM.Repo.UniversalSettings).ResetToDefault(key)
 	}
 }
 
 ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 {
-  Do ##class(%IPM.Repo.Definition).CollectServerTypes(.types)
+  do ##class(%IPM.Repo.Definition).CollectServerTypes(.types)
 
-  Set tType = $$$GetModifier(pCommandInfo, "type")
+  set tType = $$$GetModifier(pCommandInfo, "type")
 
-  Set serverClassList = ""
-  Set t = ""
-  For {
-    Set t = $Order(types(t), 1, className)
-    Quit:(t = "")
-    If ('($$$HasModifier(pCommandInfo, t)) && (t '= tType)) {
-      Kill types(t)
-    } 
-    ElseIf '$ListFind(serverClassList, className) {
-      Set serverClassList = serverClassList _ $ListBuild(className)
+  set serverClassList = ""
+  set t = ""
+  for {
+    set t = $order(types(t), 1, className)
+    quit:(t = "")
+    if ('($$$HasModifier(pCommandInfo, t)) && (t '= tType)) {
+      kill types(t)
+    }
+    elseif '$listfind(serverClassList, className) {
+      set serverClassList = serverClassList _ $listbuild(className)
     }
   }
 
-	If $$$HasModifier(pCommandInfo,"list") && '$$$HasModifier(pCommandInfo,"list-modules") {
-		Set tUseFilter = $Data(types)\10
-    Set tRes = ##class(%IPM.Repo.Definition).ListFunc()
+	if $$$HasModifier(pCommandInfo,"list") && '$$$HasModifier(pCommandInfo,"list-modules") {
+		set tUseFilter = $data(types)\10
+    set tRes = ##class(%IPM.Repo.Definition).ListFunc()
     $$$ThrowSQLIfError(tRes.%SQLCODE,tRes.%Message)
-		Set tDisplayCount = 0
-		Write !
-    While tRes.%Next(.tSC) {
+		set tDisplayCount = 0
+		write !
+    while tRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
 
-			Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+			set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
 			$$$ThrowOnError(tSC)
-			If serverClassList = "" || ($ListFind(serverClassList, $ClassName(tRepository))) {
-				Do tRepository.Display()
-				Write !
-				Set tDisplayCount = tDisplayCount + 1 
+			if serverClassList = "" || ($listfind(serverClassList, $classname(tRepository))) {
+				do tRepository.Display()
+				write !
+				set tDisplayCount = tDisplayCount + 1
 			}
     }
 		$$$ThrowOnError(tSC)
-		If (tDisplayCount = 0) {
-			Write "No repositories found.", !
+		if (tDisplayCount = 0) {
+			write "No repositories found.", !
 		}
-    Quit
-	} ElseIf $$$HasModifier(pCommandInfo,"copy-from") {
-		Set tSourceNamespace = $$$GetModifier(pCommandInfo,"copy-from")
-		Set tOldNamespace = $Namespace
-		New $Namespace
-		Try {
-			Set $Namespace = tSourceNamespace
-		} Catch e {
-			If (e.Name = "<NAMESPACE>") {
-				Write !,"Invalid namespace: ",tSourceNamespace
-				Return
+    quit
+	} elseif $$$HasModifier(pCommandInfo,"copy-from") {
+		set tSourceNamespace = $$$GetModifier(pCommandInfo,"copy-from")
+		set tOldNamespace = $namespace
+		new $namespace
+		try {
+			set $namespace = tSourceNamespace
+		} catch e {
+			if (e.Name = "<NAMESPACE>") {
+				write !,"Invalid namespace: ",tSourceNamespace
+				return
 			}
-			Throw e
+			throw e
 		}
-		
-		Set tName = $$$GetModifier(pCommandInfo,"name")
-		If (tName '= "") {
-			Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName,,.tSC)
-			If $$$ISERR(tSC) && $System.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
-				Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No repository with name '%1' exists in namespace '%2'",tName,tSourceNamespace))
+
+		set tName = $$$GetModifier(pCommandInfo,"name")
+		if (tName '= "") {
+			set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName,,.tSC)
+			if $$$ISERR(tSC) && $system.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
+				set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No repository with name '%1' exists in namespace '%2'",tName,tSourceNamespace))
 			}
 			$$$ThrowOnError(tSC)
-			Set tRepositories($Increment(tRepositories)) = tRepository
-		} Else {
+			set tRepositories($increment(tRepositories)) = tRepository
+		} else {
 			// Find all the repositories in the source namespace
-			Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+			set tRes = ##class(%SQL.Statement).%ExecDirect(,
 				"select Name "_
 				"from %IPM_Repo.Definition "_
 				"order by %IPM_Repo.Definition_SortOrder(ID) desc")
-			If (tRes.%SQLCODE < 0) {
-				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+			if (tRes.%SQLCODE < 0) {
+				throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 			}
-			While tRes.%Next(.tSC) {
+			while tRes.%Next(.tSC) {
 				$$$ThrowOnError(tSC)
-				Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+				set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
 				$$$ThrowOnError(tSC)
-				Set tRepositories($Increment(tRepositories)) = tRepository
+				set tRepositories($increment(tRepositories)) = tRepository
 			}
 			$$$ThrowOnError(tSC)
 		}
-		
-		Set $Namespace = tOldNamespace
-		For tIndex=1:1:$Get(tRepositories) {
+
+		set $namespace = tOldNamespace
+		for tIndex=1:1:$get(tRepositories) {
 			// Deep clone in case there are ever other referenced objects that need to be carried across.
 			// This is not relevant for any current repository types, but is most likely to be correct in
 			// hypothetical cases where it may matter. (A Git or GitHub-based repository, for example, would
 			// probably need to store more information that would be carried across this way.)
-			Set tNewRepository = tRepositories(tIndex).%ConstructClone(1)
-			If ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(tNewRepository.Name) {
-				Write !,"Repository already defined: ",tNewRepository.Name,"; skipping."
-				Continue
+			set tNewRepository = tRepositories(tIndex).%ConstructClone(1)
+			if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(tNewRepository.Name) {
+				write !,"Repository already defined: ",tNewRepository.Name,"; skipping."
+				continue
 			}
-			Set tOneSC = tNewRepository.%Save()
-			If $$$ISOK(tOneSC) {
-				Write !,"Copied:"
-				Do tNewRepository.Display()
+			set tOneSC = tNewRepository.%Save()
+			if $$$ISOK(tOneSC) {
+				write !,"Copied:"
+				do tNewRepository.Display()
 			}
-			Set tSC = $System.Status.AppendStatus(tSC,tOneSC)
+			set tSC = $system.Status.AppendStatus(tSC,tOneSC)
 		}
 		$$$ThrowOnError(tSC)
-	} ElseIf $$$HasModifier(pCommandInfo,"list-modules") {
-    Do ..Search(.pCommandInfo)
-		Quit
-	} ElseIf $$$HasModifier(pCommandInfo,"delete-all") {
-    If (serverClassList = "") {
+	} elseif $$$HasModifier(pCommandInfo,"list-modules") {
+    do ..Search(.pCommandInfo)
+		quit
+	} elseif $$$HasModifier(pCommandInfo,"delete-all") {
+    if (serverClassList = "") {
 			$$$ThrowOnError(##class(%IPM.Repo.Definition).%DeleteExtent())
     }
-    Else {
-      Set ptr = 0
-      While $ListNext(serverClassList, ptr, className) {
-        $$$ThrowOnError($ClassMethod(className, "%DeleteExtent"))
+    else {
+      set ptr = 0
+      while $listnext(serverClassList, ptr, className) {
+        $$$ThrowOnError($classmethod(className, "%DeleteExtent"))
       }
     }
-	} ElseIf $$$HasModifier(pCommandInfo,"delete") {
-		Set repoName = $$$GetModifier(pCommandInfo,"name")
-		If (repoName = "") {
+	} elseif $$$HasModifier(pCommandInfo,"delete") {
+		set repoName = $$$GetModifier(pCommandInfo,"name")
+		if (repoName = "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Missing -name modifier"))
 		}
-		If '##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
+		if '##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"Repository "_$$$QUOTE(repoName)_" does not exist so cannot be deleted."))
 		}
 		$$$ThrowOnError(##class(%IPM.Repo.Definition).ServerDefinitionKeyDelete(repoName))
-  } ElseIf $$$HasModifier(pCommandInfo,"reset-defaults") {
-    Merge tModifiers = pCommandInfo("modifiers")
-    Set tName = $$$GetModifier(pCommandInfo,"name")
-    If (tName = "") {
-      Set tName = "registry"
-      Set tModifiers("name") = tName
+  } elseif $$$HasModifier(pCommandInfo,"reset-defaults") {
+    merge tModifiers = pCommandInfo("modifiers")
+    set tName = $$$GetModifier(pCommandInfo,"name")
+    if (tName = "") {
+      set tName = "registry"
+      set tModifiers("name") = tName
     }
-    Set tModifiers("remote") = ""
+    set tModifiers("remote") = ""
 
-    Set tModifiers("url") = ##class(%IPM.Repo.UniversalSettings).GetDefaultRegistry()
-    If (tModifiers("url")="") {
-        Write "Error retrieving default registry URL"
-        Quit
+    set tModifiers("url") = ##class(%IPM.Repo.UniversalSettings).GetDefaultRegistry()
+    if (tModifiers("url")="") {
+        write "Error retrieving default registry URL"
+        quit
     }
-    Set tModifiers("username") = "", tModifiers("password") = ""
-    Set tType = "%IPM.Repo.Remote.Definition"
-    $$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData))
-    Do ..Shell("repo -list")
-	} Else {
-		Set tName = $$$GetModifier(pCommandInfo,"name")
-		Set tType = $ListGet(serverClassList)
-		
+    set tModifiers("username") = "", tModifiers("password") = ""
+    set tType = "%IPM.Repo.Remote.Definition"
+    $$$ThrowOnError($classmethod(tType,"Configure",1,.tModifiers,.tData))
+    do ..Shell("repo -list")
+	} else {
+		set tName = $$$GetModifier(pCommandInfo,"name")
+		set tType = $listget(serverClassList)
+
 		#dim tRepoTypeResult As %SQL.StatementResult
-		Set tStatement = ##class(%SQL.Statement).%New()
-		Set tSC = tStatement.%PrepareClassQuery("%IPM.Repo.Definition","Catalog")
+		set tStatement = ##class(%SQL.Statement).%New()
+		set tSC = tStatement.%PrepareClassQuery("%IPM.Repo.Definition","Catalog")
 		$$$ThrowOnError(tSC)
-		Set tRepoTypeResult = tStatement.%Execute()
-		If tRepoTypeResult.%SQLCODE < 0 {
-			Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRepoTypeResult.%SQLCODE, tRepoTypeResult.%Message)
+		set tRepoTypeResult = tStatement.%Execute()
+		if tRepoTypeResult.%SQLCODE < 0 {
+			throw ##class(%Exception.SQL).CreateFromSQLCODE(tRepoTypeResult.%SQLCODE, tRepoTypeResult.%Message)
 		}
-		While tRepoTypeResult.%Next(.tSC) {
+		while tRepoTypeResult.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			If tRepoTypeResult.%Get("Moniker") = "http" {
-				Continue
+			if tRepoTypeResult.%Get("Moniker") = "http" {
+				continue
 			}
-			Set tMonikers($ZConvert(tRepoTypeResult.%Get("Moniker"),"L")) = tRepoTypeResult.%Get("Classname")
-			Set tClassList($Increment(tClassList)) = tRepoTypeResult.%Get("Classname")
-			Set tDescList($Increment(tDescList)) = tRepoTypeResult.%Get("Description")
+			set tMonikers($zconvert(tRepoTypeResult.%Get("Moniker"),"L")) = tRepoTypeResult.%Get("Classname")
+			set tClassList($increment(tClassList)) = tRepoTypeResult.%Get("Classname")
+			set tDescList($increment(tDescList)) = tRepoTypeResult.%Get("Description")
 		}
 		$$$ThrowOnError(tSC)
 
 
-		If (tType = ""),(tName '= ""),##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(tName) {
-			Set tInstance = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName)
-			If $IsObject(tInstance) {
-				Set tType = tInstance.%ClassName(1)
+		if (tType = ""),(tName '= ""),##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(tName) {
+			set tInstance = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName)
+			if $isobject(tInstance) {
+				set tType = tInstance.%ClassName(1)
 			}
 		}
-	
-    If (tType = "") {
-      Set tResponse = ##class(%Library.Prompt).GetMenu("Which sort of repository do you wish to configure?",.tDescIndex,.tDescList,,$$$InitialDisplayMask)
-      If (tResponse '= $$$SuccessResponse) {
+
+    if (tType = "") {
+      set tResponse = ##class(%Library.Prompt).GetMenu("Which sort of repository do you wish to configure?",.tDescIndex,.tDescList,,$$$InitialDisplayMask)
+      if (tResponse '= $$$SuccessResponse) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
       }
-    
-      If (tDescIndex = "") {
+
+      if (tDescIndex = "") {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"A repository type must be specified."))
       }
-      
-      Set tType = tClassList(tDescIndex)
+
+      set tType = tClassList(tDescIndex)
     }
-		
-		Set tBaseClass = "%IPM.Repo.Definition"
-		If '$ClassMethod(tType,"%Extends",tBaseClass) {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid type '%1' - must extend %2",tType,tBaseClass))
+
+		set tBaseClass = "%IPM.Repo.Definition"
+		if '$classmethod(tType,"%Extends",tBaseClass) {
+			set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid type '%1' - must extend %2",tType,tBaseClass))
 		}
-		
-		Merge tModifiers = pCommandInfo("modifiers")
-		Merge tData = pCommandInfo("data")
-		$$$ThrowOnError($ClassMethod(tType,"Configure",1,.tModifiers,.tData,tType))
-    Do ..Shell("repo -list")
+
+		merge tModifiers = pCommandInfo("modifiers")
+		merge tData = pCommandInfo("data")
+		$$$ThrowOnError($classmethod(tType,"Configure",1,.tModifiers,.tData,tType))
+    do ..Shell("repo -list")
 	}
 }
 
@@ -2062,47 +2069,47 @@ ClassMethod ShowModulesForRepository(
 	pShowAllVersions As %Boolean = 0) [ Private ]
 {
   #define gn "^||tmpDesc"
-	Kill @$$$gn
-	Set (maxlenname,maxlenver) = 0, where = ""
-	If pSearchString["*" {
-		Set where=" WHERE name like ?"
-	} ElseIf pSearchString'="" { 
-		Set where=" WHERE name = ?"
+	kill @$$$gn
+	set (maxlenname,maxlenver) = 0, where = ""
+	if pSearchString["*" {
+		set where=" WHERE name like ?"
+	} elseif pSearchString'="" {
+		set where=" WHERE name = ?"
 	}
-	Set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
-	If (pSearchString = "") {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
-	} Else {
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions, $Replace(pSearchString,"*","%"))
+	set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
+	if (pSearchString = "") {
+		set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
+	} else {
+		set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions, $replace(pSearchString,"*","%"))
 	}
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	if (tRes.%SQLCODE < 0) {
+		throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
-  Set list = 0
-  Set width = 0
-	While tRes.%Next(.tSC) {
+  set list = 0
+  set width = 0
+	while tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Set name = tRes.%Get("Name")
-    If width < $Length(name) {
-      Set width = $Length(name)
+		set name = tRes.%Get("Name")
+    if width < $length(name) {
+      set width = $length(name)
     }
 
-    Set list = list + 1
-    Set list(list) = $ListBuild(name, tRes.Version)
-    Set list(list, "Origin") = tRes.Origin
-    If pShowDesc {
-      Set list(list, "Description") = tRes.Description
+    set list = list + 1
+    set list(list) = $listbuild(name, tRes.Version)
+    set list(list, "Origin") = tRes.Origin
+    if pShowDesc {
+      set list(list, "Description") = tRes.Description
     }
-    If pShowRepo {
-      Set list(list, "Repository") = tRes.Repository
+    if pShowRepo {
+      set list(list, "Repository") = tRes.Repository
     }
-    If pShowAllVersions {
-      Set list(list, "AllVersions") = tRes.AllVersions
+    if pShowAllVersions {
+      set list(list, "AllVersions") = tRes.AllVersions
     }
 	}
-  Set list("width") = width
-  Write !
-  Do ..DisplayModules(.list)
+  set list("width") = width
+  write !
+  do ..DisplayModules(.list)
 }
 
 Query SourceControlClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
@@ -2119,179 +2126,179 @@ ClassMethod LoadFromRepo(
 	tDirectoryName,
 	ByRef tParams) [ Internal ]
 {
-	Set slash=$Select($ZVersion(1)=3:"/",1:"\")
-	Set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($ZUtil(86))_"mgr"_slash_"Temp"_slash_$Translate($ZTimestamp,".,")_slash)
+	set slash=$select($zversion(1)=3:"/",1:"\")
+	set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($zutil(86))_"mgr"_slash_"Temp"_slash_$translate($ztimestamp,".,")_slash)
 	$$$ThrowOnError(##class(%File).CreateDirectoryChain(TempDir))
-	Set:$Extract(tDirectoryName,*)="/" tDirectoryName=$Extract(tDirectoryName,1,*-1)
-	Set RepoName=$Piece($Piece($Piece(tDirectoryName,"/",*),".git")," ")
-	Set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
-	If $Get(tParams("zpm","Branch"))'="" Set tCmd=tCmd_" -b "_tParams("zpm","Branch")
+	set:$extract(tDirectoryName,*)="/" tDirectoryName=$extract(tDirectoryName,1,*-1)
+	set RepoName=$piece($piece($piece(tDirectoryName,"/",*),".git")," ")
+	set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
+	if $get(tParams("zpm","Branch"))'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
 	$$$ThrowOnError(##class(%IPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr))
-  Set tDirectoryName = TempDir_slash_RepoName
-  If ($Get(tParams("Verbose"))) {
-		Write !,"Create tempory directory "_TempDir
-		Write !,tCmd
-    For i=1:1:$Get(tLog) {
-      Write tLog(i),!
+  set tDirectoryName = TempDir_slash_RepoName
+  if ($get(tParams("Verbose"))) {
+		write !,"Create tempory directory "_TempDir
+		write !,tCmd
+    for i=1:1:$get(tLog) {
+      write tLog(i),!
     }
-    Write !,tDirectoryName
+    write !,tDirectoryName
   }
-  For i=1:1:$Get(tErr) {
-    Write tErr(i),!
+  for i=1:1:$get(tErr) {
+    write tErr(i),!
   }
-	Hang 2
-	Quit tDirectoryName
+	hang 2
+	quit tDirectoryName
 }
 
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
-	Set tDirectoryName = $Get(pCommandInfo("parameters","path"))
-	Set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
-	Merge tParams = pCommandInfo("data")
-	Set tParams("cmd") = "load"
-	Do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
-	If $G(tComponents("scheme")) [ "http" {
+	set tDirectoryName = $get(pCommandInfo("parameters","path"))
+	set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
+	merge tParams = pCommandInfo("data")
+	set tParams("cmd") = "load"
+	do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
+	if $get(tComponents("scheme")) [ "http" {
 		set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
 	}
-	If ##class(%File).DirectoryExists(tDirectoryName) {
-		Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 1)
-	} ElseIf ##class(%File).Exists(tDirectoryName) && (($$$lcase($Piece(tDirectoryName,".", *))="tgz") || ($$$lcase($Piece(tDirectoryName,".", *-1, *))="tar.gz")) {
-		Set tTargetDirectory = $$$FileTempDirSys
-		If $Get(pCommandInfo("data", "Verbose")) {
-			Write !,"Extracting archive to ",tTargetDirectory
+	if ##class(%File).DirectoryExists(tDirectoryName) {
+		set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 1)
+	} elseif ##class(%File).Exists(tDirectoryName) && (($$$lcase($piece(tDirectoryName,".", *))="tgz") || ($$$lcase($piece(tDirectoryName,".", *-1, *))="tar.gz")) {
+		set tTargetDirectory = $$$FileTempDirSys
+		if $get(pCommandInfo("data", "Verbose")) {
+			write !,"Extracting archive to ",tTargetDirectory
 		}
 		$$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
 		// Try to locate the top-level module.xml file
-		If $Get(pCommandInfo("data", "Verbose")) {
-			Write !,"Trying to locate module.xml file in ", tTargetDirectory
+		if $get(pCommandInfo("data", "Verbose")) {
+			write !,"Trying to locate module.xml file in ", tTargetDirectory
 		}
-		Set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
-		If (tCount = 0) {
+		set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
+		if (tCount = 0) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
 		}
 
 		// The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
-		Set tModuleFilePath = $ListGet(tList(tCount), *)
-		Set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-		If $Get(pCommandInfo("data", "Verbose")) {
-			Write !,"Found "_tCount_" results. They are: "
-			Set idx = ""
-			For {
-				Set idx = $Order(tList(idx))
-				Quit:(idx="")
-				Write !, $Char(9), $List(tList(idx), *)
+		set tModuleFilePath = $listget(tList(tCount), *)
+		set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+		if $get(pCommandInfo("data", "Verbose")) {
+			write !,"Found "_tCount_" results. They are: "
+			set idx = ""
+			for {
+				set idx = $order(tList(idx))
+				quit:(idx="")
+				write !, $char(9), $list(tList(idx), *)
 			}
-			Write !, "Using module.xml file at ", tModuleFilePath
+			write !, "Using module.xml file at ", tModuleFilePath
 		}
 	}
 
 	// When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
 	// It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
-	Set tTargetDirectory = $Get(tTargetDirectory, tDirectoryName)
-	Set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
-	Set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-	Set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
-	Set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
+	set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
+	set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+	set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
+	set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
+	set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
 	$$$ThrowOnError(tSC)
 }
 
 ClassMethod CheckModuleNamespace() As %Status
 {
-	Do ..GetMapInfo(.tIsMappedFrom, .tIsMappedTo)
-	If $Data(tIsMappedFrom($Namespace), sourceNS) # 2 {
-		Quit $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' in namespace '%2' because it is mapped from namespace '%3'.", $$$IPMModuleName, $Namespace, sourceNS))
+	do ..GetMapInfo(.tIsMappedFrom, .tIsMappedTo)
+	if $data(tIsMappedFrom($namespace), sourceNS) # 2 {
+		quit $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' in namespace '%2' because it is mapped from namespace '%3'.", $$$IPMModuleName, $namespace, sourceNS))
 	}
-	If $Data(tIsMappedTo($Namespace)) / 2 {
-		Write !, "Will affect the following namespaces:", $NAMESPACE
-		Set ns = ""
-		For {
-			Set ns = $Order(tIsMappedTo($Namespace, ns))
-			If ns = "" {
-				Quit
+	if $data(tIsMappedTo($namespace)) / 2 {
+		write !, "Will affect the following namespaces:", $namespace
+		set ns = ""
+		for {
+			set ns = $order(tIsMappedTo($namespace, ns))
+			if ns = "" {
+				quit
 			}
-			Write ", ", ns
+			write ", ", ns
 		}
 	}
-	Quit $$$OK
+	quit $$$OK
 }
 
 ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 {
-	Set tRegistry = ""
-	Set tModuleName = $Get(pCommandInfo("parameters","module"))
-	If (tModuleName["/") {
-		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
+	set tRegistry = ""
+	set tModuleName = $get(pCommandInfo("parameters","module"))
+	if (tModuleName["/") {
+		set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
 	}
-	If (tModuleName = "") {
-		Quit $$$OK
+	if (tModuleName = "") {
+		quit $$$OK
 	}
 
-	If tModuleName = $$$IPMModuleName {
+	if tModuleName = $$$IPMModuleName {
 		$$$ThrowOnError(..CheckModuleNamespace())
 	}
 
-	Set tVersion = $Get(pCommandInfo("parameters","version"))
-	Set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
-	Set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
-	
-	Set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-	Set tSearchCriteria.Registry = tRegistry
-	Set tSearchCriteria.Name = $$$lcase(tModuleName)
-	Set tSearchCriteria.VersionExpression = tVersion
-	Set tSearchCriteria.Keywords = tKeywords
+	set tVersion = $get(pCommandInfo("parameters","version"))
+	set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
+	set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
+
+	set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+	set tSearchCriteria.Registry = tRegistry
+	set tSearchCriteria.Name = $$$lcase(tModuleName)
+	set tSearchCriteria.VersionExpression = tVersion
+	set tSearchCriteria.Keywords = tKeywords
 	$$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
-	
-	If (tResults.Count() > 0) {
-		Set tResult = ""
+
+	if (tResults.Count() > 0) {
+		set tResult = ""
 		#dim tResult As %IPM.Storage.QualifiedModuleInfo
 		// Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
-		If ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
-			Set tResult = tResults.GetAt(1)
-		} ElseIf (tResults.Count() > 0) {
-			For i=1:1:tResults.Count() {
-				Set tResultInfo = tResults.GetAt(i)
-				Set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
+		if ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
+			set tResult = tResults.GetAt(1)
+		} elseif (tResults.Count() > 0) {
+			for i=1:1:tResults.Count() {
+				set tResultInfo = tResults.GetAt(i)
+				set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
 			}
-			
-			Set tValue = ""
-      		Set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
-      		If (tResponse '= $$$SuccessResponse) {
+
+			set tValue = ""
+      		set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
+      		if (tResponse '= $$$SuccessResponse) {
         		$$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
       		}
-			
-			If (tValue '= "") {
-				Set tResult = tResults.GetAt(tValue)
+
+			if (tValue '= "") {
+				set tResult = tResults.GetAt(tValue)
 			}
 		}
-		
-		If (tResult '= "") {
-			Do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
-			Merge tParams = pCommandInfo("data")
-			Set tParams("DeveloperMode") = $Get(tParams("DeveloperMode"), 0)
-			Set tParams("cmd") = "install"
-			Set tParams("Install") = 1
-      If tResult.Deployed {
-        Set platformVersion = $System.Version.GetMajor() _ "." _$System.Version.GetMinor()
-        Set tResult.PlatformVersion = platformVersion
-        If ('tResult.PlatformVersions.Find(platformVersion)) {
+
+		if (tResult '= "") {
+			do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
+			merge tParams = pCommandInfo("data")
+			set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
+			set tParams("cmd") = "install"
+			set tParams("Install") = 1
+      if tResult.Deployed {
+        set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
+        set tResult.PlatformVersion = platformVersion
+        if ('tResult.PlatformVersions.Find(platformVersion)) {
           $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
         }
       }
       $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous))
-    
+
     }
-	} Else {
-		Set tPrefix = ""
-		If (tModuleName '= "") {
-			If (tVersion '= "") {
+	} else {
+		set tPrefix = ""
+		if (tModuleName '= "") {
+			if (tVersion '= "") {
 				$$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
-			} Else {
+			} else {
 				$$$ThrowStatus($$$ERROR($$$GeneralError, "'"_tModuleName_"' not found in any repository."))
 			}
-		} ElseIf (tKeywords '= "") {
+		} elseif (tKeywords '= "") {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
-		} Else {
-			Write !,"No modules found. Are there any repositories configured in the current namespace?"
+		} else {
+			write !,"No modules found. Are there any repositories configured in the current namespace?"
 		}
 	}
 }
@@ -2300,148 +2307,148 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
 {
 	// Overriding defaults in the "data" array:
 	// For now this is just the "UpdateSnapshots" flag but it could be more eventually.
-	Set tData("UpdateSnapshots") = 1
-	
+	set tData("UpdateSnapshots") = 1
+
 	// Note that pCommandInfo("data") may override the default of UpdateSnapshots=1.
-	Merge tData = pCommandInfo("data")
-	Merge pCommandInfo("data") = tData
-	
+	merge tData = pCommandInfo("data")
+	merge pCommandInfo("data") = tData
+
 	// Find  the currently-installed version of the module
-	Set tModuleName = $Get(pCommandInfo("parameters","module"))
-	Set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
-	If $System.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
+	set tModuleName = $get(pCommandInfo("parameters","module"))
+	set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
+	if $system.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module '%1' is not currently installed.",tModuleName)))
 	}
 	$$$ThrowOnError(tSC)
 
-	If tModuleName = $$$IPMModuleName {
+	if tModuleName = $$$IPMModuleName {
 		$$$ThrowOnError(..CheckModuleNamespace())
 	}
-	
-	Set tVersionString = tModule.Version.ToString()
-	Write !,"Reinstalling ",tModuleName," ",tVersionString
-	Set pCommandInfo("parameters","version") = tVersionString
-	Do ..Install(.pCommandInfo)
+
+	set tVersionString = tModule.Version.ToString()
+	write !,"Reinstalling ",tModuleName," ",tVersionString
+	set pCommandInfo("parameters","version") = tVersionString
+	do ..Install(.pCommandInfo)
 }
 
 ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 {
-	Merge tParams = pCommandInfo("data")
-	Set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
-	If $$$HasModifier(pCommandInfo,"all") {
+	merge tParams = pCommandInfo("data")
+	set tForce = $$$HasModifier(pCommandInfo,"force") // Force uninstallation even if things depend on this module
+	if $$$HasModifier(pCommandInfo,"all") {
 		$$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
-    Return
-	} Else {
-		Set tModuleName = pCommandInfo("parameters","module")
-		If tModuleName = $$$IPMModuleName {
+    return
+	} else {
+		set tModuleName = pCommandInfo("parameters","module")
+		if tModuleName = $$$IPMModuleName {
 			$$$ThrowOnError(..CheckModuleNamespace())
-		}	
-		Set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
+		}
+		set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
 		$$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
 	}
 }
 
 ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 {
-	Do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($Get(pCommandInfo("data", "EnvFiles")))
-	Set tModName = $Get(pCommandInfo("parameters","module"))
-	Set tPhases = $ListBuild($ZConvert(pCommandInfo, "w"))
-	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
-	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
-	Set tParams("cmd") = pCommandInfo
-	Merge tParams = pCommandInfo("data")
-	If $Data(tParams("Path"), path) # 2 {
-		Set tParams("Path") = ##class(%File).NormalizeDirectory(path)
+	do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($get(pCommandInfo("data", "EnvFiles")))
+	set tModName = $get(pCommandInfo("parameters","module"))
+	set tPhases = $listbuild($zconvert(pCommandInfo, "w"))
+	set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
+	set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
+	set tParams("cmd") = pCommandInfo
+	merge tParams = pCommandInfo("data")
+	if $data(tParams("Path"), path) # 2 {
+		set tParams("Path") = ##class(%File).NormalizeDirectory(path)
 	}
 	$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tPhases,tIsComplete,.tParams))
 }
 
 ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 {
-  	If ( ($Get(pCommandInfo("parameters","module"))="") || ($Get(pCommandInfo("parameters","version"))="") ) {
-    	Set tCommandInfo("parameters","command") = "unpublish"
-    	Do ..%Help(.tCommandInfo)
-    	Quit
+  	if ( ($get(pCommandInfo("parameters","module"))="") || ($get(pCommandInfo("parameters","version"))="") ) {
+    	set tCommandInfo("parameters","command") = "unpublish"
+    	do ..%Help(.tCommandInfo)
+    	quit
   	}
 
-	Set tRegistry = ""
-	Set tModuleName = $ZConvert($Get(pCommandInfo("parameters","module")), "L")
-	If ( tModuleName["/" ) {
-		Set $ListBuild(tRegistry, tModuleName) = $ListFromString(tModuleName, "/")
+	set tRegistry = ""
+	set tModuleName = $zconvert($get(pCommandInfo("parameters","module")), "L")
+	if ( tModuleName["/" ) {
+		set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
 	}
-	If ( tRegistry = "" ) {
-		Set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
-		If (tRS.%SQLCODE = 0) && tRS.%Next() {
-			Set tServer = $ClassMethod(tRS.Class, "%OpenId", tRS.ID)
+	if ( tRegistry = "" ) {
+		set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
+		if (tRS.%SQLCODE = 0) && tRS.%Next() {
+			set tServer = $classmethod(tRS.Class, "%OpenId", tRS.ID)
 		}
-	} Else {
-		Set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
+	} else {
+		set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
 	}
-	If ('$Isobject(tServer)) {
-		Write "Registry not found: "_tRegistry,!
-		Return $$$ERROR(5001, "Registry not found: "_tRegistry)
+	if ('$isobject(tServer)) {
+		write "Registry not found: "_tRegistry,!
+		return $$$ERROR(5001, "Registry not found: "_tRegistry)
 	}
-	Set tVersion = $Get(pCommandInfo("parameters","version"))
+	set tVersion = $get(pCommandInfo("parameters","version"))
 
-	Try {
-		Set tManager = tServer.GetPublishingManager(.tSC)
+	try {
+		set tManager = tServer.GetPublishingManager(.tSC)
 		$$$ThrowOnError(tSC)
 		$$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
 
-		If (isEnabled) {
-            Set tResult = 0
-			If ($$$lcase(tVersion)="all") {
-				Write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
-                Set tHelp = "Enter ""Yes"" if you want to delete all package versions."
-                Set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
-			} Else {
-				Write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
-                Set tHelp = "Enter ""Yes"" if you want to delete selected package version."
-				Set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+		if (isEnabled) {
+            set tResult = 0
+			if ($$$lcase(tVersion)="all") {
+				write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
+                set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+			} else {
+				write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
+                set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+				set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
 			}
 
-		    Set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+		    set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
 
-            If (tResponse '= $$$SuccessResponse) {
+            if (tResponse '= $$$SuccessResponse) {
                 $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
             }
 
-			If (tResult) {
+			if (tResult) {
 				$$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
-				Write !!,"Package deleted"
+				write !!,"Package deleted"
 			}
-		} Else {
-			Write !,"The package could not be deleted (the registry denied the request)",!
+		} else {
+			write !,"The package could not be deleted (the registry denied the request)",!
 		}
-	} Catch ex {
-		Write !!,$$$FormattedLine($$$Red, "ERROR! "), ex.DisplayString()
+	} catch ex {
+		write !!,$$$FormattedLine($$$Red, "ERROR! "), ex.DisplayString()
 	}
 }
 
 ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 {
-	Do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($Get(pCommandInfo("data", "EnvFiles")))
-	Set tModName = $Get(pCommandInfo("parameters","module"))
-	Set tPhases = $ListFromString($Get(pCommandInfo("parameters","actions"))," ")
-	Set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
-	Set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
-	If $ListLength(tPhases) {
+	do ##class(%IPM.Lifecycle.Base).LoadEnvironmentConfig($get(pCommandInfo("data", "EnvFiles")))
+	set tModName = $get(pCommandInfo("parameters","module"))
+	set tPhases = $listfromstring($get(pCommandInfo("parameters","actions"))," ")
+	set tIsComplete = '$$$HasModifier(pCommandInfo,"only")
+	set tParams("Recurse") = $$$HasModifier(pCommandInfo,"recurse")
+	if $listlength(tPhases) {
 		// Accept lower-case phase names in the command.
-		Set tPtr = 0
-		Set tActualPhases = ""
-		While $ListNext(tPhases,tPtr,tPhase) {
-			Set tActualPhases = tActualPhases_$ListBuild($ZConvert(tPhase, "w"))
+		set tPtr = 0
+		set tActualPhases = ""
+		while $listnext(tPhases,tPtr,tPhase) {
+			set tActualPhases = tActualPhases_$listbuild($zconvert(tPhase, "w"))
 		}
-		Merge tParams = pCommandInfo("data")
-		if $Data(tParams("Path"), path) # 2 {
+		merge tParams = pCommandInfo("data")
+		if $data(tParams("Path"), path) # 2 {
 			set tParams("Path") = ##class(%File).NormalizeDirectory(path)
 		}
 		$$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(tModName,tActualPhases,tIsComplete,.tParams))
-	} Else {
-		If (tModName '= "") && ##class(%IPM.Storage.Module).NameExists(tModName) {
+	} else {
+		if (tModName '= "") && ##class(%IPM.Storage.Module).NameExists(tModName) {
 			// TODO: list phases if a valid module name was specified.
-		} Else {
-			Do ..%Help()
+		} else {
+			do ..%Help()
 		}
 	}
 }
@@ -2449,34 +2456,34 @@ ClassMethod ModuleAction(ByRef pCommandInfo) [ Internal ]
 /// Run Dependency Analyzer for the given module
 ClassMethod RunDependencyAnalyzer(ByRef pCommandInfo)
 {
-	If '$$$comClassDefined("%pkg.isc.dependencyAnalyzer.Utils") {
+	if '$$$comClassDefined("%pkg.isc.dependencyAnalyzer.Utils") {
 		$$$ThrowStatus($$$ERROR($$$GeneralError, "Dependency Analyzer package must be installed before running the dependency analyzer."))
 	}
-	Set ignoredStringRef = $$$GetModifier(pCommandInfo,"ignore-str")
-	Set ignoreAll = $$$HasModifier(pCommandInfo,"ignore-str-all")
-	Set invalidOnly = $$$GetModifier(pCommandInfo,"invalid-only")
-  Set directDepsOnly = $$$HasModifier(pCommandInfo,"direct-deps-only")
-	If (ignoreAll) {
-		Set ignoredStringRef = $char(0)
+	set ignoredStringRef = $$$GetModifier(pCommandInfo,"ignore-str")
+	set ignoreAll = $$$HasModifier(pCommandInfo,"ignore-str-all")
+	set invalidOnly = $$$GetModifier(pCommandInfo,"invalid-only")
+  set directDepsOnly = $$$HasModifier(pCommandInfo,"direct-deps-only")
+	if (ignoreAll) {
+		set ignoredStringRef = $char(0)
 	}
-	Set moduleOrItemName = $Get(pCommandInfo("parameters", "moduleOrItem"))
-	If (moduleOrItemName = "") {
+	set moduleOrItemName = $get(pCommandInfo("parameters", "moduleOrItem"))
+	if (moduleOrItemName = "") {
 		$$$ThrowStatus($$$ERROR($$$GeneralError, "Module/item name must be provided. Run help command to see syntax"))
 	}
-	Write !, "Running dependency analyzer...", !, !
+	write !, "Running dependency analyzer...", !, !
 	// Status can be ignored as it is written to the current device
-	If (invalidOnly = 0)  {
-		Do ##class(%IPM.DependencyAnalyzer).RunForAllReferences(moduleOrItemName, .allReferences, 1,,,,ignoredStringRef, directDepsOnly)
-		If '$Data(allReferences) {
-			Write !, "No references found!"
+	if (invalidOnly = 0)  {
+		do ##class(%IPM.DependencyAnalyzer).RunForAllReferences(moduleOrItemName, .allReferences, 1,,,,ignoredStringRef, directDepsOnly)
+		if '$data(allReferences) {
+			write !, "No references found!"
 		}
-	} Else {
-		Do ##class(%IPM.DependencyAnalyzer).RunForInvalidReferences(moduleOrItemName, .invalidReferences, 1,,,,ignoredStringRef, directDepsOnly)
-		If '$Data(invalidReferences) {
-			Write !, "No invalid references found!"
+	} else {
+		do ##class(%IPM.DependencyAnalyzer).RunForInvalidReferences(moduleOrItemName, .invalidReferences, 1,,,,ignoredStringRef, directDepsOnly)
+		if '$data(invalidReferences) {
+			write !, "No invalid references found!"
 		}
 	}
-	Write !
+	write !
 }
 
 /// Implemented as custom query instead of `select Nsp, Nsp from %SYS.Namespace_List(0,0) WHERE status = 1` because of a DP issue, see https://github.com/intersystems/ipm/issues/579
@@ -2486,20 +2493,20 @@ Query ActiveNamespaces() As %Query(ROWSPEC = "ID:%String,Name:%String") [ SqlPro
 
 ClassMethod ActiveNamespacesExecute(qHandle As %Binary) As %Status
 {
-  Try {
-    Set tQuery = "SELECT NSP, Status FROM %SYS.Namespace_List(0,0)"
-    Set rs = ##class(%SQL.Statement).%ExecDirect(, tQuery)
-    Kill qHandle
-    While rs.%Next() {
-      If rs.%Get("Status") {
-        Set qHandle($INCREMENT(qHandle)) = rs.%Get("NSP")
+  try {
+    set tQuery = "SELECT NSP, Status FROM %SYS.Namespace_List(0,0)"
+    set rs = ##class(%SQL.Statement).%ExecDirect(, tQuery)
+    kill qHandle
+    while rs.%Next() {
+      if rs.%Get("Status") {
+        set qHandle($increment(qHandle)) = rs.%Get("NSP")
       }
     }
-    Set qHandle = 0
+    set qHandle = 0
   } catch ex {
-    Return ex.AsStatus()
+    return ex.AsStatus()
   }
-  Return $$$OK
+  return $$$OK
 }
 
 ClassMethod ActiveNamespacesFetch(
@@ -2507,127 +2514,135 @@ ClassMethod ActiveNamespacesFetch(
 	ByRef Row As %List,
 	ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = ActiveNamespacesExecute ]
 {
-  Try {
-    If $Data(qHandle($Increment(qHandle)), nsp) # 2 {
-      Set Row = $ListBuild(nsp, nsp)
-      Set AtEnd = 0
-    } Else {
-      Set Row = ""
-      Set AtEnd = 1
+  try {
+    if $data(qHandle($increment(qHandle)), nsp) # 2 {
+      set Row = $listbuild(nsp, nsp)
+      set AtEnd = 0
+    } else {
+      set Row = ""
+      set AtEnd = 1
     }
   } catch ex {
-    Return ex.AsStatus()
+    return ex.AsStatus()
   }
-  Return $$$OK
+  return $$$OK
 }
 
 ClassMethod ActiveNamespacesClose(qHandle As %Binary) As %Status [ PlaceAfter = ActiveNamespacesFetch ]
 {
-  Kill qHandle
-  Return $$$OK
+  kill qHandle
+  return $$$OK
 }
 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
-  Set tSearchString = $Get(pCommandInfo("parameters","searchString"),"")
-	If (''$Data(pCommandInfo("modifiers","tree"))) {
+  set tSearchString = $get(pCommandInfo("parameters","searchString"),"")
+	if (''$data(pCommandInfo("modifiers","tree"))) {
 		// Show tree of dependencies as well.
 		// Modules that are dependencies for no other are shown at the top level.
 		// TODO: deal with cyclic dependencies?
-		Quit:'..GetListModule(,.tModMap)	
-		Set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
+		quit:'..GetListModule(,.tModMap)
+		set tDepRes = ##class(%SQL.Statement).%ExecDirect(,
 			"select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
 			"from %IPM_Storage.ModuleItem_Dependencies")
     $$$ThrowSQLIfError(tDepRes.%SQLCODE, tDepRes.%Message)
-		While tDepRes.%Next(.tSC) {
+		while tDepRes.%Next(.tSC) {
 			$$$ThrowOnError(tSC)
-			Set tModMap(tDepRes.%Get("ModName"),tDepRes.%Get("DepName")) = tDepRes.%Get("DepVer")
-			Set tVisitedMap(tDepRes.%Get("DepName")) = 1
+			set tModMap(tDepRes.%Get("ModName"),tDepRes.%Get("DepName")) = tDepRes.%Get("DepVer")
+			set tVisitedMap(tDepRes.%Get("DepName")) = 1
 		}
 		$$$ThrowOnError(tSC)
-		
-		Set tMod = ""
-		For {
-			Set tMod = $Order(tModMap(tMod),1,tVersion)
-			Quit:(tMod="")
-			Do:'$Data(tVisitedMap(tMod)) ..AccumulateTreeRecursive(tMod,.tModMap,.tOrderedTree)
+
+		set tMod = ""
+		for {
+			set tMod = $order(tModMap(tMod),1,tVersion)
+			quit:(tMod="")
+			do:'$data(tVisitedMap(tMod)) ..AccumulateTreeRecursive(tMod,.tModMap,.tOrderedTree)
 		}
-		Do ..PrintTree(.tOrderedTree)
-	} Else {
-    Set showFields = ""
-    If +$Get(pCommandInfo("data","Desc")) {
-      Set showFields = showFields_$ListBuild(
+		do ..PrintTree(.tOrderedTree)
+	} else {
+    set showFields = ""
+    if +$get(pCommandInfo("data","Desc")) {
+      set showFields = showFields_$listbuild(
         "Description",
-        "Author.CopyrightDate", 
-        "Author.License", 
-        "Author.Notes", 
-        "Author.Organization", 
+        "Author.CopyrightDate",
+        "Author.License",
+        "Author.Notes",
+        "Author.Organization",
         "Author.Person",
         "Root"
       )
     }
-	Set tDesc=+$Get(pCommandInfo("data","Desc"))
-    Do ..GetListModules(,tSearchString, .list, showFields, $Get(pCommandInfo("modifiers", "repository")))
-	For i = 1:1:list {
-		Set entry = list(i)
-		Set name = $ListGet(entry,1)
-		Set externalName = $ListGet(entry,3)
-		Set displayName = $Select(externalName'= "":externalName, 1:name)
-		If (displayName '= name) {
-			Set displayName = displayName_" ("_name_")"
+	set tDesc=+$get(pCommandInfo("data","Desc"))
+    do ..GetListModules(,tSearchString, .list, showFields, $get(pCommandInfo("modifiers", "repository")))
+	for i = 1:1:list {
+		set entry = list(i)
+		set name = $listget(entry,1)
+		set externalName = $listget(entry,3)
+		set displayName = $select(externalName'= "":externalName, 1:name)
+		if (displayName '= name) {
+			set displayName = displayName_" ("_name_")"
 		}
-		Set $List(list(i), 1) = displayName
-		If list("width") < $Length(displayName) {
-			Set list("width") = $Length(displayName)
+		set $list(list(i), 1) = displayName
+		if list("width") < $length(displayName) {
+			set list("width") = $length(displayName)
 		}
 	}
-	Merge tModifiers = pCommandInfo("modifiers")
-	Do ..DisplayModules(.list,,,, .tModifiers)
+	merge tModifiers = pCommandInfo("modifiers")
+	do ..DisplayModules(.list,,,, .tModifiers)
 	}
 }
 
 /// Get module list in currently namespace
 ClassMethod GetListModule(
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+	ns = {$namespace},
+=======
 	ns = {$Namespace},
+>>>>>>> Stashed changes
+=======
+	ns = {$Namespace},
+>>>>>>> Stashed changes
 	ByRef Mod,
 	OnlyName = 1) As %Status [ Deprecated ]
 {
-	new $Namespace
-	set $Namespace=ns
-	Set tRes = ##class(%SQL.Statement).%ExecDirect(,
+	new $namespace
+	set $namespace=ns
+	set tRes = ##class(%SQL.Statement).%ExecDirect(,
 		"select * from %IPM_Storage.ModuleItem")
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	if (tRes.%SQLCODE < 0) {
+		throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
-	Set in=""
-	While tRes.%Next(.tSC) {
+	set in=""
+	while tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Set name=tRes.%Get("DisplayName")
-		Set in=in_"'"_name_"',"
-		Set list=$ListBuild(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
-		For a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
-			Set list=list_$ListBuild(tRes.%Get(a))
+		set name=tRes.%Get("DisplayName")
+		set in=in_"'"_name_"',"
+		set list=$listbuild(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
+		for a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
+			set list=list_$listbuild(tRes.%Get(a))
 		}
-		Set Mod(name) = tRes.%Get("VersionString")
-		Set:'OnlyName Mod(name,"L") = list
-		
+		set Mod(name) = tRes.%Get("VersionString")
+		set:'OnlyName Mod(name,"L") = list
+
 	}
 	$$$ThrowOnError(tSC)
-	Quit:in=""||(OnlyName) $$$OK
-	Set in=$Extract(in,1,*-1)
+	quit:in=""||(OnlyName) $$$OK
+	set in=$extract(in,1,*-1)
 
-	Set tQuery = "select Name, Version, Repository, Description, AllVersions from %IPM_Utils.Module_GetModuleList('registry') WHERE name in ("_in_")"
-	Set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
-	
-	If (tRes.%SQLCODE < 0) {
-		Throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
+	set tQuery = "select Name, Version, Repository, Description, AllVersions from %IPM_Utils.Module_GetModuleList('registry') WHERE name in ("_in_")"
+	set tRes = ##class(%SQL.Statement).%ExecDirect(,tQuery)
+
+	if (tRes.%SQLCODE < 0) {
+		throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
 	}
-	While tRes.%Next(.tSC) {
+	while tRes.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Set name = tRes.%Get("DisplayName")
-		Set Mod(name,"R")=$ListBuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"),tRes.%Get("AllVersions"))
+		set name = tRes.%Get("DisplayName")
+		set Mod(name,"R")=$listbuild(tRes.%Get("Version"),tRes.%Get("Description"),tRes.%Get("Repository"),tRes.%Get("AllVersions"))
 	}
-	Quit $$$OK
+	quit $$$OK
 }
 
 ClassMethod AccumulateTreeRecursive(
@@ -2636,117 +2651,117 @@ ClassMethod AccumulateTreeRecursive(
 	ByRef pTree,
 	pLevel As %Integer = 0) [ Private ]
 {
-	If (pLevel = 0) && $Data(pVisitedMap(pModName)) {
-		Quit
+	if (pLevel = 0) && $data(pVisitedMap(pModName)) {
+		quit
 	}
-	
-	Set tParentIndex = $Increment(pTree)
-	Set pTree(tParentIndex) = $ListBuild(pModName_" "_$Get(pModMap(pModName),"[missing]"))
-	Set tDep = ""
-	Set tPrevSibling = ""
-	For {
-		Set tDep = $Order(pModMap(pModName,tDep),1,tDepVerExpr)
-		Quit:(tDep="")
-		
+
+	set tParentIndex = $increment(pTree)
+	set pTree(tParentIndex) = $listbuild(pModName_" "_$get(pModMap(pModName),"[missing]"))
+	set tDep = ""
+	set tPrevSibling = ""
+	for {
+		set tDep = $order(pModMap(pModName,tDep),1,tDepVerExpr)
+		quit:(tDep="")
+
 		// Set first child for parent node to this index (if there is no first child yet)
-		Set tSiblingIndex = pTree + 1
-		If ($ListGet(pTree(tParentIndex),2) = "") {
-			Set $List(pTree(tParentIndex),2) = tSiblingIndex
+		set tSiblingIndex = pTree + 1
+		if ($listget(pTree(tParentIndex),2) = "") {
+			set $list(pTree(tParentIndex),2) = tSiblingIndex
 		}
-		
+
 		// Set next sibling for previous node to this index.
-		If (tPrevSibling '= "") {
-			Set $List(pTree(tPrevSibling),3) = tSiblingIndex
+		if (tPrevSibling '= "") {
+			set $list(pTree(tPrevSibling),3) = tSiblingIndex
 		}
-		Set tPrevSibling = tSiblingIndex
-		
-		Do ..AccumulateTreeRecursive(tDep,.pModMap,.pTree,pLevel+1)
+		set tPrevSibling = tSiblingIndex
+
+		do ..AccumulateTreeRecursive(tDep,.pModMap,.pTree,pLevel+1)
 	}
 }
 
 ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
 {
-	Set tTree = ''$Data(pCommandInfo("modifiers","tree"))
-	Set tRepos = $ListFromString($Get(pCommandInfo("modifiers","repos")))
-	Set tModName = $Get(pCommandInfo("parameters","module"))
-	Set tVersion = $Get(pCommandInfo("parameters","version"))
-  If tModName="" {
+	set tTree = ''$data(pCommandInfo("modifiers","tree"))
+	set tRepos = $listfromstring($get(pCommandInfo("modifiers","repos")))
+	set tModName = $get(pCommandInfo("parameters","module"))
+	set tVersion = $get(pCommandInfo("parameters","version"))
+  if tModName="" {
     $$$ThrowStatus($$$ERROR($$$GeneralError,"A module name is required"))
   }
-	
-	If tTree {
-		New %tree
-		Set tSC = ##class(%IPM.Utils.Module).GetDependentsAsTree(.%tree,.tErrorList,tModName,tVersion,tRepos)
+
+	if tTree {
+		new %tree
+		set tSC = ##class(%IPM.Utils.Module).GetDependentsAsTree(.%tree,.tErrorList,tModName,tVersion,tRepos)
 		$$$ThrowOnError(tSC)
-	} Else {
-		Set tSC = ##class(%IPM.Utils.Module).GetDependentsList(.tList,.tErrorList,tModName,tVersion,tRepos)
+	} else {
+		set tSC = ##class(%IPM.Utils.Module).GetDependentsList(.tList,.tErrorList,tModName,tVersion,tRepos)
 		$$$ThrowOnError(tSC)
 	}
-	
-	If $Data(tErrorList) {
-		Write !,"Warning: some errors occurred."
-		For i=1:1:tErrorList {
-			Set $ListBuild(tServer,tModName,tVersion,tErrorSC) = tErrorList(i)
-			Set tServer = $Case(tServer,"":" (installed)",:" @ "_tServer)
-			Write !,tModName," ",tVersion,tServer,": ",$System.Status.GetErrorText(tErrorSC)
+
+	if $data(tErrorList) {
+		write !,"Warning: some errors occurred."
+		for i=1:1:tErrorList {
+			set $listbuild(tServer,tModName,tVersion,tErrorSC) = tErrorList(i)
+			set tServer = $case(tServer,"":" (installed)",:" @ "_tServer)
+			write !,tModName," ",tVersion,tServer,": ",$system.Status.GetErrorText(tErrorSC)
 		}
-		Write !
+		write !
 	}
-	
-	If tTree {
-		Set tRef = "%tree"
-		Set tState = 0
-		
-		For {
-			Set tRef = $Query(@tRef)
-			Quit:tRef=""
-			
-			For i=1:1:$QLength(tRef) {
-				Set tSub = $QSubscript(tRef,i)
-				If ($Get(tState(i)) = tSub) {
-					Continue
-				} Else {
-					Set tNodeIndex = $Increment(tDependentTree)
-			
-					Set tState(i) = tSub
-					For j=i+1:1:tState {
-						Kill tState(j)
-						Kill tPreviousNode
+
+	if tTree {
+		set tRef = "%tree"
+		set tState = 0
+
+		for {
+			set tRef = $query(@tRef)
+			quit:tRef=""
+
+			for i=1:1:$qlength(tRef) {
+				set tSub = $qsubscript(tRef,i)
+				if ($get(tState(i)) = tSub) {
+					continue
+				} else {
+					set tNodeIndex = $increment(tDependentTree)
+
+					set tState(i) = tSub
+					for j=i+1:1:tState {
+						kill tState(j)
+						kill tPreviousNode
 					}
-					If $Data(tState(i,"node"),tPreviousNode)
-					
-					Set tState = i
-					Set tState(i,"node") = tNodeIndex
-					
-					Set $ListBuild(tModName,tVersion,tServer) = tSub
-					Set tServer = $Case(tServer,"":" (installed)",:" @ "_tServer)
-					
-					Set tValue = tModName_" "_tVersion_tServer
-					
-					Set tDependentTree(tNodeIndex) = $ListBuild(tValue)
-					
+					if $data(tState(i,"node"),tPreviousNode)
+
+					set tState = i
+					set tState(i,"node") = tNodeIndex
+
+					set $listbuild(tModName,tVersion,tServer) = tSub
+					set tServer = $case(tServer,"":" (installed)",:" @ "_tServer)
+
+					set tValue = tModName_" "_tVersion_tServer
+
+					set tDependentTree(tNodeIndex) = $listbuild(tValue)
+
 					// Set first child
-					If $Data(tState(i-1,"node"),tParent) && ($ListGet(tDependentTree(tParent),2) = "") {
-						Set $List(tDependentTree(tParent),2) = tNodeIndex
+					if $data(tState(i-1,"node"),tParent) && ($listget(tDependentTree(tParent),2) = "") {
+						set $list(tDependentTree(tParent),2) = tNodeIndex
 					}
-					
+
 					// Set next sibling of previous node
-					If $Data(tPreviousNode,tPreviousNode) && (tPreviousNode '= $Get(tParent)) {
-						Set $List(tDependentTree(tPreviousNode),3) = tNodeIndex
+					if $data(tPreviousNode,tPreviousNode) && (tPreviousNode '= $get(tParent)) {
+						set $list(tDependentTree(tPreviousNode),3) = tNodeIndex
 					}
-					
-					Set tPreviousNode = tNodeIndex
+
+					set tPreviousNode = tNodeIndex
 				}
 			}
 		}
-		
-		Do ..PrintTree(.tDependentTree)
-	} Else {
-		For i=1:1:tList.Count() {
+
+		do ..PrintTree(.tDependentTree)
+	} else {
+		for i=1:1:tList.Count() {
 			#dim tItem As %IPM.Storage.QualifiedModuleInfo
-			Set tItem = tList.GetAt(i)
-			Set tServer = $Case(tItem.ServerName,"":" (installed)",:" @ "_tItem.ServerName)
-			Write !,tItem.Name," ",tItem.VersionString,tServer
+			set tItem = tList.GetAt(i)
+			set tServer = $case(tItem.ServerName,"":" (installed)",:" @ "_tItem.ServerName)
+			write !,tItem.Name," ",tItem.VersionString,tServer
 		}
 	}
 }
@@ -2758,185 +2773,185 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
 /// according to pre-order (which is how the tree will be displayed, one node per line).
 ClassMethod PrintTree(ByRef pTree)
 {
-	Set tFrontPadding = ""
-	Set tChildDepth = 0
-	For i=1:1:$Order(pTree(""),-1) {
-		Set tFirstChild = ""
-		Set tNextSibling = ""
-		Set $ListBuild(tValue, tFirstChild, tNextSibling) = pTree(i)
-		
-		Set tFrontPadding = $Get(tPadding(i))
-		
-		If (tNextSibling = "") {
-			Set $Extract(tFrontPadding,*-2) = $Char($ZHex("2514H"))
+	set tFrontPadding = ""
+	set tChildDepth = 0
+	for i=1:1:$order(pTree(""),-1) {
+		set tFirstChild = ""
+		set tNextSibling = ""
+		set $listbuild(tValue, tFirstChild, tNextSibling) = pTree(i)
+
+		set tFrontPadding = $get(tPadding(i))
+
+		if (tNextSibling = "") {
+			set $extract(tFrontPadding,*-2) = $char($zhex("2514H"))
 		}
-		If (tFirstChild '= "") {
-			Set $Extract(tFrontPadding,*) = $Char($ZHex("252CH"))
+		if (tFirstChild '= "") {
+			set $extract(tFrontPadding,*) = $char($zhex("252CH"))
 		}
-		
-		Write tFrontPadding,$$$FormattedLine($$$Green,$Piece(tValue," ",1))," ",$Piece(tValue," ",2),!
-		
-		If (tNextSibling '= "") {
-			Set tPadding(tNextSibling) = $Get(tPadding(i))
+
+		write tFrontPadding,$$$FormattedLine($$$Green,$piece(tValue," ",1))," ",$piece(tValue," ",2),!
+
+		if (tNextSibling '= "") {
+			set tPadding(tNextSibling) = $get(tPadding(i))
 		}
-		If (tFirstChild '= "") {
-			Set tModPadding = ""
-			If $Get(tPadding(i)) '= "" {
-				Set tModPadding = $Extract(tPadding(i),1,*-3)_$Case(tNextSibling,"":" ",:$Char($ZHex("2502H")))_"  "
+		if (tFirstChild '= "") {
+			set tModPadding = ""
+			if $get(tPadding(i)) '= "" {
+				set tModPadding = $extract(tPadding(i),1,*-3)_$case(tNextSibling,"":" ",:$char($zhex("2502H")))_"  "
 			}
-			Set tPadding(tFirstChild) = $Extract(tModPadding,1,*-1)_$Char($ZHex("251CH"),$ZHex("2500H"),$ZHex("2500H"))
+			set tPadding(tFirstChild) = $extract(tModPadding,1,*-1)_$char($zhex("251CH"),$zhex("2500H"),$zhex("2500H"))
 		}
 	}
 }
 
 ClassMethod ListOrphans(ByRef pCommandInfo) [ Private ]
 {
-	Set tType = $$$GetModifier(pCommandInfo,"type")
-	Set tResult = ##class(%IPM.Utils.Module).OrphanedResourcesFunc($Namespace,tType)
-	While tResult.%Next(.tSC) {
+	set tType = $$$GetModifier(pCommandInfo,"type")
+	set tResult = ##class(%IPM.Utils.Module).OrphanedResourcesFunc($namespace,tType)
+	while tResult.%Next(.tSC) {
 		$$$ThrowOnError(tSC)
-		Write tResult.%Get("Name"),!
+		write tResult.%Get("Name"),!
 	}
 }
 
 ClassMethod Arrange(ByRef pCommandInfo) [ Private ]
 {
-	Set tSC = $$$OK
-	Set tAll = $$$HasModifier(pCommandInfo,"all")
-	Set tModuleName = $Get(pCommandInfo("parameters","module"))
-	If (tAll && (tModuleName '= "")) {
-		Set tSC = $$$ERROR($$$GeneralError,"Invalid command - cannot specify '-all' flag and a module name.")
-	} ElseIf ('tAll && (tModuleName = "")) {
-		Set tSC = $$$ERROR($$$GeneralError,"Invalid command - must specify '-all' or a module name.")
+	set tSC = $$$OK
+	set tAll = $$$HasModifier(pCommandInfo,"all")
+	set tModuleName = $get(pCommandInfo("parameters","module"))
+	if (tAll && (tModuleName '= "")) {
+		set tSC = $$$ERROR($$$GeneralError,"Invalid command - cannot specify '-all' flag and a module name.")
+	} elseif ('tAll && (tModuleName = "")) {
+		set tSC = $$$ERROR($$$GeneralError,"Invalid command - must specify '-all' or a module name.")
 	}
 	$$$ThrowOnError(tSC)
-	
-	Try {
-		If (tAll) {
-			Set tResult = ##class(%SQL.Statement).%ExecDirect(,
+
+	try {
+		if (tAll) {
+			set tResult = ##class(%SQL.Statement).%ExecDirect(,
 				"select Name from %IPM_Storage.ModuleItem where DeveloperMode = 1")
-			If (tResult.%SQLCODE < 0) {
-				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE,tResult.%Message)
+			if (tResult.%SQLCODE < 0) {
+				throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE,tResult.%Message)
 			}
 		}
-		For {
-			If (tAll) {
-				Set tHasData = tResult.%Next(.tSC)
+		for {
+			if (tAll) {
+				set tHasData = tResult.%Next(.tSC)
 				$$$ThrowOnError(tSC)
-				If 'tHasData {
-					Quit
+				if 'tHasData {
+					quit
 				}
-				Set tModuleName = tResult.%Get("Name")
+				set tModuleName = tResult.%Get("Name")
 			}
-			
-			Set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
+
+			set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
 			$$$ThrowOnError(tSC)
-			Set tSC = ##class(%IPM.Utils.Module).ExportDocumentForObject(tModule,.tSourceControlOutput)
+			set tSC = ##class(%IPM.Utils.Module).ExportDocumentForObject(tModule,.tSourceControlOutput)
 			$$$ThrowOnError(tSC)
-			For tLine=1:1:$Get(tSourceControlOutput) {
-				Write tSourceControlOutput(tLine),!
+			for tLine=1:1:$get(tSourceControlOutput) {
+				write tSourceControlOutput(tLine),!
 			}
-			
-			If 'tAll {
-				Quit
+
+			if 'tAll {
+				quit
 			}
 		}
-	} Catch e {
-		Set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,"Error arranging module(s)"),e.AsStatus())
+	} catch e {
+		set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,"Error arranging module(s)"),e.AsStatus())
 		$$$ThrowStatus(tSC)
 	}
 }
 
 ClassMethod Import(ByRef pCommandInfo)
 {
-	Set tSC = $$$OK
-	Set tSource = $Get(pCommandInfo("parameters","source"))
-	If (tSource = "") {
+	set tSC = $$$OK
+	set tSource = $get(pCommandInfo("parameters","source"))
+	if (tSource = "") {
     	$$$ThrowStatus($$$ERROR($$$GeneralError,"A source for import must be specified"))
   	}
-	Try {
-		Set tRecurse = '$$$HasModifier(pCommandInfo,"norecurse")
-		Set tCompile = '$$$HasModifier(pCommandInfo,"nocompile")
-		Set tVerbose = $$$HasModifier(pCommandInfo,"verbose")
-		Set tQuiet = $$$HasModifier(pCommandInfo,"quiet")
-		
+	try {
+		set tRecurse = '$$$HasModifier(pCommandInfo,"norecurse")
+		set tCompile = '$$$HasModifier(pCommandInfo,"nocompile")
+		set tVerbose = $$$HasModifier(pCommandInfo,"verbose")
+		set tQuiet = $$$HasModifier(pCommandInfo,"quiet")
+
 		#dim %SourceControl As %Studio.SourceControl.ISC
-		New %SourceControl
-		Set tSC = ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		new %SourceControl
+		set tSC = ##class(%Studio.SourceControl.Interface).SourceControlCreate()
 		$$$ThrowOnError(tSC)
-		
-		Set tSourceDir = ##class(%Library.File).NormalizeDirectory(tSource)
-		Set tSourceFile = ##class(%Library.File).NormalizeFilename(tSource)
-		Set tLoadFlags = $Select(tCompile:"c",1:"")_$Select(tQuiet:"-d",tVerbose:"d",1:"")_"k"
-		For tListOnly = 1,0 {
-			Continue:tListOnly&&'$IsObject(%SourceControl)
-			Set tLoadedList = ""
+
+		set tSourceDir = ##class(%Library.File).NormalizeDirectory(tSource)
+		set tSourceFile = ##class(%Library.File).NormalizeFilename(tSource)
+		set tLoadFlags = $select(tCompile:"c",1:"")_$select(tQuiet:"-d",tVerbose:"d",1:"")_"k"
+		for tListOnly = 1,0 {
+			continue:tListOnly&&'$isobject(%SourceControl)
+			set tLoadedList = ""
 			// First pass, this lists the things that will be loaded.
 			// Second pass, it loads them.
-			If ##class(%Library.File).Exists(tSourceFile) {
-				If ##class(%Library.File).DirectoryExists(tSourceFile) {
-					If 'tQuiet {
-						Write !,"Loading "_tSourceDir
+			if ##class(%Library.File).Exists(tSourceFile) {
+				if ##class(%Library.File).DirectoryExists(tSourceFile) {
+					if 'tQuiet {
+						write !,"Loading "_tSourceDir
 					}
-					Set tSC = $System.OBJ.ImportDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly)
-					
+					set tSC = $system.OBJ.ImportDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly)
+
 					// Build $ListBuild list of loaded items
-					Set tLoadedKey = ""
-					For {
-						Set tLoadedKey = $Order(tImportedArray(tLoadedKey))
-						If (tLoadedKey = "") {
-							Quit
+					set tLoadedKey = ""
+					for {
+						set tLoadedKey = $order(tImportedArray(tLoadedKey))
+						if (tLoadedKey = "") {
+							quit
 						}
-						
-						Set tLoadedList = tLoadedList_$ListBuild(tLoadedKey)
+
+						set tLoadedList = tLoadedList_$listbuild(tLoadedKey)
 					}
-				} Else {
-					If 'tQuiet {
-						Write !,"Loading "_tSourceFile
+				} else {
+					if 'tQuiet {
+						write !,"Loading "_tSourceFile
 					}
-					Set tSC = $System.OBJ.Load(tSourceFile,tLoadFlags,,.tLoadedList,tListOnly)
-					Set tLoadedList = $ListFromString(tLoadedList)
+					set tSC = $system.OBJ.Load(tSourceFile,tLoadFlags,,.tLoadedList,tListOnly)
+					set tLoadedList = $listfromstring(tLoadedList)
 				}
-			} Else {
-				Set tSC = $$$ERROR($$$FileDoesNotExist,tSource)
+			} else {
+				set tSC = $$$ERROR($$$FileDoesNotExist,tSource)
 			}
 			$$$ThrowOnError(tSC)
 
-			Continue:'$IsObject(%SourceControl)
-			
-			If tListOnly {
+			continue:'$isobject(%SourceControl)
+
+			if tListOnly {
 				// Trigger source control class's user action 6 (simulating a load into Studio)
 				// This happens first to avoid warnings about the file being modified outside of Studio.
-				Set tSC = ##class(%Studio.SourceControl.Interface).UserAction(1,6,$ListToString(tLoadedList),"")
+				set tSC = ##class(%Studio.SourceControl.Interface).UserAction(1,6,$listtostring(tLoadedList),"")
 				$$$ThrowOnError(tSC)
-			} Else {
-				If 'tQuiet {
-					Write !,$ListLength(tLoadedList)," item(s) loaded."
-					Write !,"Exporting modified files."
+			} else {
+				if 'tQuiet {
+					write !,$listlength(tLoadedList)," item(s) loaded."
+					write !,"Exporting modified files."
 				}
-				
-				Set tPointer = 0
-				Set tSC = $$$OK
-				While $ListNext(tLoadedList,tPointer,tLoadedItem) {
-					Set tLoadedItem = ##class(%Studio.SourceControl.Interface).normalizeName(tLoadedItem)
-					
+
+				set tPointer = 0
+				set tSC = $$$OK
+				while $listnext(tLoadedList,tPointer,tLoadedItem) {
+					set tLoadedItem = ##class(%Studio.SourceControl.Interface).normalizeName(tLoadedItem)
+
 					// Avoid comparison with file timestamp in Perforce workspace, since that's irrelevant; we have loaded a new version, likely from elsewhere.
 					// If a file has previously been exported to the Perforce workspace but not actually marked for add, GetStatus will report that the file is
 					// in source control. This case is handled later after revert is attempted and fails because the file is not known to Perforce.
-					Kill ^Sources(0,"FileTimeStamp",tLoadedItem)
-					If $$$ISOK(##class(%Studio.SourceControl.Interface).GetStatus(tLoadedItem,.tIsInSourceControl)) {
-            			If tIsInSourceControl {
-              				Set tSC = $$$ADDSC(tSC,%SourceControl.OnAfterSave(tLoadedItem))
-            			} Else {
-            				Set tSC = $$$ADDSC(tSC,%SourceControl.AddToSourceControl(tLoadedItem))
+					kill ^Sources(0,"FileTimeStamp",tLoadedItem)
+					if $$$ISOK(##class(%Studio.SourceControl.Interface).GetStatus(tLoadedItem,.tIsInSourceControl)) {
+            			if tIsInSourceControl {
+              				set tSC = $$$ADDSC(tSC,%SourceControl.OnAfterSave(tLoadedItem))
+            			} else {
+            				set tSC = $$$ADDSC(tSC,%SourceControl.AddToSourceControl(tLoadedItem))
             			}
           			}
 				}
 			}
 		}
-	} Catch e {
+	} catch e {
 		// Append string rather than using $System.Status.EmbedStatus, for clearer display in caller.
-		Set tSC = $$$ERROR($$$GeneralError,"Error in import: "_$System.Status.GetErrorText(e.AsStatus()))
+		set tSC = $$$ERROR($$$GeneralError,"Error in import: "_$system.Status.GetErrorText(e.AsStatus()))
 		$$$ThrowStatus(tSC)
 	}
 }
@@ -2947,42 +2962,42 @@ ClassMethod UpdateLanguageExtensionsOne(
 	Output pFound As %Boolean = 0,
 	ByRef tGenLines) As %Status
 {
-	Set tRtn = ##class(%Routine).%New(RoutineName)
-	If ##class(%Routine).Exists(RoutineName) {
-    While 'tRtn.AtEnd {
-      Set tLine = tRtn.ReadLine()
-      If $Match(tLine,$$$STARTTAGREGEX) {
+	set tRtn = ##class(%Routine).%New(RoutineName)
+	if ##class(%Routine).Exists(RoutineName) {
+    while 'tRtn.AtEnd {
+      set tLine = tRtn.ReadLine()
+      if $match(tLine,$$$STARTTAGREGEX) {
         // Read through the ending tag.
-        While ('tRtn.AtEnd) && ('$Match(tRtn.ReadLine(),$$$ENDTAGREGEX)) {}
-        
+        while ('tRtn.AtEnd) && ('$match(tRtn.ReadLine(),$$$ENDTAGREGEX)) {}
+
         // Generate the lines.
-        Set pFound = 1
-        For i=1:1:tGenLines {
-          Set tRtnLines($Increment(tRtnLines)) = tGenLines(i)
+        set pFound = 1
+        for i=1:1:tGenLines {
+          set tRtnLines($increment(tRtnLines)) = tGenLines(i)
         }
-      } Else { 
+      } else {
         // outside of the tags, just copy the lines to preserve users' custom code
-        Set tRtnLines($Increment(tRtnLines)) = tLine
+        set tRtnLines($increment(tRtnLines)) = tLine
 	  }
     }
-    If 'pFound {
-      For i=1:1:tGenLines {
-        Set tRtnLines($Increment(tRtnLines)) = tGenLines(i)
+    if 'pFound {
+      for i=1:1:tGenLines {
+        set tRtnLines($increment(tRtnLines)) = tGenLines(i)
       }
     }
-  } Else {
-    Merge tRtnLines = tGenLines
+  } else {
+    merge tRtnLines = tGenLines
   }
-  If (pTestOnly) {
-    Quit
+  if (pTestOnly) {
+    quit
   }
-  Do tRtn.Clear()
-  For i=1:1:tRtnLines {
-    Do tRtn.WriteLine(tRtnLines(i))
+  do tRtn.Clear()
+  for i=1:1:tRtnLines {
+    do tRtn.WriteLine(tRtnLines(i))
   }
   $$$ThrowOnError(tRtn.Save())
   $$$ThrowOnError(tRtn.Compile("/keepsource"))
-	Quit $$$OK
+	quit $$$OK
 }
 
 ClassMethod UpdateLanguageExtensions(
@@ -2990,326 +3005,326 @@ ClassMethod UpdateLanguageExtensions(
 	pTestOnly As %Boolean = 0,
 	Output pFound As %Boolean = 0) As %Status
 {
-	Set tSC = $$$OK
-	Set tInitTLevel = $TLevel
-	Try {
-		TSTART
+	set tSC = $$$OK
+	set tInitTLevel = $tlevel
+	try {
+		tstart
 		// Get routine lines to generate
-		Set tOffset = 0
-		Set tStarted = 0
-		Set labelPrefix = $Select($System.Version.GetMajor() >= 2023: "",1: "z")
-		Set method = ##class(%Dictionary.MethodDefinition).IDKEYOpen($classname(),"LanguageExtensions",,.sc)
+		set tOffset = 0
+		set tStarted = 0
+		set labelPrefix = $select($system.Version.GetMajor() >= 2023: "",1: "z")
+		set method = ##class(%Dictionary.MethodDefinition).IDKEYOpen($classname(),"LanguageExtensions",,.sc)
 		$$$ThrowOnError(sc)
-		Set tGenLines($i(tGenLines)) = $$$STARTTAGQ
-		While 'method.Implementation.AtEnd {
-			Set tGenLines($i(tGenLines)) = method.Implementation.ReadLine()
+		set tGenLines($increment(tGenLines)) = $$$STARTTAGQ
+		while 'method.Implementation.AtEnd {
+			set tGenLines($increment(tGenLines)) = method.Implementation.ReadLine()
 		}
-		Set tGenLines($i(tGenLines)) = $$$ENDTAGQ
+		set tGenLines($increment(tGenLines)) = $$$ENDTAGQ
 
-		If '$Data(tGenLines) {
-			$$$ThrowStatus($$$ERROR($$$GeneralError,"Could not find %ZLANGC00 routine contents in "_$Classname()))
+		if '$data(tGenLines) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"Could not find %ZLANGC00 routine contents in "_$classname()))
 		}
-		Do ..UpdateLanguageExtensionsOne("%ZLANGC00.MAC", pTestOnly,.pFound,.tGenLines)
-		Quit:pTestOnly
-		Set i="" 
-		For { Set i=$Order(tGenLines(i),1,tStr) Quit:i=""
-			If tStr["Do ##class" Set tGenLines(i)=$Replace($Replace(tStr,"Quit",""),"Do ","Quit ") Quit
+		do ..UpdateLanguageExtensionsOne("%ZLANGC00.MAC", pTestOnly,.pFound,.tGenLines)
+		quit:pTestOnly
+		set i=""
+		for { set i=$order(tGenLines(i),1,tStr) quit:i=""
+			if tStr["Do ##class" set tGenLines(i)=$replace($replace(tStr,"Quit",""),"Do ","Quit ") quit
 		}
-		Do ..UpdateLanguageExtensionsOne("%ZLANGF00.MAC", pTestOnly,.pFound,.tGenLines)
-		TCOMMIT
-	} Catch e {
-		Set tSC = e.AsStatus()
+		do ..UpdateLanguageExtensionsOne("%ZLANGF00.MAC", pTestOnly,.pFound,.tGenLines)
+		tcommit
+	} catch e {
+		set tSC = e.AsStatus()
 	}
-	While ($TLevel > tInitTLevel) {
-		TROLLBACK 1
+	while ($tlevel > tInitTLevel) {
+		trollback 1
 	}
-	Quit tSC
+	quit tSC
 }
 
 ClassMethod LanguageExtensions() [ Private ]
 {
 ZPM(pArgs...)
- If $System.CLS.IsMthd("%IPM.Main", "Shell") { 
- 	Do ##class(%IPM.Main).Shell(pArgs...) Quit
- } Else {
+ if $system.CLS.IsMthd("%IPM.Main", "Shell") {
+ 	do ##class(%IPM.Main).Shell(pArgs...) quit
+ } else {
 	// TODO: Needs to support enabling IPM from here, also need to decide what level of customization to provide
-	Set quitOnError = $Get(pArgs(2))
-	Set haltOnComplete = $Get(pArgs(3))
-	Write !, "IPM is not enabled in this namespace."
-	Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Nsp FROM %SYS.Namespace_List()")
-	If rs.%SQLCODE '= 0 {
-		Write !, "Error getting namespace name. SQLCODE =", rs.%SQLCODE
-	} Else {
-		New $Namespace
-		Set found = 0	
-		While rs.%Next() {
-			Set $Namespace = $Zstrip(rs.%Get("Nsp"), "<>WC")
+	set quitOnError = $get(pArgs(2))
+	set haltOnComplete = $get(pArgs(3))
+	write !, "IPM is not enabled in this namespace."
+	set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Nsp FROM %SYS.Namespace_List()")
+	if rs.%SQLCODE '= 0 {
+		write !, "Error getting namespace name. SQLCODE =", rs.%SQLCODE
+	} else {
+		new $namespace
+		set found = 0
+		while rs.%Next() {
+			set $namespace = $zstrip(rs.%Get("Nsp"), "<>WC")
 			// Some I4H containers come with %IPM.Main but the "version" command doesn't work ?!
-			If $System.CLS.IsMthd("%IPM.Main", "Shell") && ($Namespace '= "HSLIB") && ($Namespace '= "HSSYS") {
-				Write !, "Change namepace to one of the following to run the ""zpm"" command"
-				Do ##class(%IPM.Main).Shell("version")
-				Write !, "If you want to map IPM globally, switch to one of the namespaces above and run: zpm ""enable -map -globally""."
-				Write !, "If you want to reset repository and map IPM globally along with repository settings, switch to one of the namespaces above and run: zpm ""enable -community""."
-				Set found = 1
-				Quit
+			if $system.CLS.IsMthd("%IPM.Main", "Shell") && ($namespace '= "HSLIB") && ($namespace '= "HSSYS") {
+				write !, "Change namepace to one of the following to run the ""zpm"" command"
+				do ##class(%IPM.Main).Shell("version")
+				write !, "If you want to map IPM globally, switch to one of the namespaces above and run: zpm ""enable -map -globally""."
+				write !, "If you want to reset repository and map IPM globally along with repository settings, switch to one of the namespaces above and run: zpm ""enable -community""."
+				set found = 1
+				quit
 			}
 		}
 		// Shouldn't happen since %ZLANGC00.mac and %ZLANGF00.mac are present
-		If 'found {
-			Write !, "No namespace found with IPM enabled."
+		if 'found {
+			write !, "No namespace found with IPM enabled."
 		}
 	}
 
-	If quitOnError {
-		Write ! // Add a newline before quitting, otherwise the shell prompt will be on the same line as the error message
-		Do $System.Process.Terminate($Job, 1)
+	if quitOnError {
+		write ! // Add a newline before quitting, otherwise the shell prompt will be on the same line as the error message
+		do $system.Process.Terminate($job, 1)
 	}
-	If haltOnComplete {
-		Write ! // Add a newline before halting
-		Halt
+	if haltOnComplete {
+		write ! // Add a newline before halting
+		halt
 	}
 	// The $$$ERROR macro is not available for use in language extension
-	Return $System.Status.Error(5001, "IPM is not enabled in this namespace.")
+	return $system.Status.Error(5001, "IPM is not enabled in this namespace.")
  }
 }
 
 ClassMethod EnableIPM(ByRef pCommandInfo)
 {
-	New $Namespace
-	Set initNamespace = $Namespace
-	If ..IPMInstalled(.ipmModuleId){
-		Set modDef = ##class(%IPM.Storage.Module).%OpenId(ipmModuleId,,.sc)
+	new $namespace
+	set initNamespace = $namespace
+	if ..IPMInstalled(.ipmModuleId){
+		set modDef = ##class(%IPM.Storage.Module).%OpenId(ipmModuleId,,.sc)
 		$$$ThrowOnError(sc)
-		Write !, "Version of IPM in current namespace: "
-		Write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_modDef.VersionString
+		write !, "Version of IPM in current namespace: "
+		write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_modDef.VersionString
 	}
 
-	If $$$HasModifier(pCommandInfo,"community") {
-		For cmd = "repo -delete-all", "repo -reset-defaults", "enable -map -repos -globally" {
-			Write !!, "RUNNING command: """, cmd, """"
-			Do ..ShellInternal(cmd, .exc)
-			If exc '= $$$NULLOREF {
-				Write !, $$$FormattedLine($$$Red, $$$FormatText("Error running command ""%1"" - %2", cmd, exc.DisplayString()))
-			} Else {
-				Write !, $$$FormattedLine($$$Green, $$$FormatText("Command ""%1"" finished successfull", cmd))
+	if $$$HasModifier(pCommandInfo,"community") {
+		for cmd = "repo -delete-all", "repo -reset-defaults", "enable -map -repos -globally" {
+			write !!, "RUNNING command: """, cmd, """"
+			do ..ShellInternal(cmd, .exc)
+			if exc '= $$$NULLOREF {
+				write !, $$$FormattedLine($$$Red, $$$FormatText("Error running command ""%1"" - %2", cmd, exc.DisplayString()))
+			} else {
+				write !, $$$FormattedLine($$$Green, $$$FormatText("Command ""%1"" finished successfull", cmd))
 			}
 		}
-		Return
+		return
 	}
 
-	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
-	Set preview = $$$HasModifier(pCommandInfo,"preview")
-	Set map = $$$HasModifier(pCommandInfo,"map")
-	Set globally = $$$HasModifier(pCommandInfo, "globally")
-	Set localOnly = $$$HasModifier(pCommandInfo, "local-only")
-	Set version = $$$GetModifier(pCommandInfo, "version")
-	Set namespaces = $$$GetModifier(pCommandInfo, "namespaces")
-	Set namespaces = $$$ucase(namespaces)
-	Set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
-	Set mapRepos = $$$HasModifier(pCommandInfo,"repos")
-	Set remoteName = $$$GetModifier(pCommandInfo,"remote")
-	Set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
-	Set targetVersion = "" 		// var to store the final version of IPM to be installed
-	Kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
-	Set loadFlag = "ck/displayerror=1/displaylog=0" // flags + modifiers to use when loading module manifest file / stream - ensure compilation and only display error instead of entire log
+	set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	set preview = $$$HasModifier(pCommandInfo,"preview")
+	set map = $$$HasModifier(pCommandInfo,"map")
+	set globally = $$$HasModifier(pCommandInfo, "globally")
+	set localOnly = $$$HasModifier(pCommandInfo, "local-only")
+	set version = $$$GetModifier(pCommandInfo, "version")
+	set namespaces = $$$GetModifier(pCommandInfo, "namespaces")
+	set namespaces = $$$ucase(namespaces)
+	set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
+	set mapRepos = $$$HasModifier(pCommandInfo,"repos")
+	set remoteName = $$$GetModifier(pCommandInfo,"remote")
+	set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
+	set targetVersion = "" 		// var to store the final version of IPM to be installed
+	kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
+	set loadFlag = "ck/displayerror=1/displaylog=0" // flags + modifiers to use when loading module manifest file / stream - ensure compilation and only display error instead of entire log
 
 	// basic sanity checks
-	If (quiet && (namespaces = "") && 'globally) {
+	if (quiet && (namespaces = "") && 'globally) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot install IPM in quiet mode without specifying namespaces to install."))
 	}
-	If ((namespaces '= "") && globally) {
+	if ((namespaces '= "") && globally) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global installation flag at the same time."))
 	}
-	If (version '= "") && (globally && map) {
+	if (version '= "") && (globally && map) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify version when mapping the currently-installed version globally."))
 	}
-	If map && 'globally && (namespaces = "") {
+	if map && 'globally && (namespaces = "") {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"If mapping from the current namespace's routine database with -map, must specify either -globally or a list of namespaces with -ns"))
 	}
-	If ('map) && (mapRepos) {
+	if ('map) && (mapRepos) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify -repos without -map"))
 	}
 
-	If map {
-		If globally {
-			Set namespaces = ""
-			Do ..GetListNamespace(.list)
+	if map {
+		if globally {
+			set namespaces = ""
+			do ..GetListNamespace(.list)
 			// Namespace-specific mappings aren't allowed to override %ALL mappings. See https://github.com/intersystems/ipm/pull/485
-			Kill list("%ALL")
-			Set key = ""
-			For {
-				Set key = $Order(list(key))
-				If key = "" {
-					Quit
+			kill list("%ALL")
+			set key = ""
+			for {
+				set key = $order(list(key))
+				if key = "" {
+					quit
 				}
-				Set namespaces = namespaces _ $ListBuild(key)
+				set namespaces = namespaces _ $listbuild(key)
 			}
-		} Else {
-			Set namespaces = $ListFromString(namespaces)
+		} else {
+			set namespaces = $listfromstring(namespaces)
 		}
 
 		// First try to map IPM itself
-		Set pointer = 0
-		While $ListNext(namespaces,pointer,namespace) {
-			Set namespace = $Zstrip(namespace, "<>WC")
-			Set $Namespace = namespace
-			If ..IPMInstalled() {
-				If 'quiet || preview {
-					Write !,"Skipping IPM mapping of "_namespace_" - IPM already installed."
+		set pointer = 0
+		while $listnext(namespaces,pointer,namespace) {
+			set namespace = $zstrip(namespace, "<>WC")
+			set $namespace = namespace
+			if ..IPMInstalled() {
+				if 'quiet || preview {
+					write !,"Skipping IPM mapping of "_namespace_" - IPM already installed."
 				}
-				Continue
+				continue
 			}
-			Set $Namespace = initNamespace
-			If preview {
-				Write !,"Would add IPM mappings to "_namespace
-				Continue
+			set $namespace = initNamespace
+			if preview {
+				write !,"Would add IPM mappings to "_namespace
+				continue
 			}
-			If 'quiet {
-				Write !,"Mapping %IPM package in "_initNamespace_" equivalently to "_namespace
+			if 'quiet {
+				write !,"Mapping %IPM package in "_initNamespace_" equivalently to "_namespace
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace))
-			If 'quiet {
-				Write !,"Mapping %IPM.* routines in "_initNamespace_" equivalently to "_namespace
+			if 'quiet {
+				write !,"Mapping %IPM.* routines in "_initNamespace_" equivalently to "_namespace
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
 		}
 
 		// Then try to map repositories if -repos is specified
-		If mapRepos {
-			Do ..GetMapInfo(.isMappedFrom)
-			Set pointer = 0
-			While $ListNext(namespaces,pointer,namespace) {
-				Set namespace = $ZStrip(namespace, "<>WC")
-				// If IPM is not mapped from source namespace, skip repo mapping 
-				If $Get(isMappedFrom(namespace)) '= initNamespace {
-					If 'quiet || preview {
-						Write !,"Skipping repository mapping of "_namespace_" - IPM not mapped from source namespace."
+		if mapRepos {
+			do ..GetMapInfo(.isMappedFrom)
+			set pointer = 0
+			while $listnext(namespaces,pointer,namespace) {
+				set namespace = $zstrip(namespace, "<>WC")
+				// If IPM is not mapped from source namespace, skip repo mapping
+				if $get(isMappedFrom(namespace)) '= initNamespace {
+					if 'quiet || preview {
+						write !,"Skipping repository mapping of "_namespace_" - IPM not mapped from source namespace."
 					}
-					Continue
+					continue
 				}
 				// If repository are already present, also skip repo mapping avoid override
-				Set $Namespace = namespace
-				If $Data(^IPM.Repo.DefinitionD) \ 2 {
-					If 'quiet || preview {
-						Write !,"Skipping repository mapping of "_namespace_" - IPM repositories found."
+				set $namespace = namespace
+				if $data(^IPM.Repo.DefinitionD) \ 2 {
+					if 'quiet || preview {
+						write !,"Skipping repository mapping of "_namespace_" - IPM repositories found."
 					}
-					Continue
+					continue
 				}
-				Set $Namespace = initNamespace
-				If preview {
-					Write !,"Would add IPM repository mappings to "_namespace
-					Continue
+				set $namespace = initNamespace
+				if preview {
+					write !,"Would add IPM repository mappings to "_namespace
+					continue
 				}
-				If 'quiet {
-					Write !,"Mapping IPM repository in "_initNamespace_" equivalently to "_namespace
+				if 'quiet {
+					write !,"Mapping IPM repository in "_initNamespace_" equivalently to "_namespace
 				}
-				For suffix = "D", "S", "I" {
+				for suffix = "D", "S", "I" {
 					$$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace))
 				}
 			}
 		}
 
-		Set $Namespace = initNamespace
-		If preview {
-			Write !,"Preview mode; no configuration changes were made."
-		} ElseIf 'quiet {
-			Write !,"Done.",!
-			Do ..Version()
+		set $namespace = initNamespace
+		if preview {
+			write !,"Preview mode; no configuration changes were made."
+		} elseif 'quiet {
+			write !,"Done.",!
+			do ..Version()
 		}
-		Return
+		return
 	}
 
-	New $Namespace
+	new $namespace
 	// 1. Get list of local IPM artifacts under /<instance install dir>/lib/ipm/
-	Set XMLDir = $system.Util.InstallDirectory()
-	For subDirName = "lib", "ipm" {
-		Set XMLDir = ##class(%File).SubDirectoryName(XMLDir, subDirName)
+	set XMLDir = $system.Util.InstallDirectory()
+	for subDirName = "lib", "ipm" {
+		set XMLDir = ##class(%File).SubDirectoryName(XMLDir, subDirName)
 	}
-  	Set statement = ##class(%SQL.Statement).%New()
-  	Set sc = statement.%PrepareClassQuery("%File", "FileSet")
+  	set statement = ##class(%SQL.Statement).%New()
+  	set sc = statement.%PrepareClassQuery("%File", "FileSet")
   	$$$ThrowOnError(sc)
 	// Valid IPM installation manifest should be of format: ipm-0.0.1.xml
-	If ##class(%File).DirectoryExists(XMLDir) {
-		Set resultSet = statement.%Execute(XMLDir, "ipm-*.xml")
-		If (resultSet.%SQLCODE < 0)  {
+	if ##class(%File).DirectoryExists(XMLDir) {
+		set resultSet = statement.%Execute(XMLDir, "ipm-*.xml")
+		if (resultSet.%SQLCODE < 0)  {
 			$$$ThrowSQLIfError(resultSet.%SQLCODE,resultSet.%Message)
 		}
-		Kill ipmLocalArray			// multi-dim array to store local ipm manifests; ipmLocalArray(<version>)=<fileName>
-		Kill menuList				// menu to let user choose which version of local ipm to install (if not in quiet mode and no version is specified)
-		While resultSet.%Next(.sc) {
+		kill ipmLocalArray			// multi-dim array to store local ipm manifests; ipmLocalArray(<version>)=<fileName>
+		kill menuList				// menu to let user choose which version of local ipm to install (if not in quiet mode and no version is specified)
+		while resultSet.%Next(.sc) {
 			$$$ThrowOnError(sc)
-			Set fileName = resultSet.%Get("Name")
-			If (resultSet.%Get("Type") = "F") {
+			set fileName = resultSet.%Get("Name")
+			if (resultSet.%Get("Type") = "F") {
 				// get the exact version string from filename
-				Set exactIPMVer = $Piece($Piece(fileName, "ipm-", 2, *), ".xml", 1, *-1)
-				Set ipmLocalArray(exactIPMVer) = fileName
-				Set menuList($Increment(menuList)) = exactIPMVer_" (local version)"
+				set exactIPMVer = $piece($piece(fileName, "ipm-", 2, *), ".xml", 1, *-1)
+				set ipmLocalArray(exactIPMVer) = fileName
+				set menuList($increment(menuList)) = exactIPMVer_" (local version)"
 			}
 		}
 		$$$ThrowOnError(sc)
 	}
 
-	If ('$DATA(menuList) && localOnly) {
+	if ('$data(menuList) && localOnly) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"No ipm-<version>.xml installer file is found locally in directory: "__XMLDir))
 	}
 
 	// 2. Choose / propmpt user to choose which local/remote version of IPM to install
-	If (version '= "") {
-		Set targetVersion = version
-		If '$DATA(ipmLocalArray(version)) {
-			If localOnly {
+	if (version '= "") {
+		set targetVersion = version
+		if '$data(ipmLocalArray(version)) {
+			if localOnly {
 				$$$ThrowOnError($$$ERROR($$$GeneralError,"No ipm-"_version_".xml installer file is found locally in directory: "_XMLDir))
 			}
-			Write !, "No ipm-"_version_".xml installer file is found in "_XMLDir_" locally. Trying to download from the registry."
+			write !, "No ipm-"_version_".xml installer file is found in "_XMLDir_" locally. Trying to download from the registry."
 			// need to get from remote registry server
-			Set useLocal = 0
+			set useLocal = 0
 		}
-	} Else {
-		If quiet {
+	} else {
+		if quiet {
 			// quiet mode + no version specified - either error out or install latest version from registry / locally
-			If localOnly {
+			if localOnly {
 				//using semantic version utility, find the latest local version and install
-				Set key = ""
-				While 1 {
-					Set key = $Order(ipmLocalArray(key))
-					Set currentVer = ipmLocalArray(key)
-					If (targetVersion = "") {
-						Set targetVersion = currentVer
-						Continue
+				set key = ""
+				while 1 {
+					set key = $order(ipmLocalArray(key))
+					set currentVer = ipmLocalArray(key)
+					if (targetVersion = "") {
+						set targetVersion = currentVer
+						continue
 					}
-					Set semVerTarget = ##class(%IPM.General.SemanticVersion).FromString(targetVersion)
-					Set semVerCurrent = ##class(%IPM.General.SemanticVersion).FromString(currentVer)
-					If semVerCurrent.Follows(semVerTarget) {
-						Set targetVersion = currentVer
+					set semVerTarget = ##class(%IPM.General.SemanticVersion).FromString(targetVersion)
+					set semVerCurrent = ##class(%IPM.General.SemanticVersion).FromString(currentVer)
+					if semVerCurrent.Follows(semVerTarget) {
+						set targetVersion = currentVer
 					}
 				}
-			} Else {
-				Write !, "No IPM version is specified and is in quiet mode. Install the latest version of IPM from the registry."
-				Set useLocal = 0
-				Set targetVersion = "latest"
+			} else {
+				write !, "No IPM version is specified and is in quiet mode. Install the latest version of IPM from the registry."
+				set useLocal = 0
+				set targetVersion = "latest"
 			}
-		} Else {
+		} else {
 			// prompt user with option to download the latest version from registry
-			Set localIPMCount = $Get(menuList, 0)
-			If 'localOnly {
+			set localIPMCount = $get(menuList, 0)
+			if 'localOnly {
 				// Add remote version options to menuList
-				Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
+				set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 				$$$ThrowOnError(sc)
-				If $IsObject(server) {
-					Set latestVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
-					Set menuList($Increment(menuList)) = "latest"_" (remote version - "_latestVersion_")"
+				if $isobject(server) {
+					set latestVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
+					set menuList($increment(menuList)) = "latest"_" (remote version - "_latestVersion_")"
 				}
 				kill server
 				kill packageService
 			}
-			Set menuValue = 1
-			Set menuResponse = ##class(%Library.Prompt).GetMenu("Which version of IPM to use?", .menuValue, .menuList,,128)
-			If (menuResponse '= 1) {
+			set menuValue = 1
+			set menuResponse = ##class(%Library.Prompt).GetMenu("Which version of IPM to use?", .menuValue, .menuList,,128)
+			if (menuResponse '= 1) {
 				$$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported response. Operation cancelled."))
 			}
-			Set targetVersion = $Piece(menuList(menuValue), " ") // get rid of (local version) or (remote version) suffix
-			If (menuValue > localIPMCount) {
-				Set useLocal = 0
+			set targetVersion = $piece(menuList(menuValue), " ") // get rid of (local version) or (remote version) suffix
+			if (menuValue > localIPMCount) {
+				set useLocal = 0
 			}
 		}
 	}
@@ -3318,184 +3333,184 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
 	// 3. Figure out which namespaces to install
 
 	// TODO: Let user interactively choose which namespaces to install IPM
-	Set baseNS = $Namespace
-	Set sc = ##class(%SYS.Namespace).ListAll(.allNS)
+	set baseNS = $namespace
+	set sc = ##class(%SYS.Namespace).ListAll(.allNS)
 	$$$ThrowOnError(sc)
-	// multi-dim array to store all non-%SYS explicit namepaces that 
+	// multi-dim array to store all non-%SYS explicit namepaces that
 	// either have no IPM installed (if allow-upgrade is not set)
 	// or all of them (if allow-upgrade is set)
-	Kill namespacesForIPM
-	Set currentNS = ""
-	If allowUpgrade {
-		Merge namespacesForIPM = allNS
-	} Else {
-		While 1 {
-			Set currentNS = $ORDER(allNS(currentNS))
-			If currentNS = "" {
-				Quit
+	kill namespacesForIPM
+	set currentNS = ""
+	if allowUpgrade {
+		merge namespacesForIPM = allNS
+	} else {
+		while 1 {
+			set currentNS = $order(allNS(currentNS))
+			if currentNS = "" {
+				quit
 			}
 			// avoid %SYS and implied namespaces
-			If (currentNS '= "%SYS") && ($ZCONVERT(currentNS, "U") = currentNS) {
-				Set $Namespace = currentNS
-				If '$System.CLS.IsMthd("%IPM.Main", "Shell") {
-					Set namespacesForIPM(currentNS) = 1
+			if (currentNS '= "%SYS") && ($zconvert(currentNS, "U") = currentNS) {
+				set $namespace = currentNS
+				if '$system.CLS.IsMthd("%IPM.Main", "Shell") {
+					set namespacesForIPM(currentNS) = 1
 				}
 			}
 		}
 	}
-	Set $Namespace = baseNS
-	If globally {
-		Merge targetNamespaces = namespacesForIPM
-	} ElseIf (namespaces '= "") {
-		Set specifiedNSs = $ListFromString(namespaces, ",")
-		Set ptr = 0
-   		While $ListNext(specifiedNSs, ptr, value) {
-			If '$DATA(namespacesForIPM(value)) {
-				Write !, value_" is not a valid namespace to install IPM"_$Select(allowUpgrade: ". ", 1: ", or it already has IPM installed. ")_"Skipped."
-			} Else {
-				Set targetNamespaces(value) = 1
+	set $namespace = baseNS
+	if globally {
+		merge targetNamespaces = namespacesForIPM
+	} elseif (namespaces '= "") {
+		set specifiedNSs = $listfromstring(namespaces, ",")
+		set ptr = 0
+   		while $listnext(specifiedNSs, ptr, value) {
+			if '$data(namespacesForIPM(value)) {
+				write !, value_" is not a valid namespace to install IPM"_$select(allowUpgrade: ". ", 1: ", or it already has IPM installed. ")_"Skipped."
+			} else {
+				set targetNamespaces(value) = 1
 			}
 		}
-	} Else {
+	} else {
 		// TODO: Implement this part
-		Write !, "Currently do not support interactively choose namespaces to install IPM. Use -namespaces or -globally modifier."
-		Return
+		write !, "Currently do not support interactively choose namespaces to install IPM. Use -namespaces or -globally modifier."
+		return
 	}
 
 	// 4. Now that we got all the namespaces that need to install IPM, do the actual installation
-	If 'useLocal {
-		Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
+	if 'useLocal {
+		set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 		$$$ThrowOnError(sc)
-		If $IsObject(server) {
-			Set packageService = server.GetPackageService()
-			Set ipmRef = ##class(%IPM.Storage.ModuleInfo).%New()
+		if $isobject(server) {
+			set packageService = server.GetPackageService()
+			set ipmRef = ##class(%IPM.Storage.ModuleInfo).%New()
 			// TODO: Make this ipm eventually once the package name is changed
-			Set ipmRef.Name = $$$IPMModuleName
-			If (targetVersion = "latest") {
+			set ipmRef.Name = $$$IPMModuleName
+			if (targetVersion = "latest") {
 				// convert latest to semantic version so that it can be undestood by ModuleInfo class
-				Set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
+				set server = ##class(%IPM.Repo.Remote.Definition).GetOne(remoteName, .sc)
 				$$$ThrowOnError(sc)
-				If $IsObject(server) {
-					Set targetVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
+				if $isobject(server) {
+					set targetVersion = server.GetPackageService().GetLatestModuleVersion($$$IPMModuleName)
 				}
 			}
-			If (targetVersion = "") {
+			if (targetVersion = "") {
 				$$$ThrowOnError($$$ERROR($$$GeneralError,"Failed to find a satisfying target version of IPM to install."))
 			}
-			Set ipmRef.VersionString = targetVersion
-			
+			set ipmRef.VersionString = targetVersion
+
 			// Retrieve module installer manifest
-			Set manifest = packageService.GetModuleInstallerManifest(ipmRef)
-			Set currentNS = ""
-			While 1 {
-				Set currentNS = $ORDER(targetNamespaces(currentNS))
-				If currentNS = "" {
-					Quit
+			set manifest = packageService.GetModuleInstallerManifest(ipmRef)
+			set currentNS = ""
+			while 1 {
+				set currentNS = $order(targetNamespaces(currentNS))
+				if currentNS = "" {
+					quit
 				}
-				Set $Namespace = currentNS
-				If preview {
-					Write !, $$$FormatText("Would install IPM version %1 from registry in namespace %2", targetVersion, currentNS)
-					Continue
+				set $namespace = currentNS
+				if preview {
+					write !, $$$FormatText("Would install IPM version %1 from registry in namespace %2", targetVersion, currentNS)
+					continue
 				}
-				Do $SYSTEM.OBJ.LoadStream(manifest, loadFlag)
-				Write !, "IPM enabled for namespace "_currentNS
+				do $system.OBJ.LoadStream(manifest, loadFlag)
+				write !, "IPM enabled for namespace "_currentNS
 			}
-		} Else {
+		} else {
 			$$$ThrowOnError($$$ERROR($$$GeneralError,"Failed to get a valid registry server in order to download the IPM manifest."))
 		}
-	} Else {
-		Set targetIPMFileName = ipmLocalArray(targetVersion)
-		Set currentNS=$ORDER(targetNamespaces(""))
-		Set enabledNSList = ""
-		Set problematicList = ""
-		Set tOverallSC = $$$OK
-		While (currentNS '="") {
-			Set $Namespace = currentNS
-			If preview {
-				Set filePath = ##class(%File).NormalizeFilename(targetIPMFileName, XMLDir)
-				Write !, $$$FormatText("Would install IPM using file at %1 in namespace %2", filePath, currentNS)
-				Continue
+	} else {
+		set targetIPMFileName = ipmLocalArray(targetVersion)
+		set currentNS=$order(targetNamespaces(""))
+		set enabledNSList = ""
+		set problematicList = ""
+		set tOverallSC = $$$OK
+		while (currentNS '="") {
+			set $namespace = currentNS
+			if preview {
+				set filePath = ##class(%File).NormalizeFilename(targetIPMFileName, XMLDir)
+				write !, $$$FormatText("Would install IPM using file at %1 in namespace %2", filePath, currentNS)
+				continue
 			}
-			Set tSC = $SYSTEM.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag)
-			If $$$ISOK(tSC) {
-				Set enabledNSList = enabledNSList_$ListBuild(currentNS)
+			set tSC = $system.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag)
+			if $$$ISOK(tSC) {
+				set enabledNSList = enabledNSList_$listbuild(currentNS)
 			} else {
-				Set problematicList = problematicList_$ListBuild(currentNS)
+				set problematicList = problematicList_$listbuild(currentNS)
 			}
-			Set currentNS = $ORDER(targetNamespaces(currentNS))
-			Set tOverallSC = $$$ADDSC(tOverallSC,tSC)
+			set currentNS = $order(targetNamespaces(currentNS))
+			set tOverallSC = $$$ADDSC(tOverallSC,tSC)
 		}
-		If 'preview {
-			Write !, "IPM enabled for namespace(s) "_$ListToString(enabledNSList)
-			If $$$ISERR(tOverallSC) {
-				Write !, "IPM failed to enable for namespace "_$ListToString(problematicList)
+		if 'preview {
+			write !, "IPM enabled for namespace(s) "_$listtostring(enabledNSList)
+			if $$$ISERR(tOverallSC) {
+				write !, "IPM failed to enable for namespace "_$listtostring(problematicList)
 				$$$ThrowOnError(tOverallSC)
 			}
 		}
 	}
 
-	If preview {
-		Write !,"Preview mode; no configuration changes were made."
+	if preview {
+		write !,"Preview mode; no configuration changes were made."
 	}
 }
 
 ClassMethod UnmapIPM(ByRef pCommandInfo)
 {
-	Set globally = $$$HasModifier(pCommandInfo,"globally")
-	Set namespaces = $ListFromString($$$GetModifier(pCommandInfo,"namespaces"), ",")
-	Set namespaces = $$$ucase(namespaces)
-	Set verbose = '$$$HasModifier(pCommandInfo,"quiet")
+	set globally = $$$HasModifier(pCommandInfo,"globally")
+	set namespaces = $listfromstring($$$GetModifier(pCommandInfo,"namespaces"), ",")
+	set namespaces = $$$ucase(namespaces)
+	set verbose = '$$$HasModifier(pCommandInfo,"quiet")
 	set reposOnly = $$$HasModifier(pCommandInfo,"repos-only")
 	// Sanity check
-	If (globally && (namespaces '= "")) {
+	if (globally && (namespaces '= "")) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global unmap flag at the same time."))
 	}
-	If ('globally && (namespaces = "")) {
+	if ('globally && (namespaces = "")) {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Must specify either -globally or a list of namespaces with -ns"))
 	}
 	// populate namespaces if globally is set
-	If globally {
-		Do ..GetListNamespace(.nsTree)
-		Set ns = ""
-		For {
-			Set ns = $Order(nsTree(ns))
-			If ns = "" {
-				Quit
+	if globally {
+		do ..GetListNamespace(.nsTree)
+		set ns = ""
+		for {
+			set ns = $order(nsTree(ns))
+			if ns = "" {
+				quit
 			}
-			Set namespaces = namespaces_$ListBuild(ns)
+			set namespaces = namespaces_$listbuild(ns)
 		}
 	}
-	If verbose {
-		If reposOnly {
-			Write !,"Will attempt to unmap IPM repository settings from: "_ $ListToString(namespaces, ", ")
-		} Else {
-			Write !,"Will attempt to unmap IPM package, routines, and repository settings from: "_ $ListToString(namespaces, ", ")
+	if verbose {
+		if reposOnly {
+			write !,"Will attempt to unmap IPM repository settings from: "_ $listtostring(namespaces, ", ")
+		} else {
+			write !,"Will attempt to unmap IPM package, routines, and repository settings from: "_ $listtostring(namespaces, ", ")
 		}
 	}
 
 	// Gather namespaces where %IPM is mapped into
-	Do ..GetMapInfo(.tIsMappedFrom)
-	
-	Set ptr = 0
-	While $ListNext(namespaces, ptr, ns) {
-		Set src = $Get(tIsMappedFrom(ns))
-		If (src = "") {
-			If verbose {
-				Write !,"No mapping found for "_ns_". Skipping."
-			}
-			Continue
-		} 
+	do ..GetMapInfo(.tIsMappedFrom)
 
-		If verbose {
-			Write !,"Unmapping repository settings from "_ns_" (mapped from "_src_")"
+	set ptr = 0
+	while $listnext(namespaces, ptr, ns) {
+		set src = $get(tIsMappedFrom(ns))
+		if (src = "") {
+			if verbose {
+				write !,"No mapping found for "_ns_". Skipping."
+			}
+			continue
 		}
-		For suffix = "D", "S", "I" {
+
+		if verbose {
+			write !,"Unmapping repository settings from "_ns_" (mapped from "_src_")"
+		}
+		for suffix = "D", "S", "I" {
 			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveGlobalMapping(ns, "IPM.Repo.Definition"_suffix))
 		}
 
-		If 'reposOnly {
-			If verbose {
-				Write !,"Unmapping IPM package and routines from "_ns_" (mapped from "_src_")"
+		if 'reposOnly {
+			if verbose {
+				write !,"Unmapping IPM package and routines from "_ns_" (mapped from "_src_")"
 			}
 			$$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
 			$$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
@@ -3505,95 +3520,95 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
 
 ClassMethod ModuleVersion(ByRef pCommandInfo)
 {
-	Set modName = $Get(pCommandInfo("parameters","module"))
-	Set quiet = $$$HasModifier(pCommandInfo,"quiet")
-	Set force = $$$HasModifier(pCommandInfo,"force")
-	If (modName = "") {
+	set modName = $get(pCommandInfo("parameters","module"))
+	set quiet = $$$HasModifier(pCommandInfo,"quiet")
+	set force = $$$HasModifier(pCommandInfo,"force")
+	if (modName = "") {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"No module name specified."))
 	}
-	Set mod = ##class(%IPM.Storage.Module).NameOpen(modName,.sc)
-	If mod = "" {
+	set mod = ##class(%IPM.Storage.Module).NameOpen(modName,.sc)
+	if mod = "" {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_modName_" not found."))
 	}
-	Set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(modName)
-	If stream = "" {
+	set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen(modName)
+	if stream = "" {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Module stream "_modName_" not found."))
 	}
-	If 'quiet {
-		Write !,$$$FormatText("Current version of module %1 is: %2", modName, mod.VersionString)
+	if 'quiet {
+		write !,$$$FormatText("Current version of module %1 is: %2", modName, mod.VersionString)
 	}
 
 	// Compute the new semver
-	Set versionString = $Get(pCommandInfo("parameters","version"))
-	If versionString = "major" {
-		Set semver = mod.Version.WithBumpMajor()
-	} ElseIf versionString = "minor" {
-		Set semver = mod.Version.WithBumpMinor()
-	} ElseIf versionString = "patch" {
-		Set semver = mod.Version.WithBumpPatch()
-	} ElseIf versionString = "" {
-		Set semver = ##class(%IPM.General.SemanticVersion).FromString(mod.Version.ToString())
-	} Else {
-		Set semver = ##class(%IPM.General.SemanticVersion).FromString(versionString)
+	set versionString = $get(pCommandInfo("parameters","version"))
+	if versionString = "major" {
+		set semver = mod.Version.WithBumpMajor()
+	} elseif versionString = "minor" {
+		set semver = mod.Version.WithBumpMinor()
+	} elseif versionString = "patch" {
+		set semver = mod.Version.WithBumpPatch()
+	} elseif versionString = "" {
+		set semver = ##class(%IPM.General.SemanticVersion).FromString(mod.Version.ToString())
+	} else {
+		set semver = ##class(%IPM.General.SemanticVersion).FromString(versionString)
 	}
 
 	// Validate the semver
-	If 'semver.%ValidateObject() {
+	if 'semver.%ValidateObject() {
 		$$$ThrowOnError($$$ERROR($$$GeneralError,"Invalid version string: "_versionString))
 	}
 
-	If $$$HasModifier(pCommandInfo,"prerelease") {
-		Set semver = semver.WithPrerelease($$$GetModifier(pCommandInfo,"prerelease"))
+	if $$$HasModifier(pCommandInfo,"prerelease") {
+		set semver = semver.WithPrerelease($$$GetModifier(pCommandInfo,"prerelease"))
 	}
-	If $$$HasModifier(pCommandInfo,"build") {
-		Set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
+	if $$$HasModifier(pCommandInfo,"build") {
+		set semver = semver.WithBuild($$$GetModifier(pCommandInfo,"build"))
 	}
 
 	// Ensure semver is not lower than the current version, unless force is set
-	If ('force) && ('semver.Follows(mod.Version)) {
-		Set msg = $$$FormatText("Cannot set version to %1 as it is not strictly higher than the current version %2 (Use -force to override)", semver.ToString(), mod.VersionString)
-		Set msg = msg _ $Char(10, 13) _ "Note: when either version has a nonempty prerelease value, and differ from the other by major.minor.patch, neither version is considered strictly higher than the other."
-		Set msg = msg _ $Char(10, 13) _ "      See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags for more information."
+	if ('force) && ('semver.Follows(mod.Version)) {
+		set msg = $$$FormatText("Cannot set version to %1 as it is not strictly higher than the current version %2 (Use -force to override)", semver.ToString(), mod.VersionString)
+		set msg = msg _ $char(10, 13) _ "Note: when either version has a nonempty prerelease value, and differ from the other by major.minor.patch, neither version is considered strictly higher than the other."
+		set msg = msg _ $char(10, 13) _ "      See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags for more information."
 		$$$ThrowOnError($$$ERROR($$$GeneralError, msg))
 	}
-	If (semver.ToString() = mod.Version.ToString()) {
-		If 'quiet {
-			Write !,"Version is unchanged - Skipping."
+	if (semver.ToString() = mod.Version.ToString()) {
+		if 'quiet {
+			write !,"Version is unchanged - Skipping."
 		}
-		Return
+		return
 	}
 
-	If 'quiet {
-		Write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
+	if 'quiet {
+		write !,$$$FormatText("Setting version of module %1 to: %2", modName, semver.ToString())
 	}
 
-	Set initTLevel = $TLevel
-	Set ex = $$$NULLOREF
-	TSTART
-	Try {
-		New %SourceControl
-		Set docName = modName_".ZPM"
-		Do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
-		If $IsObject($Get(%SourceControl)) {
-			Write !,"Checking out "_docName
+	set initTLevel = $tlevel
+	set ex = $$$NULLOREF
+	tstart
+	try {
+		new %SourceControl
+		set docName = modName_".ZPM"
+		do ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+		if $isobject($get(%SourceControl)) {
+			write !,"Checking out "_docName
 			$$$ThrowOnError(%SourceControl.CheckOut(docName))
 		}
-		Set mod.Version = semver
-		Set mod.VersionString = semver.ToString()
+		set mod.Version = semver
+		set mod.VersionString = semver.ToString()
 		$$$ThrowOnError(mod.%Save())
-		Do ##class(%IPM.StudioDocument.Module).UpdateVersion(modName,semver)
-		TCOMMIT
-	} Catch ex {
+		do ##class(%IPM.StudioDocument.Module).UpdateVersion(modName,semver)
+		tcommit
+	} catch ex {
 	}
-	While ($TLevel > initTLevel) {
-		TROLLBACK 1
+	while ($tlevel > initTLevel) {
+		trollback 1
 	}
-	If $IsObject(ex) {
-		Throw ex
+	if $isobject(ex) {
+		throw ex
 	}
 }
 
-/// Get the mapping relationship for %IPM package. Format: 
+/// Get the mapping relationship for %IPM package. Format:
 /// <ul>
 /// <li>pIsMappedFrom(destinationNamespace) = sourceNamespace</li>
 /// <li>pIsMappedTo(sourceNamespace, destinationNamespace) = ""</li>
@@ -3602,14 +3617,14 @@ ClassMethod GetMapInfo(
 	Output pIsMappedFrom,
 	Output pIsMappedTo)
 {
-	Kill pIsMappedFrom, pIsMappedTo 
-	Do ..GetListModules("*", $$$IPMModuleName, .list)	
-	Do ..AddIPMMappedNamespaces(.list)
-	For i = 1:1:list {
-		Set destNS = $ListGet(list(i))
-		If $Data(list(i,  "modules", 1, "Installed In"), srcNS) # 2 {
-			Set pIsMappedFrom(destNS) = srcNS
-			Set pIsMappedTo(srcNS, destNS) = ""
+	kill pIsMappedFrom, pIsMappedTo
+	do ..GetListModules("*", $$$IPMModuleName, .list)
+	do ..AddIPMMappedNamespaces(.list)
+	for i = 1:1:list {
+		set destNS = $listget(list(i))
+		if $data(list(i,  "modules", 1, "Installed In"), srcNS) # 2 {
+			set pIsMappedFrom(destNS) = srcNS
+			set pIsMappedTo(srcNS, destNS) = ""
 		}
 	}
 }
@@ -3627,39 +3642,39 @@ ClassMethod ShellScript(
 	pOutputLogFile As %String = "",
 	pAppendToLog As %Boolean = 0)
 {
-	Set tSC = $$$OK
-	Set tFileOpen = 0
-	Try {
-		If (pOutputLogFile '= "") {
+	set tSC = $$$OK
+	set tFileOpen = 0
+	try {
+		if (pOutputLogFile '= "") {
 			// Append to pOutputLogFile if it exists and pAppendToLog is true.
-			Set tParams = "WS"_$Select(
+			set tParams = "WS"_$select(
 				'##class(%Library.File).Exists(pOutputLogFile):"N",
 				pAppendToLog:"A",
 				1:"N")
-			Open pOutputLogFile:tParams:1
-			If '$Test {
-				Set tSC = $$$ERROR($$$FileNotOpen,pOutputLogFile)
+			open pOutputLogFile:tParams:1
+			if '$test {
+				set tSC = $$$ERROR($$$FileNotOpen,pOutputLogFile)
 				$$$ThrowStatus(tSC)
 			}
-			Set tFileOpen = 1
-			Use pOutputLogFile
+			set tFileOpen = 1
+			use pOutputLogFile
 		}
-		Write !!,">>",pCommand,!
-		Set tSC = ..Shell(pCommand)
+		write !!,">>",pCommand,!
+		set tSC = ..Shell(pCommand)
 		$$$ThrowOnError(tSC)
-	} Catch e {
-		Set tSC = e.AsStatus()
-		Do e.Log()
+	} catch e {
+		set tSC = e.AsStatus()
+		do e.Log()
 	}
-	
-	Write !
-	If tFileOpen {
-		Close pOutputLogFile
+
+	write !
+	if tFileOpen {
+		close pOutputLogFile
 	}
-	
-	If $$$ISERR(tSC) {
+
+	if $$$ISERR(tSC) {
 		// Set ERRORLEVEL to 1
-		Do $System.Process.Terminate(,1)
+		do $system.Process.Terminate(,1)
 	}
 }
 
@@ -3670,100 +3685,100 @@ ClassMethod DisplayModules(
 	pIndent As %Integer = 0,
 	ByRef pModifiers)
 {
-  If '$Data(pList) {
-    Quit
+  if '$data(pList) {
+    quit
   }
-  Set pWithNamespace = pWithNamespace || $Data(pList("ns"))
-  If pWithNamespace {
-    Set nsWidth = $Get(pList("width")) + 2
-    Set numbersWidth = $Select(pNumbered: $Length(pList) + 3, 1: 0)
-    Set modulesWidth = 0
-    For i=1:1:pList {
-      If $Data(pList(i, "modules", "width"), width), width > modulesWidth {
-        Set modulesWidth = width
+  set pWithNamespace = pWithNamespace || $data(pList("ns"))
+  if pWithNamespace {
+    set nsWidth = $get(pList("width")) + 2
+    set numbersWidth = $select(pNumbered: $length(pList) + 3, 1: 0)
+    set modulesWidth = 0
+    for i=1:1:pList {
+      if $data(pList(i, "modules", "width"), width), width > modulesWidth {
+        set modulesWidth = width
       }
     }
 
-    For i=1:1:pList {
-      Set $ListBuild(tNS) = pList(i)
-      Write !
-      If pNumbered {
-        Write $Justify(i, numbersWidth - 2), ". "
+    for i=1:1:pList {
+      set $listbuild(tNS) = pList(i)
+      write !
+      if pNumbered {
+        write $justify(i, numbersWidth - 2), ". "
       }
-      Write $$$FormattedLinePadRight($$$Magenta, tNS _ "> ", nsWidth)
-      Set tPrefix = $Justify("", numbersWidth) _ tNS 
-      Kill tModulesList 
-      Merge tModulesList = pList(i, "modules")
-      Set tModulesList("width") = modulesWidth
-      Do ..DisplayModules(.tModulesList, 0, 0, $X)
+      write $$$FormattedLinePadRight($$$Magenta, tNS _ "> ", nsWidth)
+      set tPrefix = $justify("", numbersWidth) _ tNS
+      kill tModulesList
+      merge tModulesList = pList(i, "modules")
+      set tModulesList("width") = modulesWidth
+      do ..DisplayModules(.tModulesList, 0, 0, $x)
     }
-    Quit
+    quit
   }
 
-  Set extraColumns = $ListBuild(
-    $ListBuild("Description", $$$Yellow),
-    $ListBuild("Root", $$$Magenta),
-    $ListBuild("Author.CopyrightDate", $$$Yellow, "CopyrightDate"),
-    $ListBuild("Author.License", $$$Yellow, "License"),
-    $ListBuild("Author.Notes", $$$Yellow, "Notes"),
-    $ListBuild("Author.Organization", $$$Yellow, "Organization"),
-    $ListBuild("Author.Person", $$$Yellow, "Author"),
-    $ListBuild("Origin", $$$Default),
-    $ListBuild("AllVersions", $$$Default, "Versions"),
-    $ListBuild("Repository", $$$Default),
-    $ListBuild("Installed In", $$$Default)
+  set extraColumns = $listbuild(
+    $listbuild("Description", $$$Yellow),
+    $listbuild("Root", $$$Magenta),
+    $listbuild("Author.CopyrightDate", $$$Yellow, "CopyrightDate"),
+    $listbuild("Author.License", $$$Yellow, "License"),
+    $listbuild("Author.Notes", $$$Yellow, "Notes"),
+    $listbuild("Author.Organization", $$$Yellow, "Organization"),
+    $listbuild("Author.Person", $$$Yellow, "Author"),
+    $listbuild("Origin", $$$Default),
+    $listbuild("AllVersions", $$$Default, "Versions"),
+    $listbuild("Repository", $$$Default),
+    $listbuild("Installed In", $$$Default)
   )
 
-  Kill serverVersions
-  If $Data(pModifiers("showupstream")) {
-    Do ..GetUpstreamPackageVersions(.serverVersions)
+  kill serverVersions
+  if $data(pModifiers("showupstream")) {
+    do ..GetUpstreamPackageVersions(.serverVersions)
   }
 
-  Set width = $Get(pList("width")) + 1
-  Set tIndent = pIndent
-  Set tIndent = $Select(pIndent > 0: pIndent, 1: width)
-  For i=1:1:pList {
-    Set info = pList(i)
-    Set developerMode = 0
-    Set root = ""
-    Set $ListBuild(name, version, externalName, developerMode, root, lastUpdated) = info
-    Write:i>1 !,?pIndent
-    Write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Default, version)
-    If $Data(pModifiers("showupstream")) && ($Data(serverVersions(name)) / 10) {
-      Set r = ""
-      Set diffs = ""
-      For {
-        Set r = $Order(serverVersions(name, r), 1, sVer)
-        If r = "" {
-          Quit
+  set width = $get(pList("width")) + 1
+  set tIndent = pIndent
+  set tIndent = $select(pIndent > 0: pIndent, 1: width)
+  for i=1:1:pList {
+    set info = pList(i)
+    set developerMode = 0
+    set root = ""
+    set $listbuild(name, version, externalName, developerMode, root, lastUpdated) = info
+    write:i>1 !,?pIndent
+    write $$$FormattedLinePadRight($$$Green, name, width), $$$FormattedLine($$$Default, version)
+    if $data(pModifiers("showupstream")) && ($data(serverVersions(name)) / 10) {
+      set r = ""
+      set diffs = ""
+      for {
+        set r = $order(serverVersions(name, r), 1, sVer)
+        if r = "" {
+          quit
         }
-        If sVer '= version {
-          Set diffs = diffs_$ListBuild($$$FormatText("%1: %2", r, sVer))
+        if sVer '= version {
+          set diffs = diffs_$listbuild($$$FormatText("%1: %2", r, sVer))
         }
       }
-      If diffs '= "" {
-        Write " ", $$$FormattedLine($$$Default, "(" _ $ListToString(diffs, ", ") _ ")")
+      if diffs '= "" {
+        write " ", $$$FormattedLine($$$Default, "(" _ $listtostring(diffs, ", ") _ ")")
       }
     }
-    If $Get(developerMode) {
-      Write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
+    if $get(developerMode) {
+      write " ", $$$FormattedLine($$$Red, "(DeveloperMode)")
     }
-    If $Data(pModifiers("showsource")) {
-      Write " ", $$$FormattedLine($$$Magenta, root)
+    if $data(pModifiers("showsource")) {
+      write " ", $$$FormattedLine($$$Magenta, root)
     }
-    If $Data(pModifiers("showtime")) && ($Data(lastUpdated) # 2) {
-      Write " ", $$$FormattedLine($$$Yellow, lastUpdated)
+    if $data(pModifiers("showtime")) && ($data(lastUpdated) # 2) {
+      write " ", $$$FormattedLine($$$Yellow, lastUpdated)
     }
 
-    Set ptr = 0 
-    While $ListNext(extraColumns, ptr, column) {
-      Continue:$Get(column)=""
-      Set colName = ""
-      Set $ListBuild(colValue, color, colName) = column
-      Set colName = $Select($Get(colName)'="": colName, 1: colValue)
-      If $Data(pList(i, colValue), value), value'="" {
-        Write !,?tIndent
-        Do ..DrawColumn($$$FormattedLine(color, colName _ ": ") _ value)
+    set ptr = 0
+    while $listnext(extraColumns, ptr, column) {
+      continue:$get(column)=""
+      set colName = ""
+      set $listbuild(colValue, color, colName) = column
+      set colName = $select($get(colName)'="": colName, 1: colValue)
+      if $data(pList(i, colValue), value), value'="" {
+        write !,?tIndent
+        do ..DrawColumn($$$FormattedLine(color, colName _ ": ") _ value)
       }
     }
   }
@@ -3771,81 +3786,82 @@ ClassMethod DisplayModules(
 
 ClassMethod GetUpstreamPackageVersions(Output list)
 {
-  Set query = "SELECT %DLIST(Name) AS Repos FROM %IPM_Repo.Definition"
-  Set rs = ##class(%SQL.Statement).%ExecDirect(, query)
+  set query = "SELECT %DLIST(Name) AS Repos FROM %IPM_Repo.Definition"
+  set rs = ##class(%SQL.Statement).%ExecDirect(, query)
   $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-  If rs.%Next() {
-    Set repos = rs.%Get("Repos")
+  if rs.%Next() {
+    set repos = rs.%Get("Repos")
   }
 
-  Set ptr = 0
-  While $ListNext(repos, ptr, r) {
-    Set query = "SELECT Name,Version FROM %IPM_Utils.Module_GetModuleList(?,?) "
-    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, r, 0)
-    While rs.%Next() {
-      Set list(rs.%Get("Name"), r) = rs.%Get("Version")
+  set ptr = 0
+  while $listnext(repos, ptr, r) {
+    set query = "SELECT Name,Version FROM %IPM_Utils.Module_GetModuleList(?,?) "
+    set rs = ##class(%SQL.Statement).%ExecDirect(, query, r, 0)
+    while rs.%Next() {
+      set list(rs.%Get("Name"), r) = rs.%Get("Version")
     }
   }
 }
 
 ClassMethod Information(ByRef pCommandInfo)
 {
-	Set verbose = $$$HasModifier(pCommandInfo,"verbose")
+	set verbose = $$$HasModifier(pCommandInfo,"verbose")
 	// Get all dependency modules
 	$$$ThrowOnError(##class(%IPM.Utils.Module).BuildAllDependencyGraphs(, .graph))
-	Set sub = "" 
-	For {
-		Set sub = $Order(graph(sub))
-		If sub = "" {
-			Quit
+	set sub = ""
+	for {
+		set sub = $order(graph(sub))
+		if sub = "" {
+			quit
 		}
-		Set dep= ""
-		For {
-			Set dep= $Order(graph(sub, dep))
-			If dep= "" {
-				Quit
+		set dep= ""
+		for {
+			set dep= $order(graph(sub, dep))
+			if dep= "" {
+				quit
 			}
-			Set dependencies(dep) = ""
+			set dependencies(dep) = ""
 		}
 	}
 
-	Set messages = ..BuildIntroMessages(.outOfBoxMessage)
-	Set messages = messages _ $ListBuild(outOfBoxMessage)
-	Set ptr = 0
-	While $ListNext(messages, ptr, line) {
-		Write !, line
+	set messages = ..BuildIntroMessages(.outOfBoxMessage)
+	set messages = messages _ $listbuild(outOfBoxMessage)
+	set ptr = 0
+	while $listnext(messages, ptr, line) {
+		write !, line
 	}
-	Write !!, "Currently installed top-level modules are listed below:", !
-	Do ..GetListModules(,,.list)
-	Set updatedList("width") = 0
-	For i = 1:1:list {
-		Set entry = list(i)
-		Set name = $ListGet(entry, 1)
+	write !!, "Currently installed top-level modules are listed below:", !
+	do ..GetListModules(,,.list)
+	set updatedList("width") = 0
+	for i = 1:1:list {
+		set entry = list(i)
+		set name = $listget(entry, 1)
 		// only list non-dependencies
-		If $Data(dependencies(name)) {
-			Continue
+		if $data(dependencies(name)) {
+			continue
 		}
-		Set externalName = $List(entry, 3)
-		If (externalName '= "") && (externalName '= name) {
-			If verbose {
-				Set $List(entry, 1) = externalName_" (" _ name _ ")"
-			} Else {
-				Set $List(entry, 1) = externalName
+		set externalName = $list(entry, 3)
+		if (externalName '= "") && (externalName '= name) {
+			if verbose {
+				set $list(entry, 1) = externalName_" (" _ name _ ")"
+			} else {
+				set $list(entry, 1) = externalName
 			}
 		}
-		If updatedList("width") < $Length($ListGet(entry)) {
-			Set updatedList("width") = $Length($ListGet(entry))
+		if updatedList("width") < $length($listget(entry)) {
+			set updatedList("width") = $length($listget(entry))
 		}
-		Set version = ##class(%IPM.General.SemanticVersion).FromString($List(entry, 2))
-		Set $List(entry, 2) = version.ToStringWithoutBuild()
-		Set updatedList($Increment(updatedList)) = entry
+		set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
+		set $list(entry, 2) = version.ToStringWithoutBuild()
+		set updatedList($increment(updatedList)) = entry
 	}
-	Do ..DisplayModules(.updatedList)
+	do ..DisplayModules(.updatedList)
 }
 
-ClassMethod Update(ByRef pCommandInfo)
-{
-	Set verbose = $$$HasModifier(pCommandInfo,"verbose")
 }
+
+/// Get List Modules
+/// example d ##class(%IPM.Main).GetListModules("%SYS","zpm",.list)
+
 
 }

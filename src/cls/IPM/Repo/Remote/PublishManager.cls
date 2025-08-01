@@ -9,66 +9,75 @@ Property ServiceCache As array Of %IPM.Repo.IPublishService;
 /// Keeps track of which repositories are unavailable (by name - the keys are important, values don't matter)
 Property UnavailableNames As array Of %String;
 
-Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boolean) As %IPM.Repo.IPublishService
+Method CheckServiceCache(
+	pRepositoryName As %String,
+	Output pAvailable As %Boolean) As %IPM.Repo.IPublishService
 {
-	Set pAvailable = 0
-	If ..UnavailableNames.IsDefined(pRepositoryName) {
-		Quit $$$NULLOREF
-	}
+    set pAvailable = 0
+    if ..UnavailableNames.IsDefined(pRepositoryName) {
+        quit $$$NULLOREF
+    }
 
-	Set tClient = ..ServiceCache.GetAt(pRepositoryName)
-	If '$IsObject(tClient) {
-		Set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pRepositoryName,,.tSC)
-		$$$ThrowOnError(tSC)
+    set tClient = ..ServiceCache.GetAt(pRepositoryName)
+    if '$isobject(tClient) {
+        set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pRepositoryName,,.tSC)
+        $$$ThrowOnError(tSC)
 
-		If tRepository.Enabled {
-			// Don't cache Enabled status; no reason to prohibit it from changing.
-			Set tClient = tRepository.GetPublishService()
-			If $IsObject(tClient) {
-				Set pAvailable = tClient.IsAvailable()
-				If pAvailable {
-					Do ..ServiceCache.SetAt(tClient,tRepository.Name)
-				} Else {
-					Do ..UnavailableNames.SetAt("",tRepository.Name)
-				}
-			}
-		}
-	} Else {
-		// If the client is available in the cache for this object, it is assumed to be available.
-		Set pAvailable = 1
-	}
-	Quit tClient
+        if tRepository.Enabled {
+            // Don't cache Enabled status; no reason to prohibit it from changing.
+            set tClient = tRepository.GetPublishService()
+            if $isobject(tClient) {
+                set pAvailable = tClient.IsAvailable()
+                if pAvailable {
+                    do ..ServiceCache.SetAt(tClient,tRepository.Name)
+                } else {
+                    do ..UnavailableNames.SetAt("",tRepository.Name)
+                }
+            }
+        }
+    } else {
+        // If the client is available in the cache for this object, it is assumed to be available.
+        set pAvailable = 1
+    }
+    quit tClient
 }
 
-Method CheckUnpublishEnabled(Output isEnabled As %Boolean, pRepositoryName As %String, pPackageName As %String, pPackageVersion As %String) As %Status
+Method CheckUnpublishEnabled(
+	Output isEnabled As %Boolean,
+	pRepositoryName As %String,
+	pPackageName As %String,
+	pPackageVersion As %String) As %Status
 {
-    Set tSC = $$$OK
-	Set isEnabled = 0
-	Try {
-		Set tClient = ..CheckServiceCache(pRepositoryName,.tAvailable)
-		If 'tAvailable {
-			Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pRepositoryName))
-			Quit
-		}
-		Set isEnabled = tClient.CheckUnpublishEnabled(pPackageName, pPackageVersion)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Return tSC
+    set tSC = $$$OK
+    set isEnabled = 0
+    try {
+        set tClient = ..CheckServiceCache(pRepositoryName,.tAvailable)
+        if 'tAvailable {
+            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pRepositoryName))
+            quit
+        }
+        set isEnabled = tClient.CheckUnpublishEnabled(pPackageName, pPackageVersion)
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    return tSC
 }
 
-Method Unpublish(pRepositoryName As %String, pPackageName As %String, pPackageVersion As %String) As %Status
+Method Unpublish(
+	pRepositoryName As %String,
+	pPackageName As %String,
+	pPackageVersion As %String) As %Status
 {
-    Set tSC = $$$OK
+    set tSC = $$$OK
 
-	Set tClient = ..CheckServiceCache(pRepositoryName,.tAvailable)
-	If 'tAvailable {
-		Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pRepositoryName))
-		Quit
-	}
-	$$$ThrowOnError(tClient.Unpublish(pPackageName, pPackageVersion))
+    set tClient = ..CheckServiceCache(pRepositoryName,.tAvailable)
+    if 'tAvailable {
+        set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pRepositoryName))
+        quit
+    }
+    $$$ThrowOnError(tClient.Unpublish(pPackageName, pPackageVersion))
 
-	Return tSC
+    return tSC
 }
 
 }

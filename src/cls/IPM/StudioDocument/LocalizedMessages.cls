@@ -11,91 +11,93 @@ Parameter STREAMCLASS = "%IPM.StudioDocument.LocalizedMessageStream";
 
 Method OnCompileDocument(ByRef qstruct As %String) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		TSTART
-		Set tMsgFile = ##class(%IPM.StudioDocument.LocalizedMessageStream).NameOpen($Piece(..Name,".",1,*-1),,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tSC = ..Save()
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tTmpFileStream = ##class(%Stream.FileCharacter).%New()
-		Set ..Code.LineTerminator = $c(10)
-		Do ..Code.Rewind()
-		Do ..Code.ReadLine()  // omit xml header
-		While '(..Code.AtEnd) {
-			Set tSC = tTmpFileStream.Write(..Code.Read(16000))
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		}
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set tSC = tTmpFileStream.%Save()
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		Set file = tTmpFileStream.Filename
-		
-		// Copied from HSLIB error load process
-		Set tSC=$$Import^%occMsgXML(file,.domains,1,0)
-		If $$$ISERR(tSC) {
-			Quit
-		}
+    set tSC = $$$OK
+    try {
+        tstart
+        set tMsgFile = ##class(%IPM.StudioDocument.LocalizedMessageStream).NameOpen($piece(..Name,".",1,*-1),,.tSC)
+        if $$$ISERR(tSC) {
+            quit
+        }
 
-		// Belt and suspenders:
-		// Generate include files with all the plausible names.
-		// This needs to be improved at some point..
-		Set errdomains=""
-		Set domain="" For {
-			Set domain=$O(domains(domain)) Quit:domain=""
-			// Generate the include
-			Set errdomains = errdomains_$lb(domain)
-		}
-		Do GenerateInclude^%occMsgXML(tMsgFile.Name,0,$lts(errdomains),1)
-		
-		Set @..#INFOGLOBAL@("compile",tMsgFile.Name) = $zdt($zts,3)
-		TCOMMIT
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+        set tSC = ..Save()
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        set tTmpFileStream = ##class(%Stream.FileCharacter).%New()
+        set ..Code.LineTerminator = $char(10)
+        do ..Code.Rewind()
+        do ..Code.ReadLine()  // omit xml header
+        while '(..Code.AtEnd) {
+            set tSC = tTmpFileStream.Write(..Code.Read(16000))
+            if $$$ISERR(tSC) {
+                quit
+            }
+        }
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        set tSC = tTmpFileStream.%Save()
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        set file = tTmpFileStream.Filename
+
+        // Copied from HSLIB error load process
+        set tSC=$$Import^%occMsgXML(file,.domains,1,0)
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        // Belt and suspenders:
+        // Generate include files with all the plausible names.
+        // This needs to be improved at some point..
+        set errdomains=""
+        set domain=""
+        for {
+            set domain=$order(domains(domain))
+            quit:domain=""
+            // Generate the include
+            set errdomains = errdomains_$listbuild(domain)
+        }
+        do GenerateInclude^%occMsgXML(tMsgFile.Name,0,$listtostring(errdomains),1)
+
+        set @..#INFOGLOBAL@("compile",tMsgFile.Name) = $zdatetime($ztimestamp,3)
+        tcommit
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// Deletes the include file associated with this document.
 ClassMethod OnDelete(name As %String) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tName = ..GetIncludeFileName(name)
-		If ##class(%Library.Routine).Exists(tName) {
-			Set tSC = ##class(%Library.Routine).Delete(tName)
-			$$$ThrowOnError(tSC)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tName = ..GetIncludeFileName(name)
+        if ##class(%Library.Routine).Exists(tName) {
+            set tSC = ##class(%Library.Routine).Delete(tName)
+            $$$ThrowOnError(tSC)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Query ItemList() As %SQLQuery(ROWSPEC = "name:%String,modified:%TimeStamp") [ SqlProc ]
 {
-	select Name, LastModifiedTimestamp from %IPM_StudioDocument.LocalizedMessageStream
+    select Name, LastModifiedTimestamp from %IPM_StudioDocument.LocalizedMessageStream
 }
 
 /// Given a full error message document name (with .LOC extension), returns the full name (with extension) of the associated .INC file.
 ClassMethod GetIncludeFileName(pDocumentName As %String) As %String
 {
-	Set tName = $Piece(pDocumentName,".",1,*-1) // Strip extension
-	Quit tName_".INC"
+    set tName = $piece(pDocumentName,".",1,*-1) // Strip extension
+    quit tName_".INC"
 }
 
 /// Return other document types that this is related to.
@@ -105,22 +107,22 @@ ClassMethod GetIncludeFileName(pDocumentName As %String) As %String
 /// with 'test.INT' so you can return 'test.XXX' to complete the cycle.
 ClassMethod GetOther(Name As %String) As %String
 {
-	Set tOther = ""
-	Set tName = $Piece(Name,".",1,*-1)
-	Set tExt = $Piece(Name,".",*)
-	If (tExt = "LOC") {
-		Set tExpected = ..GetIncludeFileName(Name)
-		If ##class(%Routine).Exists(tExpected) {
-			Set tOther = tExpected
-		}
-	} ElseIf (tExt = "INC") {
-		// Not actually supported in Studio, but it's still correct.
-		Set tExpected = tName_".LOC"
-		If ..Exists(tExpected) {
-			Set tOther = tExpected
-		}
-	}
-	Quit tOther
+    set tOther = ""
+    set tName = $piece(Name,".",1,*-1)
+    set tExt = $piece(Name,".",*)
+    if (tExt = "LOC") {
+        set tExpected = ..GetIncludeFileName(Name)
+        if ##class(%Routine).Exists(tExpected) {
+            set tOther = tExpected
+        }
+    } elseif (tExt = "INC") {
+        // Not actually supported in Studio, but it's still correct.
+        set tExpected = tName_".LOC"
+        if ..Exists(tExpected) {
+            set tOther = tExpected
+        }
+    }
+    quit tOther
 }
 
 }

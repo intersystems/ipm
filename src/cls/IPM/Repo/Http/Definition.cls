@@ -28,7 +28,7 @@ Property DeploymentEnabled As %Boolean [ InitialExpression = 0 ];
 
 Index DeploymentServer On DeploymentEnabled [ Unique ];
 
-Property Details As %String(MAXLEN = "") [ SqlComputeCode = {Set {*} = {URL}}, SqlComputed, SqlComputeOnChange = (%%INSERT, %%UPDATE) ];
+Property Details As %String(MAXLEN = "") [ SqlComputeCode = {set {*} = {URL}}, SqlComputed, SqlComputeOnChange = (%%INSERT, %%UPDATE) ];
 
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
 {
@@ -48,8 +48,8 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 </commands>
 }
 
-/// This callback method is invoked by the <METHOD>%Save</METHOD> method to 
-/// provide notification that the object is being saved. It is called before 
+/// This callback method is invoked by the <METHOD>%Save</METHOD> method to
+/// provide notification that the object is being saved. It is called before
 /// any data is written to disk.
 /// 
 /// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
@@ -57,48 +57,48 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
-	// Leave DeploymentEnabled null to make unique index work right
-	// (i.e., deployment can only be enabled for one remote server.)
-	Set:..DeploymentEnabled=0 ..DeploymentEnabled=""
-	Quit $$$OK
+    // Leave DeploymentEnabled null to make unique index work right
+    // (i.e., deployment can only be enabled for one remote server.)
+    set:..DeploymentEnabled=0 ..DeploymentEnabled=""
+    quit $$$OK
 }
 
-/// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to 
+/// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to
 /// provide notification that the current object is being validated.
 /// 
 /// <P>If this method returns an error then <METHOD>%ValidateObject</METHOD> will fail.
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tStatus = $$$OK
-	Quit tStatus
+    set tStatus = $$$OK
+    quit tStatus
 }
 
 /// Outputs information about this server to the current device.
 /// Subclasses may override to show additional information.
 Method Display()
 {
-	Do ##super()
+    do ##super()
 
-	Write !,$c(9),"Default Deployment Registry? ",..Padding(3),$Case(..DeploymentEnabled,1:"Yes",:"No")
+    write !,$char(9),"Default Deployment Registry? ",..Padding(3),$case(..DeploymentEnabled,1:"Yes",:"No")
 
-	If (..Username '= "") {
-		Write !,$c(9),"Username: ",..Padding(1),..Username
-	}
-	If (..Password '= "") {
-		Write !,$c(9),"Password: ",..Padding(1),$Case(..Password,"":"<unset>",:"<set>")
-	}
-	If (..Token '= "") {
-		Write !,$c(9),"Token: ",..Padding(0),$Case(..Token,"":"<unset>",:"<set>")
-	}
-	If (..Token '= "") || (..Password '= "") || (..Username '= "") {
-		Write !,$c(9),"Token Auth Method: ",..Padding(2),..TokenAuthMethod
-	}
+    if (..Username '= "") {
+        write !,$char(9),"Username: ",..Padding(1),..Username
+    }
+    if (..Password '= "") {
+        write !,$char(9),"Password: ",..Padding(1),$case(..Password,"":"<unset>",:"<set>")
+    }
+    if (..Token '= "") {
+        write !,$char(9),"Token: ",..Padding(0),$case(..Token,"":"<unset>",:"<set>")
+    }
+    if (..Token '= "") || (..Password '= "") || (..Username '= "") {
+        write !,$char(9),"Token Auth Method: ",..Padding(2),..TokenAuthMethod
+    }
 }
 
 Method GetSortOrder() As %Integer [ Private ]
 {
-	// TODO: Allow this to be changed dynamically.
-	Quit 2 + $Case(..%Id(),"":1,:..%Id())
+    // TODO: Allow this to be changed dynamically.
+    quit 2 + $case(..%Id(),"":1,:..%Id())
 }
 
 Query PublishingServer() As %Query(ROWSPEC = "Name:%String,ID:%Integer,Url:%String,Class:%String") [ SqlProc ]
@@ -107,42 +107,45 @@ Query PublishingServer() As %Query(ROWSPEC = "Name:%String,ID:%Integer,Url:%Stri
 
 ClassMethod PublishingServerExecute(ByRef qHandle As %Binary) As %Status
 {
-	Set tSC = $$$OK
-	Set rs = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
+    set tSC = $$$OK
+    set rs = ##class(%Dictionary.ClassDefinitionQuery).SubclassOfFunc(..%ClassName(1))
 
-	Try {
-		While rs.%Next() {
-			Set classname = rs.Name
-			Set tRS = $ClassMethod(classname,"PublishingServerFunc")
-			If (tRS.%SQLCODE = 0) && tRS.%Next() {
-				#; Order by publish order and then name
-				Set qHandle(tRS.PublishOrder _ "/" _ tRS.Name) = $LB(tRS.ID, tRS.URL, classname)
-			}
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    try {
+        while rs.%Next() {
+            set classname = rs.Name
+            set tRS = $classmethod(classname,"PublishingServerFunc")
+            if (tRS.%SQLCODE = 0) && tRS.%Next() {
+                #; Order by publish order and then name
+                set qHandle(tRS.PublishOrder _ "/" _ tRS.Name) = $listbuild(tRS.ID, tRS.URL, classname)
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-ClassMethod PublishingServerFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = PublishingServerExecute ]
+ClassMethod PublishingServerFetch(
+	ByRef qHandle As %Binary,
+	ByRef Row As %List,
+	ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = PublishingServerExecute ]
 {
-	Set orderName = $Order(qHandle($Get(qHandle)))
-	If (orderName = "") {
-		Set AtEnd = 1
-	} Else {
-		#; publish order is an integer while name is a string that could contain a "/"
-		Set order = $PIECE(orderName, "/", 1)
-		Set name = $PIECE(orderName, "/", 2, *)
-		Set Row = $lb(name) _ qHandle(orderName)
-		Set qHandle = orderName
-	}
-	Quit $$$OK
+    set orderName = $order(qHandle($get(qHandle)))
+    if (orderName = "") {
+        set AtEnd = 1
+    } else {
+        #; publish order is an integer while name is a string that could contain a "/"
+        set order = $piece(orderName, "/", 1)
+        set name = $piece(orderName, "/", 2, *)
+        set Row = $listbuild(name) _ qHandle(orderName)
+        set qHandle = orderName
+    }
+    quit $$$OK
 }
 
 ClassMethod PublishingServerClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = PublishingServerFetch ]
 {
-	Quit $$$OK
+    quit $$$OK
 }
 
 Method GetPublishingManager(ByRef status) [ Abstract ]

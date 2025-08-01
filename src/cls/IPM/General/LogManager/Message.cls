@@ -14,25 +14,27 @@ Property Message As %String(MAXLEN = "");
 
 Property Count As %Integer [ InitialExpression = 1 ];
 
-Method %OnNew(pMessage As %String, pSeverity As %Integer) As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(
+	pMessage As %String,
+	pSeverity As %Integer) As %Status [ Private, ServerOnly = 1 ]
 {
-	Set ..Message = pMessage
-	Set ..Severity = pSeverity
-	Quit $$$OK
+    set ..Message = pMessage
+    set ..Severity = pSeverity
+    quit $$$OK
 }
 
 /// Outputs the message to the current device.
 Method Display()
 {
-	Write !,..SeverityLogicalToDisplay(..Severity),": ",..Message
-	If (..Count > 1) {
-		Write " (repeated "_..Count_" times)"
-	}
+    write !,..SeverityLogicalToDisplay(..Severity),": ",..Message
+    if (..Count > 1) {
+        write " (repeated "_..Count_" times)"
+    }
 }
 
 Method GetHash() As %String
 {
-	Quit $ZCRC(..Severity_..Message,7)
+    quit $zcrc(..Severity_..Message,7)
 }
 
 }

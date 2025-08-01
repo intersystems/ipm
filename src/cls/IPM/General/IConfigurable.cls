@@ -27,7 +27,9 @@ ClassMethod ClearSettingValue(pName As %String) As %Status [ Abstract ]
 }
 
 /// Sets setting <var>pName</var> to <var>pValue</var>. Should return an error %Status if <var>pValue</var> is invalid.
-ClassMethod SetSettingValue(pName As %String, pValue As %String) As %Status [ Abstract ]
+ClassMethod SetSettingValue(
+	pName As %String,
+	pValue As %String) As %Status [ Abstract ]
 {
 }
 
@@ -36,7 +38,7 @@ ClassMethod SetSettingValue(pName As %String, pValue As %String) As %Status [ Ab
 /// The default implementation is to always return "string"
 ClassMethod GetSettingType(pName As %String) As %String
 {
-	Quit "string"
+    quit "string"
 }
 
 Query ListSettings() As %Query(ROWSPEC = "Source:%String,SourceDescription:%String,Name:%String,Description:%String,Defined:%Boolean,Value:%String,IsFirstForSource:%Boolean,DataType:%String") [ Final, SqlProc ]
@@ -45,87 +47,90 @@ Query ListSettings() As %Query(ROWSPEC = "Source:%String,SourceDescription:%Stri
 
 ClassMethod ListSettingsExecute(ByRef qHandle As %Binary) As %Status [ Final ]
 {
-	Set tSC = $$$OK
-	Try {
-		Set tStmt = ##class(%SQL.Statement).%New()
-		Set tSC = tStmt.%PrepareClassQuery("%Dictionary.ClassDefinition","SubclassOf")
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		#dim tClassRes As %SQL.StatementResult
-		Set tClassRes = tStmt.%Execute($classname())
-		If (tClassRes.%SQLCODE < 0) {
-			Set tSC = $$$ERROR($$$SQLCode,tClassRes.%SQLCODE,tClassRes.%Message)
-			Quit
-		}
-		
-		Set qHandle("classes") = tClassRes
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tStmt = ##class(%SQL.Statement).%New()
+        set tSC = tStmt.%PrepareClassQuery("%Dictionary.ClassDefinition","SubclassOf")
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        #dim tClassRes As %SQL.StatementResult
+        set tClassRes = tStmt.%Execute($classname())
+        if (tClassRes.%SQLCODE < 0) {
+            set tSC = $$$ERROR($$$SQLCode,tClassRes.%SQLCODE,tClassRes.%Message)
+            quit
+        }
+
+        set qHandle("classes") = tClassRes
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-ClassMethod ListSettingsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ Final, PlaceAfter = ListSettingsExecute ]
+ClassMethod ListSettingsFetch(
+	ByRef qHandle As %Binary,
+	ByRef Row As %List,
+	ByRef AtEnd As %Integer = 0) As %Status [ Final, PlaceAfter = ListSettingsExecute ]
 {
-	Set tSC = $$$OK
-	Try {
-		#dim tClassRes As %SQL.StatementResult
-		Set tClassRes = qHandle("classes")
-		Set tListEnd = 1
-		Set tFirstForSource = 0
-		
-		If $Data(qHandle("settings"),tSettingList) {
-			Set tCurrentClass = qHandle("class")
-			Set tPointer = qHandle("pointer")
-			Set tListEnd = '$ListNext(tSettingList,tPointer,tSetting)
-		}
-			
-		If tListEnd {
-			Kill qHandle("class"),qHandle("settings"),qHandle("pointer")
-			
-			For {
-				Set AtEnd = 'tClassRes.%Next(.tSC)
-				Quit:AtEnd
-				
-				$$$ThrowOnError(tSC)
-				Set tCurrentClass = tClassRes.%GetData(1)
-				Set tSettingList = $ListFromString($Parameter(tCurrentClass,"SETTINGS"),"|")
-				Continue:'$ListLength(tSettingList)
-				
-				Set qHandle("settings") = tSettingList
-				Set qHandle("class") = tCurrentClass
-				Set tPointer = 0
-				Set tFirstForSource = 1
-				Set tListEnd = '$ListNext(tSettingList,tPointer,tSetting)
-				Quit
-			}
-		}
-		
-		If (AtEnd) {
-			Quit
-		}
-		
-		Set qHandle("pointer") = tPointer
-		
-		Set tClassDesc = $Parameter(tCurrentClass,"DESCRIPTION")
-		Set tName = $Piece(tSetting,":")
-		Set tDesc = $Piece(tSetting,":",2,*)
-		Set tIsDefined = $ClassMethod(tCurrentClass,"SettingIsDefined",tName)
-		Set tSettingValue = $ClassMethod(tCurrentClass,"GetSettingValue",tName)
-		Set tType = $ClassMethod(tCurrentClass,"GetSettingType",tName)
-		Set Row = $ListBuild(tCurrentClass,tClassDesc,tName,tDesc,tIsDefined,tSettingValue,tFirstForSource,tType)
-	} Catch e {
-		Write ! zw e w !
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        #dim tClassRes As %SQL.StatementResult
+        set tClassRes = qHandle("classes")
+        set tListEnd = 1
+        set tFirstForSource = 0
+
+        if $data(qHandle("settings"),tSettingList) {
+            set tCurrentClass = qHandle("class")
+            set tPointer = qHandle("pointer")
+            set tListEnd = '$listnext(tSettingList,tPointer,tSetting)
+        }
+
+        if tListEnd {
+            kill qHandle("class"),qHandle("settings"),qHandle("pointer")
+
+            for {
+                set AtEnd = 'tClassRes.%Next(.tSC)
+                quit:AtEnd
+
+                $$$ThrowOnError(tSC)
+                set tCurrentClass = tClassRes.%GetData(1)
+                set tSettingList = $listfromstring($parameter(tCurrentClass,"SETTINGS"),"|")
+                continue:'$listlength(tSettingList)
+
+                set qHandle("settings") = tSettingList
+                set qHandle("class") = tCurrentClass
+                set tPointer = 0
+                set tFirstForSource = 1
+                set tListEnd = '$listnext(tSettingList,tPointer,tSetting)
+                quit
+            }
+        }
+
+        if (AtEnd) {
+            quit
+        }
+
+        set qHandle("pointer") = tPointer
+
+        set tClassDesc = $parameter(tCurrentClass,"DESCRIPTION")
+        set tName = $piece(tSetting,":")
+        set tDesc = $piece(tSetting,":",2,*)
+        set tIsDefined = $classmethod(tCurrentClass,"SettingIsDefined",tName)
+        set tSettingValue = $classmethod(tCurrentClass,"GetSettingValue",tName)
+        set tType = $classmethod(tCurrentClass,"GetSettingType",tName)
+        set Row = $listbuild(tCurrentClass,tClassDesc,tName,tDesc,tIsDefined,tSettingValue,tFirstForSource,tType)
+    } catch e {
+        write ! zwrite e write !
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 ClassMethod ListSettingsClose(ByRef qHandle As %Binary) As %Status [ Final, PlaceAfter = ListSettingsExecute ]
 {
-	Quit $$$OK
+    quit $$$OK
 }
 
 }

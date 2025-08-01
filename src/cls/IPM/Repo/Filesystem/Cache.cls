@@ -27,78 +27,90 @@ Index RootNameVersion On (Root, Name, VersionString) [ Unique ];
 
 ClassMethod %OnBeforeBuildIndices(ByRef indexlist As %String(MAXLEN="") = "") As %Status [ Private, ServerOnly = 1 ]
 {
-	If (indexlist [ "SemVer") || (indexlist = "") {
-		// Force recomputation of SemVer property if index needs to be rebuilt (i.e., because structure has changed)
-		Set tRes = ##class(%SQL.Statement).%ExecDirect(,"update %IPM_Repo_Filesystem.Cache set SemVer = ''")
-		If tRes.%SQLCODE < 0 {
-			Quit $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
-		}
-	}
-	Quit $$$OK
+    if (indexlist [ "SemVer") || (indexlist = "") {
+        // Force recomputation of SemVer property if index needs to be rebuilt (i.e., because structure has changed)
+        set tRes = ##class(%SQL.Statement).%ExecDirect(,"update %IPM_Repo_Filesystem.Cache set SemVer = ''")
+        if tRes.%SQLCODE < 0 {
+            quit $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
+        }
+    }
+    quit $$$OK
 }
 
-Query OrderedMatches(pRoot As %String = "", pName As %String = "", pVersionExpression As %String = "*", pParameters As %String = "") As %Query(ROWSPEC = "Name:%String,VersionString:%String,Version_Major:%String,Version_Minor:%String,Version_Patch:%String,Version_Prerelease:%String,Version_Build:%String") [ SqlProc ]
+Query OrderedMatches(
+	pRoot As %String = "",
+	pName As %String = "",
+	pVersionExpression As %String = "*",
+	pParameters As %String = "") As %Query(ROWSPEC = "Name:%String,VersionString:%String,Version_Major:%String,Version_Minor:%String,Version_Patch:%String,Version_Prerelease:%String,Version_Build:%String") [ SqlProc ]
 {
 }
 
-ClassMethod OrderedMatchesExecute(ByRef qHandle As %Binary, pRoot As %String = "", pName As %String = "", pVersionExpression As %String = "*", pParameters As %String = "") As %Status
+ClassMethod OrderedMatchesExecute(
+	ByRef qHandle As %Binary,
+	pRoot As %String = "",
+	pName As %String = "",
+	pVersionExpression As %String = "*",
+	pParameters As %String = "") As %Status
 {
-	Set tSC = ##class(%IPM.General.SemanticVersion.Find).MatchesExecute(.qHandle,$classname(),"SemVer",..SemVerIndexLocation(),pName,pVersionExpression,pParameters)
-	Set qHandle("root") = pRoot
-	Quit tSC
+    set tSC = ##class(%IPM.General.SemanticVersion.Find).MatchesExecute(.qHandle,$classname(),"SemVer",..SemVerIndexLocation(),pName,pVersionExpression,pParameters)
+    set qHandle("root") = pRoot
+    quit tSC
 }
 
 ClassMethod OrderedMatchesClose(ByRef qHandle As %Binary) As %Status [ PlaceAfter = OrderedMatchesExecute ]
 {
-	Quit ##class(%IPM.General.SemanticVersion.Find).MatchesClose(.qHandle)
+    quit ##class(%IPM.General.SemanticVersion.Find).MatchesClose(.qHandle)
 }
 
-ClassMethod OrderedMatchesFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = OrderedMatchesExecute ]
+ClassMethod OrderedMatchesFetch(
+	ByRef qHandle As %Binary,
+	ByRef Row As %List,
+	ByRef AtEnd As %Integer = 0) As %Status [ PlaceAfter = OrderedMatchesExecute ]
 {
-	For {
-		Set tSC = ##class(%IPM.General.SemanticVersion.Find).MatchesFetch(.qHandle,.tRow,.AtEnd)
-		If AtEnd {
-			Quit
-		}
-		Set tRoot = ..RootGetStored($ListGet(tRow))
-		If (tRoot = qHandle("root")) {
-			Set Row = $ListBuild(..NameGetStored($ListGet(tRow)),..VersionStringGetStored($ListGet(tRow)))_..VersionGetStored($ListGet(tRow))
-			Quit
-		}
-	}
-	Quit tSC
+    for {
+        set tSC = ##class(%IPM.General.SemanticVersion.Find).MatchesFetch(.qHandle,.tRow,.AtEnd)
+        if AtEnd {
+            quit
+        }
+        set tRoot = ..RootGetStored($listget(tRow))
+        if (tRoot = qHandle("root")) {
+            set Row = $listbuild(..NameGetStored($listget(tRow)),..VersionStringGetStored($listget(tRow)))_..VersionGetStored($listget(tRow))
+            quit
+        }
+    }
+    quit tSC
 }
 
 Method HandleSaveError(pSC As %Status) As %Status
 {
-	Set tSC = pSC
-	Try {
-		If $System.Status.Equals(pSC,$$$ERRORCODE($$$KeyNotUnique)) {
-			$$$ThrowOnError($System.Status.DecomposeStatus(pSC,.tStatusInfo))
-			
-			// Which key?
-			Set tErrorParam = tStatusInfo(1,"param",1)
-			Set tClass = $Piece(tErrorParam,":",1)
-			Set tKey = $Piece(tErrorParam,":",2)
-			If (tClass = $classname()) && (tKey = "RootNameVersion") {
-				// Find the existing instance with matching RootNameVersion
-				Set tOtherInstance = ..RootNameVersionOpen(..Root,..Name,..VersionString,,.tSC)
-				$$$ThrowOnError(tSC)
-				
-				// Log a descriptive error message
-				Set tDupeDir = ..Root_..SubDirectory
-				Set tUseDir = tOtherInstance.Root_tOtherInstance.SubDirectory
-				Set tMessage = ..Name_" "_..VersionString_" previously found in "_tUseDir_"; also found in "_tDupeDir_". The version in "_tUseDir_" will be used."
-				Do ##class(%IPM.General.LogManager).Warning(tMessage,1)
-				
-				// Treat this as a non-error
-				Set tSC = $$$OK
-			}
-		}
-	} Catch e {
-		Set tSC = $$$ADDSC(pSC,e.AsStatus())
-	}
-	Quit tSC
+    set tSC = pSC
+    try {
+        if $system.Status.Equals(pSC,$$$ERRORCODE($$$KeyNotUnique)) {
+            $$$ThrowOnError($system.Status.DecomposeStatus(pSC,.tStatusInfo))
+
+            // Which key?
+            set tErrorParam = tStatusInfo(1,"param",1)
+            set tClass = $piece(tErrorParam,":",1)
+            set tKey = $piece(tErrorParam,":",2)
+            if (tClass = $classname()) && (tKey = "RootNameVersion") {
+                // Find the existing instance with matching RootNameVersion
+                set tOtherInstance = ..RootNameVersionOpen(..Root,..Name,..VersionString,,.tSC)
+                $$$ThrowOnError(tSC)
+
+                // Log a descriptive error message
+                set tDupeDir = ..Root_..SubDirectory
+                set tUseDir = tOtherInstance.Root_tOtherInstance.SubDirectory
+                set tMessage = ..Name_" "_..VersionString_" previously found in "_tUseDir_"; also found in "_tDupeDir_". The version in "_tUseDir_" will be used."
+                do ##class(%IPM.General.LogManager).Warning(tMessage,1)
+
+                // Treat this as a non-error
+                set tSC = $$$OK
+            }
+        }
+    } catch e {
+        set tSC = $$$ADDSC(pSC,e.AsStatus())
+    }
+    quit tSC
 }
 
 Storage Default

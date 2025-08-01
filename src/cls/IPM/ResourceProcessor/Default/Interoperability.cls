@@ -12,16 +12,16 @@ Property FilenameExtension As %String [ InitialExpression = "xml" ];
 
 Method DirectoryGet() As %String
 {
-    If i%DirectoryDefined Return i%Directory
-    Set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
-    For name = "i14y", "misc" {
-        If ##class(%File).DirectoryExists(##class(%File).NormalizeDirectory(name, tRoot)) {
-            Set i%DirectoryDefined = 1
-            Set i%Directory = name _ "/"
-            Return i%Directory
+    if i%DirectoryDefined return i%Directory
+    set tRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.SourcesRoot, ..ResourceReference.Module.Root)
+    for name = "i14y", "misc" {
+        if ##class(%File).DirectoryExists(##class(%File).NormalizeDirectory(name, tRoot)) {
+            set i%DirectoryDefined = 1
+            set i%Directory = name _ "/"
+            return i%Directory
         }
     }
-    Quit "i14y/"
+    quit "i14y/"
 }
 
 }

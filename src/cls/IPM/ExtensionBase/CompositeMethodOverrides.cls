@@ -21,7 +21,7 @@ Property StudioVersion As %String;
 Property MainJob As %String;
 
 /// Namespace this extension started out in
-Property Namespace As %String [ InitialExpression = {$Namespace} ];
+Property Namespace As %String [ InitialExpression = {$namespace} ];
 
 /// Cache of information related to mapping of resources across namespaces
 Property ResourceMappingCache As %IPM.ExtensionBase.ResourceMappingCache [ InitialExpression = {##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()} ];
@@ -35,319 +35,327 @@ Parameter SUBEXTENSIONGBL = {"^SYS(""SourceControl"",""%IPM.ExtensionBase.Compos
 /// class, do not call %New directly.
 Method %OnNew(initval As %String) As %Status [ Final ]
 {
-	Set tStatus = $$$OK
-	Try {
-		Set ..Username=$listget(initval)
-		Set ..MainJob=$listget(initval,3),..StudioVersion=$listget(initval,4)
-		Set tClasses = ..GetSubExtensionClasses()
-		Set tPtr = 0
-		While $ListNext(tClasses,tPtr,tClassName) {
-			Set tExt = $ClassMethod(tClassName,"%New",initval)
-			If '$IsObject(tExt) {
-				Set tStatus = $Get(%objlasterror,$$$ERROR($$$GeneralError,"Could not create new extension object of type "_tClassName))
-				Quit
-			}
-			Set tStatus = ..SubExtensions.SetAt(tExt,tClassName)
-			$$$ThrowOnError(tStatus)
-			Set tStatus = ..MapMenus(tClassName)
-			$$$ThrowOnError(tStatus)
-		}
-	} Catch e {
-		Set tStatus = e.AsStatus()
-	}
-	Quit tStatus
+    set tStatus = $$$OK
+    try {
+        set ..Username=$listget(initval)
+        set ..MainJob=$listget(initval,3),..StudioVersion=$listget(initval,4)
+        set tClasses = ..GetSubExtensionClasses()
+        set tPtr = 0
+        while $listnext(tClasses,tPtr,tClassName) {
+            set tExt = $classmethod(tClassName,"%New",initval)
+            if '$isobject(tExt) {
+                set tStatus = $get(%objlasterror,$$$ERROR($$$GeneralError,"Could not create new extension object of type "_tClassName))
+                quit
+            }
+            set tStatus = ..SubExtensions.SetAt(tExt,tClassName)
+            $$$ThrowOnError(tStatus)
+            set tStatus = ..MapMenus(tClassName)
+            $$$ThrowOnError(tStatus)
+        }
+    } catch e {
+        set tStatus = e.AsStatus()
+    }
+    quit tStatus
 }
 
-ClassMethod SetExtensionClasses(pPrimaryClassName As %String, pSubExtensionClassNames As %List) As %Status
+ClassMethod SetExtensionClasses(
+	pPrimaryClassName As %String,
+	pSubExtensionClassNames As %List) As %Status
 {
-	Set tStatus = $$$OK
-	Set tInitTLevel = $TLevel
-	Try {
-		TSTART
-		Set tStatus = ..SetPrimaryExtensionClass(pPrimaryClassName)
-		$$$ThrowOnError(tStatus)
-		Set tStatus = ..SetSubExtensionClasses(pSubExtensionClassNames)
-		$$$ThrowOnError(tStatus)
-		TCOMMIT
-	} Catch e {
-		Set tStatus = e.AsStatus()
-	}
-	While ($TLevel > tInitTLevel) { TROLLBACK 1 }
-	Quit tStatus
+    set tStatus = $$$OK
+    set tInitTLevel = $tlevel
+    try {
+        tstart
+        set tStatus = ..SetPrimaryExtensionClass(pPrimaryClassName)
+        $$$ThrowOnError(tStatus)
+        set tStatus = ..SetSubExtensionClasses(pSubExtensionClassNames)
+        $$$ThrowOnError(tStatus)
+        tcommit
+    } catch e {
+        set tStatus = e.AsStatus()
+    }
+    while ($tlevel > tInitTLevel) { trollback 1 }
+    quit tStatus
 }
 
 ClassMethod SetPrimaryExtensionClass(pClassName As %String) As %Status
 {
-	Set tStatus = $$$OK
-	Set tInitTLevel = $TLevel
-	Try {
-		If '##class(%Library.ClassDefinition).%ExistsId(pClassName) {
-			Quit
-		}
-		If '$ClassMethod(pClassName,"%Extends","%Studio.Extension.Base") {
-			Set tStatus = $$$ERROR($$$GeneralError,"Class '"_pClassName_"' does not extend %Studio.Extension.Base")
-			Quit
-		}
-		TSTART
-		If '$ListFind($Get(@..#SUBEXTENSIONGBL),pClassName) {
-			Set @..#SUBEXTENSIONGBL = $ListBuild(pClassName)_$Get(@..#SUBEXTENSIONGBL)
-		}
-		Set @..#PRIMARYEXTENSIONGBL = pClassName
-		TCOMMIT
-	} Catch e {
-		Set tStatus = e.AsStatus()
-	}
-	While ($TLevel > tInitTLevel) { TROLLBACK 1 }
-	Quit tStatus
+    set tStatus = $$$OK
+    set tInitTLevel = $tlevel
+    try {
+        if '##class(%Dictionary.ClassDefinition).%ExistsId(pClassName) {
+            quit
+        }
+        if '$classmethod(pClassName,"%Extends","%Studio.Extension.Base") {
+            set tStatus = $$$ERROR($$$GeneralError,"Class '"_pClassName_"' does not extend %Studio.Extension.Base")
+            quit
+        }
+        tstart
+        if '$listfind($get(@..#SUBEXTENSIONGBL),pClassName) {
+            set @..#SUBEXTENSIONGBL = $listbuild(pClassName)_$get(@..#SUBEXTENSIONGBL)
+        }
+        set @..#PRIMARYEXTENSIONGBL = pClassName
+        tcommit
+    } catch e {
+        set tStatus = e.AsStatus()
+    }
+    while ($tlevel > tInitTLevel) { trollback 1 }
+    quit tStatus
 }
 
 ClassMethod SetSubExtensionClasses(pClassNames As %List) As %Status
 {
-	Set tStatus = $$$OK
-	Try {
-		Set tClassNames = ""
-		Set tPrimaryExtension = ..GetPrimaryExtensionClass()
-		If (tPrimaryExtension '= "") {
-			Set tClassNames = $ListBuild(tPrimaryExtension)
-		}
-		Set tPtr = 0
-		While $ListNext(pClassNames,tPtr,tClassName) {
-			If ($Get(tClassName) = "") {
-				Continue
-			}
-			If '##class(%Library.ClassDefinition).%ExistsId(tClassName) {
-				Continue
-			}
-			If '$ClassMethod(tClassName,"%Extends","%Studio.Extension.Base") {
-				Set tStatus = $$$ERROR($$$GeneralError,"Class '"_tClassName_"' does not extend %Studio.Extension.Base")
-				Quit
-			}
-			If '$Data(tClassNames(tClassName)) {
-				Set tClassNames = tClassNames_$ListBuild(tClassName)
-				Set tClassNames(tClassName) = ""
-			}
-		}
-		$$$ThrowOnError(tStatus)
-		Set @..#SUBEXTENSIONGBL = pClassNames
-	} Catch e {
-		Set tStatus = e.AsStatus()
-	}
-	Quit tStatus
+    set tStatus = $$$OK
+    try {
+        set tClassNames = ""
+        set tPrimaryExtension = ..GetPrimaryExtensionClass()
+        if (tPrimaryExtension '= "") {
+            set tClassNames = $listbuild(tPrimaryExtension)
+        }
+        set tPtr = 0
+        while $listnext(pClassNames,tPtr,tClassName) {
+            if ($get(tClassName) = "") {
+                continue
+            }
+            if '##class(%Dictionary.ClassDefinition).%ExistsId(tClassName) {
+                continue
+            }
+            if '$classmethod(tClassName,"%Extends","%Studio.Extension.Base") {
+                set tStatus = $$$ERROR($$$GeneralError,"Class '"_tClassName_"' does not extend %Studio.Extension.Base")
+                quit
+            }
+            if '$data(tClassNames(tClassName)) {
+                set tClassNames = tClassNames_$listbuild(tClassName)
+                set tClassNames(tClassName) = ""
+            }
+        }
+        $$$ThrowOnError(tStatus)
+        set @..#SUBEXTENSIONGBL = pClassNames
+    } catch e {
+        set tStatus = e.AsStatus()
+    }
+    quit tStatus
 }
 
 ClassMethod GetPrimaryExtensionClass() As %String [ SqlProc ]
 {
-	Quit $Get(@..#PRIMARYEXTENSIONGBL)
+    quit $get(@..#PRIMARYEXTENSIONGBL)
 }
 
 ClassMethod GetSubExtensionClasses() As %List [ SqlProc ]
 {
-	Set tSubExts = $Get(@..#SUBEXTENSIONGBL)
-	Set tPrimaryExt = ..GetPrimaryExtensionClass()
-	If (tPrimaryExt '= "") && '$ListFind(tSubExts,tPrimaryExt) {
-		Set tSubExts = $ListBuild(tPrimaryExt)_tSubExts
-	}
-	Quit tSubExts
+    set tSubExts = $get(@..#SUBEXTENSIONGBL)
+    set tPrimaryExt = ..GetPrimaryExtensionClass()
+    if (tPrimaryExt '= "") && '$listfind(tSubExts,tPrimaryExt) {
+        set tSubExts = $listbuild(tPrimaryExt)_tSubExts
+    }
+    quit tSubExts
 }
 
 Method GetPrimaryExtension(pInternalName As %String = "") As %Studio.Extension.Base
 {
-	If (pInternalName '= "") && ($Length(pInternalName,",") = 1) {
-		Set $Namespace = ..FindNamespaceForInternalName(pInternalName)
-	}
-	If ($Namespace '= ..Namespace) {
-		Quit ..GetCurrentNamespaceExtension()
-	}
-	Quit ..SubExtensions.GetAt(..GetPrimaryExtensionClass())
+    if (pInternalName '= "") && ($length(pInternalName,",") = 1) {
+        set $namespace = ..FindNamespaceForInternalName(pInternalName)
+    }
+    if ($namespace '= ..Namespace) {
+        quit ..GetCurrentNamespaceExtension()
+    }
+    quit ..SubExtensions.GetAt(..GetPrimaryExtensionClass())
 }
 
 Method GetSubExtension(pClassName As %String) As %Studio.Extension.Base
 {
-	Quit ..SubExtensions.GetAt(pClassName)
+    quit ..SubExtensions.GetAt(pClassName)
 }
 
-Method GetMenuExtension(pMenuID As %String, pInternalName As %String = "") As %Studio.Extension.Base
+Method GetMenuExtension(
+	pMenuID As %String,
+	pInternalName As %String = "") As %Studio.Extension.Base
 {
-	Set tSettings = ##class(%IPM.ExtensionBase.UniversalSettings).%Get(.tSC)
-	If $$$ISOK(tSC) && tSettings.MappedSourceControl {
-		Set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
-		If (pInternalName '= "") && ($Length(pInternalName,",") = 1) {
-			Set tSourceNamespace = ..FindNamespaceForInternalName(pInternalName)
-			If (tSourceNamespace '= ..Namespace) {
-				Set tMenuName = $Piece(pMenuID,",")
-				Try {
-					Set $Namespace = tSourceNamespace
-					If '$Data(tCache.MenuMap(tSourceNamespace,tMenuName),tPresent) {
-						Set tOtherNSExtension = ..GetCurrentNamespaceExtension()
-						Set tCache.MenuMap(tSourceNamespace,tMenuName) = 0
-						
-						// If tOtherNSExtension defines the menu item in question...
-						Set tCheckItemResult = $Method(tOtherNSExtension,"MainMenusFunc",$ClassName(tOtherNSExtension))
-						If (tCheckItemResult.%SQLCODE < 0) {
-							Throw ##class(%Exception.SQL).CreateFromSQLCODE(tCheckItemResult.%SQLCODe,tCheckItemResult.%Message)
-						}
-						While tCheckItemResult.%Next(.tSC) {
-							$$$ThrowOnError(tSC)
-							If (tCheckItemResult.%Get("Name") = tMenuName) {
-								Set tCache.MenuMap(tSourceNamespace,tMenuName) = 1
-							}
-						}
-						$$$ThrowOnError(tSC)
-					} ElseIf (tPresent) {
-						// Intentionally stays in tSourceNamespace
-						Return ..GetCurrentNamespaceExtension()
-					}
-				} Catch e {
-					Set tSC = e.AsStatus()
-					Write !,"Error checking Studio extension menu item in ",tSourceNamespace,": ",$System.Status.GetErrorText(tSC)
-				}
-				Set $Namespace = ..Namespace
-			}
-		}
-	}
-	Quit ..GetSubExtension(..MenuMap.GetAt($Piece(pMenuID,",")))
+    set tSettings = ##class(%IPM.ExtensionBase.UniversalSettings).%Get(.tSC)
+    if $$$ISOK(tSC) && tSettings.MappedSourceControl {
+        set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
+        if (pInternalName '= "") && ($length(pInternalName,",") = 1) {
+            set tSourceNamespace = ..FindNamespaceForInternalName(pInternalName)
+            if (tSourceNamespace '= ..Namespace) {
+                set tMenuName = $piece(pMenuID,",")
+                try {
+                    set $namespace = tSourceNamespace
+                    if '$data(tCache.MenuMap(tSourceNamespace,tMenuName),tPresent) {
+                        set tOtherNSExtension = ..GetCurrentNamespaceExtension()
+                        set tCache.MenuMap(tSourceNamespace,tMenuName) = 0
+
+                        // If tOtherNSExtension defines the menu item in question...
+                        set tCheckItemResult = $method(tOtherNSExtension,"MainMenusFunc",$classname(tOtherNSExtension))
+                        if (tCheckItemResult.%SQLCODE < 0) {
+                            throw ##class(%Exception.SQL).CreateFromSQLCODE(tCheckItemResult.%SQLCODe,tCheckItemResult.%Message)
+                        }
+                        while tCheckItemResult.%Next(.tSC) {
+                            $$$ThrowOnError(tSC)
+                            if (tCheckItemResult.%Get("Name") = tMenuName) {
+                                set tCache.MenuMap(tSourceNamespace,tMenuName) = 1
+                            }
+                        }
+                        $$$ThrowOnError(tSC)
+                    } elseif (tPresent) {
+                        // Intentionally stays in tSourceNamespace
+                        return ..GetCurrentNamespaceExtension()
+                    }
+                } catch e {
+                    set tSC = e.AsStatus()
+                    write !,"Error checking Studio extension menu item in ",tSourceNamespace,": ",$system.Status.GetErrorText(tSC)
+                }
+                set $namespace = ..Namespace
+            }
+        }
+    }
+    quit ..GetSubExtension(..MenuMap.GetAt($piece(pMenuID,",")))
 }
 
 Method MapMenus(pSourceClass As %String) As %Status [ Private ]
 {
-	Set tStatus = $$$OK
-	Try {
-		Set tStmt = ##class(%SQL.Statement).%New()
-		Set tStatus = tStmt.%PrepareClassQuery(pSourceClass,"MainMenus")
-		$$$ThrowOnError(tStatus)
-		Set tResult = tStmt.%Execute(pSourceClass)
-		If (tResult.%SQLCODE < 0) {
-			Set tStatus = $$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message)
-			Quit
-		}
-		While tResult.%Next(.tStatus) {
-			Set tStatus = ..MenuMap.SetAt(pSourceClass,tResult.%Get("Name"))
-		}
-		$$$ThrowOnError(tStatus)
-	} Catch e {
-		Set tStatus = e.AsStatus()
-	}
-	Quit tStatus
+    set tStatus = $$$OK
+    try {
+        set tStmt = ##class(%SQL.Statement).%New()
+        set tStatus = tStmt.%PrepareClassQuery(pSourceClass,"MainMenus")
+        $$$ThrowOnError(tStatus)
+        set tResult = tStmt.%Execute(pSourceClass)
+        if (tResult.%SQLCODE < 0) {
+            set tStatus = $$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message)
+            quit
+        }
+        while tResult.%Next(.tStatus) {
+            set tStatus = ..MenuMap.SetAt(pSourceClass,tResult.%Get("Name"))
+        }
+        $$$ThrowOnError(tStatus)
+    } catch e {
+        set tStatus = e.AsStatus()
+    }
+    quit tStatus
 }
 
-Method ForEachExtension(pMethodName As %String, pArgs...) As %Status
+Method ForEachExtension(
+	pMethodName As %String,
+	pArgs...) As %Status
 {
-	Set tStatus = $$$OK
-	Try {
-		Set tKey = ""
-		For {
-			Set tExt = ..SubExtensions.GetNext(.tKey)
-			If (tKey = "") {
-				Quit
-			}
-			Set tOneSC = $Method(tExt,pMethodName,pArgs...)
-			Set tStatus = $$$ADDSC(tStatus,tOneSC)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tStatus
+    set tStatus = $$$OK
+    try {
+        set tKey = ""
+        for {
+            set tExt = ..SubExtensions.GetNext(.tKey)
+            if (tKey = "") {
+                quit
+            }
+            set tOneSC = $method(tExt,pMethodName,pArgs...)
+            set tStatus = $$$ADDSC(tStatus,tOneSC)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tStatus
 }
 
 ClassMethod GetCurrentNamespaceExtension() As %Studio.Extension.Base
 {
-	New %SourceControl
-	Set tSC = ##class(%Studio.SourceControl.Interface).SourceControlCreate()
-	$$$ThrowOnError(tSC)
-	Quit %SourceControl
+    new %SourceControl
+    set tSC = ##class(%Studio.SourceControl.Interface).SourceControlCreate()
+    $$$ThrowOnError(tSC)
+    quit %SourceControl
 }
 
 ClassMethod FindNamespaceForInternalName(pInternalName As %String) As %String
 {
-	Set tNamespace = $Namespace
-	If (pInternalName = "") {
-		Quit tNamespace
-	}
-	
-	Set tSettings = ##class(%IPM.ExtensionBase.UniversalSettings).%Get(.tSC)
-	If $$$ISERR(tSC) || 'tSettings.MappedSourceControl {
-		Quit tNamespace
-	}
-	
-	Set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
-	If $Data(tCache.InternalNameMap($Namespace,pInternalName),tNamespace) {
-		Quit tNamespace
-	}
-	
-	Set tExternalName = ""
-	Set tPrimaryClass = ..GetPrimaryExtensionClass()
-	If (tPrimaryClass '= "") {
-		Set tExternalName = $ClassMethod(tPrimaryClass,"ExtName",pInternalName)
-	}
-	If (tExternalName = "") && ($Length(pInternalName,",") = 1) {
-		If ##class(%Library.RoutineMgr).IsMapped(pInternalName,.tSourceDB) {
-			// See if another namespace has tSourceDB as its default routine database
-			
-			// Nothing to do but ignore this status, unfortunately.
-			// Could produce a ton of output if there are errors.
-			Set tSC = ..FindNamespaceForDatabase(tSourceDB,.tSourceNamespace)
-			If $$$ISOK(tSC) {
-				Set tNamespace = tSourceNamespace
-			}
-		}
-	}
-	Set tCache.InternalNameMap(pInternalName) = tNamespace
-	Quit tNamespace
+    set tNamespace = $namespace
+    if (pInternalName = "") {
+        quit tNamespace
+    }
+
+    set tSettings = ##class(%IPM.ExtensionBase.UniversalSettings).%Get(.tSC)
+    if $$$ISERR(tSC) || 'tSettings.MappedSourceControl {
+        quit tNamespace
+    }
+
+    set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
+    if $data(tCache.InternalNameMap($namespace,pInternalName),tNamespace) {
+        quit tNamespace
+    }
+
+    set tExternalName = ""
+    set tPrimaryClass = ..GetPrimaryExtensionClass()
+    if (tPrimaryClass '= "") {
+        set tExternalName = $classmethod(tPrimaryClass,"ExtName",pInternalName)
+    }
+    if (tExternalName = "") && ($length(pInternalName,",") = 1) {
+        if ##class(%Library.RoutineMgr).IsMapped(pInternalName,.tSourceDB) {
+            // See if another namespace has tSourceDB as its default routine database
+
+            // Nothing to do but ignore this status, unfortunately.
+            // Could produce a ton of output if there are errors.
+            set tSC = ..FindNamespaceForDatabase(tSourceDB,.tSourceNamespace)
+            if $$$ISOK(tSC) {
+                set tNamespace = tSourceNamespace
+            }
+        }
+    }
+    set tCache.InternalNameMap(pInternalName) = tNamespace
+    quit tNamespace
 }
 
-ClassMethod FindNamespaceForDatabase(pDatabase As %String, Output pNamespace As %String) As %Status
+ClassMethod FindNamespaceForDatabase(
+	pDatabase As %String,
+	Output pNamespace As %String) As %Status
 {
-	Set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
-	New $Namespace
-	Set tInitNamespace = $Namespace
-	Set pNamespace = $Namespace
-	Set tSC = $$$OK
-	Try {
-		If '$Data(tCache.DBMap(pDatabase),pNamespace) {
-			Set tServer = $Piece(pDatabase,"^",2)
-			Set tDirectory = $Piece(pDatabase,"^",3)
-			Set $Namespace = "%SYS"
-			// %SYS actually has IRISSYS as the routines DB; switch that out for things mapped to IRISLIB
-			// so that %SYS source control is used for % classes in IRISLIB.
-			Set tQuery = "select Namespace from Config.Namespaces_List() "_
-				" where Routines = ( "_
-				"	select CASE Name when 'IRISLIB' then 'IRISSYS' else Name end "_
-				"	from Config.Databases_List() "_
-				"	where "_$Case(tServer,"":"Server is null",:"Server = ?")_
-				"	and %SQLUPPER(Directory) = %SQLUPPER(?))"
-			If (tServer '= "") {
-				Set tArgs($i(tArgs)) = tServer
-			}
-			Set tArgs($i(tArgs)) = tDirectory
-			Set tResult = ##class(%SQL.Statement).%ExecDirect(,tQuery,tArgs...)
-			If (tResult.%SQLCODE < 0) {
-				Throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE, tResult.%Message)
-			}
-			While tResult.%Next(.tSC) {
-				$$$ThrowOnError(tSC)
-				Set tNamespace = tResult.%Get("Namespace")
-				// In case there are multiple namespaces with the same default code DB, use the
-				// first one that has a namespace-specific Studio extension defined.
-				// This looks at the global directly rather than using %Studio.SourceControl.Interface:SourceControlClassGet
-				// because that might the instance-wide source control class (which could be used to automatically enable
-				// this source control class for all namespaces, defeating the purpose of looking for the first NS with
-				// source control enabled more specifically)
-				If ($Get(^|tNamespace|oddStudioMenu("00-SourceControlClass")) '= "") {
-					Set pNamespace = tNamespace
-					Quit
-				}
-			}
-			$$$ThrowOnError(tSC)
-			
-			// NOTE: If no namespace has the given DB as the default routine DB, 
-			// this will store the original namespace as the one to map to
-			Set tCache.DBMap(pDatabase) = pNamespace
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-		Set pNamespace = tInitNamespace
-	}
-	Quit tSC
+    set tCache = ##class(%IPM.ExtensionBase.ResourceMappingCache).%Get()
+    new $namespace
+    set tInitNamespace = $namespace
+    set pNamespace = $namespace
+    set tSC = $$$OK
+    try {
+        if '$data(tCache.DBMap(pDatabase),pNamespace) {
+            set tServer = $piece(pDatabase,"^",2)
+            set tDirectory = $piece(pDatabase,"^",3)
+            set $namespace = "%SYS"
+            // %SYS actually has IRISSYS as the routines DB; switch that out for things mapped to IRISLIB
+            // so that %SYS source control is used for % classes in IRISLIB.
+            set tQuery = "select Namespace from Config.Namespaces_List() "_
+                " where Routines = ( "_
+                "	select CASE Name when 'IRISLIB' then 'IRISSYS' else Name end "_
+                "	from Config.Databases_List() "_
+                "	where "_$case(tServer,"":"Server is null",:"Server = ?")_
+                "	and %SQLUPPER(Directory) = %SQLUPPER(?))"
+            if (tServer '= "") {
+                set tArgs($increment(tArgs)) = tServer
+            }
+            set tArgs($increment(tArgs)) = tDirectory
+            set tResult = ##class(%SQL.Statement).%ExecDirect(,tQuery,tArgs...)
+            if (tResult.%SQLCODE < 0) {
+                throw ##class(%Exception.SQL).CreateFromSQLCODE(tResult.%SQLCODE, tResult.%Message)
+            }
+            while tResult.%Next(.tSC) {
+                $$$ThrowOnError(tSC)
+                set tNamespace = tResult.%Get("Namespace")
+                // In case there are multiple namespaces with the same default code DB, use the
+                // first one that has a namespace-specific Studio extension defined.
+                // This looks at the global directly rather than using %Studio.SourceControl.Interface:SourceControlClassGet
+                // because that might the instance-wide source control class (which could be used to automatically enable
+                // this source control class for all namespaces, defeating the purpose of looking for the first NS with
+                // source control enabled more specifically)
+                if ($get(^|tNamespace|oddStudioMenu("00-SourceControlClass")) '= "") {
+                    set pNamespace = tNamespace
+                    quit
+                }
+            }
+            $$$ThrowOnError(tSC)
+
+            // NOTE: If no namespace has the given DB as the default routine DB,
+            // this will store the original namespace as the one to map to
+            set tCache.DBMap(pDatabase) = pNamespace
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+        set pNamespace = tInitNamespace
+    }
+    quit tSC
 }
 
 }

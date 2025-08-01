@@ -21,61 +21,67 @@ Property FilenameExtension As %String;
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-		Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
-		If 'tGlobalScope {
-			Set tNeedExplicitMapping = '..ResourceIsMappedToDefaultDB(..ResourceReference.Name)
-			If tNeedExplicitMapping {
-				Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
-				Set tSC = ##class(%IPM.Utils.Module).AddPackageMapping($namespace,tName,tSourceDB)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-			}
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tName = $piece(..ResourceReference.Name,".",1,*-1)
+        set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$get(pParams("Reload","ForceLocalScope"),0)
+        if 'tGlobalScope {
+            set tNeedExplicitMapping = '..ResourceIsMappedToDefaultDB(..ResourceReference.Name)
+            if tNeedExplicitMapping {
+                set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($namespace)
+                set tSC = ##class(%IPM.Utils.Module).AddPackageMapping($namespace,tName,tSourceDB)
+                if $$$ISERR(tSC) {
+                    quit
+                }
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Method OnResolveChildren(ByRef pResourceArray) As %Status
 {
-	Set tItemKey = ""
-	For {
-		Set tItemKey = $Order(pResourceArray(tItemKey))
-		If (tItemKey = "") {
-			Quit
-		}
-		Set pResourceArray(tItemKey,"RelativePath") = ..OnItemRelativePath(tItemKey, $Get(pResourceArray(tItemKey, "UnitTest")))
-	}
-	Quit $$$OK
+    set tItemKey = ""
+    for {
+        set tItemKey = $order(pResourceArray(tItemKey))
+        if (tItemKey = "") {
+            quit
+        }
+        set pResourceArray(tItemKey,"RelativePath") = ..OnItemRelativePath(tItemKey, $get(pResourceArray(tItemKey, "UnitTest")))
+    }
+    quit $$$OK
 }
 
 /// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
-Method OnItemRelativePath(pItemName As %String, pIsUnitTest As %Boolean = 0) As %String
+Method OnItemRelativePath(
+	pItemName As %String,
+	pIsUnitTest As %Boolean = 0) As %String
 {
-  Set tSourceRoot = ""
-  if ('pIsUnitTest) {
-    Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-    If tSourceRoot'="","\/"'[$EXTRACT(tSourceRoot, *) {
-      Set tSourceRoot = tSourceRoot _ "/"
+    set tSourceRoot = ""
+    if ('pIsUnitTest) {
+        set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+        if tSourceRoot'="","\/"'[$extract(tSourceRoot, *) {
+            set tSourceRoot = tSourceRoot _ "/"
+        }
     }
-  }
-  set fileNameExtension = $Select(..FilenameExtension = "": $$$lcase($Piece(pItemName, ".", *)), 1: ..FilenameExtension)
-  set directory = ..Directory
-  #; set directory = fileNameExtension
-  set fileName = $tr($Piece(pItemName, ".", 1, *-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator) _ "." _ fileNameExtension
-	Quit $Select(..ResourceReference.Preload:"preload/",1:"") _ tSourceRoot _ $select(directory=$c(0):"", 1:directory _ "/") _ fileName
+    set fileNameExtension = $select(..FilenameExtension = "": $$$lcase($piece(pItemName, ".", *)), 1: ..FilenameExtension)
+    set directory = ..Directory
+    #; set directory = fileNameExtension
+    set fileName = $translate($piece(pItemName, ".", 1, *-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator) _ "." _ fileNameExtension
+    quit $select(..ResourceReference.Preload:"preload/",1:"") _ tSourceRoot _ $select(directory=$char(0):"", 1:directory _ "/") _ fileName
 }
 
-Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+Method OnExportItem(
+	pFullExportPath As %String,
+	pItemName As %String,
+	ByRef pItemParams,
+	ByRef pParams,
+	Output pItemHandled As %Boolean = 0) As %Status
 {
-	Set ..Format = $Case($$$lcase(..FilenameExtension),"xml":"XML",:"UDL")
-	Quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
+    set ..Format = $case($$$lcase(..FilenameExtension),"xml":"XML",:"UDL")
+    quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
 }
 
 }
-

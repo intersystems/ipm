@@ -15,9 +15,9 @@ Property Folders [ MultiDimensional, Private ];
 /// @Modifier Availability InterSystems
 Method GetTempFileName(pExtension As %String) As %String
 {
-	Set tTempFileName = ##class(%Library.File).TempFilename(pExtension)
-	Set ..Files($Increment(..Files)) = tTempFileName
-	Quit tTempFileName
+    set tTempFileName = ##class(%Library.File).TempFilename(pExtension)
+    set ..Files($increment(..Files)) = tTempFileName
+    quit tTempFileName
 }
 
 /// Gets a temporary folder name (and creates a folder with that name)
@@ -25,35 +25,35 @@ Method GetTempFileName(pExtension As %String) As %String
 /// @Modifier Availability InterSystems
 Method GetTempFolderName() As %String
 {
-	Set tTempFileName = ##class(%Library.File).TempFilename()
-	If ##class(%Library.File).Exists(tTempFileName) {
-		// In IRIS, TempFilename() creates the file. Flag for later cleanup.
-		Set ..Files($Increment(..Files)) = tTempFileName
-	}
-	Set tTempFolderName = tTempFileName_"d/" // Append "d/" for uniqueness on IRIS.
-	$$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tTempFolderName))
-	Set ..Folders($Increment(..Folders)) = tTempFolderName
-	Quit tTempFolderName
+    set tTempFileName = ##class(%Library.File).TempFilename()
+    if ##class(%Library.File).Exists(tTempFileName) {
+        // In IRIS, TempFilename() creates the file. Flag for later cleanup.
+        set ..Files($increment(..Files)) = tTempFileName
+    }
+    set tTempFolderName = tTempFileName_"d/" // Append "d/" for uniqueness on IRIS.
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tTempFolderName))
+    set ..Folders($increment(..Folders)) = tTempFolderName
+    quit tTempFolderName
 }
 
 Method Cleanup() As %Status
 {
-	Set tSC = $$$OK
-	For tIndex=1:1:$Get(..Files) {
-		Set tSC = $$$ADDSC(tSC,##class(%Library.File).Delete(..Files(tIndex)))
-	}
-	Kill ..Files
-	
-	For tIndex=1:1:$Get(..Folders) {
-		Set tSC = $$$ADDSC(tSC,##class(%IPM.Utils.File).RemoveDirectoryTree(..Folders(tIndex)))
-	}
-	Kill ..Folders
-	Quit tSC
+    set tSC = $$$OK
+    for tIndex=1:1:$get(..Files) {
+        set tSC = $$$ADDSC(tSC,##class(%Library.File).Delete(..Files(tIndex)))
+    }
+    kill ..Files
+
+    for tIndex=1:1:$get(..Folders) {
+        set tSC = $$$ADDSC(tSC,##class(%IPM.Utils.File).RemoveDirectoryTree(..Folders(tIndex)))
+    }
+    kill ..Folders
+    quit tSC
 }
 
 Method %OnClose() As %Status [ Private, ServerOnly = 1 ]
 {
-	Quit $$$ADDSC(##super(),..Cleanup())
+    quit $$$ADDSC(##super(),..Cleanup())
 }
 
 }

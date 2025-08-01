@@ -9,29 +9,29 @@ Property Expression As %String(MAXLEN = "");
 
 Method %OnNew(pRangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
 {
-	Set i%Expression = pRangeExpr
-	Quit $$$OK
+    set i%Expression = pRangeExpr
+    quit $$$OK
 }
 
 Method ExpressionSet(pValue As %String) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tOptions = $ListFromString(pValue,"||")
-		Set tPtr = 0
-		While $ListNext(tOptions,tPtr,tRangeExpr) {
-			Set tRangeExpr = $ZStrip(tRangeExpr,"<>W")
-			Set tSC = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(tRangeExpr,.tOption)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			Do ..Options.Insert(tOption)
-		}
-		Set i%Expression = pValue
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tOptions = $listfromstring(pValue,"||")
+        set tPtr = 0
+        while $listnext(tOptions,tPtr,tRangeExpr) {
+            set tRangeExpr = $zstrip(tRangeExpr,"<>W")
+            set tSC = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(tRangeExpr,.tOption)
+            if $$$ISERR(tSC) {
+                quit
+            }
+            do ..Options.Insert(tOption)
+        }
+        set i%Expression = pValue
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Method ToString() As %String [ CodeMode = expression ]
@@ -41,72 +41,74 @@ Method ToString() As %String [ CodeMode = expression ]
 
 Method ToResolvedString() As %String
 {
-	Set tOptList = ""
-	For i=1:1:..Options.Count() {
-		Set tOpt = ..Options.GetAt(i)
-		Set tOptList = tOptList_$ListBuild(tOpt.ToResolvedString())
-	}
-	Quit $ListToString(tOptList," || ")
+    set tOptList = ""
+    for i=1:1:..Options.Count() {
+        set tOpt = ..Options.GetAt(i)
+        set tOptList = tOptList_$listbuild(tOpt.ToResolvedString())
+    }
+    quit $listtostring(tOptList," || ")
 }
 
-ClassMethod FromString(pString As %String, Output pExpr As %IPM.General.SemanticVersionExpression) As %Status
+ClassMethod FromString(
+	pString As %String,
+	Output pExpr As %IPM.General.SemanticVersionExpression) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set pExpr = ..%New(pString)
-		Set tOptions = $ListFromString(pString,"||")
-		Set tPtr = 0
-		While $ListNext(tOptions,tPtr,tRangeExpr) {
-			Set tRangeExpr = $ZStrip(tRangeExpr,"<>W")
-			Set tSC = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(tRangeExpr,.tOption)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			Do pExpr.Options.Insert(tOption)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set pExpr = ..%New(pString)
+        set tOptions = $listfromstring(pString,"||")
+        set tPtr = 0
+        while $listnext(tOptions,tPtr,tRangeExpr) {
+            set tRangeExpr = $zstrip(tRangeExpr,"<>W")
+            set tSC = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(tRangeExpr,.tOption)
+            if $$$ISERR(tSC) {
+                quit
+            }
+            do pExpr.Options.Insert(tOption)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Method IsSatisfiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
-	Set tSatisfied = (..Options.Count() = 0)
-	For i=1:1:..Options.Count() {
-		If ..Options.GetAt(i).InRange(pVersion) {
-			Set tSatisfied = 1
-			Quit
-		}
-	}
-	Quit tSatisfied
+    set tSatisfied = (..Options.Count() = 0)
+    for i=1:1:..Options.Count() {
+        if ..Options.GetAt(i).InRange(pVersion) {
+            set tSatisfied = 1
+            quit
+        }
+    }
+    quit tSatisfied
 }
 
 Method And(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
-	For i=1:1:pVersionExpression.Options.Count() {
-		Set tOption = pVersionExpression.Options.GetAt(i)
-		If (..Options.Count() = 0) {
-			Do ..Options.Insert(tOption)
-		} Else {
-			For j=1:1:..Options.Count() {
-				For k=1:1:tOption.Comparators.Count() {
-					Do ..Options.GetAt(j).Comparators.Insert(tOption.Comparators.GetAt(k))
-				}
-			}
-		}
-	}
-	Set i%Expression = ..ToResolvedString()
-	Quit $This
+    for i=1:1:pVersionExpression.Options.Count() {
+        set tOption = pVersionExpression.Options.GetAt(i)
+        if (..Options.Count() = 0) {
+            do ..Options.Insert(tOption)
+        } else {
+            for j=1:1:..Options.Count() {
+                for k=1:1:tOption.Comparators.Count() {
+                    do ..Options.GetAt(j).Comparators.Insert(tOption.Comparators.GetAt(k))
+                }
+            }
+        }
+    }
+    set i%Expression = ..ToResolvedString()
+    quit $this
 }
 
 Method Or(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
-	For i=1:1:pVersionExpression.Options.Count() {
-		Do ..Options.Insert(pVersionExpression.Options.GetAt(i))
-	}
-	Set i%Expression = ..ToResolvedString()
-	Quit $This
+    for i=1:1:pVersionExpression.Options.Count() {
+        do ..Options.Insert(pVersionExpression.Options.GetAt(i))
+    }
+    set i%Expression = ..ToResolvedString()
+    quit $this
 }
 
 Storage Default

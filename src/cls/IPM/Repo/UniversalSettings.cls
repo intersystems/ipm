@@ -2,7 +2,7 @@
 /// Use this class to set or get settings
 /// 
 /// Available settings
-/// default_registry (string) - default registry url 
+/// default_registry (string) - default registry url
 /// analytics_tracking_id
 /// analytics_available (boolean) - if 1 - send usage statistics
 Class %IPM.Repo.UniversalSettings Extends %RegisteredObject
@@ -44,128 +44,139 @@ Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,Publis
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
 {
-    Set configArray = ""
-    For i=1:1:$Length(..#CONFIGURABLE, ",") {
-        Set configArray($Piece(..#CONFIGURABLE, ",",i)) = ..GetValue($Parameter(..%ClassName(1),$Piece(..#CONFIGURABLE, ",",i)))
+    set configArray = ""
+    for i=1:1:$length(..#CONFIGURABLE, ",") {
+        set configArray($piece(..#CONFIGURABLE, ",",i)) = ..GetValue($parameter(..%ClassName(1),$piece(..#CONFIGURABLE, ",",i)))
     }
-    Return $$$OK
+    return $$$OK
 }
 
 /// Writes in terminal key : value pairs for all configurable settings
 ClassMethod PrintList()
 {
-    Do ..GetAll(.confArr)
-    Set k = ""
-    For {
-        Set k = $Order(confArr(k))
-        Quit:(k="")
-        Write k_": "_confArr(k),! 
+    do ..GetAll(.confArr)
+    set k = ""
+    for {
+        set k = $order(confArr(k))
+        quit:(k="")
+        write k_": "_confArr(k),!
     }
 }
 
 ClassMethod PrintOne(key As %String)
 {
-    Set SettingsList = $Listfromstring(..#CONFIGURABLE)
-    If ('$Listfind(SettingsList,key)) {
-        Write "Config key = """_key_""" not found",!
-        Quit
+    set SettingsList = $listfromstring(..#CONFIGURABLE)
+    if ('$listfind(SettingsList,key)) {
+        write "Config key = """_key_""" not found",!
+        quit
     }
-    Write key_":"_..GetValue($Parameter(..%ClassName(1),key)),!
+    write key_":"_..GetValue($parameter(..%ClassName(1),key)),!
 }
 
 ClassMethod ResetToDefault(key As %String) As %Status
 {
-    Set SettingsList = $Listfromstring(..#CONFIGURABLE)
-    If ('$Listfind(SettingsList,key)) {
-        Write "Config key = """_key_""" not found",!
-        Quit
+    set SettingsList = $listfromstring(..#CONFIGURABLE)
+    if ('$listfind(SettingsList,key)) {
+        write "Config key = """_key_""" not found",!
+        quit
     }
-    Set sc = ..SetValue($Parameter(..%ClassName(1),key), ..GetDefaultValue($Parameter(..%ClassName(1),key)))
-    If $$$ISOK(sc) {
-        Write "Value for """_key_""" succesfully reset to default",!
-    } Else {
-        Write "Error reseting value for """_key_"""",!
+    set sc = ..SetValue($parameter(..%ClassName(1),key), ..GetDefaultValue($parameter(..%ClassName(1),key)))
+    if $$$ISOK(sc) {
+        write "Value for """_key_""" succesfully reset to default",!
+    } else {
+        write "Error reseting value for """_key_"""",!
     }
-    Return sc
+    return sc
 }
 
-ClassMethod UpdateOne(key As %String, value As %String) As %Status
+ClassMethod UpdateOne(
+	key As %String,
+	value As %String) As %Status
 {
-    Set SettingsList = $Listfromstring(..#CONFIGURABLE)
-    If ('$Listfind(SettingsList,key)) {
-        Write "Config key = """_key_""" not found",!
-        Quit
+    set SettingsList = $listfromstring(..#CONFIGURABLE)
+    if ('$listfind(SettingsList,key)) {
+        write "Config key = """_key_""" not found",!
+        quit
     }
-    Set sc = ..SetValue($Parameter(..%ClassName(1),key), value)
-    If $$$ISOK(sc) {
-        Write "Key """_key_""" succesfully updated",!
-    } Else {
-        Write "Error updating """_key_"""",!
+    set sc = ..SetValue($parameter(..%ClassName(1),key), value)
+    if $$$ISOK(sc) {
+        write "Key """_key_""" succesfully updated",!
+    } else {
+        write "Error updating """_key_"""",!
     }
-    Return sc
+    return sc
 }
 
 /// Gets value from global array
 /// indx - global subscript
 ClassMethod GetValue(indx As %String = "") As %String
 {
-    New $Namespace
-    Return:(indx="") ""
-    Set $Namespace = "%SYS"
-    Return $Get(^IPM.settings(indx))
+    new $namespace
+    return:(indx="") ""
+    set $namespace = "%SYS"
+    return $get(^IPM.settings(indx))
 }
 
 ClassMethod GetDefaultValue(indx As %String = "") As %String
 {
-    New $Namespace
-    Return:(indx="") ""
-    Set $Namespace = "%SYS"
-    Return $Get(^IPM.settings(indx,"default"))
+    new $namespace
+    return:(indx="") ""
+    set $namespace = "%SYS"
+    return $get(^IPM.settings(indx,"default"))
 }
 
-ClassMethod SetValue(indx As %String = "", val As %String = "", overwrite As %Boolean = 1) As %Status
+ClassMethod SetValue(
+	indx As %String = "",
+	val As %String = "",
+	overwrite As %Boolean = 1) As %Status
 {
-    if '$GET(overwrite, 1) && (..GetValue(indx) '= "") {
-        Return $$$OK
+    if '$get(overwrite, 1) && (..GetValue(indx) '= "") {
+        return $$$OK
     }
-    Return:(indx="") ""
-    New $Namespace   
-    Set $Namespace = "%SYS"
-    Set ^IPM.settings(indx) = val
-    If ($Data(^IPM.settings(indx,"default"))=0) {
-        Set ^IPM.settings(indx,"default") = val
+    return:(indx="") ""
+    new $namespace
+    set $namespace = "%SYS"
+    set ^IPM.settings(indx) = val
+    if ($data(^IPM.settings(indx,"default"))=0) {
+        set ^IPM.settings(indx,"default") = val
     }
-    Return $$$OK
+    return $$$OK
 }
 
 ClassMethod GetDefaultRegistry() As %String
 {
-    Return ..GetValue(..#registry)
+    return ..GetValue(..#registry)
 }
 
-ClassMethod SetDefaultRegistry(val As %String, overwrite As %Boolean = 1) As %String
+ClassMethod SetDefaultRegistry(
+	val As %String,
+	overwrite As %Boolean = 1) As %String
 {
-    Return ..SetValue(..#registry, val, overwrite)
+    return ..SetValue(..#registry, val, overwrite)
 }
 
 ClassMethod GetAnalyticsTrackingId() As %String
 {
-    Return ..GetValue(..#trackingId)
+    return ..GetValue(..#trackingId)
 }
 
-ClassMethod SetAnalyticsTrackingId(val As %String, overwrite As %Boolean = 1) As %String
+ClassMethod SetAnalyticsTrackingId(
+	val As %String,
+	overwrite As %Boolean = 1) As %String
 {
-    Return ..SetValue(..#trackingId, val, overwrite)
+    return ..SetValue(..#trackingId, val, overwrite)
 }
 
 ClassMethod GetAnalyticsAvailable() As %Boolean
 {
-    Return ..GetValue(..#analytics)
+    return ..GetValue(..#analytics)
 }
 
-ClassMethod SetAnalyticsAvailable(val As %String, overwrite As %Boolean = 1) As %Boolean
+ClassMethod SetAnalyticsAvailable(
+	val As %String,
+	overwrite As %Boolean = 1) As %Boolean
 {
-    Return ..SetValue(..#analytics, +val, overwrite)
+    return ..SetValue(..#analytics, +val, overwrite)
 }
 
 }

@@ -21,147 +21,154 @@ Property TargetResourceCache As %String [ MultiDimensional, Private, Transient ]
 
 Method TargetSet(%val) As %Status
 {
-	If (..Target '= %val) {
-		Kill ..TargetResourceCache
-	}
-	Set i%Target = %val
+    if (..Target '= %val) {
+        kill ..TargetResourceCache
+    }
+    set i%Target = %val
 }
 
-Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+Method OnAfterPhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-	// Copy specified resources from the Source namespace to current namespace
-	Set tSC = $$$OK
-	New $Namespace
-	Try {
-		If pPhase="Reload" {
-			Set tQuals = $Select($g(pParams("Verbose")):"/display",1:"/nodisplay")
-			Set tFileName = ##class(%File).TempFilename("xml")
-			Set ..Target = $Namespace
-			Set $Namespace = ..Source
-			If (..Target = ..Source) {
-				// no-op
-				Quit
-			}
-			// Call ResolveChildren with second arg 0 to ignore module ownership
-			// for classes/subpackages within .PKG resources.
-			$$$ThrowOnError(..ResourceReference.ResolveChildren(.tResourceArray, 0))
-			If '..Overwrite {
-				Set $Namespace = ..Target
-				Set tKey = ""
-				For {
-					Set tKey = $Order(tResourceArray(tKey))
-					Quit:tKey=""
-					
-					If ##class(%Library.RoutineMgr).Exists(tKey) {
-						Kill tResourceArray(tKey)
-					}
-				}
-				Set $Namespace = ..Source
-			}
-			If $Data(tResourceArray) {
-				$$$ThrowOnError($System.OBJ.Export(.tResourceArray,tFileName,tQuals))
-				Set $Namespace = ..Target
-		        $$$ThrowOnError($System.OBJ.Load(tFileName,"/nocompile/checkuptodate"_tQuals))
-			}
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    // Copy specified resources from the Source namespace to current namespace
+    set tSC = $$$OK
+    new $namespace
+    try {
+        if (pPhase="Reload") {
+            set tQuals = $select($get(pParams("Verbose")):"/display",1:"/nodisplay")
+            set tFileName = ##class(%File).TempFilename("xml")
+            set ..Target = $namespace
+            set $namespace = ..Source
+            if (..Target = ..Source) {
+                // no-op
+                quit
+            }
+            // Call ResolveChildren with second arg 0 to ignore module ownership
+            // for classes/subpackages within .PKG resources.
+            $$$ThrowOnError(..ResourceReference.ResolveChildren(.tResourceArray, 0))
+            if '..Overwrite {
+                set $namespace = ..Target
+                set tKey = ""
+                for {
+                    set tKey = $order(tResourceArray(tKey))
+                    quit:tKey=""
+
+                    if ##class(%Library.RoutineMgr).Exists(tKey) {
+                        kill tResourceArray(tKey)
+                    }
+                }
+                set $namespace = ..Source
+            }
+            if $data(tResourceArray) {
+                $$$ThrowOnError($system.OBJ.Export(.tResourceArray,tFileName,tQuals))
+                set $namespace = ..Target
+                $$$ThrowOnError($system.OBJ.Load(tFileName,"/nocompile/checkuptodate"_tQuals))
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
+Method OnPhase(
+	pPhase As %String,
+	ByRef pParams,
+	Output pResourceHandled As %Boolean = 0) As %Status
 {
-	If (pPhase = "Compile") && (..Source = $Namespace) {
-		// No need to compile the resource if we're already in the right namespace.
-		Set pResourceHandled = 1
-	}
-	Quit $$$OK
+    if (pPhase = "Compile") && (..Source = $namespace) {
+        // No need to compile the resource if we're already in the right namespace.
+        set pResourceHandled = 1
+    }
+    quit $$$OK
 }
 
-Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean) As %Status
+Method OnResolveChildren(
+	ByRef pResourceArray,
+	pCheckModuleOwnership As %Boolean) As %Status
 {
-	// For each child detected, see if the individual class or any more granular package containing is part of any module. If so, clear it from the array of child resources.
-	// Otherwise, indicate that the resource is generated (meaning "do not attempt to load/export").
-	
-	Set tSC = $$$OK
-	
-	// When called from OnAfterPhase, compare against resources/modules present in the target namespace.
-	New $Namespace
-	Set $Namespace = ..Target
-	Try {
-		Set tKey = ""
-		For {
-			Set tKey = $Order(pResourceArray(tKey))
-			If (tKey = "") {
-				Quit
-			}
-			
-			If (tKey = ..ResourceReference.Name) {
-				Set pResourceArray(tKey,"Generated") = 1
-				Continue
-			}
-			
-			Set tSourceName = $Piece(..ResourceReference.Name,".",*-1)
-			Set tName = $Piece(tKey,".",1,*-1)
-			Set tExt = $Piece(tKey,".",*)
-			
-			// Check cache first (for common packages)
-			If $Data(..TargetResourceCache(tKey)) {
-				Kill pResourceArray(tKey)
-				Continue
-			} ElseIf (tExt = "CLS") {
-				For i=$Length(tName,".")-1:-1:1 {
-					Set tPackageKey = $Piece(tName,".",1,i)_".PKG"
-					If (tPackageKey = ..ResourceReference.Name) {
-						Quit
-					}
-					
-					If $Data(..TargetResourceCache(tPackageKey)) {
-						Kill pResourceArray(tKey)
-						Continue
-					}
-				}
-			}
-			
-			// Then check persistent records for all modules
-			If ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tKey) {
-				// Resource exists as part of some module.
-				// Don't include it in the copy.
-				Kill pResourceArray(tKey)
-				Set ..TargetResourceCache(tKey) = ""
-				Continue
-			} ElseIf (tExt = "CLS") {
-				// See if a subpackage is defined as part of some module.
-				// Don't include it in the copy either.
-				For i=$Length(tName,".")-1:-1:1 {
-					Set tPackageKey = $Piece(tName,".",1,i)_".PKG"
-					If (tPackageKey = ..ResourceReference.Name) {
-						Quit
-					}
-					If ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tPackageKey) {
-						Kill pResourceArray(tKey)
-						Set ..TargetResourceCache(tPackageKey) = ""
-						Quit
-					}
-				}
-			}
-			
-			// If we haven't killed it, indicate that it's generated.
-			If $Data(pResourceArray(tKey)) {
-				Set pResourceArray(tKey,"Generated") = 1
-			}
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    // For each child detected, see if the individual class or any more granular package containing is part of any module. If so, clear it from the array of child resources.
+    // Otherwise, indicate that the resource is generated (meaning "do not attempt to load/export").
+
+    set tSC = $$$OK
+
+    // When called from OnAfterPhase, compare against resources/modules present in the target namespace.
+    new $namespace
+    set $namespace = ..Target
+    try {
+        set tKey = ""
+        for {
+            set tKey = $order(pResourceArray(tKey))
+            if (tKey = "") {
+                quit
+            }
+
+            if (tKey = ..ResourceReference.Name) {
+                set pResourceArray(tKey,"Generated") = 1
+                continue
+            }
+
+            set tSourceName = $piece(..ResourceReference.Name,".",*-1)
+            set tName = $piece(tKey,".",1,*-1)
+            set tExt = $piece(tKey,".",*)
+
+            // Check cache first (for common packages)
+            if $data(..TargetResourceCache(tKey)) {
+                kill pResourceArray(tKey)
+                continue
+            } elseif (tExt = "CLS") {
+                for i=$length(tName,".")-1:-1:1 {
+                    set tPackageKey = $piece(tName,".",1,i)_".PKG"
+                    if (tPackageKey = ..ResourceReference.Name) {
+                        quit
+                    }
+
+                    if $data(..TargetResourceCache(tPackageKey)) {
+                        kill pResourceArray(tKey)
+                        continue
+                    }
+                }
+            }
+
+            // Then check persistent records for all modules
+            if ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tKey) {
+                // Resource exists as part of some module.
+                // Don't include it in the copy.
+                kill pResourceArray(tKey)
+                set ..TargetResourceCache(tKey) = ""
+                continue
+            } elseif (tExt = "CLS") {
+                // See if a subpackage is defined as part of some module.
+                // Don't include it in the copy either.
+                for i=$length(tName,".")-1:-1:1 {
+                    set tPackageKey = $piece(tName,".",1,i)_".PKG"
+                    if (tPackageKey = ..ResourceReference.Name) {
+                        quit
+                    }
+                    if ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tPackageKey) {
+                        kill pResourceArray(tKey)
+                        set ..TargetResourceCache(tPackageKey) = ""
+                        quit
+                    }
+                }
+            }
+
+            // If we haven't killed it, indicate that it's generated.
+            if $data(pResourceArray(tKey)) {
+                set pResourceArray(tKey,"Generated") = 1
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 Method OnGetUniqueName(Output pUniqueName)
 {
-	// Validation occurs elsewhere via SQL.
-	Set pUniqueName = $c(0)
+    // Validation occurs elsewhere via SQL.
+    set pUniqueName = $char(0)
 }
 
 }

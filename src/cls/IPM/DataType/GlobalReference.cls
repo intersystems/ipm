@@ -7,16 +7,16 @@ Parameter MAXLEN = 511;
 
 ClassMethod IsValid(%val As %Library.RawString) As %Status [ ServerOnly = 0 ]
 {
-	Set tOldZReference = $ZReference
-	Set tSC = $$$OK
-	Try {
-		Set $ZReference = %val
-	} Catch e {
-		// The above SET will throw a <SYNTAX> exception for an invalid global reference
-		Set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid global reference: %1",%val))
-	}
-	Set $ZReference = tOldZReference
-	Quit tSC
+    set tOldZReference = $zreference
+    set tSC = $$$OK
+    try {
+        set $zreference = %val
+    } catch e {
+        // The above SET will throw a <SYNTAX> exception for an invalid global reference
+        set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Invalid global reference: %1",%val))
+    }
+    set $zreference = tOldZReference
+    quit tSC
 }
 
 }

@@ -21,71 +21,77 @@ Property Phase As %IPM.DataType.PhaseName [ InitialExpression = "Initialize" ];
 /// When to merge the CPF file: Before or After the specified phase. This only applies to the standard phases.
 Property When As %IPM.DataType.PhaseWhen [ InitialExpression = "Before" ];
 
-Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
+Method OnBeforePhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-    If (..When = "Before") && (..Phase = pPhase) && (..CustomPhase = "") {
-        Quit ..DoMerge(.pParams)
+    if (..When = "Before") && (..Phase = pPhase) && (..CustomPhase = "") {
+        quit ..DoMerge(.pParams)
     }
-    Quit $$$OK
+    quit $$$OK
 }
 
-Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+Method OnAfterPhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-    If (..When = "After") && (..Phase = pPhase) && (..CustomPhase = "") {
-        Quit ..DoMerge(.pParams)
+    if (..When = "After") && (..Phase = pPhase) && (..CustomPhase = "") {
+        quit ..DoMerge(.pParams)
     }
-    Quit $$$OK
+    quit $$$OK
 }
 
-Method OnCustomPhase(pCustomPhase As %String, ByRef pParams) As %Status
+Method OnCustomPhase(
+	pCustomPhase As %String,
+	ByRef pParams) As %Status
 {
-    If (..CustomPhase = pCustomPhase) {
-        Quit ..DoMerge(.pParams)
+    if (..CustomPhase = pCustomPhase) {
+        quit ..DoMerge(.pParams)
     }
-    Quit $$$OK
+    quit $$$OK
 }
 
 Method DoMerge(ByRef pParams) As %Status
 {
-    Try {
-        Set verbose = $GET(pParams("Verbose"))
-        Set root = ..ResourceReference.Module.Root
-        Set sourcesRoot = ..ResourceReference.Module.SourcesRoot
+    try {
+        set verbose = $get(pParams("Verbose"))
+        set root = ..ResourceReference.Module.Root
+        set sourcesRoot = ..ResourceReference.Module.SourcesRoot
         // Use Construct first, rather than NormalizeFilename, so we don't have to deal with leading/trailing slashes
-        Set dir = $SELECT($$$isWINDOWS: $REPLACE(..Directory, "/", "\"), 1: ..Directory)
-        Set dir = ##class(%File).Construct(root, sourcesRoot, dir)
-        Set filename = ##class(%File).NormalizeFilename(..Name, dir)
-        If (filename = "") || ('##class(%File).Exists(filename)) {
+        set dir = $select($$$isWINDOWS: $replace(..Directory, "/", "\"), 1: ..Directory)
+        set dir = ##class(%File).Construct(root, sourcesRoot, dir)
+        set filename = ##class(%File).NormalizeFilename(..Name, dir)
+        if (filename = "") || ('##class(%File).Exists(filename)) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
         }
 
-        Set stream = ##class(%Stream.FileCharacter).%New()  
+        set stream = ##class(%Stream.FileCharacter).%New()
         $$$ThrowOnError(stream.LinkToFile(filename))
-        If verbose {
-            Write !, "Merging CPF file: ", filename, !
-            Do stream.OutputToDevice()
+        if verbose {
+            write !, "Merging CPF file: ", filename, !
+            do stream.OutputToDevice()
         }
-        Do ..MergeCPF(filename)
-    } Catch ex {
-        Return ex.AsStatus()
+        do ..MergeCPF(filename)
+    } catch ex {
+        return ex.AsStatus()
     }
-    Return $$$OK
+    return $$$OK
 }
 
 ClassMethod MergeCPF(file As %String)
 {
-    // TODO The $zf(-100) callout is much slower than ##class(Config.CPF).Merge() 
+    // TODO The $zf(-100) callout is much slower than ##class(Config.CPF).Merge()
     //      Figure out why ##class(Config.CPF).Merge() doesn't work
     //      c.f. https://github.com/intersystems/ipm/pull/703#discussion_r1917290136
 
-    Set args($INCREMENT(args)) = "merge"
-    Set args($INCREMENT(args)) = ##class(%SYS.System).GetInstanceName()
-    Set args($INCREMENT(args)) = file
+    set args($increment(args)) = "merge"
+    set args($increment(args)) = ##class(%SYS.System).GetInstanceName()
+    set args($increment(args)) = file
 
     // Somehow, if the STDOUT is not set, the merge will silently fail
-    Set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
-    Set status = $ZF(-100, flags, "iris", .args)
-    If status '= 0 {
+    set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
+    set status = $zf(-100, flags, "iris", .args)
+    if status '= 0 {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Error merging CPF file. $zf(-100) exited with "_status))
     }
 }

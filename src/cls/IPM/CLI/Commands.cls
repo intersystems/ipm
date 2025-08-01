@@ -180,188 +180,188 @@ XData Schema [ Internal, MimeType = application/xml ]
 /// 				"required" = is parameter required
 ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objectgenerator ]
 {
-  #define DefaultGroup "-"
+    #define DefaultGroup "-"
 
-	Set tSC = $$$OK
-	Try {
-		Set tClassName = %classname
+    set tSC = $$$OK
+    try {
+        set tClassName = %classname
 
-		#; Don't run on base class
-		If (tClassName = "%IPM.CLI") {
-			Quit
-		}
+        #; Don't run on base class
+        if (tClassName = "%IPM.CLI") {
+            quit
+        }
 
-		#; Find named XDATA block
-		If ##class(%Dictionary.CompiledXData).%ExistsId(tClassName_"||Commands") {
-			Set tCompiledClass = ##class(%Dictionary.CompiledClass).%OpenId(tClassName,,.tSC)
-			If '$IsObject(tCompiledClass)||$$$ISERR(tSC) Quit
+        #; Find named XDATA block
+        if ##class(%Dictionary.CompiledXData).%ExistsId(tClassName_"||Commands") {
+            set tCompiledClass = ##class(%Dictionary.CompiledClass).%OpenId(tClassName,,.tSC)
+            if '$isobject(tCompiledClass)||$$$ISERR(tSC) quit
 
-			Set tIndex = tCompiledClass.XDatas.FindObjectId(tClassName_"||Commands")
-			If (tIndex = "") {
-				Set tSC = $$$ERROR($$$XDataBlockMissing,tClassName,"Commands")
-				Quit
-			}
+            set tIndex = tCompiledClass.XDatas.FindObjectId(tClassName_"||Commands")
+            if (tIndex = "") {
+                set tSC = $$$ERROR($$$XDataBlockMissing,tClassName,"Commands")
+                quit
+            }
 
-			#; Get XDATA as stream
-			Set tStream = tCompiledClass.XDatas.GetAt(tIndex).Data
-			Do tStream.Rewind()
+            #; Get XDATA as stream
+            set tStream = tCompiledClass.XDatas.GetAt(tIndex).Data
+            do tStream.Rewind()
 
-			#; Create an XML import handler ( use the internal handler )
-			Set tHandler = ##class(%XML.ImportHandler).%New("CacheTemp",$$$IntHandler) 
+            #; Create an XML import handler ( use the internal handler )
+            set tHandler = ##class(%XML.ImportHandler).%New("CacheTemp",$$$IntHandler)
 
-			#; Create the Entity Resolver
-			Set tResolver = ##class(%XML.SAX.XDataEntityResolver).%New(tClassName)
+            #; Create the Entity Resolver
+            set tResolver = ##class(%XML.SAX.XDataEntityResolver).%New(tClassName)
 
-			#; Parse the XML data in the specfied stream
-			Set tSC = ##Class(%XML.SAX.Parser).ParseStream(tStream,tHandler,tResolver,,,"Schema")
-			If $$$ISERR(tSC) {
-				Quit
-			}
-        
+            #; Parse the XML data in the specfied stream
+            set tSC = ##Class(%XML.SAX.Parser).ParseStream(tStream,tHandler,tResolver,,,"Schema")
+            if $$$ISERR(tSC) {
+                quit
+            }
+
             #; Copy tree because handler will delete it's copy when it goes out of scope
-            Merge tMap = ^CacheTemp(tHandler.Tree)
-            
-			If $Data(tMap("error"))||$Data(tMap("warning")) {
-				Set tSC = $$$ERROR($$$GeneralError,"Could not parse Commands XData block.")
-				For tType = "error","warning" {       
-					Set tIndex = ""
-					For {
-						Set tIndex = $Order(tMap(tType,tIndex),1,tError)
-						If (tIndex = "") {
-							Quit
-						}
-						Set tSC = $$$ADDSC(tSC,$$$ERROR($$$GeneralError,tError))
-					}
-				}
-				Quit
-			}
-			
-			Do %code.WriteLine(" Kill pCommandStructure")
-			// Compute the max length of a command. Used for pretty printing in %Help
-			Set tMaxLengthCommand = 0
-			Set tChild = ""
-			For {
-				Set tChild = $Order(tMap(1,"c",tChild))
-				Quit:(tChild="")
-				#Define empty """"""
-				If (tMap(tChild) = "command") {
-					Set tName = tMap(tChild,"a","name")
-					If ($Length(tName) > tMaxLengthCommand) {
-						Set tMaxLengthCommand = $Length(tName)
-					}
-					Set tName = $$$QUOTE(tName)
-					Set tExample = $$$QUOTE($Get(tMap(tChild,"a","example")))
-					If ($Get(tMap(tChild,"a","default")) = "true") {
-						Do %code.WriteLine(" Set pCommandStructure(0,""default"") = "_tName)
-					}
-					If $Data(tMap(tChild,"a","aliases")) {
-						Do %code.WriteLine(" Set pCommandStructure("_tName_",""aliases"") = "_$$$QUOTE(tMap(tChild,"a","aliases")))
-						Set tAliasList = $ListFromString(tMap(tChild,"a","aliases"))
-						Set tPtr = 0
-						While $ListNext(tAliasList,tPtr,tAlias) {
-							Do %code.WriteLine(" Set pCommandStructure(1,"_$$$QUOTE(tAlias)_") = "_tName)
-						}
-					}
-					If $Data(tMap(tChild,"a","dataPrefix"),tDataPrefix) {
-						Do %code.WriteLine(" Set pCommandStructure("_tName_",""dataPrefix"") = "_$$$QUOTE(tDataPrefix))
-					}
-					If $Data(tMap(tChild,"a","trailingModifiers"),tTrailingModifiers) {
-						Do %code.WriteLine(" Set pCommandStructure("_tName_",""trailingModifiers"") = "_$Case(tTrailingModifiers,"true":1,:0))
-					}
-					
-					// Children of command
-					Set tCommChildOne = ""
-					For {
-						Set tCommChildOne = $Order(tMap(tChild,"c",tCommChildOne))
-						Quit:(tCommChildOne="")
+            merge tMap = ^CacheTemp(tHandler.Tree)
 
-            Set tCommChildList = $ListBuild(tCommChildOne)
-            Set tGroupName = $$$DefaultGroup
-            If (tMap(tCommChildOne) = "group") {
-              Set tCommChildList = ""
-              Set tGroupChild = ""
-              Set tGroupName = $Get(tMap(tCommChildOne,"a","name"))
-              For {
-                Set tGroupChild = $Order(tMap(tCommChildOne, "c", tGroupChild))
-                Quit:(tGroupChild="")
-                Set tCommChildList = tCommChildList _ $ListBuild(tGroupChild)
-              }
-            }
-            Set tGroupName = $$$QUOTE(tGroupName)
-						
-            Set ptr = 0
-            While $ListNext(tCommChildList, ptr, tCommChild) {
-              Set tDesc = $$$QUOTE($Get(tMap(tCommChild,"a","description")))
-              
-              If (tMap(tCommChild) = "example") {
-                Set tContentNode = $Order(tMap(tCommChild,"c",0))
-                If (tContentNode '= "") {
-                  // Different version of $$$QUOTE to convert newlines into $c(10) (for example) - this is what zwrite calls.
-                  Set tExampleContent = $$Quote^%qcr($Replace($ZStrip(tMap(tContentNode),"<>C"),$Char(10),$Char(13,10)))
-                  If 0,(tGroupName = $$$QUOTE($$$DefaultGroup)) {
-                    Do %code.WriteLine(" Set pCommandStructure("_tName_",""examples"",$i(pCommandStructure("_tName_",""examples""))) = "_tExampleContent)
-                    Do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""examples"",pCommandStructure("_tName_",""examples""),""description"") = "_tDesc)
-                  } Else {
-                    Do %code.WriteLine(" Set tExampleIndex = $i(pCommandStructure("_tName_",""groups"","_tGroupName_",""examples""))")
-                    Do %code.WriteLine(" Set pCommandStructure("_tName_",""groups"","_tGroupName_",""examples"",tExampleIndex) = "_tExampleContent)
-                    Do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""groups"","_tGroupName_",""examples"",tExampleIndex,""description"") = "_tDesc)
-                  }
-                }
-              } ElseIf (tMap(tCommChild) = "description") || (tMap(tCommChild) = "summary") {
-                Set tContentNode = $Order(tMap(tCommChild,"c",0))
-                If (tContentNode '= "") {
-                  // Different version of $$$QUOTE to convert newlines into $c(10) (for example) - this is what zwrite calls.
-								Set tDescContent = $$Quote^%qcr($Replace($ZStrip(tMap(tContentNode),"<>C"),$Char(10),$Char(13,10)))
-								Do %code.WriteLine(" Set pCommandStructure("_tName_","_$$$QUOTE(tMap(tCommChild))_") = "_tDescContent)
-                }
-              } Else {
-                // Common: name, required, description
-                Set tChildName = $$$QUOTE(tMap(tCommChild,"a","name"))
-                Set tRequired = $Case($Get(tMap(tCommChild,"a","required")),"true":1,:0)
-                
-                If (tMap(tCommChild) = "modifier") {
-                  // Also: aliases, value, valueList
-                  Set tValue = $Get(tMap(tCommChild,"a","value"))
-                  Set tValueList = $$$QUOTE($Get(tMap(tCommChild,"a","valueList")))
-                  Set tDataAlias = $$$QUOTE($Get(tMap(tCommChild,"a","dataAlias")))
-                  Set tDataValue = $$$QUOTE($Get(tMap(tCommChild,"a","dataValue")))
-                  If $Data(tMap(tCommChild,"a","aliases")) {
-                    Do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""aliases"") = "_$$$QUOTE(tMap(tCommChild,"a","aliases")))
-                    Set tAliasList = $ListFromString(tMap(tCommChild,"a","aliases"))
-                    Set tPtr = 0
-                    While $ListNext(tAliasList,tPtr,tAlias) {
-                      Do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"",1,"_$$$QUOTE(tAlias)_") = "_tChildName)
+            if $data(tMap("error"))||$data(tMap("warning")) {
+                set tSC = $$$ERROR($$$GeneralError,"Could not parse Commands XData block.")
+                for tType = "error","warning" {
+                    set tIndex = ""
+                    for {
+                        set tIndex = $order(tMap(tType,tIndex),1,tError)
+                        if (tIndex = "") {
+                            quit
+                        }
+                        set tSC = $$$ADDSC(tSC,$$$ERROR($$$GeneralError,tError))
                     }
-                  }
-                  Do %code.WriteLine(" Set pCommandStructure("_tName_",""groups"","_tGroupName_",""modifiers"","_tCommChild_") = " _ tChildName)
-                  Do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""group"") = "_tGroupName)
-                  Do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""value"") = "_$Case(tValue,"true":1,:0))
-                  Do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""required"") = "_tRequired)
-                  Do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""description"") = "_tDesc)
-                  Do:(tValueList'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""valueList"") = "_tValueList)
-                  Do:(tDataAlias'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""dataAlias"") = "_tDataAlias)
-                  Do:(tDataValue'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""dataValue"") = "_tDataValue)
-                } ElseIf (tMap(tCommChild) = "parameter") {
-                  // Also: example
-                  Set tExample = $$$QUOTE($Get(tMap(tCommChild,"a","example")))
-                  Set tTrailing = $Case($Get(tMap(tCommChild,"a","trailing")),"true":1,:0)
-                  Do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"",$i(pCommandStructure("_tName_",""parameters""))) = "_tChildName)
-                  Do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""trailing"") = "_tTrailing)
-                  Do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""required"") = "_tRequired)
-                  Do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""description"") = "_tDesc)
-                  Do:(tExample'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""example"") = "_tExample)
                 }
-              }
+                quit
             }
-					}
-				}
-			}
-			Do %code.WriteLine(" Set pCommandStructure(-1, ""maxLength"") = "_tMaxLengthCommand)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()  
-	}
-	Quit tSC
+
+            do %code.WriteLine(" Kill pCommandStructure")
+            // Compute the max length of a command. Used for pretty printing in %Help
+            set tMaxLengthCommand = 0
+            set tChild = ""
+            for {
+                set tChild = $order(tMap(1,"c",tChild))
+                quit:(tChild="")
+                #Define empty """"""
+                if (tMap(tChild) = "command") {
+                    set tName = tMap(tChild,"a","name")
+                    if ($length(tName) > tMaxLengthCommand) {
+                        set tMaxLengthCommand = $length(tName)
+                    }
+                    set tName = $$$QUOTE(tName)
+                    set tExample = $$$QUOTE($get(tMap(tChild,"a","example")))
+                    if ($get(tMap(tChild,"a","default")) = "true") {
+                        do %code.WriteLine(" Set pCommandStructure(0,""default"") = "_tName)
+                    }
+                    if $data(tMap(tChild,"a","aliases")) {
+                        do %code.WriteLine(" Set pCommandStructure("_tName_",""aliases"") = "_$$$QUOTE(tMap(tChild,"a","aliases")))
+                        set tAliasList = $listfromstring(tMap(tChild,"a","aliases"))
+                        set tPtr = 0
+                        while $listnext(tAliasList,tPtr,tAlias) {
+                            do %code.WriteLine(" Set pCommandStructure(1,"_$$$QUOTE(tAlias)_") = "_tName)
+                        }
+                    }
+                    if $data(tMap(tChild,"a","dataPrefix"),tDataPrefix) {
+                        do %code.WriteLine(" Set pCommandStructure("_tName_",""dataPrefix"") = "_$$$QUOTE(tDataPrefix))
+                    }
+                    if $data(tMap(tChild,"a","trailingModifiers"),tTrailingModifiers) {
+                        do %code.WriteLine(" Set pCommandStructure("_tName_",""trailingModifiers"") = "_$case(tTrailingModifiers,"true":1,:0))
+                    }
+
+                    // Children of command
+                    set tCommChildOne = ""
+                    for {
+                        set tCommChildOne = $order(tMap(tChild,"c",tCommChildOne))
+                        quit:(tCommChildOne="")
+
+                        set tCommChildList = $listbuild(tCommChildOne)
+                        set tGroupName = $$$DefaultGroup
+                        if (tMap(tCommChildOne) = "group") {
+                        set tCommChildList = ""
+                        set tGroupChild = ""
+                        set tGroupName = $get(tMap(tCommChildOne,"a","name"))
+                        for {
+                            set tGroupChild = $order(tMap(tCommChildOne, "c", tGroupChild))
+                            quit:(tGroupChild="")
+                            set tCommChildList = tCommChildList _ $listbuild(tGroupChild)
+                        }
+                        }
+                        set tGroupName = $$$QUOTE(tGroupName)
+
+                        set ptr = 0
+                        while $listnext(tCommChildList, ptr, tCommChild) {
+                            set tDesc = $$$QUOTE($get(tMap(tCommChild,"a","description")))
+
+                            if (tMap(tCommChild) = "example") {
+                                set tContentNode = $order(tMap(tCommChild,"c",0))
+                                if (tContentNode '= "") {
+                                    // Different version of $$$QUOTE to convert newlines into $c(10) (for example) - this is what zwrite calls.
+                                    set tExampleContent = $$Quote^%qcr($replace($zstrip(tMap(tContentNode),"<>C"),$char(10),$char(13,10)))
+                                    if 0,(tGroupName = $$$QUOTE($$$DefaultGroup)) {
+                                        do %code.WriteLine(" Set pCommandStructure("_tName_",""examples"",$i(pCommandStructure("_tName_",""examples""))) = "_tExampleContent)
+                                        do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""examples"",pCommandStructure("_tName_",""examples""),""description"") = "_tDesc)
+                                    } else {
+                                        do %code.WriteLine(" Set tExampleIndex = $i(pCommandStructure("_tName_",""groups"","_tGroupName_",""examples""))")
+                                        do %code.WriteLine(" Set pCommandStructure("_tName_",""groups"","_tGroupName_",""examples"",tExampleIndex) = "_tExampleContent)
+                                        do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""groups"","_tGroupName_",""examples"",tExampleIndex,""description"") = "_tDesc)
+                                    }
+                                }
+                            } elseif (tMap(tCommChild) = "description") || (tMap(tCommChild) = "summary") {
+                                set tContentNode = $order(tMap(tCommChild,"c",0))
+                                if (tContentNode '= "") {
+                                    // Different version of $$$QUOTE to convert newlines into $c(10) (for example) - this is what zwrite calls.
+                                    set tDescContent = $$Quote^%qcr($replace($zstrip(tMap(tContentNode),"<>C"),$char(10),$char(13,10)))
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_","_$$$QUOTE(tMap(tCommChild))_") = "_tDescContent)
+                                }
+                            } else {
+                                // Common: name, required, description
+                                set tChildName = $$$QUOTE(tMap(tCommChild,"a","name"))
+                                set tRequired = $case($get(tMap(tCommChild,"a","required")),"true":1,:0)
+
+                                if (tMap(tCommChild) = "modifier") {
+                                    // Also: aliases, value, valueList
+                                    set tValue = $get(tMap(tCommChild,"a","value"))
+                                    set tValueList = $$$QUOTE($get(tMap(tCommChild,"a","valueList")))
+                                    set tDataAlias = $$$QUOTE($get(tMap(tCommChild,"a","dataAlias")))
+                                    set tDataValue = $$$QUOTE($get(tMap(tCommChild,"a","dataValue")))
+                                    if $data(tMap(tCommChild,"a","aliases")) {
+                                        do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""aliases"") = "_$$$QUOTE(tMap(tCommChild,"a","aliases")))
+                                        set tAliasList = $listfromstring(tMap(tCommChild,"a","aliases"))
+                                        set tPtr = 0
+                                        while $listnext(tAliasList,tPtr,tAlias) {
+                                        do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"",1,"_$$$QUOTE(tAlias)_") = "_tChildName)
+                                        }
+                                    }
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""groups"","_tGroupName_",""modifiers"","_tCommChild_") = " _ tChildName)
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""group"") = "_tGroupName)
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""value"") = "_$case(tValue,"true":1,:0))
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""required"") = "_tRequired)
+                                    do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""description"") = "_tDesc)
+                                    do:(tValueList'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""valueList"") = "_tValueList)
+                                    do:(tDataAlias'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""dataAlias"") = "_tDataAlias)
+                                    do:(tDataValue'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""dataValue"") = "_tDataValue)
+                                    } elseif (tMap(tCommChild) = "parameter") {
+                                    // Also: example
+                                    set tExample = $$$QUOTE($get(tMap(tCommChild,"a","example")))
+                                    set tTrailing = $case($get(tMap(tCommChild,"a","trailing")),"true":1,:0)
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"",$i(pCommandStructure("_tName_",""parameters""))) = "_tChildName)
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""trailing"") = "_tTrailing)
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""required"") = "_tRequired)
+                                    do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""description"") = "_tDesc)
+                                    do:(tExample'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""example"") = "_tExample)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            do %code.WriteLine(" Set pCommandStructure(-1, ""maxLength"") = "_tMaxLengthCommand)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 }
