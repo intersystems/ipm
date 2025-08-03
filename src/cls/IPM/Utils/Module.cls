@@ -1343,6 +1343,10 @@ ClassMethod LoadNewModule(
             tcommit
         }
         $$$ThrowOnError(tSC)
+        // On each load of a new module, we want to seed its update steps
+        if 'tDeveloperMode {
+            $$$ThrowOnError(tModule.SeedUpdateSteps())
+        }
         do tModule.WriteAfterInstallMessage()
     } catch e {
         set tSC = e.AsStatus()
