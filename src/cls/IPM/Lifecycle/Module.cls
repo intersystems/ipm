@@ -192,11 +192,38 @@ Method %Update(ByRef pParams) As %Status
     try {
         set tVerbose = $get(pParams("Verbose"))
         set tVersion = $get(pParams("Version"))
-        set tModule = ##class(%IPM.Storage.Module).NameOpen(..Module.DisplayName)
-        write:tVerbose !,"Seeding update steps",!
-        $$$ThrowOnError(tModule.SeedUpdateSteps())
-        write:tVerbose !,"Applying update steps",!
-        do ##class(%IPM.Utils.Update.Controller).ApplyUpdatesInOrder(tModule,,tVerbose)
+        set tModuleName = ..Module.DisplayName
+        set tOldModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
+
+        write:tVerbose !,"Seeding update steps for original module version",!
+        $$$ThrowOnError(tOldModule.SeedUpdateSteps())
+
+        write:tVerbose !,"Resolving new module version to install",!
+        set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+        set tSearchCriteria.Name = $$$lcase(tModuleName)
+        set tSearchCriteria.VersionExpression = tVersion
+        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+        if (tResults.Count() = 0) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Module or version not found."))
+        }
+        set tResult = tResults.GetAt(1)
+        do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
+        merge tParams = pParams("data")
+        set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
+        set tParams("cmd") = "install"
+        set tParams("Install") = 1
+
+        write:tVerbose !,"Load new module into storage",!
+        $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
+        set tNewModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
+        zwrite tNewModule
+        $$$ThrowOnError(tNewModule.%Reload())
+
+        write:tVerbose !,"Applying update steps for new version of module",!
+        do ##class(%IPM.Utils.Update.Controller).ApplyUpdatesInOrder(tNewModule,,tVerbose)
+
+        write:tVerbose !,"Saving updated module",!
+        $$$ThrowOnError(tNewModule.%Save())
     } catch e {
         set tSC = e.AsStatus()
     }
