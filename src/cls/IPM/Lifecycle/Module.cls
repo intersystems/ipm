@@ -186,4 +186,21 @@ Method %Package(ByRef pParams) As %Status
   quit tSC
 }
 
+Method %Update(ByRef pParams) As %Status
+{
+    set tSC = $$$OK
+    try {
+        set tVerbose = $get(pParams("Verbose"))
+        set tVersion = $get(pParams("Version"))
+        set tModule = ##class(%IPM.Storage.Module).NameOpen(..Module.DisplayName)
+        write:tVerbose !,"Seeding update steps",!
+        $$$ThrowOnError(tModule.SeedUpdateSteps())
+        write:tVerbose !,"Applying update steps",!
+        do ##class(%IPM.Utils.Update.Controller).ApplyUpdatesInOrder(tModule,,tVerbose)
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+  quit tSC
+}
+
 }

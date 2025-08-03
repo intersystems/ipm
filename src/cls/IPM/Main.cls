@@ -7,7 +7,7 @@ Class %IPM.Main Extends %IPM.CLI
 
 Parameter DOMAIN = "ZPM";
 
-Parameter STANDARDPHASES = {$listbuild("reload","compile","test","package","verify","publish","makedeployed")};
+Parameter STANDARDPHASES = {$listbuild("reload","compile","test","package","verify","publish","makedeployed","update")};
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -55,6 +55,8 @@ This is accessible to other instances configured to look at the current namespac
 module repository.
 * publish: saves that artifact to the repository for which deployment is enabled.
 Currently, there may only be one of these per namespace.
+* update: run any update steps for the module to become updated to the latest available version by default.
+Can also specify desired version to upgrade to.
 </description>
 
 <!-- Examples -->
@@ -137,6 +139,26 @@ This command is an alias for `module-action module-name publish`
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
+</command>
+
+<command name="update" dataPrefix="D">
+<summary>Updates a module to a newer version.</summary>
+<description>
+	Updates a module to the latest available version by default. Can also specify a version with the -version modifier. Runs all of the update steps from the current version to the newer version.
+</description>
+
+<!-- Examples -->
+<example description="Updates the HS.JSON module from the current version to version 3.0.0.">
+	update HS.JSON -version 3.0.0
+</example>
+
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module on which to perform update actions" />
+
+<!-- Modifiers -->
+<modifier name="version" aliases="ver" dataAlias="Version" description="Version to update module to" />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="force" aliases="f" dataAlias="Force" dataValue="1" description="If specified, the module will be updated even if there are warnings." />
 </command>
 
 <command name="makedeployed">
@@ -447,6 +469,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
+<modifier name="delete-data" dataAlias="DeleteData" dataValue="1" description="Deletes persistent data for the module." />
 
 </command>
 
@@ -2242,6 +2265,12 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
                 }
             }
             $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous))
+            if '$get(tParams("DeveloperMode")) {
+                set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
+                if $isobject(tModule) {
+                    $$$ThrowOnError(tModule.SeedUpdateSteps())
+                }
+            }
         }
     } else {
         set tPrefix = ""

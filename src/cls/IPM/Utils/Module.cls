@@ -1203,6 +1203,7 @@ ClassMethod LoadNewModule(
 	pRepository As %String = "",
 	pSynchronous As %Boolean = 0) As %Status
 {
+    write !, 454545
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
@@ -1343,6 +1344,10 @@ ClassMethod LoadNewModule(
             tcommit
         }
         $$$ThrowOnError(tSC)
+        // On each load of a new module, we want to seed its update steps
+        if 'tDeveloperMode {
+            $$$ThrowOnError(tModule.SeedUpdateSteps())
+        }
         do tModule.WriteAfterInstallMessage()
     } catch e {
         set tSC = e.AsStatus()

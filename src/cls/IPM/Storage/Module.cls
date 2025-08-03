@@ -324,8 +324,6 @@ Method SeedUpdateSteps(verbose As %Boolean = 0) As %Status [ Internal ]
     quit sc
 }
 
-/// Helper method for SeedUpdateSteps() so that we don't have repeat code for the same list iteration for everything except mirrored info
-/// Iterates over a list of methods and seeds them
 Method MarkStepsAsSeeded(
 	methodList As %DynamicArray,
 	className As %String,
