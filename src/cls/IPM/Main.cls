@@ -159,6 +159,8 @@ This command is an alias for `module-action module-name publish`
 <modifier name="version" aliases="ver" dataAlias="Version" description="Version to update module to" />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="force" aliases="f" dataAlias="Force" dataValue="1" description="If specified, the module will be updated even if there are warnings." />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
+
 </command>
 
 <command name="makedeployed">
