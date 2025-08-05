@@ -39,6 +39,7 @@ Method %Activate(ByRef pParams) As %Status
         set tSC = ..Configure(.pParams)
         $$$ThrowOnError(tSC)
 
+        set tVerbose = $get(pParams("Verbose"))
         // Create Studio project for package if it is loaded in developer mode and no explicit statement to not create it
         set tNoStudioProject = $get(pParams("NoStudioProject"), 0)
         if ..Module.DeveloperMode && 'tNoStudioProject {
@@ -46,7 +47,6 @@ Method %Activate(ByRef pParams) As %Status
             // Do not throw exceptions if failure to create because creating a Studio project should not block activation.
             // Just write the exception if in verbose mode
             set tStudioProjectSC = ..Module.GetStudioProject(.tProject)
-            set tVerbose = $get(pParams("Verbose"))
             if tVerbose {
                 if $$$ISOK(tStudioProjectSC) {
                     write !, "Studio project created/updated: " _ tProject.Name _ ".PRJ"
@@ -55,6 +55,12 @@ Method %Activate(ByRef pParams) As %Status
                     write !, $system.Status.GetErrorText(tStudioProjectSC)
                 }
             }
+        }
+        if '..Module.DeveloperMode && $isobject(..Module) {
+            if tVerbose {
+                write !, "Seeding update steps for module ",..Module.Name, ", for version ", ..Module.VersionString, !
+            }
+            #; $$$ThrowOnError(..Module.SeedUpdateSteps())
         }
     } catch e {
         set tSC = e.AsStatus()
@@ -186,44 +192,15 @@ Method %Package(ByRef pParams) As %Status
   quit tSC
 }
 
-Method %Update(ByRef pParams) As %Status
+Method %ApplyUpdateSteps(ByRef pParams) As %Status
 {
     set tSC = $$$OK
     try {
-        set tVerbose = $get(pParams("Verbose"))
-        set tVersion = $get(pParams("Version"))
-        set tModuleName = ..Module.DisplayName
-        set tOldModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
-
-        write:tVerbose !,"Seeding update steps for original module version",!
-        $$$ThrowOnError(tOldModule.SeedUpdateSteps())
-
-        write:tVerbose !,"Resolving new module version to install",!
-        set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-        set tSearchCriteria.Name = $$$lcase(tModuleName)
-        set tSearchCriteria.VersionExpression = tVersion
-        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
-        if (tResults.Count() = 0) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Module or version not found."))
+        set verbose = $get(pParams("Verbose"))
+        if verbose {
+            write !,"Applying update steps for new version ", ..Module.VersionString, " of module ", ..Module.Name,!
         }
-        set tResult = tResults.GetAt(1)
-        do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
-        merge tParams = pParams("data")
-        set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
-        set tParams("cmd") = "install"
-        set tParams("Install") = 1
-
-        write:tVerbose !,"Load new module into storage",!
-        $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
-        set tNewModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
-        zwrite tNewModule
-        $$$ThrowOnError(tNewModule.%Reload())
-
-        write:tVerbose !,"Applying update steps for new version of module",!
-        do ##class(%IPM.Utils.Update.Controller).ApplyUpdatesInOrder(tNewModule,,tVerbose)
-
-        write:tVerbose !,"Saving updated module",!
-        $$$ThrowOnError(tNewModule.%Save())
+        do ##class(%IPM.Utils.Update.Controller).ApplyUpdatesInOrder(..Module, ,verbose)
     } catch e {
         set tSC = e.AsStatus()
     }

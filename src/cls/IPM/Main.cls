@@ -7,7 +7,7 @@ Class %IPM.Main Extends %IPM.CLI
 
 Parameter DOMAIN = "ZPM";
 
-Parameter STANDARDPHASES = {$listbuild("reload","compile","test","package","verify","publish","makedeployed","update")};
+Parameter STANDARDPHASES = {$listbuild("reload","compile","test","package","verify","publish","makedeployed","applyupdatesteps")};
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -144,19 +144,19 @@ This command is an alias for `module-action module-name publish`
 <command name="update" dataPrefix="D">
 <summary>Updates a module to a newer version.</summary>
 <description>
-	Updates a module to the latest available version by default. Can also specify a version with the -version modifier. Runs all of the update steps from the current version to the newer version.
+	Updates a module to a newer version. Also runs all of the update steps from the current version to the newer version.
 </description>
 
 <!-- Examples -->
 <example description="Updates the HS.JSON module from the current version to version 3.0.0.">
-	update HS.JSON -version 3.0.0
+	update HS.JSON 3.0.0
 </example>
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module on which to perform update actions" />
+<parameter name="version" required="true" description="Version of module to update to" />
 
 <!-- Modifiers -->
-<modifier name="version" aliases="ver" dataAlias="Version" description="Version to update module to" />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="force" aliases="f" dataAlias="Force" dataValue="1" description="If specified, the module will be updated even if there are warnings." />
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
@@ -966,6 +966,8 @@ ClassMethod ShellInternal(
                 do ..Config(.tCommandInfo)
             } elseif (tCommandInfo = "unpublish") {
                 do ..Unpublish(.tCommandInfo)
+            }  elseif (tCommandInfo = "update") {
+                do ..Update(.tCommandInfo)
             } elseif ($listfind(..#STANDARDPHASES,tCommandInfo)) {
                 do ..RunOnePhase(.tCommandInfo)
             } elseif (tCommandInfo = "generate") {
@@ -2266,12 +2268,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
                 }
             }
             $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous))
-            if '$get(tParams("DeveloperMode")) {
-                set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
-                if $isobject(tModule) {
-                    #; $$$ThrowOnError(tModule.SeedUpdateSteps())
-                }
-            }
         }
     } else {
         set tPrefix = ""
@@ -3817,6 +3813,35 @@ ClassMethod Information(ByRef pCommandInfo)
         set updatedList($increment(updatedList)) = entry
     }
     do ..DisplayModules(.updatedList)
+}
+
+ClassMethod Update(ByRef pCommandInfo)
+{
+    set verbose = $get(pCommandInfo("data","Verbose"))
+    set version = $get(pCommandInfo("parameters","version"))
+    set module = $get(pCommandInfo("parameters","module"))
+    if verbose {
+        write !,"Resolving new version ",version," of module ",module," to install",!
+    }
+    set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+    set searchCriteria.Name = $$$lcase(module)
+    set searchCriteria.VersionExpression = version
+    $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(searchCriteria, .results))
+    if (results.Count() = 0) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Module or version not found."))
+    }
+    set result = results.GetAt(1)
+    do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.params)
+    merge params = pCommandInfo("data")
+    set params("DeveloperMode") = $get(params("DeveloperMode"), 0)
+    set params("cmd") = "install"
+    set params("Install") = 1
+
+    if verbose {
+        write !,"Loading new version of module ",module," into storage",!
+    }
+    // pass in cmd = update instead to invoke the execute phases of update
+    $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(result, .params))
 }
 
 }

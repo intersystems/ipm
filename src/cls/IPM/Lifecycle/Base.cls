@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
+Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure","ApplyUpdateSteps")};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -180,6 +180,7 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
         "verify":       $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
         "register":     $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
         "publish":      $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
+        "ApplyUpdateSteps":       $listbuild("Initialize","Reload","*","Validate","Compile","Activate","ApplyUpdateSteps"),
         "configure":    $listbuild("Configure"),
         "unconfigure":  $listbuild("Unconfigure"),
         :               ""
@@ -191,22 +192,23 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 {
     set phase = $zconvert(pOnePhase, "L")
     quit $case(phase,
-        "clean":        "Clean",
-        "initialize":   "Initialize",
-        "reload":       "Reload",
-        "validate":     "Validate",
-        "exportdata":   "ExportData",
-        "compile":      "Compile",
-        "activate":     "Activate",
-        "document":     "Document",
-        "makedeployed": "MakeDeployed",
-        "test":         "Test",
-        "package":      "Package",
-        "verify":       "Verify",
-        "register":     "Register",
-        "publish":      "Publish",
-        "configure":    "Configure",
-        "unconfigure":  "Unconfigure",
+        "clean":            "Clean",
+        "initialize":       "Initialize",
+        "reload":           "Reload",
+        "validate":         "Validate",
+        "exportdata":       "ExportData",
+        "compile":          "Compile",
+        "activate":         "Activate",
+        "document":         "Document",
+        "makedeployed":     "MakeDeployed",
+        "test":             "Test",
+        "package":          "Package",
+        "verify":           "Verify",
+        "register":         "Register",
+        "publish":          "Publish",
+        "configure":        "Configure",
+        "unconfigure":      "Unconfigure",
+        "applyupdatesteps": "ApplyUpdateSteps",
         :               pOnePhase // return the phase as-is if it's a custom phase name
     )
 }

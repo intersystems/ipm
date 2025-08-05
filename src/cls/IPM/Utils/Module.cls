@@ -1203,7 +1203,6 @@ ClassMethod LoadNewModule(
 	pRepository As %String = "",
 	pSynchronous As %Boolean = 0) As %Status
 {
-    write !, 454545
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
@@ -1339,15 +1338,15 @@ ClassMethod LoadNewModule(
         if tVerbose || $get(pParams("Multicompile","Verbose"),0) {
             write !,"Loading "_tDisplayName_" in process "_$job
         }
-        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName,$listbuild("Activate"),1,.pParams)
+        if $get(pParams("cmd")) = "update" {
+            set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName,$listbuild("ApplyUpdateSteps"),1,.pParams)
+        } else {
+            set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName,$listbuild("Activate"),1,.pParams)
+        }
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
             tcommit
         }
         $$$ThrowOnError(tSC)
-        // On each load of a new module, we want to seed its update steps
-        if 'tDeveloperMode {
-            $$$ThrowOnError(tModule.SeedUpdateSteps())
-        }
         do tModule.WriteAfterInstallMessage()
     } catch e {
         set tSC = e.AsStatus()
