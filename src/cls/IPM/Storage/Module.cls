@@ -267,7 +267,7 @@ Method ExecuteMethodList(
 Method GetAddUpdateStep(
 	className As %String,
 	methodName As %String,
-	primaryOnly As %Boolean) As %IPM.Storage.UpdateStep
+	primaryOnly As %Boolean) As %IPM.Storage.UpdateStep.Base
 {
     if primaryOnly {
         set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
