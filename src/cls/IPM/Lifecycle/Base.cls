@@ -330,7 +330,7 @@ Method %Clean(ByRef pParams) As %Status
                 set tResource = orderedResourceList.GetNext(.tKey)
                 quit:tKey=""
 
-                if $isobject(tResource.Processor) {
+                if $isobject(tResource.Processor) && tResource.IsInScope("Clean") {
                     set tSC = tResource.Processor.OnPhase("Clean",.pParams,.tResourceHandled)
                     $$$ThrowOnError(tSC)
                     if (tResourceHandled) {
@@ -682,7 +682,7 @@ Method %Reload(ByRef pParams) As %Status
         for {
             set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
-            if $isobject(tResource.Processor) {
+            if $isobject(tResource.Processor) && tResource.IsInScope("Reload") {
                 set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
             }
         }
@@ -913,7 +913,7 @@ Method %Compile(ByRef pParams) As %Status
             quit:tKey=""
 
             set tHandled = 0
-            if $isobject(tResource.Processor) {
+            if $isobject(tResource.Processor) && tResource.IsInScope("Compile") {
                 do tResource.Processor.OnPhase("Compile",.pParams,.tHandled)
                 if (tHandled) {
                     set tHandledMap(tResource.Name) = ""
@@ -1087,7 +1087,7 @@ Method %Test(ByRef pParams) As %Status
         for {
             set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
-            if $isobject(tResource.Processor) {
+            if $isobject(tResource.Processor) && tResource.IsInScope("Test") {
                 set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Test",.pParams))
             }
         }
@@ -1330,7 +1330,7 @@ Method %Verify(ByRef pParams) As %Status
             quit:tKey=""
 
             set tHandled = 0
-            if $isobject(tResource.Processor) {
+            if $isobject(tResource.Processor) && tResource.IsInScope("Verify") {
                 set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Verify",.pParams,.tHandled))
             }
         }
