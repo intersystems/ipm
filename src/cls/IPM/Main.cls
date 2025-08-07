@@ -154,7 +154,7 @@ This command is an alias for `module-action module-name publish`
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module on which to perform update actions" />
-<parameter name="version" required="true" description="Version of module to update to" />
+<parameter name="version" description="Version (or version expression) of module to update; defaults to the latest available if unspecified." />
 
 <!-- Modifiers -->
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
@@ -286,6 +286,7 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
 <modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
+<modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -409,6 +410,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 <modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
+<modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
 
 </command>
 
@@ -470,7 +472,6 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
-<modifier name="delete-data" dataAlias="DeleteData" dataValue="1" description="Deletes persistent data for the module." />
 
 </command>
 
@@ -2138,8 +2139,10 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
+    set tForce = $$$HasModifier(pCommandInfo,"force")
     merge tParams = pCommandInfo("data")
     set tParams("cmd") = "load"
+    set tParams("Force") = tForce
     do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
     if $get(tComponents("scheme")) [ "http" {
         set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
@@ -2224,6 +2227,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
     set tVersion = $get(pCommandInfo("parameters","version"))
     set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
+    set tForce = $$$HasModifier(pCommandInfo,"force")
 
     set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
     set tSearchCriteria.Registry = tRegistry
@@ -2258,8 +2262,12 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
             do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
             merge tParams = pCommandInfo("data")
             set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
-            set tParams("cmd") = "install"
-            set tParams("Install") = 1
+            set tParams("Force") = tForce
+            // In the case of an update, pCommandInfo has already been pre-populated with the necessary information.
+            if '$get(tParams("Update")) {
+                set tParams("cmd") = "install"
+                set tParams("Install") = 1
+            }
             if tResult.Deployed {
                 set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
                 set tResult.PlatformVersion = platformVersion
@@ -3823,25 +3831,10 @@ ClassMethod Update(ByRef pCommandInfo)
     if verbose {
         write !,"Resolving new version ",version," of module ",module," to install",!
     }
-    set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-    set searchCriteria.Name = $$$lcase(module)
-    set searchCriteria.VersionExpression = version
-    $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(searchCriteria, .results))
-    if (results.Count() = 0) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Module or version not found."))
-    }
-    set result = results.GetAt(1)
-    do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.params)
-    merge params = pCommandInfo("data")
-    set params("DeveloperMode") = $get(params("DeveloperMode"), 0)
-    set params("cmd") = "update"
-    set params("Install") = 1
-
-    if verbose {
-        write !,"Loading new version of module ",module," into storage",!
-    }
-    // pass in cmd = update instead to invoke the execute phases of update
-    $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(result, .params))
+    // Indicating to pCommandInfo that this is an update command, not just an install.
+    set pCommandInfo("data","Update") = 1
+    // Call ..Install() in order to install the newer version of the module.
+    do ..Install(.pCommandInfo)
 }
 
 }

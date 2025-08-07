@@ -304,8 +304,16 @@ ClassMethod LoadModuleReference(
                     set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
                     quit
                 }
+                // TODO: Move the following 2 errors down to LoadNewModule(). But need to find a way to pass in the toVersion in the 'load' case.
                 if tInstModule.Version.Follows(tModRef.Version) {
                     set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tInstModule.Name,tInstModule.VersionString,pVersion))
+                    quit
+                }
+                if '$get(pParams("Force")) && tModRef.Version.Follows(tInstModule.Version) && (($get(pParams("cmd")) = "install") || ($get(pParams("cmd")) = "load")) {
+                    set tMsg = "Cannot perform an update of "_tInstModule.Name_" from version "_tInstModule.VersionString_
+                    " to "_pVersion_" using the 'install' or 'load' commands. Please use the 'update' command instead. "_
+                    "If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'."
+                    set tSC = $$$ERROR($$$GeneralError, tMsg)
                     quit
                 }
             }
@@ -492,6 +500,7 @@ ClassMethod LoadModuleFromDirectory(
             merge tParams("Artifactory") = pParams("Artifactory")
             merge tParams("AngularArtifact") = pParams("AngularArtifact")
             merge tParams("EnvFiles") = pParams("EnvFiles")
+            merge tParams("Update") = pParams("Update")
         }
         set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pSynchronous)
         if $$$ISERR(tSC) {
@@ -1338,11 +1347,10 @@ ClassMethod LoadNewModule(
         if tVerbose || $get(pParams("Multicompile","Verbose"),0) {
             write !,"Loading "_tDisplayName_" in process "_$job
         }
-        if $get(pParams("cmd")) = "update" {
-            set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName,$listbuild("ApplyUpdateSteps"),1,.pParams)
-        } else {
-            set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName,$listbuild("Activate"),1,.pParams)
-        }
+        // LoadNewModule() may be called on an install/load or an update. In the case of an update, invoke ApplyUpdateSteps lifecycle phase.
+        // Otherwise, invoke Activate lifecycle phase.
+        set lifeCyclePhase = $select($get(pParams("Update")): "ApplyUpdateSteps", 1: "Activate")
+        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .pParams)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
             tcommit
         }
