@@ -166,24 +166,24 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 {
     set pOnePhase = $zconvert(pOnePhase, "L")
     quit $case(pOnePhase,
-        "clean":        $listbuild("Clean"),
-        "initialize":   $listbuild("Initialize"),
-        "reload":       $listbuild("Initialize","Reload","*"),
-        "validate":     $listbuild("Initialize","Reload","*","Validate"),
-        "exportdata":   $listbuild("ExportData"),
-        "compile":      $listbuild("Initialize","Reload","*","Validate","Compile"),
-        "activate":     $listbuild("Initialize","Reload","*","Validate","Compile","Activate"),
-        "document":     $listbuild("Document"),
-        "makedeployed": $listbuild("MakeDeployed"),
-        "test":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
-        "package":      $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
-        "verify":       $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
-        "register":     $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
-        "publish":      $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
-        "ApplyUpdateSteps":       $listbuild("Initialize","Reload","*","Validate","Compile","Activate","ApplyUpdateSteps"),
-        "configure":    $listbuild("Configure"),
-        "unconfigure":  $listbuild("Unconfigure"),
-        :               ""
+        "clean":            $listbuild("Clean"),
+        "initialize":       $listbuild("Initialize"),
+        "reload":           $listbuild("Initialize","Reload","*"),
+        "validate":         $listbuild("Initialize","Reload","*","Validate"),
+        "exportdata":       $listbuild("ExportData"),
+        "compile":          $listbuild("Initialize","Reload","*","Validate","Compile"),
+        "activate":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate"),
+        "document":         $listbuild("Document"),
+        "makedeployed":     $listbuild("MakeDeployed"),
+        "test":             $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
+        "package":          $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
+        "verify":           $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
+        "register":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
+        "publish":          $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
+        "applyupdatesteps": $listbuild("Initialize","Reload","*","Validate","Compile","Activate","ApplyUpdateSteps"),
+        "configure":        $listbuild("Configure"),
+        "unconfigure":      $listbuild("Unconfigure"),
+        :                   ""
     )
 }
 
@@ -1687,6 +1687,18 @@ Method %MakeDeployed(ByRef pParams) As %Status
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+Method %ApplyUpdateSteps(ByRef pParams) As %Status
+{
+    set tSC = $$$OK
+    try {
+        set verbose = $get(pParams("Verbose"))
+        do ..Module.ApplyUpdatesInOrder(,verbose)
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+  quit tSC
 }
 
 Method OnDetermineResourceDeployability(

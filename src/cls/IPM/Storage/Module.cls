@@ -231,11 +231,14 @@ Method ExecuteMethodList(
 	verbose As %Boolean = 0,
 	ByRef newStepToApply As %Boolean = 0) As %Status [ Private ]
 {
+    zwrite newStepToApply
+    zwrite methodList
     set sc = $$$OK
     try {
         set iter = methodList.%GetIterator()
         while iter.%GetNext(, .methodName) {
             set stepObj = ..GetAddUpdateStep(className, methodName, primaryOnly)
+            zwrite stepObj
             if 'newStepToApply && 'stepObj.TimeStampEnd {
                 set newStepToApply = 1
             }

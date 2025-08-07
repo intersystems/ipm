@@ -31,6 +31,7 @@ Method %Clean(ByRef pParams) As %Status
 
 Method %Activate(ByRef pParams) As %Status
 {
+    zwrite pParams
     set tSC = $$$OK
     try {
         set tSC = ##super(.pParams)
@@ -56,11 +57,11 @@ Method %Activate(ByRef pParams) As %Status
                 }
             }
         }
-        if '..Module.DeveloperMode && $isobject(..Module) {
+        if '$get(pParams("Update")) && '..Module.DeveloperMode && $isobject(..Module) {
             if tVerbose {
                 write !, "Seeding update steps for module ",..Module.Name, ", for version ", ..Module.VersionString, !
             }
-            #; $$$ThrowOnError(..Module.SeedUpdateSteps())
+            $$$ThrowOnError(..Module.SeedUpdateSteps())
         }
     } catch e {
         set tSC = e.AsStatus()
@@ -189,21 +190,6 @@ Method %Package(ByRef pParams) As %Status
         }
     }
 
-  quit tSC
-}
-
-Method %ApplyUpdateSteps(ByRef pParams) As %Status
-{
-    set tSC = $$$OK
-    try {
-        set verbose = $get(pParams("Verbose"))
-        if verbose {
-            write !,"Applying update steps for new version ", ..Module.VersionString, " of module ", ..Module.Name,!
-        }
-        do ##class(%IPM.Utils.Update.Controller).ApplyUpdatesInOrder(..Module, ,verbose)
-    } catch e {
-        set tSC = e.AsStatus()
-    }
   quit tSC
 }
 

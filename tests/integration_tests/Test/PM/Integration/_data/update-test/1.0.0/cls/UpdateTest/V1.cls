@@ -1,12 +1,12 @@
 Class UpdateTest.V1 Extends %IPM.Utils.Update.VersionBase
 {
 
-ClassMethod GetOrderedMirroredMethodNames() As %Library.DynamicArray
+ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray
 {
     return ["MethodA", "MethodC"]
 }
 
-ClassMethod GetOrderedNonMirroredMethodNames() As %Library.DynamicArray
+ClassMethod GetOrderedMethodsAnyMember() As %Library.DynamicArray
 {
     return ["MethodB", "Jest"]
 }
