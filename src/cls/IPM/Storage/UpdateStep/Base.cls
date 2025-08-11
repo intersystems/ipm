@@ -1,34 +1,27 @@
-Class %IPM.Storage.UpdateStep.Base Extends %RegisteredObject
+/// Base class for UpdateStep storage objects with properties shared across all types
+Class %IPM.Storage.UpdateStep.Base Extends %Persistent [ NoExtent ]
 {
 
+/// Module update step class name
 Property ClassName As %Dictionary.Classname [ Required ];
 
 Property MethodName As %Dictionary.Identifier [ Required ];
 
-Property HostName As %String(MAXLEN = 255) [ Required ];
+/// When update step was last initiated
+Property TimeStampStart As %TimeStamp;
 
-Property InstanceName As %String(MAXLEN = 255) [ Required ];
+/// When update step was last completed (or seeded)
+Property TimeStampEnd As %TimeStamp;
 
-Property TimeStampStart As %Library.DateTime;
-
-Property TimeStampEnd As %Library.DateTime;
-
+/// Indicates status of an update step that has been run
 Property Status As %Status;
 
 Method %OnNew(
 	className As %String = "",
-	methodName As %String = "",
-	hostName As %String = "",
-	instanceName As %String = "") As %Status
+	methodName As %String = "") As %Status
 {
     set ..ClassName = className
     set ..MethodName = methodName
-    if hostName = "" {
-        set ..HostName = ##class(%SYS.System).GetNodeName()
-    }
-    if instanceName = "" {
-        set ..InstanceName = ##class(%SYS.System).GetInstanceName()
-    }
     set ..Status = $$$OK
 
     return $$$OK
