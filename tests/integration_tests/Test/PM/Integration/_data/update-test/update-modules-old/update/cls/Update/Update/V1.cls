@@ -1,4 +1,4 @@
-Class UpdateTest.V1 Extends %IPM.Utils.Update.VersionBase
+Class Update.Update.V1 Extends %IPM.General.VersionBase
 {
 
 ClassMethod GetOrderedMirrorMethodNames() As %Library.DynamicArray
@@ -13,7 +13,7 @@ ClassMethod GetOrderedNonMirroredMethodNames() As %Library.DynamicArray
 
 ClassMethod MethodA() As %Status
 {
-    w !, "This is MethodA()"
+    write !, "This is MethodA()"
     return $$$OK
 }
 
