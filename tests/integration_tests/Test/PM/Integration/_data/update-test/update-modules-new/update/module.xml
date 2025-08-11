@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="update.ZPM">
+    <Module>
+      <Name>update</Name>
+      <Version>2.1.1</Version>
+      <Invoke Class="%IPM.Utils.Update.VersionBase" Method="CustomPhase" CustomPhase="emma" />
+      <Resource Name="Update.PKG" />
+      <UpdatePackage>Update.Update</UpdatePackage>
+    </Module>
+  </Document>
+</Export>
