@@ -13,19 +13,19 @@ ClassMethod GetOrderedNonMirroredMethodNames() As %Library.DynamicArray
 
 ClassMethod MethodA() As %Status
 {
-    w !, "This is Update.V1::MethodA()"
+    write !, "This is Update.Update.V1::MethodA()"
     return $$$OK
 }
 
 ClassMethod MethodB() As %Status
 {
-    w !, "This is Update.V1::MethodB()"
+    write !, "This is Update.Update.V1::MethodB()"
     return $$$OK
 }
 
 ClassMethod MethodC() As %Status
 {
-    w !, "This is Update.V1::MethodC()"
+    write !, "This is Update.Update.V1::MethodC()"
     return $$$OK
 }
 

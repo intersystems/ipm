@@ -13,7 +13,7 @@ ClassMethod GetOrderedNonMirroredMethodNames() As %Library.DynamicArray
 
 ClassMethod MethodA() As %Status
 {
-    write !, "This is MethodA()"
+    write !, "This is Update.Update.V1::MethodA()"
     return $$$OK
 }
 
