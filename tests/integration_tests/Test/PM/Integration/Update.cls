@@ -5,7 +5,7 @@ Parameter ModuleNoDependencies As STRING = "update";
 
 /// Update testing TO-DOs:
 /// 1. Create the following modules:
-///
+/// 
 /// - (X) Module without dependencies (simplest case)
 /// - Module with dependencies
 /// - Module with dependencies added as part of an update
@@ -18,25 +18,25 @@ Parameter ModuleNoDependencies As STRING = "update";
 /// - Module with a dependency whose update step that throws an error
 /// - Module with an <Invoke> that throws an error during a lifecycle phase
 /// - Module with a dependency with an <Invoke> that throws an error during a lifecycle phase
-///
+/// 
 /// 2. (X) Create a generic update test to be run on all the modules WITHOUT ERRORS that does the following:
 ///  Note: Run it once with -dev flag
 /// - Rows have been added to the UpdateStep table for each update method in the appropriate range of V# classes for 1) the base module and 2) each of its dependencies
 /// - The correct update steps are run (e.g. starting at the correct step within the correct major version)
 /// - (SKIPPING FOR NOW) Logging is correctly outputted to the (optionally provided) log file or standard output.
 /// - Correct versions of dependency modules are installed
-///
+/// 
 /// 3. Create a generic update test to be run on all the modules WITH ERRORS:
 /// - All update-related logic is rolled back (the old module is still installed and no new UpdateStep objects exist)
 /// - Errors are logged appropriately in the (optionally provided) log file or standard output.
-///
+/// 
 /// 4. Create tests for the following cases (to be run on the simplest module):
 /// - (X) Running update twice on the same module to new version is successful
 /// - (X) Running update with an older version throws an error immediately
 /// - (X) Running update with a version that doesn't exist in any configured repository throws an error immediately
 /// - (X) Running the same update command twice in a row results in a no-op on all update steps the second time
 /// - Running update on a module that has not been installed
-///
+/// 
 /// 5. Create tests for trying to update the same module at the same time in the same namespace fails
 /// 6. Create test for running update AFTER an an update process was killed mid-update is successful
 /// 7. Create test that verifies the correct steps have been run after update depending on mirror membership.
@@ -148,7 +148,6 @@ Method TestUpdateToSameVersionTwiceNoMirror()
 }
 
 /// ///////////////////////////////////////////// HELPER METHODS ////////////////////////////////////////////////
-
 /// NOTE: For testing simplicity, we will always assume that in the update test, both the module and its dependencies are being updated
 /// from and to the same version numbers.
 /// Completes an update of given moduleName from fromVersion to toVersion, verifying that the given updateStepsToSeed are seeded
@@ -159,7 +158,13 @@ Method TestUpdateToSameVersionTwiceNoMirror()
 /// @params fromVersion         Version of module to install
 /// @params toVersion           Version of module to which to update
 /// @params developerMode       1 if update should be run with -dev flag, 0 otherwise
-Method ModuleNormalUpdateNoMirrorHelper(moduleName As %String, updateStepsToSeed As %DynamicArray, updateStepsToRun As %DynamicArray, fromVersion As %String, toVersion As %String, developerMode As %Boolean = 0)
+Method ModuleNormalUpdateNoMirrorHelper(
+	moduleName As %String,
+	updateStepsToSeed As %DynamicArray,
+	updateStepsToRun As %DynamicArray,
+	fromVersion As %String,
+	toVersion As %String,
+	developerMode As %Boolean = 0)
 {
   if '$system.Mirror.IsMember() {
     // Load module
@@ -231,13 +236,18 @@ Method AssertUpdateStepsExist(updateStepsList As %DynamicArray) As %DynamicArray
   return updateStepList
 }
 
-Method AssertModuleInstalledCorrectly(moduleName As %String, moduleVersion As %String)
+Method AssertModuleInstalledCorrectly(
+	moduleName As %String,
+	moduleVersion As %String)
 {
   set tSC = ##class(%IPM.Main).Shell("install -v "_moduleName_" "_moduleVersion)
   do $$$AssertStatusOK(tSC, "Loaded module successfully")
 }
 
-ClassMethod GetUpdateStep(className As %String, methodName As %String, isPrimaryOnly As %Boolean) As %IPM.Storage.UpdateStep
+ClassMethod GetUpdateStep(
+	className As %String,
+	methodName As %String,
+	isPrimaryOnly As %Boolean) As %IPM.Storage.UpdateStep
 {
   if isPrimaryOnly {
     set step = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
