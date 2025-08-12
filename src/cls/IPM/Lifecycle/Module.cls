@@ -57,11 +57,11 @@ Method %Activate(ByRef pParams) As %Status
                 }
             }
         }
-        if '$get(pParams("Update")) && '..Module.DeveloperMode && $isobject(..Module) {
+        if '$get(pParams("Update")) && '..Module.DeveloperMode {
             if tVerbose {
                 write !, "Seeding update steps for module ",..Module.Name, ", for version ", ..Module.VersionString, !
             }
-            $$$ThrowOnError(..Module.SeedUpdateSteps())
+            $$$ThrowOnError(..Module.SeedUpdateSteps(tVerbose))
         }
     } catch e {
         set tSC = e.AsStatus()

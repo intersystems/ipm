@@ -1694,11 +1694,12 @@ Method %ApplyUpdateSteps(ByRef pParams) As %Status
     set tSC = $$$OK
     try {
         set verbose = $get(pParams("Verbose"))
+        // TODO: Add log file param after logging meeting discussion
         do ..Module.ApplyUpdatesInOrder(,verbose)
     } catch e {
         set tSC = e.AsStatus()
     }
-  quit tSC
+    quit tSC
 }
 
 Method OnDetermineResourceDeployability(

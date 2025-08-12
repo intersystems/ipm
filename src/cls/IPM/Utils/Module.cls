@@ -306,11 +306,14 @@ ClassMethod LoadModuleReference(
                     quit
                 }
                 // TODO: Move the following 2 errors down to LoadNewModule(). But need to find a way to pass in the toVersion in the 'load' case.
+                // If the version of the module about to be installed is OLDER than the module that is already installed
                 if tInstModule.Version.Follows(tModRef.Version) {
                     set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tInstModule.Name,tInstModule.VersionString,pVersion))
                     quit
                 }
-                if '$get(pParams("Force")) && tModRef.Version.Follows(tInstModule.Version) && (($get(pParams("cmd")) = "install") || ($get(pParams("cmd")) = "load")) {
+                // If the version of the module about to be installed is NEWER than the module that is already installed, then the action is considered an upgrade.
+                // Do not allow the user to perform an update using the install or load commands. Unless, they use the -force flag or are installing in Developer Mode.
+                if tModRef.Version.Follows(tInstModule.Version) && (($get(pParams("cmd")) = "install") || ($get(pParams("cmd")) = "load")) && '$get(pParams("Force"),0) && '$get(pParams("DeveloperMode"),0) {
                     set tMsg = "Cannot perform an update of "_tInstModule.Name_" from version "_tInstModule.VersionString_
                     " to "_pVersion_" using the 'install' or 'load' commands. Please use the 'update' command instead. "_
                     "If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'."

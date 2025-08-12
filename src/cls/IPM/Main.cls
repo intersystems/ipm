@@ -55,7 +55,7 @@ This is accessible to other instances configured to look at the current namespac
 module repository.
 * publish: saves that artifact to the repository for which deployment is enabled.
 Currently, there may only be one of these per namespace.
-* update: run any update steps for the module to become updated to the latest available version by default.
+* applyupdatesteps: run any update steps for the module to become updated to the latest available version by default.
 Can also specify desired version to upgrade to.
 </description>
 
@@ -158,7 +158,7 @@ This command is an alias for `module-action module-name publish`
 
 <!-- Modifiers -->
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="force" aliases="f" dataAlias="Force" dataValue="1" description="If specified, the module will be updated even if there are warnings." />
+<modifier name="force" aliases="f" dataAlias="Force" dataValue="1" description="If specified, the module will be updated despite warnings." />
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 </command>
 
@@ -2211,7 +2211,6 @@ ClassMethod CheckModuleNamespace() As %Status
 
 ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 {
-    zwrite pCommandInfo
     set tRegistry = ""
     set tModuleName = $get(pCommandInfo("parameters","module"))
     if (tModuleName["/") {
@@ -2236,6 +2235,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
     set tSearchCriteria.VersionExpression = tVersion
     set tSearchCriteria.Keywords = tKeywords
     $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+    zwrite tResults
 
     if (tResults.Count() > 0) {
         set tResult = ""
@@ -2243,6 +2243,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
         // Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
         if ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
             set tResult = tResults.GetAt(1)
+            zwrite tResult
         } elseif (tResults.Count() > 0) {
             for i=1:1:tResults.Count() {
                 set tResultInfo = tResults.GetAt(i)
@@ -2265,7 +2266,8 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
             set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
             set tParams("Force") = tForce
             // In the case of an update, pCommandInfo has already been pre-populated with the necessary information.
-            if '$get(tParams("Update")) {
+            // Therefore, tParams needs to be populated if this is an install command.
+            if '$get(tParams("Update"),0) {
                 set tParams("cmd") = "install"
                 set tParams("Install") = 1
             }
@@ -3826,13 +3828,19 @@ ClassMethod Information(ByRef pCommandInfo)
 
 ClassMethod Update(ByRef pCommandInfo)
 {
+    // TODO: Do not let update command be able to install a module if it doesn't already exist
     set verbose = $get(pCommandInfo("data","Verbose"))
     set version = $get(pCommandInfo("parameters","version"))
     set module = $get(pCommandInfo("parameters","module"))
     if verbose {
-        write !,"Resolving new version ",version," of module ",module," to install",!
+        if version = "" {
+            write !,"Resolving latest available version of module ",module," to install",!
+        } else {
+            write !,"Resolving new version ",version," of module ",module," to install",!
+        }
     }
     // Indicating to pCommandInfo that this is an update command, not just an install.
+    set pCommandInfo("data","cmd") = "update"
     set pCommandInfo("data","Update") = 1
     // Call ..Install() in order to install the newer version of the module.
     do ..Install(.pCommandInfo)
