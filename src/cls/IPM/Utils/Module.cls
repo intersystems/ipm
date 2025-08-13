@@ -304,18 +304,6 @@ ClassMethod LoadModuleReference(
                     set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
                     quit
                 }
-                // TODO: Move the following 2 errors down to LoadNewModule(). But need to find a way to pass in the toVersion in the 'load' case.
-                if tInstModule.Version.Follows(tModRef.Version) {
-                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tInstModule.Name,tInstModule.VersionString,pVersion))
-                    quit
-                }
-                if '$get(pParams("Force")) && tModRef.Version.Follows(tInstModule.Version) && (($get(pParams("cmd")) = "install") || ($get(pParams("cmd")) = "load")) {
-                    set tMsg = "Cannot perform an update of "_tInstModule.Name_" from version "_tInstModule.VersionString_
-                    " to "_pVersion_" using the 'install' or 'load' commands. Please use the 'update' command instead. "_
-                    "If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'."
-                    set tSC = $$$ERROR($$$GeneralError, tMsg)
-                    quit
-                }
             }
         }
 
@@ -1212,6 +1200,7 @@ ClassMethod LoadNewModule(
 	pRepository As %String = "",
 	pSynchronous As %Boolean = 0) As %Status
 {
+    write "TEST!"
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
@@ -1241,6 +1230,17 @@ ClassMethod LoadNewModule(
         }
 
         set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
+
+        set moduleNotPersistent = ..GetModuleObjectFromPath(pDirectory,.found)
+        set fromVersion = ""
+        set fromVersionString = ""
+        if found {
+            set moduleCurrent = ##class(%IPM.Storage.Module).NameOpen(moduleNotPersistent.Name)
+            if moduleCurrent '= "" {
+                set fromVersion = moduleCurrent.Version
+                set fromVersionString = moduleCurrent.VersionString
+            }
+        }
 
         if ($get(pParams("NoJournal"),0) '= 0) {
             // Disable journalling with process-level switch.
@@ -1281,6 +1281,27 @@ ClassMethod LoadNewModule(
 
         set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
+        set toVersion = tModule.Version
+        set toVersionString = tModule.VersionString
+
+        // This means that this is not a new install/load of a module
+        if fromVersion '= "" {
+            // If the version of the module about to be installed is OLDER than the module that is already installed
+            if fromVersion.Follows(toVersion) {
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tModuleName,fromVersionString,toVersionString))
+                quit
+            }
+            // If the version of the module about to be installed is NEWER than the module that is already installed, then the action is considered an upgrade.
+            // Do not allow the user to perform an update using the install or load commands. Unless, they use the -force flag or are installing in Developer Mode.
+            if toVersion.Follows(fromVersion) && (($get(pParams("cmd")) = "install") || ($get(pParams("cmd")) = "load")) && '$get(pParams("Force"),0) && '$get(pParams("DeveloperMode"),0) {
+                set tMsg = "Cannot perform an update of "_tModuleName_" from version "_fromVersionString_
+                " to "_toVersionString_" using the 'install' or 'load' commands. Please use the 'update' command instead. "_
+                "If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'."
+                set tSC = $$$ERROR($$$GeneralError, tMsg)
+                quit
+            }
+        }
+
         set tModule.Repository = pRepository
 
         if $data(pParams("DeveloperMode"),tDeveloperMode) {
