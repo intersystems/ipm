@@ -31,6 +31,7 @@ Method %Clean(ByRef pParams) As %Status
 
 Method %Activate(ByRef pParams) As %Status
 {
+    write "NOJAC"
     zwrite pParams
     set tSC = $$$OK
     try {
