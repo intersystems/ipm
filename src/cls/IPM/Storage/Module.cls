@@ -85,12 +85,9 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
-Relationship AnyMirrorMemberUpdateSteps As %IPM.Storage.UpdateStep.AnyMirrorMember(XMLPROJECTION = "NONE") [ Cardinality = many, Inverse = ModuleHome ];
-
 Property UpdatePackage As %Dictionary.Classname;
 
-/// Iterates through a module and its dependencies and applies their update steps that haven't been run up through the current version
-/// Starts with the most dependent module and works its way backwards to the base module we are calling "update" on
+/// Iterates through all of a module's update step classes up through the current major version and calls ApplyStepsInOrder
 Method ApplyUpdatesInOrder(
 	logFile As %Library.File = "",
 	verbose As %Boolean = 0) As %Status
@@ -135,37 +132,6 @@ Method ApplyUpdatesInOrder(
     }
     $$$UnlockUpdateModule(..Name)
     quit sc
-}
-
-/// Get list of dependency modules in order of how we want to update them.
-/// We want to perform updates in reverse order of dependencies depth.
-/// i.e. Call update steps for highest depth dependent module all the way up back the base module being updated
-Method GetModulesToUpdateOrderedList() As %List [ Private ]
-{
-    $$$ThrowOnError(..BuildDependencyGraph(.pDependencyGraph))
-    set key = ""
-    for {
-        set key = $order(pDependencyGraph(key))
-        quit:key=""
-        // Order elements based on dependency depth
-        set depth = $list(pDependencyGraph(key), 1)
-        set depths(depth, key) = ""
-    }
-
-    // Reverse the order so we process most dependent modules first
-    set processList = $listbuild(..Name)
-    set depthKey = ""
-    for {
-        set depthKey = $order(depths(depthKey))
-        quit:depthKey=""
-        set modKey = ""
-        for {
-            set modKey = $order(depths(depthKey, modKey))
-            quit:modKey=""
-            set processList = $listbuild(modKey) _ processList
-        }
-    }
-    return processList
 }
 
 /// For a given version, apply update steps listed in the module's update package version class
@@ -290,15 +256,12 @@ Method AddUpdateStep(
 {
     if primaryOnly {
         set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).%New(className, methodName)
-        // TODO: Replace this with actual foreign key
-        set stepObj.ForeignModule = ..Name
-        $$$ThrowOnError(stepObj.%Save())
     }
     else {
         set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMirrorMember).%New(className, methodName)
-        $$$ThrowOnError(..AnyMirrorMemberUpdateSteps.Insert(stepObj))
-        $$$ThrowOnError(..%Save())
     }
+    set stepObj.HomeModule = $this
+    $$$ThrowOnError(stepObj.%Save())
     return stepObj
 }
 

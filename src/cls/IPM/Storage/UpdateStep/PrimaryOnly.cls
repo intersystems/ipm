@@ -10,10 +10,14 @@ Property InstanceName As %String(MAXLEN = 255) [ Required ];
 
 Index UpdateClassMethodIdx On (ClassName, MethodName) [ Unique ];
 
-/// TODO: Remove this string property and actually implement a foreign key
-/// Foreign key relating this step to the IPM module it belongs to
-Property ForeignModule As %String;
+/// Home module which this update step belongs to
+Property HomeModule As %IPM.Storage.Module;
 
+/// ForeignKey pointing to the module which this update step belonds to
+ForeignKey HomeModKey(HomeModule) References %IPM.Storage.Module() [ OnDelete = cascade ];
+
+/// Description
+/// Relationship to module for which this update step belongs to
 Method %OnNew(
 	className As %String = "",
 	methodName As %String = "") As %Status
@@ -22,7 +26,6 @@ Method %OnNew(
     set ..MethodName = methodName
     set ..HostName = ##class(%SYS.System).GetNodeName()
     set ..InstanceName = ##class(%SYS.System).GetInstanceName()
-    set ..Status = $$$OK
 
     return $$$OK
 }
@@ -66,6 +69,9 @@ Storage Default
 </Value>
 <Value name="9">
 <Value>TimeStampEnd</Value>
+</Value>
+<Value name="10">
+<Value>HomeModule</Value>
 </Value>
 </Data>
 <DataLocation>^%IPM.Storage.UpC3A.PrimaryOnlyD</DataLocation>

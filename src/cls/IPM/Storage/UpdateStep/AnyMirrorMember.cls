@@ -1,10 +1,13 @@
 Class %IPM.Storage.UpdateStep.AnyMirrorMember Extends (%Persistent, %IPM.Storage.UpdateStep.Base)
 {
 
-/// Relationship to module for which this update step belongs to
-Relationship ModuleHome As %IPM.Storage.Module [ Cardinality = one, Inverse = AnyMirrorMemberUpdateSteps, OnDelete = cascade ];
-
 Index UpdateClassMethodIdx On (ClassName, MethodName) [ Unique ];
+
+/// Home module which this update step belongs to
+Property HomeModule As %IPM.Storage.Module;
+
+/// ForeignKey pointing to the module which this update step belonds to
+ForeignKey HomeModKey(HomeModule) References %IPM.Storage.Module() [ OnDelete = cascade ];
 
 /// Returns %IPM.Storage.UpdateStep.AnyMirrorMember object corresponding to unique index in storage table
 /// If object does not exist, this will return an empty object
@@ -39,6 +42,9 @@ Storage Default
 </Value>
 <Value name="7">
 <Value>ModuleHome</Value>
+</Value>
+<Value name="8">
+<Value>HomeModule</Value>
 </Value>
 </Data>
 <DataLocation>^%IPM.StoragC3A.AnyMirrorMeE8EED</DataLocation>

@@ -14,7 +14,7 @@ Property TimeStampStart As %TimeStamp;
 Property TimeStampEnd As %TimeStamp;
 
 /// Indicates status of an update step that has been run
-Property Status As %Status;
+Property Status As %Status [ InitialExpression = {$$$OK} ];
 
 Method %OnNew(
 	className As %String = "",
@@ -22,7 +22,6 @@ Method %OnNew(
 {
     set ..ClassName = className
     set ..MethodName = methodName
-    set ..Status = $$$OK
 
     return $$$OK
 }
