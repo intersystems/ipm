@@ -173,10 +173,8 @@ Method ApplyStepsInOrder(
 /// Helper method for ApplyStepsInOrder()
 /// Iterates over a method name list and calls their update steps.
 /// If an update step does not already exist, a new one gets created.
-/// Once reaching the first method that hasn't been run on the instance (no TimeStampEnd value),
 /// newStepToApply - Gets marked as true to tell us to run all remaining steps in the list, whether or not they have been run/seeded before
 ///                  Can carry this over to subsequent calls by passing the newStepToApply variable to those ExecuteUpdateStepMethodList() calls
-///                  i.e. We find a new step to apply in the mirroredMethodNames list so we know to execute all steps in the nonMirroredMethodNames list
 Method ExecuteUpdateStepMethodList(
 	methodList As %Library.DynamicArray,
 	className As %String,
@@ -268,7 +266,6 @@ Method AddUpdateStep(
 /// Seed update steps for all versions prior to the current major version by setting TimeStampEnd to current time
 /// Seeding steps mark the steps as having been run so will not be run on subsequent 'update' calls
 /// Steps that already have TimeStampEnd defined (already been run/seeded) will be skipped
-/// Steps that don't exist yet will be created and immediately seeded
 Method SeedAllUpdateSteps(verbose As %Boolean = 0) As %Status [ Internal ]
 {
     set sc = $$$OK
