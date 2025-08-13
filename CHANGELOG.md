@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #829: Fixed export of resources with null Directory attribute
 - #832: Fixed places that export to possibly-nonexistent directories by adding /createdirs (needed in 2025.2+)
 - #823: Fixed selectively undeploying classes within a package
+- #820: Fixed `${packagename}` not working for FileCopy
 
 ### Changed
 - Format all files and add consistent formatting settings, format on save etc.
