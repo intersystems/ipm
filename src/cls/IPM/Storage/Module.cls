@@ -85,102 +85,66 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
-Relationship AnyMemberUpdateSteps As %IPM.Storage.UpdateStep.AnyMember(XMLPROJECTION = "NONE") [ Cardinality = many, Inverse = ModuleHome ];
+Property UpdatePackage As %Dictionary.Classname;
 
-Property UpdatePackage As %String(MAXLEN = 255);
-
-/// Iterates through a module and its dependencies and applies their update steps that haven't been run up through the current version
-/// Starts with the most dependent module and works its way backwards to the base module we are calling "update" on
+/// Iterates through all of a module's update step classes up through the current major version and calls ApplyStepsInOrder
 Method ApplyUpdatesInOrder(
 	logFile As %Library.File = "",
-	verbose As %Boolean = 0)
+	verbose As %Boolean = 0) As %Status
 {
     if verbose {
-        write !, "Acquiring lock on ^%IPM.Update("_..Name_")"
+        write !, "Acquiring lock on ^IPM.UpdateLock("_..Name_")"
     }
     $$$LockUpdateModule(..Name)
     if ('$test) {
         quit
     }
 
-    set tSC = $$$OK
+    set sc = $$$OK
     set tInitTLevel = $tlevel
     try {
         tstart
-        // For each base module dependency
-        set processList = ..GetModulesToUpdateOrderedList()
 
-        set ptr = 0
-        while $listnext(processList, ptr, moduleName) {
-            set nextModule = ##class(%IPM.Storage.Module).NameOpen(moduleName)
-            set toVersion = nextModule.Version.Major
-            for version=1:1:toVersion {
-                if verbose {
-                    write !, "Starting to run update steps for module="_nextModule.Name_" version="_version
-                }
-                set tSC = nextModule.ApplyStepsInOrder(version, logFile, verbose)
+        $$$ThrowOnError(##class(%IPM.Utils.Update.VersionBase).GetUpdatePackageClassList(..UpdatePackage, .classList))
+        set keyVersion = ""
+        for {
+            // Iterate over update package class list for steps to apply. Apply all of those up to and including this major version
+            set keyVersion = $order(classList(keyVersion))
+            if (keyVersion = "") || (keyVersion > ..Version.Major) {
+                quit
             }
+            if verbose {
+                write !, "Starting to run update steps for module="_..Name_" version="_keyVersion
+            }
+            set sc = ..ApplyStepsInOrder(keyVersion, logFile, verbose)
         }
+
         tcommit
     } catch (ex) {
-        set tSC = ex.AsStatus()
+        set sc = ex.AsStatus()
     }
     while ($tlevel > tInitTLevel) {
         trollback 1
     }
 
     if verbose {
-        write !, "Releasing lock on ^IPM.Update("_..Name_")"
+        write !, "Releasing lock on ^IPM.UpdateLock("_..Name_")"
     }
     $$$UnlockUpdateModule(..Name)
-    quit tSC
+    quit sc
 }
 
-/// Get list of dependency modules in order of how we want to update them.
-/// We want to perform updates in reverse order of dependencies depth.
-/// i.e. Call update steps for highest depth dependent module all the way up back the base module being updated
-Method GetModulesToUpdateOrderedList() As %List [ Private ]
-{
-    $$$ThrowOnError(..BuildDependencyGraph(.pDependencyGraph))
-    set key = ""
-    for {
-        set key = $order(pDependencyGraph(key))
-        quit:key=""
-        // Order elements based on dependency depth
-        set depth = $list(pDependencyGraph(key), 1)
-        set depths(depth, key) = ""
-    }
-
-    // Reverse the order so we process most dependent modules first
-    set processList = $listbuild(..Name)
-    set depthKey = ""
-    for {
-        set depthKey = $order(depths(depthKey))
-        quit:depthKey=""
-        set modKey = ""
-        for {
-            set modKey = $order(depths(depthKey, modKey))
-            quit:modKey=""
-            set processList = $listbuild(modKey) _ processList
-        }
-    }
-    return processList
-}
-
+/// For a given version, apply update steps listed in the module's update package version class
+/// First run are steps that can be executed on any mirror member, followed by those that can only be run on the primary
+/// Previously executed steps will be skipped until a new one has been found.
+/// If a step has not been run, all subsequent steps will be run, regardless of if they already have or not.
+/// i.e. If an update class returns methods Foo1, Foo2, Foo3 for v1.0.0 but v1.1.0 has Foo1, Foo2, Bar1, Foo3,
+///      only Bar1, Foo3 will be run on the update for v1.1.0
 Method ApplyStepsInOrder(
 	version As %String,
 	logFile As %Library.File,
-	verbose As %Boolean = 0) As %Status
+	verbose As %Boolean = 0) As %Status [ Internal ]
 {
-    // Attempt to acquire lock, quit if we cannot
-    if verbose {
-        write !, "Acquiring lock on ^%IPM.Update("_..Name_", "_version_")"
-    }
-    $$$LockUpdateModuleVersion(..Name, version)
-    if ('$test) {
-        quit
-    }
-
     set sc = $$$OK
     try {
         set className = ..UpdatePackage_".V"_version
@@ -190,63 +154,55 @@ Method ApplyStepsInOrder(
             }
             quit
         }
-        set hostName = ##class(%SYS.System).GetNodeName()
-        set instanceName = ##class(%SYS.System).GetInstanceName()
 
         // Regardless of mirror status, run these methods first
-        set anyMemberMethodNames = $classmethod(className, "GetOrderedMethodsAnyMember")
-        set sc = ..ExecuteMethodList(anyMemberMethodNames, className, hostName, instanceName, 0, logFile, verbose, .newStepToApply)
+        set anyMirrorMemberMethodNames = $classmethod(className, "GetOrderedMethodsAnyMirrorMember")
+        set sc = ..ExecuteUpdateStepMethodList(anyMirrorMemberMethodNames, className, 0, logFile, verbose, .newStepToApply)
 
         // Don't run these steps on mirror members that are not primary (changes to DBs that are RO on non-primary members)
         if '($system.Mirror.IsMember() && '$system.Mirror.IsPrimary()) {
             set primaryOnlyMethodNames = $classmethod(className, "GetOrderedMethodsPrimaryOnly")
-            set sc = ..ExecuteMethodList(primaryOnlyMethodNames, className, hostName, instanceName, 1, logFile, verbose, .newStepToApply)
+            set sc = ..ExecuteUpdateStepMethodList(primaryOnlyMethodNames, className, 1, logFile, verbose, .newStepToApply)
         }
     } catch (ex) {
         set sc = ex.AsStatus()
     }
-
-    if verbose {
-        write !, "Releasing lock on ^%IPM.Update("_..Name_", "_version_")"
-    }
-    $$$UnlockUpdateModuleVersion(..Name, version)
-
     quit sc
 }
 
 /// Helper method for ApplyStepsInOrder()
 /// Iterates over a method name list and calls their update steps.
 /// If an update step does not already exist, a new one gets created.
-/// Once reaching the first method that hasn't been run on the instance (no TimeStampEnd value),
-/// newStepToApply gets marked as true to tell us to run all remaining steps in the list
-/// Can carry this over to subsequent calls by passing the newStepToApply variable to those ExecuteMethodList() calls
-/// i.e. We find a new step to apply in the mirroredMethodNames list so we know to execute all steps in the nonMirroredMethodNames list
-Method ExecuteMethodList(
+/// newStepToApply - Gets marked as true to tell us to run all remaining steps in the list, whether or not they have been run/seeded before
+///                  Can carry this over to subsequent calls by passing the newStepToApply variable to those ExecuteUpdateStepMethodList() calls
+Method ExecuteUpdateStepMethodList(
 	methodList As %Library.DynamicArray,
 	className As %String,
-	hostName As %String,
-	instanceName As %String,
 	primaryOnly As %Boolean,
 	logfile As %Library.File,
 	verbose As %Boolean = 0,
 	ByRef newStepToApply As %Boolean = 0) As %Status [ Private ]
 {
-    zwrite newStepToApply
-    zwrite methodList
     set sc = $$$OK
     try {
         set iter = methodList.%GetIterator()
         while iter.%GetNext(, .methodName) {
-            set stepObj = ..GetAddUpdateStep(className, methodName, primaryOnly)
-            zwrite stepObj
+            // Get update step object for this className + methodName. If one does not already exist, create a new one and use that
+            set stepObj = ..GetUpdateStep(className, methodName, primaryOnly, 1)
+            // Once we come across a step that hasn't been run/seeded, mark newStepToApply as true.
+            // This indicates that we should run all subsequent steps, regardless of their current status
             if 'newStepToApply && 'stepObj.TimeStampEnd {
                 set newStepToApply = 1
             }
             if newStepToApply {
-                set stepObj.TimeStampStart = $zdatetime($horolog,3)
                 if verbose {
                     write !, "Running "_className_"::"_methodName_"()"
                 }
+                if primaryOnly {
+                    set stepObj.HostName = ##class(%SYS.System).GetNodeName()
+                    set stepObj.InstanceName = ##class(%SYS.System).GetInstanceName()
+                }
+                set stepObj.TimeStampStart = $zdatetime($horolog,3)
                 set stepObj.Status = $$$OK
                 try {
                     do $classmethod(className, methodName)
@@ -267,59 +223,78 @@ Method ExecuteMethodList(
     quit sc
 }
 
-Method GetAddUpdateStep(
+/// Attempt to get update step object with this className + methodName index
+/// primaryOnly - set to 1 if this update step is one that runs on the primaryOnly
+/// createNew - set to 1 to create a new step object with these values if one is not found to already exist
+Method GetUpdateStep(
+	className As %String,
+	methodName As %String,
+	primaryOnly As %Boolean,
+	createNew As %Boolean = 0) As %IPM.Storage.UpdateStep.Base
+{
+    if primaryOnly {
+        set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
+    }
+    else {
+        set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMirrorMember).GetUpdateStep(className, methodName)
+    }
+    if createNew && '$isobject(stepObj) {
+        set stepObj = ..AddUpdateStep(className, methodName, primaryOnly)
+    }
+    return stepObj
+}
+
+/// Create a new update step object for this module
+/// Update steps are defined by their unique className + methodName combination
+/// primaryOnly - set to 1 if this new update step can only be run on the primary in a mirrored environment
+Method AddUpdateStep(
 	className As %String,
 	methodName As %String,
 	primaryOnly As %Boolean) As %IPM.Storage.UpdateStep.Base
 {
     if primaryOnly {
-        set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
-        if '$isobject(stepObj) {
-            set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).%New(className, methodName)
-            // TODO: Replace this with actual foreign key
-            set stepObj.ForeignModule = ..Name
-            $$$ThrowOnError(stepObj.%Save())
-        }
+        set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).%New(className, methodName)
     }
     else {
-        set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).GetUpdateStep(className, methodName)
-        if '$isobject(stepObj) {
-            set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).%New(className, methodName)
-            $$$ThrowOnError(..AnyMemberUpdateSteps.Insert(stepObj))
-            $$$ThrowOnError(..%Save())
-        }
+        set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMirrorMember).%New(className, methodName)
     }
+    set stepObj.HomeModule = $this
+    $$$ThrowOnError(stepObj.%Save())
     return stepObj
 }
 
 /// Seed update steps for all versions prior to the current major version by setting TimeStampEnd to current time
-/// Steps that already have TimeStampEnd defined (already been run) will be skipped
-/// Steps that don't exist yet will be created and immediately seeded
-Method SeedUpdateSteps(verbose As %Boolean = 0) As %Status [ Internal ]
+/// Seeding steps mark the steps as having been run so will not be run on subsequent 'update' calls
+/// Steps that already have TimeStampEnd defined (already been run/seeded) will be skipped
+Method SeedAllUpdateSteps(verbose As %Boolean = 0) As %Status [ Internal ]
 {
     set sc = $$$OK
     try {
-        set hostName = ##class(%SYS.System).GetNodeName()
-        set instanceName = ##class(%SYS.System).GetInstanceName()
-
         $$$ThrowOnError(##class(%IPM.Utils.Update.VersionBase).GetUpdatePackageClassList(..UpdatePackage, .classList))
-        set key = ""
+        set keyVersion = ""
         for {
-            set key = $order(classList(key))
-            quit:key=""
+            // Iterate over update package class list for steps to seed. Seed all of those up to and including this major version
+            set keyVersion = $order(classList(keyVersion))
+            if (keyVersion = "") || (keyVersion > ..Version.Major) {
+                quit
+            }
 
-            set className = classList(key)
+            set className = classList(keyVersion)
             if verbose {
                 write !, "Starting seeding steps for "_className
             }
 
             // Seed any member update steps
-            set anyMemberMethodNames = $classmethod(className, "GetOrderedMethodsAnyMember")
-            $$$ThrowOnError(..MarkStepsAsSeeded(anyMemberMethodNames, className, hostName, instanceName, 0, verbose))
+            set anyMirrorMemberMethodNames = $classmethod(className, "GetOrderedMethodsAnyMirrorMember")
+            $$$ThrowOnError(..SeedUpdateStepsFromList(anyMirrorMemberMethodNames, className, 0, verbose))
 
             // Seed primary only update steps
             set primaryOnlyMethodNames = $classmethod(className, "GetOrderedMethodsPrimaryOnly")
-            $$$ThrowOnError(..MarkStepsAsSeeded(primaryOnlyMethodNames, className, hostName, instanceName, 1, verbose))
+            $$$ThrowOnError(..SeedUpdateStepsFromList(primaryOnlyMethodNames, className, 1, verbose))
+
+            if verbose {
+                write !, "Done seeding steps for "_className
+            }
         }
     } catch (ex) {
         set sc = ex.AsStatus()
@@ -327,13 +302,12 @@ Method SeedUpdateSteps(verbose As %Boolean = 0) As %Status [ Internal ]
     quit sc
 }
 
-/// Helper method for SeedUpdateSteps() so that we don't have repeat code for the same list iteration for everything except mirrored info
-/// Iterates over a list of methods and seeds them
-Method MarkStepsAsSeeded(
+/// Iterates over a provided list of method names + class name and seeds their update steps by setting their TimeStampEnd values to imply they have been run
+/// Steps that already have TimeStampEnd defined (already been run/seeded) will be skipped
+/// Steps that don't exist yet will be created and immediately seeded
+Method SeedUpdateStepsFromList(
 	methodList As %DynamicArray,
 	className As %String,
-	hostName As %String,
-	instanceName As %String,
 	primaryOnly As %Boolean,
 	verbose As %Boolean = 0) As %Status [ Internal, Private ]
 {
@@ -341,11 +315,16 @@ Method MarkStepsAsSeeded(
     try {
         set iter = methodList.%GetIterator()
         while iter.%GetNext(, .methodName) {
-            set stepObj = ..GetAddUpdateStep(className, methodName, primaryOnly)
+            // Get update step object for this className + methodName. If one does not already exist, create a new one and seed it
+            set stepObj = ..GetUpdateStep(className, methodName, primaryOnly, 1)
             // Only seed steps that haven't already been run
             if 'stepObj.TimeStampEnd {
                 if verbose {
                     write !, $char(9)_"Seeding "_methodName_"()"
+                }
+                if primaryOnly {
+                    set stepObj.HostName = ##class(%SYS.System).GetNodeName()
+                    set stepObj.InstanceName = ##class(%SYS.System).GetInstanceName()
                 }
                 set stepObj.TimeStampEnd = $zdatetime($horolog,3)
                 $$$ThrowOnError(stepObj.%Save())

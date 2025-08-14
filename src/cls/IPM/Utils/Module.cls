@@ -479,7 +479,12 @@ ClassMethod LoadModuleFromDirectory(
             // Only propagate selected settings that should apply to dependencies.
             set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
             set tParams("Verbose") = tVerbose
-            set tParams("cmd") = "install"
+            zwrite tParams
+            if '$get(pParams("Update"),0) {
+                set tParams("cmd") = "install"
+            } else {
+                set tParams("cmd") = "update"
+            }
             merge tParams("NoLock") = pParams("NoLock")
             merge tParams("NoMapping") = pParams("NoMapping")
             merge tParams("NoTransaction") = pParams("NoTransaction")
@@ -1297,6 +1302,7 @@ ClassMethod LoadNewModule(
             // If the version of the module about to be installed is NEWER than the module that is already installed, then the action is considered an upgrade.
             // Do not allow the user to perform an update using the install or load commands. Unless, they use the -force flag or are installing in Developer Mode.
             if toVersion.Follows(fromVersion) && (($get(pParams("cmd")) = "install") || ($get(pParams("cmd")) = "load")) && '$get(pParams("Force"),0) && '$get(pParams("DeveloperMode"),0) {
+                zwrite pParams
                 set tMsg = "Cannot perform an update of "_tModuleName_" from version "_fromVersionString_
                 " to "_toVersionString_" using the 'install' or 'load' commands. Please use the 'update' command instead. "_
                 "If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'."

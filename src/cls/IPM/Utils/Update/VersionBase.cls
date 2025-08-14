@@ -1,16 +1,18 @@
-Include %IPM.Common
-
 Class %IPM.Utils.Update.VersionBase [ Abstract ]
 {
 
 /// Returns dynamic array of update method names to apply in order that can be run on both primary and backup
 /// Example output list: ["methodA", "methodB", "methodC"]
-ClassMethod GetOrderedMethodsAnyMember() As %Library.DynamicArray [ Abstract ]
+/// When mirror enabled: These steps will run on all members
+/// When mirror not enabled: These steps will be run on the instance
+ClassMethod GetOrderedMethodsAnyMirrorMember() As %Library.DynamicArray [ Abstract ]
 {
 }
 
 /// Returns dynamic array of update method names to apply in order that must be run on the primary
 /// Example output list: ["methodA", "methodB", "methodC"]
+/// When mirror enabled: These steps will run ONLY on the primary mirror member
+/// When mirror not enabled: These steps will be run on the instance
 ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray [ Abstract ]
 {
 }
@@ -30,12 +32,14 @@ ClassMethod GetUpdatePackageClassList(
         set tRes = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT * "_
             "FROM %Dictionary.CompiledClass "_
-            "WHERE Name LIKE '"_updatePackage_".%'")
+            "WHERE Name %STARTSWITH '"_updatePackage_".V'")
         if (tRes.%SQLCODE < 0) {
             throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
         }
         while tRes.%Next() {
+            // Class name is of the form UpdatePackage.V#
             set className = tRes.Name
+            // This strips everything except numbers following the '.' in the class name so we can isolate the # of this update class itself
             set classNum = $zstrip($piece(className, ".", *),"*E'N")
             set updatePackageClassList(classNum) = className
         }

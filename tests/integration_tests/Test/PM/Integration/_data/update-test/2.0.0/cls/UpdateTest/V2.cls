@@ -6,7 +6,7 @@ ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray
     return ["Method1", "Method3"]
 }
 
-ClassMethod GetOrderedMethodsAnyMember() As %Library.DynamicArray
+ClassMethod GetOrderedMethodsAnyMirrorMember() As %Library.DynamicArray
 {
     return ["Method2", "Will"]
 }

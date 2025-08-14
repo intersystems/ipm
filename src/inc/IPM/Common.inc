@@ -91,7 +91,5 @@ ROUTINE %IPM.Common [Type=INC]
 #Define DeployedProjectIndex "%Export","DeployedProject"
 
 #; Locking for module update framework
-#Define LockUpdateModule(%name) lock +^%IPM.Update(%name):3
-#Define UnlockUpdateModule(%name) lock -^%IPM.Update(%name)
-#Define LockUpdateModuleVersion(%name, %version) lock +^%IPM.Update(%name, %version):3
-#Define UnlockUpdateModuleVersion(%name, %version) lock -^%IPM.Update(%name, %version)
+#Define LockUpdateModule(%name) lock +^IPM.UpdateLock(%name):3
+#Define UnlockUpdateModule(%name) lock -^IPM.UpdateLock(%name)

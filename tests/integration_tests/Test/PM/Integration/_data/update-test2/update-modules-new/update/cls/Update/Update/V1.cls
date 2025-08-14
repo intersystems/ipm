@@ -1,4 +1,4 @@
-Class UpdateTest.V1 Extends %IPM.Utils.Update.VersionBase
+Class Update.Update.V1 Extends %IPM.Utils.Update.VersionBase
 {
 
 ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray
@@ -8,30 +8,24 @@ ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray
 
 ClassMethod GetOrderedMethodsAnyMirrorMember() As %Library.DynamicArray
 {
-    return ["MethodB", "Jest"]
+    return ["MethodB"]
 }
 
 ClassMethod MethodA() As %Status
 {
-    write !, "This is MethodA()"
+    write !, "This is Update.Update.V1::MethodA()"
     return $$$OK
 }
 
 ClassMethod MethodB() As %Status
 {
-    write !, "This is MethodB()"
+    write !, "This is Update.Update.V1::MethodB()"
     return $$$OK
 }
 
 ClassMethod MethodC() As %Status
 {
-    write !, "This is MethodC()"
-    return $$$OK
-}
-
-ClassMethod Jest() As %Status
-{
-    write !, "THIS IS METHOD JEST()"
+    write !, "This is Update.Update.V1::MethodC()"
     return $$$OK
 }
 
