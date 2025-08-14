@@ -180,12 +180,12 @@ Method ModuleNormalUpdateNoMirrorHelper(
 
       set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
       do $$$AssertNotEquals("", updateStep, "Update step with class="_className_" and method="_methodName_" exists.")
-      set timeStampArr(updateStep.UpdateStepClassMethodIdx) = updateStep.TimeStampEnd
+      set timeStampArr(updateStep.UpdateStepClassMethodIdx) = updateStep.TimeStampStart
     }
 
     // Update module
     set devFlag = $select(developerMode: "-dev", 1: "")
-    set tSC = ##class(%IPM.Main).Shell("update -v "_devFlag_moduleName_" "_toVersion)
+    set tSC = ##class(%IPM.Main).Shell("update -v "_devFlag_" "_moduleName_" "_toVersion)
     do $$$AssertStatusOK(tSC, "Updated module "_moduleName_" without error")
 
     // Check that seeded methods were not re-run
@@ -196,11 +196,11 @@ Method ModuleNormalUpdateNoMirrorHelper(
       set isPrimaryOnly = value.%Get(2)
 
       set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
-      do $$$AssertEquals(timeStampArr(updateStep.UpdateStepClassMethodIdx), updateStep.TimeStampEnd, "Seeded update step with class="_className_" and method="_methodName_" was correctly not rerun on update.")
+      do $$$AssertEquals(timeStampArr(updateStep.UpdateStepClassMethodIdx), updateStep.TimeStampStart, "Seeded update step with class="_className_" and method="_methodName_" was correctly not rerun on update.")
     }
 
     // Check whether correct UpdateStep rows exist in the correct table after update command is run
-    set updateSteps = ..AssertUpdateStepsExist(updateStepsToRun)
+    do ..AssertUpdateStepsExist(updateStepsToRun)
 
     // NOTE: For testing simplicity, we will always assume that in the update test, both the module and its dependencies are being updated
     // from and to the same version numbers.
@@ -219,9 +219,8 @@ Method ModuleNormalUpdateNoMirrorHelper(
 
 /// Asserts that each update method in the given array has a corresponding UpdateStep object of the correct subclass
 /// @params updateStepsList  Array of arrays, where each element is [className, methodName, isPrimaryOnly]
-Method AssertUpdateStepsExist(updateStepsList As %DynamicArray) As %DynamicArray
+Method AssertUpdateStepsExist(updateStepsList As %DynamicArray)
 {
-  set updateStepList = []
   set iter = updateStepsList.%GetIterator()
   while iter.%GetNext(.key, .value) {
     set className = value.%Get(0)
@@ -230,10 +229,7 @@ Method AssertUpdateStepsExist(updateStepsList As %DynamicArray) As %DynamicArray
 
     set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
     do $$$AssertNotEquals("", updateStep, "Update step with class="_className_" and method="_methodName_" exists.")
-    do updateStepList.%Push(updateStep)
   }
-
-  return updateStepList
 }
 
 Method AssertModuleInstalledCorrectly(
