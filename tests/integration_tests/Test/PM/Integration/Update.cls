@@ -170,7 +170,7 @@ Method ModuleNormalUpdateNoMirrorHelper(
     // Load module
     do ..AssertModuleInstalledCorrectly(moduleName, fromVersion)
 
-    // Verify that update steps were correctly seeded and capture the TimeStampEnd property for comparison
+    // Verify that update steps were correctly seeded and capture the TimeStampStart property for comparison
     set timeStampArr = []
     set iter = updateStepsToSeed.%GetIterator()
     while iter.%GetNext(.key, .value) {
@@ -210,9 +210,15 @@ Method ModuleNormalUpdateNoMirrorHelper(
     do $$$AssertEquals(module.VersionString, toVersion)
 
     // Check that dependency versions have been updated
-    set iter = module.Dependencies.%GetIterator()
-    while iter.%GetNext(.key, .value) {
-      do $$$AssertEquals(value.VersionString, toVersion)
+    // dependencyGraph format: dependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
+    set moduleName = ""
+    for {
+      set moduleName = $order(dependencyGraph(moduleName),1,moduleInfo)
+      quit:moduleName=""
+
+      set moduleVersion = $list(moduleInfo, 2)
+
+      do $$$AssertEquals(moduleVersion, toVersion)
     }
   }
 }
