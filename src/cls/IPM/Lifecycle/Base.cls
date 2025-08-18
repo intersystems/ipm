@@ -209,7 +209,7 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
         "configure":        "Configure",
         "unconfigure":      "Unconfigure",
         "applyupdatesteps": "ApplyUpdateSteps",
-        :               pOnePhase // return the phase as-is if it's a custom phase name
+        :                   pOnePhase // return the phase as-is if it's a custom phase name
     )
 }
 
@@ -1691,19 +1691,19 @@ Method %MakeDeployed(ByRef pParams) As %Status
 
 Method %ApplyUpdateSteps(ByRef pParams) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
         if $system.Mirror.IsMember() && $system.Mirror.IsPrimary() {
-            write !,"WARNING: You are running update steps on the primary instance of a mirrored federation. It is recommended to start the update process on a backup instance to minimize downtime."
+            write !,"WARNING: You are running update steps on the primary member of a mirror. It is recommended to start the update process on a backup instance to minimize downtime."
             write !,"If you have already run update on the backup instance, please disregard this warning."
         }
         set verbose = $get(pParams("Verbose"))
         // TODO: Add log file param after logging meeting discussion
         do ..Module.ApplyUpdatesInOrder(,verbose)
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 Method OnDetermineResourceDeployability(

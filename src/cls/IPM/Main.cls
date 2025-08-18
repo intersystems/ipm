@@ -55,8 +55,8 @@ This is accessible to other instances configured to look at the current namespac
 module repository.
 * publish: saves that artifact to the repository for which deployment is enabled.
 Currently, there may only be one of these per namespace.
-* applyupdatesteps: run any update steps for the module to become updated to the latest available version by default.
-Can also specify desired version to upgrade to.
+* applyupdatesteps: run any update steps for the module to become updated to the latest available version.
+Can also specify desired version to update to.
 </description>
 
 <!-- Examples -->
@@ -144,7 +144,7 @@ This command is an alias for `module-action module-name publish`
 <command name="update" dataPrefix="D">
 <summary>Updates a module to a newer version.</summary>
 <description>
-	Updates a module to a newer version. Also runs all of the update steps from the current version to the newer version.
+	Updates a module to a newer version. By default, updates to the latest available version. Also runs all of the update steps from the current version to the newer version.
 </description>
 
 <!-- Examples -->
@@ -154,13 +154,12 @@ This command is an alias for `module-action module-name publish`
 
 <!-- Parameters -->
 <parameter name="module" required="true" description="Name of module on which to perform update actions" />
-<parameter name="version" description="Version (or version expression) of module to update; defaults to the latest available if unspecified." />
+<parameter name="version" description="Version (or version expression) of module to update; defaults to the latest available if unspecified. Is ignored if -path is provided." />
 
 <!-- Modifiers -->
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="force" aliases="f" dataAlias="Force" dataValue="1" description="If specified, the module will be updated despite warnings." />
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format." />
-<modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module." />
+<modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 </command>
 
 <command name="makedeployed">
@@ -2142,7 +2141,12 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     set tForce = $$$HasModifier(pCommandInfo,"force")
     merge tParams = pCommandInfo("data")
-    set tParams("cmd") = "load"
+    // In the case of an update, pCommandInfo has already been pre-populated with the necessary information.
+    // Therefore, tParams needs to be populated here if this is a load command.
+    if '$get(tParams("Update"),0) {
+        set tParams("cmd") = "load"
+        set tParams("Load") = 1
+    }
     set tParams("Force") = tForce
     do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
     if $get(tComponents("scheme")) [ "http" {
@@ -2267,7 +2271,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
             set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
             set tParams("Force") = tForce
             // In the case of an update, pCommandInfo has already been pre-populated with the necessary information.
-            // Therefore, tParams needs to be populated if this is an install command.
+            // Therefore, tParams needs to be populated here if this is an install command.
             if '$get(tParams("Update"),0) {
                 set tParams("cmd") = "install"
                 set tParams("Install") = 1
@@ -3833,14 +3837,15 @@ ClassMethod Update(ByRef pCommandInfo)
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
-    set moduleCurrent = ##class(%IPM.Storage.Module).NameOpen(moduleName,.tSC)
-    $$$ThrowOnError(tSC)
-    if moduleCurrent = "" {
-        write !,"ERROR: Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update.",!
-        quit
+    if ##class(%IPM.Storage.Module).NameExists(moduleName,.id) {
+        $$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
+    set moduleCurrent = ##class(%IPM.Storage.Module).%OpenId(id,,.sc)
+    $$$ThrowOnError(sc)
     if verbose {
-        if version = "" {
+        if path '= "" {
+            write !,"Resolving version of module specified by path: ",path," to install",!
+        } elseif version = "" {
             write !,"Resolving latest available version of module ",moduleName," to install",!
         } else {
             write !,"Resolving new version ",version," of module ",moduleName," to install",!
