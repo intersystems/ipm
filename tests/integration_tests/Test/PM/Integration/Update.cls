@@ -49,26 +49,28 @@ Parameter ModuleTwoVersion As STRING = "2.1.1";
 
 Parameter ModuleThreeVersion As STRING = "3.5.0";
 
-Method OnBeforeAllTests() As %Status
+Parameter UpdateTestRepo As STRING = "update-test-modules";
+
+Method OnBeforeOneTest() As %Status
 {
   // Setup repo pointing to all modules used for tests in this class
-  set tSC = ##class(%IPM.Main).Shell("repo -n integration-tests -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/")
-  do $$$AssertStatusOK(tSC,"Created integration-tests repo successfully.")
-  return tSC
+  set sc = ##class(%IPM.Main).Shell("repo -n "_..#UpdateTestRepo_"-fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/update-test/")
+  do $$$AssertStatusOK(sc,"Created "_..#UpdateTestRepo_" repo successfully.")
+  return sc
 }
 
-Method OnAfterAllTests() As %Status
+Method OnAfterOneTest() As %Status
 {
   // Clean up repo used for tests
-  set tSC = ##class(%IPM.Main).Shell("repo -delete -name integration-tests")
-  do $$$AssertStatusOK(tSC,"Deleted integration-tests repo successfully.")
-  return tSC
+  set sc = ##class(%IPM.Main).Shell("repo -delete -name "_..#UpdateTestRepo)
+  do $$$AssertStatusOK(sc,"Deleted "_..#UpdateTestRepo_" repo successfully.")
+  return sc
 }
 
 Method TestModuleNormalUpdateNoMirror()
 {
   set updateStepsToSeed = [["Update.Update.V1", "MethodA", 1]]
-  set updateStepsToRun = [["Update.Update.V1", "MethodB", 0], ["Update.Update.V1", "MethodC", 1], ["Update.Update.V2", "MethodA", 1], ["Update.Update.V2", "MethodB", 0], ["Update.Update.V2", "MethodC", 1]]
+  set updateStepsToRun = [["Update.Update.V1", "MethodB", 0], ["Update.Update.V1", "MethodC", 1], ["Update.Update.V2", "MethodA", 1], ["Update.Update.V2", "MethodC", 1], ["Update.Update.V2", "MethodB", 0]]
 
   do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
   do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 1)
@@ -80,8 +82,8 @@ Method TestUpdateToOlderVersion()
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleTwoVersion)
 
   // Update module
-  set tSC = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
-  do $$$AssertStatusNotOK(tSC, "Attempt at updating module to older version failed.")
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
+  do $$$AssertStatusNotOK(sc, "Attempt at updating module to older version failed.")
 }
 
 Method TestUpdateToInvalidVersion()
@@ -90,8 +92,8 @@ Method TestUpdateToInvalidVersion()
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
 
   // Update module
-  set tSC = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" 1.0.0")
-  do $$$AssertStatusNotOK(tSC, "Attempt at updating module to non-existent version failed.")
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" 1.0.0")
+  do $$$AssertStatusNotOK(sc, "Attempt at updating module to non-existent version failed.")
 }
 
 Method TestUpdateToNewVersionTwice()
@@ -100,12 +102,12 @@ Method TestUpdateToNewVersionTwice()
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
 
   // Update module to a 2.x version
-  set tSC = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
-  do $$$AssertStatusOK(tSC, "Updated module to "_..#ModuleTwoVersion_" without error")
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
+  do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_" without error")
 
   // Update module to a 3.x version
-  set tSC = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleThreeVersion)
-  do $$$AssertStatusOK(tSC, "Updated module to "_..#ModuleThreeVersion_" without error")
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleThreeVersion)
+  do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleThreeVersion_" without error")
 }
 
 Method TestUpdateToSameVersionTwiceNoMirror()
@@ -114,8 +116,8 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
 
   // Update module to a 2.x version
-  set tSC = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
-  do $$$AssertStatusOK(tSC, "Updated module to "_..#ModuleTwoVersion_"without error")
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
+  do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_"without error")
 
   // Get timestamps of the V2 methods
   set stepTwoA = ..GetUpdateStep("Update.Update.V2", "MethodA", 1)
@@ -132,8 +134,8 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   set twoCEnd = stepTwoC.TimeStampEnd
 
   // Update module to SAME version
-  set tSC = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
-  do $$$AssertStatusOK(tSC, "Updated module to "_..#ModuleTwoVersion_"without error")
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
+  do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_"without error")
 
   // Check that second update does not rerun update steps
   // (timestamps on each update step should not have changed)
@@ -152,12 +154,12 @@ Method TestUpdateToSameVersionTwiceNoMirror()
 /// from and to the same version numbers.
 /// Completes an update of given moduleName from fromVersion to toVersion, verifying that the given updateStepsToSeed are seeded
 /// and that the given updateStepsToRun are run
-/// @params moduleName          Name of module to install and update
-/// @params updateStepsToSeed   Array of [className, methodName, isPrimaryOnlyStep] update steps that are defined in the module PRE-update
-/// @params updateStepsToRun    Array of [className, methodName, isPrimaryOnlyStep] update steps that exist in the new version of the module POST-update
-/// @params fromVersion         Version of module to install
-/// @params toVersion           Version of module to which to update
-/// @params developerMode       1 if update should be run with -dev flag, 0 otherwise
+/// @argument moduleName          Name of module to install and update
+/// @argument updateStepsToSeed   Array of [className, methodName, isPrimaryOnlyStep] update steps that are defined in the module PRE-update
+/// @argument updateStepsToRun    Array of [className, methodName, isPrimaryOnlyStep] update steps that exist in the new version of the module POST-update
+/// @argument fromVersion         Version of module to install
+/// @argument toVersion           Version of module to which to update
+/// @argument developerMode       1 if update should be run with -dev flag, 0 otherwise
 Method ModuleNormalUpdateNoMirrorHelper(
 	moduleName As %String,
 	updateStepsToSeed As %DynamicArray,
@@ -166,60 +168,61 @@ Method ModuleNormalUpdateNoMirrorHelper(
 	toVersion As %String,
 	developerMode As %Boolean = 0)
 {
-  if '$system.Mirror.IsMember() {
-    // Load module
-    do ..AssertModuleInstalledCorrectly(moduleName, fromVersion)
+  if $system.Mirror.IsMember() {
+    return
+  }
+  // Load module
+  do ..AssertModuleInstalledCorrectly(moduleName, fromVersion)
 
-    // Verify that update steps were correctly seeded and capture the TimeStampStart property for comparison
-    set timeStampArr = []
-    set iter = updateStepsToSeed.%GetIterator()
-    while iter.%GetNext(.key, .value) {
-      set className = value.%Get(0)
-      set methodName = value.%Get(1)
-      set isPrimaryOnly = value.%Get(2)
+  // Verify that update steps were correctly seeded and capture the TimeStampStart property for comparison
+  set timeStampArr = []
+  set iter = updateStepsToSeed.%GetIterator()
+  while iter.%GetNext(.key, .value) {
+    set className = value.%Get(0)
+    set methodName = value.%Get(1)
+    set isPrimaryOnly = value.%Get(2)
 
-      set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
-      do $$$AssertNotEquals("", updateStep, "Update step with class="_className_" and method="_methodName_" exists.")
-      set timeStampArr(updateStep.UpdateStepClassMethodIdx) = updateStep.TimeStampStart
-    }
+    set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
+    do $$$AssertNotEquals("", updateStep, "Update step with class="_className_" and method="_methodName_" exists.")
+    set timeStampArr(className, methodName, isPrimaryOnly) = updateStep.TimeStampStart
+  }
 
-    // Update module
-    set devFlag = $select(developerMode: "-dev", 1: "")
-    set tSC = ##class(%IPM.Main).Shell("update -v "_devFlag_" "_moduleName_" "_toVersion)
-    do $$$AssertStatusOK(tSC, "Updated module "_moduleName_" without error")
+  // Update module
+  set devFlag = $select(developerMode: "-dev", 1: "")
+  set sc = ##class(%IPM.Main).Shell("update -v "_devFlag_" "_moduleName_" "_toVersion)
+  do $$$AssertStatusOK(sc, "Updated module "_moduleName_" without error")
 
-    // Check that seeded methods were not re-run
-    set iter = updateStepsToSeed.%GetIterator()
-    while iter.%GetNext(.key, .value) {
-      set className = value.%Get(0)
-      set methodName = value.%Get(1)
-      set isPrimaryOnly = value.%Get(2)
+  // Check that seeded methods were not re-run
+  set iter = updateStepsToSeed.%GetIterator()
+  while iter.%GetNext(.key, .value) {
+    set className = value.%Get(0)
+    set methodName = value.%Get(1)
+    set isPrimaryOnly = value.%Get(2)
 
-      set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
-      do $$$AssertEquals(timeStampArr(updateStep.UpdateStepClassMethodIdx), updateStep.TimeStampStart, "Seeded update step with class="_className_" and method="_methodName_" was correctly not rerun on update.")
-    }
+    set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
+    do $$$AssertEquals(timeStampArr(className, methodName, isPrimaryOnly), updateStep.TimeStampStart, "Seeded update step with class="_className_" and method="_methodName_" was correctly not rerun on update.")
+  }
 
-    // Check whether correct UpdateStep rows exist in the correct table after update command is run
-    do ..AssertUpdateStepsExist(updateStepsToRun)
+  // Check whether correct UpdateStep rows exist in the correct table after update command is run
+  do ..AssertUpdateStepsExist(updateStepsToRun)
 
-    // NOTE: For testing simplicity, we will always assume that in the update test, both the module and its dependencies are being updated
-    // from and to the same version numbers.
+  // NOTE: For testing simplicity, we will always assume that in the update test, both the module and its dependencies are being updated
+  // from and to the same version numbers.
 
-    // Check module version has been updated
-    set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
-    do $$$AssertEquals(module.VersionString, toVersion)
+  // Check module version has been updated
+  set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+  do $$$AssertEquals(module.VersionString, toVersion)
 
-    // Check that dependency versions have been updated
-    // dependencyGraph format: dependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
-    set moduleName = ""
-    for {
-      set moduleName = $order(dependencyGraph(moduleName),1,moduleInfo)
-      quit:moduleName=""
+  // Check that dependency versions have been updated
+  // dependencyGraph format: dependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
+  set moduleName = ""
+  for {
+    set moduleName = $order(dependencyGraph(moduleName),1,moduleInfo)
+    quit:moduleName=""
 
-      set moduleVersion = $list(moduleInfo, 2)
+    set moduleVersion = $list(moduleInfo, 2)
 
-      do $$$AssertEquals(moduleVersion, toVersion)
-    }
+    do $$$AssertEquals(moduleVersion, toVersion)
   }
 }
 
@@ -242,8 +245,8 @@ Method AssertModuleInstalledCorrectly(
 	moduleName As %String,
 	moduleVersion As %String)
 {
-  set tSC = ##class(%IPM.Main).Shell("install -v "_moduleName_" "_moduleVersion)
-  do $$$AssertStatusOK(tSC, "Loaded module successfully")
+  set sc = ##class(%IPM.Main).Shell("install -v "_moduleName_" "_moduleVersion)
+  do $$$AssertStatusOK(sc, "Loaded module successfully")
 }
 
 ClassMethod GetUpdateStep(
