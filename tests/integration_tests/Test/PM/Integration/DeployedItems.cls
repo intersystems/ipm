@@ -5,79 +5,95 @@ Parameter ModuleFolder = "deployable-test";
 
 Parameter ModuleName = "deployable-test";
 
+Method OnBeforeAllTests() As %Status
+{
+    // Enable interoperability to satisfy SystemRequirements
+    set sc = $$$OK
+    do $$$AssertStatusOK(##class(%EnsembleMgr).EnableNamespace($namespace))
+    return sc
+}
+
+Method OnAfterAllTests() As %Status
+{
+    // Disable interoperability
+    set sc = $$$OK
+    do $$$AssertStatusOK(##class(%EnsembleMgr).DisableNamespace($namespace))
+    return sc
+}
+
 Method TestDeployedItems()
 {
-    Do ..SetupModule()
+    do ..SetupModule()
 
-    Set tmpDir = $$$FileTempDir _ "package"
-    Set sc = ##class(%IPM.Main).Shell("package " _..#ModuleName _ " -v -path " _ tmpDir)
-    Do $$$AssertStatusOK(sc, "Successfully packaged module to "_tmpDir)
-    Do ..SetupOrasReigstry()
-    Set sc = ##class(%IPM.Main).Shell("publish "_..#ModuleName)
-    Do $$$AssertStatusOK(sc, "Successfully published module")
-    Do ..UninstallModule()
+    set tmpDir = $$$FileTempDir _ "package"
+    set sc = ##class(%IPM.Main).Shell("package " _..#ModuleName _ " -v -path " _ tmpDir)
+    do $$$AssertStatusOK(sc, "Successfully packaged module to "_tmpDir)
+    do ..SetupOrasRegistry()
+    set sc = ##class(%IPM.Main).Shell("publish "_..#ModuleName)
+    do $$$AssertStatusOK(sc, "Successfully published module")
+    do ..UninstallModule()
 
-    Set sc = ##class(%IPM.Main).Shell("load -v "_tmpDir)
-    Do $$$AssertStatusOK(sc, "Successfully loaded module with deployed items at "_tmpDir)
-    Do ..RunDeployedCode()
-    Do ..UninstallModule()
+    set sc = ##class(%IPM.Main).Shell("load -v "_tmpDir)
+    do $$$AssertStatusOK(sc, "Successfully loaded module with deployed items at "_tmpDir)
+    do ..RunDeployedCode()
+    do ..UninstallModule()
 
-    Set sc = ##class(%IPM.Main).Shell("install "_..#ModuleName)
-    Do $$$AssertStatusOK(sc, "Successfully installed module")
+    set sc = ##class(%IPM.Main).Shell("install "_..#ModuleName)
+    do $$$AssertStatusOK(sc, "Successfully installed module")
 
-    Do ..RunDeployedCode()
-    Do ..UninstallModule()
-    Do ..RestoreDefaultReigstry()
+    do ..RunDeployedCode()
+    do ..UninstallModule()
+    do ..RestoreDefaultReigstry()
 }
 
 Method SetupModule()
 {
-    Set folder = ..GetModuleDir(..#ModuleFolder)
-    Set sc = ##class(%IPM.Main).Shell("load -v "_folder)
-    Do $$$AssertStatusOK(sc, "Successfully loaded module at "_folder)
+    set folder = ..GetModuleDir(..#ModuleFolder)
+    set sc = ##class(%IPM.Main).Shell("load -v "_folder)
+    do $$$AssertStatusOK(sc, "Successfully loaded module at "_folder)
 
-    Set sc = ##class(%IPM.Main).Shell(..#ModuleName _ " makedeployed -v")
-    Do $$$AssertStatusOK(sc, "Successfully ran MakeDeployed")
+    set sc = ##class(%IPM.Main).Shell(..#ModuleName _ " makedeployed -v")
+    do $$$AssertStatusOK(sc, "Successfully ran MakeDeployed")
 }
 
 Method UninstallModule()
 {
-    Set sc = ##class(%IPM.Main).Shell("uninstall "_..#ModuleName)
-    Do $$$AssertStatusOK(sc, "Successfully uninstalled module")
-    Try {
-        Do ##class(DeployableTest.Main).Hello()
-        Do $$$AssertFailure("Should not be able to run method after uninstall")
-    } Catch ex {
-        Do $$$AssertSuccess("Run method after uninstall failed as expected")
+    set sc = ##class(%IPM.Main).Shell("uninstall "_..#ModuleName)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled module")
+    try {
+        do ##class(DeployableTest.Main).Hello()
+        do $$$AssertFailure("Should not be able to run method after uninstall")
+    } catch ex {
+        do $$$AssertSuccess("Run method after uninstall failed as expected")
     }
 }
 
 Method RunDeployedCode()
 {
-    Try {
-        Do ##class(DeployableTest.Main).Hello()
-        Do $$$AssertSuccess("Successfully ran method from deployed item")
-    } Catch ex {
-        Do $$$AssertFailure("Failed to run method from deployed item: "_ex.AsStatus())
+    try {
+        do ##class(DeployableTest.Main).Hello()
+        do $$$AssertSuccess("Successfully ran method from deployed item")
+    } catch ex {
+        do $$$AssertFailure("Failed to run method from deployed item: "_ex.AsStatus())
     }
 }
 
-Method SetupOrasReigstry()
+Method SetupOrasRegistry()
 {
-    Set sc = ##class(%IPM.Main).Shell("repo -delete-all")
-    Do $$$AssertStatusOK(sc, "Successfully deleted modules")
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc, "Successfully deleted modules")
 
-    Set sc = ##class(%IPM.Main).Shell("repo -name oras -o -url http://oras:5000 -publish 1")
-    Do $$$AssertStatusOK(sc, "Successfully setup oras registry")
+    set sc = ##class(%IPM.Main).Shell("repo -name oras -o -url http://oras:5000 -publish 1")
+    do $$$AssertStatusOK(sc, "Successfully setup oras registry")
 }
 
 Method RestoreDefaultReigstry()
 {
-    Set sc = ##class(%IPM.Main).Shell("repo -delete-all")
-    Do $$$AssertStatusOK(sc, "Successfully deleted modules")
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc, "Successfully deleted modules")
 
-    Set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
-    Do $$$AssertStatusOK(sc, "Successfully reset repo to defaults")
+    set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
+    do $$$AssertStatusOK(sc, "Successfully reset repo to defaults")
 }
 
 }
