@@ -224,7 +224,7 @@ Method AssertModuleInstalledCorrectly(
 ClassMethod GetUpdateStep(
 	className As %String,
 	methodName As %String,
-	isPrimaryOnly As %Boolean) As %IPM.Storage.UpdateStep
+	isPrimaryOnly As %Boolean) As %IPM.Storage.UpdateStep.Base
 {
   if isPrimaryOnly {
     set step = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
