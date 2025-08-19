@@ -1,48 +1,8 @@
 Class Test.PM.Integration.Update Extends Test.PM.Integration.Base
 {
 
-Parameter ModuleNoDependencies As STRING = "update";
+Parameter ModuleNoDependencies As STRING = "update-simple";
 
-/// Update testing TO-DOs:
-/// 1. Create the following modules:
-/// 
-/// - (X) Module without dependencies (simplest case)
-/// - Module with dependencies
-/// - Module with dependencies added as part of an update
-/// - Module with dependencies removed as part of an update
-/// - Module without any update methods (in either the current or updated module)
-/// - Module with update methods but no seeded steps
-/// - Module with new update method added to an older major version
-/// - Module with changed update method order for the current major version
-/// - Module with an update step that throws an error
-/// - Module with a dependency whose update step that throws an error
-/// - Module with an <Invoke> that throws an error during a lifecycle phase
-/// - Module with a dependency with an <Invoke> that throws an error during a lifecycle phase
-/// 
-/// 2. (X) Create a generic update test to be run on all the modules WITHOUT ERRORS that does the following:
-///  Note: Run it once with -dev flag
-/// - Rows have been added to the UpdateStep table for each update method in the appropriate range of V# classes for 1) the base module and 2) each of its dependencies
-/// - The correct update steps are run (e.g. starting at the correct step within the correct major version)
-/// - (SKIPPING FOR NOW) Logging is correctly outputted to the (optionally provided) log file or standard output.
-/// - Correct versions of dependency modules are installed
-/// 
-/// 3. Create a generic update test to be run on all the modules WITH ERRORS:
-/// - All update-related logic is rolled back (the old module is still installed and no new UpdateStep objects exist)
-/// - Errors are logged appropriately in the (optionally provided) log file or standard output.
-/// 
-/// 4. Create tests for the following cases (to be run on the simplest module):
-/// - (X) Running update twice on the same module to new version is successful
-/// - (X) Running update with an older version throws an error immediately
-/// - (X) Running update with a version that doesn't exist in any configured repository throws an error immediately
-/// - (X) Running the same update command twice in a row results in a no-op on all update steps the second time
-/// - Running update on a module that has not been installed
-/// 
-/// 5. Create tests for trying to update the same module at the same time in the same namespace fails
-/// 6. Create test for running update AFTER an an update process was killed mid-update is successful
-/// 7. Create test that verifies the correct steps have been run after update depending on mirror membership.
-/// 8. Update CI pipeline to add another IRIS instance which is mirrored. Initialize the main IRIS container as the primary and the new container as the backup.
-/// 9. Update tests above to be mirror-aware.
-/// - Check that the correct subset of update steps are run on each mirror member corresponding to its mirror membership types
 Parameter ModuleOneVersion As STRING = "1.2.1";
 
 Parameter ModuleTwoVersion As STRING = "2.1.1";
@@ -69,8 +29,8 @@ Method OnAfterOneTest() As %Status
 
 Method TestModuleNormalUpdateNoMirror()
 {
-  set updateStepsToSeed = [["Update.Update.V1", "MethodA", 1]]
-  set updateStepsToRun = [["Update.Update.V1", "MethodB", 0], ["Update.Update.V1", "MethodC", 1], ["Update.Update.V2", "MethodA", 1], ["Update.Update.V2", "MethodC", 1], ["Update.Update.V2", "MethodB", 0]]
+  set updateStepsToSeed = [["UpdatePackage.V1", "MethodA", 1]]
+  set updateStepsToRun = [["UpdatePackage.V1", "MethodB", 0], ["UpdatePackage.V1", "MethodC", 1], ["UpdatePackage.V2", "MethodA", 1], ["UpdatePackage.V2", "MethodC", 1], ["UpdatePackage.V2", "MethodB", 0]]
 
   do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
   do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 1)
@@ -84,6 +44,7 @@ Method TestUpdateToOlderVersion()
   // Update module
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
   do $$$AssertStatusNotOK(sc, "Attempt at updating module to older version failed.")
+  do $$$AssertTrue((sc [ "version"), "Error message is descriptive and correctly mentions 'version'")
 }
 
 Method TestUpdateToInvalidVersion()
@@ -112,6 +73,9 @@ Method TestUpdateToNewVersionTwice()
 
 Method TestUpdateToSameVersionTwiceNoMirror()
 {
+  if $system.Mirror.IsMember() {
+    return
+  }
   // Load module
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
 
@@ -120,9 +84,9 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_"without error")
 
   // Get timestamps of the V2 methods
-  set stepTwoA = ..GetUpdateStep("Update.Update.V2", "MethodA", 1)
-  set stepTwoB = ..GetUpdateStep("Update.Update.V2", "MethodB", 0)
-  set stepTwoC = ..GetUpdateStep("Update.Update.V2", "MethodC", 1)
+  set stepTwoA = ..GetUpdateStep("UpdatePackage.V2", "MethodA", 1)
+  set stepTwoB = ..GetUpdateStep("UpdatePackage.V2", "MethodB", 0)
+  set stepTwoC = ..GetUpdateStep("UpdatePackage.V2", "MethodC", 1)
 
   set twoAStart = stepTwoA.TimeStampStart
   set twoAEnd = stepTwoA.TimeStampEnd
@@ -136,6 +100,11 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   // Update module to SAME version
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_"without error")
+
+  // Reload UpdateStep persistence to get the (hopefully not updated) version
+  set stepTwoA = ..GetUpdateStep("UpdatePackage.V2", "MethodA", 1)
+  set stepTwoB = ..GetUpdateStep("UpdatePackage.V2", "MethodB", 0)
+  set stepTwoC = ..GetUpdateStep("UpdatePackage.V2", "MethodC", 1)
 
   // Check that second update does not rerun update steps
   // (timestamps on each update step should not have changed)
@@ -183,7 +152,7 @@ Method ModuleNormalUpdateNoMirrorHelper(
     set isPrimaryOnly = value.%Get(2)
 
     set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
-    do $$$AssertNotEquals("", updateStep, "Update step with class="_className_" and method="_methodName_" exists.")
+    do $$$AssertTrue(%IsObject(updateStep), "Update step with class="_className_" and method="_methodName_" exists.")
     set timeStampArr(className, methodName, isPrimaryOnly) = updateStep.TimeStampStart
   }
 
@@ -200,6 +169,7 @@ Method ModuleNormalUpdateNoMirrorHelper(
     set isPrimaryOnly = value.%Get(2)
 
     set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
+    do $$$AssertTrue(%IsObject(updateStep), "Update step with class="_className_" and method="_methodName_" exists.")
     do $$$AssertEquals(timeStampArr(className, methodName, isPrimaryOnly), updateStep.TimeStampStart, "Seeded update step with class="_className_" and method="_methodName_" was correctly not rerun on update.")
   }
 
@@ -215,6 +185,8 @@ Method ModuleNormalUpdateNoMirrorHelper(
 
   // Check that dependency versions have been updated
   // dependencyGraph format: dependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
+  set sc = module.BuildDependencyGraph(.dependencyGraph)
+  do $$$AssertStatusOK(sc, "%IPM.Storage.Module::BuildDependencyGraph() completed successfully on the updated module.")
   set moduleName = ""
   for {
     set moduleName = $order(dependencyGraph(moduleName),1,moduleInfo)
@@ -237,7 +209,7 @@ Method AssertUpdateStepsExist(updateStepsList As %DynamicArray)
     set isPrimaryOnly = value.%Get(2)
 
     set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
-    do $$$AssertNotEquals("", updateStep, "Update step with class="_className_" and method="_methodName_" exists.")
+    do $$$AssertTrue(%IsObject(updateStep), "Update step with class="_className_" and method="_methodName_" exists.")
   }
 }
 
