@@ -32,8 +32,15 @@ Method TestModuleNormalUpdateNoMirror()
   set updateStepsToSeed = [["UpdatePackage.V1", "MethodA", 1]]
   set updateStepsToRun = [["UpdatePackage.V1", "MethodB", 0], ["UpdatePackage.V1", "MethodC", 1], ["UpdatePackage.V2", "MethodA", 1], ["UpdatePackage.V2", "MethodC", 1], ["UpdatePackage.V2", "MethodB", 0]]
 
+  // No dev mode, install
   do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
+
+  // Dev mode, install
   do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 1)
+
+  // No dev mode, load
+  set exportDir = $system.Util.ManagerDirectory()
+  do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 1, exportDir)
 }
 
 Method TestUpdateToOlderVersion()
@@ -135,12 +142,19 @@ Method ModuleNormalUpdateNoMirrorHelper(
 	updateStepsToRun As %DynamicArray,
 	fromVersion As %String,
 	toVersion As %String,
-	developerMode As %Boolean = 0)
+	developerMode As %Boolean = 0,
+	pathToModule As %String = "")
 {
   if $system.Mirror.IsMember() {
     return
   }
-  // Load module
+
+  // Package module to update to (if we want to test updating from a tarball)
+  if pathToModule {
+    do ..AssertModulePackagedCorrectly(moduleName, toVersion, pathToModule)
+  }
+
+  // Install module
   do ..AssertModuleInstalledCorrectly(moduleName, fromVersion)
 
   // Verify that update steps were correctly seeded and capture the TimeStampStart property for comparison
@@ -156,9 +170,10 @@ Method ModuleNormalUpdateNoMirrorHelper(
     set timeStampArr(className, methodName, isPrimaryOnly) = updateStep.TimeStampStart
   }
 
-  // Update module
-  set devFlag = $select(developerMode: "-dev", 1: "")
-  set sc = ##class(%IPM.Main).Shell("update -v "_devFlag_" "_moduleName_" "_toVersion)
+  // Update module (with appropriate flags)
+  set devFlag = $select(developerMode: " -dev ", 1: "")
+  set pathFlag = $select(pathToModule: " -path="_pathToModule, 1: "")
+  set sc = ##class(%IPM.Main).Shell("update -v"_devFlag_pathFlag_moduleName_" "_toVersion)
   do $$$AssertStatusOK(sc, "Updated module "_moduleName_" without error")
 
   // Check that seeded methods were not re-run
@@ -186,7 +201,7 @@ Method ModuleNormalUpdateNoMirrorHelper(
   // Check that dependency versions have been updated
   // dependencyGraph format: dependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
   set sc = module.BuildDependencyGraph(.dependencyGraph)
-  do $$$AssertStatusOK(sc, "%IPM.Storage.Module::BuildDependencyGraph() completed successfully on the updated module.")
+  $$$ThrowOnError(sc)
   set moduleName = ""
   for {
     set moduleName = $order(dependencyGraph(moduleName),1,moduleInfo)
@@ -196,6 +211,24 @@ Method ModuleNormalUpdateNoMirrorHelper(
 
     do $$$AssertEquals(moduleVersion, toVersion)
   }
+}
+
+ClassMethod AssertModulePackagedCorrectly(
+	moduleName As %String,
+	version As %String,
+	packageDir As %String)
+{
+  // Initial install of module (necessary to be able to package)
+  set sc = ##class(%IPM.Main).Shell("install "_moduleName_" "_version)
+  do $$$AssertStatusOK(sc,"Installed "_moduleName_" version = "_version_" successfully.")
+
+  // Package module
+  set sc = ##class(%IPM.Main).Shell(_moduleName_" package -only -v -DPath="_packageDir)
+  do $$$AssertStatusOK(sc, "Successfully packaged module to "_packageDir)
+
+  // Uninstall module
+  set sc = ##class(%IPM.Main).Shell("uninstall "_moduleName_" "_version)
+  do $$$AssertStatusOK(sc,"Uninstalled "_moduleName_" version = "_version_" successfully after packaging.")
 }
 
 /// Asserts that each update method in the given array has a corresponding UpdateStep object of the correct subclass
