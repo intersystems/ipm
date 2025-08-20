@@ -1,4 +1,4 @@
-/// For a module a module requires steps to be run when updating to a new version, define those steps in a class named <UpdatePackage>.V#.
+/// For a module that requires steps to be run when updating to a new version, define those steps in a class named <UpdatePackage>.V#.
 /// Have that class extend this one and overwrite the two "GetOrdered" methods with a list of method names.
 /// These method names are the steps, defined in <UpdatePackage>.V#.cls, that should be run, in order, on a module update
 Class %IPM.General.Update.VersionBase [ Abstract ]

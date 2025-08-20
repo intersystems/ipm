@@ -94,6 +94,7 @@ Method HandleAllUpdateSteps(
 	seedSteps As %Boolean = 0,
 	verbose As %Boolean = 0) As %Status
 {
+    set sc = $$$OK
     // Only need to acquire lock when applying the steps, not when seeding them
     if 'seedSteps {
         if verbose {
@@ -101,11 +102,10 @@ Method HandleAllUpdateSteps(
         }
         $$$LockUpdateModule(..Name)
         if ('$test) {
-            return $$$OK
+            return sc
         }
     }
 
-    set sc = $$$OK
     try {
         $$$ThrowOnError(##class(%IPM.General.Update.VersionBase).GetUpdatePackageClassList(..UpdatePackage, .classList))
         set keyVersion = ""
@@ -125,7 +125,7 @@ Method HandleAllUpdateSteps(
                 }
             }
 
-            // Don't want newStepToApply (execution of all subsequent steps when seeing a new one) to persist across versions
+            // Don't want newStepToApply (execution of all subsequent steps when encountering a new one) to persist across versions
             set newStepToApply = 0
             if $system.CLS.IsMthd(className, "GetOrderedMethods") {
                 set orderedMethodNames = $classmethod(className, "GetOrderedMethods")
@@ -182,11 +182,14 @@ Method HandleUpdateStepsFromList(
             do ..SeedUpdateStep(stepObj, primaryOnly, verbose)
         }
         else {
-            // If it's a primary only step and this member is in the mirror but not a primary, don't execute it
-            if primaryOnly && $system.Mirror.IsMember() && '$system.Mirror.IsPrimary() {
-                continue
+            // Once we come across a step that hasn't been run/seeded, mark newStepToApply as true.
+            // This indicates that we should run all subsequent steps, regardless of their current status
+            if 'newStepToApply && 'stepObj.TimeStampEnd {
+                set newStepToApply = 1
             }
-            do ..ExecuteUpdateStep(stepObj, primaryOnly, .newStepToApply, verbose)
+            if newStepToApply {
+                do ..ExecuteUpdateStep(stepObj, primaryOnly, verbose)
+            }
         }
     }
 }
@@ -212,7 +215,7 @@ Method SeedUpdateStep(
     }
     else {
         if verbose {
-            write !, $char(9)_"Skipping seeding "_updateStep.MethodName_"() (already seeded)"
+            write !, $char(9)_"Skipping seeding "_updateStep.MethodName_"() (already run or seeded)"
         }
     }
 }
@@ -224,35 +227,33 @@ Method SeedUpdateStep(
 Method ExecuteUpdateStep(
 	updateStep As %IPM.Storage.UpdateStep.Base,
 	primaryOnly As %Boolean,
-	ByRef newStepToApply As %Boolean = 0,
 	verbose As %Boolean = 0)
 {
-    // Once we come across a step that hasn't been run/seeded, mark newStepToApply as true.
-    // This indicates that we should run all subsequent steps, regardless of their current status
-    if 'newStepToApply && 'updateStep.TimeStampEnd {
-        set newStepToApply = 1
+    // If it's a primary only step and this member is in the mirror but not a primary, don't execute it
+    if primaryOnly && $system.Mirror.IsMember() && '$system.Mirror.IsPrimary() {
+        if verbose {
+            write !, $char(9)_"Skipping "_updateStep.MethodName_"(). This step is to be run on the mirror primary only."
+        }
+        quit
     }
-    if newStepToApply {
-        if verbose {
-            write !, $char(9)_"Running "_updateStep.MethodName_"()"
-        }
-        if primaryOnly {
-            set updateStep.HostName = ##class(%SYS.System).GetNodeName()
-            set updateStep.InstanceName = ##class(%SYS.System).GetInstanceName()
-        }
-        set updateStep.TimeStampStart = $zdatetime($horolog,3)
-        set updateStep.Status = $$$OK
-        try {
-
-            $$$ThrowOnError($classmethod(updateStep.ClassName, updateStep.MethodName))
-        } catch (ex) {
-            set updateStep.Status = ex.AsStatus()
-        }
+    if verbose {
+        write !, $char(9)_"Running "_updateStep.MethodName_"()"
+    }
+    if primaryOnly {
+        set updateStep.HostName = ##class(%SYS.System).GetNodeName()
+        set updateStep.InstanceName = ##class(%SYS.System).GetInstanceName()
+    }
+    set updateStep.TimeStampStart = $zdatetime($horolog,3)
+    set updateStep.Status = $$$OK
+    try {
+        $$$ThrowOnError($classmethod(updateStep.ClassName, updateStep.MethodName))
         set updateStep.TimeStampEnd = $zdatetime($horolog,3)
-        $$$ThrowOnError(updateStep.%Save())
-        if verbose {
-            write !, $char(9)_updateStep.MethodName_"() Finished"
-        }
+    } catch (ex) {
+        set updateStep.Status = ex.AsStatus()
+    }
+    $$$ThrowOnError(updateStep.%Save())
+    if verbose {
+        write !, $char(9)_updateStep.MethodName_"() Finished"
     }
 }
 
