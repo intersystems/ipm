@@ -31,8 +31,6 @@ Method %Clean(ByRef pParams) As %Status
 
 Method %Activate(ByRef pParams) As %Status
 {
-    write "NOJAC"
-    zwrite pParams
     set tSC = $$$OK
     try {
         set tSC = ##super(.pParams)
@@ -41,7 +39,7 @@ Method %Activate(ByRef pParams) As %Status
         set tSC = ..Configure(.pParams)
         $$$ThrowOnError(tSC)
 
-        set tVerbose = $get(pParams("Verbose"))
+        set verbose = $get(pParams("Verbose"))
         // Create Studio project for package if it is loaded in developer mode and no explicit statement to not create it
         set tNoStudioProject = $get(pParams("NoStudioProject"), 0)
         if ..Module.DeveloperMode && 'tNoStudioProject {
@@ -49,7 +47,7 @@ Method %Activate(ByRef pParams) As %Status
             // Do not throw exceptions if failure to create because creating a Studio project should not block activation.
             // Just write the exception if in verbose mode
             set tStudioProjectSC = ..Module.GetStudioProject(.tProject)
-            if tVerbose {
+            if verbose {
                 if $$$ISOK(tStudioProjectSC) {
                     write !, "Studio project created/updated: " _ tProject.Name _ ".PRJ"
                 } else {
@@ -59,10 +57,10 @@ Method %Activate(ByRef pParams) As %Status
             }
         }
         if '$get(pParams("Update")) && '..Module.DeveloperMode {
-            if tVerbose {
-                write !, "Seeding update steps for module ",..Module.Name, ", for version ", ..Module.VersionString, !
+            if verbose {
+                write !, "Seeding update steps for module = ",..Module.Name, ", for version = ", ..Module.VersionString, !
             }
-            $$$ThrowOnError(..Module.SeedAllUpdateSteps(tVerbose))
+            $$$ThrowOnError(..Module.SeedAllUpdateSteps(verbose))
         }
     } catch e {
         set tSC = e.AsStatus()

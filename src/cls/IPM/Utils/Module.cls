@@ -225,7 +225,6 @@ ClassMethod LoadQualifiedReference(
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        zwrite tReference
         set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pSynchronous)
     } catch e {
         set tSC = e.AsStatus()
@@ -243,8 +242,6 @@ ClassMethod LoadModuleReference(
 	ByRef pDependencyGraph,
 	pSynchronous As %Boolean = 0) As %Status
 {
-    write "JAC!"
-    zwrite pParams
     // Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
     set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
 
@@ -1214,6 +1211,7 @@ ClassMethod LoadNewModule(
         set tVerbose = $get(pParams("Verbose"))
         set tUseTransactions = '($get(pParams("NoTransaction"),0) || $get(pParams("NoJournal"),0))
         set isUpdate = $get(params("Update"),0)
+        set isLoad = $get(params("Load"),0)
         if '$data(pParams("qstruct")) {
             set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
         }
@@ -1240,9 +1238,10 @@ ClassMethod LoadNewModule(
         set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
 
         set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
-        if foundNewModuleObj {
-            do ..CheckOperationVersionValidity(.newModuleObj, .pParams, .sc)
-            $$$ThrowOnError(sc)
+        // Note that for update/install commands, the operation version validity has already been checked in %IPM.Main.Install().
+        if isLoad && foundNewModuleObj {
+            // Check that the module currently installed is not being downgraded. Also check that "load" is not being used to update a module, unless the -force flag is passed.
+            do ..CheckOperationVersionValidity(.newModuleObj, .pParams)
         }
 
         if ($get(pParams("NoJournal"),0) '= 0) {
@@ -1283,23 +1282,20 @@ ClassMethod LoadNewModule(
             }
         }
 
-        // If we found the newModuleObj before, then just use that. No need to re-open the object.
-        if 'foundNewModuleObj {
-            set newModuleObj = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
-            $$$ThrowOnError(tSC)
-        }
+        set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
+        $$$ThrowOnError(tSC)
 
-        set newModuleObj.Repository = pRepository
+        set tModule.Repository = pRepository
 
         if $data(pParams("DeveloperMode"),tDeveloperMode) {
             // Mark module as not deployed if installing with dev mode
-            set newModuleObj.Deployed = 0
-            set newModuleObj.DeveloperMode = tDeveloperMode
-            set newModuleObj.Root = pDirectory
-            set tSC = newModuleObj.%Save()
+            set tModule.Deployed = 0
+            set tModule.DeveloperMode = tDeveloperMode
+            set tModule.Root = pDirectory
+            set tSC = tModule.%Save()
             $$$ThrowOnError(tSC)
         } else {
-            set tDeveloperMode = +newModuleObj.DeveloperMode
+            set tDeveloperMode = +tModule.DeveloperMode
         }
 
         if (tDeveloperMode && tUseTransactions) {
@@ -1331,19 +1327,19 @@ ClassMethod LoadNewModule(
         if 'tInstallContext.ModuleIsDependency(tModuleName) {
             if 'pSynchronous {
                 // Regular async multi-threaded loading of dependencies
-                set tSC = newModuleObj.LoadDependencies("",.pParams)
+                set tSC = tModule.LoadDependencies("",.pParams)
                 $$$ThrowOnError(tSC)
             } else {
                 // Temporary custom loading of dependencies in a synchronous
                 // manner to prevent lock timeouts until lifecycle rework
                 // is complete (HSIEO-4450)
-                do ..SyncLoadDependencies(newModuleObj, .pParams)
+                do ..SyncLoadDependencies(tModule, .pParams)
             }
         }
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
-        set tSC = newModuleObj.%Reload()
+        set tSC = tModule.%Reload()
         $$$ThrowOnError(tSC)
 
         if (tDeveloperMode && tUseTransactions) {
@@ -1363,7 +1359,7 @@ ClassMethod LoadNewModule(
             tcommit
         }
         $$$ThrowOnError(tSC)
-        do newModuleObj.WriteAfterInstallMessage()
+        do tModule.WriteAfterInstallMessage()
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -1373,14 +1369,11 @@ ClassMethod LoadNewModule(
     quit tSC
 }
 
-/// Check whether an update/install/load from a currently installed module to a new version of the module is a valid operation.
+/// Check whether an update from a currently installed module to a new version of the module is a valid operation.
 ClassMethod CheckOperationVersionValidity(
-	newModule As %IPM.Storage.Module,
-	ByRef params,
-	Output sc As %Status)
+	ByRef newModule,
+	ByRef params) [ Internal ]
 {
-    set sc = $$$OK
-
     set toVersion = newModule.Version
     set toVersionString = newModule.VersionString
     set moduleName = newModule.Name
@@ -1391,23 +1384,20 @@ ClassMethod CheckOperationVersionValidity(
         set fromVersion = moduleCurrent.Version
         set fromVersionString = moduleCurrent.VersionString
     } else {
-        // This means that this is a new install/load of a module
+        // This means that this is a new install/load of a module. Hence no version from/to validity to check.
         quit
     }
 
     // If the version of the module about to be installed is OLDER than the module that is already installed
     if fromVersion.Follows(toVersion) {
-        set msg = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3.",moduleName,fromVersionString,toVersionString))
-        set sc = $$$ERROR($$$GeneralError, msg)
-        quit
+        set msg = $$$FormatText("Cannot downgrade %1 from version %2 to %3. To downgrade a module, you must first run the uninstall command. Then, run the install command with the desired module version.",moduleName,fromVersionString,toVersionString)
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
     // If the version of the module about to be installed is NEWER than the module that is already installed, then the action is considered an update.
     // Do not allow the user to perform an update using the install or load commands. Unless, they use the -force flag or are installing in Developer Mode.
-    if toVersion.Follows(fromVersion) && (($get(params("cmd")) = "install") || ($get(params("cmd")) = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) {
-        set msg = "Cannot perform an update of "_moduleName_" from version "_fromVersionString_
-        " to "_toVersionString_" using the 'install' or 'load' commands. Please use the 'update' command instead. "_
-        "If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'."
-        set sc = $$$ERROR($$$GeneralError, msg)
+    if (($get(params("cmd")) = "install") || ($get(params("cmd")) = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) {
+        set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.",moduleName,fromVersionString,toVersionString)
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
 }
 

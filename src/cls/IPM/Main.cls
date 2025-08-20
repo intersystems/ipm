@@ -145,6 +145,7 @@ This command is an alias for `module-action module-name publish`
 <summary>Updates a module to a newer version.</summary>
 <description>
 	Updates a module to a newer version. By default, updates to the latest available version. Also runs all of the update steps from the current version to the newer version.
+    This command is an alias for module-action module-name applyupdatesteps.
 </description>
 
 <!-- Examples -->
@@ -2141,8 +2142,8 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     set tForce = $$$HasModifier(pCommandInfo,"force")
     merge tParams = pCommandInfo("data")
-    // In the case of an update, pCommandInfo has already been pre-populated with the necessary information.
-    // Therefore, tParams needs to be populated here if this is a load command.
+    // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
+    // In the case of a load command, tParams still needs to be populated here.
     if '$get(tParams("Update"),0) {
         set tParams("cmd") = "load"
         set tParams("Load") = 1
@@ -2240,7 +2241,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
     set tSearchCriteria.VersionExpression = tVersion
     set tSearchCriteria.Keywords = tKeywords
     $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
-    zwrite tResults
 
     if (tResults.Count() > 0) {
         set tResult = ""
@@ -2248,7 +2248,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
         // Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
         if ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
             set tResult = tResults.GetAt(1)
-            zwrite tResult
         } elseif (tResults.Count() > 0) {
             for i=1:1:tResults.Count() {
                 set tResultInfo = tResults.GetAt(i)
@@ -2270,12 +2269,14 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
             merge tParams = pCommandInfo("data")
             set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
             set tParams("Force") = tForce
-            // In the case of an update, pCommandInfo has already been pre-populated with the necessary information.
-            // Therefore, tParams needs to be populated here if this is an install command.
+            // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
+            // In the case of a install command, tParams still needs to be populated here.
             if '$get(tParams("Update"),0) {
                 set tParams("cmd") = "install"
                 set tParams("Install") = 1
             }
+            // Check that the module currently installed is not being downgraded. Also check that "install" is not being used to update a module, unless the -force flag is passed.
+            do ##class(%IPM.Utils.Module).CheckOperationVersionValidity(.tResult,.tParams)
             if tResult.Deployed {
                 set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
                 set tResult.PlatformVersion = platformVersion
@@ -3833,25 +3834,26 @@ ClassMethod Information(ByRef pCommandInfo)
 
 ClassMethod Update(ByRef pCommandInfo)
 {
+    if $get(pCommandInfo("data","PermitDowngrade"),0) {
+        $$$ThrowOnError($$$ERROR($$$GeneralError,"The 'PermitDowngrade' flag is not allowed for the update command."))
+    }
     set verbose = $get(pCommandInfo("data","Verbose"))
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
-    if ##class(%IPM.Storage.Module).NameExists(moduleName,.id) {
+    if '##class(%IPM.Storage.Module).NameExists(moduleName,.id) {
         $$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
-    set moduleCurrent = ##class(%IPM.Storage.Module).%OpenId(id,,.sc)
-    $$$ThrowOnError(sc)
     if verbose {
         if path '= "" {
-            write !,"Resolving version of module specified by path: ",path," to install",!
+            write !,"Resolving version of module specified by -path flag: ",path," to update",!
         } elseif version = "" {
             write !,"Resolving latest available version of module ",moduleName," to install",!
         } else {
-            write !,"Resolving new version ",version," of module ",moduleName," to install",!
+            write !,"Preparing to update module ",moduleName," to version ",version,!
         }
     }
-    // Indicating to pCommandInfo that this is an update command, not just an install.
+    // Indicating to pCommandInfo that this is an update command, not an install or load command. pCommandInfo will be passed to either Install() or Load() to continue performing the update.
     set pCommandInfo("data","cmd") = "update"
     set pCommandInfo("data","Update") = 1
     if path '= "" {
