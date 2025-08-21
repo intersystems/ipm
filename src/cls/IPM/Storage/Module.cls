@@ -229,7 +229,6 @@ Method ExecuteUpdateStep(
 	primaryOnly As %Boolean,
 	verbose As %Boolean = 0)
 {
-    // If it's a primary only step and this member is in the mirror but not a primary, don't execute it
     if primaryOnly && $system.Mirror.IsMember() && '$system.Mirror.IsPrimary() {
         if verbose {
             write !, $char(9)_"Skipping "_updateStep.MethodName_"(). This step is to be run on the mirror primary only."
