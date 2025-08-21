@@ -171,9 +171,9 @@ Method ModuleNormalUpdateNoMirrorHelper(
   }
 
   // Update module (with appropriate flags)
-  set devFlag = $select(developerMode: " -dev ", 1: "")
-  set pathFlag = $select(pathToModule: " -path="_pathToModule, 1: "")
-  set sc = ##class(%IPM.Main).Shell("update -v"_devFlag_pathFlag_moduleName_" "_toVersion)
+  set devFlag = $select(developerMode: "-dev ", 1: "")
+  set pathFlag = $select(pathToModule: "-path="_pathToModule_" ", 1: "")
+  set sc = ##class(%IPM.Main).Shell("update -v "_devFlag_pathFlag_moduleName_" "_toVersion)
   do $$$AssertStatusOK(sc, "Updated module "_moduleName_" without error")
 
   // Check that seeded methods were not re-run
