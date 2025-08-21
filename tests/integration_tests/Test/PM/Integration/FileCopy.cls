@@ -139,6 +139,10 @@ Method TestFileCopyScope()
         // The Scope="verify" file should be copied
         do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Test/test1.txt"), mgrDir _ "FileCopy/Scope/Test/test1.txt does exist")
         do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Verify/Test/test2.txt does exist")
+
+        // Clean up by deleting the copied directory
+        set dir = mgrDir _ "FileCopy/"
+        do $$$AssertStatusOK(##class(%File).RemoveDirectoryTree(dir))
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestFileCopyScope.")
     }
