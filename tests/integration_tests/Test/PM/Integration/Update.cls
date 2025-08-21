@@ -213,7 +213,7 @@ Method ModuleNormalUpdateNoMirrorHelper(
   }
 }
 
-ClassMethod AssertModulePackagedCorrectly(
+Method AssertModulePackagedCorrectly(
 	moduleName As %String,
 	version As %String,
 	packageDir As %String)
