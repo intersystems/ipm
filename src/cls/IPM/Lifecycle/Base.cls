@@ -1695,11 +1695,10 @@ Method %ApplyUpdateSteps(ByRef pParams) As %Status
     try {
         if $system.Mirror.IsMember() && $system.Mirror.IsPrimary() {
             write !,"WARNING: You are running update steps on the primary member of a mirror. It is recommended to start the update process on a backup instance to minimize downtime."
-            write !,"If you have already run update on the backup instance, please disregard this warning."
         }
         set verbose = $get(pParams("Verbose"))
         // TODO: Add log file param after logging meeting discussion
-        do ..Module.ApplyUpdatesInOrder(,verbose)
+        $$$ThrowOnError(..Module.HandleAllUpdateSteps(,,verbose))
     } catch e {
         set sc = e.AsStatus()
     }
