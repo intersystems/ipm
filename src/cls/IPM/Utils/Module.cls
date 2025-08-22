@@ -1239,10 +1239,19 @@ ClassMethod LoadNewModule(
         set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
 
         set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
-        // Note that for update/install commands, the operation version validity has already been checked in %IPM.Main.Install().
-        if isLoad && foundNewModuleObj {
-            // Check that the module currently installed is not being downgraded. Also check that "load" is not being used to update a module, unless the -force flag is passed.
-            do ..CheckOperationVersionValidity(newModuleObj, .pParams)
+        if foundNewModuleObj {
+            // Check that on an update command with -path flag, the module in the path matches the module specified for update.
+            set commandLineModuleName = $get(pParams("ModuleName"))
+            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
+                set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
+                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            }
+            // Note that for update/install commands, the operation version validity has already been checked in %IPM.Main.Install().
+            if isLoad {
+                // Check that the module currently installed is not being downgraded.
+                // Check that the load command is not being used to update a module, unless the -force flag is passed.
+                do ..CheckOperationVersionValidity(newModuleObj, .pParams)
+            }
         }
 
         if ($get(pParams("NoJournal"),0) '= 0) {
