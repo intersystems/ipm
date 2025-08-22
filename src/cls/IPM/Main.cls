@@ -2139,8 +2139,12 @@ ClassMethod LoadFromRepo(
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
+    if tDirectoryName = "" {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"No path provided. Please provide the path to the module to load."))
+    }
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     set tForce = $$$HasModifier(pCommandInfo,"force")
+    set moduleName = pCommandInfo("parameters","module")
     merge tParams = pCommandInfo("data")
     // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
     // In the case of a load command, tParams still needs to be populated here.
@@ -2148,6 +2152,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
         set tParams("cmd") = "load"
         set tParams("Load") = 1
     }
+    set tParams("ModuleName") = moduleName
     set tParams("Force") = tForce
     do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
     if $get(tComponents("scheme")) [ "http" {
@@ -2223,6 +2228,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
     }
     if (tModuleName = "") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"No module name provided. Please provide the name of the module to install."))
         quit $$$OK
     }
 
@@ -3841,6 +3847,9 @@ ClassMethod Update(ByRef pCommandInfo)
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
+    if moduleName = "" {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"No module name provided. Please provide the name of the module to update."))
+    }
     if '##class(%IPM.Storage.Module).NameExists(moduleName) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
