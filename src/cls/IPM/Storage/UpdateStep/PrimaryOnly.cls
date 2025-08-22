@@ -10,6 +10,9 @@ Property InstanceName As %String(MAXLEN = 255) [ InitialExpression = {##class(%S
 
 Index UpdateClassMethodIdx On (ClassName, MethodName) [ Unique ];
 
+/// ForeignKey pointing to the module which this update step belongs to
+ForeignKey HomeModKey(HomeModule) References %IPM.Storage.Module() [ OnDelete = cascade ];
+
 Method %OnNew(
 	className As %String = "",
 	methodName As %String = "") As %Status

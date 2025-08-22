@@ -19,9 +19,6 @@ Property Status As %Status [ InitialExpression = {$$$OK} ];
 /// Home module which this update step belongs to
 Property HomeModule As %IPM.Storage.Module;
 
-/// ForeignKey pointing to the module which this update step belongs to
-ForeignKey HomeModKey(HomeModule) References %IPM.Storage.Module(Name) [ OnDelete = cascade ];
-
 Method %OnNew(
 	className As %String = "",
 	methodName As %String = "") As %Status

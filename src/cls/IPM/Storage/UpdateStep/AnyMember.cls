@@ -4,6 +4,9 @@ Class %IPM.Storage.UpdateStep.AnyMember Extends %IPM.Storage.UpdateStep.Base
 
 Index UpdateClassMethodIdx On (ClassName, MethodName) [ Unique ];
 
+/// ForeignKey pointing to the module which this update step belongs to
+ForeignKey HomeModKey(HomeModule) References %IPM.Storage.Module() [ OnDelete = cascade ];
+
 /// Returns %IPM.Storage.UpdateStep.AnyMember object corresponding to unique index in storage table
 /// If object does not exist, this will return an empty object
 ClassMethod GetUpdateStep(

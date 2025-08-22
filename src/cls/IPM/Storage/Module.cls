@@ -182,13 +182,14 @@ Method HandleUpdateStepsFromList(
             do ..SeedUpdateStep(stepObj, primaryOnly, verbose)
         }
         else {
-            // Once we come across a step that hasn't been run/seeded, mark newStepToApply as true.
+            // Once we come across a step that hasn't been run/seeded or failed on it's last run, mark newStepToApply as true.
             // This indicates that we should run all subsequent steps, regardless of their current status
-            if 'newStepToApply && 'stepObj.TimeStampEnd {
+            if 'newStepToApply && ('stepObj.TimeStampEnd || $$$ISERR(stepObj.Status)) {
                 set newStepToApply = 1
             }
             if newStepToApply {
                 do ..ExecuteUpdateStep(stepObj, primaryOnly, verbose)
+                $$$ThrowOnError(stepObj.Status)
             }
         }
     }
@@ -238,19 +239,17 @@ Method ExecuteUpdateStep(
     if verbose {
         write !, $char(9)_"Running "_updateStep.MethodName_"()"
     }
-    if primaryOnly {
-        set updateStep.HostName = ##class(%SYS.System).GetNodeName()
-        set updateStep.InstanceName = ##class(%SYS.System).GetInstanceName()
-    }
     set updateStep.TimeStampStart = $zdatetime($horolog,3)
-    set updateStep.Status = $$$OK
     try {
-        $$$ThrowOnError($classmethod(updateStep.ClassName, updateStep.MethodName))
-        set updateStep.TimeStampEnd = $zdatetime($horolog,3)
+        set sc = $classmethod(updateStep.ClassName, updateStep.MethodName)
+        $$$ThrowOnError(sc)
     } catch (ex) {
-        set updateStep.Status = ex.AsStatus()
+        set sc = ex.AsStatus()
     }
-    $$$ThrowOnError(updateStep.%Save())
+    set updateStep.TimeStampEnd = $zdatetime($horolog,3)
+    set updateStep.Status = sc
+    set sc = updateStep.%Save()
+    $$$ThrowOnError(sc)
     if verbose {
         write !, $char(9)_updateStep.MethodName_"() Finished"
     }
