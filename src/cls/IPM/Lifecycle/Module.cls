@@ -60,7 +60,8 @@ Method %Activate(ByRef pParams) As %Status
             if verbose {
                 write !, "Seeding update steps for module = ",..Module.Name, ", for version = ", ..Module.VersionString, !
             }
-            $$$ThrowOnError(..Module.SeedAllUpdateSteps(verbose))
+            write !, "1", !
+            $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1, verbose))
         }
     } catch e {
         set tSC = e.AsStatus()

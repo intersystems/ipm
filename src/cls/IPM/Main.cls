@@ -2276,7 +2276,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
                 set tParams("Install") = 1
             }
             // Check that the module currently installed is not being downgraded. Also check that "install" is not being used to update a module, unless the -force flag is passed.
-            do ##class(%IPM.Utils.Module).CheckOperationVersionValidity(.tResult,.tParams)
+            do ##class(%IPM.Utils.Module).CheckOperationVersionValidity(tResult,.tParams)
             if tResult.Deployed {
                 set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
                 set tResult.PlatformVersion = platformVersion
@@ -3835,14 +3835,14 @@ ClassMethod Information(ByRef pCommandInfo)
 ClassMethod Update(ByRef pCommandInfo)
 {
     if $get(pCommandInfo("data","PermitDowngrade"),0) {
-        $$$ThrowOnError($$$ERROR($$$GeneralError,"The 'PermitDowngrade' flag is not allowed for the update command."))
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"The 'PermitDowngrade' flag is not allowed for the update command."))
     }
     set verbose = $get(pCommandInfo("data","Verbose"))
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
-    if '##class(%IPM.Storage.Module).NameExists(moduleName,.id) {
-        $$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
+    if '##class(%IPM.Storage.Module).NameExists(moduleName) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
     if verbose {
         if path '= "" {
