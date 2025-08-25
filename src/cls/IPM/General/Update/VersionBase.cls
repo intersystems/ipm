@@ -1,6 +1,5 @@
 /// For a module that requires steps to be run when updating to a new version, define those steps in a class named <UpdatePackage>.V#.
-/// To make sure those steps run, have that class extend %IPM.General.Update.VersionBase and
-/// override at least one of <method>GetOrderedMethods</method> and <method>GetOrderedMethodsPrimaryOnly</method>
+/// That class must extend %IPM.General.Update.VersionBase and override at least one of <method>GetOrderedMethods</method> and <method>GetOrderedMethodsPrimaryOnly</method>
 Class %IPM.General.Update.VersionBase [ Abstract ]
 {
 
@@ -14,7 +13,7 @@ ClassMethod GetOrderedMethods() As %Library.DynamicArray [ Abstract ]
 {
 }
 
-/// Returns a dynamic array of update method names to apply in order. This method has different behavior when the instance is mirrored versus not. <br />
+/// Returns a dynamic array of update method names to apply in order. <br />
 /// When the instance is not mirrored, these are always run synchronously when the zpm "update" command is run (during the ApplyUpdateSteps lifecycle phase). <br />
 /// When the instance is mirrored, this will run only when the instance becomes the primary member. <br />
 /// <example>
@@ -34,7 +33,7 @@ ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray [ Abstract ]
 /// </example>
 ClassMethod GetUpdatePackageClassList(
 	updatePackage As %String,
-	Output updatePackageClassList) As %Status
+	Output updatePackageClassList)
 {
     set sc = $$$OK
     try {
@@ -55,7 +54,7 @@ ClassMethod GetUpdatePackageClassList(
     } catch (ex) {
         set sc = ex.AsStatus()
     }
-    return sc
+    $$$ThrowOnError(sc)
 }
 
 }

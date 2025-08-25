@@ -107,7 +107,7 @@ Method HandleAllUpdateSteps(
     }
 
     try {
-        $$$ThrowOnError(##class(%IPM.General.Update.VersionBase).GetUpdatePackageClassList(..UpdatePackage, .classList))
+        do ##class(%IPM.General.Update.VersionBase).GetUpdatePackageClassList(..UpdatePackage, .classList)
         set keyVersion = ""
         for {
             // Iterate over update package class list for steps to apply. Apply all of those up to and including this major version
@@ -177,9 +177,9 @@ Method HandleUpdateStepsFromList(
     set iter = methodList.%GetIterator()
     while iter.%GetNext(, .methodName) {
         // Get update step object for this className + methodName. If one does not already exist, create a new one and use that
-        set stepObj = ..GetUpdateStep(className, methodName, primaryOnly, 1)
+        set stepObj = ..GetAddUpdateStep(className, methodName, primaryOnly)
         if seedSteps {
-            do ..SeedUpdateStep(stepObj, primaryOnly, verbose)
+            do ..SeedUpdateStep(stepObj, verbose)
         }
         else {
             // Once we come across a step that hasn't been run/seeded or failed on it's last run, mark newStepToApply as true.
@@ -200,16 +200,11 @@ Method HandleUpdateStepsFromList(
 /// Steps that already have TimeStampEnd defined (already been run/seeded) won't be seeded
 Method SeedUpdateStep(
 	updateStep As %IPM.Storage.UpdateStep.Base,
-	primaryOnly As %Boolean,
 	verbose As %Boolean = 0)
 {
     if 'updateStep.TimeStampEnd {
         if verbose {
             write !, $char(9)_"Seeding "_updateStep.MethodName_"()"
-        }
-        if primaryOnly {
-            set updateStep.HostName = ##class(%SYS.System).GetNodeName()
-            set updateStep.InstanceName = ##class(%SYS.System).GetInstanceName()
         }
         set updateStep.TimeStampEnd = $zdatetime($horolog,3)
         $$$ThrowOnError(updateStep.%Save())
@@ -255,40 +250,25 @@ Method ExecuteUpdateStep(
     }
 }
 
-/// Attempt to get update step object with this className + methodName index
+/// Gets an update step object with this className + methodName index
+/// If an update step does not already exist, this will create a new one and return that object
 /// primaryOnly - set to 1 if this update step is one that runs on the primaryOnly
-/// createNew - set to 1 to create a new step object with these values if one is not found to already exist
-Method GetUpdateStep(
-	className As %String,
-	methodName As %String,
-	primaryOnly As %Boolean,
-	createNew As %Boolean = 0) As %IPM.Storage.UpdateStep.Base
-{
-    if primaryOnly {
-        set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
-    }
-    else {
-        set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).GetUpdateStep(className, methodName)
-    }
-    if createNew && '$isobject(stepObj) {
-        set stepObj = ..AddUpdateStep(className, methodName, primaryOnly)
-    }
-    return stepObj
-}
-
-/// Create a new update step object for this module
-/// Update steps are defined by their unique className + methodName combination
-/// primaryOnly - set to 1 if this new update step can only be run on the primary in a mirrored environment
-Method AddUpdateStep(
+Method GetAddUpdateStep(
 	className As %String,
 	methodName As %String,
 	primaryOnly As %Boolean) As %IPM.Storage.UpdateStep.Base
 {
     if primaryOnly {
-        set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).%New(className, methodName)
+        set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
+        if '$isobject(stepObj) {
+            set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).%New(className, methodName)
+        }
     }
     else {
-        set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).%New(className, methodName)
+        set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).GetUpdateStep(className, methodName)
+        if '$isobject(stepObj) {
+            set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).%New(className, methodName)
+        }
     }
     set stepObj.HomeModule = $this
     $$$ThrowOnError(stepObj.%Save())
