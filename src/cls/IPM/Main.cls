@@ -2139,9 +2139,6 @@ ClassMethod LoadFromRepo(
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
-    if tDirectoryName = "" {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"No path provided. Please provide the path to the module to load."))
-    }
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     set tForce = $$$HasModifier(pCommandInfo,"force")
     set moduleName = pCommandInfo("parameters","module")
@@ -2226,10 +2223,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
     set tModuleName = $get(pCommandInfo("parameters","module"))
     if (tModuleName["/") {
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
-    }
-    if (tModuleName = "") {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"No module name provided. Please provide the name of the module to install."))
-        quit $$$OK
     }
 
     if tModuleName = $$$IPMModuleName {
@@ -3847,9 +3840,6 @@ ClassMethod Update(ByRef pCommandInfo)
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
-    if moduleName = "" {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"No module name provided. Please provide the name of the module to update."))
-    }
     if '##class(%IPM.Storage.Module).NameExists(moduleName) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
