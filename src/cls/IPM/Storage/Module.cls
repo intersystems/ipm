@@ -250,8 +250,10 @@ Method ExecuteUpdateStep(
     }
 }
 
-/// Gets an update step object with this className + methodName index
-/// If an update step does not already exist, this will create a new one and return that object
+/// Get or Add an update step for this current module based on className + methodName index
+/// If an update step already exists, this method behaves like a Get()
+/// If an update step does not exist, this method behaves like an Add()
+/// In both cases, this method will return the update step object
 /// primaryOnly - set to 1 if this update step is one that runs on the primaryOnly
 Method GetAddUpdateStep(
 	className As %String,
