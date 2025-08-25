@@ -19,7 +19,7 @@ on:
 jobs:
   images:
     uses: ./.github/workflows/images.yml
-  
+
   prepare:
     runs-on: ubuntu-latest
     needs: images
@@ -39,14 +39,14 @@ jobs:
           [ $GITHUB_EVENT_NAME == 'push' ] && VERSION+=-beta && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f4)+1))
           [ $GITHUB_EVENT_NAME == 'pull_request' ] && VERSION+=-dev.${{ github.event.pull_request.number }} && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f5)+1))
           echo number=${VERSION} >> $GITHUB_OUTPUT
-  
+
   build:
     timeout-minutes: 20
     needs: 
       - prepare
     strategy:
       fail-fast: false
-      matrix: 
+      matrix:
         image: ${{ fromJson(github.event.inputs.IMAGE || needs.prepare.outputs.images) }}
     runs-on: ubuntu-latest
     steps:
@@ -80,16 +80,20 @@ jobs:
         timeout-minutes: 15
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
-          docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
+          docker pull intersystemsdc/iris-community:latest
           docker network create zpm
           REGISTRY=$(docker run --rm -d \
             --network zpm \
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
-            docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
+            intersystemsdc/iris-community:latest \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker exec -i $REGISTRY iris session iris -UUSER << EOF
+            zpm "install zpm-registry"
+            halt
+          EOF
           docker logs $REGISTRY
       - name: Test and Verify
         timeout-minutes: 15
@@ -119,10 +123,14 @@ jobs:
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
-            docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
+            intersystemsdc/iris-community:latest \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker exec -i $REGISTRY iris session iris -UUSER << EOF
+            zpm "install zpm-registry"
+            halt
+          EOF
           docker logs $REGISTRY
       - name: Test and publish to temporary registry
         timeout-minutes: 15
@@ -226,11 +234,11 @@ jobs:
         with:
           name: zpm-${{ needs.prepare.outputs.version }}
           path: zpm-${{ needs.prepare.outputs.version }}.xml
-  
+
   release:
     runs-on: ubuntu-latest
     if: github.event.repository.fork == false
-    needs: 
+    needs:
       - prepare
       - build
     steps:
