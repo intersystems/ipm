@@ -41,6 +41,9 @@ Method TestModuleNormalUpdateNoMirror()
   // No dev mode, load
   set exportDir = $system.Util.ManagerDirectory()
   do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 1, exportDir)
+
+  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
+  do ..CleanUp(modulesToUninstall)
 }
 
 Method TestUpdateToOlderVersion()
@@ -52,6 +55,9 @@ Method TestUpdateToOlderVersion()
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
   do $$$AssertStatusNotOK(sc, "Attempt at updating module to older version failed.")
   do $$$AssertTrue((sc [ "version"), "Error message is descriptive and correctly mentions 'version'")
+
+  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
+  do ..CleanUp(modulesToUninstall)
 }
 
 Method TestUpdateToInvalidVersion()
@@ -62,6 +68,9 @@ Method TestUpdateToInvalidVersion()
   // Update module
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" 1.0.0")
   do $$$AssertStatusNotOK(sc, "Attempt at updating module to non-existent version failed.")
+
+  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
+  do ..CleanUp(modulesToUninstall)
 }
 
 Method TestUpdateToNewVersionTwice()
@@ -76,6 +85,9 @@ Method TestUpdateToNewVersionTwice()
   // Update module to a 3.x version
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleThreeVersion)
   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleThreeVersion_" without error")
+
+  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
+  do ..CleanUp(modulesToUninstall)
 }
 
 Method TestUpdateToSameVersionTwiceNoMirror()
@@ -123,6 +135,9 @@ Method TestUpdateToSameVersionTwiceNoMirror()
 
   do $$$AssertEquals(twoCStart, stepTwoC.TimeStampStart)
   do $$$AssertEquals(twoCEnd, stepTwoC.TimeStampEnd)
+
+  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
+  do ..CleanUp(modulesToUninstall)
 }
 
 /// ///////////////////////////////////////////// HELPER METHODS ////////////////////////////////////////////////
@@ -266,6 +281,17 @@ ClassMethod GetUpdateStep(
   }
 
   return step
+}
+
+ClassMethod CleanUp(moduleArr As %DynamicArray)
+{
+  set iter = moduleArr.%GetIterator()
+  while iter.%GetNext(.key, .value) {
+    set moduleName = value.%Get(0)
+
+    set sc = ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+    $$$ThrowOnError(sc)
+  }
 }
 
 }
