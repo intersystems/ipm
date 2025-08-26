@@ -3,6 +3,8 @@ Class Test.PM.Integration.Update Extends Test.PM.Integration.Base
 
 Parameter ModuleNoDependencies As STRING = "update-simple";
 
+Parameter ModuleWithDependencies As STRING = "update-deps";
+
 Parameter ModuleOneVersion As STRING = "1.2.1";
 
 Parameter ModuleTwoVersion As STRING = "2.1.1";
@@ -27,23 +29,20 @@ Method OnAfterOneTest() As %Status
   return sc
 }
 
-Method TestModuleNormalUpdateNoMirror()
+Method TestAllNoErrorModulesNoMirror()
 {
+  if $system.Mirror.IsMember() {
+    return
+  }
+  // Simple module without dependencies
   set updateStepsToSeed = [["UpdatePackage.V1", "MethodA", 1]]
   set updateStepsToRun = [["UpdatePackage.V1", "MethodB", 0], ["UpdatePackage.V1", "MethodC", 1], ["UpdatePackage.V2", "MethodA", 1], ["UpdatePackage.V2", "MethodC", 1], ["UpdatePackage.V2", "MethodB", 0]]
+  do ..DoNormalUpdateNoMirror(..ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 
-  // No dev mode, install
-  do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
-
-  // Dev mode, install
-  do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 1)
-
-  // No dev mode, load
-  set exportDir = $system.Util.ManagerDirectory()
-  do ..ModuleNormalUpdateNoMirrorHelper(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 1, exportDir)
-
-  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
-  do ..CleanUp(modulesToUninstall)
+  // Module with dependencies
+  set updateStepsToSeed = updateStepsToSeed.addAll([["UpdateDeps.UpdatePackage.V1", "MethodA", 1]])
+  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDeps.UpdatePackage.V1", "MethodB", 0], ["UpdateDeps.UpdatePackage.V1", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodA", 1], ["UpdateDeps.UpdatePackage.V2", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodB", 0]])
+  do ..DoNormalUpdateNoMirror(..ModuleWithDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 }
 
 Method TestUpdateToOlderVersion()
@@ -56,8 +55,7 @@ Method TestUpdateToOlderVersion()
   do $$$AssertStatusNotOK(sc, "Attempt at updating module to older version failed.")
   do $$$AssertTrue((sc [ "version"), "Error message is descriptive and correctly mentions 'version'")
 
-  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
-  do ..CleanUp(modulesToUninstall)
+  do ..CleanUpModule(..#ModuleNoDependencies)
 }
 
 Method TestUpdateToInvalidVersion()
@@ -69,8 +67,7 @@ Method TestUpdateToInvalidVersion()
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" 1.0.0")
   do $$$AssertStatusNotOK(sc, "Attempt at updating module to non-existent version failed.")
 
-  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
-  do ..CleanUp(modulesToUninstall)
+  do ..CleanUpModule(..#ModuleNoDependencies)
 }
 
 Method TestUpdateToNewVersionTwice()
@@ -86,8 +83,7 @@ Method TestUpdateToNewVersionTwice()
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleThreeVersion)
   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleThreeVersion_" without error")
 
-  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
-  do ..CleanUp(modulesToUninstall)
+  do ..CleanUpModule(..#ModuleNoDependencies)
 }
 
 Method TestUpdateToSameVersionTwiceNoMirror()
@@ -136,11 +132,42 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   do $$$AssertEquals(twoCStart, stepTwoC.TimeStampStart)
   do $$$AssertEquals(twoCEnd, stepTwoC.TimeStampEnd)
 
-  set modulesToUninstall = [].%Push(..#ModuleNoDependencies)
-  do ..CleanUp(modulesToUninstall)
+  do ..CleanUpModule(..#ModuleNoDependencies)
 }
 
 /// ///////////////////////////////////////////// HELPER METHODS ////////////////////////////////////////////////
+/// Runs through four variations of update for a given module that are each expected to complete successfully:
+/// - Install, dev mode
+/// - Install, no dev mode
+/// - Load, no dev mode
+/// - Load, dev mode
+Method NormalUpdateTestSuite(
+	moduleName As %String,
+	updateStepsToSeed As %DynamicArray,
+	updateStepsToRun As %DynamicArray,
+	fromVersion As %String,
+	toVersion As %String)
+{
+  // No dev mode, install
+  do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 0)
+  do ..CleanUpModule(moduleName)
+
+  // Dev mode, install
+  do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 1)
+  do ..CleanUpModule(moduleName)
+
+  // Dev mode, load
+  set exportDir = $system.Util.ManagerDirectory()_"/"_moduleName
+  do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 1, exportDir)
+  do ..CleanUpModule(moduleName)
+  do ..CleanUpDirectory(exportDir)
+
+  // No dev mode, load
+  do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 0, exportDir)
+  do ..CleanUpModule(moduleName)
+  do ..CleanUpDirectory(exportDir)
+}
+
 /// NOTE: For testing simplicity, we will always assume that in the update test, both the module and its dependencies are being updated
 /// from and to the same version numbers.
 /// Completes an update of given moduleName from fromVersion to toVersion, verifying that the given updateStepsToSeed are seeded
@@ -151,7 +178,7 @@ Method TestUpdateToSameVersionTwiceNoMirror()
 /// @argument fromVersion         Version of module to install
 /// @argument toVersion           Version of module to which to update
 /// @argument developerMode       1 if update should be run with -dev flag, 0 otherwise
-Method ModuleNormalUpdateNoMirrorHelper(
+Method SingleNormalUpdateTest(
 	moduleName As %String,
 	updateStepsToSeed As %DynamicArray,
 	updateStepsToRun As %DynamicArray,
@@ -160,10 +187,6 @@ Method ModuleNormalUpdateNoMirrorHelper(
 	developerMode As %Boolean = 0,
 	pathToModule As %String = "")
 {
-  if $system.Mirror.IsMember() {
-    return
-  }
-
   // Package module to update to (if we want to test updating from a tarball)
   if pathToModule {
     do ..AssertModulePackagedCorrectly(moduleName, toVersion, pathToModule)
@@ -228,24 +251,6 @@ Method ModuleNormalUpdateNoMirrorHelper(
   }
 }
 
-Method AssertModulePackagedCorrectly(
-	moduleName As %String,
-	version As %String,
-	packageDir As %String)
-{
-  // Initial install of module (necessary to be able to package)
-  set sc = ##class(%IPM.Main).Shell("install "_moduleName_" "_version)
-  do $$$AssertStatusOK(sc,"Installed "_moduleName_" version = "_version_" successfully.")
-
-  // Package module
-  set sc = ##class(%IPM.Main).Shell(_moduleName_" package -only -v -DPath="_packageDir)
-  do $$$AssertStatusOK(sc, "Successfully packaged module to "_packageDir)
-
-  // Uninstall module
-  set sc = ##class(%IPM.Main).Shell("uninstall "_moduleName_" "_version)
-  do $$$AssertStatusOK(sc,"Uninstalled "_moduleName_" version = "_version_" successfully after packaging.")
-}
-
 /// Asserts that each update method in the given array has a corresponding UpdateStep object of the correct subclass
 /// @params updateStepsList  Array of arrays, where each element is [className, methodName, isPrimaryOnly]
 Method AssertUpdateStepsExist(updateStepsList As %DynamicArray)
@@ -269,6 +274,23 @@ Method AssertModuleInstalledCorrectly(
   do $$$AssertStatusOK(sc, "Loaded module successfully")
 }
 
+Method AssertModulePackagedCorrectly(
+	moduleName As %String,
+	version As %String,
+	packageDir As %String)
+{
+  // Initial install of module (necessary to be able to package)
+  set sc = ##class(%IPM.Main).Shell("install "_moduleName_" "_version)
+  do $$$AssertStatusOK(sc,"Installed "_moduleName_" version = "_version_" successfully.")
+
+  // Package module
+  set sc = ##class(%IPM.Main).Shell(_moduleName_" package -only -v -DPath="_packageDir)
+  do $$$AssertStatusOK(sc, "Successfully packaged module to "_packageDir)
+
+  // Uninstall module
+  do ..CleanUpModule(moduleName)
+}
+
 ClassMethod GetUpdateStep(
 	className As %String,
 	methodName As %String,
@@ -283,15 +305,16 @@ ClassMethod GetUpdateStep(
   return step
 }
 
-ClassMethod CleanUp(moduleArr As %DynamicArray)
+ClassMethod CleanUpModule(moduleName As %String)
 {
-  set iter = moduleArr.%GetIterator()
-  while iter.%GetNext(.key, .value) {
-    set moduleName = value.%Get(0)
+  set sc = ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+  $$$ThrowOnError(sc)
+}
 
-    set sc = ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
-    $$$ThrowOnError(sc)
-  }
+ClassMethod CleanUpDirectory(dir As %String)
+{
+  set sc = ##class(%File).RemoveDirectoryTree(dir, .return)
+  $$$ThrowOnError(sc)
 }
 
 }
