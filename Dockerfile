@@ -1,4 +1,4 @@
-ARG BASE=irepo.intersystems.com/intersystems/iris-community:2025.1
+ARG BASE=containers.intersystems.com/intersystems/iris-community:2025.1
 
 FROM ${BASE}
 
