@@ -163,7 +163,7 @@ Method HandleAllUpdateSteps(
 /// 
 /// If seeding: For only steps that don't have a TimeStampEnd value, set it's TimeStampEnd to the current time
 /// 
-/// If executing: Only start running steps at the first one found not to have a TimeStampEnd value.
+/// If executing: Only start running steps at the first one found not to have a TimeStampEnd value or if an errored step is found
 ///               After finding this step, run it and all subsequent steps, regardless of if they have been run or not.
 Method HandleUpdateStepsFromList(
 	methodList As %Library.DynamicArray,
@@ -189,7 +189,6 @@ Method HandleUpdateStepsFromList(
             }
             if newStepToApply {
                 do ..ExecuteUpdateStep(stepObj, primaryOnly, verbose)
-                $$$ThrowOnError(stepObj.Status)
             }
         }
     }
@@ -245,6 +244,7 @@ Method ExecuteUpdateStep(
     set updateStep.Status = sc
     set sc = updateStep.%Save()
     $$$ThrowOnError(sc)
+    $$$ThrowOnError(updateStep.Status)
     if verbose {
         write !, $char(9)_updateStep.MethodName_"() Finished"
     }
