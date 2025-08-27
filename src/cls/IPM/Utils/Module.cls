@@ -868,6 +868,13 @@ ClassMethod UninstallAll(
                     quit
                 }
 
+                if tModuleName = "zpm" {
+                    // don't uninstall IPM itself
+                    kill tModuleNames(tModuleName)
+                    set tProgressMade = 1
+                    continue
+                }
+
                 if ($data(tModuleNames(tModuleName)) > 1) {
                     // If there are dependencies left that have not been uninstalled yet, skip this module.
                     continue
