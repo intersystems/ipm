@@ -651,11 +651,8 @@ ClassMethod %ParseCommandInput(
                 set paramName = $get(tCommandStructure(pCommandInfo,"parameters",i))
                 quit:paramName=""
                 if $get(tCommandStructure(pCommandInfo,"parameters",paramName,"required"),0) {
-                    if '$data(pCommandInfo("parameters",paramName)) {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Missing required parameter %1 for command %2",$$$QUOTE(paramName),$$$QUOTE(commandName))))
-                    }
-                    if (pCommandInfo("parameters",paramName) = "") {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Non-empty value required for parameter %1 for command %2",$$$QUOTE(paramName),$$$QUOTE(commandName))))
+                    if $get(pCommandInfo("parameters",paramName)) = "" {
+                        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Non-empty value required for parameter %1",$$$QUOTE(paramName))))
                     }
                 }
             }
