@@ -111,4 +111,41 @@ Method TestPackageNameExpression()
     }
 }
 
+Method TestFileCopyScope()
+{
+    set tSC = $$$OK
+    try {
+        // Only the non-scoped FileCopy should activate on load
+        set tModuleDir = ..GetModuleDir("packagename")
+        set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
+        do $$$AssertStatusOK(tSC,"Module successfully installed")
+
+        // Neither the Scope="test" Scope="verify" file should be copied
+        set mgrDir = $system.Util.ManagerDirectory()
+        do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/testmodule/cls/Test.cls"), "Test.cls in " _ mgrDir _ "FileCopy/testmodule/cls exists")
+        do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Test/test1.txt"), mgrDir _ "FileCopy/Scope/Test/test1.txt does not exist")
+        do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Scope/Test/test2.txt does not exist")
+
+        // call <module> test
+        set tSC = ##class(%IPM.Main).Shell("testmodule test -v")
+        do $$$AssertStatusOK(tSC,"Test phase succeeded")
+        // The Scope="test" file should be copied
+        do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Test/test1.txt"), mgrDir _ "FileCopy/Scope/Test/test1.txt does exist")
+        do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Scope/Test/test2.txt does not exist")
+
+        // call <module> verify
+        set tSC = ##class(%IPM.Main).Shell("testmodule verify -v")
+        do $$$AssertStatusOK(tSC,"Verify phase succeeded")
+        // The Scope="verify" file should be copied
+        do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Test/test1.txt"), mgrDir _ "FileCopy/Scope/Test/test1.txt does exist")
+        do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Verify/Test/test2.txt does exist")
+
+        // Clean up by deleting the copied directory
+        set dir = mgrDir _ "FileCopy/"
+        do $$$AssertStatusOK(##class(%File).RemoveDirectoryTree(dir))
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestFileCopyScope.")
+    }
+}
+
 }

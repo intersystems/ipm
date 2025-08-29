@@ -412,7 +412,7 @@ ClassMethod ExecutePhases(
                     if (tKey = "") {
                         quit
                     }
-                    if $isobject(tResource.Processor) {
+                    if $isobject(tResource.Processor) && tResource.IsInScope(tOnePhase) {
                         do tResource.Processor.SetParams(.pParams)
                         set tSC = $method(tResource.Processor,"OnBeforePhase",tOnePhase,.pParams)
                         $$$ThrowOnError(tSC)
@@ -438,7 +438,7 @@ ClassMethod ExecutePhases(
                         }
                         set tProcessor = tResource.Processor
                         // %IsA() only returns true if the class is the "primary" superclass, while %Extends() works for other superclasses (such as mixins).
-                        if $isobject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") {
+                        if $isobject(tProcessor) && tProcessor.%Extends("%IPM.ResourceProcessor.CustomPhaseMixin") && tResource.IsInScope(tOnePhase) {
                             $$$ThrowOnError(tProcessor.OnCustomPhase(tOnePhase, .pParams))
                         }
                     }
@@ -470,7 +470,7 @@ ClassMethod ExecutePhases(
                     if (tKey = "") {
                         quit
                     }
-                    if $isobject(tResource.Processor) {
+                    if $isobject(tResource.Processor) && tResource.IsInScope(tOnePhase) {
                         do tResource.Processor.SetParams(.pParams)
                         set tSC = $method(tResource.Processor,"OnAfterPhase",tOnePhase,.pParams)
                         $$$ThrowOnError(tSC)

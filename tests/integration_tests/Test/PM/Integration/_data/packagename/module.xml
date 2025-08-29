@@ -13,6 +13,8 @@
       <Resource Directory="cls" Name="Test.cls"/>
       <SourcesRoot>src</SourcesRoot>
       <FileCopy Name="src/" Target="${mgrdir}FileCopy/${packagename}/"/>
+      <FileCopy Name="test1.txt" Target="${mgrdir}FileCopy/Scope/Test/test1.txt" Scope="test"/>
+      <FileCopy Name="test2.txt" Target="${mgrdir}FileCopy/Scope/Verify/test2.txt" Scope="verify"/>
     </Module>
   </Document>
 </Export>
