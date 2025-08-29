@@ -868,7 +868,7 @@ ClassMethod UninstallAll(
                     quit
                 }
 
-                if tModuleName = "zpm" {
+                if tModuleName = $$$IPMModuleName {
                     // don't uninstall IPM itself
                     kill tModuleNames(tModuleName)
                     set tProgressMade = 1
