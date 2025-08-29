@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #837: Fixed poorly formatted and unclear error message when Python wheel fails to install
 - #810: Fixed `<SystemRequirements Interoperability="enabled"/>` in module.xml not enabling interoperability for deployed code namespaces
 - #836: Fixed FileCopy (and other resource processors) not checking scope
+- #688: `uninstall -f -all` will no longer attempt to uninstall IPM
 
 ### Changed
 - Format all files and add consistent formatting settings, format on save etc.
