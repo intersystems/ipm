@@ -163,7 +163,28 @@ Method TestIRISVersions()
 	Do ..AssertNotSatisfied(">=2022.1", "2021.2")
 }
 
-Method AssertEquivalent(pVersionExpression1 As %String, pVersionExpression2 As %String, pVerbose As %Boolean = 0) As %Boolean [ Internal, Private ]
+Method TestAndedOr()
+{
+	do ##class(%IPM.General.SemanticVersionExpression).FromString("^3.0.0",.sve1)
+	do ##class(%IPM.General.SemanticVersionExpression).FromString("^2.0.1 || ^3.0.0",.sve2)
+	set sve3 = sve1.And(sve2)
+	do $$$AssertTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("3.2.1")))
+	do $$$AssertNotTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("2.0.0")))
+	do $$$AssertNotTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("4.0.0")))
+}
+
+Method TestOnTheFlyMigration()
+{
+	// Tests that, with legacy storage missing CLASSNAME=1 on AnyOf (formerly Options), we properly interpret it as a range.
+	set expr = ##class(%IPM.General.SemanticVersionExpression).%Open($lb($lb(">=2022.1",$lb($lb($lb($lb($lb($lb(">=",2022,1,0,,">=2022.1.0","",""))),">=2022.1")))),"%IPM.General.SemanticVersionExpression"))
+	do $$$AssertEquals(expr.AnyOf.GetAt(1).%ClassName(1),"%IPM.General.SemanticVersionExpression.Range")
+	do $$$AssertEquals(expr.AnyOf.GetAt(1).ToResolvedString(),">=2022.1.0")
+}
+
+Method AssertEquivalent(
+	pVersionExpression1 As %String,
+	pVersionExpression2 As %String,
+	pVerbose As %Boolean = 0) As %Boolean [ Internal, Private ]
 {
 	Set tEquivalent = 0
 	Try {
@@ -194,7 +215,9 @@ Method AssertEquivalent(pVersionExpression1 As %String, pVersionExpression2 As %
 	Quit tEquivalent
 }
 
-Method AssertSatisfied(pVersionExpression As %String, pVersion As %String) As %Boolean [ Internal, Private ]
+Method AssertSatisfied(
+	pVersionExpression As %String,
+	pVersion As %String) As %Boolean [ Internal, Private ]
 {
 	Set tSatisfied = 0
 	Try {
@@ -211,7 +234,9 @@ Method AssertSatisfied(pVersionExpression As %String, pVersion As %String) As %B
 	Quit tSatisfied
 }
 
-Method AssertNotSatisfied(pVersionExpression As %String, pVersion As %String) As %Boolean [ Internal, Private ]
+Method AssertNotSatisfied(
+	pVersionExpression As %String,
+	pVersion As %String) As %Boolean [ Internal, Private ]
 {
 	Set tUnsatisfied = 0
 	Try {
