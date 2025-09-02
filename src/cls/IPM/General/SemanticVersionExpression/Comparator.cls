@@ -131,7 +131,7 @@ Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
 
 Method IsSatsifiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean [ Abstract ]
 {
-	Quit ..Evaluate(pVersion)
+	quit ..Evaluate(pVersion)
 }
 
 Storage Default

@@ -108,41 +108,45 @@ Method IsSatisfiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean
 
 Method And(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
-	set expr1 = ..%ConstructClone()
-	do ..AnyOf.Clear()
-	do ..AllOf.Clear()
-	do ..AllOf.Insert(expr1)
-	do ..AllOf.Insert(pVersionExpression)
-	set i%Expression = ..ToResolvedString()
+    if pVersionExpression.Expression '= "" {
+        set expr1 = ..%ConstructClone()
+        do ..AnyOf.Clear()
+        do ..AllOf.Clear()
+        do ..AllOf.Insert(expr1)
+        do ..AllOf.Insert(pVersionExpression)
+        set i%Expression = ..ToResolvedString()
+    }
 	quit $this
 }
 
 Method Or(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
-	set expr1 = ..%ConstructClone()
-	do ..AnyOf.Clear()
-	do ..AllOf.Clear()
-	do ..AnyOf.Insert(expr1)
-	do ..AnyOf.Insert(pVersionExpression)
-	set i%Expression = ..ToResolvedString()
+    if pVersionExpression.Expression '= "" {
+        set expr1 = ..%ConstructClone()
+        do ..AnyOf.Clear()
+        do ..AllOf.Clear()
+        do ..AnyOf.Insert(expr1)
+        do ..AnyOf.Insert(pVersionExpression)
+        set i%Expression = ..ToResolvedString()
+    }
 	quit $this
 }
 
 Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 {
 	// On-the-fly data migration to tack on list-of-serial CLASSNAME=1 with default classname of %IPM.General.SemanticVersionExpression.Range
-	Set key = ""
-	For {
-		Set key = $order(i%AnyOf(key),1,data)
-		If key="" {
-			Quit
+	set key = ""
+	for {
+		set key = $order(i%AnyOf(key),1,data)
+		if key="" {
+			quit
 		}
-		If $ListLength(data) = 1 {
-			Set $List(data,2) = "%IPM.General.SemanticVersionExpression.Range"
+		if $listlength(data) = 1 {
+			set $list(data,2) = "%IPM.General.SemanticVersionExpression.Range"
 		}
-		Set i%AnyOf(key) = data
+		set i%AnyOf(key) = data
 	}
-	Quit $$$OK
+	quit $$$OK
 }
 
 Storage Default

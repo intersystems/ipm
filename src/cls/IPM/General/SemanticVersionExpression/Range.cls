@@ -218,7 +218,7 @@ Method InRange(pVersion As %IPM.General.SemanticVersion) As %Boolean
 
 Method IsSatisfiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
-	Quit ..InRange(pVersion)
+	quit ..InRange(pVersion)
 }
 
 Storage Default
