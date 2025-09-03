@@ -1,4 +1,4 @@
-Class %IPM.General.SemanticVersionExpression.Comparator Extends (%SerialObject, %IPM.General.SemanticVersionExpression.IComparable)
+Class %IPM.General.SemanticVersionExpression.Comparator Extends %IPM.General.SemanticVersionExpression.IComparable
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVer.Comp";
@@ -42,96 +42,96 @@ ClassMethod FromString(
 	pExpr As %String,
 	Output pComparator As %IPM.General.SemanticVersionExpression.Comparator) As %Status
 {
-    set tSC = $$$OK
-    set pComparator = ..%New(pExpr)
-    try {
-        set tFirst = $extract(pExpr)
-        set tSecond = $extract(pExpr,2)
-        if (tFirst '= +tFirst) {
-            if (tSecond '= +tSecond) {
-                set pComparator.Operator = tFirst_tSecond
-                set pExpr = $extract(pExpr,3,*)
-            } else {
-                set pComparator.Operator = tFirst
-                set pExpr = $extract(pExpr,2,*)
-            }
-        }
-
-        // Ensure we got a valid operator.
-        set tSC = ##class(%IPM.General.SemanticVersionExpression.Comparator).OperatorIsValid(pComparator.Operator)
-        if $$$ISERR(tSC) {
-            quit
-        }
-
-        set pComparator.Major = $piece(pExpr,".",1)
-        set pComparator.Minor = $piece(pExpr,".",2)
-        set tEnd = $piece(pExpr,".",3,*)
-        set pComparator.Patch = $piece($piece(tEnd,"-"),"+") // Before -prerelease and/or +build
-        set pComparator.Prerelease = $piece($piece(tEnd,"-",2),"+") // After - and possibly before +build
-        set pComparator.Build = $piece(tEnd,"+",2)
-
-        set tSC = pComparator.%ValidateObject()
-        if $$$ISERR(tSC) {
-            quit
-        }
-    } catch e {
-        set tSC = e.AsStatus()
+  set tSC = $$$OK
+  set pComparator = ..%New(pExpr)
+  try {
+    set tFirst = $extract(pExpr)
+    set tSecond = $extract(pExpr,2)
+    if (tFirst '= +tFirst) {
+      if (tSecond '= +tSecond) {
+        set pComparator.Operator = tFirst_tSecond
+        set pExpr = $extract(pExpr,3,*)
+      } else {
+        set pComparator.Operator = tFirst
+        set pExpr = $extract(pExpr,2,*)
+      }
     }
+
+    // Ensure we got a valid operator.
+    set tSC = ##class(%IPM.General.SemanticVersionExpression.Comparator).OperatorIsValid(pComparator.Operator)
     if $$$ISERR(tSC) {
-        set tSC = $system.Status.EmbedStatus($$$ERROR($$$GeneralError,"Error parsing semantic version expression: "_pExpr),tSC)
+      quit
     }
-    quit tSC
+
+    set pComparator.Major = $piece(pExpr,".",1)
+    set pComparator.Minor = $piece(pExpr,".",2)
+    set tEnd = $piece(pExpr,".",3,*)
+    set pComparator.Patch = $piece($piece(tEnd,"-"),"+") // Before -prerelease and/or +build
+    set pComparator.Prerelease = $piece($piece(tEnd,"-",2),"+") // After - and possibly before +build
+    set pComparator.Build = $piece(tEnd,"+",2)
+
+    set tSC = pComparator.%ValidateObject()
+    if $$$ISERR(tSC) {
+      quit
+    }
+  } catch e {
+    set tSC = e.AsStatus()
+  }
+  if $$$ISERR(tSC) {
+    set tSC = $system.Status.EmbedStatus($$$ERROR($$$GeneralError,"Error parsing semantic version expression: "_pExpr),tSC)
+  }
+  quit tSC
 }
 
 Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
-    set tEquals = (..Operator [ "=")
-    if tEquals {
-        for part = "Major", "Minor", "Patch", "Prerelease", "Build" {
-            set val1 = $property(pVersion, part)
-            set val2 = $property($this, part)
-            quit:((val1 = "*")||(val2 = "*"))
-            // Enforce exact match if comparator specifies the part (e.g., Prerelease or Build)
-            if val2 '= "" {
-                set tEquals = tEquals && (val1 = val2)
-            }
-        }
+  set tEquals = (..Operator [ "=")
+  if tEquals {
+    for part = "Major", "Minor", "Patch", "Prerelease", "Build" {
+      set val1 = $property(pVersion, part)
+      set val2 = $property($this, part)
+      quit:((val1 = "*")||(val2 = "*"))
+      // Enforce exact match if comparator specifies the part (e.g., Prerelease or Build)
+      if val2 '= "" {
+        set tEquals = tEquals && (val1 = val2)
+      }
     }
-    if (+##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease") = 0) || ($extract(..Operator,1) = "=")  {
-        // If SemVerPostRelease is disabled, then we should not consider post-release versions as equal to the base version
-        // ..Operator = "=" means direct equality and not <= or >= so compare pre-release as well
-        set tEquals = tEquals && (pVersion.Prerelease = ..Prerelease)
-    }
-    if tEquals || (..Operator = "=") {
-        quit tEquals
-    }
+  }
+  if (+##class(%IPM.Repo.UniversalSettings).GetValue("SemVerPostRelease") = 0) || ($extract(..Operator,1) = "=")  {
+    // If SemVerPostRelease is disabled, then we should not consider post-release versions as equal to the base version
+    // ..Operator = "=" means direct equality and not <= or >= so compare pre-release as well
+      set tEquals = tEquals && (pVersion.Prerelease = ..Prerelease)
+  }
+  if tEquals || (..Operator = "=") {
+    quit tEquals
+  }
 
-    // For purposes of this comparison, remove build metadata.
-    // Normally, <released version>.Follows(<otherwise identical +snapshot version>) returns 1.
-    // However, in this case, it should not; a semantic version expression requiring earlier/later
-    // than 1.1.0, for example, should reject 1.1.0+snapshot
-    #dim tVersion As %IPM.General.SemanticVersion
-    set tVersion = pVersion.%ConstructClone()
-    set tVersion.Build = ""
+  // For purposes of this comparison, remove build metadata.
+  // Normally, <released version>.Follows(<otherwise identical +snapshot version>) returns 1.
+  // However, in this case, it should not; a semantic version expression requiring earlier/later
+  // than 1.1.0, for example, should reject 1.1.0+snapshot
+  #dim tVersion As %IPM.General.SemanticVersion
+  set tVersion = pVersion.%ConstructClone()
+  set tVersion.Build = ""
 
-    set tCompVersion = ##class(%IPM.General.SemanticVersion).%New()
-    set tCompVersion.Major = ..Major
-    set tCompVersion.Minor = ..Minor
-    set tCompVersion.Patch = ..Patch
-    set tCompVersion.Prerelease = ..Prerelease
+  set tCompVersion = ##class(%IPM.General.SemanticVersion).%New()
+  set tCompVersion.Major = ..Major
+  set tCompVersion.Minor = ..Minor
+  set tCompVersion.Patch = ..Patch
+  set tCompVersion.Prerelease = ..Prerelease
 
-    if (..Operator [ "<") {
-        quit tCompVersion.Follows(tVersion)
-    } else {
-        quit tVersion.Follows(tCompVersion)
-    }
+  if (..Operator [ "<") {
+    quit tCompVersion.Follows(tVersion)
+  } else {
+    quit tVersion.Follows(tCompVersion)
+  }
 
-    quit 1
+  quit 1
 }
 
-Method IsSatsifiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean [ Abstract ]
+Method IsSatisfiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
-	quit ..Evaluate(pVersion)
+  quit ..Evaluate(pVersion)
 }
 
 Storage Default

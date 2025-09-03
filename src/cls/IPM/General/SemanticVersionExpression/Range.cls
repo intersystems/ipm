@@ -1,4 +1,4 @@
-Class %IPM.General.SemanticVersionExpression.Range Extends (%SerialObject, %IPM.General.SemanticVersionExpression.IComparable)
+Class %IPM.General.SemanticVersionExpression.Range Extends %IPM.General.SemanticVersionExpression.IComparable
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVer.Range";
@@ -216,9 +216,9 @@ Method InRange(pVersion As %IPM.General.SemanticVersion) As %Boolean
     quit tSatisfied
 }
 
-Method IsSatisfiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean
+Method IsSatisfiedBy(version As %IPM.General.SemanticVersion) As %Boolean
 {
-	quit ..InRange(pVersion)
+	quit ..InRange(version)
 }
 
 Storage Default
