@@ -1109,6 +1109,57 @@ ClassMethod GetModuleNameFromXML(
     return $$$OK
 }
 
+/// Parses defaults defined in the module.xml that look like this:
+/// ```
+/// <Defaults>
+///     <Parameter Name="ArbitraryDefault">1234</Parameter>
+///     <Parameter Name="NoTransaction">1</Parameter>
+///     <Parameter Name="NoLock">1</Parameter>
+/// </Defaults>
+/// ```
+/// 
+/// Returns results as multidimensional array
+ClassMethod GetModuleDefaultsFromXML(
+	pDirectory As %String,
+	Output defaults) As %Status
+{
+    set stream=##class(%Stream.FileBinary).%New()
+    set status = stream.LinkToFile(pDirectory_"module.xml")
+    if $$$ISERR(status) {
+        return status
+    }
+
+    set status = ##class(%XML.XPATH.Document).CreateFromStream(stream, .document)
+    if $$$ISERR(status) {
+        return status
+    }
+
+    // Get name of the default
+    set status = document.EvaluateExpression("/Export/Document/Module/Defaults/Parameter", "@Name", .attributes)
+    if $$$ISERR(status) {
+        return status
+    }
+    // Get value of the default
+    set status = document.EvaluateExpression("/Export/Document/Module/Defaults/Parameter", "text()", .values)
+    if $$$ISERR(status) {
+        return status
+    }
+    if attributes.Count() '= values.Count() {
+        return $$$ERROR($$$GeneralError,$$$FormatText("Module defaults improperly formatted."))
+    }
+
+    // Combine results
+    set defaults = 0
+    for i = 1:1:attributes.Count() {
+        set defaults = defaults + 1
+        set attribute = attributes.GetAt(i).Value
+        set value = values.GetAt(i).Value
+        set defaults(attribute)=value
+    }
+
+    return $$$OK
+}
+
 ClassMethod ExportDocumentForObject(
 	pSourceModule As %IPM.Storage.Module,
 	Output pSourceControlOutput) As %Status
@@ -1213,6 +1264,8 @@ ClassMethod LoadNewModule(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
+        // check module.xml for defaults
+
         set tVerbose = $get(pParams("Verbose"))
         set tUseTransactions = '($get(pParams("NoTransaction"),0) || $get(pParams("NoJournal"),0))
         if '$data(pParams("qstruct")) {
