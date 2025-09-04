@@ -1123,39 +1123,41 @@ ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
 	Output defaults) As %Status
 {
-    set stream=##class(%Stream.FileBinary).%New()
-    set status = stream.LinkToFile(pDirectory_"module.xml")
-    if $$$ISERR(status) {
-        return status
+  /// Use XML.Reader to parse the <Defaults>
+  set reader = ##class(%XML.Reader).%New()
+  set status = reader.OpenFile(##class(%Library.File).NormalizeDirectory(pDirectory) _ "module.xml")
+  if $$$ISERR(status) {
+    return status
+  }
+
+  do reader.Correlate("Module", "%IPM.Storage.Module")
+  do reader.Next(.object, .status)
+  if $$$ISERR(status) {
+    return status
+  }
+
+  set packaging = object.Packaging
+  set status = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(packaging, .lifecycleClass)
+  if $$$ISERR(status) {
+    return status
+  }
+
+  // Iterate through the defaults
+  set defaults = 0
+  set key = ""
+  for {
+    set def = object.Defaults.GetNext(.key)
+    if key = "" {
+      quit
+    }
+    // Filter based on optional LifecycleClass
+    if (def.LifecycleClass '= "") && (def.LifecycleClass '= lifecycleClass) {
+      continue
     }
 
-    set status = ##class(%XML.XPATH.Document).CreateFromStream(stream, .document)
-    if $$$ISERR(status) {
-        return status
-    }
-
-    // Get name of the default
-    set status = document.EvaluateExpression("/Export/Document/Module/Defaults/Parameter", "@Name", .attributes)
-    if $$$ISERR(status) {
-        return status
-    }
-    // Get value of the default
-    set status = document.EvaluateExpression("/Export/Document/Module/Defaults/Parameter", "text()", .values)
-    if $$$ISERR(status) {
-        return status
-    }
-    if attributes.Count() '= values.Count() {
-        return $$$ERROR($$$GeneralError,$$$FormatText("Module defaults improperly formatted."))
-    }
-
-    // Combine results
-    set defaults = 0
-    for i = 1:1:attributes.Count() {
-        set defaults = defaults + 1
-        set attribute = attributes.GetAt(i).Value
-        set value = values.GetAt(i).Value
-        set defaults(attribute)=value
-    }
+    set defaults = defaults + 1
+    set defaults(def.Name) = def.Value
+  }
 
     return $$$OK
 }
@@ -1265,6 +1267,9 @@ ClassMethod LoadNewModule(
     set tInitTLevel = $tlevel
     try {
         // check module.xml for defaults
+        set tSC = ..GetModuleDefaultsFromXML(pDirectory, .defaults)
+        $$$ThrowOnError(tSC)
+        merge pParams = defaults
 
         set tVerbose = $get(pParams("Verbose"))
         set tUseTransactions = '($get(pParams("NoTransaction"),0) || $get(pParams("NoJournal"),0))

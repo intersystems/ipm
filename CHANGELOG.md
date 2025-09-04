@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Format all files and add consistent formatting settings, format on save etc.
 - #848: Resource processing should be done in order of granularity
+- #779: Module defaults specified in `<Defaults>` in the module.xml are used when loading/installing the module and not just when the module itself runs its lifecycle phases
 
 ## [0.10.2] - 2025-06-04
 
