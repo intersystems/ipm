@@ -234,9 +234,9 @@ Method ExecuteUpdateStep(
         write !, $char(9)_"Running "_updateStep.MethodName_"()"
     }
     set updateStep.TimeStampStart = $zdatetime($horolog,3)
+    set sc = $$$OK
     try {
-        set sc = $classmethod(updateStep.ClassName, updateStep.MethodName)
-        $$$ThrowOnError(sc)
+        do $classmethod(updateStep.ClassName, updateStep.MethodName)
     } catch (ex) {
         set sc = ex.AsStatus()
     }
