@@ -5,6 +5,8 @@ Parameter ModuleNoDependencies As STRING = "update-simple";
 
 Parameter ModuleWithDependencies As STRING = "update-deps";
 
+Parameter ModuleWithDependenciesAdded As STRING = "update-deps-added";
+
 Parameter ModuleOneVersion As STRING = "1.2.1";
 
 Parameter ModuleTwoVersion As STRING = "2.1.1";
@@ -13,19 +15,11 @@ Parameter ModuleThreeVersion As STRING = "3.5.0";
 
 Parameter UpdateTestRepo As STRING = "update-test-modules";
 
-Method OnBeforeOneTest() As %Status
-{
-  // Setup repo pointing to all modules used for tests in this class
-  set sc = ##class(%IPM.Main).Shell("repo -n "_..#UpdateTestRepo_"-fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/update-test/")
-  do $$$AssertStatusOK(sc,"Created "_..#UpdateTestRepo_" repo successfully.")
-  return sc
-}
-
-Method OnAfterOneTest() As %Status
+Method OnBeforeAllTests() As %Status
 {
   // Clean up repo used for tests
-  set sc = ##class(%IPM.Main).Shell("repo -delete -name "_..#UpdateTestRepo)
-  do $$$AssertStatusOK(sc,"Deleted "_..#UpdateTestRepo_" repo successfully.")
+  set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+  set sc = ##class(%IPM.Main).Shell("repo -n "_..#UpdateTestRepo_" -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/update-test/")
   return sc
 }
 
@@ -37,12 +31,17 @@ Method TestAllNoErrorModulesNoMirror()
   // Simple module without dependencies
   set updateStepsToSeed = [["UpdatePackage.V1", "MethodA", 1]]
   set updateStepsToRun = [["UpdatePackage.V1", "MethodB", 0], ["UpdatePackage.V1", "MethodC", 1], ["UpdatePackage.V2", "MethodA", 1], ["UpdatePackage.V2", "MethodC", 1], ["UpdatePackage.V2", "MethodB", 0]]
-  do ..DoNormalUpdateNoMirror(..ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  do ..NormalUpdateTestSuite(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 
   // Module with dependencies
   set updateStepsToSeed = updateStepsToSeed.addAll([["UpdateDeps.UpdatePackage.V1", "MethodA", 1]])
   set updateStepsToRun = updateStepsToRun.addAll([["UpdateDeps.UpdatePackage.V1", "MethodB", 0], ["UpdateDeps.UpdatePackage.V1", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodA", 1], ["UpdateDeps.UpdatePackage.V2", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodB", 0]])
-  do ..DoNormalUpdateNoMirror(..ModuleWithDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  do ..NormalUpdateTestSuite(..#ModuleWithDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+
+  // Module with dependencies added in new version
+  set updateStepsToSeed = [["UpdateDepsAdded.UpdatePackage.V1", "MethodA", 1]]
+  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsAdded.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsAdded.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodB", 0]])
+  do ..NormalUpdateTestSuite(..#ModuleWithDependenciesAdded, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 }
 
 Method TestUpdateToOlderVersion()
