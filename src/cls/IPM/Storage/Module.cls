@@ -194,18 +194,19 @@ Method HandleUpdateStepsFromList(
     }
 }
 
-/// Seeds an update step by setting TimeStampEnd to current time
-/// Seeding steps mark the steps as having been run so will not be run on subsequent 'update' calls
-/// Steps that already have TimeStampEnd defined (already been run/seeded) won't be seeded
+/// Seeds an update step by setting TimeStampEnd to current time and status to $$$OK
+/// Seeding steps mark the steps as having been successfully run so will not be run on subsequent 'update' calls
+/// Only seed steps that have no TimeStampEnd defined (not already been run/seeded) or errored on their last run
 Method SeedUpdateStep(
 	updateStep As %IPM.Storage.UpdateStep.Base,
 	verbose As %Boolean = 0)
 {
-    if 'updateStep.TimeStampEnd {
+    if 'updateStep.TimeStampEnd || $$$ISERR(updateStep.Status) {
         if verbose {
             write !, $char(9)_"Seeding "_updateStep.MethodName_"()"
         }
         set updateStep.TimeStampEnd = $zdatetime($horolog,3)
+        set updateStep.Status = $$$OK
         $$$ThrowOnError(updateStep.%Save())
     }
     else {
