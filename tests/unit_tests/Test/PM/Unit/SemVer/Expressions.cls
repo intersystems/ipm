@@ -184,6 +184,9 @@ Method TestAndedOr()
   do $$$AssertNotTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("2.4.0")))
   do $$$AssertNotTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("2.0.0")))
   do $$$AssertNotTrue(sve3.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("4.0.0")))
+
+  // Test that you cannot ExpressionSet() an AND expression
+  do $$$AssertStatusNotOK(sve3.ExpressionSet(">3.0.0"))
 }
 
 Method TestOnTheFlyMigration()

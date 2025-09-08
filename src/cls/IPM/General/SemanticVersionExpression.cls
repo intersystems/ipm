@@ -19,6 +19,10 @@ Method %OnNew(rangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
 
 Method ExpressionSet(value As %String) As %Status
 {
+  // An instance of this class can only either have items in AnyOf or AllOf, not both
+  if ..AllOf.Count() {
+    quit $$$ERROR($$$GeneralError,$$$FormatText("This instance of SemanticVersionExpression already has an AND operator and cannot be set"))
+  }
   set status = $$$OK
   try {
     set options = $listfromstring(value,"||")
@@ -28,6 +32,9 @@ Method ExpressionSet(value As %String) As %Status
       set status = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
       if $$$ISERR(status) {
         quit
+      }
+      if option.ToResolvedString() = "" {
+        continue
       }
       do ..AnyOf.Insert(option)
     }
@@ -50,9 +57,7 @@ Method ToResolvedString() As %String
     for i=1:1:..AnyOf.Count() {
       set opt = ..AnyOf.GetAt(i)
       set resolvedString = opt.ToResolvedString()
-      if resolvedString '= "" {
-        set optList = optList_$listbuild("(" _ resolvedString _ ")")
-      }
+      set optList = optList_$listbuild("(" _ resolvedString _ ")")
     }
     quit $listtostring(optList," || ")
   }
@@ -73,16 +78,7 @@ ClassMethod FromString(
   set status = $$$OK
   try {
       set expr = ..%New(string)
-      set options = $listfromstring(string,"||")
-      set ptr = 0
-      while $listnext(options,ptr,rangeExpr) {
-          set rangeExpr = $zstrip(rangeExpr,"<>W")
-          set status = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
-          if $$$ISERR(status) {
-              quit
-          }
-          do expr.AnyOf.Insert(option)
-      }
+      set status = expr.ExpressionSet(string)
   } catch e {
       set status = e.AsStatus()
   }
