@@ -161,10 +161,13 @@ Method HandleAllUpdateSteps(
 
 /// For a given version, seed or execute update steps listed in the module's update package version class
 /// 
-/// If seeding: For only steps that don't have a TimeStampEnd value, set it's TimeStampEnd to the current time
+/// If seeding: For only steps that don't have a TimeStampEnd value or have an errored status, set it's TimeStampEnd to the current time
 /// 
 /// If executing: Only start running steps at the first one found not to have a TimeStampEnd value or if an errored step is found
 ///               After finding this step, run it and all subsequent steps, regardless of if they have been run or not.
+/// 
+/// newStepToApply - Gets marked as true to tell us to run all remaining steps in the list, whether or not they have been run/seeded before
+///                  Can carry this over to subsequent calls by passing the newStepToApply variable to those HandleUpdateStepsFromList() calls
 Method HandleUpdateStepsFromList(
 	methodList As %Library.DynamicArray,
 	className As %String,
@@ -217,9 +220,6 @@ Method SeedUpdateStep(
 }
 
 /// Executes an update step
-/// If an update step does not already exist, a new one gets created.
-/// newStepToApply - Gets marked as true to tell us to run all remaining steps in the list, whether or not they have been run/seeded before
-///                  Can carry this over to subsequent calls by passing the newStepToApply variable to those ExecuteUpdateStep() calls
 Method ExecuteUpdateStep(
 	updateStep As %IPM.Storage.UpdateStep.Base,
 	primaryOnly As %Boolean,
