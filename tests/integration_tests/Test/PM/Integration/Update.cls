@@ -7,6 +7,8 @@ Parameter ModuleWithDependencies As STRING = "update-deps";
 
 Parameter ModuleWithDependenciesAdded As STRING = "update-deps-added";
 
+Parameter ModuleWithDependenciesRemoved As STRING = "update-deps-removed";
+
 Parameter ModuleOneVersion As STRING = "1.2.1";
 
 Parameter ModuleTwoVersion As STRING = "2.1.1";
@@ -42,6 +44,11 @@ Method TestAllNoErrorModulesNoMirror()
   set updateStepsToSeed = [["UpdateDepsAdded.UpdatePackage.V1", "MethodA", 1]]
   set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsAdded.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsAdded.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodB", 0]])
   do ..NormalUpdateTestSuite(..#ModuleWithDependenciesAdded, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+
+  // Module with dependencies added in new version
+  set updateStepsToSeed = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodA", 1], ["UpdatePackage.V1", "MethodA", 1]]
+  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsRemoved.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsRemoved.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodB", 0]])
+  do ..NormalUpdateTestSuite(..#ModuleWithDependenciesRemoved, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 }
 
 Method TestUpdateToOlderVersion()
