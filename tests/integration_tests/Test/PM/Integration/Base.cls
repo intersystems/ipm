@@ -75,7 +75,10 @@ Method TearDown() As %Status
 	Quit tSC
 }
 
-ClassMethod ReadXDataToModule(pNamespace As %String = {$NAMESPACE}, pXDataName As %String, ByRef pModule As %IPM.Storage.Module) As %Status
+ClassMethod ReadXDataToModule(
+	pNamespace As %String = {$NAMESPACE},
+	pXDataName As %String,
+	ByRef pModule As %IPM.Storage.Module) As %Status
 {
 	New $Namespace
 	Set tInitNS = $Namespace
@@ -126,7 +129,9 @@ ClassMethod GetModuleDir(subfolders... As %String) As %String
 }
 
 /// Returns whether a substring is found in any element of a multi-dimensional array
-ClassMethod FindStringInMultiDimArray(pString As %String, ByRef pArray) As %Boolean
+ClassMethod FindStringInMultiDimArray(
+	pString As %String,
+	ByRef pArray) As %Boolean
 {
 	set sub = ""
 	For {
