@@ -1205,7 +1205,6 @@ ClassMethod LoadNewModule(
 	pRepository As %String = "",
 	pSynchronous As %Boolean = 0) As %Status
 {
-    zwrite pParams
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
