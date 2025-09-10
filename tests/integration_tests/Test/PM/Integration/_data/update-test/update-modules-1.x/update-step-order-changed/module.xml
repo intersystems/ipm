@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="update-step-order-changed.ZPM">
+    <Module>
+      <Name>update-step-order-changed</Name>
+      <Version>1.2.1</Version>
+      <Resource Name="UpdateStepOrderChanged.UpdatePackage.PKG" />
+      <UpdatePackage>UpdateStepOrderChanged.UpdatePackage</UpdatePackage>
+    </Module>
+  </Document>
+</Export>
