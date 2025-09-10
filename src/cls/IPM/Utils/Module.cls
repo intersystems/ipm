@@ -476,9 +476,7 @@ ClassMethod LoadModuleFromDirectory(
             // Only propagate selected settings that should apply to dependencies.
             set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
             set tParams("Verbose") = tVerbose
-            if '$get(pParams("Update"),0) {
-                set tParams("cmd") = "install"
-            } else {
+            if $get(pParams("Update"),0) {
                 set tParams("cmd") = "update"
             }
             merge tParams("NoLock") = pParams("NoLock")
@@ -493,6 +491,7 @@ ClassMethod LoadModuleFromDirectory(
             merge tParams("AngularArtifact") = pParams("AngularArtifact")
             merge tParams("EnvFiles") = pParams("EnvFiles")
             merge tParams("Update") = pParams("Update")
+            merge tParams("DeveloperMode") = pParams("DeveloperMode")
         }
         set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pSynchronous)
         if $$$ISERR(tSC) {
