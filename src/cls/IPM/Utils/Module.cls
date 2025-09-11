@@ -468,17 +468,18 @@ ClassMethod LoadModuleFromDirectory(
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         write:tVerbose !,"Loading from ",pDirectory,!
-        if $get(pParams("Install")) {
+        if $get(pParams("Install")) || $get(pParams("Update")) {
             // Propagate pParams fully.
             merge tParams = pParams
-            zkill tParams("Install")
+            if $get(pParams("Update"),0) {
+                set tParams("cmd") = "update"
+            } else {
+                zkill tParams("Install")
+            }
         } else {
             // Only propagate selected settings that should apply to dependencies.
             set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
             set tParams("Verbose") = tVerbose
-            if $get(pParams("Update"),0) {
-                set tParams("cmd") = "update"
-            }
             merge tParams("NoLock") = pParams("NoLock")
             merge tParams("NoMapping") = pParams("NoMapping")
             merge tParams("NoTransaction") = pParams("NoTransaction")
@@ -490,8 +491,6 @@ ClassMethod LoadModuleFromDirectory(
             merge tParams("Artifactory") = pParams("Artifactory")
             merge tParams("AngularArtifact") = pParams("AngularArtifact")
             merge tParams("EnvFiles") = pParams("EnvFiles")
-            merge tParams("Update") = pParams("Update")
-            merge tParams("DeveloperMode") = pParams("DeveloperMode")
         }
         set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pSynchronous)
         if $$$ISERR(tSC) {
