@@ -13,7 +13,7 @@ Parameter ModuleNoUpdateSteps As STRING = "update-no-steps";
 
 Parameter ModuleStepAddedOlderVersion As STRING = "update-step-added-to-older-version-class";
 
-Parameter ModuleStepAddedNewVersion As STRING = "update-step-added-curr-version-class";
+Parameter ModuleStepAddedCurrVersion As STRING = "update-step-added-curr-version-class";
 
 Parameter ModuleOneVersion As STRING = "1.2.1";
 
@@ -55,203 +55,141 @@ Method TestModuleUpdateStepAddedOlderVersion()
 
 Method TestAllNoErrorModulesNoMirror()
 {
-  #; if $system.Mirror.IsMember() {
-  #;   return
-  #; }
-  #; // Simple module without dependencies
-  #; set updateStepsToSeed = [["UpdatePackage.V1", "MethodA", 1]]
-  #; set updateStepsToRun = [["UpdatePackage.V1", "MethodB", 0], ["UpdatePackage.V1", "MethodC", 1], ["UpdatePackage.V2", "MethodA", 1], ["UpdatePackage.V2", "MethodC", 1], ["UpdatePackage.V2", "MethodB", 0]]
-  #; do ..NormalUpdateTestSuite(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  if $system.Mirror.IsMember() {
+    return
+  }
+  // Simple module without dependencies
+  set updateStepsToSeed = [["UpdatePackage.V1", "MethodA", 1]]
+  set updateStepsToRun = [["UpdatePackage.V1", "MethodB", 0], ["UpdatePackage.V1", "MethodC", 1], ["UpdatePackage.V2", "MethodA", 1], ["UpdatePackage.V2", "MethodC", 1], ["UpdatePackage.V2", "MethodB", 0]]
+  do ..NormalUpdateTestSuite(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 
-  #; // Module with dependencies
-  #; set updateStepsToSeed = updateStepsToSeed.addAll([["UpdateDeps.UpdatePackage.V1", "MethodA", 1]])
-  #; set updateStepsToRun = updateStepsToRun.addAll([["UpdateDeps.UpdatePackage.V1", "MethodB", 0], ["UpdateDeps.UpdatePackage.V1", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodA", 1], ["UpdateDeps.UpdatePackage.V2", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodB", 0]])
-  #; do ..NormalUpdateTestSuite(..#ModuleWithDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  // Module with dependencies
+  set updateStepsToSeed = updateStepsToSeed.addAll([["UpdateDeps.UpdatePackage.V1", "MethodA", 1]])
+  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDeps.UpdatePackage.V1", "MethodB", 0], ["UpdateDeps.UpdatePackage.V1", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodA", 1], ["UpdateDeps.UpdatePackage.V2", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodB", 0]])
+  do ..NormalUpdateTestSuite(..#ModuleWithDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 
-  #; // Module with dependencies added in new version
-  #; set updateStepsToSeed = [["UpdateDepsAdded.UpdatePackage.V1", "MethodA", 1]]
-  #; set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsAdded.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsAdded.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodB", 0]])
-  #; do ..SingleNormalUpdateTest(..#ModuleWithDependenciesAdded, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
-  #; do ..CleanUpModule(..#ModuleWithDependenciesAdded)
+  // Module with dependencies added in new version
+  set updateStepsToSeed = [["UpdateDepsAdded.UpdatePackage.V1", "MethodA", 1]]
+  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsAdded.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsAdded.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodB", 0]])
+  do ..SingleNormalUpdateTest(..#ModuleWithDependenciesAdded, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
+  do ..CleanUpModule(..#ModuleWithDependenciesAdded)
 
-  #; // Module with dependencies added in new version
-  #; set updateStepsToSeed = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodA", 1], ["UpdatePackage.V1", "MethodA", 1]]
-  #; set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsRemoved.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsRemoved.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodB", 0]])
-  #; do ..SingleNormalUpdateTest(..#ModuleWithDependenciesRemoved, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
-  #; do ..CleanUpModule(..#ModuleWithDependenciesAdded)
+  // Module with dependencies added in new version
+  set updateStepsToSeed = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodA", 1], ["UpdatePackage.V1", "MethodA", 1]]
+  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsRemoved.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsRemoved.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodB", 0]])
+  do ..SingleNormalUpdateTest(..#ModuleWithDependenciesRemoved, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
+  do ..CleanUpModule(..#ModuleWithDependenciesAdded)
 
   // Module with no update steps
   do ..SingleNormalUpdateTest(..#ModuleNoUpdateSteps, [], [], ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
   do ..CleanUpModule(..#ModuleNoUpdateSteps)
 }
 
-// Method TestAllErrorModulesNoMirror()
-
-// {
-
-//   do ..SingleFailedUpdateTest(..#ModuleStepAddedOlderVersion, ..#ModuleTwoVersion, ..#ModuleThreeVersion)
-
-//   do ..CleanUpModule(moduleName)
-
-// }
-
-// Method TestUpdateOfUninstalledModule()
-
-// {
-
-//   // Make sure the module is not installed
-
-//   if (##class(%IPM.Storage.Module).NameExists(..#ModuleNoDependencies)) {
-
-//     set sc = ##class(%IPM.Main).Shell("uninstall "_..#ModuleNoDependencies)
-
-//     $$$ThrowOnError(sc)
-
-//   }
-
-//   // Update non-existent module
-
-//   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
-
-//   do $$$AssertStatusNotOK(sc)
-
-// }
-
-// Method TestUpdateToOlderVersion()
-
-// {
-
-//   // Load module
-
-//   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleTwoVersion)
-
-//   // Update module
-
-//   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
-
-//   do $$$AssertStatusNotOK(sc, "Attempt at updating module to older version failed.")
-
-//   do $$$AssertTrue((sc [ "version"), "Error message is descriptive and correctly mentions 'version'")
-
-//   do ..CleanUpModule(..#ModuleNoDependencies)
-
-// }
-
-// Method TestUpdateToInvalidVersion()
-
-// {
-
-//   // Load module
-
-//   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
-
-//   // Update module
-
-//   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" 1.0.0")
-
-//   do $$$AssertStatusNotOK(sc, "Attempt at updating module to non-existent version failed.")
-
-//   do ..CleanUpModule(..#ModuleNoDependencies)
-
-// }
-
-// Method TestUpdateToNewVersionTwice()
-
-// {
-
-//   // Load module
-
-//   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
-
-//   // Update module to a 2.x version
-
-//   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
-
-//   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_" without error")
-
-//   // Update module to a 3.x version
-
-//   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleThreeVersion)
-
-//   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleThreeVersion_" without error")
-
-//   do ..CleanUpModule(..#ModuleNoDependencies)
-
-// }
-
-// Method TestUpdateToSameVersionTwiceNoMirror()
-
-// {
-
-//   if $system.Mirror.IsMember() {
-
-//     return
-
-//   }
-
-//   // Load module
-
-//   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
-
-//   // Update module to a 2.x version
-
-//   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
-
-//   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_"without error")
-
-//   // Get timestamps of the V2 methods
-
-//   set stepTwoA = ..GetUpdateStep("UpdatePackage.V2", "MethodA", 1)
-
-//   set stepTwoB = ..GetUpdateStep("UpdatePackage.V2", "MethodB", 0)
-
-//   set stepTwoC = ..GetUpdateStep("UpdatePackage.V2", "MethodC", 1)
-
-//   set twoAStart = stepTwoA.TimeStampStart
-
-//   set twoAEnd = stepTwoA.TimeStampEnd
-
-//   set twoBStart = stepTwoB.TimeStampStart
-
-//   set twoBEnd = stepTwoB.TimeStampEnd
-
-//   set twoCStart = stepTwoC.TimeStampStart
-
-//   set twoCEnd = stepTwoC.TimeStampEnd
-
-//   // Update module to SAME version
-
-//   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
-
-//   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_"without error")
-
-//   // Reload UpdateStep persistence to get the (hopefully not updated) version
-
-//   set stepTwoA = ..GetUpdateStep("UpdatePackage.V2", "MethodA", 1)
-
-//   set stepTwoB = ..GetUpdateStep("UpdatePackage.V2", "MethodB", 0)
-
-//   set stepTwoC = ..GetUpdateStep("UpdatePackage.V2", "MethodC", 1)
-
-//   // Check that second update does not rerun update steps
-
-//   // (timestamps on each update step should not have changed)
-
-//   do $$$AssertEquals(twoAStart, stepTwoA.TimeStampStart)
-
-//   do $$$AssertEquals(twoAEnd, stepTwoA.TimeStampEnd)
-
-//   do $$$AssertEquals(twoBStart, stepTwoB.TimeStampStart)
-
-//   do $$$AssertEquals(twoBEnd, stepTwoB.TimeStampEnd)
-
-//   do $$$AssertEquals(twoCStart, stepTwoC.TimeStampStart)
-
-//   do $$$AssertEquals(twoCEnd, stepTwoC.TimeStampEnd)
-
-//   do ..CleanUpModule(..#ModuleNoDependencies)
-
-// }
+Method TestAllErrorModulesNoMirror()
+{
+  #; do ..SingleFailedUpdateTest(..#ModuleStepAddedOlderVersion, ..#ModuleTwoVersion, ..#ModuleThreeVersion)
+  #; do ..CleanUpModule(moduleName)
+}
+
+Method TestUpdateOfUninstalledModule()
+{
+  // Make sure the module is not installed
+  if (##class(%IPM.Storage.Module).NameExists(..#ModuleNoDependencies)) {
+    set sc = ##class(%IPM.Main).Shell("uninstall "_..#ModuleNoDependencies)
+    $$$ThrowOnError(sc)
+  }
+
+  // Update non-existent module
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
+  do $$$AssertStatusNotOK(sc)
+}
+
+Method TestUpdateToOlderVersion()
+{
+  // Install module
+  do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleTwoVersion)
+
+  // Update module
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
+  do $$$AssertStatusNotOK(sc, "Attempt at updating module to older version failed.")
+  do $$$AssertTrue((sc [ "version"), "Error message is descriptive and correctly mentions 'version'")
+
+  do ..CleanUpModule(..#ModuleNoDependencies)
+}
+
+Method TestUpdateToInvalidVersion()
+{
+  // Install module
+  do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
+
+  // Update module
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" 1.0.0")
+  do $$$AssertStatusNotOK(sc, "Attempt at updating module to non-existent version failed.")
+
+  do ..CleanUpModule(..#ModuleNoDependencies)
+}
+
+Method TestUpdateToNewVersionTwice()
+{
+  // Install module
+  do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
+
+  // Update module to a 2.x version
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
+  do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_" without error")
+
+  // Update module to a 3.x version
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleThreeVersion)
+  do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleThreeVersion_" without error")
+
+  do ..CleanUpModule(..#ModuleNoDependencies)
+}
+
+Method TestUpdateToSameVersionTwiceNoMirror()
+{
+
+  if $system.Mirror.IsMember() {
+    return
+  }
+
+  // Load module
+  do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
+
+  // Update module to a 2.x version
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
+  do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_"without error")
+
+  // Get timestamps of the V2 methods
+  set stepTwoA = ..GetUpdateStep("UpdatePackage.V2", "MethodA", 1)
+  set stepTwoB = ..GetUpdateStep("UpdatePackage.V2", "MethodB", 0)
+  set stepTwoC = ..GetUpdateStep("UpdatePackage.V2", "MethodC", 1)
+  set twoAStart = stepTwoA.TimeStampStart
+  set twoAEnd = stepTwoA.TimeStampEnd
+  set twoBStart = stepTwoB.TimeStampStart
+  set twoBEnd = stepTwoB.TimeStampEnd
+  set twoCStart = stepTwoC.TimeStampStart
+  set twoCEnd = stepTwoC.TimeStampEnd
+
+  // Update module to SAME version
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
+  do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleTwoVersion_"without error")
+
+  // Reload UpdateStep persistence to get the (hopefully not updated) version
+  set stepTwoA = ..GetUpdateStep("UpdatePackage.V2", "MethodA", 1)
+  set stepTwoB = ..GetUpdateStep("UpdatePackage.V2", "MethodB", 0)
+  set stepTwoC = ..GetUpdateStep("UpdatePackage.V2", "MethodC", 1)
+
+  // Check that second update does not rerun update steps
+  // (timestamps on each update step should not have changed)
+  do $$$AssertEquals(twoAStart, stepTwoA.TimeStampStart)
+  do $$$AssertEquals(twoAEnd, stepTwoA.TimeStampEnd)
+  do $$$AssertEquals(twoBStart, stepTwoB.TimeStampStart)
+  do $$$AssertEquals(twoBEnd, stepTwoB.TimeStampEnd)
+  do $$$AssertEquals(twoCStart, stepTwoC.TimeStampStart)
+  do $$$AssertEquals(twoCEnd, stepTwoC.TimeStampEnd)
+
+  do ..CleanUpModule(..#ModuleNoDependencies)
+}
 
 /// ///////////////////////////////////////////// HELPER METHODS ////////////////////////////////////////////////
 /// Runs through four variations of update for a given module that are each expected to complete successfully:
@@ -347,8 +285,8 @@ Method SingleNormalUpdateNewStepTest(
 
 /// NOTE: For testing simplicity, we will always assume that in the update test, both the module and its dependencies are being updated
 /// from and to the same version numbers.
-/// Completes an update of given moduleName from fromVersion to toVersion, verifying that the given updateStepsToSeed are seeded
-/// and that the given updateStepsToRun are run
+/// Verifies that updating the given moduleName from fromVersion to toVersion FAILS, checking that the given updateStepsToSeed are seeded
+/// but that the "update" command throws an error.
 /// @argument moduleName          Name of module to install and update
 /// @argument updateStepsToSeed   Array of [className, methodName, isPrimaryOnlyStep] update steps that are defined in the module PRE-update
 /// @argument updateStepsToRun    Array of [className, methodName, isPrimaryOnlyStep] update steps that exist in the new version of the module POST-update
