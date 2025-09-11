@@ -37,7 +37,7 @@ Method TestEvaluateMacro()
 
 Method TestGetModuleDefaultsFromXML()
 {
-  do $$$AssertStatusOK(##class(%IPM.Utils.Module).GetModuleDefaultsFromXML("/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/module-defaults/", .defaults))
+  do ##class(%IPM.Utils.Module).GetModuleDefaultsFromXML("/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/module-defaults/", .defaults)
   do $$$AssertEquals(defaults,3)
   do $$$AssertEquals(defaults("ArbitraryDefault"), 1234)
   do $$$AssertEquals(defaults("NoLock"), 1)

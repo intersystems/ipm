@@ -1121,26 +1121,15 @@ ClassMethod GetModuleNameFromXML(
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
-	Output defaults) As %Status
+	Output defaults)
 {
-  /// Use XML.Reader to parse the <Defaults>
-  set reader = ##class(%XML.Reader).%New()
-  set status = reader.OpenFile(##class(%Library.File).NormalizeDirectory(pDirectory) _ "module.xml")
-  if $$$ISERR(status) {
-    return status
-  }
-
-  do reader.Correlate("Module", "%IPM.Storage.Module")
-  do reader.Next(.object, .status)
-  if $$$ISERR(status) {
-    return status
+  set object = ..GetModuleObjectFromPath(pDirectory, .found)
+  if 'found {
+    quit
   }
 
   set packaging = object.Packaging
-  set status = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(packaging, .lifecycleClass)
-  if $$$ISERR(status) {
-    return status
-  }
+  $$$ThrowOnError(##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(packaging, .lifecycleClass))
 
   // Iterate through the defaults
   set defaults = 0
@@ -1158,8 +1147,6 @@ ClassMethod GetModuleDefaultsFromXML(
     set defaults = defaults + 1
     set defaults(def.Name) = def.Value
   }
-
-    return $$$OK
 }
 
 ClassMethod ExportDocumentForObject(
@@ -1267,8 +1254,7 @@ ClassMethod LoadNewModule(
     set tInitTLevel = $tlevel
     try {
         // check module.xml for defaults
-        set tSC = ..GetModuleDefaultsFromXML(pDirectory, .defaults)
-        $$$ThrowOnError(tSC)
+        do ..GetModuleDefaultsFromXML(pDirectory, .defaults)
         merge params = defaults
         merge params = pParams
 
