@@ -15,6 +15,8 @@ Parameter ModuleStepAddedOlderVersion As STRING = "update-step-added-to-older-ve
 
 Parameter ModuleStepAddedCurrVersion As STRING = "update-step-added-curr-version-class";
 
+Parameter ModuleStepErrors As STRING = "update-step-errors";
+
 Parameter ModuleOneVersion As STRING = "1.2.1";
 
 Parameter ModuleOneVersionMinorBump As STRING = "1.3.1";
@@ -31,26 +33,6 @@ Method OnBeforeAllTests() As %Status
   set sc = ##class(%IPM.Main).Shell("repo -delete-all")
   set sc = ##class(%IPM.Main).Shell("repo -n "_..#UpdateTestRepo_" -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/update-test/")
   return sc
-}
-
-Method TestModuleUpdateStepAddedOlderVersion()
-{
-  // Test updating module when update step is added to an older V# class
-  set updateStepsToSeed = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodB", 0]]
-  set seededUpdateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1]]
-  set seededUpdateStepsToNotRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodB", 0]]
-  set updateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodD", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V3", "MethodA", 1]]
-
-  do ..SingleNormalUpdateNewStepTest(..#ModuleStepAddedOlderVersion, updateStepsToSeed, seededUpdateStepsToRun, seededUpdateStepsToNotRun, updateStepsToRun, ..#ModuleTwoVersion, ..#ModuleThreeVersion)
-  do ..CleanUpModule(..#ModuleStepAddedOlderVersion)
-
-  // Test updating module when new update step is added to current V# class which precedes existing update steps in order
-  set updateStepsToSeed = [["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodC", 1]]
-  set seededUpdateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1]]
-  set updateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodD", 0]]
-
-  do ..SingleNormalUpdateNewStepTest(..#ModuleStepAddedCurrVersion, updateStepsToSeed, seededUpdateStepsToRun, [], updateStepsToRun, ..#ModuleOneVersion, ..#ModuleOneVersionMinorBump)
-  do ..CleanUpModule(..#ModuleStepAddedCurrVersion)
 }
 
 Method TestAllNoErrorModulesNoMirror()
@@ -87,8 +69,28 @@ Method TestAllNoErrorModulesNoMirror()
 
 Method TestAllErrorModulesNoMirror()
 {
-  #; do ..SingleFailedUpdateTest(..#ModuleStepAddedOlderVersion, ..#ModuleTwoVersion, ..#ModuleThreeVersion)
-  #; do ..CleanUpModule(moduleName)
+  do ..SingleFailedUpdateTest(..#ModuleStepErrors, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  do ..CleanUpModule(..#ModuleStepErrors)
+}
+
+Method TestModuleUpdateStepAddedOlderVersion()
+{
+  // Test updating module when update step is added to an older V# class
+  set updateStepsToSeed = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodB", 0]]
+  set seededUpdateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1]]
+  set seededUpdateStepsToNotRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodB", 0]]
+  set updateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodD", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V3", "MethodA", 1]]
+
+  do ..SingleNormalUpdateNewStepTest(..#ModuleStepAddedOlderVersion, updateStepsToSeed, seededUpdateStepsToRun, seededUpdateStepsToNotRun, updateStepsToRun, ..#ModuleTwoVersion, ..#ModuleThreeVersion)
+  do ..CleanUpModule(..#ModuleStepAddedOlderVersion)
+
+  // Test updating module when new update step is added to current V# class which precedes existing update steps in order
+  set updateStepsToSeed = [["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodC", 1]]
+  set seededUpdateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1]]
+  set updateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodD", 0]]
+
+  do ..SingleNormalUpdateNewStepTest(..#ModuleStepAddedCurrVersion, updateStepsToSeed, seededUpdateStepsToRun, [], updateStepsToRun, ..#ModuleOneVersion, ..#ModuleOneVersionMinorBump)
+  do ..CleanUpModule(..#ModuleStepAddedCurrVersion)
 }
 
 Method TestUpdateOfUninstalledModule()
