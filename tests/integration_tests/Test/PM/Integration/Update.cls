@@ -163,10 +163,13 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   set stepTwoA = ..GetUpdateStep("UpdatePackage.V2", "MethodA", 1)
   set stepTwoB = ..GetUpdateStep("UpdatePackage.V2", "MethodB", 0)
   set stepTwoC = ..GetUpdateStep("UpdatePackage.V2", "MethodC", 1)
+
   set twoAStart = stepTwoA.TimeStampStart
   set twoAEnd = stepTwoA.TimeStampEnd
+
   set twoBStart = stepTwoB.TimeStampStart
   set twoBEnd = stepTwoB.TimeStampEnd
+
   set twoCStart = stepTwoC.TimeStampStart
   set twoCEnd = stepTwoC.TimeStampEnd
 
@@ -183,8 +186,10 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   // (timestamps on each update step should not have changed)
   do $$$AssertEquals(twoAStart, stepTwoA.TimeStampStart)
   do $$$AssertEquals(twoAEnd, stepTwoA.TimeStampEnd)
+
   do $$$AssertEquals(twoBStart, stepTwoB.TimeStampStart)
   do $$$AssertEquals(twoBEnd, stepTwoB.TimeStampEnd)
+
   do $$$AssertEquals(twoCStart, stepTwoC.TimeStampStart)
   do $$$AssertEquals(twoCEnd, stepTwoC.TimeStampEnd)
 
