@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="moduledefaults.ZPM">
+    <Module>
+      <Name>ModuleDefaults</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Directory="cls" Name="Test.cls"/>
+      <SourcesRoot>src</SourcesRoot>
+      <Defaults>
+        <Parameter Name="ArbitraryDefault" LifecycleClass="%IPM.Lifecycle.Module">1234</Parameter>
+        <Parameter Name="NoTransaction" LifecycleClass="%IPM.Lifecycle.StudioProject">1</Parameter>
+        <Parameter Name="NoLock">1</Parameter>
+        <Parameter Name="Verbose">1</Parameter>
+      </Defaults>
+    </Module>
+  </Document>
+</Export>
