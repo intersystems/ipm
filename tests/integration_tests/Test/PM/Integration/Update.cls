@@ -17,6 +17,12 @@ Parameter ModuleStepAddedCurrVersion As STRING = "update-step-added-curr-version
 
 Parameter ModuleStepErrors As STRING = "update-step-errors";
 
+Parameter ModuleSeededStepErrors As STRING = "update-seeded-step-errors";
+
+Parameter ModuleDepErrors As STRING = "update-dep-errors";
+
+Parameter ModuleInvokeErrors As STRING = "update-invoke-errors";
+
 Parameter ModuleOneVersion As STRING = "1.2.1";
 
 Parameter ModuleOneVersionMinorBump As STRING = "1.3.1";
@@ -41,13 +47,13 @@ Method TestAllNoErrorModulesNoMirror()
     return
   }
   // Simple module without dependencies
-  set updateStepsToSeed = [["UpdatePackage.V1", "MethodA", 1]]
-  set updateStepsToRun = [["UpdatePackage.V1", "MethodB", 0], ["UpdatePackage.V1", "MethodC", 1], ["UpdatePackage.V2", "MethodA", 1], ["UpdatePackage.V2", "MethodC", 1], ["UpdatePackage.V2", "MethodB", 0]]
+  set updateStepsToSeed = [["UpdatePackage.V1", "MethodA", 0]]
+  set updateStepsToRun = [["UpdatePackage.V1", "MethodB", 1], ["UpdatePackage.V1", "MethodC", 1], ["UpdatePackage.V2", "MethodA", 1], ["UpdatePackage.V2", "MethodC", 1], ["UpdatePackage.V2", "MethodB", 0]]
   do ..NormalUpdateTestSuite(..#ModuleNoDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 
   // Module with dependencies
-  set updateStepsToSeed = updateStepsToSeed.addAll([["UpdateDeps.UpdatePackage.V1", "MethodA", 1]])
-  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDeps.UpdatePackage.V1", "MethodB", 0], ["UpdateDeps.UpdatePackage.V1", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodA", 1], ["UpdateDeps.UpdatePackage.V2", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodB", 0]])
+  set updateStepsToSeed = updateStepsToSeed.addAll([["UpdateDeps.UpdatePackage.V1", "MethodA", 0]])
+  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDeps.UpdatePackage.V1", "MethodB", 1], ["UpdateDeps.UpdatePackage.V1", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodA", 1], ["UpdateDeps.UpdatePackage.V2", "MethodC", 1], ["UpdateDeps.UpdatePackage.V2", "MethodB", 0]])
   do ..NormalUpdateTestSuite(..#ModuleWithDependencies, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion)
 
   // Module with dependencies added in new version
@@ -56,24 +62,39 @@ Method TestAllNoErrorModulesNoMirror()
   do ..SingleNormalUpdateTest(..#ModuleWithDependenciesAdded, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
   do ..CleanUpModule(..#ModuleWithDependenciesAdded)
 
-  // Module with dependencies added in new version
-  set updateStepsToSeed = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodA", 1], ["UpdatePackage.V1", "MethodA", 1]]
-  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsRemoved.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsRemoved.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodB", 0]])
+  // Module with dependencies removed in new version
+  set updateStepsToSeed = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodA", 1], ["UpdatePackage.V1", "MethodA", 0]]
+  set updateStepsToRun = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsRemoved.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodB", 0]]
   do ..SingleNormalUpdateTest(..#ModuleWithDependenciesRemoved, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
-  do ..CleanUpModule(..#ModuleWithDependenciesAdded)
+  do ..CleanUpModule(..#ModuleWithDependenciesRemoved)
 
   // Module with no update steps
   do ..SingleNormalUpdateTest(..#ModuleNoUpdateSteps, [], [], ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
   do ..CleanUpModule(..#ModuleNoUpdateSteps)
+
+  // Module with an error in a seeded update step
+  set updateStepsToSeed = [["UpdateSeededStepErrors.UpdatePackage.V1", "MethodA", 0]]
+  set updateStepsToRun = [["UpdateSeededStepErrors.UpdatePackage.V2", "MethodA", 1]]
+  do ..SingleNormalUpdateTest(..#ModuleSeededStepErrors, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
+  do ..CleanUpModule(..#ModuleSeededStepErrors)
 }
 
 Method TestAllErrorModulesNoMirror()
 {
-  do ..SingleFailedUpdateTest(..#ModuleStepErrors, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  set updateStepsToSeed = [["UpdateStepErrors.UpdatePackage.V1", "MethodA", 1], ["UpdateStepErrors.UpdatePackage.V1", "MethodB", 0], ["UpdateStepErrors.UpdatePackage.V1", "MethodC", 1]]
+  do ..SingleFailedUpdateTest(..#ModuleStepErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
   do ..CleanUpModule(..#ModuleStepErrors)
+
+  set updateStepsToSeed = updateStepsToSeed.addAll([["UpdateDepErrors.UpdatePackage.V1", "MethodA", 0]])
+  do ..SingleFailedUpdateTest(..#ModuleDepErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  do ..CleanUpModule(..#ModuleDepErrors)
+
+  set updateStepsToSeed = [["UpdateInvokeErrors.UpdatePackage.V1", "MethodA", 0]]
+  do ..SingleFailedUpdateTest(..#ModuleInvokeErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  do ..CleanUpModule(..#ModuleInvokeErrors)
 }
 
-Method TestModuleUpdateStepAddedOlderVersion()
+Method TestModuleUpdateStepAdded()
 {
   // Test updating module when update step is added to an older V# class
   set updateStepsToSeed = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodB", 0]]
@@ -86,8 +107,8 @@ Method TestModuleUpdateStepAddedOlderVersion()
 
   // Test updating module when new update step is added to current V# class which precedes existing update steps in order
   set updateStepsToSeed = [["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodC", 1]]
-  set seededUpdateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1]]
-  set updateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodD", 0]]
+  set seededUpdateStepsToRun = [["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodC", 1]]
+  set updateStepsToRun = [["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodD", 0]]
 
   do ..SingleNormalUpdateNewStepTest(..#ModuleStepAddedCurrVersion, updateStepsToSeed, seededUpdateStepsToRun, [], updateStepsToRun, ..#ModuleOneVersion, ..#ModuleOneVersionMinorBump)
   do ..CleanUpModule(..#ModuleStepAddedCurrVersion)
@@ -260,7 +281,7 @@ Method SingleNormalUpdateNewStepTest(
   set sc = ##class(%IPM.Main).Shell("update -v "_moduleName_" "_toVersion)
   do $$$AssertStatusOK(sc, "Updated module "_moduleName_" without error")
 
-  // Check that the seeded update methods within the same version class as the new update step was prepended to WERE run
+  // Check that the seeded update methods within the same version class as the new update step was prepended to were run
   set iter = seededUpdateStepsToRun.%GetIterator()
   while iter.%GetNext(.key, .value) {
     set className = value.%Get(0)
@@ -287,7 +308,7 @@ Method SingleNormalUpdateNewStepTest(
 
   // Check module version has been updated
   set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
-  do $$$AssertEquals(module.VersionString, toVersion)
+  do $$$AssertEquals(module.VersionString, toVersion, "Module "_moduleName_" version was successfully updated so that the desired version="_toVersion_" equals current version="_module.VersionString)
 }
 
 /// NOTE: For testing simplicity, we will always assume that in the update test, both the module and its dependencies are being updated
@@ -302,7 +323,6 @@ Method SingleNormalUpdateNewStepTest(
 Method SingleFailedUpdateTest(
 	moduleName As %String,
 	updateStepsToSeed As %DynamicArray,
-	updateStepsToRun As %DynamicArray,
 	fromVersion As %String,
 	toVersion As %String)
 {
@@ -395,9 +415,9 @@ Method SingleNormalUpdateTest(
 
   // Check module version has been updated
   set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
-  do $$$AssertEquals(module.VersionString, toVersion)
+  do $$$AssertEquals(module.VersionString, toVersion, "Module "_moduleName_" version was successfully updated so that the desired version="_toVersion_" equals current version="_module.VersionString)
 
-  // Check that dependency versions have been updated
+  // Check that dependency version string in the module.xml of the base module matches the version installed
   // dependencyGraph format: dependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
   set sc = module.BuildDependencyGraph(.dependencyGraph)
   $$$ThrowOnError(sc)
@@ -406,9 +426,10 @@ Method SingleNormalUpdateTest(
     set moduleName = $order(dependencyGraph(moduleName),1,moduleInfo)
     quit:moduleName=""
 
-    set moduleVersion = $list(moduleInfo, 2)
+    set moduleExpectedVersion = $list(moduleInfo, 3) // Taken from the module.xml <Version> tag
+    set moduleActualVersion = ##class(%IPM.Storage.Module).NameOpen(moduleName).VersionString // The version of the installed module
 
-    do $$$AssertEquals(moduleVersion, toVersion)
+    do $$$AssertEquals(moduleExpectedVersion, moduleActualVersion, "Module dependency "_moduleName_" expected version="_moduleExpectedVersion_" equals actual version="_moduleActualVersion)
   }
 }
 
