@@ -1131,13 +1131,16 @@ ClassMethod GetModuleDefaultsFromXML(
   set packaging = object.Packaging
   $$$ThrowOnError(##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(packaging, .lifecycleClass))
 
-  // Iterate through the defaults
+  // Iterate through the default parameters
   set defaults = 0
   set key = ""
   for {
     set def = object.Defaults.GetNext(.key)
     if key = "" {
       quit
+    }
+    if ($classname(def) '= "%IPM.Storage.ModuleSetting.Parameter") {
+      continue
     }
     // Filter based on optional LifecycleClass
     if (def.LifecycleClass '= "") && (def.LifecycleClass '= lifecycleClass) {
