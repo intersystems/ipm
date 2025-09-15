@@ -23,6 +23,8 @@ Parameter ModuleDepErrors As STRING = "update-dep-errors";
 
 Parameter ModuleInvokeErrors As STRING = "update-invoke-errors";
 
+Parameter ModuleDepInvokeErrors As STRING = "update-dep-invoke-errors";
+
 Parameter ModuleOneVersion As STRING = "1.2.1";
 
 Parameter ModuleOneVersionMinorBump As STRING = "1.3.1";
@@ -92,6 +94,27 @@ Method TestAllErrorModulesNoMirror()
   set updateStepsToSeed = [["UpdateInvokeErrors.UpdatePackage.V1", "MethodA", 0]]
   do ..SingleFailedUpdateTest(..#ModuleInvokeErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
   do ..CleanUpModule(..#ModuleInvokeErrors)
+
+  set updateStepsToSeed = [["UpdateDepInvokeErrors.UpdatePackage.V1", "MethodA", 0], ["UpdateInvokeErrors.UpdatePackage.V1", "MethodA", 0]]
+  do ..SingleFailedUpdateTest(..#ModuleDepInvokeErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
+  do ..CleanUpModule(..#ModuleDepInvokeErrors)
+}
+
+Method TestUpdateNonMatchingTarballFails()
+{
+  set moduleToPackage = ..#ModuleWithDependencies
+  set moduleToUpdate = ..#ModuleNoDependencies
+  set fromVersion = ..#ModuleOneVersion
+  set toVersion = ..#ModuleTwoVersion
+
+  // Package moduleToPackage (which is not the same module as moduleToUpdate)
+  set exportDir = $system.Util.ManagerDirectory()_moduleToPackage
+  do ..AssertModulePackagedCorrectly(moduleToPackage, toVersion, exportDir)
+
+  do ..AssertModuleInstalledCorrectly(moduleToUpdate, fromVersion)
+
+  set sc = ##class(%IPM.Main).Shell("update -v -path "_exportDir_" "_moduleToUpdate_" "_toVersion)
+  do $$$AssertStatusNotOK(sc, "Attempting to update module "_moduleToUpdate_" FAILED because the module in the path provided does not match the module to update.")
 }
 
 Method TestModuleUpdateStepAdded()
