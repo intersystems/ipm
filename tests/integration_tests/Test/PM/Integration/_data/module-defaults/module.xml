@@ -13,6 +13,7 @@
         <Parameter Name="NoTransaction" LifecycleClass="%IPM.Lifecycle.StudioProject">1</Parameter>
         <Parameter Name="NoLock">1</Parameter>
         <Parameter Name="Verbose">1</Parameter>
+        <NamespaceConfig EnableEnsemble="0"></NamespaceConfig>
       </Defaults>
     </Module>
   </Document>
