@@ -23,9 +23,7 @@ ClassMethod GetUpdateStep(
         set obj = ..%OpenId(stepId, , .sc)
         $$$ThrowOnError(sc)
     } else {
-        set obj = ..%New()
-        set obj.ClassName = className
-        set obj.MethodName = methodName
+        set obj = ..%New(className, methodName)
     }
     return obj
 }

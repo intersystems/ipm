@@ -23,15 +23,13 @@ ForeignKey HomeModKey(HomeModule) References %IPM.Storage.Module() [ OnDelete = 
 /// @Argument methodName    The method name of the update step</param>
 ClassMethod GetUpdateStep(
 	className As %String,
-	methodName As %String) As %IPM.Storage.UpdateStep.AnyMember
+	methodName As %String) As %IPM.Storage.UpdateStep.PrimaryOnly
 {
     if ..UpdateClassMethodIdxExists(className, methodName, .stepId) {
         set obj = ..%OpenId(stepId, , .sc)
         $$$ThrowOnError(sc)
     } else {
-        set obj = ..%New()
-        set obj.ClassName = className
-        set obj.MethodName = methodName
+        set obj = ..%New(className, methodName)
     }
     return obj
 }
