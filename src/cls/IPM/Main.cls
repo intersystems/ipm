@@ -2154,9 +2154,8 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
     if $get(tComponents("scheme")) [ "http" {
         set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
     }
-    if ##class(%File).DirectoryExists(tDirectoryName) {
-        set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 1)
-    } elseif ##class(%File).Exists(tDirectoryName) && (($$$lcase($piece(tDirectoryName,".", *))="tgz") || ($$$lcase($piece(tDirectoryName,".", *-1, *))="tar.gz")) {
+    set extension = $$$lcase($piece(tDirectoryName,".",*))
+    if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = $$$FileTempDirSys
         if $get(pCommandInfo("data", "Verbose")) {
             write !,"Extracting archive to ",tTargetDirectory
