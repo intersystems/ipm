@@ -48,6 +48,9 @@ XData Schema [ Internal, MimeType = application/xml ]
     <!-- Parameter required? -->
     <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
 
+    <!-- Whether the modifier is deprecated -->
+    <xs:attribute name="deprecated" type="xs:boolean" use="optional" default="false"/>
+
     <!-- Description of what this parameter does -->
     <xs:attribute name="description" type="string" use="optional"/>
 
@@ -92,8 +95,11 @@ XData Schema [ Internal, MimeType = application/xml ]
 <!-- Modifier name -->
 <xs:attribute name="name" type="string" use="required"/>
 
-<!-- Modifier name -->
+<!-- Modifier required -->
 <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
+
+<!-- Whether the modifier is deprecated -->
+<xs:attribute name="deprecated" type="xs:boolean" use="optional" default="false"/>
 
 <!-- Comma-separated list of aliases -->
 <xs:attribute name="aliases" type="string" use="optional"/>
@@ -101,7 +107,7 @@ XData Schema [ Internal, MimeType = application/xml ]
 <!-- If true, the modifier name is followed in the command string by a value -->
 <xs:attribute name="value" type="xs:boolean" use="optional" default="false"/>
 
-<!-- If true, the modifier name is followed in the command string by a value -->
+<!-- Description of the modifier -->
 <xs:attribute name="description" type="string" use="optional"/>
 
 <!-- If set, this provides a fixed list of valid values for the modifier -->
@@ -159,7 +165,7 @@ XData Schema [ Internal, MimeType = application/xml ]
 </xs:schema>
 }
 
-/// Turns the Comomand XData block into a subscripted array as follows:
+/// Turns the Command XData block into a subscripted array as follows:
 /// pCommandStructure(1, "<alias>") = "<command name>"
 /// pCommandStructure("<command-name>") ->
 /// 		"description" = describes the command
@@ -173,11 +179,13 @@ XData Schema [ Internal, MimeType = application/xml ]
 /// 				"aliases" = aliases for the modifier
 /// 				"description" = describes the modifier
 /// 				"required" = whether or not modifier is required for the command
+/// 				"deprecated" = whether or not modifier is deprecated for the command
 /// 				"trailing" = whether modifier is a trailing modifier
 /// 		"parameters":
 /// 			"<parameter>":
 /// 				"description" = description of parameter
 /// 				"required" = is parameter required
+/// 				"deprecated" = whether or not parameter is deprecated for the command
 ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objectgenerator ]
 {
     #define DefaultGroup "-"
@@ -315,9 +323,10 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
                                     do %code.WriteLine(" Set pCommandStructure("_tName_","_$$$QUOTE(tMap(tCommChild))_") = "_tDescContent)
                                 }
                             } else {
-                                // Common: name, required, description
+                                // Common to bother modifier and parameter
                                 set tChildName = $$$QUOTE(tMap(tCommChild,"a","name"))
                                 set tRequired = $case($get(tMap(tCommChild,"a","required")),"true":1,:0)
+                                set tDeprecated = $case($get(tMap(tCommChild,"a","deprecated")),"true":1,:0)
 
                                 if (tMap(tCommChild) = "modifier") {
                                     // Also: aliases, value, valueList
@@ -337,17 +346,19 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
                                     do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""group"") = "_tGroupName)
                                     do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""value"") = "_$case(tValue,"true":1,:0))
                                     do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""required"") = "_tRequired)
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""deprecated"") = "_tDeprecated)
                                     do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""description"") = "_tDesc)
                                     do:(tValueList'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""valueList"") = "_tValueList)
                                     do:(tDataAlias'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""dataAlias"") = "_tDataAlias)
                                     do:(tDataValue'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"","_tChildName_",""dataValue"") = "_tDataValue)
-                                    } elseif (tMap(tCommChild) = "parameter") {
+                                } elseif (tMap(tCommChild) = "parameter") {
                                     // Also: example
                                     set tExample = $$$QUOTE($get(tMap(tCommChild,"a","example")))
                                     set tTrailing = $case($get(tMap(tCommChild,"a","trailing")),"true":1,:0)
                                     do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"",$i(pCommandStructure("_tName_",""parameters""))) = "_tChildName)
                                     do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""trailing"") = "_tTrailing)
                                     do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""required"") = "_tRequired)
+                                    do %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""deprecated"") = "_tDeprecated)
                                     do:(tDesc'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""description"") = "_tDesc)
                                     do:(tExample'=$$$empty) %code.WriteLine(" Set pCommandStructure("_tName_",""parameters"","_tChildName_",""example"") = "_tExample)
                                 }
