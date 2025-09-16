@@ -161,10 +161,13 @@ Method HandleAllUpdateSteps(
 
 /// For a given version, seed or execute update steps listed in the module's update package version class
 /// 
-/// If seeding: For only steps that don't have a TimeStampEnd value, set it's TimeStampEnd to the current time
+/// If seeding: For only steps that don't have a TimeStampEnd value or have an errored status, set it's TimeStampEnd to the current time
 /// 
 /// If executing: Only start running steps at the first one found not to have a TimeStampEnd value or if an errored step is found
 ///               After finding this step, run it and all subsequent steps, regardless of if they have been run or not.
+/// 
+/// newStepToApply - Gets marked as true to tell us to run all remaining steps in the list, whether or not they have been run/seeded before
+///                  Can carry this over to subsequent calls by passing the newStepToApply variable to those HandleUpdateStepsFromList() calls
 Method HandleUpdateStepsFromList(
 	methodList As %Library.DynamicArray,
 	className As %String,
@@ -194,18 +197,19 @@ Method HandleUpdateStepsFromList(
     }
 }
 
-/// Seeds an update step by setting TimeStampEnd to current time
-/// Seeding steps mark the steps as having been run so will not be run on subsequent 'update' calls
-/// Steps that already have TimeStampEnd defined (already been run/seeded) won't be seeded
+/// Seeds an update step by setting TimeStampEnd to current time and status to $$$OK
+/// Seeding steps mark the steps as having been successfully run so will not be run on subsequent 'update' calls
+/// Only seed steps that have no TimeStampEnd defined (not already been run/seeded) or errored on their last run
 Method SeedUpdateStep(
 	updateStep As %IPM.Storage.UpdateStep.Base,
 	verbose As %Boolean = 0)
 {
-    if 'updateStep.TimeStampEnd {
+    if 'updateStep.TimeStampEnd || $$$ISERR(updateStep.Status) {
         if verbose {
             write !, $char(9)_"Seeding "_updateStep.MethodName_"()"
         }
         set updateStep.TimeStampEnd = $zdatetime($horolog,3)
+        set updateStep.Status = $$$OK
         $$$ThrowOnError(updateStep.%Save())
     }
     else {
@@ -216,9 +220,6 @@ Method SeedUpdateStep(
 }
 
 /// Executes an update step
-/// If an update step does not already exist, a new one gets created.
-/// newStepToApply - Gets marked as true to tell us to run all remaining steps in the list, whether or not they have been run/seeded before
-///                  Can carry this over to subsequent calls by passing the newStepToApply variable to those ExecuteUpdateStep() calls
 Method ExecuteUpdateStep(
 	updateStep As %IPM.Storage.UpdateStep.Base,
 	primaryOnly As %Boolean,
@@ -262,15 +263,8 @@ Method GetAddUpdateStep(
 {
     if primaryOnly {
         set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
-        if '$isobject(stepObj) {
-            set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).%New(className, methodName)
-        }
-    }
-    else {
+    } else {
         set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).GetUpdateStep(className, methodName)
-        if '$isobject(stepObj) {
-            set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).%New(className, methodName)
-        }
     }
     set stepObj.HomeModule = $this
     $$$ThrowOnError(stepObj.%Save())
