@@ -593,6 +593,7 @@ Method GetDefaultParameters(Output pParams)
 
             // Convert "."-delimited pieces to subscripts in pParams
             set tPieces = $listfromstring(tDefault.Name,".")
+            kill tValue
             set tValue = tDefault.Value
             for tSubscript=$listlength(tPieces):-1:1 {
                 kill tData
