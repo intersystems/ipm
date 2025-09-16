@@ -163,7 +163,10 @@ Method TestIRISVersions()
 	Do ..AssertNotSatisfied(">=2022.1", "2021.2")
 }
 
-Method AssertEquivalent(pVersionExpression1 As %String, pVersionExpression2 As %String, pVerbose As %Boolean = 0) As %Boolean [ Internal, Private ]
+Method AssertEquivalent(
+	pVersionExpression1 As %String,
+	pVersionExpression2 As %String,
+	pVerbose As %Boolean = 0) As %Boolean [ Internal, Private ]
 {
 	Set tEquivalent = 0
 	Try {
@@ -194,7 +197,9 @@ Method AssertEquivalent(pVersionExpression1 As %String, pVersionExpression2 As %
 	Quit tEquivalent
 }
 
-Method AssertSatisfied(pVersionExpression As %String, pVersion As %String) As %Boolean [ Internal, Private ]
+Method AssertSatisfied(
+	pVersionExpression As %String,
+	pVersion As %String) As %Boolean [ Internal, Private ]
 {
 	Set tSatisfied = 0
 	Try {
@@ -211,7 +216,9 @@ Method AssertSatisfied(pVersionExpression As %String, pVersion As %String) As %B
 	Quit tSatisfied
 }
 
-Method AssertNotSatisfied(pVersionExpression As %String, pVersion As %String) As %Boolean [ Internal, Private ]
+Method AssertNotSatisfied(
+	pVersionExpression As %String,
+	pVersion As %String) As %Boolean [ Internal, Private ]
 {
 	Set tUnsatisfied = 0
 	Try {
