@@ -113,8 +113,11 @@ Method TestUpdateNonMatchingTarballFails()
 
   do ..AssertModuleInstalledCorrectly(moduleToUpdate, fromVersion)
 
-  set sc = ##class(%IPM.Main).Shell("update -v -path "_exportDir_" "_moduleToUpdate_" "_toVersion)
+  set sc = ##class(%IPM.Main).Shell("update -v -path "_exportDir_" "_moduleToUpdate)
   do $$$AssertStatusNotOK(sc, "Attempting to update module "_moduleToUpdate_" FAILED because the module in the path provided does not match the module to update.")
+
+  do ..CleanUpModule(moduleToUpdate)
+  do ..CleanUpDirectory(exportDir)
 }
 
 Method TestModuleUpdateStepAdded()
@@ -405,7 +408,6 @@ Method SingleNormalUpdateTest(
     set className = value.%Get(0)
     set methodName = value.%Get(1)
     set isPrimaryOnly = value.%Get(2)
-    write !, "[SEEDED] Module: "_moduleName_", Class: "_className_" Method: "_methodName_" isPrimaryOnly: "_isPrimaryOnly
 
     set updateStep = ..GetUpdateStep(className, methodName, isPrimaryOnly)
     do $$$AssertTrue($isobject(updateStep), "Update step with class="_className_" and method="_methodName_" exists.")
