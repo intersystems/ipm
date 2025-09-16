@@ -356,16 +356,7 @@ ClassMethod ExecutePhases(
         // Report timing subject to parameter; overall timing if only one phase has yet been tracked in context
         // (e.g., set up in multithreaded load) and more than one phase is to be executed.
         set tTiming = $get(pParams("Timing"),0)
-        set tOverallTiming = tTiming && ($listlength(tPhases) > 1) && ($listlength($get($$$ZPMHandledModules($namespace,pModuleName))) < 2)
-
-        // Subscript by namespace to handle application build and integration testing processes, which may
-        // load a module in a different namespace (and call ExecutePhases there) at a lower stack level than the
-        // initial call to ExecutePhases
-        if '$data($$$ZPMHandledModules($namespace)) {
-            new $$$ZPMHandledModules
-        } else {
-            set $$$ZPMHandledModules($namespace,pModuleName) = $get($$$ZPMHandledModules($namespace,pModuleName))_tPhases
-        }
+        set tOverallTiming = tTiming && ($listlength(tPhases) > 1)
 
         // Execute resolved phases in sequence
         set tLifecycle.PhaseList = tPhases
@@ -629,67 +620,45 @@ ClassMethod HasScope(
     quit $listfind(tPhases, scopeItem) > 0
 }
 
-Method LoadDependencies(
-	pPhaseList As %List,
-	ByRef pParams) As %Status
-{
-    set tSC = $$$OK
-    try {
-        set tVerbose = $get(pParams("Verbose"))
-
-        if '$data(pParams("qstruct")) {
-            set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
-        } else {
-            merge qstruct = pParams("qstruct")
-        }
-
-        // Resolve and validate dependencies
-        set tReloadSnapshots = +$get(pParams("UpdateSnapshots"))
-        set tPermitDowngrade = +$get(pParams("PermitDowngrade"))
-        set tSC = ..BuildDependencyGraph(.tDependencyGraph,,tReloadSnapshots,.qstruct,pPhaseList,,,,,,tPermitDowngrade)
-        if $$$ISERR(tSC) {
-            quit
-        }
-
-        if $data(tDependencyGraph) {
-            set tOptimizeInstalled = 'tReloadSnapshots
-            write:tVerbose !,"Dependencies:"
-            set tModuleLoop = ""
-            for {
-                set tModuleLoop = $order(tDependencyGraph(tModuleLoop),1,tValue)
-                quit:tModuleLoop=""
-
-                if (tOptimizeInstalled) && '$data($$$ZPMHandledModules($namespace,tModuleLoop)) {
-                    // Optimize for exact version matches that are already installed.
-                    if ##class(%IPM.Storage.Module).NameExists(tModuleLoop) {
-                        set tMod = ##class(%IPM.Storage.Module).NameOpen(tModuleLoop,,.tSC)
-                        $$$ThrowOnError(tSC)
-                        if (tMod.VersionString = $listget(tValue,3)) {
-                            set $list(tValue,2) = ""
-                            set $list(tDependencyGraph(tModuleLoop),2) = ""
-                        }
-                    }
-                }
-
-                set tServer = $case($listget(tValue,2),"":" (installed)",:" @ "_$listget(tValue,2))
-                write:tVerbose !,tModuleLoop," ",$listget(tValue,3),tServer
-            }
-
-            // Download dependencies.
-            kill tParams
-            merge tParams("qstruct") = qstruct
-            merge tParams = pParams
-            set tSC = ##class(%IPM.Utils.Module).LoadDependencies(.tDependencyGraph,.tParams)
-            if $$$ISERR(tSC) {
-                quit
-            }
-        }
-    } catch e {
-        set tSC = e.AsStatus()
-    }
-    quit tSC
-}
-
+/// Builds a dependency graph for this module, recursively resolving dependencies to the specified depth.
+/// The dependency graph is returned in <var>pDependencyGraph</var>, which is an array where the keys are module names and the values are lists of three items:
+/// <ul>
+/// <li>Depth in the dependency tree (1 for direct dependencies, 2 for dependencies of dependencies, etc.)</li>
+/// <li>Server from which the module will be (or was) obtained; empty string if already installed</li>
+/// <li>Version string of the module to be installed</li>
+/// </ul>
+/// <p>
+/// If <var>pDepth</var> is 1, only direct dependencies are resolved.
+/// If it is 2, dependencies of dependencies are also resolved, and so on.
+/// If it is 0, dependencies are resolved to any depth.
+/// <p>
+/// If <var>pForceSnapshotReload</var> is 1, then any cached snapshot of available modules is reloaded from the repository server(s).
+/// <p>
+/// <var>qstruct</var> is passed to the repository manager to control which repositories are queried.
+/// <p>
+/// <var>pPhases</var> is a list of lifecycle phases that will be executed for the module.
+/// This is used to determine whether scoped dependencies should be considered.
+/// If empty, all dependencies are considered.
+/// <p>
+/// <var>pSubModules</var> is an output parameter that returns a list of submodules that were found.
+/// <p>
+/// <var>pPass</var> controls whether exact version dependencies (1) or fuzzy version dependencies (2) are processed.
+/// The method is typically called twice, once for each pass.
+/// <p>
+/// <var>pModulePath</var> is used internally to track the path of modules being processed, to detect cyclic dependencies.
+/// <p>
+/// If <var>pIgnoreInstalledModules</var> is 1, then already-installed modules are not considered when resolving dependencies.
+/// <p>
+/// <var>pKnownDependencies</var> is a list of modules that are known dependencies of the root module being installed.
+/// This is used to avoid considering these modules as already-installed when resolving dependencies.
+/// <p>
+/// If <var>pPermitDowngrade</var> is 1, then dependencies that require downgrading an already-installed module are permitted.
+/// <p>
+/// If <var>pCheckNestedScoped</var> is 1, then scoped dependencies of dependencies are checked against the phases of the root module being installed.
+/// <p>
+/// <var>pSearchList</var> is an output parameter that returns a list of repository servers that were searched.
+/// <p>
+/// If <var>pIncludeDisplayName</var> is 1, then the display name of each module is included in the output list for informational purposes.
 Method BuildDependencyGraph(
 	ByRef pDependencyGraph,
 	pDepth As %Integer = 1,
@@ -704,7 +673,7 @@ Method BuildDependencyGraph(
 	pPermitDowngrade As %Boolean = 0,
 	pCheckNestedScoped As %Boolean = 0,
 	ByRef pSearchList,
-	pIncludeDisplayName As %Boolean = 0) As %Status
+	pIncludeDisplayName As %Boolean = 0) As %Status [ Internal ]
 {
     #define EXACT 1
     #define FUZZY 2
@@ -717,10 +686,6 @@ Method BuildDependencyGraph(
         // This makes it available at lower stack levels, which helps
         // to avoid significant duplicate work in dependency resolution.
         set tRepositoryManager = ##class(%IPM.Repo.Manager).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
-        // Disregard violation of dependencies of pending modules
-        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
         $$$ThrowOnError(tSC)
 
         // May want to pass phases to subsequent calls
@@ -772,9 +737,8 @@ Method BuildDependencyGraph(
             if 'pIgnoreInstalledModules {
                 // Also apply requirements presented by other installed modules, with the exception of those that are:
                 //	* Known as dependencies of the root module being installed (and thus eligible for upgrade)
-                //	* Pending (re)installation
                 //  * Already in the dependency graph
-                set tOtherDeps = pKnownDependencies_tInstallContext.GetPendingModuleList()
+                set tOtherDeps = pKnownDependencies
                 set tExistingDepKey = ""
                 for {
                     set tExistingDepKey = $order(pDependencyGraph(tExistingDepKey))
@@ -807,13 +771,6 @@ Method BuildDependencyGraph(
             // The "clean" phase can be used to bypass this (by removing modules from the current namespace)
             // Forcing an update from disk can also override this, although we ensure that the same module is
             // not loaded multiple times in a given operation.
-            set tForceSnapshotReload = pForceSnapshotReload
-            if tForceSnapshotReload && $data($$$ZPMHandledModules($namespace,tDep.Name),tHandled) {
-                if $listfind(tHandled,"Activate") {
-                    // If we have already activated the given module, don't do so again.
-                    set tForceSnapshotReload = 0
-                }
-            }
             if ('pIgnoreInstalledModules) && ..NameExists(tDep.Name) {
                 set tLocalObj = ..NameOpen(tDep.Name,,.tSC)
                 if $$$ISERR(tSC) {
@@ -821,7 +778,7 @@ Method BuildDependencyGraph(
                 }
 
                 set tInstalledVersionValid = tLocalObj.Version.Satisfies(tSearchExpr) && ((tVersion = "") || (tVersion = tLocalObj.VersionString))
-                if tInstalledVersionValid && '(tLocalObj.Version.IsSnapshot() && tForceSnapshotReload) {
+                if tInstalledVersionValid && '(tLocalObj.Version.IsSnapshot() && pForceSnapshotReload) {
                     set tLocalMod = 1
                     set tDepth = $select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
                     set pDependencyGraph(tDep.Name) = $listbuild(pDepth,"",tLocalObj.VersionString)
@@ -1086,23 +1043,12 @@ Method GetResolvedReferences(
 	Output pReferenceArray,
 	pLockedDependencies As %Boolean = 0,
 	pPhases As %List = "",
-	pSkipDependencies As %Boolean = 0,
 	ByRef pDependencyGraph) As %Status
 {
     set tSC = $$$OK
     try {
         if '$data(pDependencyGraph) {
             set tSC = ..BuildDependencyGraph(.pDependencyGraph,,,,pPhases)
-            if $$$ISERR(tSC) {
-                quit
-            }
-        }
-
-        if 'pSkipDependencies {
-            kill tParams
-            set tParams("Verbose") = 0
-            set tParams("qstruct") = "k"
-            set tSC = ##class(%IPM.Utils.Module).LoadDependencies(.pDependencyGraph,.tParams)
             if $$$ISERR(tSC) {
                 quit
             }
@@ -1151,7 +1097,7 @@ Method GetResolvedReferences(
 
                 // pLockedDependencies=0 to avoid duplicating effort on nested dependencies;
                 // this loop will already get all of them.
-                set tSC = tModule.GetResolvedReferences(.pReferenceArray,0,,1)
+                set tSC = tModule.GetResolvedReferences(.pReferenceArray,0)
                 if $$$ISERR(tSC) {
                     quit
                 }
@@ -1289,11 +1235,6 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
             quit
         }
 
-        // Pre-check for uniqueness among resources (make sure there are no collisions and report descriptive errors if there are).
-        // This is simpler than trying to interpret a unique index violation later, and will work in all cases where we're updating modules.
-        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
         set tSC = $$$OK
         set orderedResourceList = ..GetOrderedResourceList()
         set tKey = ""
@@ -1308,10 +1249,6 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
                     set tOtherResource = ##class(%IPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
                     if $$$ISERR(tSC) {
                         quit
-                    }
-                    if tInstallContext.ModuleIsPending(tOtherResource.Module.Name) {
-                        // %OnAddToSaveSet will correct for this condition.
-                        continue
                     }
                     if (tResource.Name = tResource.UniqueName) {
                         // Common case: classes, packages, include files, etc.
@@ -1371,33 +1308,6 @@ Method %OnAddToSaveSet(
         if (..Hash '= tHash) {
             set ..Hash = tHash
             set ..LastModifiedTimestamp = $zdatetime($horolog,3)
-        }
-
-        // Deal with resources moving from a module dependent on the current module that hasn't been reloaded yet
-        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
-        set tSC = $$$OK
-        set orderedResourceList = ..GetOrderedResourceList()
-        set tKey = ""
-        for {
-            set tResource = orderedResourceList.GetNext(.tKey)
-            quit:(tKey="")
-
-            // If it hasn't been saved yet (to account for module renames)...
-            if (tResource.%Id() = "") && (tResource.UniqueName '= "") {
-                // ... see if some other resource exists with the same name.
-                if ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
-                    set tOtherResource = ##class(%IPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
-                    $$$ThrowOnError(tSC)
-
-                    if tInstallContext.ModuleIsPending(tOtherResource.Module.Name) {
-                        // Delete the resource. If the pending module still contains it, there will be an error when that module is loaded.
-                        set tSC = ##class(%IPM.Storage.ResourceReference).%DeleteId(tResourceId)
-                        $$$ThrowOnError(tSC)
-                    }
-                }
-            }
         }
     } catch e {
         set tSC = e.AsStatus()
