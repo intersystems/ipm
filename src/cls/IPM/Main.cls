@@ -2142,7 +2142,6 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     set tForce = $$$HasModifier(pCommandInfo,"force")
-    set moduleName = pCommandInfo("parameters","module")
     merge tParams = pCommandInfo("data")
     // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
     // In the case of a load command, tParams still needs to be populated here.
@@ -2150,15 +2149,13 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
         set tParams("cmd") = "load"
         set tParams("Load") = 1
     }
-    set tParams("ModuleName") = moduleName
     set tParams("Force") = tForce
     do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
     if $get(tComponents("scheme")) [ "http" {
         set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
     }
-    if ##class(%File).DirectoryExists(tDirectoryName) {
-        set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 1)
-    } elseif ##class(%File).Exists(tDirectoryName) && (($$$lcase($piece(tDirectoryName,".", *))="tgz") || ($$$lcase($piece(tDirectoryName,".", *-1, *))="tar.gz")) {
+    set extension = $$$lcase($piece(tDirectoryName,".",*))
+    if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = $$$FileTempDirSys
         if $get(pCommandInfo("data", "Verbose")) {
             write !,"Extracting archive to ",tTargetDirectory
@@ -3856,6 +3853,7 @@ ClassMethod Update(ByRef pCommandInfo)
     // Indicating to pCommandInfo that this is an update command, not an install or load command. pCommandInfo will be passed to either Install() or Load() to continue performing the update.
     set pCommandInfo("data","cmd") = "update"
     set pCommandInfo("data","Update") = 1
+    set pCommandInfo("data","ModuleName") = moduleName
     if path '= "" {
         // A path to a tarball is specified. Call ..Load() in order to load the newer version of the module.
         set pCommandInfo("parameters","path") = path

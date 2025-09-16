@@ -2,19 +2,30 @@
 Class %IPM.Storage.UpdateStep.AnyMember Extends %IPM.Storage.UpdateStep.Base
 {
 
+/// Ensure it is not a % global so storage is namespace specific.
+Parameter DEFAULTGLOBAL As STRING = "^IPM.UpdateStep.AnyMember";
+
 Index UpdateClassMethodIdx On (ClassName, MethodName) [ Unique ];
 
 /// ForeignKey pointing to the module which this update step belongs to
 ForeignKey HomeModKey(HomeModule) References %IPM.Storage.Module() [ OnDelete = cascade ];
 
-/// Returns %IPM.Storage.UpdateStep.AnyMember object corresponding to unique index in storage table
-/// If object does not exist, this will return an empty object
+/// Returns object of this class corresponding to unique index in storage table
+/// If object does not exist, this will return a new object with the ClassName and MethodName
+/// properties set. <br />
+/// @Argument className     The class name of the update step. <br />
+/// @Argument methodName    The method name of the update step</param>
 ClassMethod GetUpdateStep(
 	className As %String,
 	methodName As %String) As %IPM.Storage.UpdateStep.AnyMember
 {
-    do ..UpdateClassMethodIdxExists(className, methodName, .stepId)
-    return ..%OpenId(stepId)
+    if ..UpdateClassMethodIdxExists(className, methodName, .stepId) {
+        set obj = ..%OpenId(stepId, , .sc)
+        $$$ThrowOnError(sc)
+    } else {
+        set obj = ..%New(className, methodName)
+    }
+    return obj
 }
 
 Storage Default
@@ -42,11 +53,11 @@ Storage Default
 <Value>HomeModule</Value>
 </Value>
 </Data>
-<DataLocation>^%IPM.Storage.UpdaC3A.AnyMemberD</DataLocation>
+<DataLocation>^IPM.UpdateStep.AnyMemberD</DataLocation>
 <DefaultData>AnyMemberDefaultData</DefaultData>
-<IdLocation>^%IPM.Storage.UpdaC3A.AnyMemberD</IdLocation>
-<IndexLocation>^%IPM.Storage.UpdaC3A.AnyMemberI</IndexLocation>
-<StreamLocation>^%IPM.Storage.UpdaC3A.AnyMemberS</StreamLocation>
+<IdLocation>^IPM.UpdateStep.AnyMemberD</IdLocation>
+<IndexLocation>^IPM.UpdateStep.AnyMemberI</IndexLocation>
+<StreamLocation>^IPM.UpdateStep.AnyMemberS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

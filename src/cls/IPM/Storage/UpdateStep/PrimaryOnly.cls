@@ -2,6 +2,9 @@
 Class %IPM.Storage.UpdateStep.PrimaryOnly Extends %IPM.Storage.UpdateStep.Base
 {
 
+/// Ensure it is not a % global so storage is namespace specific.
+Parameter DEFAULTGLOBAL As STRING = "^IPM.UpdateStep.PrimaryOnly";
+
 /// HostName where the update step was last ran
 Property HostName As %String(MAXLEN = 255) [ InitialExpression = {##class(%SYS.System).GetNodeName()}, Required ];
 
@@ -13,24 +16,22 @@ Index UpdateClassMethodIdx On (ClassName, MethodName) [ Unique ];
 /// ForeignKey pointing to the module which this update step belongs to
 ForeignKey HomeModKey(HomeModule) References %IPM.Storage.Module() [ OnDelete = cascade ];
 
-Method %OnNew(
-	className As %String = "",
-	methodName As %String = "") As %Status
-{
-    set ..ClassName = className
-    set ..MethodName = methodName
-
-    return $$$OK
-}
-
-/// Returns %IPM.Storage.UpdateStep.PrimaryOnly object corresponding to unique index in storage table
-/// If object does not exist, this will return an empty object
+/// Returns object of this class corresponding to unique index in storage table
+/// If object does not exist, this will return a new object with the ClassName and MethodName
+/// properties set. <br />
+/// @Argument className     The class name of the update step. <br />
+/// @Argument methodName    The method name of the update step</param>
 ClassMethod GetUpdateStep(
 	className As %String,
 	methodName As %String) As %IPM.Storage.UpdateStep.PrimaryOnly
 {
-    do ..UpdateClassMethodIdxExists(className, methodName, .stepId)
-    return ..%OpenId(stepId)
+    if ..UpdateClassMethodIdxExists(className, methodName, .stepId) {
+        set obj = ..%OpenId(stepId, , .sc)
+        $$$ThrowOnError(sc)
+    } else {
+        set obj = ..%New(className, methodName)
+    }
+    return obj
 }
 
 Storage Default
@@ -43,10 +44,10 @@ Storage Default
 <Value>ClassName</Value>
 </Value>
 <Value name="3">
-<Value>InstanceName</Value>
+<Value>HostName</Value>
 </Value>
 <Value name="4">
-<Value>TimeStampStart</Value>
+<Value>InstanceName</Value>
 </Value>
 <Value name="5">
 <Value>TimeStampEnd</Value>
@@ -58,17 +59,17 @@ Storage Default
 <Value>HomeModule</Value>
 </Value>
 <Value name="8">
-<Value>HostName</Value>
-</Value>
-<Value name="9">
 <Value>MethodName</Value>
 </Value>
+<Value name="9">
+<Value>TimeStampStart</Value>
+</Value>
 </Data>
-<DataLocation>^%IPM.Storage.UpC3A.PrimaryOnlyD</DataLocation>
+<DataLocation>^IPM.UpdateStep.PrimaryOnlyD</DataLocation>
 <DefaultData>PrimaryOnlyDefaultData</DefaultData>
-<IdLocation>^%IPM.Storage.UpC3A.PrimaryOnlyD</IdLocation>
-<IndexLocation>^%IPM.Storage.UpC3A.PrimaryOnlyI</IndexLocation>
-<StreamLocation>^%IPM.Storage.UpC3A.PrimaryOnlyS</StreamLocation>
+<IdLocation>^IPM.UpdateStep.PrimaryOnlyD</IdLocation>
+<IndexLocation>^IPM.UpdateStep.PrimaryOnlyI</IndexLocation>
+<StreamLocation>^IPM.UpdateStep.PrimaryOnlyS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

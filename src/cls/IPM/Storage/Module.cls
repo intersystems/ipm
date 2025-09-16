@@ -263,15 +263,8 @@ Method GetAddUpdateStep(
 {
     if primaryOnly {
         set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
-        if '$isobject(stepObj) {
-            set stepObj = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).%New(className, methodName)
-        }
-    }
-    else {
+    } else {
         set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).GetUpdateStep(className, methodName)
-        if '$isobject(stepObj) {
-            set stepObj = ##class(%IPM.Storage.UpdateStep.AnyMember).%New(className, methodName)
-        }
     }
     set stepObj.HomeModule = $this
     $$$ThrowOnError(stepObj.%Save())
