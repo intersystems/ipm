@@ -42,6 +42,7 @@ ClassMethod FromString(
 	pExpr As %String,
 	Output pComparator As %IPM.General.SemanticVersionExpression.Comparator) As %Status
 {
+  set pExpr = $zstrip(pExpr, "*", "()")
   set tSC = $$$OK
   set pComparator = ..%New(pExpr)
   try {

@@ -187,6 +187,18 @@ Method TestAndedOr()
 
   // Test that you cannot ExpressionSet() an AND expression
   do $$$AssertStatusNotOK(sve3.ExpressionSet(">3.0.0"))
+
+  // Test FromString of AND'ed expression
+  do $$$AssertStatusOK(##class(%IPM.General.SemanticVersionExpression).FromString("(=1.1.2) && (>=1.0.1)",.sve4))
+  do $$$AssertTrue(sve4.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("1.1.2")))
+  do $$$AssertNotTrue(sve4.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("1.0.1")))
+  do $$$AssertNotTrue(sve4.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("2.0.1")))
+
+  // Test alternate syntax
+  do $$$AssertStatusOK(##class(%IPM.General.SemanticVersionExpression).FromString("(1.1.2) && (^1.0.1)",.sve4))
+  do $$$AssertTrue(sve4.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("1.1.2")))
+  do $$$AssertNotTrue(sve4.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("1.0.1")))
+  do $$$AssertNotTrue(sve4.IsSatisfiedBy(##class(%IPM.General.SemanticVersion).FromString("2.0.1")))
 }
 
 Method TestOnTheFlyMigration()

@@ -1123,33 +1123,12 @@ ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
 	Output defaults)
 {
-  set object = ..GetModuleObjectFromPath(pDirectory, .found)
+  set module = ..GetModuleObjectFromPath(pDirectory, .found)
   if 'found {
     quit
   }
 
-  set packaging = object.Packaging
-  $$$ThrowOnError(##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(packaging, .lifecycleClass))
-
-  // Iterate through the default parameters
-  set defaults = 0
-  set key = ""
-  for {
-    set def = object.Defaults.GetNext(.key)
-    if key = "" {
-      quit
-    }
-    if ($classname(def) '= "%IPM.Storage.ModuleSetting.Parameter") {
-      continue
-    }
-    // Filter based on optional LifecycleClass
-    if (def.LifecycleClass '= "") && (def.LifecycleClass '= lifecycleClass) {
-      continue
-    }
-
-    set defaults = defaults + 1
-    set defaults(def.Name) = def.Value
-  }
+  do module.GetDefaultParameters(.defaults)
 }
 
 ClassMethod ExportDocumentForObject(

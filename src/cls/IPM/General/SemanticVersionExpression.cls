@@ -6,9 +6,11 @@ Parameter DEFAULTGLOBAL = "^IPM.General.SemVerExpression";
 /// List of semantic version expressions to provide support for ||
 Property AnyOf As list Of %IPM.General.SemanticVersionExpression.IComparable(CLASSNAME = 1);
 
-/// Used to combine multiple semantic version expressions when doing dependency resolution
+/// Used to combine multiple semantic version expressions with "&&" when doing dependency resolution
 Property AllOf As list Of %IPM.General.SemanticVersionExpression.IComparable(CLASSNAME = 1);
 
+/// String representation of this SemVer expression composed of the AnyOf and AllOf lists
+/// Parentheses are not used in parsing but are merely stylistic
 Property Expression As %String(MAXLEN = "");
 
 Method %OnNew(rangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
@@ -25,18 +27,36 @@ Method ExpressionSet(value As %String) As %Status
   }
   set status = $$$OK
   try {
-    set options = $listfromstring(value,"||")
-    set ptr = 0
-    while $listnext(options,ptr,rangeExpr) {
-      set rangeExpr = $zstrip(rangeExpr,"<>W")
-      set status = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
-      if $$$ISERR(status) {
-        quit
+    if value["&&" {
+      set reqs = $listfromstring(value,"&&")
+      set ptr = 0
+      while $listnext(reqs,ptr,rangeExpr) {
+        set rangeExpr = $zstrip(rangeExpr,"<>W")
+        set rangeExpr = $zstrip(rangeExpr, "*", "()")
+        set status = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
+        if $$$ISERR(status) {
+          quit
+        }
+        if option.ToResolvedString() = "" {
+          continue
+        }
+        do ..AllOf.Insert(option)
       }
-      if option.ToResolvedString() = "" {
-        continue
+    } else {
+      set options = $listfromstring(value,"||")
+      set ptr = 0
+      while $listnext(options,ptr,rangeExpr) {
+        set rangeExpr = $zstrip(rangeExpr,"<>W")
+        set rangeExpr = $zstrip(rangeExpr, "*", "()")
+        set status = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
+        if $$$ISERR(status) {
+          quit
+        }
+        if option.ToResolvedString() = "" {
+          continue
+        }
+        do ..AnyOf.Insert(option)
       }
-      do ..AnyOf.Insert(option)
     }
     set i%Expression = value
   } catch e {
@@ -57,14 +77,23 @@ Method ToResolvedString() As %String
     for i=1:1:..AnyOf.Count() {
       set opt = ..AnyOf.GetAt(i)
       set resolvedString = opt.ToResolvedString()
-      set optList = optList_$listbuild("(" _ resolvedString _ ")")
+      if ..AnyOf.Count() > 1 {
+        set optList = optList_$listbuild("(" _ resolvedString _ ")")
+      } else {
+        set optList = optList_$listbuild(resolvedString)
+      }
     }
     quit $listtostring(optList," || ")
   }
   if ..AllOf.Count() {
     for i=1:1:..AllOf.Count() {
       set opt = ..AllOf.GetAt(i)
-      set optList = optList_$listbuild("(" _ opt.ToResolvedString() _ ")")
+      set resolvedString = opt.ToResolvedString()
+      if ..AllOf.Count() > 1 {
+        set optList = optList_$listbuild("(" _ resolvedString _ ")")
+      } else {
+        set optList = optList_$listbuild(resolvedString)
+      }
     }
     quit $listtostring(optList," && ")
   }
