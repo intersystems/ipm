@@ -658,7 +658,11 @@ ClassMethod %ParseCommandInput(
                     if (tKey = "") {
                         quit
                     }
-                    set pCommandInfo(tType,tKey,"deprecated") = $get(tCommandStructure(tCommandName,tType,tKey,"deprecated"),0)
+                    // Only include deprecated subscript if command is deprecated
+                    set tIsDeprecated = $get(tCommandStructure(tCommandName,tType,tKey,"deprecated"),0)
+                    if tIsDeprecated {
+                        set pCommandInfo(tType,tKey,"deprecated") = 1
+                    }
                 }
             }
         }
