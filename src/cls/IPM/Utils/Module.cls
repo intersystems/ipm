@@ -871,7 +871,6 @@ ClassMethod UninstallAll(
                 if tModuleName = $$$IPMModuleName {
                     // don't uninstall IPM itself
                     kill tModuleNames(tModuleName)
-                    set tProgressMade = 1
                     continue
                 }
 
