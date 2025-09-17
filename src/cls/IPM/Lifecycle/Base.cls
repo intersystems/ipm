@@ -900,10 +900,6 @@ Method %Compile(ByRef pParams) As %Status
             $$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlCreate())
         }
 
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
-
         // Compile items within the module that are compilable using OnPhase
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1078,10 +1074,6 @@ Method %Test(ByRef pParams) As %Status
 {
     set tSC = $$$OK
     try {
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
-
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
@@ -1129,7 +1121,7 @@ Method %Export(
         }
 
         set tExportDependencies = $get(pParams("ExportDependencies"), ..#EXPORTDEPENDENCIES)
-        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,1,.pDependencyGraph)
+        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph)
         if $$$ISERR(tSC) {
             quit
         }
@@ -1317,10 +1309,6 @@ Method %Verify(ByRef pParams) As %Status
                 }
             }
         }
-
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1602,7 +1590,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 
         // Default implementation: see which resources are expicitly flagged with Deploy = true.
         // Build an array of those, then mark them as deployed.
-        $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,1,.pDependencyGraph))
+        $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,.pDependencyGraph))
 
         set tModuleKey = ""
         for {

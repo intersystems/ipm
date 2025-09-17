@@ -262,7 +262,7 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
-<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
+<modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -338,7 +338,6 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
                     "latest": ""
                 },
                 "custom_modifiers": {
-                    "NoMapping": 1,
                     "Deploy.Parameter": "TESTDEPLOY"
                 }
             }
@@ -385,7 +384,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
-<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
+<modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 
 </command>
 
@@ -896,6 +895,9 @@ ClassMethod ShellInternal(
             // Parse command
             $$$ThrowOnError(..%ParseCommandInput(tCommand,.tParsedCommandInfo))
 
+            // Warn for deprecated parameters/modifiers
+            do ..WarnOnDeprecatedModifiersOrParameters(.tParsedCommandInfo)
+
             // Merge defaults first so they can be overwritten by commands
             do ..GetNamespaceDefaultModifiers(.tDefaultArray)
             merge tCommandInfo("data") = tDefaultArray
@@ -973,6 +975,22 @@ ClassMethod ShellInternal(
             quit
         }
         write !
+    }
+}
+
+/// Warn for deprecated parameters/modifiers
+ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal, Private ]
+{
+    for key = "modifiers", "parameters" {
+        set name = ""
+        for {
+            set name = $order(pCommandInfo(key,name))
+            quit:name=""
+            if ($get(pCommandInfo(key,name,"deprecated"),0)) {
+                set singularKey = $zconvert($extract(key,1),"U") _ $extract(key,2,*-1)
+                write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: %1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name)),!
+            }
+        }
     }
 }
 
@@ -2111,7 +2129,6 @@ ClassMethod LoadFromRepo(
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
-    set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     merge tParams = pCommandInfo("data")
     set tParams("cmd") = "load"
     do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
@@ -2155,7 +2172,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
+    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams)
     set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
     $$$ThrowOnError(tSC)
 }
@@ -2197,7 +2214,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 
     set tVersion = $get(pCommandInfo("parameters","version"))
     set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
-    set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
 
     set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
     set tSearchCriteria.Registry = tRegistry
@@ -2241,7 +2257,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
                     $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
                 }
             }
-            $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous))
+            $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
         }
     } else {
         set tPrefix = ""
