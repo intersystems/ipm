@@ -6,9 +6,11 @@ Parameter DEFAULTGLOBAL = "^IPM.General.SemVerExpression";
 /// List of semantic version expressions to provide support for ||
 Property AnyOf As list Of %IPM.General.SemanticVersionExpression.IComparable(CLASSNAME = 1);
 
-/// Used to combine multiple semantic version expressions when doing dependency resolution
+/// Used to combine multiple semantic version expressions with "&&" when doing dependency resolution
 Property AllOf As list Of %IPM.General.SemanticVersionExpression.IComparable(CLASSNAME = 1);
 
+/// String representation of this SemVer expression composed of the AnyOf and AllOf lists
+/// Parentheses are not used in parsing but are merely stylistic
 Property Expression As %String(MAXLEN = "");
 
 Method %OnNew(rangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
