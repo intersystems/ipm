@@ -113,11 +113,72 @@ Method TestUpdateNonMatchingTarballFails()
 
   do ..AssertModuleInstalledCorrectly(moduleToUpdate, fromVersion)
 
-  set sc = ##class(%IPM.Main).Shell("update -v -path "_exportDir_" "_moduleToUpdate)
+  set sc = ##class(%IPM.Main).Shell("update "_moduleToUpdate_" -path "_exportDir_" -v")
   do $$$AssertStatusNotOK(sc, "Attempting to update module "_moduleToUpdate_" FAILED because the module in the path provided does not match the module to update.")
 
   do ..CleanUpModule(moduleToUpdate)
   do ..CleanUpDirectory(exportDir)
+}
+
+Method TestSimultaneousUpdateFails()
+{
+  do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
+
+  set isNamedResourceDeleted = $system.Event.Delete("FirstUpdate")
+  if 'isNamedResourceDeleted {
+    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not deleted"))
+  }
+  set isNamedResourceDeleted = $system.Event.Delete("SecondUpdate")
+  if 'isNamedResourceDeleted {
+    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource SecondUpdate not deleted"))
+  }
+
+  set isNamedResourceCreated = $system.Event.Create("FirstUpdate")
+  if 'isNamedResourceCreated {
+    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not created"))
+  }
+  set isNamedResourceCreated = $system.Event.Create("SecondUpdate")
+  if 'isNamedResourceCreated {
+    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource SecondUpdate not created"))
+  }
+
+  job ..UpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleTwoVersion, "First Update")
+  job ..UpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleThreeVersion, "Second Update")
+
+  set $listbuild(firstCode, firstResponse) = $system.Event.WaitMsg("First Update")
+  set $listbuild(secondCode, secondResponse) = $system.Event.WaitMsg("Second Update")
+
+  do $$$AssertStatusOK(firstResponse, "Update of module="_..#ModuleNoDependencies_" to version="_..#ModuleTwoVersion_" succeeded.")
+  do $$$AssertStatusNotOK(secondResponse, "Attempting to update module="_..#ModuleNoDependencies_" while another update of that module in the same namespace is in-progress failed.")
+
+  do ..CleanUpModule(..#ModuleNoDependencies)
+}
+
+Method TestUpdateAfterInterruptedUpdate()
+{
+  do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
+
+  set isNamedResourceCreated = $system.Event.Create("Interrupted Update")
+  if 'isNamedResourceCreated {
+    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not created"))
+  }
+
+  job ..InterruptedUpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleTwoVersion, "Interrupted Update")
+
+  // Gets child job ID
+  set $listbuild(codeOne, processId) = $system.Event.WaitMsg("Interrupted Update")
+  do $system.Process.Terminate(processId)
+
+  // Gets update status
+  set $listbuild(codeTwo, sc) = $system.Event.WaitMsg("Interrupted Update")
+  do $$$AssertStatusNotOK(sc, "Updating module "_..#ModuleNoDependencies_" from "_..#ModuleOneVersion_" to "_..#ModuleTwoVersion_" was interrupted and failed.")
+
+  // Perform another update
+  set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
+  do $$$AssertStatusOK(sc, "Update of module "_..#ModuleNoDependencies_" version "_..#ModuleTwoVersion_" after interrupted update succeeded.")
+
+  // Assert it completed
+  do ..CleanUpModule(..#ModuleNoDependencies)
 }
 
 Method TestModuleUpdateStepAdded()
@@ -150,7 +211,7 @@ Method TestUpdateOfUninstalledModule()
 
   // Update non-existent module
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
-  do $$$AssertStatusNotOK(sc)
+  do $$$AssertStatusNotOK(sc, "Update of uninstalled module "_..#ModuleNoDependencies_" version "_..#ModuleOneVersion_" failed.")
 }
 
 Method TestUpdateToOlderVersion()
@@ -498,6 +559,31 @@ Method AssertModulePackagedCorrectly(
   do ..CleanUpModule(moduleName)
 }
 
+ClassMethod UpdateJobWrapper(
+	moduleName,
+	toVersion,
+	resourceName)
+{
+  set sc = ##class(%IPM.Main).Shell("update "_moduleName_" "_toVersion_" -v")
+
+  // Send update status to the named resource
+  do $system.Event.Signal(resourceName, sc)
+}
+
+ClassMethod InterruptedUpdateJobWrapper(
+	moduleName,
+	toVersion,
+	resourceName)
+{
+  // Send job ID to the named resource
+  do $system.Event.Signal(resourceName, $system.SYS.ProcessID())
+
+  set sc = ##class(%IPM.Main).Shell("update "_moduleName_" "_toVersion_" -v")
+
+  // Send update status to the named resource
+  do $system.Event.Signal(resourceName, sc)
+}
+
 ClassMethod GetUpdateStep(
 	className As %String,
 	methodName As %String,
@@ -507,6 +593,10 @@ ClassMethod GetUpdateStep(
     set step = ##class(%IPM.Storage.UpdateStep.PrimaryOnly).GetUpdateStep(className, methodName)
   } else {
     set step = ##class(%IPM.Storage.UpdateStep.AnyMember).GetUpdateStep(className, methodName)
+  }
+
+  if step.%Id() = "" {
+    return ""
   }
 
   return step
