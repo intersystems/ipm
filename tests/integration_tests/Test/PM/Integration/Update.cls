@@ -124,29 +124,25 @@ Method TestSimultaneousUpdateFails()
 {
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
 
-  set isNamedResourceDeleted = $system.Event.Delete("FirstUpdate")
-  if 'isNamedResourceDeleted {
-    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not deleted"))
-  }
-  set isNamedResourceDeleted = $system.Event.Delete("SecondUpdate")
-  if 'isNamedResourceDeleted {
-    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource SecondUpdate not deleted"))
+  if ('$system.Event.Defined("FirstUpdate")){
+    set isNamedResourceCreated = $system.Event.Create("FirstUpdate")
+    if 'isNamedResourceCreated {
+      $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not created"))
+    }
   }
 
-  set isNamedResourceCreated = $system.Event.Create("FirstUpdate")
-  if 'isNamedResourceCreated {
-    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not created"))
-  }
-  set isNamedResourceCreated = $system.Event.Create("SecondUpdate")
-  if 'isNamedResourceCreated {
-    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource SecondUpdate not created"))
+  if ('$system.Event.Defined("SecondUpdate")){
+    set isNamedResourceCreated = $system.Event.Create("SecondUpdate")
+    if 'isNamedResourceCreated {
+      $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource SecondUpdate not created"))
+    }
   }
 
-  job ..UpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleTwoVersion, "First Update")
-  job ..UpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleThreeVersion, "Second Update")
+  job ..UpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleTwoVersion, "FirstUpdate")
+  job ..UpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleThreeVersion, "SecondUpdate")
 
-  set $listbuild(firstCode, firstResponse) = $system.Event.WaitMsg("First Update")
-  set $listbuild(secondCode, secondResponse) = $system.Event.WaitMsg("Second Update")
+  set $listbuild(firstCode, firstResponse) = $system.Event.WaitMsg("FirstUpdate")
+  set $listbuild(secondCode, secondResponse) = $system.Event.WaitMsg("SecondUpdate")
 
   do $$$AssertStatusOK(firstResponse, "Update of module="_..#ModuleNoDependencies_" to version="_..#ModuleTwoVersion_" succeeded.")
   do $$$AssertStatusNotOK(secondResponse, "Attempting to update module="_..#ModuleNoDependencies_" while another update of that module in the same namespace is in-progress failed.")
@@ -158,19 +154,19 @@ Method TestUpdateAfterInterruptedUpdate()
 {
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
 
-  set isNamedResourceCreated = $system.Event.Create("Interrupted Update")
+  set isNamedResourceCreated = $system.Event.Create("InterruptedUpdate")
   if 'isNamedResourceCreated {
     $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not created"))
   }
 
-  job ..InterruptedUpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleTwoVersion, "Interrupted Update")
+  job ..InterruptedUpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleTwoVersion, "InterruptedUpdate")
 
   // Gets child job ID
-  set $listbuild(codeOne, processId) = $system.Event.WaitMsg("Interrupted Update")
+  set $listbuild(codeOne, processId) = $system.Event.WaitMsg("InterruptedUpdate")
   do $system.Process.Terminate(processId)
 
   // Gets update status
-  set $listbuild(codeTwo, sc) = $system.Event.WaitMsg("Interrupted Update")
+  set $listbuild(codeTwo, sc) = $system.Event.WaitMsg("InterruptedUpdate")
   do $$$AssertStatusNotOK(sc, "Updating module "_..#ModuleNoDependencies_" from "_..#ModuleOneVersion_" to "_..#ModuleTwoVersion_" was interrupted and failed.")
 
   // Perform another update
