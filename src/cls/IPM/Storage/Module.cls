@@ -516,7 +516,7 @@ ClassMethod ExecutePhases(
 
         if pIsComplete {
             set tPhases = tLifecycle.GetCompletePhases(pPhases)
-            if (($listfind(tPhases, "Package") || $listfind(tPhases, "Publish")) && tModule.HaveToDeploy() && tModule.DeveloperMode) {
+            if (($listfind(tPhases, "Package") || $listfind(tPhases, "Publish")) && tModule.HaveToDeploy() ) {
                 set tPhases = $listbuild("PrepareDeploy") _ tPhases
             }
         } else {

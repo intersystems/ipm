@@ -584,7 +584,7 @@ Method %Reload(ByRef pParams) As %Status
         set tSkipScoped = 'tDeveloperMode
         set tVerbose = $get(pParams("Verbose"))
         set tRoot = $get(pParams("RootDirectory"))
-        if (tRoot = "") && tDeveloperMode {
+        if (tRoot = "") && (tDeveloperMode || ($get(pParams("PackageDeployNamespace")) '= "")) {
             set tRoot = ..Module.Root
         }
         do ..LoadEnvironmentConfig($get(pParams("EnvFiles")))
