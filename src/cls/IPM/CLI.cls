@@ -506,6 +506,7 @@ ClassMethod %ParseCommandInput(
                         set tDataName = tDataAlias
                         if $data(tCommandStructure(modifierSubscript,"modifiers",tModifier,"dataValue"),tDataValue) {
                             do ..SetData(.pCommandInfo,tDataAlias,tDataValue)
+                            set tDataName = ""
                             set tState = $$$PREARGUMENT
                         } else {
                             set tState = $$$MODIFIERVALUE
@@ -514,6 +515,7 @@ ClassMethod %ParseCommandInput(
                         set tState = $$$MODIFIERVALUE
                     } else {
                         set pCommandInfo("modifiers",tModifier) = ""
+                        set tDataName = ""
                         set tState = $$$PREARGUMENT
                     }
                     set tAccum = ""
