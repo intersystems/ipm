@@ -88,10 +88,7 @@ ClassMethod %Help(ByRef pCommandInfo) [ Final ]
     write !
 }
 
-ClassMethod UnifyLifecycles(
-	ByRef tOneCommandStruct,
-	ByRef tCommandStruct,
-	phases As %List)
+ClassMethod UnifyLifecycles(ByRef tOneCommandStruct, ByRef tCommandStruct, phases As %List)
 {
     set ptr = 0
     while $listnext(phases, ptr, currPhase) {
@@ -107,12 +104,7 @@ ClassMethod UnifyLifecycles(
     }
 }
 
-ClassMethod %HelpForCommand(
-	pCommandName As %String,
-	ByRef pCommandStruct,
-	pDetailed As %Boolean = 0,
-	pMarkdownFormat As %Boolean = 0,
-	pMaxLength As %Integer = 0)
+ClassMethod %HelpForCommand(pCommandName As %String, ByRef pCommandStruct, pDetailed As %Boolean = 0, pMarkdownFormat As %Boolean = 0, pMaxLength As %Integer = 0)
 {
     /// Section separator in Markdown
     #define SectionSeparator $Case(pMarkdownFormat, 1: "-----", : "")
@@ -217,9 +209,7 @@ ClassMethod %HelpForCommand(
     do ..%HelpForCommandDetails(.pCommandStruct, pMarkdownFormat)
 }
 
-ClassMethod %HelpForCommandDetails(
-	ByRef pCommandStruct,
-	pMarkdownFormat As %Boolean = 0) [ Internal ]
+ClassMethod %HelpForCommandDetails(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
     do ..%HelpForCommandParameters(.pCommandStruct, pMarkdownFormat)
     do ..%HelpForCommandModifiers(.pCommandStruct, pMarkdownFormat)
@@ -233,9 +223,7 @@ ClassMethod %HelpForCommandDetails(
     }
 }
 
-ClassMethod %HelpForCommandParameters(
-	ByRef pCommandStruct,
-	pMarkdownFormat As %Boolean = 0) [ Internal ]
+ClassMethod %HelpForCommandParameters(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
     if ('$data(pCommandStruct("parameters"))) {
         quit
@@ -278,9 +266,7 @@ ClassMethod %HelpForCommandParameters(
       }
 }
 
-ClassMethod %HelpForCommandModifiers(
-	ByRef pCommandStruct,
-	pMarkdownFormat As %Boolean = 0) [ Internal ]
+ClassMethod %HelpForCommandModifiers(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
     if ('$data(pCommandStruct("groups"))) {
         quit
@@ -345,9 +331,7 @@ ClassMethod %HelpForCommandModifiers(
     }
 }
 
-ClassMethod %HelpForCommandExamples(
-	ByRef pCommandStruct,
-	pMarkdownFormat As %Boolean = 0) [ Internal ]
+ClassMethod %HelpForCommandExamples(ByRef pCommandStruct, pMarkdownFormat As %Boolean = 0) [ Internal ]
 {
     if ('$data(pCommandStruct("examples"))) {
         quit
@@ -403,9 +387,7 @@ ClassMethod %HelpForCommandExamples(
 /// pCommandInfo("modifiers","<modifier-name>") = "<modifier-value>"
 /// pCommandInfo("parameters","<parameter-name>") = "<parameter-value>"
 /// pCommandInfo("data","<data-name>") = "<data-value>"
-ClassMethod %ParseCommandInput(
-	pCommandString As %String,
-	Output pCommandInfo) As %Status [ Final ]
+ClassMethod %ParseCommandInput(pCommandString As %String, Output pCommandInfo) As %Status [ Final ]
 {
     set tSC = $$$OK
     kill pCommandInfo
@@ -441,6 +423,7 @@ ClassMethod %ParseCommandInput(
         set tModifier = ""
         set tDataName = ""
         set tParamCount = 0
+        set tIsCustomData = 0
         set tPreEscapeState = ""
         for {
             set tChar = $extract(pCommandString,tPos)
@@ -521,8 +504,9 @@ ClassMethod %ParseCommandInput(
                     set tAccum = ""
                 } elseif (tState = $$$MODIFIERVALUE) {
                     if ($get(tDataName) '= "") {
-                        do ..SetData(.pCommandInfo,tDataName,tAccum,1)
+                        do ..SetData(.pCommandInfo,tDataName,tAccum,tIsCustomData)
                         set tDataName = ""
+                        set tIsCustomData = 0
                     } else {
                         set pCommandInfo("modifiers",tModifier) = tAccum
                     }
@@ -583,7 +567,8 @@ ClassMethod %ParseCommandInput(
                     continue
                 } elseif (tState = $$$MODIFIERVALUEQUOTED) {
                     if ($get(tDataName) '= "") {
-                        do ..SetData(.pCommandInfo,tDataName,tAccum,1)
+                        do ..SetData(.pCommandInfo,tDataName,tAccum,tIsCustomData)
+                        set tIsCustomData = 0
                     } else {
                         set pCommandInfo("modifiers",tModifier) = tAccum
                     }
@@ -631,6 +616,7 @@ ClassMethod %ParseCommandInput(
                     if (tAccum = "") && (tDataPrefix '= "") && (tChar = tDataPrefix) {
                         set tState = $$$DATANAME
                         set tDataName = ""
+                        set tIsCustomData = 1
                         continue
                     }
                 }
@@ -781,11 +767,7 @@ ClassMethod %GetCommandStructure(Output pCommandStructure)
 }
 
 /// Utility method for setting multiple subscripts based on .-delimited <var>pDataName</var>
-ClassMethod SetData(
-	pTargetArray,
-	pDataName,
-	pDataValue,
-	pCustomParam = 0) [ Private, PublicList = pTargetArray ]
+ClassMethod SetData(pTargetArray, pDataName, pDataValue, pCustomParam = 0) [ Private, PublicList = pTargetArray ]
 {
     if (pCustomParam && (pDataName'[".")) {
         // dubplicate param without prefix zpm for compatibility
@@ -805,9 +787,7 @@ ClassMethod SetData(
 /// Draw a border around a list of strings. Optionally provide a text format for the strings. <br />
 /// @Argument	pLineList		List of strings to write. <br />
 /// @Argument	pTextFormat		Text format (e.g. $$$Red, $$$Bold, etc.). <br />
-ClassMethod DrawBorder(
-	pLineList As %Library.List,
-	pTextFormat As %Integer = {$$$Default})
+ClassMethod DrawBorder(pLineList As %Library.List, pTextFormat As %Integer = {$$$Default})
 {
     // Find longest line in list
     set ptr = 0

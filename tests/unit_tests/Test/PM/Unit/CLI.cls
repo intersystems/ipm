@@ -77,6 +77,77 @@ Method TestParser()
 	Set tResults(tCommands)=
 	Set tResults(tCommands,
 	*/
+
+    // defaulted dataValue (-v) followed by a valued modifier
+    // Expect: -v -> data("Verbose")=1, and -env value goes to data("EnvFiles") (NOT into "Verbose")
+    Set tCommands($i(tCommands)) = "install SomeModule -v -env C:\env1.json;C:\env2.json"
+    Set tResults(tCommands)="install"
+    Set tResults(tCommands,"parameters","module")="SomeModule"
+    Set tResults(tCommands,"data","Verbose")=1
+    Set tResults(tCommands,"data","EnvFiles")="C:\env1.json;C:\env2.json"
+
+    // defaulted dataValue (-q) followed by a valued modifier
+    // Expect: -q -> data("Verbose")=0, and -env captured correctly
+    Set tCommands($i(tCommands)) = "install SomeModule -q -env /etc/env1.json;/etc/env2.json"
+    Set tResults(tCommands)="install"
+    Set tResults(tCommands,"parameters","module")="SomeModule"
+    Set tResults(tCommands,"data","Verbose")=0
+    Set tResults(tCommands,"data","EnvFiles")="/etc/env1.json;/etc/env2.json"
+
+    // module-action + phase modifiers
+    // Expect: -v sets data("Verbose")=1, -path goes to data("Path"), and -export-deps maps to data("ExportDependencies")
+    Set tCommands($i(tCommands)) = "module-action MyModule package -v -path /tmp/pkg -export-deps 1"
+    Set tResults(tCommands)="module-action"
+    Set tResults(tCommands,"parameters","module")="MyModule"
+    Set tResults(tCommands,"parameters","actions")="package"
+    Set tResults(tCommands,"data","Verbose")=1
+    Set tResults(tCommands,"data","Path")="/tmp/pkg"
+    Set tResults(tCommands,"data","ExportDependencies")=1
+
+    // defaulted dataValue (-dev) followed by a valued modifier
+    // Expect: -dev -> data("DeveloperMode")=1, and -extra-pip-flags captured correctly
+    Set tCommands($i(tCommands)) = "load -dev -extra-pip-flags ""--timeout 30"" C:\code\my-module\"
+    Set tResults(tCommands)="load"
+    Set tResults(tCommands,"parameters","path")="C:\code\my-module\"
+    Set tResults(tCommands,"data","DeveloperMode")=1
+    Set tResults(tCommands,"data","ExtraPipFlags")="--timeout 30"
+
+    // Recognized alias should NOT mirror under data("zpm",...)
+	// Expects no data("zpm","EnvFiles")
+    Set tCommands($i(tCommands)) = "install SomeModule -env C:\a.json;C:\b.json"
+    Set tResults(tCommands)="install"
+    Set tResults(tCommands,"parameters","module")="SomeModule"
+    Set tResults(tCommands,"data","EnvFiles")="C:\a.json;C:\b.json"
+
+    // Recognized alias with a preceding defaulted dataValue (-v) should NOT mirror under data("zpm",...)
+    Set tCommands($i(tCommands)) = "install SomeModule -v -env /etc/a.json;/etc/b.json"
+    Set tResults(tCommands)="install"
+    Set tResults(tCommands,"parameters","module")="SomeModule"
+    Set tResults(tCommands,"data","Verbose")=1
+    Set tResults(tCommands,"data","EnvFiles")="/etc/a.json;/etc/b.json"
+
+    // module-action with valued aliases; no zpm copies for aliases
+    Set tCommands($i(tCommands)) = "module-action MyModule package -v -path /tmp/pkg -export-deps 1"
+    Set tResults(tCommands)="module-action"
+    Set tResults(tCommands,"parameters","module")="MyModule"
+    Set tResults(tCommands,"parameters","actions")="package"
+    Set tResults(tCommands,"data","Verbose")=1
+    Set tResults(tCommands,"data","Path")="/tmp/pkg"
+    Set tResults(tCommands,"data","ExportDependencies")=1
+
+    // load with defaulted alias then valued alias; no zpm copy for alias
+    Set tCommands($i(tCommands)) = "load -dev -extra-pip-flags ""--timeout 30"" C:\code\my-module\"
+    Set tResults(tCommands)="load"
+    Set tResults(tCommands,"parameters","path")="C:\code\my-module\"
+    Set tResults(tCommands,"data","DeveloperMode")=1
+    Set tResults(tCommands,"data","ExtraPipFlags")="--timeout 30"
+
+    // Mix of -D and recognized alias
+    Set tCommands($i(tCommands)) = "install SomeModule -DEnvFiles=/etc/one;/etc/two -env /etc/three;/etc/four"
+    Set tResults(tCommands)="install"
+    Set tResults(tCommands,"parameters","module")="SomeModule"
+    Set tResults(tCommands,"data","EnvFiles")="/etc/three;/etc/four"
+    Set tResults(tCommands,"data","zpm","EnvFiles")="/etc/one;/etc/two"
 	
 	// Verify output matches
 	For i=1:1:tCommands {
@@ -130,10 +201,7 @@ Method TestModifiers()
 	do ..CompareModifiers("-path /my/path -env envPath -recurse 1", "makedeployed","test-module")
 }
 
-Method CompareModifiers(
-	commandModifiers As %String,
-	phase As %String,
-	module As %String)
+Method CompareModifiers(commandModifiers As %String, phase As %String, module As %String)
 {
 	/// Test modifier support for lifecycle phases. Make sure ModuleAction and RunOnePhase have the same support
 	do ##class(%IPM.Main).%ParseCommandInput(module_" "_phase_" "+commandModifiers,.info1)
@@ -166,10 +234,7 @@ Method AssertNoException(pCommand As %String)
 /// returns true if they're both undefined or have the same value.<br />
 /// <var>pMessage</var> has details of the first difference found, if any.
 /// See https://community.intersystems.com/post/best-way-compare-two-arrays-equality-same-subscripts-and-values
-Method CompareArrays(
-	ByRef first,
-	ByRef second,
-	Output pMessage) As %Boolean [ PublicList = (tRef1, tRef2, first, second) ]
+Method CompareArrays(ByRef first, ByRef second, Output pMessage) As %Boolean [ PublicList = (tRef1, tRef2, first, second) ]
 {
     New tRef1,tRef2
     Set pMessage = ""
