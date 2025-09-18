@@ -651,18 +651,6 @@ ClassMethod %ParseCommandInput(
                 set tState = tPreEscapeState
             }
         }
-        if ($get(pCommandInfo) '= "") {
-            set commandName = pCommandInfo
-            for i=1:1 {
-                set paramName = $get(tCommandStructure(pCommandInfo,"parameters",i))
-                quit:paramName=""
-                if $get(tCommandStructure(pCommandInfo,"parameters",paramName,"required"),0) {
-                    if $get(pCommandInfo("parameters",paramName)) = "" {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Non-empty value required for parameter %1",$$$QUOTE(paramName))))
-                    }
-                }
-            }
-        }
         // TODO: Extra validation.
     } catch e {
         if e.%IsA("%Exception.SystemException") {
