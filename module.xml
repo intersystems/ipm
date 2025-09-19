@@ -2,7 +2,7 @@
 <Export generator="Cache" version="25">
 <Document name="ZPM.ZPM"><Module>
   <Name>ZPM</Name>
-  <Version>0.10.3-SNAPSHOT</Version>
+  <Version>0.10.4-SNAPSHOT</Version>
   <ExternalName>IPM</ExternalName>
   <Description>InterSystems Package Manager (IPM) provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
   <Keywords>Package Manager</Keywords>
@@ -41,7 +41,7 @@
   <PythonWheel Name="typing_extensions-4.12.2-py3-none-any.whl" ExtraPipFlags="--no-deps"/>
   <PythonWheel Name="urllib3-2.3.0-py3-none-any.whl" ExtraPipFlags="--no-deps"/>
 
-  <!-- Pure python implementation of rpds-py for offline installation or behind a firewall. 
+  <!-- Pure python implementation of rpds-py for offline installation or behind a firewall.
     This intentionally and necessarily masks possible installation of the real rpds-py package
     for the sake of working in a container environment with durable %SYS. -->
   <FileCopy Name="modules/python/rpds.py" Target="${mgrdir}python/rpds.py"/>
