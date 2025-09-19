@@ -36,7 +36,7 @@ ClassMethod OverrideAbstractMembers(
                 // Copy member from origin to pClassName (using Objects)
                 if (tMemberType = $$$cCLASSmethod) {
                     #dim tSourceMethod,tDestMethod As %Dictionary.MethodDefinition
-                    set tSourceMethod = ##class(%Dictionary.MethodDefinition).%OpenId(tOrigin_"||"_tMember)
+                    set tSourceMethod = ##class(%Dictionary.MethodDefinition).%OpenId(tOrigin_"||"_tMember,0)
                     set tDestMethod = tSourceMethod.%ConstructClone()
                     set tDestMethod.Abstract = 0
                     if (pDefaultToSuper) && (tDestMethod.Implementation.Size > 0) {
@@ -56,7 +56,7 @@ ClassMethod OverrideAbstractMembers(
                     $$$ThrowOnError(tClassDef.Methods.Insert(tDestMethod))
                 } elseif (tMemberType = $$$cCLASSparameter) {
                     #dim tSourceParam,tDestParam As %Dictionary.ParameterDefinition
-                    set tSourceParam = ##class(%Dictionary.ParameterDefinition).%OpenId(tOrigin_"||"_tMember)
+                    set tSourceParam = ##class(%Dictionary.ParameterDefinition).%OpenId(tOrigin_"||"_tMember,0)
                     set tDestParam = tSourceParam.%ConstructClone()
                     set tDestParam.Abstract = 0
                     $$$ThrowOnError(tClassDef.Parameters.Insert(tDestParam))

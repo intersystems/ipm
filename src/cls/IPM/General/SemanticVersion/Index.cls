@@ -74,7 +74,7 @@ ClassMethod IndexLocationForCompile(
 	pClassName As %String,
 	pIndexName As %String) As %String
 {
-    set tStorage = ##class(%Dictionary.ClassDefinition).%OpenId(pClassName).Storages.GetAt(1).IndexLocation
+    set tStorage = ##class(%Dictionary.ClassDefinition).%OpenId(pClassName,0).Storages.GetAt(1).IndexLocation
     quit $name(@tStorage@(pIndexName))
 }
 

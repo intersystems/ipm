@@ -233,7 +233,7 @@ Method ReplaceMatchRoles(
         set template = $listget(templates, i)
         if matchRoles[template {
             set dbRole = "%DB_DEFAULT"
-            set db = ##class(SYS.Database).%OpenId(dbDir)
+            set db = ##class(SYS.Database).%OpenId(dbDir,0)
             if $isobject(db) {
                 set dbRole = db.ResourceName
             }

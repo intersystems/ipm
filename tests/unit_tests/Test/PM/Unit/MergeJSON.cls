@@ -69,18 +69,18 @@ XData AllCases [ MimeType = application/json ]
 
 Method TestMergeDynamicObjects()
 {
-    Set xdataID="Test.PM.Unit.MergeJSON||AllCases"
-    Set compiledXdata=##class(%Dictionary.CompiledXData).%OpenId(xdataID)
-    Set stream=compiledXdata.Data
-    Do $$$AssertTrue($IsObject(stream))
+    set xdataID="Test.PM.Unit.MergeJSON||AllCases"
+    set compiledXdata=##class(%Dictionary.CompiledXData).%OpenId(xdataID,0)
+    set stream=compiledXdata.Data
+    do $$$AssertTrue($isobject(stream))
 
-    Set allTestCases = [].%FromJSON(stream)
-    Set iter = allTestCases.%GetIterator()
-    While iter.%GetNext(.key, .case) {
-        Do ##class(%IPM.General.EnvironmentConfig).MergeDynamicObjects(case.dest, case.src)
-        If '$$$AssertTrue(..Equal(case.dest, case.expected)) {
-            Set message = $$$FormatText("Failed test case: %1, output = %2", case.%ToJSON(), case.dest.%ToJSON())
-            Do $$$LogMessage(message)
+    set allTestCases = [].%FromJSON(stream)
+    set iter = allTestCases.%GetIterator()
+    while iter.%GetNext(.key, .case) {
+        do ##class(%IPM.General.EnvironmentConfig).MergeDynamicObjects(case.dest, case.src)
+        if '$$$AssertTrue(..Equal(case.dest, case.expected)) {
+            set message = $$$FormatText("Failed test case: %1, output = %2", case.%ToJSON(), case.dest.%ToJSON())
+            do $$$LogMessage(message)
         }
     }
 }
@@ -89,34 +89,34 @@ ClassMethod Equal(
 	j1 As %IPM.DataType.Any,
 	j2 As %IPM.DataType.Any) As %Boolean
 {
-    Quit ..IsSubset(j1, j2) && ..IsSubset(j2, j1)
+    quit ..IsSubset(j1, j2) && ..IsSubset(j2, j1)
 }
 
 ClassMethod IsSubset(
 	j1 As %IPM.DataType.Any,
 	j2 As %IPM.DataType.Any) As %Boolean
 {
-    If j1 = j2 {
-        Return 1
+    if j1 = j2 {
+        return 1
     }
-    If ('$IsObject(j1)) || ('$IsObject(j2)) {
-        Return 0
+    if ('$isobject(j1)) || ('$isobject(j2)) {
+        return 0
     }
-    If $classname(j1) '= $classname(j2) {
-        Return 0
-    }
-
-    Set iter = j1.%GetIterator()
-    While iter.%GetNext(.key, .value1, .type1) {
-        If j2.%GetTypeOf(key) '= type1 {
-            Return 0
-        }
-        If '..IsSubset(value1, j2.%Get(key)) {
-            Return 0
-        }
+    if $classname(j1) '= $classname(j2) {
+        return 0
     }
 
-    Return 1
+    set iter = j1.%GetIterator()
+    while iter.%GetNext(.key, .value1, .type1) {
+        if j2.%GetTypeOf(key) '= type1 {
+            return 0
+        }
+        if '..IsSubset(value1, j2.%Get(key)) {
+            return 0
+        }
+    }
+
+    return 1
 }
 
 }

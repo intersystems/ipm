@@ -613,7 +613,7 @@ Method %Reload(ByRef pParams) As %Status
             set tSC = $$$ERROR($$$GeneralError,"Module name mismatch.") quit
         }
 
-        #; Reopen, usefull in Packaging deployed modules
+        #; Reopen, useful in Packaging deployed modules
         set ..Module = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
 
@@ -1158,7 +1158,8 @@ Method %Export(
 
         // Deployed items should be exported as a studio project to a designated directory
         set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
-        set tDeployedProject = ##class(%Studio.Project).%OpenId(tDeployedProjectName)
+        set tDeployedProject = ##class(%Studio.Project).%OpenId(tDeployedProjectName,,.sc)
+        $$$ThrowOnError(sc)
         if '$isobject(tDeployedProject) {
             set tDeployedProject = ##class(%Studio.Project).%New()
             set tDeployedProject.Name = tDeployedProjectName
@@ -1359,7 +1360,7 @@ Method %Publish(ByRef pParams) As %Status
         // Determine which server/registry to publish to
         set tServer =  ""
         if tPublishTo '= "" {
-            set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tPublishTo,,.tSC)
+            set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tPublishTo,0,.tSC)
         }
 
         if '$isobject(tServer) {
@@ -1829,7 +1830,7 @@ Method ExportSingleModule(
         }
         if ($extract(tFullResourceName) = "/") {
             // Resources with paths are relative to the module root and are simply copied to the export directory.
-            set tModule = ##class(%IPM.Storage.Module).NameOpen(tSrcModule,,.tSC)
+            set tModule = ##class(%IPM.Storage.Module).NameOpen(tSrcModule,0,.tSC)
             $$$ThrowOnError(tSC)
 
             if (tModule.Root = "") {

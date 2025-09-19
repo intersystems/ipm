@@ -25,7 +25,7 @@ ClassMethod ManifestBuildValueArray(
         if '$isobject(tDocument) {
             quit
         }
-        set tXData = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||ManifestTransform",,.tSC)
+        set tXData = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||ManifestTransform",0,.tSC)
         if $$$ISERR(tSC) {
             quit
         }

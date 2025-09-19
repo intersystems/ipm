@@ -139,7 +139,7 @@ ClassMethod RetrieveBuiltDatabase(
             $$$ThrowOnError(##class(SYS.Database).DismountDatabase(tDB.Directory))
 
             // Copy database to temp binary stream
-            set tSourceStream = ##class(%Stream.FileBinary).%OpenId(##class(%File).NormalizeFilename(tDB.Directory_"\IRIS.DAT"),,.tSC)
+            set tSourceStream = ##class(%Stream.FileBinary).%OpenId(##class(%File).NormalizeFilename(tDB.Directory_"\IRIS.DAT"),0,.tSC)
             $$$ThrowOnError(tSC)
 
             $$$ThrowOnError(pStream.CopyFrom(tSourceStream))
@@ -147,7 +147,7 @@ ClassMethod RetrieveBuiltDatabase(
             do pStream.Rewind()
 
             // Remount database
-            set tSysDB = ##class(SYS.Database).%OpenId(tDB.Directory)
+            set tSysDB = ##class(SYS.Database).%OpenId(tDB.Directory,0)
             if ('tSysDB.Mounted) {
                 $$$ThrowOnError(##class(SYS.Database).MountDatabase(tDB.Directory))
             }
@@ -658,7 +658,7 @@ ClassMethod MapClassDataEquivalently(
         $$$ThrowOnError(tSC)
 
         // Also map stream global. The extent manager doesn't handle this. :(
-        set tClassDef = ##class(%Dictionary.CompiledClass).%OpenId(pClassName,,.tSC)
+        set tClassDef = ##class(%Dictionary.CompiledClass).%OpenId(pClassName,0,.tSC)
         $$$ThrowOnError(tSC)
 
         #dim tStorage As %Dictionary.CompiledStorage

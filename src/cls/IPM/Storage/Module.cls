@@ -1306,7 +1306,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
             if (tResource.%Id() = "") && (tResource.UniqueName '= "") {
                 // ... see if some other resource exists with the same name.
                 if ##class(%IPM.Storage.ResourceReference).ResourceNameExists(tResource.UniqueName,.tResourceId) {
-                    set tOtherResource = ##class(%IPM.Storage.ResourceReference).%OpenId(tResourceId,,.tSC)
+                    set tOtherResource = ##class(%IPM.Storage.ResourceReference).%OpenId(tResourceId,0,.tSC)
                     if $$$ISERR(tSC) {
                         quit
                     }

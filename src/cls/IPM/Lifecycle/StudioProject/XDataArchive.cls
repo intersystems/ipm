@@ -64,7 +64,7 @@ Method Populate(pVerbose As %Boolean = 1) As %Status
 
         // Copy the requisite classes to the temp package name to support use in non-Package Manager contexts
         for tPostfix = "",".IFile",".FileBinary",".FileCharacter" {
-            set tSource = ##class(%Dictionary.ClassDefinition).%OpenId($classname()_tPostfix,,.tSC)
+            set tSource = ##class(%Dictionary.ClassDefinition).%OpenId($classname()_tPostfix,0,.tSC)
             $$$ThrowOnError(tSC)
 
             set tTarget = tSource.%ConstructClone(1)
@@ -184,7 +184,7 @@ ClassMethod Extract(pTargetDirectory As %String) As %Status
             if (tClassKey = "") {
                 quit
             }
-            set tClassDef = ##class(%Dictionary.ClassDefinition).%OpenId(tClassKey,,.tSC)
+            set tClassDef = ##class(%Dictionary.ClassDefinition).%OpenId(tClassKey,0,.tSC)
             $$$ThrowOnError(tSC)
 
             set tXDataKey = ""

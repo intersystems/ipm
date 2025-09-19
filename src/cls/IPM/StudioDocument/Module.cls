@@ -49,7 +49,7 @@ ClassMethod UpdatePersistentFromStream(
             set tReader = ##class(%XML.Reader).%New()
             do pStream.Contents.Rewind()
             // Preprocess the pStream contents to apply InternalXSL
-            set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL").Data
+            set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||InternalXSL",0).Data
             set tTransformedStream = ##class(%Stream.GlobalCharacter).%New()
             set tTransformedStream.LineTerminator = $char(10)
             set tSC = ##class(%XML.XSLT.Transformer).TransformStream(pStream.Contents, tXSL, .tTransformedStream)
@@ -322,7 +322,7 @@ Method ExportToXML(flags As %String) As %Status
     if ('..Code.Size) {
         quit $$$OK
     }
-    set tXSL=##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||ExternalXSL").Data
+    set tXSL=##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||ExternalXSL",0).Data
 
     set tSC = ##class(%XML.XSLT.Transformer).TransformStream(..Code, tXSL, .tOutput)
     if $$$ISERR(tSC) {

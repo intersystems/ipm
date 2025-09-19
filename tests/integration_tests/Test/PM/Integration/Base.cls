@@ -85,7 +85,7 @@ ClassMethod ReadXDataToModule(
 	set tStatus = $$$OK
 	try {
 		set $namespace = pNamespace
-		set tXData = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||"_pXDataName,,.tStatus)
+		set tXData = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||"_pXDataName,0,.tStatus)
 		if $$$ISERR(tStatus) {
 			quit
 		}

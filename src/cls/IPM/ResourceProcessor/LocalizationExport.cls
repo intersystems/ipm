@@ -122,7 +122,7 @@ ClassMethod GetMessageFile(
     set tSC = $$$OK
     set pFileObject = $$$NULLOREF
     try {
-        set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName)
+        set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName,0)
         if (tRtn = $$$NULLOREF) {
             set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
             quit
@@ -161,7 +161,7 @@ ClassMethod SaveMessageFile(
         }
 
         if (pCompile) {
-            set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName)
+            set tRtn = ##class(%Library.RoutineMgr).%OpenId(pDocName,0)
             if (tRtn = $$$NULLOREF) {
                 set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error message document '%1' does not exist.",pDocName))
                 quit

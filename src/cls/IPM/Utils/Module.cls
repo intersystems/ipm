@@ -1680,7 +1680,7 @@ ClassMethod AddGlobalMapping(
         if '##Class(Config.MapGlobals).Exists(pNamespace,pMapping) {
             set tProps("Database") = pFrom
             if pSetCollation {
-                set tDB=##class(SYS.Database).%OpenId(##class(%Library.File).NormalizeDirectory($system.Util.InstallDirectory()_"mgr")_pFrom)
+                set tDB=##class(SYS.Database).%OpenId(##class(%Library.File).NormalizeDirectory($system.Util.InstallDirectory()_"mgr")_pFrom,0)
                 if $isobject(tDB) {
                     set tProps("Collation") = tDB.NewGlobalCollation
                 }

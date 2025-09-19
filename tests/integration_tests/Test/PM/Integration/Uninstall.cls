@@ -3,6 +3,7 @@ Class Test.PM.Integration.Uninstall Extends Test.PM.Integration.Base
 
 Method TestSimpleUninstallAll()
 {
+    break
     // install a few modules
     set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
 
@@ -21,6 +22,7 @@ Method TestSimpleUninstallAll()
     // verify everything except IPM is uninstalled
     do ##class(%IPM.Main).GetListModules(,,.list)
     do $$$AssertTrue(list=1, "Only one module left")
+    break
     do $$$AssertTrue($list(list(1))="zpm", "IPM has not been uninstalled")
 }
 

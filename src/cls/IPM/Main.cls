@@ -1176,7 +1176,7 @@ ClassMethod GetListModules(
             set maxWidth = $length(name)
         }
         continue:pExtraFields=""
-        set obj = ##class(%IPM.Storage.Module).NameOpen(name, .tSC)
+        set obj = ##class(%IPM.Storage.Module).NameOpen(name,0, .tSC)
         continue:$$$ISERR(tSC)
         set ptr = 0
         while $listnext(pExtraFields, ptr, field) {
@@ -1341,7 +1341,7 @@ ClassMethod Version(ByRef pCommandInfo) [ Internal ]
         $$$ThrowOnError(tSC)
 
         #dim tRepository As %IPM.Repo.Remote.Definition
-        set tRepository = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRes.ID,,.tSC)
+        set tRepository = ##class(%IPM.Repo.Remote.Definition).%OpenId(tRes.ID,0,.tSC)
         $$$ThrowOnError(tSC)
         set tService = tRepository.GetPackageService()
         set tInfo = tService.GetInfo()
@@ -1858,7 +1858,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
         write !
         while tRes.%Next(.tSC) {
             $$$ThrowOnError(tSC)
-            set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+            set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),0,.tSC)
             $$$ThrowOnError(tSC)
             if serverClassList = "" || ($listfind(serverClassList, $classname(tRepository))) {
                 do tRepository.Display()
@@ -1887,7 +1887,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 
         set tName = $$$GetModifier(pCommandInfo,"name")
         if (tName '= "") {
-            set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName,,.tSC)
+            set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName,0,.tSC)
             if $$$ISERR(tSC) && $system.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
                 set tSC = $$$ERROR($$$GeneralError,$$$FormatText("No repository with name '%1' exists in namespace '%2'",tName,tSourceNamespace))
             }
@@ -1904,7 +1904,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
             }
             while tRes.%Next(.tSC) {
                 $$$ThrowOnError(tSC)
-                set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),,.tSC)
+                set tRepository = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRes.%Get("Name"),0,.tSC)
                 $$$ThrowOnError(tSC)
                 set tRepositories($increment(tRepositories)) = tRepository
             }
@@ -1993,7 +1993,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
         $$$ThrowOnError(tSC)
 
         if (tType = "") && (tName '= "") && ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(tName) {
-            set tInstance = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName)
+            set tInstance = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tName,0)
             if $isobject(tInstance) {
                 set tType = tInstance.%ClassName(1)
             }
@@ -2269,19 +2269,17 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
     merge tData = pCommandInfo("data")
     merge pCommandInfo("data") = tData
 
-    // Find  the currently-installed version of the module
+    // Find the currently-installed version of the module
     set tModuleName = $get(pCommandInfo("parameters","module"))
-    set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
-    if $system.Status.Equals(tSC,$$$ERRORCODE($$$KeyValueNotFoundOpen)) {
+    if '##class(%IPM.Storage.Module).NameExists(tModuleName,.tModuleId) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Module '%1' is not currently installed.",tModuleName)))
     }
-    $$$ThrowOnError(tSC)
 
     if tModuleName = $$$IPMModuleName {
         $$$ThrowOnError(..CheckModuleNamespace())
     }
 
-    set tVersionString = tModule.Version.ToString()
+    set tVersionString = ##class(%IPM.Storage.Module).VersionStringGetStored(tModuleId)
     write !,"Reinstalling ",tModuleName," ",tVersionString
     set pCommandInfo("parameters","version") = tVersionString
     do ..Install(.pCommandInfo)
@@ -2338,7 +2336,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
             set tServer = $classmethod(tRS.Class, "%OpenId", tRS.ID)
         }
     } else {
-        set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
+        set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,0,.tSC)
     }
     if ('$isobject(tServer)) {
         write "Registry not found: "_tRegistry,!
@@ -2948,7 +2946,7 @@ ClassMethod UpdateLanguageExtensions(
         set tOffset = 0
         set tStarted = 0
         set labelPrefix = $select($system.Version.GetMajor() >= 2023: "",1: "z")
-        set method = ##class(%Dictionary.MethodDefinition).IDKEYOpen($classname(),"LanguageExtensions",,.sc)
+        set method = ##class(%Dictionary.MethodDefinition).IDKEYOpen($classname(),"LanguageExtensions",0,.sc)
         $$$ThrowOnError(sc)
         set tGenLines($increment(tGenLines)) = $$$STARTTAGQ
         while 'method.Implementation.AtEnd {
@@ -3028,10 +3026,9 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
     new $namespace
     set initNamespace = $namespace
     if ..IPMInstalled(.ipmModuleId){
-        set modDef = ##class(%IPM.Storage.Module).%OpenId(ipmModuleId,,.sc)
-        $$$ThrowOnError(sc)
+        set version = ##class(%IPM.Storage.Module).VersionGetStored(ipmModuleId)
         write !, "Version of IPM in current namespace: "
-        write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_modDef.VersionString
+        write !,($namespace)_"> "_$$$FormattedLine($$$Green,$$$IPMModuleName_" ")_version
     }
 
     if $$$HasModifier(pCommandInfo,"community") {
@@ -3458,7 +3455,7 @@ ClassMethod ModuleVersion(ByRef pCommandInfo)
     if (modName = "") {
         $$$ThrowOnError($$$ERROR($$$GeneralError,"No module name specified."))
     }
-    set mod = ##class(%IPM.Storage.Module).NameOpen(modName,.sc)
+    set mod = ##class(%IPM.Storage.Module).NameOpen(modName,0,.sc)
     if (mod = "") {
         $$$ThrowOnError($$$ERROR($$$GeneralError,"Module "_modName_" not found."))
     }

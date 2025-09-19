@@ -193,7 +193,7 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
 
         #; Find named XDATA block
         if ##class(%Dictionary.CompiledXData).%ExistsId(tClassName_"||Commands") {
-            set tCompiledClass = ##class(%Dictionary.CompiledClass).%OpenId(tClassName,,.tSC)
+            set tCompiledClass = ##class(%Dictionary.CompiledClass).%OpenId(tClassName,0,.tSC)
             if '$isobject(tCompiledClass)||$$$ISERR(tSC) quit
 
             set tIndex = tCompiledClass.XDatas.FindObjectId(tClassName_"||Commands")
@@ -315,7 +315,7 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
                                     do %code.WriteLine(" Set pCommandStructure("_tName_","_$$$QUOTE(tMap(tCommChild))_") = "_tDescContent)
                                 }
                             } else {
-                                // Common: name, required, description
+                                // Common to both modifier and parameter
                                 set tChildName = $$$QUOTE(tMap(tCommChild,"a","name"))
                                 set tRequired = $case($get(tMap(tCommChild,"a","required")),"true":1,:0)
 

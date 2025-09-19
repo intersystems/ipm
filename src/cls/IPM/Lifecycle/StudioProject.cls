@@ -114,7 +114,7 @@ Method %Package(ByRef pParams) As %Status
 
         $$$ThrowOnError(tMainProject.DeployToFile(tTargetFile,$select(tVerbose:"d",1:"-d")_"/createdirs"))
 
-        set tPayloadStream = ##class(%Stream.FileCharacter).%OpenId(tTargetFile,,.tSC)
+        set tPayloadStream = ##class(%Stream.FileCharacter).%OpenId(tTargetFile,0,.tSC)
         $$$ThrowOnError(tSC)
         $$$ThrowOnError(..Payload.CopyFrom(tPayloadStream))
     } catch e {
@@ -194,7 +194,7 @@ Method PackageOneModule(
         }
 
         // Copy installer class to a version that doesn't extend %IPM.AbstractInstaller.
-        set tSourceClass = ##class(%Dictionary.ClassDefinition).%OpenId(pModule.InstallerClass,,.tSC)
+        set tSourceClass = ##class(%Dictionary.ClassDefinition).%OpenId(pModule.InstallerClass,0,.tSC)
         $$$ThrowOnError(tSC)
 
         set tDestClass = tSourceClass.%ConstructClone(1)

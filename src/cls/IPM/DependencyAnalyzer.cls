@@ -197,7 +197,7 @@ ClassMethod FindReferenceHelper(
             set tModuleName = tModule.Name
         }
     } else {
-        set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
+        set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,0,.tSC)
         $$$ThrowOnError(tSC)
     }
 

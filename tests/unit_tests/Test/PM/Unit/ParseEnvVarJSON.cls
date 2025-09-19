@@ -34,70 +34,70 @@ XData SampleJSON [ MimeType = application/json ]
 /// Run by <B>RunTest</B> immediately before each test method in the test class is run.<br>
 /// <dl>
 /// <dt><i>testname</i>
-/// <dd>Name of the test to be run. Required. 
-/// </dl> 
+/// <dd>Name of the test to be run. Required.
+/// </dl>
 Method OnBeforeOneTest(testname As %String) As %Status
 {
-    Try {
-        Do ..SetEnvironmentVariable()
-    } Catch ex {
-        Return ex.AsStatus()
+    try {
+        do ..SetEnvironmentVariable()
+    } catch ex {
+        return ex.AsStatus()
     }
-    Quit $$$OK
+    quit $$$OK
 }
 
 /// Run by <B>RunTest</B> immediately after each test method in the test class is run.<br>
 /// <dl>
 /// <dt><i>testname</i>
-/// <dd>Name of the test to be run. Required. 
-/// </dl> 
+/// <dd>Name of the test to be run. Required.
+/// </dl>
 Method OnAfterOneTest(testname As %String) As %Status
 {
-    Try {
-        Do ..UnsetEnvironmentVariable()
-    } Catch ex {
-        Return ex.AsStatus()
+    try {
+        do ..UnsetEnvironmentVariable()
+    } catch ex {
+        return ex.AsStatus()
     }
-    Quit $$$OK
+    quit $$$OK
 }
 
 ClassMethod SetEnvironmentVariable()
 {
-    // For lack of a better way, we'll set the environment variables using Embedded Python. 
+    // For lack of a better way, we'll set the environment variables using Embedded Python.
     // Will update once we have a pure COS way to do this.
-    Set os = ##class(%SYS.Python).Import("os")
+    set os = ##class(%SYS.Python).Import("os")
     // Note: the putenv only affects environment variables for the current process without any mapping to the actual environment variables.
-    Do os.putenv(..#ENVNAME1, ..#ENVVALUE1)
-    Do os.putenv(..#ENVNAME2, ..#ENVVALUE2)
-    Do os.putenv(..#ENVNAME3, ..#ENVVALUE3)
-    Do os.putenv(..#ENVNAME4, ..#ENVVALUE4)
+    do os.putenv(..#ENVNAME1, ..#ENVVALUE1)
+    do os.putenv(..#ENVNAME2, ..#ENVVALUE2)
+    do os.putenv(..#ENVNAME3, ..#ENVVALUE3)
+    do os.putenv(..#ENVNAME4, ..#ENVVALUE4)
 }
 
 ClassMethod UnsetEnvironmentVariable()
 {
-    Set os = ##class(%SYS.Python).Import("os")
-    Do os.environ.pop(..#ENVNAME1, "")
-    Do os.environ.pop(..#ENVNAME2, "")
-    Do os.environ.pop(..#ENVNAME3, "")
-    Do os.environ.pop(..#ENVNAME4, "")
+    set os = ##class(%SYS.Python).Import("os")
+    do os.environ.pop(..#ENVNAME1, "")
+    do os.environ.pop(..#ENVNAME2, "")
+    do os.environ.pop(..#ENVNAME3, "")
+    do os.environ.pop(..#ENVNAME4, "")
 }
 
 Method TestParseEnvVarJSON()
 {
-    Do ..SetEnvironmentVariable()
+    do ..SetEnvironmentVariable()
 
-    Set xdataID=$CLASSNAME()_"||SampleJSON"
-    Set compiledXdata=##class(%Dictionary.CompiledXData).%OpenId(xdataID)
-    Set stream=compiledXdata.Data
-    Do $$$AssertTrue($ISOBJECT(stream))
-    Set sampleJSON = {}.%FromJSON(stream)
+    set xdataID=$classname()_"||SampleJSON"
+    set compiledXdata=##class(%Dictionary.CompiledXData).%OpenId(xdataID,0)
+    set stream=compiledXdata.Data
+    do $$$AssertTrue($isobject(stream))
+    set sampleJSON = {}.%FromJSON(stream)
 
-    Set parsedJSON = ##class(%IPM.General.EnvironmentConfig).%Evaluate(sampleJSON)
-    Do $$$AssertEquals(parsedJSON.package.nested.key, ..#ENVVALUE1)
-    Do $$$AssertEquals(parsedJSON.toplevel, ..#ENVVALUE2)
-    Do $$$AssertEquals(parsedJSON.arrayConcatenated."0", ..#ENVVALUE3_..#ENVVALUE4)
+    set parsedJSON = ##class(%IPM.General.EnvironmentConfig).%Evaluate(sampleJSON)
+    do $$$AssertEquals(parsedJSON.package.nested.key, ..#ENVVALUE1)
+    do $$$AssertEquals(parsedJSON.toplevel, ..#ENVVALUE2)
+    do $$$AssertEquals(parsedJSON.arrayConcatenated."0", ..#ENVVALUE3_..#ENVVALUE4)
 
-    Do ..UnsetEnvironmentVariable()
+    do ..UnsetEnvironmentVariable()
 }
 
 }

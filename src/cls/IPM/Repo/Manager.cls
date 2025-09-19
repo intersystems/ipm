@@ -71,7 +71,7 @@ Method SearchRepositoriesForModule(
                 quit
             }
             set repoID = tRes.%Get("ID")
-            set tServer = ##class(%IPM.Repo.Definition).%OpenId(repoID,,.tSC)
+            set tServer = ##class(%IPM.Repo.Definition).%OpenId(repoID,0,.tSC)
             if $$$ISERR(tSC) {
                 quit
             }

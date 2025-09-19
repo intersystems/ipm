@@ -554,10 +554,10 @@ Method SaveFile(pPath As %String = "") As %Status
     // save
     try {
         $$$ThrowOnError(..XMLExportToStream(.tStream))
-        set tXSL=##class(%Dictionary.CompiledXData).%OpenId("%IPM.StudioDocument.Module||ExternalXSL").Data
+        set tXSL=##class(%Dictionary.CompiledXData).%OpenId("%IPM.StudioDocument.Module||ExternalXSL",0).Data
         $$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStream(tStream, tXSL, .tOutput))
 
-        set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||XSLT").Data
+        set tXSL = ##class(%Dictionary.CompiledXData).%OpenId(..%ClassName(1)_"||XSLT",0).Data
         $$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStream(tOutput, tXSL, .tXMLStream))
 
         set tSC = ##class(%XML.Document).GetDocumentFromStream(tXMLStream, .tDoc)
