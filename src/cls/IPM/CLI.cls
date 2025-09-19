@@ -441,6 +441,7 @@ ClassMethod %ParseCommandInput(
         set tModifier = ""
         set tDataName = ""
         set tParamCount = 0
+        set tIsCustomData = 0
         set tPreEscapeState = ""
         for {
             set tChar = $extract(pCommandString,tPos)
@@ -506,6 +507,7 @@ ClassMethod %ParseCommandInput(
                         set tDataName = tDataAlias
                         if $data(tCommandStructure(modifierSubscript,"modifiers",tModifier,"dataValue"),tDataValue) {
                             do ..SetData(.pCommandInfo,tDataAlias,tDataValue)
+                            set tDataName = ""
                             set tState = $$$PREARGUMENT
                         } else {
                             set tState = $$$MODIFIERVALUE
@@ -514,13 +516,15 @@ ClassMethod %ParseCommandInput(
                         set tState = $$$MODIFIERVALUE
                     } else {
                         set pCommandInfo("modifiers",tModifier) = ""
+                        set tDataName = ""
                         set tState = $$$PREARGUMENT
                     }
                     set tAccum = ""
                 } elseif (tState = $$$MODIFIERVALUE) {
                     if ($get(tDataName) '= "") {
-                        do ..SetData(.pCommandInfo,tDataName,tAccum,1)
+                        do ..SetData(.pCommandInfo,tDataName,tAccum,tIsCustomData)
                         set tDataName = ""
+                        set tIsCustomData = 0
                     } else {
                         set pCommandInfo("modifiers",tModifier) = tAccum
                     }
@@ -581,7 +585,8 @@ ClassMethod %ParseCommandInput(
                     continue
                 } elseif (tState = $$$MODIFIERVALUEQUOTED) {
                     if ($get(tDataName) '= "") {
-                        do ..SetData(.pCommandInfo,tDataName,tAccum,1)
+                        do ..SetData(.pCommandInfo,tDataName,tAccum,tIsCustomData)
+                        set tIsCustomData = 0
                     } else {
                         set pCommandInfo("modifiers",tModifier) = tAccum
                     }
@@ -629,6 +634,7 @@ ClassMethod %ParseCommandInput(
                     if (tAccum = "") && (tDataPrefix '= "") && (tChar = tDataPrefix) {
                         set tState = $$$DATANAME
                         set tDataName = ""
+                        set tIsCustomData = 1
                         continue
                     }
                 }
@@ -645,7 +651,6 @@ ClassMethod %ParseCommandInput(
                 set tState = tPreEscapeState
             }
         }
-
         // TODO: Extra validation.
     } catch e {
         if e.%IsA("%Exception.SystemException") {
