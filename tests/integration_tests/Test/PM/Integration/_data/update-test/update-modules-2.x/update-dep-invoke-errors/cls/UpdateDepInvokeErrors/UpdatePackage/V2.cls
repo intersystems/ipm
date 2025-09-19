@@ -1,4 +1,4 @@
-Class UpdatePackage.V1 Extends %IPM.General.Update.VersionBase
+Class UpdateDepInvokeErrors.UpdatePackage.V2 Extends %IPM.General.Update.VersionBase
 {
 
 ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray
@@ -13,7 +13,7 @@ ClassMethod GetOrderedMethods() As %Library.DynamicArray
 
 ClassMethod MethodA()
 {
-    write !, "This is UpdatePackage.V1::MethodA()"
+  write !, "This is  UpdateDepInvokeErrors.UpdatePackage.V2::MethodA()"
 }
 
 }

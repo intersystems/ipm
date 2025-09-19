@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="update-deps-added.ZPM">
+    <Module>
+      <Name>update-deps-added</Name>
+      <Version>2.1.1</Version>
+      <Resource Name="UpdateDepsAdded.UpdatePackage.PKG" />
+      <UpdatePackage>UpdateDepsAdded.UpdatePackage</UpdatePackage>
+      <Dependencies>
+        <ModuleReference>
+          <Name>update-simple</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

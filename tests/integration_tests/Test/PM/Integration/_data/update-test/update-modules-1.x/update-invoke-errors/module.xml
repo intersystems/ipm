@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="update-invoke-errors.ZPM">
+    <Module>
+      <Name>update-invoke-errors</Name>
+      <Version>1.2.1</Version>
+      <Resource Name="UpdateInvokeErrors.UpdatePackage.PKG" />
+      <Resource Name="ClassPackage.PKG"/>
+      <UpdatePackage>UpdateInvokeErrors.UpdatePackage</UpdatePackage>
+    </Module>
+  </Document>
+</Export>
