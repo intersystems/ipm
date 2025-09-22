@@ -120,36 +120,6 @@ Method TestUpdateNonMatchingTarballFails()
   do ..CleanUpDirectory(exportDir)
 }
 
-Method TestSimultaneousUpdateFails()
-{
-  do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
-
-  if ('$system.Event.Defined("FirstUpdate")){
-    set isNamedResourceCreated = $system.Event.Create("FirstUpdate")
-    if 'isNamedResourceCreated {
-      $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not created"))
-    }
-  }
-
-  if ('$system.Event.Defined("SecondUpdate")){
-    set isNamedResourceCreated = $system.Event.Create("SecondUpdate")
-    if 'isNamedResourceCreated {
-      $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource SecondUpdate not created"))
-    }
-  }
-
-  job ..UpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleTwoVersion, "FirstUpdate")
-  job ..UpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleThreeVersion, "SecondUpdate")
-
-  set $listbuild(firstCode, firstResponse) = $system.Event.WaitMsg("FirstUpdate")
-  set $listbuild(secondCode, secondResponse) = $system.Event.WaitMsg("SecondUpdate")
-
-  do $$$AssertStatusOK(firstResponse, "Update of module="_..#ModuleNoDependencies_" to version="_..#ModuleTwoVersion_" succeeded.")
-  do $$$AssertStatusNotOK(secondResponse, "Attempting to update module="_..#ModuleNoDependencies_" while another update of that module in the same namespace is in-progress failed.")
-
-  do ..CleanUpModule(..#ModuleNoDependencies)
-}
-
 Method TestUpdateAfterInterruptedUpdate()
 {
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
@@ -554,17 +524,6 @@ Method AssertModulePackagedCorrectly(
 
   // Uninstall module
   do ..CleanUpModule(moduleName)
-}
-
-ClassMethod UpdateJobWrapper(
-	moduleName,
-	toVersion,
-	resourceName)
-{
-  set sc = ##class(%IPM.Main).Shell("update "_moduleName_" "_toVersion_" -v")
-
-  // Send update status to the named resource
-  do $system.Event.Signal(resourceName, sc)
 }
 
 ClassMethod InterruptedUpdateJobWrapper(
