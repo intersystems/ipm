@@ -11,7 +11,7 @@ Method OnBeforeAllTests() As %Status
 
 Method OnAfterAllTests() As %Status
 {
-    // Using update-test modules for the test of making sure update steps are used correctly with zpm "install"
+    // Remove test repository after tests have been run
     set sc = ##class(%IPM.Main).Shell("repo -delete -name update-test-modules")
     do $$$AssertStatusOK(sc,"Deleted update-test-modules repo successfully.")
     return sc
@@ -160,7 +160,7 @@ Method ConfirmUpdateStepsExist(
         set methodName = value.%Get(1)
         set isPrimaryOnly = value.%Get(2)
 
-        set stepExists = ##class(Test.PM.Integration.Update).UpdateStepExists(className, methodName, isPrimaryOnly)
+        set stepExists = $isobject(##class(Test.PM.Integration.Update).GetUpdateStep(className, methodName, isPrimaryOnly))
         if doesExist {
             do $$$AssertTrue(stepExists, "Update step with class="_className_" and method="_methodName_" exists")
         }
