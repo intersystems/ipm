@@ -596,6 +596,19 @@ ClassMethod GetUpdateStep(
   return step
 }
 
+ClassMethod UpdateStepExists(
+	className As %String,
+	methodName As %String,
+	isPrimaryOnly As %Boolean) As %Boolean
+{
+    if isPrimaryOnly {
+        return ##class(%IPM.Storage.UpdateStep.PrimaryOnly).UpdateClassMethodIdxExists(className, methodName)
+    }
+    else {
+        return ##class(%IPM.Storage.UpdateStep.AnyMember).UpdateClassMethodIdxExists(className, methodName)
+    }
+}
+
 ClassMethod CleanUpModule(moduleName As %String)
 {
   set sc = ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
