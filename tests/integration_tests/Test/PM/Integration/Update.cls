@@ -167,7 +167,7 @@ Method TestUpdateAfterInterruptedUpdate()
   set $listbuild(codeOne, updateProcessId) = $system.Event.WaitMsg("InterruptedUpdate")
   set sc = $system.Process.Terminate(updateProcessId)
 
-  // Gets update status
+  // Gets process termination status
   do $$$AssertTrue(sc = 1, "Updating module "_..#ModuleNoDependencies_" from "_..#ModuleOneVersion_" to "_..#ModuleTwoVersion_" was interrupted.")
 
   // Perform another update
