@@ -45,7 +45,7 @@ Method TestUpdateStepsSeededOnInstall()
                              ["UpdatePackage.V3", "MethodA", 1]]
     do ..ConfirmUpdateStepsAreSeeded(updateStepsToSeed)
 
-    /// Defining paths for module tarball
+    // Defining paths for module tarball
     set tempDir = $$$FileTempDir
     set exportPath = ##class(%File).NormalizeFilename("update-simple", tempDir)
     set tarballPath = ##class(%File).NormalizeFilename("update-simple.tgz", tempDir)
