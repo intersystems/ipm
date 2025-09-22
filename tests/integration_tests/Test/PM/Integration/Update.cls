@@ -154,20 +154,21 @@ Method TestUpdateAfterInterruptedUpdate()
 {
   do ..AssertModuleInstalledCorrectly(..#ModuleNoDependencies, ..#ModuleOneVersion)
 
-  set isNamedResourceCreated = $system.Event.Create("InterruptedUpdate")
-  if 'isNamedResourceCreated {
-    $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource FirstUpdate not created"))
+  if ('$system.Event.Defined("InterruptedUpdate")){
+    set isNamedResourceCreated = $system.Event.Create("InterruptedUpdate")
+    if 'isNamedResourceCreated {
+      $$$ThrowOnError($$$ERROR($$$GeneralError, "Resource InterruptedUpdate not created"))
+    }
   }
 
   job ..InterruptedUpdateJobWrapper(..#ModuleNoDependencies, ..#ModuleTwoVersion, "InterruptedUpdate")
 
   // Gets child job ID
-  set $listbuild(codeOne, processId) = $system.Event.WaitMsg("InterruptedUpdate")
-  do $system.Process.Terminate(processId)
+  set $listbuild(codeOne, updateProcessId) = $system.Event.WaitMsg("InterruptedUpdate")
+  set sc = $system.Process.Terminate(updateProcessId)
 
   // Gets update status
-  set $listbuild(codeTwo, sc) = $system.Event.WaitMsg("InterruptedUpdate")
-  do $$$AssertStatusNotOK(sc, "Updating module "_..#ModuleNoDependencies_" from "_..#ModuleOneVersion_" to "_..#ModuleTwoVersion_" was interrupted and failed.")
+  do $$$AssertTrue(sc = 1, "Updating module "_..#ModuleNoDependencies_" from "_..#ModuleOneVersion_" to "_..#ModuleTwoVersion_" was interrupted.")
 
   // Perform another update
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleTwoVersion)
@@ -575,9 +576,6 @@ ClassMethod InterruptedUpdateJobWrapper(
   do $system.Event.Signal(resourceName, $system.SYS.ProcessID())
 
   set sc = ##class(%IPM.Main).Shell("update "_moduleName_" "_toVersion_" -v")
-
-  // Send update status to the named resource
-  do $system.Event.Signal(resourceName, sc)
 }
 
 ClassMethod GetUpdateStep(
