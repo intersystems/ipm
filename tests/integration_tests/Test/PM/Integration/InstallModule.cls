@@ -11,7 +11,7 @@ Method OnBeforeAllTests() As %Status
 
 Method OnAfterAllTests() As %Status
 {
-    // Using update-test modules for the test of making sure update steps are used correctly with zpm "install"
+    // Remove test repository after tests have been run
     set sc = ##class(%IPM.Main).Shell("repo -delete -name update-test-modules")
     do $$$AssertStatusOK(sc,"Deleted update-test-modules repo successfully.")
     return sc
@@ -45,7 +45,7 @@ Method TestUpdateStepsSeededOnInstall()
                              ["UpdatePackage.V3", "MethodA", 1]]
     do ..ConfirmUpdateStepsAreSeeded(updateStepsToSeed)
 
-    /// Defining paths for module tarball
+    // Defining paths for module tarball
     set tempDir = $$$FileTempDir
     set exportPath = ##class(%File).NormalizeFilename("update-simple", tempDir)
     set tarballPath = ##class(%File).NormalizeFilename("update-simple.tgz", tempDir)
@@ -72,14 +72,20 @@ Method TestUpdateStepsSeededOnInstall()
 /// Verify that attempting to run install/load without the force flag fails if a module is already installed
 Method TestInstallForceFlag()
 {
-    set sc = ##class(%IPM.Main).Shell("install -v update-simple 3.5.0")
+    set sc = ##class(%IPM.Main).Shell("install -v update-simple 2.1.1")
     do $$$AssertStatusOK(sc,"Installed update-simple")
 
+    set sc = ##class(%IPM.Main).Shell("install -v update-simple 1.2.1")
+    do $$$AssertStatusNotOK(sc,"Trying to install older version of already existing update-simple without -force flag fails")
+
     set sc = ##class(%IPM.Main).Shell("install -v update-simple 3.5.0")
-    do $$$AssertStatusNotOK(sc,"Trying to install already existing update-simple without -force flag fails")
+    do $$$AssertStatusNotOK(sc,"Trying to install newer version of already existing update-simple without -force flag fails")
+
+    set sc = ##class(%IPM.Main).Shell("install -v -force update-simple 1.2.1")
+    do $$$AssertStatusNotOK(sc,"Trying to install older version of already existing update-simple with -force flag fails")
 
     set sc = ##class(%IPM.Main).Shell("install -v -force update-simple 3.5.0")
-    do $$$AssertStatusOK(sc,"Trying to install already existing update-simple with -force flag succeeds")
+    do $$$AssertStatusOK(sc,"Trying to install newer version of already existing update-simple with -force flag succeeds")
 
     // Clean up the module after test is completed
     $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall update-simple"))
@@ -137,14 +143,20 @@ Method TestUninstallDependencyDoesError()
 /// succeeds in dev mode and fails otherwise
 Method TestDevMode()
 {
-    set sc = ##class(%IPM.Main).Shell("install -v update-simple 3.5.0")
+    set sc = ##class(%IPM.Main).Shell("install -v update-simple 2.1.1")
     do $$$AssertStatusOK(sc,"Installed update-simple")
 
+    set sc = ##class(%IPM.Main).Shell("install -v update-simple 1.2.1")
+    do $$$AssertStatusNotOK(sc,"Trying to install older version of already existing update-simple without -dev flag fails")
+
     set sc = ##class(%IPM.Main).Shell("install -v update-simple 3.5.0")
-    do $$$AssertStatusNotOK(sc,"Trying to install already existing update-simple without -dev flag fails")
+    do $$$AssertStatusNotOK(sc,"Trying to install newer version of already existing update-simple without -dev flag fails")
+
+    set sc = ##class(%IPM.Main).Shell("install -v -dev update-simple 1.2.1")
+    do $$$AssertStatusNotOK(sc,"Trying to install older version of already existing update-simple with -dev flag fails")
 
     set sc = ##class(%IPM.Main).Shell("install -v -dev update-simple 3.5.0")
-    do $$$AssertStatusOK(sc,"Trying to install already existing update-simple with -dev flag succeeds")
+    do $$$AssertStatusOK(sc,"Trying to install newer version of already existing update-simple with -dev flag succeeds")
 
     // Clean up the module after test is completed
     $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall update-simple"))
@@ -160,7 +172,7 @@ Method ConfirmUpdateStepsExist(
         set methodName = value.%Get(1)
         set isPrimaryOnly = value.%Get(2)
 
-        set stepExists = ##class(Test.PM.Integration.Update).UpdateStepExists(className, methodName, isPrimaryOnly)
+        set stepExists = $isobject(##class(Test.PM.Integration.Update).GetUpdateStep(className, methodName, isPrimaryOnly))
         if doesExist {
             do $$$AssertTrue(stepExists, "Update step with class="_className_" and method="_methodName_" exists")
         }
