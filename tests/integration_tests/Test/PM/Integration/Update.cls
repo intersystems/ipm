@@ -321,14 +321,14 @@ Method NormalUpdateTestSuite(
   do ..CleanUpModule(moduleName)
 
   // Dev mode, install
-  #; do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 1)
-  #; do ..CleanUpModule(moduleName)
+  do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 1)
+  do ..CleanUpModule(moduleName)
 
   // Dev mode, load
   set exportDir = $system.Util.ManagerDirectory()_moduleName
-  #; do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 1, exportDir)
-  #; do ..CleanUpModule(moduleName)
-  #; do ..CleanUpDirectory(exportDir)
+  do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 1, exportDir)
+  do ..CleanUpModule(moduleName)
+  do ..CleanUpDirectory(exportDir)
 
   // No dev mode, load
   do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 0, exportDir)
