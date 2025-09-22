@@ -8,6 +8,7 @@ ClassMethod ToFile(
     set tSC = $$$OK
     try {
         set tFile = ##class(%Stream.FileCharacter).%New()
+        set tFile.TranslateTable="UTF8"
         do tFile.LinkToFile(pFileName)
 
         kill ^||TMP // results global
