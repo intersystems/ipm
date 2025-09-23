@@ -1398,11 +1398,20 @@ ClassMethod CheckOperationVersionValidity(
         set msg = $$$FormatText("Cannot downgrade %1 from version %2 to %3. To downgrade a module, you must first run the uninstall command. Then, run the install or load command with the desired module version.",moduleName,fromVersionString,toVersionString)
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
-    // If the version of the module about to be installed is NEWER than the module that is already installed, then the action is considered an update.
-    // Do not allow the user to perform an update using the install or load commands. Unless, they use the -force flag or are installing in Developer Mode.
-    if toVersion.Follows(fromVersion) && (($get(params("cmd")) = "install") || ($get(params("cmd")) = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) {
-        set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.",moduleName,fromVersionString,toVersionString)
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    // Gate 'install'/'load' to same-or-newer version without -force or Developer Mode
+    set cmd = $get(params("cmd"))
+    if ((cmd = "install") || (cmd = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) {
+        // Same version: require 'reinstall'
+        if (toVersionString = fromVersionString) {
+            set msg = $$$FormatText("Module %1 version %2 is already installed. To reinstall the same version, please use the 'reinstall' command. If you intend to bypass this check, you can use the -force or -dev flag with 'install' or 'load'.", moduleName, toVersionString)
+        }
+        // Newer version: require 'update'
+        if toVersion.Follows(fromVersion) {
+            set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.", moduleName, fromVersionString, toVersionString)
+        }
+        if $data(msg) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+        }
     }
 }
 
