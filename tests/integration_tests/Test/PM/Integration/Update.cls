@@ -60,7 +60,7 @@ Method TestAllNoErrorModulesNoMirror()
 
   // Module with dependencies added in new version
   set updateStepsToSeed = [["UpdateDepsAdded.UpdatePackage.V1", "MethodA", 1]]
-  set updateStepsToRun = updateStepsToRun.addAll([["UpdateDepsAdded.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsAdded.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodB", 0]])
+  set updateStepsToRun = [["UpdateDepsAdded.UpdatePackage.V1", "MethodB", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodB", 0]]
   do ..SingleNormalUpdateTest(..#ModuleWithDependenciesAdded, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
   do ..CleanUpModule(..#ModuleWithDependenciesAdded)
 
