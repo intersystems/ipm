@@ -1404,6 +1404,11 @@ ClassMethod CheckOperationVersionValidity(
         set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.",moduleName,fromVersionString,toVersionString)
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
+    // If the version of the module about to be installed is the SAME as the version already installed, do not allow 'install' or 'load' (unless -force or -dev). Require 'reinstall'.
+    if (toVersionString = fromVersionString) && (($get(params("cmd")) = "install") || ($get(params("cmd")) = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) {
+        set msg = $$$FormatText("Module %1 version %2 is already installed. To reinstall the same version, please use the 'reinstall' command. If you intend to bypass this check, you can use the -force or -dev flag with 'install' or 'load'.",moduleName,toVersionString)
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    }
 }
 
 /// Temporary workaround to synchronously load dependencies. Can be removed once
