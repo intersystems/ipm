@@ -867,6 +867,13 @@ ClassMethod UninstallAll(
                     quit
                 }
 
+                if tModuleName = $$$IPMModuleName {
+                    // don't uninstall IPM itself
+                    kill tModuleNames(tModuleName)
+                    set tProgressMade = 1
+                    continue
+                }
+
                 if ($data(tModuleNames(tModuleName)) > 1) {
                     // If there are dependencies left that have not been uninstalled yet, skip this module.
                     continue
@@ -1101,6 +1108,28 @@ ClassMethod GetModuleNameFromXML(
     return $$$OK
 }
 
+/// Parses defaults defined in the module.xml that look like this:
+/// ```
+/// <Defaults>
+///     <Parameter Name="ArbitraryDefault">1234</Parameter>
+///     <Parameter Name="NoTransaction">1</Parameter>
+///     <Parameter Name="NoLock">1</Parameter>
+/// </Defaults>
+/// ```
+/// 
+/// Returns results as multidimensional array
+ClassMethod GetModuleDefaultsFromXML(
+	pDirectory As %String,
+	Output defaults)
+{
+  set module = ..GetModuleObjectFromPath(pDirectory, .found)
+  if 'found {
+    quit
+  }
+
+  do module.GetDefaultParameters(.defaults)
+}
+
 ClassMethod ExportDocumentForObject(
 	pSourceModule As %IPM.Storage.Module,
 	Output pSourceControlOutput) As %Status
@@ -1207,11 +1236,17 @@ ClassMethod LoadNewModule(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
-        set tVerbose = $get(pParams("Verbose"))
-        set tUseTransactions = '($get(pParams("NoTransaction"),0) || $get(pParams("NoJournal"),0))
+        // check module.xml for defaults
+        do ..GetModuleDefaultsFromXML(pDirectory, .defaults)
+        merge params = defaults
+        merge params = pParams
+
+        set tVerbose = $get(params("Verbose"))
+        set tUseTransactions = '($get(params("NoTransaction"),0) || $get(params("NoJournal"),0))
         set isUpdate = $get(pParams("Update"),0)
         set isLoad = $get(pParams("Load"),0)
         if '$data(pParams("qstruct")) {
+
             set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
         }
         set commandLineModuleName = $get(pParams("ModuleName"))
@@ -1235,8 +1270,15 @@ ClassMethod LoadNewModule(
             set tLogManager.Threshold = tMinLogLevel
         }
 
-        set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
+        if ($get(params("NoJournal"),0) '= 0) {
+            // Disable journalling with process-level switch.
+            set tJournalMgr = ##class(%IPM.Utils.JournalManager).%New(0)
+        } elseif tUseTransactions {
+            tstart
+        }
 
+        set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
+        
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1288,8 +1330,8 @@ ClassMethod LoadNewModule(
             // Force developer mode to be 0 if repository is read only.
             if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(pRepository, .tRepositoryId) {
                 if +##class(%IPM.Repo.Definition).ReadOnlyGetStored(tRepositoryId) {
-                    // Set in pParams directly so that this value gets transmitted downstream
-                    set pParams("DeveloperMode") = 0
+                    // Set in params directly so that this value gets transmitted downstream
+                    set params("DeveloperMode") = 0
                     if tVerbose {
                         write !, "Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode"
                     }
@@ -1301,7 +1343,7 @@ ClassMethod LoadNewModule(
         $$$ThrowOnError(tSC)
         set tModule.Repository = pRepository
 
-        if $data(pParams("DeveloperMode"),tDeveloperMode) {
+        if $data(params("DeveloperMode"),tDeveloperMode) {
             // Mark module as not deployed if installing with dev mode
             set tModule.Deployed = 0
             set tModule.DeveloperMode = tDeveloperMode
@@ -1331,20 +1373,20 @@ ClassMethod LoadNewModule(
             new $$$ZPMHandledModules
             set $$$ZPMHandledModules($namespace) = "" //Initialize.
         }
-        merge $$$ZPMHandledModules($namespace) = pParams("Multicompile","ModuleContext")
+        merge $$$ZPMHandledModules($namespace) = params("Multicompile","ModuleContext")
 
         $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
 
         if 'tInstallContext.ModuleIsDependency(tModuleName) {
             if 'pSynchronous {
                 // Regular async multi-threaded loading of dependencies
-                set tSC = tModule.LoadDependencies("",.pParams)
+                set tSC = tModule.LoadDependencies("",.params)
                 $$$ThrowOnError(tSC)
             } else {
                 // Temporary custom loading of dependencies in a synchronous
                 // manner to prevent lock timeouts until lifecycle rework
                 // is complete (HSIEO-4450)
-                do ..SyncLoadDependencies(tModule, .pParams)
+                do ..SyncLoadDependencies(tModule, .params)
             }
         }
 
@@ -1358,10 +1400,11 @@ ClassMethod LoadNewModule(
             // in a transaction; we want to be able to debug!
             tcommit
         }
-        set pParams("RootDirectory") = pDirectory
-        if tVerbose || $get(pParams("Multicompile","Verbose"),0) {
+        set params("RootDirectory") = pDirectory
+        if tVerbose || $get(params("Multicompile","Verbose"),0) {
             write !,"Loading "_tDisplayName_" in process "_$job
         }
+
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .pParams)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {

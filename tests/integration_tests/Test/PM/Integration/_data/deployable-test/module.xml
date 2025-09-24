@@ -5,9 +5,11 @@
       <Name>deployable-test</Name>
       <Version>0.0.1-alpha.1+build</Version>
       <Packaging>module</Packaging>
+      <SystemRequirements Interoperability="enabled"/>
       <Resource Name="DeployableTest.Main.CLS" Deploy="true"/>
       <Resource Name="DeployableTest.Routine.MAC" Deploy="true"/>
       <Resource Name="DeployableTest.Undeployed.CLS"/>
+      <Resource Name="DeployableTest.Production.CLS" Deploy="true"/>
     </Module>
   </Document>
 </Export>

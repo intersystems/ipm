@@ -6,6 +6,8 @@ on:
       - main
       - v0.9.x
       - v0.10.x
+    paths:
+      - 'src/**'
 
 jobs:
   check_changelog:
@@ -14,7 +16,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with: 
+      with:
         fetch-depth: 0
 
     - name: Check for updated CHANGELOG.md

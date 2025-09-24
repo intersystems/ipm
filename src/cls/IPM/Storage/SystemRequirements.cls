@@ -45,10 +45,10 @@ Method CheckVersion() As %Status
         set CurrentSystemVersion = ##class(%IPM.General.SemanticVersion).FromString(tSystemVersion)
         if ('..Version.IsSatisfiedBy(CurrentSystemVersion)) {
             return $$$ERROR($$$GeneralError,"The module cannot be installed on the current version (" _ tSystemVersion _ ") of the system, version """ _ ..VersionString _ """ is required")
-        }
+    		}
         return $$$OK
     } catch ex {
-        return $$$ERROR($$$GeneralError, "Unable to check reqired system version")
+        return $$$ERROR($$$GeneralError, "Unable to check reqired system version: "_$system.Status.GetErrorText(ex.AsStatus()))
     }
 }
 
