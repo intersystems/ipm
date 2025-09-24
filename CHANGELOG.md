@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
+- #819: Drastically increase `zpm "info"` speed when many dependent packages have been installed
+- #888: Fixed `zpm "list -tree"` showing packages as `[missing]` because of case mismatch
 
 ## [0.10.3] - 2025-09-17
 
