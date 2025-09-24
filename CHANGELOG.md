@@ -8,8 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.4] - Unreleased
 
 ### Fixed
+- #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
+- #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers
 - #899: Fixed CLI parser parses modifiers incorrectly
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
+
+### Added
+- #550: Add a new "update" command and framework to support in-place module updates
 
 ## [0.10.3] - 2025-09-17
 

@@ -76,7 +76,7 @@ Method TearDown() As %Status
 }
 
 ClassMethod ReadXDataToModule(
-	pNamespace As %String = {$namespace},
+	pNamespace As %String = {$NAMESPACE},
 	pXDataName As %String,
 	ByRef pModule As %IPM.Storage.Module) As %Status
 {
