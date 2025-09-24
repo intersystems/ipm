@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
-- #899: Fixed CLI parser so that defined modifier values are read correctly
 - #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers
 
 ### Added
