@@ -1,4 +1,4 @@
-Class UpdatePackage.V1 Extends %IPM.General.Update.VersionBase
+Class UpdateDeps.UpdatePackage.V1 Extends %IPM.General.Update.VersionBase
 {
 
 ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray
@@ -13,17 +13,17 @@ ClassMethod GetOrderedMethods() As %Library.DynamicArray
 
 ClassMethod MethodA()
 {
-    write !, "This is UpdatePackage.V1::MethodA()"
+    write !, "This is UpdateDeps.UpdatePackage.V1::MethodA()"
 }
 
 ClassMethod MethodB()
 {
-    write !, "This is UpdatePackage.V1::MethodB()"
+    write !, "This is UpdateDeps.UpdatePackage.V1::MethodB()"
 }
 
 ClassMethod MethodC()
 {
-    write !, "This is UpdatePackage.V1::MethodC()"
+    write !, "This is UpdateDeps.UpdatePackage.V1::MethodC()"
 }
 
 }

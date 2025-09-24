@@ -1214,6 +1214,7 @@ ClassMethod LoadNewModule(
         if '$data(pParams("qstruct")) {
             set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
         }
+        set commandLineModuleName = $get(pParams("ModuleName"))
 
         // Check for valid license key prior to top-level module load
         // This may throw an exception.
@@ -1236,28 +1237,6 @@ ClassMethod LoadNewModule(
 
         set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
 
-        set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
-        if foundNewModuleObj {
-            // Check that on an update command with -path flag, the module in the path matches the module specified for update.
-            set commandLineModuleName = $get(pParams("ModuleName"))
-            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
-                set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
-                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-            }
-            // Note that for update/install commands, the operation version validity has already been checked in %IPM.Main.Install().
-            if isLoad {
-                // Check that the module currently installed is not being downgraded.
-                // Check that the load command is not being used to update a module, unless the -force flag is passed.
-                do ..CheckOperationVersionValidity(newModuleObj, .pParams)
-            }
-        }
-
-        if ($get(pParams("NoJournal"),0) '= 0) {
-            // Disable journalling with process-level switch.
-            set tJournalMgr = ##class(%IPM.Utils.JournalManager).%New(0)
-        } elseif tUseTransactions {
-            tstart
-        }
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1276,6 +1255,34 @@ ClassMethod LoadNewModule(
 
         set tDisplayName = $piece(tFirstLoaded, ".", 1, *-1)
         set tModuleName = $$$lcase(tDisplayName)
+
+        #dim tInstallContext As %IPM.General.InstallContext
+        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
+        $$$ThrowOnError(tSC)
+
+        if 'tInstallContext.ModuleIsDependency(tModuleName) {
+          set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
+          if foundNewModuleObj {
+            // Check that on an update command with -path flag, the module in the path matches the base module specified for update.
+            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
+                set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
+                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            }
+            // Note that for update/install commands, the operation version validity has already been checked in %IPM.Main.Install().
+            if isLoad {
+                // Check that the module currently installed is not being downgraded.
+                // Check that the load command is not being used to update a module, unless the -force flag is passed.
+                do ..CheckOperationVersionValidity(newModuleObj, .pParams)
+            }
+        }
+        }
+
+        if ($get(pParams("NoJournal"),0) '= 0) {
+            // Disable journalling with process-level switch.
+            set tJournalMgr = ##class(%IPM.Utils.JournalManager).%New(0)
+        } elseif tUseTransactions {
+            tstart
+        }
 
         if (pRepository '= "") {
             // Force developer mode to be 0 if repository is read only.
@@ -1328,9 +1335,6 @@ ClassMethod LoadNewModule(
 
         $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
 
-        #dim tInstallContext As %IPM.General.InstallContext
-        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
-        $$$ThrowOnError(tSC)
         if 'tInstallContext.ModuleIsDependency(tModuleName) {
             if 'pSynchronous {
                 // Regular async multi-threaded loading of dependencies
