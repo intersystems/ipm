@@ -119,8 +119,7 @@ Method HandleAllUpdateSteps(
             if verbose {
                 if seedSteps {
                     write !, "Starting seeding steps for module = "_..Name_" & class = "_className
-                }
-                else {
+                } else {
                     write !, "Starting to run update steps for module = "_..Name_" & class = "_className
                 }
             }
@@ -183,9 +182,8 @@ Method HandleUpdateStepsFromList(
         set stepObj = ..GetAddUpdateStep(className, methodName, primaryOnly)
         if seedSteps {
             do ..SeedUpdateStep(stepObj, verbose)
-        }
-        else {
-            // Once we come across a step that hasn't been run/seeded or failed on it's last run, mark newStepToApply as true.
+        } else {
+            // Once we come across a step that hasn't been run/seeded or failed on its last run, mark newStepToApply as true.
             // This indicates that we should run all subsequent steps, regardless of their current status
             if 'newStepToApply && ('stepObj.TimeStampEnd || $$$ISERR(stepObj.Status)) {
                 set newStepToApply = 1
