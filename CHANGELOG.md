@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.4] - Unreleased
+
+### Fixed
+- #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
+- #899: Fixed CLI parser so that defined modifier values are read correctly
+- #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers
+
+### Added
+- #550: Add a new "update" command and framework to support in-place module updates
+
 ## [0.10.3] - Unreleased
 
 ### Fixed
