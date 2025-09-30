@@ -80,6 +80,9 @@ Method TestAllNoErrorModulesNoMirror()
   set updateStepsToRun = [["UpdateSeededStepErrors.UpdatePackage.V2", "MethodA", 1]]
   do ..SingleNormalUpdateTest(..#ModuleSeededStepErrors, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
   do ..CleanUpModule(..#ModuleSeededStepErrors)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestAllErrorModulesNoMirror()
@@ -99,6 +102,9 @@ Method TestAllErrorModulesNoMirror()
   set updateStepsToSeed = [["UpdateDepInvokeErrors.UpdatePackage.V1", "MethodA", 0], ["UpdateInvokeErrors.UpdatePackage.V1", "MethodA", 0]]
   do ..SingleFailedUpdateTest(..#ModuleDepInvokeErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
   do ..CleanUpModule(..#ModuleDepInvokeErrors)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateNonMatchingTarballFails()
@@ -118,8 +124,10 @@ Method TestUpdateNonMatchingTarballFails()
   do $$$AssertStatusNotOK(sc, "Attempting to update module "_moduleToUpdate_" FAILED because the module in the path provided does not match the module to update.")
 
   do ..CleanUpModule(moduleToUpdate)
-  do ..CleanUpModule(moduleToPackage)
   do ..CleanUpDirectory(exportDir)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateAfterInterruptedUpdate()
@@ -148,6 +156,9 @@ Method TestUpdateAfterInterruptedUpdate()
 
   // Assert it completed
   do ..CleanUpModule(..#ModuleNoDependencies)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestModuleUpdateStepAdded()
@@ -168,6 +179,9 @@ Method TestModuleUpdateStepAdded()
 
   do ..SingleNormalUpdateNewStepTest(..#ModuleStepAddedCurrVersion, updateStepsToSeed, seededUpdateStepsToRun, [], updateStepsToRun, ..#ModuleOneVersion, ..#ModuleOneVersionMinorBump)
   do ..CleanUpModule(..#ModuleStepAddedCurrVersion)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateOfUninstalledModule()
@@ -181,6 +195,9 @@ Method TestUpdateOfUninstalledModule()
   // Update non-existent module
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
   do $$$AssertStatusNotOK(sc, "Update of uninstalled module "_..#ModuleNoDependencies_" version "_..#ModuleOneVersion_" failed.")
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateToOlderVersion()
@@ -194,6 +211,9 @@ Method TestUpdateToOlderVersion()
   do $$$AssertTrue((sc [ "version"), "Error message is descriptive and correctly mentions 'version'")
 
   do ..CleanUpModule(..#ModuleNoDependencies)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateToInvalidVersion()
@@ -206,6 +226,9 @@ Method TestUpdateToInvalidVersion()
   do $$$AssertStatusNotOK(sc, "Attempt at updating module to non-existent version failed.")
 
   do ..CleanUpModule(..#ModuleNoDependencies)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateToNewVersionTwice()
@@ -222,6 +245,9 @@ Method TestUpdateToNewVersionTwice()
   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleThreeVersion_" without error")
 
   do ..CleanUpModule(..#ModuleNoDependencies)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateToSameVersionTwiceNoMirror()
@@ -273,6 +299,9 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   do $$$AssertEquals(twoCEnd, stepTwoC.TimeStampEnd)
 
   do ..CleanUpModule(..#ModuleNoDependencies)
+
+  do ##class(%IPM.Main).GetListModules($namespace,,.list)
+  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 /// ///////////////////////////////////////////// HELPER METHODS ////////////////////////////////////////////////
