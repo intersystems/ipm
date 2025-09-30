@@ -822,48 +822,48 @@ ClassMethod UninstallAll(
 {
   set tSC = $$$OK
   try {
-    // Get all dependency graphs for the namespace.
-    set tSC = ..BuildAllDependencyGraphs(,.tGraphs,.errorList)
-    $$$ThrowOnError(tSC)
-    if ($get(errorList,0) > 0) && pForce {
-      // If forcing uninstallation of everything and dependency resolution has failed,
-      // brute force uninstall everything anyway
-      do ##class(%IPM.Main).GetListModules(,,.list)
-      for i = 1:1:list {
-        set moduleName = $listget(list(i), 1)
-        if moduleName = $$$IPMModuleName {
-          // don't uninstall IPM itself
-          continue
-        }
+    // Build simple dependency graph for all installed modules based on
+    //  1) the list of all installed modules
+    //  2) dependencies as listed in %IPM.Storage.Module.Dependencies
+    // tModuleNames(moduleName) = "" for all modules
+    // tModuleNames(dependency,moduleName) = "" if moduleName depends on dependency
+    // tDependsOn(moduleName,dependency) = "" if moduleName depends on dependency
+    // this is not recursive, so if A depends on B and B depends on C, neither tModulesNames(C,A) nor tDependsOn(A,C) are set
 
-        write !,"Uninstalling ",moduleName
-        set tOneSC = ##class(%IPM.Storage.Module).Uninstall(moduleName,pForce,,.tParams)
-        if $$$ISERR(tOneSC) {
-          write !,"Error uninstalling ",moduleName,": ",$system.Status.GetErrorText(tOneSC)
-          set tSC = $system.Status.AppendStatus(tSC,tOneSC)
-          set tFailedModules(moduleName) = ""
-        }
-      }
-      quit
+    set depRes = ##class(%SQL.Statement).%ExecDirect(,
+      "select ModuleItem->Name ModName,Dependencies_Name DepName "_
+      "from %IPM_Storage.ModuleItem_Dependencies")
+    $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+    while depRes.%Next(.sc) {
+      $$$ThrowOnError(sc)
+      set modName = depRes.%Get("ModName")
+      set depName = depRes.%Get("DepName")
+      set tModuleNames(depName, modName) = ""
+      set tDependsOn(modName, depName) = ""
+    }
+    $$$ThrowOnError(sc)
+
+    // Get list of all installed modules
+    do ##class(%IPM.Main).GetListModules(,,.modList)
+    for i = 1:1:modList {
+      set name = $listget(modList(i),1)
+      set simpleModList(name) = ""
+      // list of modules must be from here because modules without dependencies won't appear in %IPM_Storage.ModuleItem_Dependencies
+      set tModuleNames(name) = ""
     }
 
-    // Build arrays mapping dependencies in both directions.
-    // Doesn't need to be recursive.
-    for tIndex=1:1:$get(tGraphs) {
-      set tModuleName = $listget(tGraphs(tIndex),2)
-      set tModuleNames(tModuleName) = ""
-      set tDependency = ""
-      for {
-        set tDependency = $order(tGraphs(tIndex,tDependency),1,tData)
-        if (tDependency = "") {
-          quit
+    // Iterate through list of modules to uninstall, removing any that are missing
+    set module = ""
+    for {
+      set module = $order(tModuleNames(module))
+      if (module = "") {
+        quit
+      }
+      if '$data(simpleModList(module)) {
+        if $get(pParams("Verbose")) {
+          write !,"WARNING: module ",module," is missing, skipping uninstall",!
         }
-        if ($listget(tData,2) '= "") {
-          // This is not actually installed locally.
-          continue
-        }
-        set tDependsOn(tModuleName,tDependency) = ""
-        set tModuleNames(tDependency,tModuleName) = ""
+        kill tModuleNames(module)
       }
     }
 
