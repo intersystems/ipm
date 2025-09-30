@@ -1,37 +1,68 @@
-Class %IPM.General.SemanticVersionExpression Extends (%SerialObject, %XML.Adaptor) [ StorageStrategy = "" ]
+Class %IPM.General.SemanticVersionExpression Extends (%SerialObject, %XML.Adaptor, %IPM.General.SemanticVersionExpression.IComparable) [ StorageStrategy = "" ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVerExpression";
 
-Property Options As list Of %IPM.General.SemanticVersionExpression.Range;
+/// List of semantic version expressions to provide support for ||
+Property AnyOf As list Of %IPM.General.SemanticVersionExpression.IComparable(CLASSNAME = 1);
 
+/// Used to combine multiple semantic version expressions with "&&" when doing dependency resolution
+Property AllOf As list Of %IPM.General.SemanticVersionExpression.IComparable(CLASSNAME = 1);
+
+/// String representation of this SemVer expression composed of the AnyOf and AllOf lists
+/// Parentheses are not used in parsing but are merely stylistic
 Property Expression As %String(MAXLEN = "");
 
-Method %OnNew(pRangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(rangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
 {
-    set i%Expression = pRangeExpr
-    quit $$$OK
+  set i%Expression = rangeExpr
+  quit $$$OK
 }
 
-Method ExpressionSet(pValue As %String) As %Status
+Method ExpressionSet(value As %String) As %Status
 {
-    set tSC = $$$OK
-    try {
-        set tOptions = $listfromstring(pValue,"||")
-        set tPtr = 0
-        while $listnext(tOptions,tPtr,tRangeExpr) {
-            set tRangeExpr = $zstrip(tRangeExpr,"<>W")
-            set tSC = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(tRangeExpr,.tOption)
-            if $$$ISERR(tSC) {
-                quit
-            }
-            do ..Options.Insert(tOption)
+  // An instance of this class can only either have items in AnyOf or AllOf, not both
+  if ..AllOf.Count() {
+    quit $$$ERROR($$$GeneralError,$$$FormatText("This instance of SemanticVersionExpression already has an AND operator and cannot be set"))
+  }
+  set status = $$$OK
+  try {
+    if value["&&" {
+      set reqs = $listfromstring(value,"&&")
+      set ptr = 0
+      while $listnext(reqs,ptr,rangeExpr) {
+        set rangeExpr = $zstrip(rangeExpr,"<>W")
+        set rangeExpr = $zstrip(rangeExpr, "*", "()")
+        set status = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
+        if $$$ISERR(status) {
+          quit
         }
-        set i%Expression = pValue
-    } catch e {
-        set tSC = e.AsStatus()
+        if option.ToResolvedString() = "" {
+          continue
+        }
+        do ..AllOf.Insert(option)
+      }
+    } else {
+      set options = $listfromstring(value,"||")
+      set ptr = 0
+      while $listnext(options,ptr,rangeExpr) {
+        set rangeExpr = $zstrip(rangeExpr,"<>W")
+        set rangeExpr = $zstrip(rangeExpr, "*", "()")
+        set status = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
+        if $$$ISERR(status) {
+          quit
+        }
+        if option.ToResolvedString() = "" {
+          continue
+        }
+        do ..AnyOf.Insert(option)
+      }
     }
-    quit tSC
+    set i%Expression = value
+  } catch e {
+    set status = e.AsStatus()
+  }
+  quit status
 }
 
 Method ToString() As %String [ CodeMode = expression ]
@@ -41,74 +72,110 @@ Method ToString() As %String [ CodeMode = expression ]
 
 Method ToResolvedString() As %String
 {
-    set tOptList = ""
-    for i=1:1:..Options.Count() {
-        set tOpt = ..Options.GetAt(i)
-        set tOptList = tOptList_$listbuild(tOpt.ToResolvedString())
+  set optList = ""
+  if ..AnyOf.Count() {
+    for i=1:1:..AnyOf.Count() {
+      set opt = ..AnyOf.GetAt(i)
+      set resolvedString = opt.ToResolvedString()
+      if ..AnyOf.Count() > 1 {
+        set optList = optList_$listbuild("(" _ resolvedString _ ")")
+      } else {
+        set optList = optList_$listbuild(resolvedString)
+      }
     }
-    quit $listtostring(tOptList," || ")
+    quit $listtostring(optList," || ")
+  }
+  if ..AllOf.Count() {
+    for i=1:1:..AllOf.Count() {
+      set opt = ..AllOf.GetAt(i)
+      set resolvedString = opt.ToResolvedString()
+      if ..AllOf.Count() > 1 {
+        set optList = optList_$listbuild("(" _ resolvedString _ ")")
+      } else {
+        set optList = optList_$listbuild(resolvedString)
+      }
+    }
+    quit $listtostring(optList," && ")
+  }
+  quit ""
 }
 
 ClassMethod FromString(
-	pString As %String,
-	Output pExpr As %IPM.General.SemanticVersionExpression) As %Status
+	string As %String,
+	Output expr As %IPM.General.SemanticVersionExpression) As %Status
 {
-    set tSC = $$$OK
-    try {
-        set pExpr = ..%New(pString)
-        set tOptions = $listfromstring(pString,"||")
-        set tPtr = 0
-        while $listnext(tOptions,tPtr,tRangeExpr) {
-            set tRangeExpr = $zstrip(tRangeExpr,"<>W")
-            set tSC = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(tRangeExpr,.tOption)
-            if $$$ISERR(tSC) {
-                quit
-            }
-            do pExpr.Options.Insert(tOption)
-        }
-    } catch e {
-        set tSC = e.AsStatus()
-    }
-    quit tSC
+  set status = $$$OK
+  try {
+      set expr = ..%New(string)
+      set status = expr.ExpressionSet(string)
+  } catch e {
+      set status = e.AsStatus()
+  }
+  quit status
 }
 
-Method IsSatisfiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean
+Method IsSatisfiedBy(version As %IPM.General.SemanticVersion) As %Boolean
 {
-    set tSatisfied = (..Options.Count() = 0)
-    for i=1:1:..Options.Count() {
-        if ..Options.GetAt(i).InRange(pVersion) {
-            set tSatisfied = 1
-            quit
-        }
+  set satisfied = (..AnyOf.Count() = 0)
+  for i=1:1:..AnyOf.Count() {
+    if ..AnyOf.GetAt(i).IsSatisfiedBy(version) {
+      set satisfied = 1
+      quit
     }
-    quit tSatisfied
+  }
+
+  set allSatisfied = 1
+  for i=1:1:..AllOf.Count() {
+    if '..AllOf.GetAt(i).IsSatisfiedBy(version) {
+      set allSatisfied = 0
+      quit
+    }
+  }
+
+  quit satisfied && allSatisfied
 }
 
-Method And(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
+Method And(versionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
-    for i=1:1:pVersionExpression.Options.Count() {
-        set tOption = pVersionExpression.Options.GetAt(i)
-        if (..Options.Count() = 0) {
-            do ..Options.Insert(tOption)
-        } else {
-            for j=1:1:..Options.Count() {
-                for k=1:1:tOption.Comparators.Count() {
-                    do ..Options.GetAt(j).Comparators.Insert(tOption.Comparators.GetAt(k))
-                }
-            }
-        }
-    }
+  if versionExpression.Expression '= "" {
+    set expr1 = ..%ConstructClone()
+    do ..AnyOf.Clear()
+    do ..AllOf.Clear()
+    do ..AllOf.Insert(expr1)
+    do ..AllOf.Insert(versionExpression)
     set i%Expression = ..ToResolvedString()
-    quit $this
+  }
+  quit $this
 }
 
-Method Or(pVersionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
+Method Or(versionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
-    for i=1:1:pVersionExpression.Options.Count() {
-        do ..Options.Insert(pVersionExpression.Options.GetAt(i))
-    }
+  if versionExpression.Expression '= "" {
+    set expr1 = ..%ConstructClone()
+    do ..AnyOf.Clear()
+    do ..AllOf.Clear()
+    do ..AnyOf.Insert(expr1)
+    do ..AnyOf.Insert(versionExpression)
     set i%Expression = ..ToResolvedString()
-    quit $this
+  }
+	quit $this
+}
+
+Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
+{
+  // On-the-fly data migration to tack on list-of-serial CLASSNAME=1 with default classname of %IPM.General.SemanticVersionExpression.Range
+  set key = ""
+  for {
+    set key = $order(i%AnyOf(key),1,data)
+    if key="" {
+      quit
+    }
+    if $listlength(data) = 1 {
+      set $list(data,2) = "%IPM.General.SemanticVersionExpression.Range"
+    }
+    set i%AnyOf(key) = data
+  }
+  quit $$$OK
 }
 
 Storage Default
@@ -118,7 +185,10 @@ Storage Default
 <Value>Expression</Value>
 </Value>
 <Value name="2">
-<Value>Options</Value>
+<Value>AnyOf</Value>
+</Value>
+<Value name="3">
+<Value>AllOf</Value>
 </Value>
 </Data>
 <State>SemanticVersionExpressionState</State>

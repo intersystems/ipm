@@ -80,6 +80,10 @@ Method %PrepareDeploy(ByRef pParams) As %Status
         set pParams("InitNamespace") = $namespace
 
         set tNSPostfix = "PACKAGE-" _ $piece($zhorolog, ".")
+        set sysReqs = ..Module.SystemRequirements
+        if $isobject(sysReqs) && (sysReqs.Interoperability = "enabled") {
+            set tNSConfig.EnableEnsemble = 1
+        }
         set tSC = ##class(%IPM.Utils.Build).InitializeNamespace(tNSPostfix, tVerbose, .tPackageDeployNamespace, tNSConfig)
         $$$ThrowOnError(tSC)
         set pParams("PackageDeployNamespace") = tPackageDeployNamespace

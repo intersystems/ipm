@@ -2542,8 +2542,8 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
         $$$ThrowSQLIfError(tDepRes.%SQLCODE, tDepRes.%Message)
         while tDepRes.%Next(.tSC) {
             $$$ThrowOnError(tSC)
-            set tModMap(tDepRes.%Get("ModName"),tDepRes.%Get("DepName")) = tDepRes.%Get("DepVer")
-            set tVisitedMap(tDepRes.%Get("DepName")) = 1
+            set tModMap($zconvert(tDepRes.%Get("ModName"),"l"),$zconvert(tDepRes.%Get("DepName"),"l")) = tDepRes.%Get("DepVer")
+            set tVisitedMap($zconvert(tDepRes.%Get("DepName"),"l")) = 1
         }
         $$$ThrowOnError(tSC)
 
@@ -2601,7 +2601,7 @@ ClassMethod GetListModule(
     set in=""
     while tRes.%Next(.tSC) {
         $$$ThrowOnError(tSC)
-        set name=tRes.%Get("DisplayName")
+        set name=$zconvert(tRes.%Get("DisplayName"),"l")
         set in=in_"'"_name_"',"
         set list=$listbuild(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
         for a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
@@ -3772,59 +3772,57 @@ ClassMethod GetUpstreamPackageVersions(Output list)
     }
 }
 
+/// Provides information on all installed top level modules (i.e. modules that are not depended on)
 ClassMethod Information(ByRef pCommandInfo)
 {
-    set verbose = $$$HasModifier(pCommandInfo,"verbose")
-    // Get all dependency modules
-    $$$ThrowOnError(##class(%IPM.Utils.Module).BuildAllDependencyGraphs(, .graph))
-    set sub = ""
-    for {
-        set sub = $order(graph(sub))
-        if (sub = "") {
-            quit
-        }
-        set dep= ""
-        for {
-            set dep = $order(graph(sub, dep))
-            if (dep = "") {
-                quit
-            }
-            set dependencies(dep) = ""
-        }
-    }
+  set verbose = $$$HasModifier(pCommandInfo,"verbose")
+  // Figure out which installed modules are not dependencies by
+  // 1) getting list of all installed modules
+  // 2) getting list of all dependencies
+  // and 3) cross checking the two lists
+  do ..GetListModules(,,.modList)
+  set depRes = ##class(%SQL.Statement).%ExecDirect(,
+    "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
+    "from %IPM_Storage.ModuleItem_Dependencies")
+  $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+  while depRes.%Next(.sc) {
+    $$$ThrowOnError(sc)
+    set visited($zconvert(depRes.%Get("DepName"),"l")) = 1
+  }
+  $$$ThrowOnError(sc)
 
-    set messages = ..BuildIntroMessages(.outOfBoxMessage)
-    set messages = messages _ $listbuild(outOfBoxMessage)
-    set ptr = 0
-    while $listnext(messages, ptr, line) {
-        write !, line
+  set topLevelList("width") = 0
+  for i = 1:1:modList {
+    set entry = modList(i)
+    set name = $listget(entry, 1)
+    // only list non-dependencies
+    if '$data(visited(name)) {
+      // compile information
+      set externalName = $list(entry, 3)
+      if (externalName '= "") && (externalName '= name) {
+        if verbose {
+          set $list(entry, 1) = externalName_" (" _ name _ ")"
+        } else {
+          set $list(entry, 1) = externalName
+        }
+      }
+      if topLevelList("width") < $length($listget(entry)) {
+        set topLevelList("width") = $length($listget(entry))
+      }
+      set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
+      set $list(entry, 2) = version.ToStringWithoutBuild()
+      set topLevelList($increment(topLevelList)) = entry
     }
-    write !!, "Currently installed top-level modules are listed below:", !
-    do ..GetListModules(,,.list)
-    set updatedList("width") = 0
-    for i = 1:1:list {
-        set entry = list(i)
-        set name = $listget(entry, 1)
-        // only list non-dependencies
-        if $data(dependencies(name)) {
-            continue
-        }
-        set externalName = $list(entry, 3)
-        if (externalName '= "") && (externalName '= name) {
-            if verbose {
-                set $list(entry, 1) = externalName_" (" _ name _ ")"
-            } else {
-                set $list(entry, 1) = externalName
-            }
-        }
-        if updatedList("width") < $length($listget(entry)) {
-            set updatedList("width") = $length($listget(entry))
-        }
-        set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
-        set $list(entry, 2) = version.ToStringWithoutBuild()
-        set updatedList($increment(updatedList)) = entry
-    }
-    do ..DisplayModules(.updatedList)
+  }
+
+  set messages = ..BuildIntroMessages(.outOfBoxMessage)
+  set messages = messages _ $listbuild(outOfBoxMessage)
+  set ptr = 0
+  while $listnext(messages, ptr, line) {
+    write !, line
+  }
+  write !!, "Currently installed top-level modules are listed below:", !
+  do ..DisplayModules(.topLevelList)
 }
 
 ClassMethod Update(ByRef pCommandInfo)

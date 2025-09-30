@@ -8,22 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.11.0] - Unreleased
 
 ### Fixed
+- #899: Fixed CLI parser parses modifiers incorrectly
+- #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
+- #819: Drastically increase `zpm "info"` speed when many dependent packages have been installed
+- #888: Fixed `zpm "list -tree"` showing packages as `[missing]` because of case mismatch
 - #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
 - #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers (breaking change)
 
 ### Added
 - #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 
-## [0.10.3] - Unreleased
+## [0.10.3] - 2025-09-17
 
 ### Fixed
 - #829: Fixed export of resources with null Directory attribute
 - #832: Fixed places that export to possibly-nonexistent directories by adding /createdirs (needed in 2025.2+)
 - #823: Fixed selectively undeploying classes within a package
+- #820: Fixed `${packagename}` not working for FileCopy
+- #837: Fixed poorly formatted and unclear error message when Python wheel fails to install
+- #810: Fixed `<SystemRequirements Interoperability="enabled"/>` in module.xml not enabling interoperability for deployed code namespaces
+- #836: Fixed FileCopy (and other resource processors) not checking scope
+- #688: `uninstall -f -all` will no longer attempt to uninstall IPM
+- #839: SemVer expression "And" (as used in dependency resolution) fixed for complex ranges
 
 ### Changed
 - Format all files and add consistent formatting settings, format on save etc.
 - #848: Resource processing should be done in order of granularity
+- #779: Module parameters specified in `<Defaults>` in the module.xml are used when loading/installing the module and not just when the module itself runs its lifecycle phases
 
 ## [0.10.2] - 2025-06-04
 
