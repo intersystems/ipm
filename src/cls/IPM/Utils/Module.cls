@@ -1235,29 +1235,32 @@ ClassMethod LoadNewModule(
         }
 
         set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
-        #dim tInstallContext As %IPM.General.InstallContext
-        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
-        $$$ThrowOnError(tSC)
 
         set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
+        set toVersion = ""
+        set toVersionString = ""
         set fromVersion = ""
         set fromVersionString = ""
-        set moduleCurrent = ##class(%IPM.Storage.Module).NameOpen(newModuleObj.Name)
-        // Empty moduleCurrent implies there is no module currently installed with commandLineModuleName
+        set moduleCurrent = ""
+        if foundNewModuleObj {
+            set toVersion = newModuleObj.Version
+            set toVersionString = newModuleObj.VersionString
+            // Cannot simply get name from pParams because load command doesn't take in module name
+            set moduleCurrent = ##class(%IPM.Storage.Module).NameOpen(newModuleObj.Name)
+        }
         if moduleCurrent '= "" {
             set fromVersion = moduleCurrent.Version
             set fromVersionString = moduleCurrent.VersionString
         }
-        if foundNewModuleObj && 'tInstallContext.ModuleIsDependency(newModuleObj.Name) {
-            // Check that on an update command with -path flag, the module in the path matches the base module specified for update.
-            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
-              set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
-              $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+        if (fromVersion '= "") && (toVersion '= "") {
+            if fromVersion.Follows(toVersion) {
+                set msg = $$$FormatText("Cannot downgrade %1 from version %2 to %3. To downgrade a module, you must first run the uninstall command. Then, run the install or load command with the desired module version.",newModuleObj.Name,fromVersionString,toVersionString)
+                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
-            // Check that the module currently installed is not being downgraded.
-            // Check that the load or install command is not being used to update a module, unless the -force flag is passed or if there is no UpdatePackage defined in the new module.
-            if fromVersion '= "" {
-                do ..CheckOperationVersionValidity(newModuleObj, fromVersion, fromVersionString, .pParams)
+            set cmd = $get(pParams("cmd"))
+            if ((cmd = "install") || (cmd = "load")) && '$get(pParams("Force"),0) && '$get(pParams("DeveloperMode"),0) && (toVersion.Follows(fromVersion)) && (newModuleObj.UpdatePackage '= "") {
+                set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.", newModuleObj.Name, fromVersionString, toVersionString)
+                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
         }
 
@@ -1279,6 +1282,18 @@ ClassMethod LoadNewModule(
 
         set tDisplayName = $piece(tFirstLoaded, ".", 1, *-1)
         set tModuleName = $$$lcase(tDisplayName)
+
+        #dim tInstallContext As %IPM.General.InstallContext
+        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
+        $$$ThrowOnError(tSC)
+
+        if foundNewModuleObj && 'tInstallContext.ModuleIsDependency(tModuleName) {
+            // Check that on an update command with -path flag, the module in the path matches the base module specified for update.
+            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
+              set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
+              $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            }
+        }
 
         if ($get(pParams("NoJournal"),0) '= 0) {
             // Disable journalling with process-level switch.
@@ -1380,28 +1395,6 @@ ClassMethod LoadNewModule(
         trollback 1
     }
     quit tSC
-}
-
-/// Check whether an install, load, or update from a currently installed module to a different version of that module is a valid operation.
-ClassMethod CheckOperationVersionValidity(
-	newModule As %IPM.Storage.Module,
-	fromVersion As %IPM.General.SemanticVersion,
-	fromVersionString As %String,
-	ByRef params) [ Internal ]
-{
-    set toVersion = newModule.Version
-    set toVersionString = newModule.VersionString
-    set moduleName = newModule.Name
-    // If the version of the module about to be installed is OLDER than the module that is already installed
-    if fromVersion.Follows(toVersion) {
-        set msg = $$$FormatText("Cannot downgrade %1 from version %2 to %3. To downgrade a module, you must first run the uninstall command. Then, run the install or load command with the desired module version.",moduleName,fromVersionString,toVersionString)
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-    }
-    set cmd = $get(params("cmd"))
-    if ((cmd = "install") || (cmd = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) && (toVersion.Follows(fromVersion)) && (newModule.UpdatePackage '= "") {
-        set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.", moduleName, fromVersionString, toVersionString)
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-    }
 }
 
 /// Temporary workaround to synchronously load dependencies. Can be removed once
