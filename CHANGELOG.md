@@ -5,13 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.4] - Unreleased
+## [0.11.0] - Unreleased
 
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
 - #819: Drastically increase `zpm "info"` speed when many dependent packages have been installed
 - #888: Fixed `zpm "list -tree"` showing packages as `[missing]` because of case mismatch
+- #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
+- #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers (breaking change)
+
+### Added
+- #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 
 ## [0.10.3] - 2025-09-17
 

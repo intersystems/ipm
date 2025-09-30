@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="update-no-steps.ZPM">
+    <Module>
+      <Name>update-no-steps</Name>
+      <Version>2.1.1</Version>
+      <Resource Name="UpdateNoStepsPackage.PKG" />
+      <UpdatePackage>UpdateNoStepsPackage</UpdatePackage>
+    </Module>
+  </Document>
+</Export>
