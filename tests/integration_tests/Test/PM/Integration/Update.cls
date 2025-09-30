@@ -69,7 +69,7 @@ Method TestAllNoErrorModulesNoMirror()
   set updateStepsToRun = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsRemoved.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodB", 0]]
   do ..SingleNormalUpdateTest(..#ModuleWithDependenciesRemoved, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
   do ..CleanUpModule(..#ModuleWithDependenciesRemoved)
-  do ..CleanUpModule(..#ModuleWithDependencies)
+  do ..CleanUpModule(..#ModuleNoDependencies)
 
   // Module with no update steps
   do ..SingleNormalUpdateTest(..#ModuleNoUpdateSteps, [], [], ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
@@ -118,6 +118,7 @@ Method TestUpdateNonMatchingTarballFails()
   do $$$AssertStatusNotOK(sc, "Attempting to update module "_moduleToUpdate_" FAILED because the module in the path provided does not match the module to update.")
 
   do ..CleanUpModule(moduleToUpdate)
+  do ..CleanUpModule(moduleToPackage)
   do ..CleanUpDirectory(exportDir)
 }
 
