@@ -255,46 +255,46 @@ Method CheckBeforeClean(
 	ByRef pParams,
 	Output pSkip As %Boolean = 0) As %Status
 {
-  set tSC = $$$OK
-  try {
-    set tVerbose = $get(pParams("Verbose"))
-    set tLevel = $get(pParams("Clean","Level"),0)
-    set tRecurse = $get(pParams("Clean","Recurse"),1)
+    set tSC = $$$OK
+    try {
+        set tVerbose = $get(pParams("Verbose"))
+        set tLevel = $get(pParams("Clean","Level"),0)
+        set tRecurse = $get(pParams("Clean","Recurse"),1)
 
-    if (..Module.GlobalScope && '$get(pParams("Clean","GlobalScope"))) {
-      do ..Log("Clean SKIPPED - module has global scope.")
-      set pSkip = 1
-      quit
-    }
-
-    if '$get(pParams("Clean","Force")) {
-      // Check to see if anything depends on this module and return an error status if it does.
-      set tSC = ##class(%IPM.Utils.Module).GetDependentsList(.tList,,..Module.Name)
-      if $$$ISERR(tSC) {
-        quit
-      }
-
-      set tModList = ""
-      for i=1:1:tList.Count() {
-        set tName = tList.GetAt(i).Name
-        if '$data(pParams("Clean","Cycle",tName)) {
-          set tModList = tModList_$listbuild(tName)
+        if (..Module.GlobalScope && '$get(pParams("Clean","GlobalScope"))) {
+            do ..Log("Clean SKIPPED - module has global scope.")
+            set pSkip = 1
+            quit
         }
-      }
 
-      if ($listlength(tModList) > 0) && (tLevel > 0) {
-        do ..Log("Clean SKIPPED - required by " _ $listlength(tModList) _ " other module" _ $case($listlength(tModList),1:"",:"s") _ ". (" _ $listtostring(tModList,"; ") _ ")")
-        set pSkip = 1
-        quit
-      }
+        if '$get(pParams("Clean","Force")) {
+            // Check to see if anything depends on this module and return an error status if it does.
+            set tSC = ##class(%IPM.Utils.Module).GetDependentsList(.tList,,..Module.Name)
+            if $$$ISERR(tSC) {
+                quit
+            }
+
+            set tModList = ""
+            for i=1:1:tList.Count() {
+                set tName = tList.GetAt(i).Name
+                if '$data(pParams("Clean","Cycle",tName)) {
+                    set tModList = tModList_$listbuild(tName)
+                }
+            }
+
+            if ($listlength(tModList) > 0) && (tLevel > 0) {
+                do ..Log("Clean SKIPPED - required by " _ $listlength(tModList) _ " other module" _ $case($listlength(tModList),1:"",:"s") _ ". (" _ $listtostring(tModList,"; ") _ ")")
+                set pSkip = 1
+                quit
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
     }
-  } catch e {
-    set tSC = e.AsStatus()
-  }
-  if pSkip {
-    set pParams("Clean","Skip",..Module.Name) = ""
-  }
-  quit tSC
+    if pSkip {
+        set pParams("Clean","Skip",..Module.Name) = ""
+    }
+    quit tSC
 }
 
 Method %Clean(ByRef pParams) As %Status

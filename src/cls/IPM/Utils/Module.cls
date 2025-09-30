@@ -820,121 +820,121 @@ ClassMethod UninstallAll(
 	pForce As %Boolean,
 	ByRef pParams) As %Status
 {
-  set tSC = $$$OK
-  try {
-    // Build simple dependency graph for all installed modules based on
-    //  1) the list of all installed modules
-    //  2) dependencies as listed in %IPM.Storage.Module.Dependencies
-    // tModuleNames(moduleName) = "" for all modules
-    // tModuleNames(dependency,moduleName) = "" if moduleName depends on dependency
-    // tDependsOn(moduleName,dependency) = "" if moduleName depends on dependency
-    // this is not recursive, so if A depends on B and B depends on C, neither tModulesNames(C,A) nor tDependsOn(A,C) are set
+    set tSC = $$$OK
+    try {
+        // Build simple dependency graph for all installed modules based on
+        //  1) the list of all installed modules
+        //  2) dependencies as listed in %IPM.Storage.Module.Dependencies
+        // tModuleNames(moduleName) = "" for all modules
+        // tModuleNames(dependency,moduleName) = "" if moduleName depends on dependency
+        // tDependsOn(moduleName,dependency) = "" if moduleName depends on dependency
+        // this is not recursive, so if A depends on B and B depends on C, neither tModulesNames(C,A) nor tDependsOn(A,C) are set
 
-    set depRes = ##class(%SQL.Statement).%ExecDirect(,
-      "select ModuleItem->Name ModName,Dependencies_Name DepName "_
-      "from %IPM_Storage.ModuleItem_Dependencies")
-    $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
-    while depRes.%Next(.sc) {
-      $$$ThrowOnError(sc)
-      set modName = depRes.%Get("ModName")
-      set depName = depRes.%Get("DepName")
-      set tModuleNames(depName, modName) = ""
-      set tDependsOn(modName, depName) = ""
-    }
-    $$$ThrowOnError(sc)
-
-    // Get list of all installed modules
-    do ##class(%IPM.Main).GetListModules(,,.modList)
-    for i = 1:1:modList {
-      set name = $listget(modList(i),1)
-      set simpleModList(name) = ""
-      // list of modules must be from here because modules without dependencies won't appear in %IPM_Storage.ModuleItem_Dependencies
-      set tModuleNames(name) = ""
-    }
-
-    // Iterate through list of modules to uninstall, removing any that are missing
-    set module = ""
-    for {
-      set module = $order(tModuleNames(module))
-      if (module = "") {
-        quit
-      }
-      if '$data(simpleModList(module)) {
-        if $get(pParams("Verbose")) {
-          write !,"WARNING: module ",module," is missing, skipping uninstall",!
+        set depRes = ##class(%SQL.Statement).%ExecDirect(,
+            "select ModuleItem->Name ModName,Dependencies_Name DepName "_
+            "from %IPM_Storage.ModuleItem_Dependencies")
+        $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+        while depRes.%Next(.sc) {
+            $$$ThrowOnError(sc)
+            set modName = depRes.%Get("ModName")
+            set depName = depRes.%Get("DepName")
+            set tModuleNames(depName, modName) = ""
+            set tDependsOn(modName, depName) = ""
         }
-        kill tModuleNames(module)
-      }
-    }
+        $$$ThrowOnError(sc)
 
-    set tProgressMade = 1
-    for {
-      if '$data(tModuleNames) {
-        quit
-      }
-      if 'tProgressMade {
-        set tFirstSC = $$$ERROR($$$GeneralError,"Unable to uninstall all modules.")
-        set tSC = $system.Status.AppendStatus(tFirstSC,tSC) // Append any previous errors (which may be causes or unrelated)
-        $$$ThrowStatus(tSC)
-      }
-      set tProgressMade = 0
-
-      // Loop over "dependents" array to delete each module that has nothing left that depends on it.
-      // If a module fails to uninstall, modules that it depends on will not be uninstalled, unless
-      // pForce is true.
-      set tModuleName = ""
-      for {
-        set tModuleName = $order(tModuleNames(tModuleName))
-        if (tModuleName = "") {
-          quit
+        // Get list of all installed modules
+        do ##class(%IPM.Main).GetListModules(,,.modList)
+        for i = 1:1:modList {
+            set name = $listget(modList(i),1)
+            set simpleModList(name) = ""
+            // list of modules must be from here because modules without dependencies won't appear in %IPM_Storage.ModuleItem_Dependencies
+            set tModuleNames(name) = ""
         }
 
-        if tModuleName = $$$IPMModuleName {
-          // don't uninstall IPM itself
-          kill tModuleNames(tModuleName)
-          continue
-        }
-
-        if ($data(tModuleNames(tModuleName)) > 1) {
-          // If there are dependencies left that have not been uninstalled yet, skip this module.
-          continue
-        }
-
-        if $data(tFailedModules(tModuleName)) {
-          // If we have already tried unsuccessfully to uninstall a given module, don't try again.
-          continue
-        }
-
-        kill tParams
-        merge tParams = pParams
-        write !,"Uninstalling ",tModuleName
-        set tOneSC = ##class(%IPM.Storage.Module).Uninstall(tModuleName,pForce,,.tParams)
-        if $$$ISOK(tOneSC) || pForce {
-          // If we are forcing uninstallation of everything that can be uninstalled,
-          // treat the module in question as uninstalled even if something went fatally wrong.
-          set tDependentModule = ""
-          for {
-            set tDependentModule = $order(tDependsOn(tModuleName,tDependentModule))
-            if (tDependentModule = "") {
+        // Iterate through list of modules to uninstall, removing any that are missing
+        set module = ""
+        for {
+            set module = $order(tModuleNames(module))
+            if (module = "") {
                 quit
             }
-            kill tModuleNames(tDependentModule,tModuleName)
-          }
-          kill tDependsOn(tModuleName)
-          kill tModuleNames(tModuleName)
-          set tProgressMade = 1
+            if '$data(simpleModList(module)) {
+                if $get(pParams("Verbose")) {
+                    write !,"WARNING: module ",module," is missing, skipping uninstall",!
+                }
+                kill tModuleNames(module)
+            }
         }
-        if $$$ISERR(tOneSC) {
-          write !,"Error uninstalling ",tModuleName,": ",$system.Status.GetErrorText(tOneSC)
-          set tSC = $system.Status.AppendStatus(tSC,tOneSC)
-          set tFailedModules(tModuleName) = ""
+
+        set tProgressMade = 1
+        for {
+            if '$data(tModuleNames) {
+                quit
+            }
+            if 'tProgressMade {
+                set tFirstSC = $$$ERROR($$$GeneralError,"Unable to uninstall all modules.")
+                set tSC = $system.Status.AppendStatus(tFirstSC,tSC) // Append any previous errors (which may be causes or unrelated)
+                $$$ThrowStatus(tSC)
+            }
+            set tProgressMade = 0
+
+            // Loop over "dependents" array to delete each module that has nothing left that depends on it.
+            // If a module fails to uninstall, modules that it depends on will not be uninstalled, unless
+            // pForce is true.
+            set tModuleName = ""
+            for {
+                set tModuleName = $order(tModuleNames(tModuleName))
+                if (tModuleName = "") {
+                    quit
+                }
+
+                if tModuleName = $$$IPMModuleName {
+                    // don't uninstall IPM itself
+                    kill tModuleNames(tModuleName)
+                    continue
+                }
+
+                if ($data(tModuleNames(tModuleName)) > 1) {
+                    // If there are dependencies left that have not been uninstalled yet, skip this module.
+                    continue
+                }
+
+                if $data(tFailedModules(tModuleName)) {
+                    // If we have already tried unsuccessfully to uninstall a given module, don't try again.
+                    continue
+                }
+
+                kill tParams
+                merge tParams = pParams
+                write !,"Uninstalling ",tModuleName
+                set tOneSC = ##class(%IPM.Storage.Module).Uninstall(tModuleName,pForce,,.tParams)
+                if $$$ISOK(tOneSC) || pForce {
+                    // If we are forcing uninstallation of everything that can be uninstalled,
+                    // treat the module in question as uninstalled even if something went fatally wrong.
+                    set tDependentModule = ""
+                    for {
+                        set tDependentModule = $order(tDependsOn(tModuleName,tDependentModule))
+                        if (tDependentModule = "") {
+                            quit
+                        }
+                        kill tModuleNames(tDependentModule,tModuleName)
+                    }
+                    kill tDependsOn(tModuleName)
+                    kill tModuleNames(tModuleName)
+                    set tProgressMade = 1
+                }
+                if $$$ISERR(tOneSC) {
+                    write !,"Error uninstalling ",tModuleName,": ",$system.Status.GetErrorText(tOneSC)
+                    set tSC = $system.Status.AppendStatus(tSC,tOneSC)
+                    set tFailedModules(tModuleName) = ""
+                }
+            }
         }
-      }
+    } catch e {
+        set tSC = e.AsStatus()
     }
-  } catch e {
-    set tSC = e.AsStatus()
-  }
-  quit tSC
+    quit tSC
 }
 
 /// If <var>pSnapshots</var> is empty, lists all modules.
