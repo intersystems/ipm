@@ -2272,8 +2272,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
                 set tParams("cmd") = "install"
                 set tParams("Install") = 1
             }
-            // Check that the module currently installed is not being downgraded. Also check that "install" is not being used to update a module, unless the -force flag is passed.
-            do ##class(%IPM.Utils.Module).CheckOperationVersionValidity(tResult,.tParams)
             if tResult.Deployed {
                 set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
                 set tResult.PlatformVersion = platformVersion

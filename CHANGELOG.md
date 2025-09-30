@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers
 
 ### Added
-- #550: Add a new "update" command and framework to support in-place module updates
+- #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 
 ## [0.10.3] - Unreleased
 

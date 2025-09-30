@@ -1,5 +1,5 @@
 /// Base class for UpdateStep storage objects with properties shared across all types
-Class %IPM.Storage.UpdateStep.Base Extends %Persistent [ NoExtent ]
+Class %IPM.Storage.UpdateStep.Base Extends %Persistent [ Abstract, NoExtent ]
 {
 
 /// Module update step class name
