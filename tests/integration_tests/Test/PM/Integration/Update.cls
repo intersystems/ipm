@@ -124,6 +124,7 @@ Method TestUpdateNonMatchingTarballFails()
   do $$$AssertStatusNotOK(sc, "Attempting to update module "_moduleToUpdate_" FAILED because the module in the path provided does not match the module to update.")
 
   do ..CleanUpModule(moduleToUpdate)
+  do ..CleanUpModule(moduleToPackage)
   do ..CleanUpDirectory(exportDir)
 
   do ##class(%IPM.Main).GetListModules($namespace,,.list)

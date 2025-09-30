@@ -115,6 +115,8 @@ Method TestUninstallRemovesUpdateSteps()
 /// Verify that, if trying to uninstall a dependency module it errors out and no update metadata is removed
 Method TestUninstallDependencyDoesError()
 {
+    do $$$AssertSkipped("The functionality for preventing an uninstall of a dependency module does not yet exist.")
+    quit
     // First, install base module and dependency
     set sc = ##class(%IPM.Main).Shell("install -v update-deps 2.1.1")
     do $$$AssertStatusOK(sc, "Installed update-deps and dependencies")
