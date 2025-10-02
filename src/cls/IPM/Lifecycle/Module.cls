@@ -74,6 +74,7 @@ Method %PrepareDeploy(ByRef pParams) As %Status
     try {
         set tVerbose = $get(pParams("Verbose"))
         merge tParams = pParams
+        set pParams("RootDirectory") = ..Module.Root
 
         set tNSConfig = ..Module.GetNamespaceConfig()
 

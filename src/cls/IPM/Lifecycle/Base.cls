@@ -584,7 +584,7 @@ Method %Reload(ByRef pParams) As %Status
         set tSkipScoped = 'tDeveloperMode
         set tVerbose = $get(pParams("Verbose"))
         set tRoot = $get(pParams("RootDirectory"))
-        if (tRoot = "") && (tDeveloperMode || ($get(pParams("PackageDeployNamespace")) '= "")) {
+        if (tRoot = "") && tDeveloperMode {
             set tRoot = ..Module.Root
         }
         do ..LoadEnvironmentConfig($get(pParams("EnvFiles")))
@@ -613,7 +613,7 @@ Method %Reload(ByRef pParams) As %Status
             set tSC = $$$ERROR($$$GeneralError,"Module name mismatch.") quit
         }
 
-        #; Reopen, usefull in Packaging deployed modules
+        #; Reopen, useful in Packaging deployed modules
         set ..Module = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
 
