@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="python-version-req-too-high.ZPM">
+    <Module>
+      <Name>python-version-req-too-high</Name>
+      <Version>0.0.1+snapshot</Version>
+      <Packaging>module</Packaging>
+      <SystemRequirements PythonVersion=">=9999.9999.9999"/>
+    </Module>
+  </Document>
+</Export>
