@@ -9,6 +9,8 @@ Parameter LuneReqsOnlineLocation = "lune-wheel-reqs-online";
 
 Parameter LuneReqsOfflineLocation = "lune-wheel-reqs-offline";
 
+Parameter LuneNoWheelReqsOfflineLocation = "lune-no-wheel-reqs-offline";
+
 /// The PythonWheel resource processor expects to install wheels from the dist directory, as opposed to source code
 ClassMethod GenerateWheel()
 {
@@ -141,6 +143,15 @@ Method TestWheelAndReqsPresentOffline()
     } catch ex {
         do $$$AssertFailure("Failed to import lune-wheel resource: "_ex.AsStatus())
     }
+}
+
+/// Testing case where Python wheel is not present and requirements.txt is present. System not connected to Internet.
+Method TestNoWheelAndReqsPresentOffline()
+{
+    do ..PurgePythonPackage("lune")
+    set dir = ..GetModuleDir("python-deps-tests", ..#LuneNoWheelReqsOfflineLocation)
+    set sc = ##class(%IPM.Main).Shell("load -v " _ dir)
+    do $$$AssertStatusNotOK(sc, "Failed to install lune-wheel resource")
 }
 
 }
