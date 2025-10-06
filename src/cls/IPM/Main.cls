@@ -2111,6 +2111,11 @@ ClassMethod LoadFromRepo(
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
+    if tDirectoryName = "" {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"No path has been specified."))
+    } elseif '##class(%File).Exists(tDirectoryName) && ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) '= tDirectoryName) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"The specified path must be absolute."))
+    }
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     merge tParams = pCommandInfo("data")
     set tParams("cmd") = "load"
