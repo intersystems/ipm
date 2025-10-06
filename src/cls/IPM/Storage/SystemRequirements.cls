@@ -25,6 +25,8 @@ Property Health As %Boolean(XMLPROJECTION = "ATTRIBUTE");
 
 Property IPMVersion As %String(MAXLEN = 256, XMLPROJECTION = "ATTRIBUTE");
 
+Property PythonVersion As %String(MAXLEN = 256, XMLPROJECTION = "ATTRIBUTE");
+
 Method CheckRequirements() As %Status
 {
     set tSC = $$$OK
@@ -32,6 +34,7 @@ Method CheckRequirements() As %Status
     set tSC = $system.Status.AppendStatus(tSC,..CheckInteroperability())
     set tSC = $system.Status.AppendStatus(tSC,..CheckHealth())
     set tSC = $system.Status.AppendStatus(tSC,..CheckIPMVersion())
+    set tSC = $system.Status.AppendStatus(tSC,..CheckPythonVersion())
     return tSC
 }
 
@@ -90,6 +93,25 @@ Method CheckIPMVersion() As %Status
     return $$$ERROR($$$GeneralError, "The module requires IPM version "_..IPMVersion_". Current IPM version is "_tVersion.ToString())
 }
 
+Method CheckPythonVersion() As %Status
+{
+    if ..PythonVersion = "" {
+        return $$$OK
+    }
+    set pythonVersion = ##class(%IPM.General.SemanticVersion).FromString(..GetPythonVersion())
+    $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(..PythonVersion,.requiredVersionExpression))
+    if pythonVersion.Satisfies(requiredVersionExpression) {
+        return $$$OK
+    }
+    return $$$ERROR($$$GeneralError, "The module requires Python version " _ ..PythonVersion _ ". Current Python version is " _ pythonVersion.ToString())
+}
+
+ClassMethod GetPythonVersion() [ Language = python ]
+{
+    import sys
+    return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+}
+
 ClassMethod IsHealthInstance() As %Boolean
 {
   set cls = "%ZHSLIB.HealthShareMgr", mthd = "IsHealthShareInstance"
@@ -124,6 +146,9 @@ Storage Default
 </Value>
 <Value name="7">
 <Value>IPMVersion</Value>
+</Value>
+<Value name="8">
+<Value>PythonVersion</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.SystemRequirementsD</DataLocation>
