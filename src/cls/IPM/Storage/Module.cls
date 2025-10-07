@@ -753,7 +753,7 @@ Method BuildDependencyGraph(
             // Build cumulative version requirement string
             #dim tSearchExpr As %IPM.General.SemanticVersionExpression
             set tSearchExpr = tDep.Version.%ConstructClone(1)
-            set tConstraintList = $listbuild(..Name_": "_tDep.VersionString)
+            set tConstraintList = $listbuild(..Name_" "_..VersionString_": "_tDep.VersionString)
             set tSourcePath = ""
             for {
                 set tSourcePath = $order(pDependencyGraph(tDep.Name,tSourcePath),1,tOtherReq)
