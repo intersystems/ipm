@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
 - #706: `load` now only accepts absolute paths
+- #563: The `verify` phase will uninstall all modules after every integration test
 
 ## [0.10.3] - 2025-09-17
 
