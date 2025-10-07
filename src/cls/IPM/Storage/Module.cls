@@ -1566,13 +1566,13 @@ Method %Compile(ByRef qstruct As %String) As %Status
 
 Method IsLocked() As %Boolean
 {
-    quit ($zconvert(..Version.Build,"L") '= "snapshot")
+    quit '..DeveloperMode
 }
 
 Method Lock() As %Status
 {
     if '..IsLocked() {
-        set ..Version.Build = ""
+        set ..DeveloperMode = 0
     }
     quit $$$OK
 }
