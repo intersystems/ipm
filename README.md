@@ -12,7 +12,7 @@ Helps to install ObjectScript classes and routines, globals, Embedded Python mod
 
 ## Installing the InterSystems Package Manager Client:
 
-The simplest way to install the latest version of IPM is to run the following ObjectScript snippet.
+The simplest way to install the latest version of IPM is to run the following ObjectScript snippet with a user that has the %ALL role.
 
 _In CI/CD scripts, for deterministic behavior, replace `version="latest"` with the specific IPM version desired._
 
@@ -51,22 +51,22 @@ zpm: USER>
 
 ## Compatibility Notes
 
-With the release of IPM v0.9.0 on December 2024, IPM is no longer mapped across namespaces. 
-This is an intentional change so that users can have different IPM versions and configurations in different namespaces. 
+With the release of IPM v0.9.0 on December 2024, IPM is no longer mapped across namespaces.
+This is an intentional change so that users can have different IPM versions and configurations in different namespaces.
 If you install IPM on an instance without the legacy 0.7.x version, IPM is only installed to the current namespace.
 
 * To retain the old behavior where %IPM routines and classes mapped across all namespaces, run `zpm "enable -map -globally`. This is automatically performed when upgrading from a legacy version and can be undone by running `zpm "unmap -globally"`.
 * You can optionally choose to map IPM repositories across namespaces with `zpm "enable -map -repos -namespaces NS1,NS2,NS3` or `zpm "enable -map -repos -globally`. Repositories are only mapped if %IPM classes and routines are also mapped from the same namespace.
 * As a convenience command, `zpm "enable -community"` will make IPM behave essentially the same as legacy versions (v0.7.x) by setting up the the community registry and maping %IPM routines and classes, as well IPM repository settings to all namespaces.
- 
+
 ## How to Install a ZPM Module:
 
 1. Call this command to open zpm shell:
-> USER> zpm  
+> USER> zpm
 
 2. See the list of available modules:
 > zpm: USER>repo -list-modules -n registry
->  
+>
 > deepseebuttons 0.1.7
 > dsw 2.1.35
 > holefoods 0.1.0
@@ -80,10 +80,10 @@ If you install IPM on an instance without the legacy 0.7.x version, IPM is only 
 > zpm 0.0.7
 
 3. You can load any module that resides in any of the defined repos into IRIS. E.g. here is the way to install webterminal:
-> zpm: USER> install webterminal  
+> zpm: USER> install webterminal
 
 ## To uninstall a module:
-> USER> zpm  
+> USER> zpm
 >
 > zpm: USER> uninstall webterminal
 
