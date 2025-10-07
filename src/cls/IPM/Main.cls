@@ -256,7 +256,7 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <!-- Modifiers -->
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set. In addition, transactions will not be rolled back if installation fails." />
 <modifier name="nodev" dataAlias="DeveloperMode" dataValue="0" description="Disables the DeveloperMode flag for the module's lifecycle." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
@@ -379,7 +379,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="latest" aliases="l" description="Installs the latest available version of this module without prompting the user." />
 <modifier name="prompt" aliases="p" description="Prompts user which version to install, if more then one found." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set. In addition, transactions will not be rolled back if installation fails." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
@@ -2111,6 +2111,11 @@ ClassMethod LoadFromRepo(
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
+    if tDirectoryName = "" {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"No path has been specified."))
+    } elseif '##class(%File).Exists(tDirectoryName) && ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) '= tDirectoryName) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"The specified path must be absolute."))
+    }
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     merge tParams = pCommandInfo("data")
     set tParams("cmd") = "load"

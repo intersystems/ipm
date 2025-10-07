@@ -18,9 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #888: Fixed `zpm "list -tree"` showing packages as `[missing]` because of case mismatch
 - #58: Prevent uninstallation of dependent module without `-force` flag
 - #908: Fix case where `uninstall -all` would fail because of incomplete dependency information
+- #363: `help load` and `help install` will now mention that setting the `dev` flag will not roll back transactions on failure
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
+- #706: `load` now only accepts absolute paths
 
 ## [0.10.3] - 2025-09-17
 
