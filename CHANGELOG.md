@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.11.0] - Unreleased
 
+### Added
+- #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
+- #909: IPM now warns when Python 3.13 or higher is installed (IRIS incompatibility)
+
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
