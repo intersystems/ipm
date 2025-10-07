@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="uninstall-f.ZPM">
+    <Module>
+      <Name>uninstall-f</Name>
+      <Version>0.0.1</Version>
+      <Packaging>module</Packaging>
+      <Dependencies>
+        <ModuleReference>
+          <Name>uninstall-a</Name>
+          <Version>0.0.1</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>uninstall-b</Name>
+          <Version>0.0.1</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>uninstall-e</Name>
+          <Version>0.0.1</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

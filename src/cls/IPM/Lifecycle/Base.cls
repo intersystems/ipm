@@ -284,12 +284,10 @@ Method CheckBeforeClean(
                 }
             }
 
-            if ($listlength(tModList) > 0) {
-                if (tLevel > 0) && tVerbose {
-                    do ..Log("Clean SKIPPED - required by ",$listlength(tModList)," other module",$case($listlength(tModList),1:"",:"s"),". (",$listtostring(tModList,"; "),")")
-                    set pSkip = 1
-                    quit
-                }
+            if ($listlength(tModList) > 0) && (tLevel > 0) {
+                do ..Log("Clean SKIPPED - required by " _ $listlength(tModList) _ " other module" _ $case($listlength(tModList),1:"",:"s") _ ". (" _ $listtostring(tModList,"; ") _ ")")
+                set pSkip = 1
+                quit
             }
         }
     } catch e {

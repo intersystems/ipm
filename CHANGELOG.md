@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
 - #819: Drastically increase `zpm "info"` speed when many dependent packages have been installed
 - #888: Fixed `zpm "list -tree"` showing packages as `[missing]` because of case mismatch
+- #58: Prevent uninstallation of dependent module without `-force` flag
+- #908: Fix case where `uninstall -all` would fail because of incomplete dependency information
 - #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
 - #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers (breaking change)
 
