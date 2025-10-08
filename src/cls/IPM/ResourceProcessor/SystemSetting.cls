@@ -1,3 +1,11 @@
+/// This resource processor sets the ^%SYS("CSP") global to a specified value during the Compile phase
+/// This is primarily for backwards compatibility with older IPM versions (v0.7 or earlier) that used this to control CSP application settings.
+/// Newer versions of IPM (v0.9 and later) should use the CPF resource processor instead
+/// Example usage in module.xml:
+/// ```
+/// <SystemSetting Name="CSP.Test" Value="123"/>
+/// ```
+/// This will set ^%SYS("CSP","Test") = "123"
 Class %IPM.ResourceProcessor.SystemSetting Extends %IPM.ResourceProcessor.Abstract
 {
 
@@ -14,7 +22,6 @@ Method OnPhase(
 	Output pResourceHandled As %Boolean = 0) As %Status
 {
   if pPhase = "Compile" {
-    write !, "Resource Reference Name: ", ..ResourceReference.Name
     if $piece(..ResourceReference.Name, ".") = "CSP" {
       set tName = $piece(..Name, ".", 2)
       if tName '= "" {
