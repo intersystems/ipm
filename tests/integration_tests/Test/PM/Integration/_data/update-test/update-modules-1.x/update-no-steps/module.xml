@@ -4,7 +4,6 @@
     <Module>
       <Name>update-no-steps</Name>
       <Version>1.2.1</Version>
-      <Resource Name="UpdateNoStepsPackage.PKG" />
       <UpdatePackage>UpdateNoStepsPackage</UpdatePackage>
     </Module>
   </Document>
