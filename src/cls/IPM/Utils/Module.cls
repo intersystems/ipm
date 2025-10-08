@@ -1263,10 +1263,10 @@ ClassMethod LoadNewModule(
         set tVerbose = $get(params("Verbose"))
         set tUseTransactions = '($get(params("NoTransaction"),0) || $get(params("NoJournal"),0))
         set isUpdate = $get(params("Update"),0)
-        if '$data(pParams("qstruct")) {
+        if '$data(params("qstruct")) {
             set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
         }
-        set commandLineModuleName = $get(pParams("ModuleName"))
+        set commandLineModuleName = $get(params("ModuleName"))
 
         // Check for valid license key prior to top-level module load
         // This may throw an exception.
@@ -1317,8 +1317,8 @@ ClassMethod LoadNewModule(
                 set msg = $$$FormatText("Cannot downgrade %1 from version %2 to %3. To downgrade a module, you must first run the uninstall command. Then, run the install or load command with the desired module version.",newModuleObj.Name,fromVersionString,toVersionString)
                 $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
-            set cmd = $get(pParams("cmd"))
-            if ((cmd = "install") || (cmd = "load")) && '$get(pParams("Force"),0) && '$get(pParams("DeveloperMode"),0) && (toVersion.Follows(fromVersion)) && (newModuleObj.UpdatePackage '= "") {
+            set cmd = $get(params("cmd"))
+            if ((cmd = "install") || (cmd = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) && (toVersion.Follows(fromVersion)) && (newModuleObj.UpdatePackage '= "") {
                 set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.", newModuleObj.Name, fromVersionString, toVersionString)
                 $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
@@ -1435,7 +1435,7 @@ ClassMethod LoadNewModule(
         }
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
-        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .pParams)
+        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
             tcommit
         }
