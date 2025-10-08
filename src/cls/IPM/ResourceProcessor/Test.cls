@@ -178,9 +178,9 @@ Method OnPhase(
             set tSC = $classmethod(tManagerClass,"RunTest",tTestSpec,tFlags,.tUserParams)
 
             // If running integration tests in the verify phase, uninstall all modules after each test
-            if $get(pParams("tVerifyNamespace"))'="" {
+            if $get(pParams("verifyNamespace"))'="" {
                 set oldNamespace = $namespace
-                set $namespace = pParams("tVerifyNamespace")
+                set $namespace = pParams("verifyNamespace")
                 $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(0,.pParams))
                 set $namespace = oldNamespace
             }
