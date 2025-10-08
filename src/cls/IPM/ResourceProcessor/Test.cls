@@ -180,8 +180,9 @@ Method OnPhase(
             // If running integration tests in the verify phase, uninstall all modules after each test
             if $get(pParams("verifyNamespace"))'="" {
                 set oldNamespace = $namespace
+                new $namespace
                 set $namespace = pParams("verifyNamespace")
-                $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(0,.pParams))
+                $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(1,.pParams))
                 set $namespace = oldNamespace
             }
 
