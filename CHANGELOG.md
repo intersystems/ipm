@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #58: Prevent uninstallation of dependent module without `-force` flag
 - #908: Fix case where `uninstall -all` would fail because of incomplete dependency information
 - #363: `help load` and `help install` will now mention that setting the `dev` flag will not roll back transactions on failure
+- #884: Fix missing module version in error message when dependency resolution fails to find suitable version
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
