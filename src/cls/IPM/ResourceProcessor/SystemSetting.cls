@@ -6,7 +6,7 @@
 /// <SystemSetting Name="CSP.Test" Value="123"/>
 /// ```
 /// This will set ^%SYS("CSP","Test") = "123"
-Class %IPM.ResourceProcessor.SystemSetting Extends %IPM.ResourceProcessor.Abstract
+Class %IPM.ResourceProcessor.SystemSetting Extends %IPM.ResourceProcessor.Abstract [ Deprecated ]
 {
 
 /// Comma-separated list of resource attribute names that this processor uses
