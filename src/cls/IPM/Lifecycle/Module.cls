@@ -143,6 +143,10 @@ Method %Package(ByRef pParams) As %Status
         if $$$ISERR(tSC) {
             quit
         }
+        if tExportDirectory="" {
+            set tExportDirectory = tExportSubDirectory
+        }
+
 
         set tSC = ..OnBeforeArtifact(tExportSubDirectory,tExportSubDirectory,.pParams)
         if $$$ISERR(tSC) {
