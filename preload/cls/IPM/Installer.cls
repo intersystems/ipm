@@ -48,11 +48,7 @@ XData MapOnly [ XMLNamespace = INSTALLER ]
   </Namespace>
 </Manifest>
 }
-ClassMethod setup(
-	ByRef pVars,
-	pLogLevel As %Integer,
-	pInstaller As %Installer.Installer,
-	pLogger As %Installer.AbstractLogger) As %Status [ CodeMode = objectgenerator, Internal ]
+
 ClassMethod setup(
 	ByRef pVars,
 	pLogLevel As %Integer,
