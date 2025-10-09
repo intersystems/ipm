@@ -129,20 +129,22 @@ Method %Package(ByRef pParams) As %Status
         }
 
         set tExportDirectory = $get(pParams("Path"))
-        if (tExportDirectory'="") && ('##class(%File).DirectoryExists(tExportDirectory)) {
-            set tExportDirectory = ##class(%File).NormalizeDirectory(tExportDirectory)
-            if '##class(%File).CreateDirectoryChain(tExportDirectory,.tReturn) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",tExportDirectory,tReturn))
+        if (tExportDirectory'="") {
+            // create temporary subdirectory to prevent clashes
+            set randomDir = $translate($system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
+            set tExportSubDirectory = ##class(%Library.File).NormalizeDirectory(tExportDirectory) _ randomDir _ "/"
+            if '##class(%File).CreateDirectoryChain(tExportSubDirectory,.tReturn) {
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",tExportSubDirectory,tReturn))
                 quit
             }
         }
 
-        set tSC = ..%Export(.pParams,.tExportDirectory)
+        set tSC = ..%Export(.pParams,.tExportSubDirectory)
         if $$$ISERR(tSC) {
             quit
         }
 
-        set tSC = ..OnBeforeArtifact(tExportDirectory,tExportDirectory,.pParams)
+        set tSC = ..OnBeforeArtifact(tExportSubDirectory,tExportSubDirectory,.pParams)
         if $$$ISERR(tSC) {
             quit
         }
@@ -150,7 +152,7 @@ Method %Package(ByRef pParams) As %Status
         write:tVerbose !,"Module exported to:",!,$char(9),tExportDirectory,!
 
         set tTgzFile = $extract(tExportDirectory,1,*-1)_".tgz"
-        set tSC = ##class(%IPM.General.Archive).Create(tExportDirectory,tTgzFile,.tOutput)
+        set tSC = ##class(%IPM.General.Archive).Create(tExportSubDirectory,tTgzFile,.tOutput)
         if $$$ISERR(tSC) {
             quit
         }
@@ -173,6 +175,11 @@ Method %Package(ByRef pParams) As %Status
             quit
         }
         set pParams("PackageFile") = tTgzFile
+
+        // Delete the temporary export directory
+        set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tExportSubDirectory)
+        $$$ThrowOnError(tSC)
+
     } catch e {
         set tSC = e.AsStatus()
     }

@@ -25,7 +25,7 @@ Method TestDeployedItems()
 {
     do ..SetupModule()
 
-    set tmpDir = $$$FileTempDir _ "package"
+    set tmpDir = $$$FileTempDir _ "/package"
     set sc = ##class(%IPM.Main).Shell("package " _..#ModuleName _ " -v -path " _ tmpDir)
     do $$$AssertStatusOK(sc, "Successfully packaged module to "_tmpDir)
     do ..SetupOrasRegistry()
@@ -33,7 +33,7 @@ Method TestDeployedItems()
     do $$$AssertStatusOK(sc, "Successfully published module")
     do ..UninstallModule()
 
-    set sc = ##class(%IPM.Main).Shell("load -v "_tmpDir)
+    set sc = ##class(%IPM.Main).Shell("load -v "_tmpDir_".tgz")
     do $$$AssertStatusOK(sc, "Successfully loaded module with deployed items at "_tmpDir)
     do ..RunDeployedCode()
     do ..UninstallModule()
