@@ -104,8 +104,8 @@ Method TestPackageNameExpression()
         do $$$AssertStatusOK(tSC,"Module successfully installed")
 
         // Verify the destination has correctly replaced $(packagename)
-        set mgrDir = $system.Util.ManagerDirectory()
-        do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/testmodule/cls/Test.cls"), "Test.cls in " _ mgrDir _ "FileCopy/testmodule/cls exists")
+        set ipmDir = ##class(%Library.File).NormalizeDirectory($system.Util.DataDirectory() _ "ipm/testmodule/1.0.0/")
+        do $$$AssertTrue(##class(%File).Exists(ipmDir _ "FileCopy/testmodule/cls/Test.cls"), "Test.cls in " _ ipmDir _ "FileCopy/testmodule/cls exists")
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestPackageNameExpression.")
     }
@@ -121,8 +121,9 @@ Method TestFileCopyScope()
         do $$$AssertStatusOK(tSC,"Module successfully installed")
 
         // Neither the Scope="test" Scope="verify" file should be copied
+        set ipmDir = ##class(%Library.File).NormalizeDirectory($system.Util.DataDirectory() _ "ipm/testmodule/1.0.0/")
         set mgrDir = $system.Util.ManagerDirectory()
-        do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/testmodule/cls/Test.cls"), "Test.cls in " _ mgrDir _ "FileCopy/testmodule/cls exists")
+        do $$$AssertTrue(##class(%File).Exists(ipmDir _ "FileCopy/testmodule/cls/Test.cls"), "Test.cls in " _ ipmDir _ "FileCopy/testmodule/cls exists")
         do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Test/test1.txt"), mgrDir _ "FileCopy/Scope/Test/test1.txt does not exist")
         do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Scope/Test/test2.txt does not exist")
 
