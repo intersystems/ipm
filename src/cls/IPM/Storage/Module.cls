@@ -937,7 +937,7 @@ Method BuildDependencyGraph(
             // Build cumulative version requirement string
             #dim tSearchExpr As %IPM.General.SemanticVersionExpression
             set tSearchExpr = tDep.Version.%ConstructClone(1)
-            set tConstraintList = $listbuild(..Name_": "_tDep.VersionString)
+            set tConstraintList = $listbuild(..Name_" "_..VersionString_": "_tDep.VersionString)
             set tSourcePath = ""
             for {
                 set tSourcePath = $order(pDependencyGraph(tDep.Name,tSourcePath),1,tOtherReq)
@@ -1750,13 +1750,13 @@ Method %Compile(ByRef qstruct As %String) As %Status
 
 Method IsLocked() As %Boolean
 {
-    quit ($zconvert(..Version.Build,"L") '= "snapshot")
+    quit '..DeveloperMode
 }
 
 Method Lock() As %Status
 {
     if '..IsLocked() {
-        set ..Version.Build = ""
+        set ..DeveloperMode = 0
     }
     quit $$$OK
 }
