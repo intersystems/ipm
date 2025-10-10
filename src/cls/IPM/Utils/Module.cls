@@ -413,8 +413,8 @@ ClassMethod LoadModuleFromArchive(
     try {
         set tVerbose = $get(pParams("Verbose"))
 
-        set randomDir = $translate($system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
-        set tTargetDirectory = ##class(%SYS.System).TempDirectory()_"/"_randomDir
+        // Modules have a well-defined location inside the archive
+        set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/" _ pModuleName _ "/" _ pModuleVersion)
         if ##class(%File).DirectoryExists(tTargetDirectory) {
             // Delete it.
             set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
@@ -442,13 +442,6 @@ ClassMethod LoadModuleFromArchive(
         set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         if $$$ISERR(tSC) {
             quit
-        }
-        // Delete directory at the end of the run
-        if ##class(%File).DirectoryExists(tTargetDirectory) {
-            set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
-            if $$$ISERR(tSC) {
-                quit
-            }
         }
     } catch e {
         set tSC = e.AsStatus()
