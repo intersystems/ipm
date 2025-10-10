@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.4] - Unreleased
+## [0.11.0] - Unreleased
 
 ### Added
 - #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #888: Fixed `zpm "list -tree"` showing packages as `[missing]` because of case mismatch
 - #58: Prevent uninstallation of dependent module without `-force` flag
 - #908: Fix case where `uninstall -all` would fail because of incomplete dependency information
+- #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
+- #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers (breaking change)
+
+### Added
+- #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 - #363: `help load` and `help install` will now mention that setting the `dev` flag will not roll back transactions on failure
 - #884: Fix missing module version in error message when dependency resolution fails to find suitable version
 - #838: Improve error messages when installation fails

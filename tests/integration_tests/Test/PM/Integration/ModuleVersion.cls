@@ -51,42 +51,45 @@ XData AllCases [ MimeType = application/json ]
 
 Method TestModuleVersion()
 {
-    Set xdataID="Test.PM.Integration.ModuleVersion||AllCases"
-    Set compiledXdata=##class(%Dictionary.CompiledXData).%OpenId(xdataID)
-    Set stream=compiledXdata.Data
-    Do $$$AssertTrue($IsObject(stream))
+    set xdataID="Test.PM.Integration.ModuleVersion||AllCases"
+    set compiledXdata=##class(%Dictionary.CompiledXData).%OpenId(xdataID)
+    set stream=compiledXdata.Data
+    do $$$AssertTrue($isobject(stream))
 
-    Set allTestCases = [].%FromJSON(stream)
-    Set iter = allTestCases.%GetIterator()
-    While iter.%GetNext(.key, .case) {
-        Do $$$LogMessage("Running test case: "_case.%ToJSON())
+    set allTestCases = [].%FromJSON(stream)
+    set iter = allTestCases.%GetIterator()
+    while iter.%GetNext(.key, .case) {
+        do $$$LogMessage("Running test case: "_case.%ToJSON())
 
-        Set args = case.args
-        Set expected = case.expected
+        set args = case.args
+        set expected = case.expected
 
-        Set modDir = ..GetModuleDir("module-version")
-        Set sc = ##class(%IPM.Main).Shell("load " _ modDir)
-        Do $$$AssertStatusOK(sc, "Loaded module successfully")
+        set modDir = ..GetModuleDir("module-version")
+        set sc = ##class(%IPM.Main).Shell("load " _ modDir)
+        do $$$AssertStatusOK(sc, "Loaded module successfully")
 
-        Set sc = ##class(%IPM.Main).Shell("modver mv " _ args)
-        If expected = "" {
-            Do $$$AssertStatusNotOK(sc, "Module-version failed as expected")
-            Continue
+        set sc = ##class(%IPM.Main).Shell("modver mv " _ args)
+        if expected = "" {
+            do $$$AssertStatusNotOK(sc, "Module-version failed as expected")
+            continue
         }
-        Do $$$AssertStatusOK(sc, "Module-version executed successfully")
+        do $$$AssertStatusOK(sc, "Module-version executed successfully")
 
-        Kill mod
-        Set mod = ##class(%IPM.Storage.Module).NameOpen("mv")
-        Do mod.%Reload()
-        Do $$$AssertEquals(mod.VersionString, expected)
-        Do $$$AssertEquals(mod.Version.ToString(), expected)
+        kill mod
+        set mod = ##class(%IPM.Storage.Module).NameOpen("mv")
+        do mod.%Reload()
+        do $$$AssertEquals(mod.VersionString, expected)
+        do $$$AssertEquals(mod.Version.ToString(), expected)
 
-        Kill stream
-        Set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen("mv")
-        Do stream.%Reload()
-        Set content = stream.Contents.Read()
-        Do $$$AssertTrue(content [ ("<Version>"_expected_"</Version>"))
-        Do $$$AssertNotTrue(content [ ("<Version>"_..#OriginalVersion_"</Version>"))
+        kill stream
+        set stream = ##class(%IPM.StudioDocument.ModuleStream).NameOpen("mv")
+        do stream.%Reload()
+        set content = stream.Contents.Read()
+        do $$$AssertTrue(content [ ("<Version>"_expected_"</Version>"))
+        do $$$AssertNotTrue(content [ ("<Version>"_..#OriginalVersion_"</Version>"))
+
+        set sc = ##class(%IPM.Main).Shell("uninstall mv")
+        do $$$AssertStatusOK(sc, "Module 'mv' successfully uninstalled between test cases.")
     }
 }
 
