@@ -185,7 +185,7 @@ Method %Package(ByRef pParams) As %Status
     }
 
     // Delete the temporary export directory
-    if (tExportSubDirectory'="") && ##class(%Library.File).DirectoryExists(tExportSubDirectory) {
+    if ($get(tExportSubDirectory)'="") && ##class(%Library.File).DirectoryExists(tExportSubDirectory) {
         set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.File).RemoveDirectoryTree(tExportSubDirectory))
     }
 
