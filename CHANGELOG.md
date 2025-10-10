@@ -16,12 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
 - #819: Drastically increase `zpm "info"` speed when many dependent packages have been installed
 - #888: Fixed `zpm "list -tree"` showing packages as `[missing]` because of case mismatch
-- #58: Prevent uninstallation of dependent module without `-force` flag
+- #058: Prevent uninstallation of dependent module without `-force` flag
 - #908: Fix case where `uninstall -all` would fail because of incomplete dependency information
 - #363: `help load` and `help install` will now mention that setting the `dev` flag will not roll back transactions on failure
 - #884: Fix missing module version in error message when dependency resolution fails to find suitable version
 - #838: Improve error messages when installation fails
 - #924: Make "module" parameter not required for "uninstall" command so -all modifier works
+- #928: `zpm "info"` now recognizes existence of configured ORAS registries
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string

@@ -797,13 +797,15 @@ ClassMethod GetVersion(
         }
     }
     set sc=$$$OK
-    set sql="select URL from %IPM_Repo_Remote.Definition where Enabled = 1"
+    set sql="select URL from %IPM_Repo_Remote.Definition where Enabled = 1" _
+        " union " _
+        "select URL from %IPM_Repo_Oras.Definition where Enabled = 1"
         ,rs=##class(%ResultSet).%New()
         ,sc=rs.Prepare(sql)
     set:sc sc=rs.Execute("")
     if sc {
         quit:'rs.%Next()
-        set out=rs.Get("URL")
+        set out=$zconvert(rs.Get("URL"),"l")
     }
     quit sc
 }
