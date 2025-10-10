@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #363: `help load` and `help install` will now mention that setting the `dev` flag will not roll back transactions on failure
 - #884: Fix missing module version in error message when dependency resolution fails to find suitable version
 - #838: Improve error messages when installation fails
+- #924: Make "module" parameter not required for "uninstall" command so -all modifier works
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string

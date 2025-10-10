@@ -464,7 +464,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 </example>
 
 <!-- Parameters -->
-<parameter name="module" required="true" description="Name of module to uninstall" />
+<parameter name="module" description="Name of module to uninstall" />
 
 <!-- Modifiers -->
 <modifier name="all" aliases="a" description="Uninstalls all modules installed in the current namespace." />
