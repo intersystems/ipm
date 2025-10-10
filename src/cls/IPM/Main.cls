@@ -2114,9 +2114,10 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
     set isAbsolutePath = ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) = tDirectoryName)
+    set isURL = $extract(tDirectoryName,1,4)="http"
     if tDirectoryName = "" {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"No path has been specified."))
-    } elseif '##class(%File).Exists(tDirectoryName) && 'isAbsolutePath && (tDirectoryName'["http") {
+    } elseif '##class(%File).Exists(tDirectoryName) && 'isAbsolutePath && 'isURL {
         // if the path is to a directory (not a file) and it is not a URL, it must be absolute
         $$$ThrowStatus($$$ERROR($$$GeneralError,"The specified path must be absolute."))
     }
