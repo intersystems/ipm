@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
 - #909: IPM now warns when Python 3.13 or higher is installed (IRIS incompatibility)
+- #850: Re-added `<SystemSetting> Resource Processor for backwards compatibility
 
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly
