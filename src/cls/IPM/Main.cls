@@ -2113,9 +2113,11 @@ ClassMethod LoadFromRepo(
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
+    set isAbsolutePath = ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) = tDirectoryName)
     if tDirectoryName = "" {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"No path has been specified."))
-    } elseif '##class(%File).Exists(tDirectoryName) && ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) '= tDirectoryName) {
+    } elseif '##class(%File).Exists(tDirectoryName) && 'isAbsolutePath && (tDirectoryName'["http") {
+        // if the path is to a directory (not a file) and it is not a URL, it must be absolute
         $$$ThrowStatus($$$ERROR($$$GeneralError,"The specified path must be absolute."))
     }
     set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
