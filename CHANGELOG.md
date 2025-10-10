@@ -20,10 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #908: Fix case where `uninstall -all` would fail because of incomplete dependency information
 - #363: `help load` and `help install` will now mention that setting the `dev` flag will not roll back transactions on failure
 - #884: Fix missing module version in error message when dependency resolution fails to find suitable version
+- #838: Improve error messages when installation fails
+- #924: Make "module" parameter not required for "uninstall" command so -all modifier works
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
 - #706: `load` now only accepts absolute paths
+- #278: Modules will now be installed at a well-defined default location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
+- #374: A new System Expression `${ipmdir}` points to the module's default installation location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
 - #563: The `verify` phase will uninstall all modules after every integration test
 
 ## [0.10.3] - 2025-09-17

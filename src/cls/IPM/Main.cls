@@ -437,7 +437,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 </example>
 
 <!-- Parameters -->
-<parameter name="module" required="true" description="Name of module to uninstall" />
+<parameter name="module" description="Name of module to uninstall" />
 
 <!-- Modifiers -->
 <modifier name="all" aliases="a" description="Uninstalls all modules installed in the current namespace." />
@@ -2193,11 +2193,18 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
     }
     if (tModuleName = "") {
-        quit $$$OK
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No module name specified."))
     }
 
     if tModuleName = $$$IPMModuleName {
         $$$ThrowOnError(..CheckModuleNamespace())
+    }
+    // check if any registries are configured and enabled
+    new SQLCODE, count
+    &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
+    $$$ThrowSQLIfError(SQLCODE,%message)
+    if (SQLCODE = 0) && (count = 0) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
     }
 
     set tVersion = $get(pCommandInfo("parameters","version"))
