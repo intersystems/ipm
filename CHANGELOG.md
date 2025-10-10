@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #838: Improve error messages when installation fails
 - #924: Make "module" parameter not required for "uninstall" command so -all modifier works
 - #928: `zpm "info"` now recognizes existence of configured ORAS registries
+- #930: Fix issue where `load` didn't work on GitHub URLs
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
