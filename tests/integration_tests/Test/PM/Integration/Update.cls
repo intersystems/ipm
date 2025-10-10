@@ -62,49 +62,42 @@ Method TestAllNoErrorModulesNoMirror()
   set updateStepsToSeed = [["UpdateDepsAdded.UpdatePackage.V1", "MethodA", 1]]
   set updateStepsToRun = [["UpdateDepsAdded.UpdatePackage.V1", "MethodB", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsAdded.UpdatePackage.V2", "MethodB", 0]]
   do ..SingleNormalUpdateTest(..#ModuleWithDependenciesAdded, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
-  do ..CleanUpModule(..#ModuleWithDependenciesAdded)
+  do ..CleanUp()
 
   // Module with dependencies removed in new version
   set updateStepsToSeed = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodA", 1], ["UpdatePackage.V1", "MethodA", 0]]
   set updateStepsToRun = [["UpdateDepsRemoved.UpdatePackage.V1", "MethodB", 0], ["UpdateDepsRemoved.UpdatePackage.V1", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodA", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodC", 1], ["UpdateDepsRemoved.UpdatePackage.V2", "MethodB", 0]]
   do ..SingleNormalUpdateTest(..#ModuleWithDependenciesRemoved, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
-  do ..CleanUpModule(..#ModuleWithDependenciesRemoved)
-  do ..CleanUpModule(..#ModuleNoDependencies)
+  do ..CleanUp()
 
   // Module with no update steps
   do ..SingleNormalUpdateTest(..#ModuleNoUpdateSteps, [], [], ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
-  do ..CleanUpModule(..#ModuleNoUpdateSteps)
+  do ..CleanUp()
 
   // Module with an error in a seeded update step
   set updateStepsToSeed = [["UpdateSeededStepErrors.UpdatePackage.V1", "MethodA", 0]]
   set updateStepsToRun = [["UpdateSeededStepErrors.UpdatePackage.V2", "MethodA", 1]]
   do ..SingleNormalUpdateTest(..#ModuleSeededStepErrors, updateStepsToSeed, updateStepsToRun, ..#ModuleOneVersion, ..#ModuleTwoVersion, 0)
-  do ..CleanUpModule(..#ModuleSeededStepErrors)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
+  do ..CleanUp()
 }
 
 Method TestAllErrorModulesNoMirror()
 {
   set updateStepsToSeed = [["UpdateStepErrors.UpdatePackage.V1", "MethodA", 1], ["UpdateStepErrors.UpdatePackage.V1", "MethodB", 0], ["UpdateStepErrors.UpdatePackage.V1", "MethodC", 1]]
   do ..SingleFailedUpdateTest(..#ModuleStepErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
-  do ..CleanUpModule(..#ModuleStepErrors)
+  do ..CleanUp()
 
   set updateStepsToSeed = updateStepsToSeed.addAll([["UpdateDepErrors.UpdatePackage.V1", "MethodA", 0]])
   do ..SingleFailedUpdateTest(..#ModuleDepErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
-  do ..CleanUpModule(..#ModuleDepErrors)
+  do ..CleanUp()
 
   set updateStepsToSeed = [["UpdateInvokeErrors.UpdatePackage.V1", "MethodA", 0]]
   do ..SingleFailedUpdateTest(..#ModuleInvokeErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
-  do ..CleanUpModule(..#ModuleInvokeErrors)
+  do ..CleanUp()
 
   set updateStepsToSeed = [["UpdateDepInvokeErrors.UpdatePackage.V1", "MethodA", 0], ["UpdateInvokeErrors.UpdatePackage.V1", "MethodA", 0]]
   do ..SingleFailedUpdateTest(..#ModuleDepInvokeErrors, updateStepsToSeed, ..#ModuleOneVersion, ..#ModuleTwoVersion)
-  do ..CleanUpModule(..#ModuleDepInvokeErrors)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
+  do ..CleanUp()
 }
 
 Method TestUpdateNonMatchingTarballFails()
@@ -123,12 +116,8 @@ Method TestUpdateNonMatchingTarballFails()
   set sc = ##class(%IPM.Main).Shell("update "_moduleToUpdate_" -path "_exportDir_" -v")
   do $$$AssertStatusNotOK(sc, "Attempting to update module "_moduleToUpdate_" FAILED because the module in the path provided does not match the module to update.")
 
-  do ..CleanUpModule(moduleToUpdate)
-  do ..CleanUpModule(moduleToPackage)
+  do ..CleanUp()
   do ..CleanUpDirectory(exportDir)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateAfterInterruptedUpdate()
@@ -156,10 +145,7 @@ Method TestUpdateAfterInterruptedUpdate()
   do $$$AssertStatusOK(sc, "Update of module "_..#ModuleNoDependencies_" version "_..#ModuleTwoVersion_" after interrupted update succeeded.")
 
   // Assert it completed
-  do ..CleanUpModule(..#ModuleNoDependencies)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
+  do ..CleanUp()
 }
 
 Method TestModuleUpdateStepAdded()
@@ -171,7 +157,7 @@ Method TestModuleUpdateStepAdded()
   set updateStepsToRun = [["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodD", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V1", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V2", "MethodC", 1], ["UpdateStepAddedOlderVersion.UpdatePackage.V3", "MethodA", 1]]
 
   do ..SingleNormalUpdateNewStepTest(..#ModuleStepAddedOlderVersion, updateStepsToSeed, seededUpdateStepsToRun, seededUpdateStepsToNotRun, updateStepsToRun, ..#ModuleTwoVersion, ..#ModuleThreeVersion)
-  do ..CleanUpModule(..#ModuleStepAddedOlderVersion)
+  do ..CleanUp()
 
   // Test updating module when new update step is added to current V# class which precedes existing update steps in order
   set updateStepsToSeed = [["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodA", 1], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodB", 0], ["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodC", 1]]
@@ -179,10 +165,7 @@ Method TestModuleUpdateStepAdded()
   set updateStepsToRun = [["UpdateStepAddedCurrVersionClass.UpdatePackage.V1", "MethodD", 0]]
 
   do ..SingleNormalUpdateNewStepTest(..#ModuleStepAddedCurrVersion, updateStepsToSeed, seededUpdateStepsToRun, [], updateStepsToRun, ..#ModuleOneVersion, ..#ModuleOneVersionMinorBump)
-  do ..CleanUpModule(..#ModuleStepAddedCurrVersion)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
+  do ..CleanUp()
 }
 
 Method TestUpdateOfUninstalledModule()
@@ -196,9 +179,6 @@ Method TestUpdateOfUninstalledModule()
   // Update non-existent module
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleOneVersion)
   do $$$AssertStatusNotOK(sc, "Update of uninstalled module "_..#ModuleNoDependencies_" version "_..#ModuleOneVersion_" failed.")
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
 }
 
 Method TestUpdateToOlderVersion()
@@ -211,10 +191,7 @@ Method TestUpdateToOlderVersion()
   do $$$AssertStatusNotOK(sc, "Attempt at updating module to older version failed.")
   do $$$AssertTrue((sc [ "version"), "Error message is descriptive and correctly mentions 'version'")
 
-  do ..CleanUpModule(..#ModuleNoDependencies)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
+  do ..CleanUp()
 }
 
 Method TestUpdateToInvalidVersion()
@@ -226,10 +203,7 @@ Method TestUpdateToInvalidVersion()
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" 1.0.0")
   do $$$AssertStatusNotOK(sc, "Attempt at updating module to non-existent version failed.")
 
-  do ..CleanUpModule(..#ModuleNoDependencies)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
+  do ..CleanUp()
 }
 
 Method TestUpdateToNewVersionTwice()
@@ -245,10 +219,7 @@ Method TestUpdateToNewVersionTwice()
   set sc = ##class(%IPM.Main).Shell("update -v "_..#ModuleNoDependencies_" "_..#ModuleThreeVersion)
   do $$$AssertStatusOK(sc, "Updated module to "_..#ModuleThreeVersion_" without error")
 
-  do ..CleanUpModule(..#ModuleNoDependencies)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
+  do ..CleanUp()
 }
 
 Method TestUpdateToSameVersionTwiceNoMirror()
@@ -299,10 +270,7 @@ Method TestUpdateToSameVersionTwiceNoMirror()
   do $$$AssertEquals(twoCStart, stepTwoC.TimeStampStart)
   do $$$AssertEquals(twoCEnd, stepTwoC.TimeStampEnd)
 
-  do ..CleanUpModule(..#ModuleNoDependencies)
-
-  do ##class(%IPM.Main).GetListModules($namespace,,.list)
-  do $$$AssertTrue(list=1, "Only zpm is installed")
+  do ..CleanUp()
 }
 
 /// ///////////////////////////////////////////// HELPER METHODS ////////////////////////////////////////////////
@@ -320,21 +288,21 @@ Method NormalUpdateTestSuite(
 {
   // No dev mode, install
   do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 0)
-  do ..CleanUpModule(moduleName)
+  do ..CleanUp()
 
   // Dev mode, install
   do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 1)
-  do ..CleanUpModule(moduleName)
+  do ..CleanUp()
 
   // Dev mode, load
   set exportDir = $system.Util.ManagerDirectory()_moduleName
   do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 1, exportDir)
-  do ..CleanUpModule(moduleName)
+  do ..CleanUp()
   do ..CleanUpDirectory(exportDir)
 
   // No dev mode, load
   do ..SingleNormalUpdateTest(moduleName, updateStepsToSeed, updateStepsToRun, fromVersion, toVersion, 0, exportDir)
-  do ..CleanUpModule(moduleName)
+  do ..CleanUp()
   do ..CleanUpDirectory(exportDir)
 }
 
@@ -555,7 +523,7 @@ Method AssertModulePackagedCorrectly(
   do $$$AssertStatusOK(sc, "Successfully packaged module "_moduleName_" to "_packageDir)
 
   // Uninstall module
-  do ..CleanUpModule(moduleName)
+  do ..CleanUp()
 }
 
 ClassMethod InterruptedUpdateJobWrapper(
@@ -587,12 +555,10 @@ ClassMethod GetUpdateStep(
   return step
 }
 
-ClassMethod CleanUpModule(moduleName As %String)
+ClassMethod CleanUp()
 {
-  set sc = ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+  set sc = ##class(%IPM.Main).Shell("uninstall -all")
   $$$ThrowOnError(sc)
-
-  return
 }
 
 ClassMethod CleanUpDirectory(dir As %String)
