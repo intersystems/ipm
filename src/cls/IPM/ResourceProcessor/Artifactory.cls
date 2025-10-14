@@ -13,7 +13,7 @@ Parameter DESCRIPTION As STRING = "Retrieves a build artifact from an external r
 /// Comma-separated list of resource attribute names that this processor uses.
 Parameter ATTRIBUTES As STRING = "ArtifactName,DeployDirectory,DevDirectory,Version,BranchName,ArtifactoryRepo";
 
-/// Name of the artifact, found as the name of the UI application repo, need to distinguish from ArtifactoryRepo.
+/// Name of the artifact.
 Property ArtifactName As %String(MAXLEN = 128) [ Required ];
 
 /// Path to which the artifact should be unpacked upon activation when in NON-developer mode; may contain expressions.
@@ -31,7 +31,7 @@ Property Version As %String(MAXLEN = 100) [ Required ];
 /// Source branch where the artifact was built from.
 Property BranchName As %String(MAXLEN = 128);
 
-/// Name of the artifactory repo where UI artifacts live.
+/// Name of the artifactory repo where artifacts live.
 /// If not provided, this will fall back to the value in parameters.json as default.
 Property ArtifactoryRepo As %String(MAXLEN = "");
 
@@ -111,8 +111,6 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set port = $get(artifactory("Port"))
     set artifactoryRepo = $select((..ArtifactoryRepo '= ""):..ArtifactoryRepo, 1:$get(artifactory("UI")))
     set apiURL = $get(artifactory("APIURL"))
-    set storageAPIURL = $get(artifactory("StorageAPIURL"))
-    set metadataAPIURL = $get(artifactory("MetadataAPIURL"))
     set username = $get(artifactory("Username"))
     set password = $get(artifactory("Password"))
 
