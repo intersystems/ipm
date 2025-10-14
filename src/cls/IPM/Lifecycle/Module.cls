@@ -131,32 +131,38 @@ Method %Package(ByRef pParams) As %Status
     try {
         set tVerbose = $get(pParams("Verbose"))
         if ..Module.HaveToDeploy() {
-        $$$ThrowOnError(..MakeDeployed(.pParams))
+            $$$ThrowOnError(..MakeDeployed(.pParams))
         }
 
         set tExportDirectory = $get(pParams("Path"))
-        if (tExportDirectory'="") && ('##class(%File).DirectoryExists(tExportDirectory)) {
-            set tExportDirectory = ##class(%File).NormalizeDirectory(tExportDirectory)
-            if '##class(%File).CreateDirectoryChain(tExportDirectory,.tReturn) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",tExportDirectory,tReturn))
+        if (tExportDirectory'="") {
+            // create temporary subdirectory to prevent clashes
+            set randomDir = $translate($system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
+            set tExportSubDirectory = ##class(%Library.File).NormalizeDirectory(tExportDirectory) _ randomDir _ "/"
+            if '##class(%File).CreateDirectoryChain(tExportSubDirectory,.tReturn) {
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",tExportSubDirectory,tReturn))
                 quit
             }
         }
 
-        set tSC = ..%Export(.pParams,.tExportDirectory)
+        set tSC = ..%Export(.pParams,.tExportSubDirectory)
+        if $$$ISERR(tSC) {
+            quit
+        }
+        // If no path is specified, the above call to %Export will generate a temporary directory
+        if tExportDirectory="" {
+            set tExportDirectory = tExportSubDirectory
+        }
+
+        set tSC = ..OnBeforeArtifact(tExportSubDirectory,tExportSubDirectory,.pParams)
         if $$$ISERR(tSC) {
             quit
         }
 
-        set tSC = ..OnBeforeArtifact(tExportDirectory,tExportDirectory,.pParams)
-        if $$$ISERR(tSC) {
-            quit
-        }
-
-        write:tVerbose !,"Module exported to:",!,$char(9),tExportDirectory,!
+        write:tVerbose !,"Module contents exported to temporary directory:",!,$char(9),tExportSubDirectory,!
 
         set tTgzFile = $extract(tExportDirectory,1,*-1)_".tgz"
-        set tSC = ##class(%IPM.General.Archive).Create(tExportDirectory,tTgzFile,.tOutput)
+        set tSC = ##class(%IPM.General.Archive).Create(tExportSubDirectory,tTgzFile,.tOutput)
         if $$$ISERR(tSC) {
             quit
         }
@@ -179,8 +185,14 @@ Method %Package(ByRef pParams) As %Status
             quit
         }
         set pParams("PackageFile") = tTgzFile
+
     } catch e {
         set tSC = e.AsStatus()
+    }
+
+    // Delete the temporary export directory
+    if ($get(tExportSubDirectory)'="") && ##class(%Library.File).DirectoryExists(tExportSubDirectory) {
+        set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.File).RemoveDirectoryTree(tExportSubDirectory))
     }
 
     if '$get(pParams("Package","KeepNamespace")) {

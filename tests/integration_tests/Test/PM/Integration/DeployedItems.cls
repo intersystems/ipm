@@ -33,7 +33,7 @@ Method TestDeployedItems()
     do $$$AssertStatusOK(sc, "Successfully published module")
     do ..UninstallModule()
 
-    set sc = ##class(%IPM.Main).Shell("load -v "_tmpDir)
+    set sc = ##class(%IPM.Main).Shell("load -v "_tmpDir_".tgz")
     do $$$AssertStatusOK(sc, "Successfully loaded module with deployed items at "_tmpDir)
     do ..RunDeployedCode()
     do ..UninstallModule()
