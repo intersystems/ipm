@@ -12,7 +12,7 @@ Helps to install ObjectScript classes and routines, globals, Embedded Python mod
 
 ## Installing the InterSystems Package Manager Client:
 
-The simplest way to install the latest version of IPM is to run the following ObjectScript snippet.
+The simplest way to install the latest version of IPM is to run the following ObjectScript snippet with a user that has the %ALL role.
 
 _In CI/CD scripts, for deterministic behavior, replace `version="latest"` with the specific IPM version desired._
 

@@ -1244,6 +1244,7 @@ Method %Verify(ByRef pParams) As %Status
             set tMustCreate = 1
             set tMustLoad = 1
             set tNewNamespace = tInitNS _ "-VERIFY"
+            set pParams("verifyNamespace") = tNewNamespace
             if $get(pParams("Verify", "PreDeleteNamespace")) {
                 do ##class(%IPM.Utils.Build).DeleteNamespace(tNewNamespace)
             }
