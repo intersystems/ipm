@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #374: A new System Expression `${ipmdir}` points to the module's default installation location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
 - #563: The `verify` phase will uninstall all modules after every integration test
 - #611, #686: If a path is supplied for `package`, it will now create a temporary subdirectory in that path to export the module into to avoid clashes with any existing files. This subdirectory will be deleted afterwards, leaving just the .tgz file.
+- #844: If the "NameSpace" attribute isn't specified for a Web Application, it will be created in the current namespace instead of %SYS
 
 ## [0.10.3] - 2025-09-17
 
