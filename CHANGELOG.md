@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
 - #909: IPM now warns when Python 3.13 or higher is installed (IRIS incompatibility)
 - #850: Re-added `<SystemSetting> Resource Processor for backwards compatibility
+- #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly
@@ -21,9 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #908: Fix case where `uninstall -all` would fail because of incomplete dependency information
 - #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
 - #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers (breaking change)
-
-### Added
-- #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 - #363: `help load` and `help install` will now mention that setting the `dev` flag will not roll back transactions on failure
 - #884: Fix missing module version in error message when dependency resolution fails to find suitable version
 - #838: Improve error messages when installation fails
@@ -38,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #374: A new System Expression `${ipmdir}` points to the module's default installation location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
 - #563: The `verify` phase will uninstall all modules after every integration test
 - #611, #686: If a path is supplied for `package`, it will now create a temporary subdirectory in that path to export the module into to avoid clashes with any existing files. This subdirectory will be deleted afterwards, leaving just the .tgz file.
+- #844: If the "NameSpace" attribute isn't specified for a Web Application, it will be created in the current namespace instead of %SYS
 
 ## [0.10.3] - 2025-09-17
 

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-  <Document name="rest-demo.ZPM">
+  <Document name="rest-demo-ns.ZPM">
     <Module>
-      <Name>rest-demo</Name>
+      <Name>rest-demo-ns</Name>
       <Version>1.0.0</Version>
       <Description>This is a demo of a rest application</Description>
       <Keywords>rest</Keywords>
@@ -18,15 +18,14 @@
 
       <Resource Name="Test.Rest.Demo.CLS"/>
       <WebApplication
-        Name="/restdemo"
-        NameSpace="{$namespace}"
+        Name="/restdemons"
         Path="/src"
         Recurse="1"
         MatchRoles=":${dbrole}:%SQL:%All:%Developer,%Manager:%All"
         AutheEnabled="#{$$$AutheCache + $$$AutheUnauthenticated}"
         DispatchClass="Test.Rest.Demo"
         ServeFiles="1"
-        CookiePath="/restdemo"
+        CookiePath="/restdemons"
         UseCookies="2"
        />
     <AfterInstallMessage>Module installed successfully!</AfterInstallMessage>

@@ -514,16 +514,21 @@ Method AssertModulePackagedCorrectly(
 	version As %String,
 	packageDir As %String)
 {
-  // Initial install of module (necessary to be able to package)
-  set sc = ##class(%IPM.Main).Shell("install "_moduleName_" "_version)
-  do $$$AssertStatusOK(sc,"Installed "_moduleName_" version = "_version_" successfully for packaging.")
+    // Initial install of module (necessary to be able to package)
+    set sc = ##class(%IPM.Main).Shell("install "_moduleName_" "_version)
+    do $$$AssertStatusOK(sc,"Installed "_moduleName_" version = "_version_" successfully for packaging.")
 
-  // Package module
-  set sc = ##class(%IPM.Main).Shell(moduleName_" package -only -v -DPath="_packageDir)
-  do $$$AssertStatusOK(sc, "Successfully packaged module "_moduleName_" to "_packageDir)
+    // Package module
+    set sc = ##class(%IPM.Main).Shell(moduleName_" package -only -v -DPath="_packageDir)
+    do $$$AssertStatusOK(sc, "Successfully packaged module "_moduleName_" to "_packageDir)
 
-  // Uninstall module
-  do ..CleanUp()
+    // Unpack the tarball
+    set tgzFile = $zstrip(packageDir,">","/\")_".tgz"
+    set tSC = ##class(%IPM.General.Archive).Extract(tgzFile,packageDir,.tOutput)
+    do $$$AssertStatusOK(tSC, "Unpackaged " _ tgzFile _ " to "_ packageDir)
+
+    // Uninstall module
+    do ..CleanUp()
 }
 
 ClassMethod InterruptedUpdateJobWrapper(
