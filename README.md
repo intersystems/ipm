@@ -51,7 +51,7 @@ zpm: USER>
 
 ## Compatibility Notes
 
-With IPM version 0.11.0+ "install packagename" will be blocked by default with option to override with -force flag if an older version is already installed and the newer version has UpdatePackage defined in module.xml.
+With IPM version 0.10.4+ "install packagename" will be blocked if `packagename` is installed in the current namespace and the newer version has `UpdatePackage` defined in module.xml. This behavior can be overridden with -force flag.
 
 With the release of IPM v0.9.0 on December 2024, IPM is no longer mapped across namespaces.
 This is an intentional change so that users can have different IPM versions and configurations in different namespaces.
