@@ -109,7 +109,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set useHttps = $get(artifactory("UseHttps"), 0)
     set server = $get(artifactory("Server"))
     set port = $get(artifactory("Port"))
-    set artifactoryRepo = $select((..ArtifactoryRepo '= ""):..ArtifactoryRepo, 1:$get(artifactory("UI")))
+    set artifactoryRepo = $select((..ArtifactoryRepo '= ""):..ArtifactoryRepo, 1:$get(artifactory("Repo")))
     set apiURL = $get(artifactory("APIURL"))
     set username = $get(artifactory("Username"))
     set password = $get(artifactory("Password"))
