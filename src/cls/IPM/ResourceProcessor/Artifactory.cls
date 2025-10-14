@@ -11,10 +11,10 @@ Class %IPM.ResourceProcessor.Artifactory Extends %IPM.ResourceProcessor.Abstract
 Parameter DESCRIPTION As STRING = "Retrieves a build artifact from an external repository and unpacks it into the desired location(s).";
 
 /// Comma-separated list of resource attribute names that this processor uses.
-Parameter ATTRIBUTES As STRING = "SourceControlRepo,DeployDirectory,DevDirectory,Version,BranchName,ArtifactoryRepo";
+Parameter ATTRIBUTES As STRING = "ArtifactName,DeployDirectory,DevDirectory,Version,BranchName,ArtifactoryRepo";
 
 /// Name of the artifact, found as the name of the UI application repo, need to distinguish from ArtifactoryRepo.
-Property SourceControlRepo As %String(MAXLEN = 128) [ Required ];
+Property ArtifactName As %String(MAXLEN = 128) [ Required ];
 
 /// Path to which the artifact should be unpacked upon activation when in NON-developer mode; may contain expressions.
 Property DeployDirectory As %String(MAXLEN = "") [ Required ];
@@ -31,7 +31,7 @@ Property Version As %String(MAXLEN = 100) [ Required ];
 /// Source branch where the artifact was built from.
 Property BranchName As %String(MAXLEN = 128);
 
-/// Name of the artifactory repo where UI artifacts live. (eg. healthshare-generic-dev-cambridge)
+/// Name of the artifactory repo where UI artifacts live.
 /// If not provided, this will fall back to the value in parameters.json as default.
 Property ArtifactoryRepo As %String(MAXLEN = "");
 
@@ -53,18 +53,16 @@ Method OnAfterPhase(
             if '##class(%File).DirectoryExists(installDirectory) {
                 if $get(params("Artifactory", "Run"), 0) {
                     if (verbose) {
-                        write !, "No artifact found in "_installDirectory_" and -DArtifact.Run set. Will now download it from artifactory."
+                        write !, "No artifact found in "_installDirectory_" and -DArtifactory.Run set. Will now download it from artifactory."
                     }
                     do ..DownloadArtifact(.params)
-                }
-                else {
+                } else {
                     if (verbose) {
-                        write !, "No artifact found in "_installDirectory_" and -DArtifact.Run was NOT set, skipping copying contents."
+                        write !, "No artifact found in "_installDirectory_" and -DArtifactory.Run was NOT set, skipping copying contents."
                     }
                     quit
                 }
-            }
-            else {
+            } else {
                 if (verbose) {
                     write !, "Artifact found in "_installDirectory_". Will use that instead of downloading a new one."
                 }
@@ -104,7 +102,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set destinationDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
 
     if (verbose) {
-        write !, "Start retrieving UI artifact..."
+        write !, "Start retrieving artifact..."
     }
 
     merge artifactory = params("Artifactory")
@@ -120,10 +118,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 
     // The following variables need to be set for all or none
     if ((server = "") || (artifactoryRepo = "") || (apiURL = "") || (username = "") || (password = "")) {
-        if (verbose) {
-            set errorText = "No information provided for server, port, artifactory repo, api url, username and password."
-            $$$ThrowStatus($$$ERROR($$$GeneralError,errorText))
-        }
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, artifactory repo, api url, username, and password must be provided to download an artifact"))
     }
 
     set tempFile = ##class(%Library.File).TempFilename(,,.errorCode)
@@ -134,11 +129,11 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     // In Unix: /tmp/filJeBjAr
     set OSTempDir = $piece(tempFile,$$$SLASH,1,*-1)
 
-    // create a subdir for the resource identified by its SourceControlRepo, e.g.: C:\Windows\TEMP\hs-universal-login
+    // create a subdir for the resource identified by its ArtifactName, e.g.: C:\Windows\TEMP\hs-universal-login
     // SubDirectoryName does normalization as well
-    set PMTempDir = ##class(%Library.File).SubDirectoryName(OSTempDir, ..SourceControlRepo, 1)
+    set PMTempDir = ##class(%Library.File).SubDirectoryName(OSTempDir, ..ArtifactName, 1)
 
-    set artifactPath = ..FindValidArtifact(useHttps, server, port, username, password, apiURL, artifactoryRepo, ..SourceControlRepo, ..Version, ..BranchName, verbose)
+    set artifactPath = ..GetArtifactPath(useHttps, server, port, username, password, apiURL, artifactoryRepo, ..ArtifactName, ..Version, ..BranchName, verbose)
     set artifactName = ..RetrieveArtifact(useHttps, server, port, artifactPath, PMTempDir, verbose)
 
     // Unpack artifact in temp location (so that if anything goes wrong, the true destination does not get affected)
@@ -146,9 +141,9 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     do ..UnTar(artifactName, PMTempDir, destinationDirectory, verbose)
 }
 
-/// Return the path of the valid artifact, and empty string if the algorithm finds either no qualified artifact or no new artifact
-/// compared with what was stored before.
-ClassMethod FindValidArtifact(
+/// Return the path of the valid artifact
+/// Errors if no valid artifact is found
+ClassMethod GetArtifactPath(
 	useHttps As %Boolean,
 	artifactServer As %String,
 	artifactPort As %String,
@@ -156,7 +151,7 @@ ClassMethod FindValidArtifact(
 	password As %String,
 	apiURL As %String,
 	artifactoryRepo As %String,
-	sourceControlRepo As %String,
+	artifactName As %String,
 	version As %String,
 	branchName As %String,
 	verbose As %Boolean = 0) As %String [ Internal ]
@@ -181,7 +176,7 @@ ClassMethod FindValidArtifact(
     */
     set aqlFindBody = {
         "repo":(artifactoryRepo),
-        "name":{"$match":(sourceControlRepo_"-"_version_"*")}
+        "name":{"$match":(artifactName_"-"_version_"*")}
     }
     // "@commit.branch"
     if (branchName '= "") {
@@ -229,9 +224,9 @@ ClassMethod FindValidArtifact(
         set updatedISC = ##class(%IPM.Utils.Module).ConvertW3CToTimestampUTC(updated)
         // If current timestamp is later than max seen, then this is the most up to date artifact so far and we should use that
         if ($system.SQL.DATEDIFF("ms", maxTimeStamp, updatedISC) > 0) {
-            set maxTimeStamp = updatedISC
             // only retrieve the value blob when we detect a later timestamp
             set targetResultObj = value
+            set maxTimeStamp = updatedISC
         }
     }
 
@@ -246,10 +241,9 @@ ClassMethod FindValidArtifact(
     return artifactPath
 }
 
-/// Retrieves the artifact based on the artifactPath provided.
-/// destinationDirectory: Destination of directory for the artifact to be downloaded to
-/// There is no need to return full path of the downloaded artifact tar/tgz but just the file name
+/// Retrieves the artifact based on the artifactPath provided
 /// Full path will be written to console if verbose is enabled.
+/// Returns the file name of the artifact downloaded
 ClassMethod RetrieveArtifact(
 	useHttps As %Boolean,
 	artifactServer As %String,
