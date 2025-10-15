@@ -88,11 +88,25 @@ Method %PrepareDeploy(ByRef pParams) As %Status
         set tSC = ##class(%IPM.Utils.Build).InitializeNamespace(tNSPostfix, tVerbose, .tPackageDeployNamespace, tNSConfig)
         $$$ThrowOnError(tSC)
         set pParams("PackageDeployNamespace") = tPackageDeployNamespace
+        set pParams("PackageDeployOriginalNamespace") = $namespace
 
         $$$ThrowOnError(..Module.%Reload())
 
         set tSource = tPackageDeployNamespace _ "-CODE"
         set orderedResourceList = ..Module.GetOrderedResourceList()
+
+        // also map dependencies
+        set deps = ..Module.Dependencies
+        for i=1:1:deps.Count() {
+            set depName = deps.GetAt(i).Name
+            set depMod = ##class(%IPM.Storage.Module).NameOpen(depName,,.tSC)
+            $$$ThrowOnError(tSC)
+            set depResourceList = depMod.GetOrderedResourceList()
+            for j=1:1:depResourceList.Count() {
+                $$$ThrowOnError(orderedResourceList.Insert(depResourceList.GetAt(j)))
+            }
+        }
+
         set tKey = ""
         for {
             set tResource = orderedResourceList.GetNext(.tKey)
