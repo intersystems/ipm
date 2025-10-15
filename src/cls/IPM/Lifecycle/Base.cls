@@ -593,7 +593,7 @@ Method %Reload(ByRef pParams) As %Status
         quit:tRoot=""
 
         set tRoot = ##class(%File).NormalizeDirectory("",tRoot)
-        set tSC = $system.OBJ.Import(tRoot_"module.xml","/nodisplay",,.error,.tLoadedList) quit:$$$ISERR(tSC)
+        set tSC = $system.OBJ.Load(tRoot_"module.xml","/nodisplay",.error,.tLoadedList) quit:$$$ISERR(tSC)
 
         // If publishing deployed code in a new namespace, also need to load dependencies
         set deployOriginalNS = $get(pParams("PackageDeployOriginalNamespace"))
@@ -618,7 +618,7 @@ Method %Reload(ByRef pParams) As %Status
                         }
                         // switch to current namespace to import dependency
                         set $namespace = currentNamespace
-                        set tSC = $system.OBJ.Import(depRoot_"module.xml","/nodisplay",,.error,.tDepLoadedList) quit:$$$ISERR(tSC)
+                        set tSC = $system.OBJ.Load(depRoot_"module.xml","/nodisplay",.error,.tDepLoadedList) quit:$$$ISERR(tSC)
 
                         // set root of dependency module to the one we just loaded from
                         set newDepModule = ##class(%IPM.Storage.Module).NameOpen(depName,,.tSC)
