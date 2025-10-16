@@ -595,51 +595,6 @@ Method %Reload(ByRef pParams) As %Status
         set tRoot = ##class(%File).NormalizeDirectory("",tRoot)
         set tSC = $system.OBJ.Load(tRoot_"module.xml","/nodisplay",.error,.tLoadedList) quit:$$$ISERR(tSC)
 
-        // If publishing deployed code in a new namespace, also need to load dependencies
-        set deployOriginalNS = $get(pParams("PackageDeployOriginalNamespace"))
-        if deployOriginalNS '= "" {
-            new $namespace
-            set currentNamespace = $namespace
-            set deps = ..Module.Dependencies
-            for i=1:1:deps.Count() {
-                set depName = deps.GetAt(i).Name
-                // switch to old namespace to grab dependency root
-                set $namespace = deployOriginalNS
-                if ##class(%IPM.Storage.Module).NameExists(depName) {
-                    set depModule = ##class(%IPM.Storage.Module).NameOpen(depName,,.tSC)
-                    if $$$ISERR(tSC) {
-                        quit
-                    }
-                    set depRoot = depModule.Root
-                    if (depRoot'="") {
-                        set depRoot = ##class(%File).NormalizeDirectory("",depRoot)
-                        if tVerbose {
-                            write !,"Loading dependency " _ depName _ " from "_depRoot _ " into " _ currentNamespace
-                        }
-                        // switch to current namespace to import dependency
-                        set $namespace = currentNamespace
-                        set tSC = $system.OBJ.Load(depRoot_"module.xml","/nodisplay",.error,.tDepLoadedList) quit:$$$ISERR(tSC)
-
-                        // set root of dependency module to the one we just loaded from
-                        set newDepModule = ##class(%IPM.Storage.Module).NameOpen(depName,,.tSC)
-                        if $$$ISERR(tSC) {
-                            quit
-                        }
-                        if (newDepModule.Root '= depRoot) {
-                            if tVerbose {
-                                write !,"Changing module root from '"_newDepModule.Root_"' to '"_depRoot_"'"
-                            }
-                            set newDepModule.Root = depRoot
-                            $$$ThrowOnError(newDepModule.%Save())
-                        }
-                    }
-                }
-            }
-            // make sure we end up back in the current namespace
-            set $namespace = currentNamespace
-        }
-
-
         // Validate loaded module
         set first = $$$lcase($order(tLoadedList("")))
         if (first = "") {
@@ -729,24 +684,6 @@ Method %Reload(ByRef pParams) As %Status
             quit:tKey=""
             if $isobject(tResource.Processor) && tResource.IsInScope("Reload") {
                 set tSC = $$$ADDSC(tSC,tResource.Processor.OnPhase("Reload",.pParams))
-            }
-        }
-        // If publishing deployed code in a new namespace, also process resources for dependencies
-        if deployOriginalNS '= "" {
-            set deps = ..Module.Dependencies
-            for i=1:1:deps.Count() {
-                set depName = deps.GetAt(i).Name
-                set depMod = ##class(%IPM.Storage.Module).NameOpen(depName,,.tSC)
-                if $$$ISERR(tSC) {
-                    quit
-                }
-                set depResourceList = depMod.GetOrderedResourceList()
-                for j=1:1:depResourceList.Count() {
-                    set depResource = depResourceList.GetAt(j)
-                    if $isobject(depResource.Processor) && depResource.IsInScope("Reload") {
-                        set tSC = $$$ADDSC(tSC,depResource.Processor.OnPhase("Reload",.pParams))
-                    }
-                }
             }
         }
         if $$$ISERR(tSC) {
@@ -1267,17 +1204,6 @@ Method %Export(
             }
             write:tVerbose !,tSourcePath," -> ",tExportPath
         }
-    } catch e {
-        set tSC = e.AsStatus()
-    }
-    quit tSC
-}
-
-Method %PrepareDeploy(ByRef pParams) As %Status [ Abstract ]
-{
-    set tSC = $$$OK
-    try {
-        // TODO: Implement
     } catch e {
         set tSC = e.AsStatus()
     }
