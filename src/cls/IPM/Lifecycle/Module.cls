@@ -138,16 +138,6 @@ Method %Package(ByRef pParams) As %Status
         set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.File).RemoveDirectoryTree(tExportSubDirectory))
     }
 
-    if '$get(pParams("Package","KeepNamespace")) {
-        set tPackageDeployNamespace = $get(pParams("PackageDeployNamespace"))
-        set tInitNamespace = $get(pParams("InitNamespace"))
-        if (tInitNamespace '= ""), (tPackageDeployNamespace '= ""), tInitNamespace '= $namespace {
-            set $namespace = tInitNamespace
-            do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
-            kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
-        }
-    }
-
   quit tSC
 }
 

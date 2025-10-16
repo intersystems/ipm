@@ -682,11 +682,6 @@ ClassMethod ExecutePhases(
     } catch e {
         set tSC = e.AsStatus()
     }
-    if $$$ISERR(tSC) && $data(pParams("PackageDeployNamespace"),tPackageDeployNamespace) &&(tPackageDeployNamespace'="") {
-        set $namespace = $get(pParams("InitNamespace"))
-        do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
-        kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
-    }
     quit tSC
 }
 
