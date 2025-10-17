@@ -419,6 +419,67 @@ ClassMethod UpdateVersion(
     $$$ThrowOnError(document.%Save())
 }
 
+/// XSLT to add Python Wheel resources
+XData AppendWheelUnderModuleTransform [ XMLNamespace = "http://www.intersystems.com/studio/document" ]
+{
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:param name="wheelName" select="'replacementWheelName'"/>
+
+  <xsl:template match="@*|node()">
+    <xsl:copy><xsl:apply-templates select="@*|node()"/></xsl:copy>
+  </xsl:template>
+
+  <!-- Append a wheel under /Module/Version -->
+  <xsl:template match="*[local-name()='Module']/*[local-name()='Version']">
+    <xsl:variable name="ns" select="namespace-uri(..)"/>
+    <xsl:copy><xsl:apply-templates select="@*|node()"/></xsl:copy>
+    <xsl:element name="PythonWheel" namespace="{$ns}">
+      <xsl:element name="Name" namespace="{$ns}">
+        <xsl:value-of select="$wheelName"/>
+      </xsl:element>
+    </xsl:element>
+
+  </xsl:template>
+</xsl:stylesheet>
+}
+
+/// Compile AppendWheelUnderModuleTransform with concrete values
+ClassMethod CompiledAppendWheelUnderModuleXSLT(wheelName As %String) As %XML.XSLT.CompiledStyleSheet
+{
+    set xData = ##class(%Dictionary.CompiledXData).IDKEYOpen($classname(),"AppendWheelUnderModuleTransform",,.sc)
+    $$$ThrowOnError(sc)
+    set s = ""
+    while 'xData.Data.AtEnd {
+        set s = s _ xData.Data.Read()
+    }
+    set s = $replace(s, "replacementWheelName", wheelName)
+    set stream = ##class(%Stream.TmpCharacter).%New()
+    $$$ThrowOnError(stream.Write(s))
+    $$$ThrowOnError(stream.Rewind())
+    set sc = ##class(%XML.XSLT.CompiledStyleSheet).CreateFromStream(stream, .compiledStyleSheet)
+    $$$ThrowOnError(sc)
+    quit compiledStyleSheet
+}
+
+/// Append Python Wheel resources to module.xml
+ClassMethod AddPythonWheels(
+	moduleName As %String,
+	wheelName As %String)
+{
+    // Can't use %IPM.Repo.XSLTProvider because we need to pass a parameter
+    set compiledTransform = ..CompiledAppendWheelUnderModuleXSLT(wheelName)
+    set document = ##class(%Library.RoutineMgr).%OpenId(moduleName_".ZPM")
+    if '$isobject(document) {
+        // %Library.RoutineMgr:%OpenId doesn't have a byref status arg.
+        $$$ThrowStatus($get(%objlasterror,$$$ERROR($$$GeneralError,"Unable to open "_moduleName_".ZPM")))
+    }
+    $$$ThrowOnError(document.Code.Rewind())
+    set sc = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(document.Code, compiledTransform, .updatedContents)
+    $$$ThrowOnError(document.Code.Clear())
+    $$$ThrowOnError(document.Code.CopyFrom(updatedContents))
+    $$$ThrowOnError(document.%Save())
+}
+
 XData ExternalXSL
 {
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.4] - Unreleased
 
 ### Added
+- #938 Added flag -export-python-deps to package command
 - #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
 - #909: IPM now warns when Python 3.13 or higher is installed (IRIS incompatibility)
 - #850: Re-added `<SystemSetting> Resource Processor for backwards compatibility
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #930: Fix issue where `load` didn't work on GitHub URLs
 
 ### Changed
+- Removed secret flag NewVersion handling in %Publish()
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
 - #706: `load` now only accepts absolute paths
 - #278: Modules will now be installed at a well-defined default location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
