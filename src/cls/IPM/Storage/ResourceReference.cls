@@ -368,7 +368,7 @@ ClassMethod GetStatus(
                 set pReferenced = 1
                 set pEditable = 1 //Still allow editing
                 if tModule.IsLocked() {
-                    set pMessage = $$$FormatText("WARNING: Module '%1' is not a snapshot version and should not be modified.", tName)
+                    set pMessage = $$$FormatText("WARNING: Module '%1' is not installed in developer mode and should not be modified.", tName)
                 }
             }
             quit
@@ -393,11 +393,9 @@ ClassMethod GetStatus(
         }
 
         set pReferenced = 1
-        set pEditable = 'tRef.Module.IsLocked() && tRef.Module.DeveloperMode
+        set pEditable = 'tRef.Module.IsLocked()
         set pSourceModuleName = tRef.Module.Name
         if tRef.Module.IsLocked() {
-            set pMessage = $$$FormatText("WARNING: Module '%1' is a released (non-snapshot) version, so its resources may not be modified.", tRef.Module.Name)
-        } elseif 'tRef.Module.DeveloperMode {
             set pMessage = $$$FormatText("Module '%1' has not been loaded/installed in development mode, so its resources may not be modified.", tRef.Module.Name)
         }
     } catch e {

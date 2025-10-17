@@ -17,12 +17,11 @@
       <SourcesRoot>src</SourcesRoot>
 
       <Resource Name="Test.Rest.Demo.CLS"/>
-      <WebApplication 
+      <WebApplication
         Name="/restdemo"
         NameSpace="{$namespace}"
         Path="/src"
         Recurse="1"
-        Directory="{$cspdir}/restdemo" 
         MatchRoles=":${dbrole}:%SQL:%All:%Developer,%Manager:%All"
         AutheEnabled="#{$$$AutheCache + $$$AutheUnauthenticated}"
         DispatchClass="Test.Rest.Demo"
@@ -30,7 +29,7 @@
         CookiePath="/restdemo"
         UseCookies="2"
        />
-    <AfterInstallMessage>Module installed successfully!</AfterInstallMessage>     
-    </Module>    
+    <AfterInstallMessage>Module installed successfully!</AfterInstallMessage>
+    </Module>
   </Document>
 </Export>

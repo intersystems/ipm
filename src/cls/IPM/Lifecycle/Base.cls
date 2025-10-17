@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
+Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure","ApplyUpdateSteps")};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -166,23 +166,24 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 {
     set pOnePhase = $zconvert(pOnePhase, "L")
     quit $case(pOnePhase,
-        "clean":        $listbuild("Clean"),
-        "initialize":   $listbuild("Initialize"),
-        "reload":       $listbuild("Initialize","Reload","*"),
-        "validate":     $listbuild("Initialize","Reload","*","Validate"),
-        "exportdata":   $listbuild("ExportData"),
-        "compile":      $listbuild("Initialize","Reload","*","Validate","Compile"),
-        "activate":     $listbuild("Initialize","Reload","*","Validate","Compile","Activate"),
-        "document":     $listbuild("Document"),
-        "makedeployed": $listbuild("MakeDeployed"),
-        "test":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
-        "package":      $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
-        "verify":       $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
-        "register":     $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
-        "publish":      $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
-        "configure":    $listbuild("Configure"),
-        "unconfigure":  $listbuild("Unconfigure"),
-        :               ""
+        "clean":            $listbuild("Clean"),
+        "initialize":       $listbuild("Initialize"),
+        "reload":           $listbuild("Initialize","Reload","*"),
+        "validate":         $listbuild("Initialize","Reload","*","Validate"),
+        "exportdata":       $listbuild("ExportData"),
+        "compile":          $listbuild("Initialize","Reload","*","Validate","Compile"),
+        "activate":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate"),
+        "document":         $listbuild("Document"),
+        "makedeployed":     $listbuild("MakeDeployed"),
+        "test":             $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
+        "package":          $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
+        "verify":           $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
+        "register":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
+        "publish":          $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
+        "applyupdatesteps": $listbuild("Initialize","Reload","*","Validate","Compile","Activate","ApplyUpdateSteps"),
+        "configure":        $listbuild("Configure"),
+        "unconfigure":      $listbuild("Unconfigure"),
+        :                   ""
     )
 }
 
@@ -191,23 +192,24 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 {
     set phase = $zconvert(pOnePhase, "L")
     quit $case(phase,
-        "clean":        "Clean",
-        "initialize":   "Initialize",
-        "reload":       "Reload",
-        "validate":     "Validate",
-        "exportdata":   "ExportData",
-        "compile":      "Compile",
-        "activate":     "Activate",
-        "document":     "Document",
-        "makedeployed": "MakeDeployed",
-        "test":         "Test",
-        "package":      "Package",
-        "verify":       "Verify",
-        "register":     "Register",
-        "publish":      "Publish",
-        "configure":    "Configure",
-        "unconfigure":  "Unconfigure",
-        :               pOnePhase // return the phase as-is if it's a custom phase name
+        "clean":            "Clean",
+        "initialize":       "Initialize",
+        "reload":           "Reload",
+        "validate":         "Validate",
+        "exportdata":       "ExportData",
+        "compile":          "Compile",
+        "activate":         "Activate",
+        "document":         "Document",
+        "makedeployed":     "MakeDeployed",
+        "test":             "Test",
+        "package":          "Package",
+        "verify":           "Verify",
+        "register":         "Register",
+        "publish":          "Publish",
+        "configure":        "Configure",
+        "unconfigure":      "Unconfigure",
+        "applyupdatesteps": "ApplyUpdateSteps",
+        :                   pOnePhase // return the phase as-is if it's a custom phase name
     )
 }
 
@@ -282,12 +284,10 @@ Method CheckBeforeClean(
                 }
             }
 
-            if ($listlength(tModList) > 0) {
-                if (tLevel > 0) && tVerbose {
-                    do ..Log("Clean SKIPPED - required by ",$listlength(tModList)," other module",$case($listlength(tModList),1:"",:"s"),". (",$listtostring(tModList,"; "),")")
-                    set pSkip = 1
-                    quit
-                }
+            if ($listlength(tModList) > 0) && (tLevel > 0) {
+                do ..Log("Clean SKIPPED - required by " _ $listlength(tModList) _ " other module" _ $case($listlength(tModList),1:"",:"s") _ ". (" _ $listtostring(tModList,"; ") _ ")")
+                set pSkip = 1
+                quit
             }
         }
     } catch e {
@@ -1296,6 +1296,7 @@ Method %Verify(ByRef pParams) As %Status
             set tMustCreate = 1
             set tMustLoad = 1
             set tNewNamespace = tInitNS _ "-VERIFY"
+            set pParams("verifyNamespace") = tNewNamespace
             if $get(pParams("Verify", "PreDeleteNamespace")) {
                 do ##class(%IPM.Utils.Build).DeleteNamespace(tNewNamespace)
             }
@@ -1725,6 +1726,22 @@ Method %MakeDeployed(ByRef pParams) As %Status
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+Method %ApplyUpdateSteps(ByRef pParams) As %Status
+{
+    set sc = $$$OK
+    try {
+        if $system.Mirror.IsMember() && $system.Mirror.IsPrimary() {
+            write !,"WARNING: You are running update steps on the primary member of a mirror. It is recommended to start the update process on a backup instance to minimize downtime."
+        }
+        set verbose = $get(pParams("Verbose"))
+        // TODO: Add log file param after logging meeting discussion
+        $$$ThrowOnError(..Module.HandleAllUpdateSteps(,,verbose))
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 Method OnDetermineResourceDeployability(

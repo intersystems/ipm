@@ -304,10 +304,6 @@ ClassMethod LoadModuleReference(
                     set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
                     quit
                 }
-                if tInstModule.Version.Follows(tModRef.Version) {
-                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cannot downgrade %1 from version %2 to %3",tInstModule.Name,tInstModule.VersionString,pVersion))
-                    quit
-                }
             }
         }
 
@@ -417,8 +413,8 @@ ClassMethod LoadModuleFromArchive(
     try {
         set tVerbose = $get(pParams("Verbose"))
 
-        set randomDir = $translate($system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
-        set tTargetDirectory = ##class(%SYS.System).TempDirectory()_"/"_randomDir
+        // Modules have a well-defined location inside the archive
+        set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/" _ pModuleName _ "/" _ pModuleVersion)
         if ##class(%File).DirectoryExists(tTargetDirectory) {
             // Delete it.
             set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
@@ -447,13 +443,6 @@ ClassMethod LoadModuleFromArchive(
         if $$$ISERR(tSC) {
             quit
         }
-        // Delete directory at the end of the run
-        if ##class(%File).DirectoryExists(tTargetDirectory) {
-            set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
-            if $$$ISERR(tSC) {
-                quit
-            }
-        }
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -472,15 +461,18 @@ ClassMethod LoadModuleFromDirectory(
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         write:tVerbose !,"Loading from ",pDirectory,!
-        if $get(pParams("Install")) {
+        if $get(pParams("Install")) || $get(pParams("Update")) {
             // Propagate pParams fully.
             merge tParams = pParams
-            zkill tParams("Install")
+            if $get(pParams("Update"),0) {
+                set tParams("cmd") = "update"
+            } else {
+                zkill tParams("Install")
+            }
         } else {
             // Only propagate selected settings that should apply to dependencies.
             set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
             set tParams("Verbose") = tVerbose
-            set tParams("cmd") = "install"
             merge tParams("NoLock") = pParams("NoLock")
             merge tParams("NoMapping") = pParams("NoMapping")
             merge tParams("NoTransaction") = pParams("NoTransaction")
@@ -822,27 +814,48 @@ ClassMethod UninstallAll(
 {
     set tSC = $$$OK
     try {
-        // Get all dependency graphs for the namespace.
-        set tSC = ..BuildAllDependencyGraphs(,.tGraphs)
-        $$$ThrowOnError(tSC)
+        // Build simple dependency graph for all installed modules based on
+        //  1) the list of all installed modules
+        //  2) dependencies as listed in %IPM.Storage.Module.Dependencies
+        // tModuleNames(moduleName) = "" for all modules
+        // tModuleNames(dependency,moduleName) = "" if moduleName depends on dependency
+        // tDependsOn(moduleName,dependency) = "" if moduleName depends on dependency
+        // this is not recursive, so if A depends on B and B depends on C, neither tModulesNames(C,A) nor tDependsOn(A,C) are set
 
-        // Build arrays mapping dependencies in both directions.
-        // Doesn't need to be recursive.
-        for tIndex=1:1:$get(tGraphs) {
-            set tModuleName = $listget(tGraphs(tIndex),2)
-            set tModuleNames(tModuleName) = ""
-            set tDependency = ""
-            for {
-                set tDependency = $order(tGraphs(tIndex,tDependency),1,tData)
-                if (tDependency = "") {
-                    quit
+        set depRes = ##class(%SQL.Statement).%ExecDirect(,
+            "select ModuleItem->Name ModName,Dependencies_Name DepName "_
+            "from %IPM_Storage.ModuleItem_Dependencies")
+        $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+        while depRes.%Next(.sc) {
+            $$$ThrowOnError(sc)
+            set modName = depRes.%Get("ModName")
+            set depName = depRes.%Get("DepName")
+            set tModuleNames(depName, modName) = ""
+            set tDependsOn(modName, depName) = ""
+        }
+        $$$ThrowOnError(sc)
+
+        // Get list of all installed modules
+        do ##class(%IPM.Main).GetListModules(,,.modList)
+        for i = 1:1:modList {
+            set name = $listget(modList(i),1)
+            set simpleModList(name) = ""
+            // list of modules must be from here because modules without dependencies won't appear in %IPM_Storage.ModuleItem_Dependencies
+            set tModuleNames(name) = ""
+        }
+
+        // Iterate through list of modules to uninstall, removing any that are missing
+        set module = ""
+        for {
+            set module = $order(tModuleNames(module))
+            if (module = "") {
+                quit
+            }
+            if '$data(simpleModList(module)) {
+                if $get(pParams("Verbose")) {
+                    write !,"WARNING: module ",module," is missing, skipping uninstall",!
                 }
-                if ($listget(tData,2) '= "") {
-                    // This is not actually installed locally.
-                    continue
-                }
-                set tDependsOn(tModuleName,tDependency) = ""
-                set tModuleNames(tDependency,tModuleName) = ""
+                kill tModuleNames(module)
             }
         }
 
@@ -871,7 +884,6 @@ ClassMethod UninstallAll(
                 if tModuleName = $$$IPMModuleName {
                     // don't uninstall IPM itself
                     kill tModuleNames(tModuleName)
-                    set tProgressMade = 1
                     continue
                 }
 
@@ -1226,6 +1238,8 @@ ClassMethod ExportDocumentForObject(
     quit tSC
 }
 
+/// Loads the desired version of the module and invokes appropriate lifecycle phase.
+/// May be called on an install or load or update.
 ClassMethod LoadNewModule(
 	pDirectory As %String,
 	ByRef pParams,
@@ -1235,16 +1249,17 @@ ClassMethod LoadNewModule(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
-        // check module.xml for defaults
         do ..GetModuleDefaultsFromXML(pDirectory, .defaults)
         merge params = defaults
         merge params = pParams
 
         set tVerbose = $get(params("Verbose"))
         set tUseTransactions = '($get(params("NoTransaction"),0) || $get(params("NoJournal"),0))
+        set isUpdate = $get(params("Update"),0)
         if '$data(params("qstruct")) {
             set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
         }
+        set commandLineModuleName = $get(params("ModuleName"))
 
         // Check for valid license key prior to top-level module load
         // This may throw an exception.
@@ -1273,6 +1288,36 @@ ClassMethod LoadNewModule(
         } elseif tUseTransactions {
             tstart
         }
+
+        set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
+        set toVersion = ""
+        set toVersionString = ""
+        set fromVersion = ""
+        set fromVersionString = ""
+        set moduleCurrent = ""
+        if foundNewModuleObj {
+            set toVersion = newModuleObj.Version
+            set toVersionString = newModuleObj.VersionString
+            // Cannot simply get name from pParams because load command doesn't take in module name
+            set moduleCurrent = ##class(%IPM.Storage.Module).NameOpen(newModuleObj.Name)
+        }
+        if moduleCurrent '= "" {
+            set fromVersion = moduleCurrent.Version
+            set fromVersionString = moduleCurrent.VersionString
+        }
+        if (fromVersion '= "") && (toVersion '= "") {
+            if fromVersion.Follows(toVersion) {
+                set msg = $$$FormatText("Cannot downgrade %1 from version %2 to %3. To downgrade a module, you must first run the uninstall command. Then, run the install or load command with the desired module version.",newModuleObj.Name,fromVersionString,toVersionString)
+                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            }
+            set cmd = $get(params("cmd"))
+            if ((cmd = "install") || (cmd = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) && (toVersion.Follows(fromVersion)) && (newModuleObj.UpdatePackage '= "") {
+                set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.", newModuleObj.Name, fromVersionString, toVersionString)
+                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            }
+        }
+
+        // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
 
@@ -1290,6 +1335,18 @@ ClassMethod LoadNewModule(
 
         set tDisplayName = $piece(tFirstLoaded, ".", 1, *-1)
         set tModuleName = $$$lcase(tDisplayName)
+
+        #dim tInstallContext As %IPM.General.InstallContext
+        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
+        $$$ThrowOnError(tSC)
+
+        if foundNewModuleObj && 'tInstallContext.ModuleIsDependency(tModuleName) {
+            // Check that on an update command with -path flag, the module in the path matches the base module specified for update.
+            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
+              set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
+              $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            }
+        }
 
         if (pRepository '= "") {
             // Force developer mode to be 0 if repository is read only.
@@ -1342,9 +1399,6 @@ ClassMethod LoadNewModule(
 
         $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
 
-        #dim tInstallContext As %IPM.General.InstallContext
-        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
-        $$$ThrowOnError(tSC)
         if 'tInstallContext.ModuleIsDependency(tModuleName) {
             if 'pSynchronous {
                 // Regular async multi-threaded loading of dependencies
@@ -1372,7 +1426,9 @@ ClassMethod LoadNewModule(
         if tVerbose || $get(params("Multicompile","Verbose"),0) {
             write !,"Loading "_tDisplayName_" in process "_$job
         }
-        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName,$listbuild("Activate"),1,.params)
+        // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
+        set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
+        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
             tcommit
         }

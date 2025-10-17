@@ -28,6 +28,11 @@ Method CopyAttributes() [ Private ]
      * attribute as the attribute list is just all non-private/transient properties
      * in Security.Applications.
      */
+
+    // If NameSpace isn't specified, default to current namespace
+    if ..ResourceReference.Attributes.GetAt("NameSpace") = "" {
+        $$$ThrowOnError(..ResourceReference.Attributes.SetAt($namespace, "NameSpace"))
+    }
     set key = ""
     while 1 {
         set value = ..ResourceReference.Attributes.GetNext(.key)

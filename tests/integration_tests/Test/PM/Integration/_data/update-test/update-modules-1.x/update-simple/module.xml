@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="update-simple.ZPM">
+    <Module>
+      <Name>update-simple</Name>
+      <Version>1.2.1</Version>
+      <Resource Name="UpdatePackage.PKG" />
+      <UpdatePackage>UpdatePackage</UpdatePackage>
+    </Module>
+  </Document>
+</Export>
