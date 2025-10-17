@@ -741,7 +741,16 @@ Method InstallPythonRequirements(
         }
         set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
         $$$ThrowOnError(tSC)
-
+        set wheelsPath = ##class(%File).NormalizeFilename("wheels", pRoot)
+        set command = ..ResolvePipCaller(.pParams) _ $listbuild("download", "-r", "requirements.txt", "-d", wheelsPath, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+        if tVerbose {
+            write !, "Running "
+            zwrite command
+        } else {
+            set stdout = ""
+        }
+        set sc = ##class(%IPM.Utils.Module).RunCommand(pRoot, command, .stdout)
+        $$$ThrowOnError(sc)
         do ..Log("requirements.txt SUCCESS")
     } catch ex {
         set tSC = ex.AsStatus()
@@ -1155,6 +1164,10 @@ Method %Export(
                 }
             }
         }
+        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
+        if exportPythonDependencies {
+            $$$ThrowOnError(..HandlePythonDependencies())
+        }
 
         // Deployed items should be exported as a studio project to a designated directory
         set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
@@ -1208,6 +1221,45 @@ Method %Export(
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Walk the wheels directory under root and add Python Wheel resources to manifest if needed
+Method HandlePythonDependencies() As %Status
+{
+    set sc = $$$OK
+    try {
+        set wheelsDir = ##class(%File).NormalizeDirectory("wheels", ..Module.Root)
+        if '##class(%File).DirectoryExists(wheelsDir) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheels directory not found."))
+        }
+        set stmt = ##class(%SQL.Statement).%New()
+        set status = stmt.%PrepareClassQuery("%File", "FileSet")
+        if $$$ISERR(status) {
+            write "%Prepare failed:"
+            do $system.Status.DisplayError(status)
+            quit
+        }
+        set rset = stmt.%Execute(wheelsDir, "*.whl")
+        if (rset.%SQLCODE '= 0) {
+            write "%Execute failed:", !, "SQLCODE ", rset.%SQLCODE, ": ", rset.%Message
+            quit
+        }
+        while rset.%Next() {
+            set file = rset.%Get("ItemName")
+            set type = rset.%Get("Type")
+            if (type '= "F") || (file = "") {
+                continue
+            }
+            do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
+        }
+        if (rset.%SQLCODE < 0) {
+            write "%Next failed:", !, "SQLCODE ", rset.%SQLCODE, ": ", rset.%Message
+            quit
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    quit sc
 }
 
 Method %PrepareDeploy(ByRef pParams) As %Status [ Abstract ]
@@ -1353,7 +1405,6 @@ Method %Publish(ByRef pParams) As %Status
         set tVerbose = $get(pParams("Verbose"))
         set tRelease = $get(pParams("Release"),$get(pParams("zpm","Release"),0))
         set tPublishTo = $get(pParams("PublishTo"),$get(pParams("zpm","PublishTo"),""))
-        set tNewVersion = $get(pParams("NewVersion"),$get(pParams("zpm","NewVersion"),""))
         set tUseExternalName = $get(pParams("UseExternalName"),$get(pParams("zpm","UseExternalName"),0))
 
         // Determine which server/registry to publish to
@@ -1374,9 +1425,6 @@ Method %Publish(ByRef pParams) As %Status
         }
         if tVerbose {
             write !,"Publish to: ", tServer.URL
-        }
-        if tNewVersion '= "" {
-            set tNewVersion = ##class(%IPM.General.SemanticVersion).FromString(tNewVersion)
         }
 
         set tPublishClient = tServer.GetPublishService()
@@ -1424,14 +1472,6 @@ Method %Publish(ByRef pParams) As %Status
         }
 
         $$$ThrowOnError(tPublishClient.PublishModule(tModule))
-
-        // May need to update the version of the currently-installed module.
-        if $data(tNewVersion),$isobject(tNewVersion) {
-            write:tVerbose !,"Version: ", tNewVersion.ToString()
-            set ..Module.Version = tNewVersion
-            set tSC = ##class(%IPM.Utils.Module).ExportDocumentForObject(..Module)
-            $$$ThrowOnError(tSC)
-        }
     } catch e {
         if (e.Name["ZSOAP") {
             set tSC = $get(%objlasterror,e.AsStatus())

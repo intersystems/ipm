@@ -11,6 +11,10 @@ Parameter LuneReqsOfflineLocation = "lune-wheel-reqs-offline";
 
 Parameter LuneNoWheelReqsOfflineLocation = "lune-no-wheel-reqs-offline";
 
+Parameter PackageWithPythonDepsLocation = "package-with-python-deps";
+
+Parameter ExportPackageWithPythonDepsLocation = "export-package-with-python-deps";
+
 /// The PythonWheel resource processor expects to install wheels from the dist directory, as opposed to source code
 ClassMethod GenerateWheel()
 {
@@ -133,7 +137,7 @@ Method TestWheelAndReqsPresentOffline()
 {
     do ..PurgePythonPackage("lune")
     set dir = ..GetModuleDir("python-deps-tests", ..#LuneReqsOfflineLocation)
-    set sc = ##class(%IPM.Main).Shell("load -v " _ dir)
+    set sc = ##class(%IPM.Main).Shell("load -v -bypass-py-deps " _ dir)
     do $$$AssertStatusOK(sc, "Successfully installed lune-wheel resource")
     try {
         set lunePackage = ##class(%SYS.Python).Import("lune")
@@ -152,6 +156,37 @@ Method TestNoWheelAndReqsPresentOffline()
     set dir = ..GetModuleDir("python-deps-tests", ..#LuneNoWheelReqsOfflineLocation)
     set sc = ##class(%IPM.Main).Shell("load -v " _ dir)
     do $$$AssertStatusNotOK(sc, "Failed to install lune-wheel resource")
+}
+
+/// Package with -export-python-deps should write wheel resources into module.xml
+Method TestPackageWithPythonDeps() As %Status
+{
+    set dir = ..GetModuleDir("python-deps-tests", ..#PackageWithPythonDepsLocation)
+
+    // Use a local filesystem repo to install the test module into the namespace
+    set sc = ##class(%IPM.Main).Shell("repo -fs -name localrepo -path " _ dir)
+    do $$$AssertStatusOK(sc, "Configured local filesystem repo")
+
+    set sc = ##class(%IPM.Main).Shell("install -v localrepo/package-with-python-deps")
+    do $$$AssertStatusOK(sc, "Installed module from local filesystem repo")
+
+    set exportDir = ..GetModuleDir("python-deps-tests", ..#ExportPackageWithPythonDepsLocation)
+
+    // Run package with the python-deps export flag
+    set sc = ##class(%IPM.Main).Shell("package package-with-python-deps -v -export-python-deps -path "_ exportDir)
+    do $$$AssertStatusOK(sc, "Packaged module with -export-python-deps")
+
+    set sc = ##class(%IPM.Main).Shell("uninstall package-with-python-deps")
+    do $$$AssertStatusOK(sc, "Uninstalled module")
+
+    set sc = ##class(%IPM.Main).Shell("load -bypass-py-deps " _ exportDir)
+    do $$$AssertStatusOK(sc, "Loaded packaged module")
+
+    // Cleanup
+    set sc = ##class(%IPM.Main).Shell("uninstall package-with-python-deps")
+    do $$$AssertStatusOK(sc, "Uninstalled module")
+    set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
+    do $$$AssertStatusOK(sc, "Deleted local filesystem repo")
 }
 
 }

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.4] - Unreleased
 
+### Added
+- #938 Added flag -export-python-deps to package command
+
+### Changed
+- Removed secret flag NewVersion handling in %Publish()
+
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
