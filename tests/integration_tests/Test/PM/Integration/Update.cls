@@ -444,7 +444,7 @@ Method SingleNormalUpdateTest(
 
   // Update module (with appropriate flags)
   set devFlag = $select(developerMode: "-dev ", 1: "")
-  set pathFlag = $select((pathToModule '= ""): "-path "_pathToModule_" ", 1: "")
+  set pathFlag = $select((pathToModule '= ""): "-path "_pathToModule_".tgz ", 1: "")
   set sc = ##class(%IPM.Main).Shell("update -v "_devFlag_pathFlag_moduleName_" "_toVersion)
   do $$$AssertStatusOK(sc, "Updated module "_moduleName_" without error")
 
@@ -521,11 +521,6 @@ Method AssertModulePackagedCorrectly(
     // Package module
     set sc = ##class(%IPM.Main).Shell(moduleName_" package -only -v -DPath="_packageDir)
     do $$$AssertStatusOK(sc, "Successfully packaged module "_moduleName_" to "_packageDir)
-
-    // Unpack the tarball
-    set tgzFile = $zstrip(packageDir,">","/\")_".tgz"
-    set tSC = ##class(%IPM.General.Archive).Extract(tgzFile,packageDir,.tOutput)
-    do $$$AssertStatusOK(tSC, "Unpackaged " _ tgzFile _ " to "_ packageDir)
 
     // Uninstall module
     do ..CleanUp()

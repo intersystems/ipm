@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
 - #909: IPM now warns when Python 3.13 or higher is installed (IRIS incompatibility)
-- #850: Re-added `<SystemSetting> Resource Processor for backwards compatibility
+- #850: Re-added `<SystemSetting>` Resource Processor for backwards compatibility
 - #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 
 ### Fixed
@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #563: The `verify` phase will uninstall all modules after every integration test
 - #611, #686: If a path is supplied for `package`, it will now create a temporary subdirectory in that path to export the module into to avoid clashes with any existing files. This subdirectory will be deleted afterwards, leaving just the .tgz file.
 - #844: If the "NameSpace" attribute isn't specified for a Web Application, it will be created in the current namespace instead of %SYS
+- #815: The PrepareDeploy phase has been removed and packaging+publishing of modules with deployed code will happen in the current namespace even in developer mode
 
 ## [0.10.3] - 2025-09-17
 
