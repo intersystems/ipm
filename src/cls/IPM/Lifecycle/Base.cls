@@ -1229,7 +1229,6 @@ Method %Export(
     quit tSC
 }
 
-/// Walk the wheels directory under root and add Python Wheel resources to manifest if needed
 Method ExportPythonDependencies(ByRef pParams)
 {
     try {
@@ -1252,7 +1251,7 @@ Method ExportPythonDependencies(ByRef pParams)
             do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
         }
         $$$ThrowOnError(sc)
-    } catch ex {
+    }catch ex {
         $$$ThrowStatus(ex.AsStatus())
     }
 }

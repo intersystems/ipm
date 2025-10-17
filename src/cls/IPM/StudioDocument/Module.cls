@@ -443,7 +443,6 @@ XData AppendWheelUnderModuleTransform [ XMLNamespace = "http://www.intersystems.
 </xsl:stylesheet>
 }
 
-/// Compile AppendWheelUnderModuleTransform with concrete values
 ClassMethod CompileAppendWheelUnderModuleXSLT(wheelName As %String) As %XML.XSLT.CompiledStyleSheet
 {
     set xData = ##class(%Dictionary.CompiledXData).IDKEYOpen($classname(),"AppendWheelUnderModuleTransform",,.sc)
@@ -461,6 +460,7 @@ ClassMethod CompileAppendWheelUnderModuleXSLT(wheelName As %String) As %XML.XSLT
     quit compiledStyleSheet
 }
 
+/// Compile AppendWheelUnderModuleTransform with concrete values
 /// Append Python Wheel resources to module.xml
 ClassMethod AddPythonWheels(
 	moduleName As %String,
