@@ -176,6 +176,16 @@ Method OnPhase(
             if $data(^UnitTestRoot,tOldUnitTestRoot) // Stash ^UnitTestRoot
             set ^UnitTestRoot = tUnitTestDir
             set tSC = $classmethod(tManagerClass,"RunTest",tTestSpec,tFlags,.tUserParams)
+
+            // If running integration tests in the verify phase, uninstall all modules after each test
+            if $get(pParams("verifyNamespace"))'="" {
+                set oldNamespace = $namespace
+                new $namespace
+                set $namespace = pParams("verifyNamespace")
+                $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(1,.pParams))
+                set $namespace = oldNamespace
+            }
+
             zkill ^UnitTestRoot
             $$$ThrowOnError(tSC)
 

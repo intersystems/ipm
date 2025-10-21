@@ -38,10 +38,17 @@ Method TestEvaluateMacro()
 Method TestGetModuleDefaultsFromXML()
 {
   do ##class(%IPM.Utils.Module).GetModuleDefaultsFromXML("/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/module-defaults/", .defaults)
-  do $$$AssertEquals(defaults,3)
   do $$$AssertEquals(defaults("ArbitraryDefault"), 1234)
   do $$$AssertEquals(defaults("NoLock"), 1)
   do $$$AssertEquals(defaults("Verbose"), 1)
+
+  set count = 0
+  set key = $order(defaults(""))
+  while (key'="") {
+    set count = count + 1
+    set key = $order(defaults(key))
+  }
+  do $$$AssertEquals(count, 3)
 }
 
 }

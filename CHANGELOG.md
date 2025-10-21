@@ -5,7 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.3] - Unreleased
+## [0.10.4] - 2025-10-21
+
+### Added
+- #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
+- #909: IPM now warns when Python 3.13 or higher is installed (IRIS incompatibility)
+- #850: Re-added `<SystemSetting>` Resource Processor for backwards compatibility
+- #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
+
+### Fixed
+- #899: Fixed CLI parser parses modifiers incorrectly
+- #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
+- #819: Drastically increase `zpm "info"` speed when many dependent packages have been installed
+- #888: Fixed `zpm "list -tree"` showing packages as `[missing]` because of case mismatch
+- #058: Prevent uninstallation of dependent module without `-force` flag
+- #908: Fix case where `uninstall -all` would fail because of incomplete dependency information
+- #892: Fixed load behavior (no longer sets Developer Mode unless -dev flag is set)
+- #903: Fixed install behavior which succeeded even when trying to reinstall a module without -dev or -force modifiers (breaking change)
+- #363: `help load` and `help install` will now mention that setting the `dev` flag will not roll back transactions on failure
+- #884: Fix missing module version in error message when dependency resolution fails to find suitable version
+- #838: Improve error messages when installation fails
+- #924: Make "module" parameter not required for "uninstall" command so -all modifier works
+- #928: `zpm "info"` now recognizes existence of configured ORAS registries
+- #930: Fix issue where `load` didn't work on GitHub URLs
+
+### Changed
+- #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
+- #706: `load` now only accepts absolute paths
+- #278: Modules will now be installed at a well-defined default location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
+- #374: A new System Expression `${ipmdir}` points to the module's default installation location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
+- #563: The `verify` phase will uninstall all modules after every integration test
+- #611, #686: If a path is supplied for `package`, it will now create a temporary subdirectory in that path to export the module into to avoid clashes with any existing files. This subdirectory will be deleted afterwards, leaving just the .tgz file.
+- #844: If the "NameSpace" attribute isn't specified for a Web Application, it will be created in the current namespace instead of %SYS
+- #815: The PrepareDeploy phase has been removed and packaging+publishing of modules with deployed code will happen in the current namespace even in developer mode
+
+## [0.10.3] - 2025-09-17
 
 ### Fixed
 - #829: Fixed export of resources with null Directory attribute
@@ -21,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Format all files and add consistent formatting settings, format on save etc.
 - #848: Resource processing should be done in order of granularity
-- #779: Module default parameters specified in `<Defaults>` in the module.xml are used when loading/installing the module and not just when the module itself runs its lifecycle phases
+- #779: Module parameters specified in `<Defaults>` in the module.xml are used when loading/installing the module and not just when the module itself runs its lifecycle phases
 
 ## [0.10.2] - 2025-06-04
 

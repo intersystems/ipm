@@ -7,7 +7,7 @@ Class %IPM.Main Extends %IPM.CLI
 
 Parameter DOMAIN = "ZPM";
 
-Parameter STANDARDPHASES = {$listbuild("reload","compile","test","package","verify","publish","makedeployed")};
+Parameter STANDARDPHASES = {$listbuild("reload","compile","test","package","verify","publish","makedeployed","applyupdatesteps")};
 
 /// Description of commands to use for this CLI
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
@@ -55,6 +55,8 @@ This is accessible to other instances configured to look at the current namespac
 module repository.
 * publish: saves that artifact to the repository for which deployment is enabled.
 Currently, there may only be one of these per namespace.
+* applyupdatesteps: run any update steps for the module to become updated to the latest available version.
+Can also specify desired version to update to.
 </description>
 
 <!-- Examples -->
@@ -137,6 +139,29 @@ This command is an alias for `module-action module-name publish`
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
+</command>
+
+<command name="update" dataPrefix="D">
+<summary>Updates a module to a newer version.</summary>
+<description>
+	Updates a module to a newer version. By default, updates to the latest available version. Also runs all of the update steps from the current version to the newer version.
+    This command is an alias for module-action module-name applyupdatesteps.
+</description>
+
+<!-- Examples -->
+<example description="Updates the HS.JSON module from the current version to version 3.0.0.">
+	update HS.JSON 3.0.0
+</example>
+
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module on which to perform update actions" />
+<parameter name="version" description="Version (or version expression) of module to update; defaults to the latest available if unspecified. Is ignored if -path is provided." />
+
+<!-- Modifiers -->
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format." />
+<modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 </command>
 
 <command name="makedeployed">
@@ -256,13 +281,14 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <!-- Modifiers -->
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="branch" aliases="b" dataAlias="Branch" value="true" description="The name of the branch in the repository" />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set. In addition, transactions will not be rolled back if installation fails." />
 <modifier name="nodev" dataAlias="DeveloperMode" dataValue="0" description="Disables the DeveloperMode flag for the module's lifecycle." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
+<modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -378,13 +404,14 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="latest" aliases="l" description="Installs the latest available version of this module without prompting the user." />
 <modifier name="prompt" aliases="p" description="Prompts user which version to install, if more then one found." />
-<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set. In addition, transactions will not be rolled back if installation fails." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
+<modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
 
 </command>
 
@@ -436,7 +463,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 </example>
 
 <!-- Parameters -->
-<parameter name="module" required="true" description="Name of module to uninstall" />
+<parameter name="module" description="Name of module to uninstall" />
 
 <!-- Modifiers -->
 <modifier name="all" aliases="a" description="Uninstalls all modules installed in the current namespace." />
@@ -796,13 +823,15 @@ ClassMethod GetVersion(
         }
     }
     set sc=$$$OK
-    set sql="select URL from %IPM_Repo_Remote.Definition where Enabled = 1"
+    set sql="select URL from %IPM_Repo_Remote.Definition where Enabled = 1" _
+        " union " _
+        "select URL from %IPM_Repo_Oras.Definition where Enabled = 1"
         ,rs=##class(%ResultSet).%New()
         ,sc=rs.Prepare(sql)
     set:sc sc=rs.Execute("")
     if sc {
         quit:'rs.%Next()
-        set out=rs.Get("URL")
+        set out=$zconvert(rs.Get("URL"),"l")
     }
     quit sc
 }
@@ -944,6 +973,8 @@ ClassMethod ShellInternal(
                 do ..Config(.tCommandInfo)
             } elseif (tCommandInfo = "unpublish") {
                 do ..Unpublish(.tCommandInfo)
+            }  elseif (tCommandInfo = "update") {
+                do ..Update(.tCommandInfo)
             } elseif ($listfind(..#STANDARDPHASES,tCommandInfo)) {
                 do ..RunOnePhase(.tCommandInfo)
             } elseif (tCommandInfo = "generate") {
@@ -2129,15 +2160,29 @@ ClassMethod LoadFromRepo(
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
+    set isAbsolutePath = ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) = tDirectoryName)
+    set isURL = $extract(tDirectoryName,1,4)="http"
+    if tDirectoryName = "" {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"No path has been specified."))
+    } elseif '##class(%File).Exists(tDirectoryName) && 'isAbsolutePath && 'isURL {
+        // if the path is to a directory (not a file) and it is not a URL, it must be absolute
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"The specified path must be absolute."))
+    }
+    set tForce = $$$HasModifier(pCommandInfo,"force")
     merge tParams = pCommandInfo("data")
-    set tParams("cmd") = "load"
+    // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
+    // In the case of a load command, tParams still needs to be populated here.
+    if '$get(tParams("Update"),0) {
+        set tParams("cmd") = "load"
+        set tParams("Load") = 1
+    }
+    set tParams("Force") = tForce
     do ##class(%Net.URLParser).Decompose(tDirectoryName, .tComponents)
     if $get(tComponents("scheme")) [ "http" {
         set tDirectoryName=..LoadFromRepo(tDirectoryName,.tParams)
     }
-    if ##class(%File).DirectoryExists(tDirectoryName) {
-        set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 1)
-    } elseif ##class(%File).Exists(tDirectoryName) && (($$$lcase($piece(tDirectoryName,".", *))="tgz") || ($$$lcase($piece(tDirectoryName,".", *-1, *))="tar.gz")) {
+    set extension = $$$lcase($piece(tDirectoryName,".",*))
+    if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = $$$FileTempDirSys
         if $get(pCommandInfo("data", "Verbose")) {
             write !,"Extracting archive to ",tTargetDirectory
@@ -2205,15 +2250,23 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
     }
     if (tModuleName = "") {
-        quit $$$OK
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No module name specified."))
     }
 
     if tModuleName = $$$IPMModuleName {
         $$$ThrowOnError(..CheckModuleNamespace())
     }
+    // check if any registries are configured and enabled
+    new SQLCODE, count
+    &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
+    $$$ThrowSQLIfError(SQLCODE,%message)
+    if (SQLCODE = 0) && (count = 0) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
+    }
 
     set tVersion = $get(pCommandInfo("parameters","version"))
     set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
+    set tForce = $$$HasModifier(pCommandInfo,"force")
 
     set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
     set tSearchCriteria.Registry = tRegistry
@@ -2248,8 +2301,13 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
             do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
             merge tParams = pCommandInfo("data")
             set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
-            set tParams("cmd") = "install"
-            set tParams("Install") = 1
+            set tParams("Force") = tForce
+            // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
+            // In the case of a install command, tParams still needs to be populated here.
+            if '$get(tParams("Update"),0) {
+                set tParams("cmd") = "install"
+                set tParams("Install") = 1
+            }
             if tResult.Deployed {
                 set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
                 set tResult.PlatformVersion = platformVersion
@@ -2520,8 +2578,8 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
         $$$ThrowSQLIfError(tDepRes.%SQLCODE, tDepRes.%Message)
         while tDepRes.%Next(.tSC) {
             $$$ThrowOnError(tSC)
-            set tModMap(tDepRes.%Get("ModName"),tDepRes.%Get("DepName")) = tDepRes.%Get("DepVer")
-            set tVisitedMap(tDepRes.%Get("DepName")) = 1
+            set tModMap($zconvert(tDepRes.%Get("ModName"),"l"),$zconvert(tDepRes.%Get("DepName"),"l")) = tDepRes.%Get("DepVer")
+            set tVisitedMap($zconvert(tDepRes.%Get("DepName"),"l")) = 1
         }
         $$$ThrowOnError(tSC)
 
@@ -2579,7 +2637,7 @@ ClassMethod GetListModule(
     set in=""
     while tRes.%Next(.tSC) {
         $$$ThrowOnError(tSC)
-        set name=tRes.%Get("DisplayName")
+        set name=$zconvert(tRes.%Get("DisplayName"),"l")
         set in=in_"'"_name_"',"
         set list=$listbuild(tRes.%Get("VersionString"),tRes.%Get("Description"),tRes.%Get("Root"))
         for a="Author_CopyrightDate", "Author_License", "Author_Notes", "Author_Organization", "Author_Person" {
@@ -3750,59 +3808,92 @@ ClassMethod GetUpstreamPackageVersions(Output list)
     }
 }
 
+/// Provides information on all installed top level modules (i.e. modules that are not depended on)
 ClassMethod Information(ByRef pCommandInfo)
 {
-    set verbose = $$$HasModifier(pCommandInfo,"verbose")
-    // Get all dependency modules
-    $$$ThrowOnError(##class(%IPM.Utils.Module).BuildAllDependencyGraphs(, .graph))
-    set sub = ""
-    for {
-        set sub = $order(graph(sub))
-        if (sub = "") {
-            quit
-        }
-        set dep= ""
-        for {
-            set dep = $order(graph(sub, dep))
-            if (dep = "") {
-                quit
-            }
-            set dependencies(dep) = ""
-        }
-    }
+  set verbose = $$$HasModifier(pCommandInfo,"verbose")
+  // Figure out which installed modules are not dependencies by
+  // 1) getting list of all installed modules
+  // 2) getting list of all dependencies
+  // and 3) cross checking the two lists
+  do ..GetListModules(,,.modList)
+  set depRes = ##class(%SQL.Statement).%ExecDirect(,
+    "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
+    "from %IPM_Storage.ModuleItem_Dependencies")
+  $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+  while depRes.%Next(.sc) {
+    $$$ThrowOnError(sc)
+    set visited($zconvert(depRes.%Get("DepName"),"l")) = 1
+  }
+  $$$ThrowOnError(sc)
 
-    set messages = ..BuildIntroMessages(.outOfBoxMessage)
-    set messages = messages _ $listbuild(outOfBoxMessage)
-    set ptr = 0
-    while $listnext(messages, ptr, line) {
-        write !, line
+  set topLevelList("width") = 0
+  for i = 1:1:modList {
+    set entry = modList(i)
+    set name = $listget(entry, 1)
+    // only list non-dependencies
+    if '$data(visited(name)) {
+      // compile information
+      set externalName = $list(entry, 3)
+      if (externalName '= "") && (externalName '= name) {
+        if verbose {
+          set $list(entry, 1) = externalName_" (" _ name _ ")"
+        } else {
+          set $list(entry, 1) = externalName
+        }
+      }
+      if topLevelList("width") < $length($listget(entry)) {
+        set topLevelList("width") = $length($listget(entry))
+      }
+      set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
+      set $list(entry, 2) = version.ToStringWithoutBuild()
+      set topLevelList($increment(topLevelList)) = entry
     }
-    write !!, "Currently installed top-level modules are listed below:", !
-    do ..GetListModules(,,.list)
-    set updatedList("width") = 0
-    for i = 1:1:list {
-        set entry = list(i)
-        set name = $listget(entry, 1)
-        // only list non-dependencies
-        if $data(dependencies(name)) {
-            continue
-        }
-        set externalName = $list(entry, 3)
-        if (externalName '= "") && (externalName '= name) {
-            if verbose {
-                set $list(entry, 1) = externalName_" (" _ name _ ")"
-            } else {
-                set $list(entry, 1) = externalName
-            }
-        }
-        if updatedList("width") < $length($listget(entry)) {
-            set updatedList("width") = $length($listget(entry))
-        }
-        set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
-        set $list(entry, 2) = version.ToStringWithoutBuild()
-        set updatedList($increment(updatedList)) = entry
+  }
+
+  set messages = ..BuildIntroMessages(.outOfBoxMessage)
+  set messages = messages _ $listbuild(outOfBoxMessage)
+  set ptr = 0
+  while $listnext(messages, ptr, line) {
+    write !, line
+  }
+  write !!, "Currently installed top-level modules are listed below:", !
+  do ..DisplayModules(.topLevelList)
+}
+
+ClassMethod Update(ByRef pCommandInfo)
+{
+    if $get(pCommandInfo("data","PermitDowngrade"),0) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"The 'PermitDowngrade' flag is not allowed for the update command."))
     }
-    do ..DisplayModules(.updatedList)
+    set verbose = $get(pCommandInfo("data","Verbose"))
+    set version = $get(pCommandInfo("parameters","version"))
+    set path = $$$GetModifier(pCommandInfo,"path")
+    set moduleName = $get(pCommandInfo("parameters","module"))
+    if '##class(%IPM.Storage.Module).NameExists(moduleName) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
+    }
+    if verbose {
+        if path '= "" {
+            write !,"Resolving version of module specified by -path flag: ",path," to update",!
+        } elseif version = "" {
+            write !,"Resolving latest available version of module ",moduleName," to install",!
+        } else {
+            write !,"Preparing to update module ",moduleName," to version ",version,!
+        }
+    }
+    // Indicating to pCommandInfo that this is an update command, not an install or load command. pCommandInfo will be passed to either Install() or Load() to continue performing the update.
+    set pCommandInfo("data","cmd") = "update"
+    set pCommandInfo("data","Update") = 1
+    set pCommandInfo("data","ModuleName") = moduleName
+    if path '= "" {
+        // A path to a tarball is specified. Call ..Load() in order to load the newer version of the module.
+        set pCommandInfo("parameters","path") = path
+        do ..Load(.pCommandInfo)
+    } else {
+        // Call ..Install() in order to install the newer version of the module.
+        do ..Install(.pCommandInfo)
+    }
 }
 
 }

@@ -80,6 +80,77 @@ Method TestParser()
 	Set tResults(tCommands,
 	*/
 
+    // defaulted dataValue (-v) followed by a valued modifier
+    // Expect: -v -> data("Verbose")=1, and -env value goes to data("EnvFiles") (NOT into "Verbose")
+    set tCommands($increment(tCommands)) = "install SomeModule -v -env C:\env1.json;C:\env2.json"
+    set tResults(tCommands)="install"
+    set tResults(tCommands,"parameters","module")="SomeModule"
+    set tResults(tCommands,"data","Verbose")=1
+    set tResults(tCommands,"data","EnvFiles")="C:\env1.json;C:\env2.json"
+
+    // defaulted dataValue (-q) followed by a valued modifier
+    // Expect: -q -> data("Verbose")=0, and -env captured correctly
+    set tCommands($increment(tCommands)) = "install SomeModule -q -env /etc/env1.json;/etc/env2.json"
+    set tResults(tCommands)="install"
+    set tResults(tCommands,"parameters","module")="SomeModule"
+    set tResults(tCommands,"data","Verbose")=0
+    set tResults(tCommands,"data","EnvFiles")="/etc/env1.json;/etc/env2.json"
+
+    // module-action + phase modifiers
+    // Expect: -v sets data("Verbose")=1, -path goes to data("Path"), and -export-deps maps to data("ExportDependencies")
+    set tCommands($increment(tCommands)) = "module-action MyModule package -v -path /tmp/pkg -export-deps 1"
+    set tResults(tCommands)="module-action"
+    set tResults(tCommands,"parameters","module")="MyModule"
+    set tResults(tCommands,"parameters","actions")="package"
+    set tResults(tCommands,"data","Verbose")=1
+    set tResults(tCommands,"data","Path")="/tmp/pkg"
+    set tResults(tCommands,"data","ExportDependencies")=1
+
+    // defaulted dataValue (-dev) followed by a valued modifier
+    // Expect: -dev -> data("DeveloperMode")=1, and -extra-pip-flags captured correctly
+    set tCommands($increment(tCommands)) = "load -dev -extra-pip-flags ""--timeout 30"" C:\code\my-module\"
+    set tResults(tCommands)="load"
+    set tResults(tCommands,"parameters","path")="C:\code\my-module\"
+    set tResults(tCommands,"data","DeveloperMode")=1
+    set tResults(tCommands,"data","ExtraPipFlags")="--timeout 30"
+
+    // Recognized alias should NOT mirror under data("zpm",...)
+	// Expects no data("zpm","EnvFiles")
+    set tCommands($increment(tCommands)) = "install SomeModule -env C:\a.json;C:\b.json"
+    set tResults(tCommands)="install"
+    set tResults(tCommands,"parameters","module")="SomeModule"
+    set tResults(tCommands,"data","EnvFiles")="C:\a.json;C:\b.json"
+
+    // Recognized alias with a preceding defaulted dataValue (-v) should NOT mirror under data("zpm",...)
+    set tCommands($increment(tCommands)) = "install SomeModule -v -env /etc/a.json;/etc/b.json"
+    set tResults(tCommands)="install"
+    set tResults(tCommands,"parameters","module")="SomeModule"
+    set tResults(tCommands,"data","Verbose")=1
+    set tResults(tCommands,"data","EnvFiles")="/etc/a.json;/etc/b.json"
+
+    // module-action with valued aliases; no zpm copies for aliases
+    set tCommands($increment(tCommands)) = "module-action MyModule package -v -path /tmp/pkg -export-deps 1"
+    set tResults(tCommands)="module-action"
+    set tResults(tCommands,"parameters","module")="MyModule"
+    set tResults(tCommands,"parameters","actions")="package"
+    set tResults(tCommands,"data","Verbose")=1
+    set tResults(tCommands,"data","Path")="/tmp/pkg"
+    set tResults(tCommands,"data","ExportDependencies")=1
+
+    // load with defaulted alias then valued alias; no zpm copy for alias
+    set tCommands($increment(tCommands)) = "load -dev -extra-pip-flags ""--timeout 30"" C:\code\my-module\"
+    set tResults(tCommands)="load"
+    set tResults(tCommands,"parameters","path")="C:\code\my-module\"
+    set tResults(tCommands,"data","DeveloperMode")=1
+    set tResults(tCommands,"data","ExtraPipFlags")="--timeout 30"
+
+    // Mix of -D and recognized alias
+    set tCommands($increment(tCommands)) = "install SomeModule -DEnvFiles=/etc/one;/etc/two -env /etc/three;/etc/four"
+    set tResults(tCommands)="install"
+    set tResults(tCommands,"parameters","module")="SomeModule"
+    set tResults(tCommands,"data","EnvFiles")="/etc/three;/etc/four"
+    set tResults(tCommands,"data","zpm","EnvFiles")="/etc/one;/etc/two"
+
 	// Verify output matches
 	for i=1:1:tCommands {
 		kill tParsedCommandInfo,tExpectedCommandInfo
