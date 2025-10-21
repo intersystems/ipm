@@ -1113,11 +1113,7 @@ ClassMethod LoadNewModule(
         set tDisplayName = $piece(tFirstLoaded, ".", 1, *-1)
         set tModuleName = $$$lcase(tDisplayName)
 
-        #dim tInstallContext As %IPM.General.InstallContext
-        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
-        if foundNewModuleObj && 'tInstallContext.ModuleIsDependency(tModuleName) {
+        if foundNewModuleObj {
             // Check that on an update command with -path flag, the module in the path matches the base module specified for update.
             if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
               set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
