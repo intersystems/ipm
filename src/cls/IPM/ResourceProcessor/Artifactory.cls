@@ -1,4 +1,4 @@
-Include %IPM.Common
+Include (%IPM.Common, %IPM.Formatting)
 
 /// Resource processor class to be used to obtain an artifact from an external repository via an HTTP request
 /// and unpack that artifact into given directories. <br />
@@ -17,57 +17,74 @@ Parameter ATTRIBUTES As STRING = "InstallDirectory,Filter";
 Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest}, Required ];
 
 /// As JSON, the contents of the filter to be used in the items.find() query in JFrog Artifactory
-/// For more details on specific values, visit <a href="https://jfrog.com/help/r/jfrog-artifactory-documentation/artifactory-query-language">
-Property Filter As %String(MAXLEN = 2048);
+/// For more details on specific values, visit <a href="https://jfrog.com/help/r/jfrog-artifactory-documentation/artifactory-query-language" target="_blank">JFrog AQL Documentation</a>
+Property Filter As %String(MAXLEN = "");
 
-Method OnAfterPhase(phase As %String, ByRef params) As %Status
+Method OnAfterPhase(
+	phase As %String,
+	ByRef params) As %Status
 {
     #dim ex As %Exception.AbstractException
     set sc = $$$OK
     try {
-        if (phase = "Package") {
-            do ..DownloadArtifact(.params)
-        }
         if (phase = "Activate") {
             set verbose  = $get(params("Verbose"),0)
             // If install directory exists, use that
             // Else, download from artifactory
             set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
             if '##class(%File).DirectoryExists(downloadDirectory) {
-                if $get(params("Artifactory", "Run"), 0) {
-                    if (verbose) {
-                        write !, "No artifact found in "_downloadDirectory_" and -DArtifactory.Run set. Will now download it from artifactory."
-                    }
-                    do ..DownloadArtifact(.params)
-                } else {
-                    if (verbose) {
-                        write !, "No artifact found in "_downloadDirectory_" and -DArtifactory.Run was NOT set, skipping copying contents."
-                    }
-                    quit
+                if (verbose) {
+                    write !, "No artifact found in "_downloadDirectory_", will now download it from artifactory."
                 }
+                do ..DownloadArtifact(.params)
             } else {
                 if (verbose) {
                     write !, "Artifact found in "_downloadDirectory_". Will use that instead of downloading a new one."
                 }
             }
-
-            // copy everything from /<module root>/<resource name>/ into the final destination
-            // overwrite existing files if there are any in destination dir
-            if (verbose) {
-                write !, "Going to copy extracted contents from "_downloadDirectory_" to "_..InstallDirectory
-            }
-            // pOverlay = 1, pDeleteBeforeCopy = 1
-            if '##class(%Library.File).CopyDir(downloadDirectory, ..InstallDirectory, 1, ,1) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_..InstallDirectory))
-            }
-            if (verbose) {
-                write !, "Copy Succeeded."
+            // If artifact fails to download in dev mode then the directory won't exist but execution won't error either
+            if ##class(%File).DirectoryExists(downloadDirectory) {
+                // copy everything from /<module root>/<resource name>/ into the final destination
+                // overwrite existing files if there are any in destination dir
+                if (verbose) {
+                    write !, "Going to copy extracted contents from "_downloadDirectory_" to "_..InstallDirectory
+                }
+                // Copy contents over with pDeleteBeforeCopy = 1
+                if '##class(%Library.File).CopyDir(downloadDirectory, ..InstallDirectory,,,1) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_..InstallDirectory))
+                }
+                if (verbose) {
+                    write !, "Copy Succeeded."
+                }
             }
         }
     } catch ex {
         set sc = ex.AsStatus()
     }
     quit sc
+}
+
+Method OnExportItem(
+	fullExportPath As %String,
+	itemName As %String,
+	ByRef itemParams,
+	ByRef params,
+	Output itemHandled As %Boolean = 0) As %Status
+{
+    set sc = $$$OK
+    try {
+        if (params("cmd") = "package") {
+            do ..DownloadArtifact(.params)
+            set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
+            set exportPath = params("ModuleExportPath")
+            // Copy contents over to package directory with pDeleteBeforeCopy = 1
+            do ##class(%File).CopyDir(downloadDirectory, exportPath,,1)
+            set itemHandled = 1
+        }
+    } catch (ex) {
+        set sc = ex.AsStatus()
+    }
+    return sc
 }
 
 /// Wrapper method to invoked shared functionality of retreiving an artifact then untarring the contents
@@ -81,37 +98,20 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     if (verbose) {
         write !, "Start retrieving artifact..."
     }
-
-    merge artifactory = params("Artifactory")
-    set useHttps = $get(artifactory("UseHttps"), 0)
-    set server = $get(artifactory("Server"))
-    set port = $get(artifactory("Port"))
-    set apiURL = $get(artifactory("APIURL"))
-
-    // "Order of operations" for auth method:
-    // 1. Method explicitly specified via -DArtifactory.UseTokenAuth
-    // 2. Command Line Variables Specified
-    // 3. Fallback to Environment Variables
-    // When both specified at same level: Use token auth over basic auth
-    if $get(artifactory("UseTokenAuth")) '= "" {
-        set useTokenAuth = artifactory("UseTokenAuth")
-    } elseif $get(artifactory("BearerToken")) '= "" {
-        set useTokenAuth = 1
-    } elseif $get(artifactory("Username")) '= "" && $get(artifactory("Password")) '= "" {
-        set useTokenAuth = 0
-    } elseif $system.Util.GetEnviron("ARTI_TOKEN") '= "" {
-        set useTokenAuth = 1
-    } else {
-        set useTokenAuth = 0
-    }
-    // For auth variables: 1. check command line; 2. check environment vars; 3. If none specified will be an empty value
-    set username = $select($get(artifactory("Username")) '= "": artifactory("Username"), 1: $system.Util.GetEnviron("ARTI_USERNAME"))
-    set password = $select($get(artifactory("Password")) '= "": artifactory("Password"), 1: $system.Util.GetEnviron("ARTI_PASSWORD"))
-    set bearerToken = $select($get(artifactory("BearerToken")) '= "": artifactory("BearerToken"), 1: $system.Util.GetEnviron("ARTI_TOKEN"))
+    set server = $system.Util.GetEnviron("ARTI_SERVER")
+    set port = $system.Util.GetEnviron("ARTI_PORT")
+    set apiURL = $system.Util.GetEnviron("ARTI_APIURL")
+    set username = $system.Util.GetEnviron("ARTI_USERNAME")
+    set password = $system.Util.GetEnviron("ARTI_PASSWORD")
+    set bearerToken = $system.Util.GetEnviron("ARTI_TOKEN")
 
     // The following variables need to be set for all or none
-    if ((server = "") || (port = "") || (apiURL = "")) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, and api url must be provided to download an artifact"))
+    if ((server = "") || (port = "") || (apiURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
+        if (developerMode) {
+            write !, $$$FormattedLine($$$Red, "WARNING: Not all of server, port, api url, and a bearer token or username and password were provided, skipping downloading artifact.")
+            quit
+        }
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, api url, and a bearer token or username and password must be provided to download an artifact"))
     }
 
     set tempFile = ##class(%Library.File).TempFilename(,,.errorCode)
@@ -126,8 +126,8 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     // SubDirectoryName does normalization as well
     set PMTempDir = ##class(%Library.File).SubDirectoryName(OSTempDir, ..ResourceReference.Name, 1)
 
-    set artifactPath = ..GetArtifactPath(useHttps, server, port, apiURL, useTokenAuth, username, password, bearerToken, ..Filter, verbose)
-    set artifactName = ..RetrieveArtifact(useHttps, server, port, artifactPath, PMTempDir, verbose)
+    set artifactPath = ..GetArtifactPath(server, port, apiURL, username, password, bearerToken, ..Filter, verbose)
+    set artifactName = ..RetrieveArtifact(server, port, artifactPath, PMTempDir, verbose)
 
     // Unpack artifact in temp location (so that if anything goes wrong, the true destination does not get affected)
     // and copy artifact to destination
@@ -136,14 +136,23 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 
 /// Return the path of the valid artifact
 /// Errors if no valid artifact is found
-ClassMethod GetArtifactPath(useHttps As %Boolean, artifactServer As %String, artifactPort As %String, apiURL As %String, useTokenAuth As %Boolean, username As %String, password As %String, bearerToken As %String, filter As %String, verbose As %Boolean = 0) As %String [ Internal ]
+ClassMethod GetArtifactPath(
+	artifactServer As %String,
+	artifactPort As %String,
+	apiURL As %String,
+	username As %String,
+	password As %String,
+	bearerToken As %String,
+	filter As %String,
+	verbose As %Boolean = 0) As %String [ Internal ]
 {
     set httpRequest = ##class(%Net.HttpRequest).%New()
-    set httpRequest.Https = useHttps
+    set httpRequest.Https = 1
     set httpRequest.SSLConfiguration = ##class(%IPM.Utils.Module).CreateAndGetSSLConfig()
     set httpRequest.Server = artifactServer
     set httpRequest.Port = artifactPort
-    if (useTokenAuth) {
+    // Token auth gets priority over baisc auth
+    if (bearerToken '= "") {
         do httpRequest.SetHeader("Authorization", "Bearer "_bearerToken)
         if (verbose) {
             write !, "Using token auth in HTTP request"
@@ -181,16 +190,14 @@ ClassMethod GetArtifactPath(useHttps As %Boolean, artifactServer As %String, art
     set jsonObj = ##class(%Library.DynamicAbstractObject).%FromJSON(responseData)
     #dim results As %Library.DynamicArray
     set results = jsonObj.%Get("results")
-    set targetResultObj = results.%Get(0, "")
-
-    if (targetResultObj = "") {
+    if (results.%Size() > 1) && (verbose) {
+        write !, results.%Size()_" valid artifacts found matching the filtered criteria. Choosing the one most recently updated."
+    }
+    set resultArtifact = results.%Get(0, "")
+    if (resultArtifact = "") {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "No valid artifact was found based on the query parameters"))
     }
-
-    set artifactoryRepo = targetResultObj.%Get("repo")
-    set path = targetResultObj.%Get("path")
-    set name = targetResultObj.%Get("name")
-    set artifactPath = "artifactory/"_artifactoryRepo_"/"_path_"/"_name
+    set artifactPath = "artifactory/"_resultArtifact.%Get("repo")_"/"_resultArtifact.%Get("path")_"/"_resultArtifact.%Get("name")
     if (verbose) {
         write !, "Valid artifact found at: "_artifactPath
     }
@@ -201,16 +208,21 @@ ClassMethod GetArtifactPath(useHttps As %Boolean, artifactServer As %String, art
 /// Retrieves the artifact based on the artifactPath provided
 /// Full path will be written to console if verbose is enabled.
 /// Returns the file name of the artifact downloaded
-ClassMethod RetrieveArtifact(useHttps As %Boolean, artifactServer As %String, artifactPort As %String, artifactPath As %String, downloadDirectory As %String, verbose As %Boolean = 0) As %String [ Internal ]
+ClassMethod RetrieveArtifact(
+	artifactServer As %String,
+	artifactPort As %String,
+	artifactPath As %String,
+	downloadDirectory As %String,
+	verbose As %Boolean = 0) As %String [ Internal ]
 {
     set httpRequest = ##class(%Net.HttpRequest).%New()
-    set httpRequest.Https = useHttps
+    set httpRequest.Https = 1
     set httpRequest.SSLConfiguration = ##class(%IPM.Utils.Module).CreateAndGetSSLConfig()
     set httpRequest.Server = artifactServer
     set httpRequest.Port = artifactPort
 
     if verbose {
-        write !, "Start retrieving artifact at "_$case(useHttps, 1: "https", : "http")_"://" _ artifactServer _ ":" _ $case((artifactPort = ""), 1: "", : ":"_artifactPort) _ "/" _ artifactPath
+        write !, "Start retrieving artifact at https://" _ artifactServer _ ":" _ $case((artifactPort = ""), 1: "", : ":"_artifactPort) _ "/" _ artifactPath
     }
     $$$ThrowOnError(httpRequest.Get(artifactPath))
 
@@ -239,13 +251,12 @@ ClassMethod RetrieveArtifact(useHttps As %Boolean, artifactServer As %String, ar
     set localPath = ##class(%Library.File).NormalizeFilename(artifactName, downloadDirectory)
     if '##class(%Library.File).Exists(localPath) {
         if verbose {
-            write !, "Update found. Saving to " _ localPath
+            write !, "Saving to " _ localPath
         }
 
         set stream = ##class(%Library.FileBinaryStream).%New()
         set stream.Filename = localPath
-        $$$ThrowOnError(stream.CopyFrom(responseData))
-        $$$ThrowOnError(stream.%Save())
+        $$$ThrowOnError(stream.CopyFromAndSave(responseData))
     }
 
     return artifactName
@@ -255,7 +266,11 @@ ClassMethod RetrieveArtifact(useHttps As %Boolean, artifactServer As %String, ar
 /// artifactName: the source tgz file name
 /// sourceFileDir: the directory of pSourceFilePath (passed to save the effort of parsing again based on Windows/Unix)
 /// copyToDir: the destination directory for extracted contents to be copied to
-ClassMethod UnTar(artifactName As %String, sourceFileDir As %String, copyToDir As %String, verbose As %Boolean = 0) [ Internal ]
+ClassMethod UnTar(
+	artifactName As %String,
+	sourceFileDir As %String,
+	copyToDir As %String,
+	verbose As %Boolean = 0) [ Internal ]
 {
     // if there is no artifact name, then it means there is nothing to be untarred
     if (artifactName = "") {
@@ -338,7 +353,7 @@ ClassMethod UnTar(artifactName As %String, sourceFileDir As %String, copyToDir A
         write !, "Going to copy extracted contents from "_extractedDir_" to "_copyToDir
     }
 
-    // pOverlay = 1, pDeleteBeforeCopy = 1
+    // Copy contents over with pDeleteBeforeCopy = 1
     if '##class(%Library.File).CopyDir(extractedDir, copyToDir, 1, ,1) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_copyToDir))
     }
