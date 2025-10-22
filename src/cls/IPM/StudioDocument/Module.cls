@@ -444,17 +444,17 @@ XData AppendWheelUnderModuleTransform [ XMLNamespace = "http://www.intersystems.
 }
 
 /// Compile AppendWheelUnderModuleTransform with concrete values
-ClassMethod CompiledAppendWheelUnderModuleXSLT(wheelName As %String) As %XML.XSLT.CompiledStyleSheet
+ClassMethod CompileAppendWheelUnderModuleXSLT(wheelName As %String) As %XML.XSLT.CompiledStyleSheet
 {
     set xData = ##class(%Dictionary.CompiledXData).IDKEYOpen($classname(),"AppendWheelUnderModuleTransform",,.sc)
     $$$ThrowOnError(sc)
-    set s = ""
+    set baseStream = ""
     while 'xData.Data.AtEnd {
-        set s = s _ xData.Data.Read()
+        set baseStream = baseStream _ xData.Data.Read()
     }
-    set s = $replace(s, "replacementWheelName", wheelName)
+    set baseStream = $replace(baseStream, "replacementWheelName", wheelName)
     set stream = ##class(%Stream.TmpCharacter).%New()
-    $$$ThrowOnError(stream.Write(s))
+    $$$ThrowOnError(stream.Write(baseStream))
     $$$ThrowOnError(stream.Rewind())
     set sc = ##class(%XML.XSLT.CompiledStyleSheet).CreateFromStream(stream, .compiledStyleSheet)
     $$$ThrowOnError(sc)
@@ -467,7 +467,7 @@ ClassMethod AddPythonWheels(
 	wheelName As %String)
 {
     // Can't use %IPM.Repo.XSLTProvider because we need to pass a parameter
-    set compiledTransform = ..CompiledAppendWheelUnderModuleXSLT(wheelName)
+    set compiledTransform = ..CompileAppendWheelUnderModuleXSLT(wheelName)
     set document = ##class(%Library.RoutineMgr).%OpenId(moduleName_".ZPM")
     if '$isobject(document) {
         // %Library.RoutineMgr:%OpenId doesn't have a byref status arg.

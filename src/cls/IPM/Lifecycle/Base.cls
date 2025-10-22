@@ -700,10 +700,11 @@ Method %Reload(ByRef pParams) As %Status
 
 Method InstallPythonRequirements(
 	pRoot As %String = "",
-	ByRef pParams)
+	ByRef pParams,
+	download As %Boolean = 0)
 {
     set cmd = $get(pParams("cmd"))
-    if '$listfind($listbuild("install", "load"), cmd) {
+    if ('download && '$listfind($listbuild("install", "load"), cmd)) {
         quit $$$OK
     }
     set tVerbose = $get(pParams("Verbose"))
@@ -720,9 +721,6 @@ Method InstallPythonRequirements(
     }
     set tSC = $$$OK
     try {
-        do ..Log("requirements.txt START")
-        write:tVerbose !
-
         set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
         if '$system.CLS.IsMthd("%SYS.Python", "Import") {
             throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
@@ -732,29 +730,37 @@ Method InstallPythonRequirements(
         set tPyMinor = tSysModule."version_info".minor
         set tPyMicro = tSysModule."version_info".micro
         set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
-        set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
-        if tVerbose {
-            write !, "Running "
-            zwrite command
+        if download {
+            do ..Log("Download Python wheels START")
+            write:tVerbose !
+            set wheelsPath = ##class(%File).NormalizeFilename("wheels", pRoot)
+            set command = ..ResolvePipCaller(.pParams) _ $listbuild("download", "-r", "requirements.txt", "-d", wheelsPath, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+            if tVerbose {
+                write !, "Running "
+                zwrite command
+            } else {
+                set stdout = ""
+            }
+            set sc = ##class(%IPM.Utils.Module).RunCommand(pRoot, command, .stdout)
+            $$$ThrowOnError(sc)
+            do ..Log("Download Python wheels SUCCESS")
         } else {
-            set stdout = ""
+            do ..Log("requirements.txt START")
+            write:tVerbose !
+            set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+            if tVerbose {
+                write !, "Running "
+                zwrite command
+            } else {
+                set stdout = ""
+            }
+            set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
+            $$$ThrowOnError(tSC)
+            do ..Log("requirements.txt SUCCESS")
         }
-        set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
-        $$$ThrowOnError(tSC)
-        set wheelsPath = ##class(%File).NormalizeFilename("wheels", pRoot)
-        set command = ..ResolvePipCaller(.pParams) _ $listbuild("download", "-r", "requirements.txt", "-d", wheelsPath, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
-        if tVerbose {
-            write !, "Running "
-            zwrite command
-        } else {
-            set stdout = ""
-        }
-        set sc = ##class(%IPM.Utils.Module).RunCommand(pRoot, command, .stdout)
-        $$$ThrowOnError(sc)
-        do ..Log("requirements.txt SUCCESS")
     } catch ex {
         set tSC = ex.AsStatus()
-        do ..Log("requirements.txt FAILURE")
+        do ..Log("Pip command FAILURE")
     }
     quit tSC
 }
@@ -1166,7 +1172,7 @@ Method %Export(
         }
         set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
         if exportPythonDependencies {
-            $$$ThrowOnError(..HandlePythonDependencies())
+            do ..ExportPythonDependencies(.pParams)
         }
 
         // Deployed items should be exported as a studio project to a designated directory
@@ -1224,27 +1230,20 @@ Method %Export(
 }
 
 /// Walk the wheels directory under root and add Python Wheel resources to manifest if needed
-Method HandlePythonDependencies() As %Status
+Method ExportPythonDependencies(ByRef pParams)
 {
-    set sc = $$$OK
     try {
+        set root = ##class(%File).NormalizeDirectory("", ..Module.Root)
+        $$$ThrowOnError(..InstallPythonRequirements(root, .pParams, 1))
         set wheelsDir = ##class(%File).NormalizeDirectory("wheels", ..Module.Root)
         if '##class(%File).DirectoryExists(wheelsDir) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheels directory not found."))
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheels directory: "_wheelsDir_" not found."))
         }
         set stmt = ##class(%SQL.Statement).%New()
-        set status = stmt.%PrepareClassQuery("%File", "FileSet")
-        if $$$ISERR(status) {
-            write "%Prepare failed:"
-            do $system.Status.DisplayError(status)
-            quit
-        }
+        $$$ThrowOnError(stmt.%PrepareClassQuery("%File", "FileSet"))
         set rset = stmt.%Execute(wheelsDir, "*.whl")
-        if (rset.%SQLCODE '= 0) {
-            write "%Execute failed:", !, "SQLCODE ", rset.%SQLCODE, ": ", rset.%Message
-            quit
-        }
-        while rset.%Next() {
+        $$$ThrowSQLIfError(rset.%SQLCODE,rset.%Message)
+        while rset.%Next(.sc) {
             set file = rset.%Get("ItemName")
             set type = rset.%Get("Type")
             if (type '= "F") || (file = "") {
@@ -1252,14 +1251,10 @@ Method HandlePythonDependencies() As %Status
             }
             do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
         }
-        if (rset.%SQLCODE < 0) {
-            write "%Next failed:", !, "SQLCODE ", rset.%SQLCODE, ": ", rset.%Message
-            quit
-        }
+        $$$ThrowOnError(sc)
     } catch ex {
-        set sc = ex.AsStatus()
+        $$$ThrowStatus(ex.AsStatus())
     }
-    quit sc
 }
 
 Method %PrepareDeploy(ByRef pParams) As %Status [ Abstract ]

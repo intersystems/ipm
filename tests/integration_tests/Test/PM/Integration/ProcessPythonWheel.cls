@@ -27,7 +27,7 @@ ClassMethod GenerateWheel()
 }
 
 /// Get the version of a Python package
-ClassMethod PythonVersionOf(name As %String) As %String
+ClassMethod GetPythonVersion(name As %String) As %String
 {
     // Note that importlib.metadata is available on Python 3.8+
     try {
@@ -37,8 +37,8 @@ ClassMethod PythonVersionOf(name As %String) As %String
         return ver
     } catch ex {
         // In case Python version is lower than 3.8
-        set pkgres = ##class(%SYS.Python).Import("pkg_resources")
-        set dist = pkgres."get_distribution"(name)
+        set packageResources = ##class(%SYS.Python).Import("pkg_resources")
+        set dist = packageResources."get_distribution"(name)
         return dist."version"
     }
 }
@@ -47,9 +47,15 @@ ClassMethod PythonVersionOf(name As %String) As %String
 ClassMethod DeletePath(path As %String)
 {
     if ##class(%File).DirectoryExists(path) {
-        do ##class(%File).RemoveDirectoryTree(path)
+        set removeSuccess = ##class(%File).RemoveDirectoryTree(path)
+        if 'removeSuccess {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to remove directory: "_path))
+        }
     } elseif ##class(%File).Exists(path) {
-        do ##class(%File).Delete(path)
+        set removeSuccess = ##class(%File).Delete(path)
+        if 'removeSuccess {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to remove file: "_path))
+        }
     }
 }
 
@@ -101,7 +107,7 @@ Method TestWheelPresent()
     try {
         set lunePackage = ##class(%SYS.Python).Import("lune")
         do $$$AssertSuccess("Successfully imported lune-wheel resource using wheel")
-        set wheelVer = ..PythonVersionOf("lune")
+        set wheelVer = ..GetPythonVersion("lune")
         do $$$AssertEquals(wheelVer, "1.6.2")
     } catch ex {
         do $$$AssertFailure("Failed to import lune-wheel resource: "_ex.AsStatus())
@@ -123,7 +129,7 @@ Method TestWheelAndReqsPresentOnline()
         if httprequest.HttpResponse '= "" {
             set lunePackage = ##class(%SYS.Python).Import("lune")
             do $$$AssertSuccess("Successfully imported lune-wheel resource using requirements.txt")
-            set reqVer = ..PythonVersionOf("lune")
+            set reqVer = ..GetPythonVersion("lune")
             do $$$AssertEquals(reqVer, "1.6.4")
         }
     } catch ex {
@@ -142,7 +148,7 @@ Method TestWheelAndReqsPresentOffline()
     try {
         set lunePackage = ##class(%SYS.Python).Import("lune")
         do $$$AssertSuccess("Successfully imported lune-wheel resource using wheel")
-        set wheelVer = ..PythonVersionOf("lune")
+        set wheelVer = ..GetPythonVersion("lune")
         do $$$AssertEquals(wheelVer, "1.6.2")
     } catch ex {
         do $$$AssertFailure("Failed to import lune-wheel resource: "_ex.AsStatus())
@@ -161,6 +167,8 @@ Method TestNoWheelAndReqsPresentOffline()
 /// Package with -export-python-deps should write wheel resources into module.xml
 Method TestPackageWithPythonDeps() As %Status
 {
+    do ..PurgePythonPackage("lune")
+    do ..PurgePythonPackage("ansible")
     set dir = ..GetModuleDir("python-deps-tests", ..#PackageWithPythonDepsLocation)
 
     // Use a local filesystem repo to install the test module into the namespace
