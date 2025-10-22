@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Removed secret flag NewVersion handling in %Publish()
 
+### Removed
+- Removed secret flag NewVersion handling in %Publish()
+
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results

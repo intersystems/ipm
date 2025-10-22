@@ -1248,7 +1248,7 @@ Method ExportPythonDependencies(ByRef pParams)
             if (type '= "F") || (file = "") {
                 continue
             }
-            do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
+        do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
         }
         $$$ThrowOnError(sc)
     }catch ex {
