@@ -516,9 +516,6 @@ ClassMethod ExecutePhases(
 
         if pIsComplete {
             set tPhases = tLifecycle.GetCompletePhases(pPhases)
-            if (($listfind(tPhases, "Package") || $listfind(tPhases, "Publish")) && tModule.HaveToDeploy() && tModule.DeveloperMode) {
-                set tPhases = $listbuild("PrepareDeploy") _ tPhases
-            }
         } else {
             set tPhases = $listbuild(##class(%IPM.Lifecycle.Base).MatchSinglePhase($listtostring(pPhases)))
         }
@@ -684,11 +681,6 @@ ClassMethod ExecutePhases(
         }
     } catch e {
         set tSC = e.AsStatus()
-    }
-    if $$$ISERR(tSC) && $data(pParams("PackageDeployNamespace"),tPackageDeployNamespace) &&(tPackageDeployNamespace'="") {
-        set $namespace = $get(pParams("InitNamespace"))
-        do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
-        kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
     }
     quit tSC
 }

@@ -68,63 +68,6 @@ Method %Activate(ByRef pParams) As %Status
     quit tSC
 }
 
-Method %PrepareDeploy(ByRef pParams) As %Status
-{
-    set tSC = $$$OK
-    try {
-        set tVerbose = $get(pParams("Verbose"))
-        merge tParams = pParams
-
-        set tNSConfig = ..Module.GetNamespaceConfig()
-
-        set pParams("InitNamespace") = $namespace
-
-        set tNSPostfix = "PACKAGE-" _ $piece($zhorolog, ".")
-        set sysReqs = ..Module.SystemRequirements
-        if $isobject(sysReqs) && (sysReqs.Interoperability = "enabled") {
-            set tNSConfig.EnableEnsemble = 1
-        }
-        set tSC = ##class(%IPM.Utils.Build).InitializeNamespace(tNSPostfix, tVerbose, .tPackageDeployNamespace, tNSConfig)
-        $$$ThrowOnError(tSC)
-        set pParams("PackageDeployNamespace") = tPackageDeployNamespace
-
-        $$$ThrowOnError(..Module.%Reload())
-
-        set tSource = tPackageDeployNamespace _ "-CODE"
-        set orderedResourceList = ..Module.GetOrderedResourceList()
-        set tKey = ""
-        for {
-            set tResource = orderedResourceList.GetNext(.tKey)
-            quit:(tKey="")
-
-            set tName = $piece(tResource.Name, ".", 1, *-1)
-            set tExtension = $$$ucase($piece(tResource.Name, ".", *))
-            if (tExtension = "") || ($extract(tExtension) = "/") {
-                continue
-            }
-
-            set tSC = $case(tExtension,
-                "GBL":##class(%IPM.Utils.Module).AddGlobalMapping(tPackageDeployNamespace, tName, tSource),
-                "INC":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "INC", tSource),
-                "INT":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "INT", tSource),
-                "MAC":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "MAC", tSource),
-                "PKG":##class(%IPM.Utils.Module).AddPackageMapping(tPackageDeployNamespace, tName, tSource),
-                "":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "ALL", tSource),
-                :$$$OK
-            )
-            $$$ThrowOnError(tSC)
-        }
-        set $namespace = tPackageDeployNamespace
-        write:tVerbose !,"Packaging in namespace: ",$namespace
-    } catch e {
-        set tSC = e.AsStatus()
-        if $get(tPackageDeployNamespace)'="" {
-            do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
-        }
-    }
-    quit tSC
-}
-
 Method %Package(ByRef pParams) As %Status
 {
     set tSC = $$$OK
@@ -193,16 +136,6 @@ Method %Package(ByRef pParams) As %Status
     // Delete the temporary export directory
     if ($get(tExportSubDirectory)'="") && ##class(%Library.File).DirectoryExists(tExportSubDirectory) {
         set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.File).RemoveDirectoryTree(tExportSubDirectory))
-    }
-
-    if '$get(pParams("Package","KeepNamespace")) {
-        set tPackageDeployNamespace = $get(pParams("PackageDeployNamespace"))
-        set tInitNamespace = $get(pParams("InitNamespace"))
-        if (tInitNamespace '= ""), (tPackageDeployNamespace '= ""), tInitNamespace '= $namespace {
-            set $namespace = tInitNamespace
-            do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
-            kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
-        }
     }
 
   quit tSC

@@ -21,9 +21,9 @@ Method OnAfterAllTests() As %Status
     return sc
 }
 
-Method TestDeployedItems()
+Method DeployedItemsHelper(noDevMode As %Boolean = 0)
 {
-    do ..SetupModule()
+    do ..SetupModule(noDevMode)
 
     set tmpDir = $$$FileTempDir _ "package"
     set sc = ##class(%IPM.Main).Shell("package " _..#ModuleName _ " -only -v -path " _ tmpDir)
@@ -43,13 +43,13 @@ Method TestDeployedItems()
 
     do ..RunDeployedCode()
     do ..UninstallModule()
-    do ..RestoreDefaultReigstry()
+    do ..RestoreDefaultRegistry()
 }
 
-Method SetupModule()
+Method SetupModule(noDevMode As %Boolean = 0)
 {
     set folder = ..GetModuleDir(..#ModuleFolder)
-    set sc = ##class(%IPM.Main).Shell("load -v "_folder)
+    set sc = ##class(%IPM.Main).Shell("load -v "_folder _ $select(noDevMode:" -nodev", 1:" -dev"))
     do $$$AssertStatusOK(sc, "Successfully loaded module at "_folder)
 }
 
@@ -84,13 +84,23 @@ Method SetupOrasRegistry()
     do $$$AssertStatusOK(sc, "Successfully setup oras registry")
 }
 
-Method RestoreDefaultReigstry()
+Method RestoreDefaultRegistry()
 {
     set sc = ##class(%IPM.Main).Shell("repo -delete-all")
     do $$$AssertStatusOK(sc, "Successfully deleted modules")
 
     set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
     do $$$AssertStatusOK(sc, "Successfully reset repo to defaults")
+}
+
+Method TestDeployedItems()
+{
+  do ..DeployedItemsHelper(0)
+}
+
+Method TestPublishWithoutDevMode()
+{
+  do ..DeployedItemsHelper(1)
 }
 
 }

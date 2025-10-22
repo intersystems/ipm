@@ -613,7 +613,7 @@ Method %Reload(ByRef pParams) As %Status
             set tSC = $$$ERROR($$$GeneralError,"Module name mismatch.") quit
         }
 
-        #; Reopen, usefull in Packaging deployed modules
+        #; Reopen, useful in Packaging deployed modules
         set ..Module = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
 
