@@ -916,7 +916,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-///
+/// 
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1160,6 +1160,7 @@ ClassMethod LoadNewModule(
 
         $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
 
+        kill params("ModuleName") // Ensure module name is not passed down to dependency loads
         do ..LoadDependencies(tModule, .params)
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
@@ -1308,7 +1309,7 @@ ClassMethod CheckLicenseKey() As %Boolean
     // Limit the number of attempts in case this somehow ends up running in a non-interactive process.
     #define MaxTries 5
     set tValidLicense = ($system.License.GetKeyStatus() '= "Invalid")
-    while ('tValidLicense) && $$$InProgrammerMode && ('$$$IsISCWorker) && ($increment(tTries) <= $$$MaxTries) {
+    while ('tValidLicense) && $$$InProgrammerMode && ($increment(tTries) <= $$$MaxTries) {
         write !!,"Your system has no (valid) license key present"
         write !,"Copy a valid license key into "_$system.Util.ManagerDirectory()
         write !,"and then enter 'y' to activate it. Enter 'n' to continue without a license key, "

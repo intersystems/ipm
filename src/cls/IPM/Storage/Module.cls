@@ -1214,7 +1214,6 @@ ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 /// @Argument	pReferenceArray		Array of all module's resources (including resources that compose a resource) that contain the appropriate phase scope.<br />
 /// @Argument	pLockedDependencies	Whether method should be recursively applied to the module's dependencies (true = yes).<br />
 /// @Argument	pPhases				List of IPM lifecycle phases to be applied to the current module.<br />
-/// @Argument	pSkipDependencies	Whether to skip loading uninstalled dependency modules.<br />
 /// @Argument	pDependencyGraph 	Tree of module's dependencies.<br />
 Method GetResolvedReferences(
 	Output pReferenceArray,

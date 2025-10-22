@@ -1014,13 +1014,6 @@ Method %Compile(ByRef pParams) As %Status
                 }
 
                 set tNoCompileLock = '$get(pParams("NoLock"))
-                if $$$IsISCWorker && 'tNoCompileLock {
-                    // Customized locking - takes out shared locks on dependencies to avoid conflicts between parallel module loads.
-                    set tSC = ##class(%IPM.Utils.LockManager).LockClassesRecursive(.tLockManager,.tCompileArray,.tLockedClasses)
-                    $$$ThrowOnError(tSC)
-                    set tNoCompileLock = 1
-                }
-
                 // Actually do the compile
                 if $data(tCompileArray)>1 {
                     set tCompiledSomething = 1
