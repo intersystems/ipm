@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.5] - Unreleased
+
+### Added
+- #938 Added flag -export-python-deps to package command
+
+### Changed
+
+### Deprecated
+
+### Removed
+- #938 Removed secret flag NewVersion handling in %Publish()
+
+### Fixed
+
+### Security
+
 ## [0.10.4] - 2025-10-21
 
 ### Added
@@ -15,10 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 
 ### Removed
-- Removed secret flag NewVersion handling in %Publish()
-
-### Removed
-- Removed secret flag NewVersion handling in %Publish()
 
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly

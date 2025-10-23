@@ -704,7 +704,7 @@ Method InstallPythonRequirements(
 	download As %Boolean = 0)
 {
     set cmd = $get(pParams("cmd"))
-    if ('download && '$listfind($listbuild("install", "load"), cmd)) {
+    if ('download && '$listfind($listbuild("install", "load", "update"), cmd)) {
         quit $$$OK
     }
     set tVerbose = $get(pParams("Verbose"))
@@ -725,13 +725,15 @@ Method InstallPythonRequirements(
         if '$system.CLS.IsMthd("%SYS.Python", "Import") {
             throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
         }
+        set processType = ""
         set tSysModule = ##class(%SYS.Python).Import("sys")
         set tPyMajor = tSysModule."version_info".major
         set tPyMinor = tSysModule."version_info".minor
         set tPyMicro = tSysModule."version_info".micro
         set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
         if download {
-            do ..Log("Download Python wheels START")
+            set processType = "Download Python wheels"
+            do ..Log(processType _ " START")
             write:tVerbose !
             set wheelsPath = ##class(%File).NormalizeFilename("wheels", pRoot)
             set command = ..ResolvePipCaller(.pParams) _ $listbuild("download", "-r", "requirements.txt", "-d", wheelsPath, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
@@ -743,9 +745,9 @@ Method InstallPythonRequirements(
             }
             set sc = ##class(%IPM.Utils.Module).RunCommand(pRoot, command, .stdout)
             $$$ThrowOnError(sc)
-            do ..Log("Download Python wheels SUCCESS")
         } else {
-            do ..Log("requirements.txt START")
+            set processType = "requirements.txt"
+            do ..Log(processType _ " START")
             write:tVerbose !
             set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
             if tVerbose {
@@ -756,11 +758,11 @@ Method InstallPythonRequirements(
             }
             set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
             $$$ThrowOnError(tSC)
-            do ..Log("requirements.txt SUCCESS")
         }
+        do ..Log(processType _ " SUCCESS")
     } catch ex {
         set tSC = ex.AsStatus()
-        do ..Log("Pip command FAILURE")
+        do ..Log(processType _ " FAILURE")
     }
     quit tSC
 }
@@ -1254,17 +1256,19 @@ Method ExportPythonDependencies(ByRef pParams)
     }catch ex {
         $$$ThrowStatus(ex.AsStatus())
     }
-}
-
-Method %PrepareDeploy(ByRef pParams) As %Status [ Abstract ]
-{
-    set tSC = $$$OK
-    try {
-        // TODO: Implement
-    } catch e {
-        set tSC = e.AsStatus()
+    set stmt = ##class(%SQL.Statement).%New()
+    $$$ThrowOnError(stmt.%PrepareClassQuery("%File", "FileSet"))
+    set rset = stmt.%Execute(wheelsDir, "*.whl")
+    $$$ThrowSQLIfError(rset.%SQLCODE,rset.%Message)
+    while rset.%Next(.sc) {
+        set file = rset.%Get("ItemName")
+        set type = rset.%Get("Type")
+        if (type '= "F") || (file = "") {
+            continue
+        }
+    do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
     }
-    quit tSC
+    $$$ThrowOnError(sc)
 }
 
 Method %Package(ByRef pParams) As %Status [ Abstract ]
