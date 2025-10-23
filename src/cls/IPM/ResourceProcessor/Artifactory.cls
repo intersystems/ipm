@@ -73,14 +73,12 @@ Method OnExportItem(
 {
     set sc = $$$OK
     try {
-        if (params("cmd") = "package") {
-            do ..DownloadArtifact(.params)
-            set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
-            set exportPath = params("ModuleExportPath")
-            // Copy contents over to package directory with pDeleteBeforeCopy = 1
-            do ##class(%File).CopyDir(downloadDirectory, exportPath,,1)
-            set itemHandled = 1
-        }
+        do ..DownloadArtifact(.params)
+        set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
+        set exportPath = params("ModuleExportPath")
+        // Copy contents over to package directory with pDeleteBeforeCopy = 1
+        do ##class(%File).CopyDir(downloadDirectory, exportPath,,1)
+        set itemHandled = 1
     } catch (ex) {
         set sc = ex.AsStatus()
     }
@@ -95,23 +93,23 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set verbose  = $get(params("Verbose"),0)
     set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
 
-    if (verbose) {
-        write !, "Start retrieving artifact..."
-    }
     set server = $system.Util.GetEnviron("ARTI_SERVER")
     set port = $system.Util.GetEnviron("ARTI_PORT")
-    set apiURL = $system.Util.GetEnviron("ARTI_APIURL")
+    set aqlURL = $system.Util.GetEnviron("ARTI_AQL_URL")
     set username = $system.Util.GetEnviron("ARTI_USERNAME")
     set password = $system.Util.GetEnviron("ARTI_PASSWORD")
     set bearerToken = $system.Util.GetEnviron("ARTI_TOKEN")
 
     // The following variables need to be set for all or none
-    if ((server = "") || (port = "") || (apiURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
+    if ((server = "") || (port = "") || (aqlURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
         if (developerMode) {
-            write !, $$$FormattedLine($$$Red, "WARNING: Not all of server, port, api url, and a bearer token or username and password were provided, skipping downloading artifact.")
+            write !, $$$FormattedLine($$$Red, "WARNING: Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact.")
             quit
         }
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, api url, and a bearer token or username and password must be provided to download an artifact"))
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, aql url, and a bearer token or username and password must be provided to download an artifact"))
+    }
+    if (verbose) {
+        write !, "Start retrieving artifact..."
     }
 
     set tempFile = ##class(%Library.File).TempFilename(,,.errorCode)
@@ -126,7 +124,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     // SubDirectoryName does normalization as well
     set PMTempDir = ##class(%Library.File).SubDirectoryName(OSTempDir, ..ResourceReference.Name, 1)
 
-    set artifactPath = ..GetArtifactPath(server, port, apiURL, username, password, bearerToken, ..Filter, verbose)
+    set artifactPath = ..GetArtifactPath(server, port, aqlURL, username, password, bearerToken, ..Filter, verbose)
     set artifactName = ..RetrieveArtifact(server, port, artifactPath, PMTempDir, verbose)
 
     // Unpack artifact in temp location (so that if anything goes wrong, the true destination does not get affected)
@@ -139,7 +137,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 ClassMethod GetArtifactPath(
 	artifactServer As %String,
 	artifactPort As %String,
-	apiURL As %String,
+	aqlURL As %String,
 	username As %String,
 	password As %String,
 	bearerToken As %String,
@@ -174,7 +172,7 @@ ClassMethod GetArtifactPath(
     }
     do httpRequest.EntityBody.Write(body)
     do httpRequest.ContentTypeSet("text/plain")
-    $$$ThrowOnError(httpRequest.Send("POST", apiURL))
+    $$$ThrowOnError(httpRequest.Send("POST", aqlURL))
     set responseData = httpRequest.HttpResponse.Data
     set responseDataStr = responseData.Read(,.readStatus)
     $$$ThrowOnError(readStatus)
