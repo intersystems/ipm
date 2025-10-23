@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [0.10.5] - Unreleased
 
 ### Added
@@ -24,13 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.4] - 2025-10-21
 
 ### Added
-- #938 Added flag -export-python-deps to package command
 - #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
 - #909: IPM now warns when Python 3.13 or higher is installed (IRIS incompatibility)
 - #850: Re-added `<SystemSetting>` Resource Processor for backwards compatibility
 - #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
-
-### Removed
 
 ### Fixed
 - #899: Fixed CLI parser parses modifiers incorrectly
@@ -49,7 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #930: Fix issue where `load` didn't work on GitHub URLs
 
 ### Changed
-- Removed secret flag NewVersion handling in %Publish()
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
 - #706: `load` now only accepts absolute paths
 - #278: Modules will now be installed at a well-defined default location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
