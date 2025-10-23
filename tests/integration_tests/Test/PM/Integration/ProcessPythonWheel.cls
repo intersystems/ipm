@@ -180,8 +180,10 @@ Method TestPackageWithPythonDeps() As %Status
 
     set exportDir = ..GetModuleDir("python-deps-tests", ..#ExportPackageWithPythonDepsLocation)
 
+    set exportTarball = ..GetModuleDir("python-deps-tests", ..#ExportPackageWithPythonDepsLocation, "package-with-python-deps")
+
     // Run package with the python-deps export flag
-    set sc = ##class(%IPM.Main).Shell("package package-with-python-deps -v -export-python-deps -path "_ exportDir)
+    set sc = ##class(%IPM.Main).Shell("package package-with-python-deps -v -export-python-deps -path "_ exportTarball)
     do $$$AssertStatusOK(sc, "Packaged module with -export-python-deps")
 
     set sc = ##class(%IPM.Main).Shell("uninstall package-with-python-deps")
