@@ -2122,7 +2122,7 @@ ClassMethod LoadFromRepo(
     set:$extract(tDirectoryName,*)="/" tDirectoryName=$extract(tDirectoryName,1,*-1)
     set RepoName=$piece($piece($piece(tDirectoryName,"/",*),".git")," ")
     set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
-    if $get(tParams("zpm","Branch"))'="" set tCmd=tCmd_" -b "_tParams("zpm","Branch")
+    if $get(tParams("Branch"))'="" set tCmd=tCmd_" -b "_tParams("Branch")
     $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr))
     set tDirectoryName = TempDir_slash_RepoName
     if ($get(tParams("Verbose"))) {
