@@ -645,7 +645,7 @@ Method %Reload(ByRef pParams) As %Status
             quit
         }
 
-        $$$ThrowOnError(..InstallPythonRequirements(tRoot, .pParams))
+        $$$ThrowOnError(..InstallOrDownloadPythonRequirements(tRoot, .pParams))
 
         // Reload the module definition
         set tSC = ..Module.%Reload()
@@ -698,7 +698,7 @@ Method %Reload(ByRef pParams) As %Status
     quit tSC
 }
 
-Method InstallPythonRequirements(
+Method InstallOrDownloadPythonRequirements(
 	pRoot As %String = "",
 	ByRef pParams,
 	download As %Boolean = 0)
@@ -1232,10 +1232,11 @@ Method %Export(
     quit tSC
 }
 
+/// Downloads Python wheels for Python dependencies into the /root/wheels directory of the module. Also updates module.xml with the Python Wheel resources.
 Method ExportPythonDependencies(ByRef pParams)
 {
     set root = ##class(%File).NormalizeDirectory("", ..Module.Root)
-    $$$ThrowOnError(..InstallPythonRequirements(root, .pParams, 1))
+    $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
     set wheelsDir = ##class(%File).NormalizeDirectory("wheels", ..Module.Root)
     if '##class(%File).DirectoryExists(wheelsDir) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheels directory: "_wheelsDir_" not found."))
