@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.5] - Unreleased
 
+### Added
+- #938 Added flag -export-python-deps to package command
+
+### Removed
+- #938 Removed secret flag NewVersion handling in %Publish()
+
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
 
