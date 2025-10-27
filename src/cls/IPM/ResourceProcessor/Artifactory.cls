@@ -48,9 +48,12 @@ Method OnAfterPhase(
                 // overwrite existing files if there are any in destination dir
                 if (verbose) {
                     write !, "Going to copy extracted contents from "_downloadDirectory_" to "_..InstallDirectory
+                    if ##class(%File).DirectoryExists(..InstallDirectory) {
+                        write !, $$$FormattedLine($$$Yellow, "WARNING: "_..InstallDirectory_" has contents which will be overwritten by this action.")
+                    }
                 }
                 // Copy contents over with pDeleteBeforeCopy = 1
-                if '##class(%Library.File).CopyDir(downloadDirectory, ..InstallDirectory,,,1) {
+                if '##class(%File).CopyDir(downloadDirectory, ..InstallDirectory, 1, , 1) {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_..InstallDirectory))
                 }
                 if (verbose) {
@@ -77,7 +80,7 @@ Method OnExportItem(
         set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
         set exportPath = params("ModuleExportPath")
         // Copy contents over to package directory with pDeleteBeforeCopy = 1
-        do ##class(%File).CopyDir(downloadDirectory, exportPath,,1)
+        do ##class(%File).CopyDir(downloadDirectory, exportPath, 1, , 1)
         set itemHandled = 1
     } catch (ex) {
         set sc = ex.AsStatus()
@@ -100,10 +103,9 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set password = $system.Util.GetEnviron("ARTI_PASSWORD")
     set bearerToken = $system.Util.GetEnviron("ARTI_TOKEN")
 
-    // The following variables need to be set for all or none
-    if ((server = "") || (port = "") || (aqlURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
+    if ((server '= "") || (port = "") || (aqlURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
         if (developerMode) {
-            write !, $$$FormattedLine($$$Red, "WARNING: Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact.")
+            write !, $$$FormattedLine($$$Yellow, "WARNING: Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact.")
             quit
         }
         $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, aql url, and a bearer token or username and password must be provided to download an artifact"))
@@ -112,7 +114,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
         write !, "Start retrieving artifact..."
     }
 
-    set tempFile = ##class(%Library.File).TempFilename(,,.errorCode)
+    set tempFile = ##class(%File).TempFilename(,,.errorCode)
     if (errorCode < 0) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to create temporary directory, system error code: "_errorCode))
     }
@@ -122,7 +124,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 
     // create a subdir for the resource identified by its Name, e.g.: /tmp/ui/hs-app-hub/package/
     // SubDirectoryName does normalization as well
-    set PMTempDir = ##class(%Library.File).SubDirectoryName(OSTempDir, ..ResourceReference.Name, 1)
+    set PMTempDir = ##class(%File).SubDirectoryName(OSTempDir, ..ResourceReference.Name, 1)
 
     set artifactPath = ..GetArtifactPath(server, port, aqlURL, username, password, bearerToken, ..Filter, verbose)
     set artifactName = ..RetrieveArtifact(server, port, artifactPath, PMTempDir, verbose)
@@ -220,7 +222,7 @@ ClassMethod RetrieveArtifact(
     set httpRequest.Port = artifactPort
 
     if verbose {
-        write !, "Start retrieving artifact at https://" _ artifactServer _ ":" _ $case((artifactPort = ""), 1: "", : ":"_artifactPort) _ "/" _ artifactPath
+        write !, "Start retrieving artifact at https://"_artifactServer_":"_artifactPort_"/"_artifactPath
     }
     $$$ThrowOnError(httpRequest.Get(artifactPath))
 
@@ -240,19 +242,19 @@ ClassMethod RetrieveArtifact(
     }
 
     // Create directory if it doesn't exist
-    if '##class(%Library.File).DirectoryExists(downloadDirectory) {
-        if '##class(%Library.File).CreateDirectoryChain(downloadDirectory) {
+    if '##class(%File).DirectoryExists(downloadDirectory) {
+        if '##class(%File).CreateDirectoryChain(downloadDirectory) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to create destination directory: "_downloadDirectory))
         }
     }
 
-    set localPath = ##class(%Library.File).NormalizeFilename(artifactName, downloadDirectory)
-    if '##class(%Library.File).Exists(localPath) {
+    set localPath = ##class(%File).NormalizeFilename(artifactName, downloadDirectory)
+    if '##class(%File).Exists(localPath) {
         if verbose {
             write !, "Saving to " _ localPath
         }
 
-        set stream = ##class(%Library.FileBinaryStream).%New()
+        set stream = ##class(%FileBinaryStream).%New()
         set stream.Filename = localPath
         $$$ThrowOnError(stream.CopyFromAndSave(responseData))
     }
@@ -278,14 +280,14 @@ ClassMethod UnTar(
         return
     }
     // normalize
-    set sourceFileDir = ##class(%Library.File).NormalizeDirectory(sourceFileDir)
-    set artifactPath = ##class(%Library.File).NormalizeFilename(artifactName, sourceFileDir)
+    set sourceFileDir = ##class(%File).NormalizeDirectory(sourceFileDir)
+    set artifactPath = ##class(%File).NormalizeFilename(artifactName, sourceFileDir)
 
     // make sure pSourceFilePath and sourceFileDir exist
-    if '##class(%Library.File).DirectoryExists(sourceFileDir) {
+    if '##class(%File).DirectoryExists(sourceFileDir) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Directory does not exist: "_sourceFileDir))
     }
-    if '##class(%Library.File).Exists(artifactPath) {
+    if '##class(%File).Exists(artifactPath) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "File does not exist: "_artifactPath))
     }
 
@@ -339,9 +341,9 @@ ClassMethod UnTar(
         write !, "Command launched successfully."
     }
     // After extracting, a new directory /package under sourceFileDir will be created holding the extracted files, so make sure to get to correct level
-    set extractedDir = ##class(%Library.File).NormalizeDirectory(sourceFileDir_$$$SLASH_"package")
+    set extractedDir = ##class(%File).NormalizeDirectory(sourceFileDir_$$$SLASH_"package")
 
-    if '##class(%Library.File).DirectoryExists(extractedDir) {
+    if '##class(%File).DirectoryExists(extractedDir) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Extracted directory does not exist: "_extractedDir))
     }
 
@@ -352,7 +354,7 @@ ClassMethod UnTar(
     }
 
     // Copy contents over with pDeleteBeforeCopy = 1
-    if '##class(%Library.File).CopyDir(extractedDir, copyToDir, 1, ,1) {
+    if '##class(%File).CopyDir(extractedDir, copyToDir, 1, , 1) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_copyToDir))
     }
 
