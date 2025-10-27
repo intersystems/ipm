@@ -103,7 +103,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set password = $system.Util.GetEnviron("ARTI_PASSWORD")
     set bearerToken = $system.Util.GetEnviron("ARTI_TOKEN")
 
-    if ((server '= "") || (port = "") || (aqlURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
+    if ((server = "") || (port = "") || (aqlURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
         if (developerMode) {
             write !, $$$FormattedLine($$$Yellow, "WARNING: Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact.")
             quit
