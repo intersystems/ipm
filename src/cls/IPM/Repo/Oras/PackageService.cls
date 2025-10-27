@@ -99,9 +99,9 @@ ClassMethod AggregatePlatformVersions(
 Method ListModulesFromTagString(
 	semverExpr As %IPM.General.SemanticVersionExpression,
 	client As %SYS.Python,
-	ByRef moduleList As %ListOfObjects,
 	searchCriteria As %IPM.Repo.SearchCriteria,
-	name As %String)
+	name As %String,
+	ByRef moduleList As %ListOfObjects)
 {
     set allTagsString = ..GetAllTags(..Location, name, "", client)
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
@@ -218,11 +218,11 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
                 continue
             }
             #; collect all versions for this package in tList
-            do ..ListModulesFromTagString(tVersionExpression, client, tList, pSearchCriteria, package)
+            do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
         }
     } else {
         // TODO: Make this work properly for the case where name is empty (searching in a repo with a namespace)
-        do ..ListModulesFromTagString(tVersionExpression, client, tList, pSearchCriteria, name)
+        do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
     }
     return tList
 }
@@ -388,11 +388,11 @@ ClassMethod GetModuleXML(
     manifest=""
     try:
         manifest = client.get_manifest(target)
-        for key in manifest['annotations']:
-            if key == "com.intersystems.ipm.module.v1+xml":
-                moduleXML = manifest['annotations'][key]
-                # remove whitespace
-                return "".join(moduleXML.split())
+        annotations = manifest.get('annotations', {})
+        module_xml = annotations.get('com.intersystems.ipm.module.v1+xml')
+        if module_xml:
+            # remove all whitespace
+            return "".join(module_xml.split())
     except Exception as ex:
         print("Exception: %s" % str(ex))
 
@@ -414,7 +414,7 @@ ClassMethod GetPackageMetadata(
 
     try:
         manifest = client.get_manifest(target)
-        annotations = manifest['annotations']
+        annotations = manifest.get('annotations', {})
         return json.dumps(annotations)
     except Exception as ex:
         print("Exception: %s" % str(ex))
@@ -550,8 +550,8 @@ ClassMethod VerifyModuleHashAndSize(
             # check size and hash
             manifest_size = layer["size"]
             manifest_hash = layer["digest"]
-            hash = ("sha256:" + hash).lower()
-            return manifest_size == size and manifest_hash == hash
+            expected_hash = f"sha256:{hash}".lower()
+            return manifest_size == size and manifest_hash == expected_hash
     except Exception as ex:
         print("Exception: %s" % str(ex))
     return False

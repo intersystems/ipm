@@ -137,7 +137,7 @@ This command is an alias for `module-action module-name verify`
 This command is an alias for `module-action module-name publish`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
-<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
 </command>
 
@@ -174,10 +174,10 @@ This command is an alias for `module-action module-name makedeployed`
 
 <command name="unpublish">
 <description>
-Delete package from registry
+Delete package from repository
 </description>
-<example description="Delete all versions of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName all</example>
-<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName 1.0.0</example>
+<example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName all</example>
+<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName 1.0.0</example>
 <parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
 <parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
 
