@@ -647,8 +647,8 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 </command>
 
 <command name="search" aliases="find">
-<description>Shows all modules in current registry or namespaces</description>
-<example description="Shows all modules in current registry">search -r</example>
+<description>Shows all modules matching the search string in all configured registries</description>
+<example description="Shows all versions of all modules starting with `zpm`">search -versions zpm*</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
 <modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
 <modifier name="versions" dataAlias="AllVersions" dataValue="1" description="Shows all versions for each module." />

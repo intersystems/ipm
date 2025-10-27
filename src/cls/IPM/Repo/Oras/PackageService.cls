@@ -49,7 +49,7 @@ Method GetModule(
 Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
 {
     set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
-    return ..GetModuleXMLPy(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    return ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 }
 
 Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
@@ -59,7 +59,7 @@ Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
     #; Get ORAS client
     set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
-    return ..HasModulePy(..Location, name, ..Namespace, client)
+    return ..HasModuleHelper(..Location, name, ..Namespace, client)
 }
 
 /// Given a list of ORAS tags, aggregate the platform versions by package version
@@ -95,17 +95,16 @@ ClassMethod AggregatePlatformVersions(
     return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
-/// <var>allTagsString</var> is as returned by <method>GetAllTagsPy</method> (comma + space separated)
 /// <var>moduleList</var> is a list of objects of type <class>%IPM.Storage.ModuleInfo</class> to which this method adds entries
 /// <var>name</var> is the name of the package for which we are enumerating versions
 Method ListModulesFromTagString(
-	allTagsString As %String,
 	semverExpr As %IPM.General.SemanticVersionExpression,
 	client As %SYS.Python,
-	moduleList As %ListOfObjects,
+	ByRef moduleList As %ListOfObjects,
 	searchCriteria As %IPM.Repo.SearchCriteria,
 	name As %String)
 {
+    set allTagsString = ..GetAllTags(..Location, name, "", client)
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
     set pointer = 0
     while $listnext(allVersionsList,pointer,moduleVersion) {
@@ -129,7 +128,7 @@ Method ListModulesFromTagString(
         }
 
         #; get metadata from annotations
-        set metadata = ..GetPackageMetadataPy(..Location, name, "", tag, client)
+        set metadata = ..GetPackageMetadata(..Location, name, "", tag, client)
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
         $$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
@@ -208,24 +207,25 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
         }
         set data = ##class(%DynamicAbstractObject).%FromJSON(json)
         set iter = data.repositories.%GetIterator()
+        // Iterate through each package
+        // key is the index
+        // package is the package name
+        // type is always "string"
         while iter.%GetNext(.key, .package, .type) {
             if (package="") {
                 continue
             }
-            #; filter by module name
+            #; filter by module name if requested
             if (name'="") && (package'=name) {
                 continue
             }
-            #; get all versions
-            set allTagsString = ..GetAllTagsPy(..Location, package, "", client)
-            do ..ListModulesFromTagString(allTagsString, tVersionExpression, client, tList, pSearchCriteria, package)
+            #; collect all versions for this package in tList
+            do ..ListModulesFromTagString(tVersionExpression, client, tList, pSearchCriteria, package)
         }
-        return tList
+    } else {
+        // TODO: Make this work properly for the case where name is empty (searching in a repo with a namespace)
+        do ..ListModulesFromTagString(tVersionExpression, client, tList, pSearchCriteria, name)
     }
-
-    // TODO: Make this work properly for the case where name is empty (searching in a repo with a namespace)
-    set allTagsString = ..GetAllTagsPy(..Location, name, "", client)
-    do ..ListModulesFromTagString(allTagsString, tVersionExpression, client, tList, pSearchCriteria, name)
     return tList
 }
 
@@ -292,7 +292,7 @@ ClassMethod Pull(
     set stream = ""
     set tSC = $$$OK
 
-    set pkgAndTag = ..GetPackageVersionPy(registry, package,  namespace, username, password, token, tokenAuthMethod, 1)
+    set pkgAndTag = ..GetPackageVersion(registry, package, namespace, username, password, token, tokenAuthMethod, 1)
     set pkg = $piece(pkgAndTag, ",", 1)
     set tag = $piece(pkgAndTag, ",", 2)
 
@@ -332,7 +332,7 @@ ClassMethod Pull(
         set hash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
         set hash = ##class(%xsd.hexBinary).LogicalToXSD(hash)
 
-        set verified = ..VerifyModuleHashAndSizePy(registry, package, "", username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
+        set verified = ..VerifyModuleHashAndSize(registry, package, "", username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
         if 'verified {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Module size and/or hash failed validation!"))
         }
@@ -359,7 +359,7 @@ ClassMethod PullOras(
 	tokenAuthMethod As %String,
 	path As %String)
 {
-    set pkgTag = ..GetPackageVersionPy(registry, package, namespace, username, password, token, tokenAuthMethod, 1)
+    set pkgTag = ..GetPackageVersion(registry, package, namespace, username, password, token, tokenAuthMethod, 1)
     set pkg = $piece(pkgTag, ",", 1)
     set tag = $$$Semver2Tag($piece(pkgTag, ",", 2))
 
@@ -374,7 +374,7 @@ ClassMethod PullOras(
 }
 
 /// Returns the contents of the module.xml for the given package
-ClassMethod GetModuleXMLPy(
+ClassMethod GetModuleXML(
 	registry As %String,
 	package As %String,
 	namespace As %String,
@@ -404,7 +404,7 @@ ClassMethod GetModuleXMLPy(
     return ""
 }
 
-ClassMethod GetPackageMetadataPy(
+ClassMethod GetPackageMetadata(
 	registry As %String,
 	package As %String,
 	namespace As %String,
@@ -433,7 +433,7 @@ ClassMethod GetPackageMetadataPy(
 /// 			     in the latter case, returns semver corresponding to the latest tag
 /// 	asString   : 0 => returns as python tuple of (package, semver)
 /// 			     1 => returns as string of "<package>,<semver>"
-ClassMethod GetPackageVersionPy(
+ClassMethod GetPackageVersion(
 	registry As %String,
 	package As %String,
 	namespace As %String,
@@ -460,7 +460,7 @@ ClassMethod GetPackageVersionPy(
 
 /// Lists all of the modules and their latest versions in the package
 /// Returns the tag for the highest numbered version
-ClassMethod GetLatestTagPy(
+ClassMethod GetLatestTag(
 	registry As %String,
 	package As %String,
 	namespace As %String,
@@ -482,7 +482,7 @@ ClassMethod GetLatestTagPy(
 }
 
 /// Returns comma separated string of all the tags for a given package
-ClassMethod GetAllTagsPy(
+ClassMethod GetAllTags(
 	registry As %String,
 	package As %String,
 	namespace As %String,
@@ -507,7 +507,7 @@ ClassMethod GetAllTagsPy(
 }
 
 /// Returns whether the given package is in the registry
-ClassMethod HasModulePy(
+ClassMethod HasModuleHelper(
 	registry As %String,
 	package As %String,
 	namespace As %String,
@@ -559,7 +559,7 @@ ClassMethod AppendURIs(
 }
 
 /// Returns whether the given SHA256 hash and file size matches the hash and size in the ORAS manifest for the module
-ClassMethod VerifyModuleHashAndSizePy(
+ClassMethod VerifyModuleHashAndSize(
 	registry As %String,
 	package As %String,
 	namespace As %String,
