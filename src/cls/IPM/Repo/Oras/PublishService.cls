@@ -150,7 +150,6 @@ ClassMethod PushOras(
     import contextlib
 
     # Get all files in the directory and fully specify path
-    #; file_paths = [os.path.join(directoryPath, f) for f in os.listdir(directoryPath)]
     with os.scandir(directoryPath) as it:
         file_paths = [os.path.join(directoryPath, entry.name) for entry in it if entry.is_file()]
     client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenAuthMethod)
@@ -163,9 +162,6 @@ ClassMethod PushOras(
     for tag in tags.split(","):
         if not regex.search(tag):
             raise ValueError(f"Invalid OCI tag: {tag}")
-
-        #; # Annotations are manifest.xml and other metadata
-        #; manifest_annotations = json.loads(metadata)
 
         # Suppress console output using a context manager
         with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
