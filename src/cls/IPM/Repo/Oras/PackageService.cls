@@ -34,12 +34,11 @@ Method GetModule(
 	pModuleReference As %IPM.Storage.ModuleInfo,
 	Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-    set version = $$$Semver2Tag(pModuleReference.VersionString)
+    set tag = $$$Semver2Tag(pModuleReference.VersionString)
     if (pModuleReference.Deployed) {
-        set version = version _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
+        set tag = tag _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
     }
-    set name = pModuleReference.Name _ ":" _ version
-    set status = ..Pull(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
+    set status = ..Pull(..Location, pModuleReference.Name, tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
     $$$ThrowOnError(status)
     #; module is pulled as a .tgz file
     set AsArchive = 1
@@ -128,7 +127,7 @@ Method ListModulesFromTagString(
         }
 
         #; get metadata from annotations
-        set metadata = ..GetPackageMetadata(..Location, name, "", tag, client)
+        set metadata = ..GetPackageMetadata(..Location, name, tag, "", client)
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
         $$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
@@ -183,7 +182,6 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
     set tList = ##class(%Library.ListOfObjects).%New()
 
     #; get all versions
-
     // When no namespace is specified, we can only call "v2/_catalog" to get all the packages. In case of error, fail descriptively
     if (..Namespace = "") {
         set request = ..GetHttpRequest()
@@ -282,6 +280,7 @@ ClassMethod GetClient(
 ClassMethod Pull(
 	registry As %String,
 	package As %String,
+	tag As %String,
 	namespace As %String,
 	username As %String,
 	password As %String,
@@ -292,14 +291,14 @@ ClassMethod Pull(
     set stream = ""
     set tSC = $$$OK
 
-    set pkgAndTag = ..GetPackageVersion(registry, package, namespace, username, password, token, tokenAuthMethod, 1)
-    set pkg = $piece(pkgAndTag, ",", 1)
-    set tag = $piece(pkgAndTag, ",", 2)
+    if tag = "" {
+        set tag = ..GetLatestTag(registry, package,  namespace, username, password, token, tokenAuthMethod, 1)
+    }
 
     try {
         #; Pull into temp directory
         set tempFile = ""
-        set tempDirectory = $$$FileTempDir _ "/" _ pkg _ "/" _ tag
+        set tempDirectory = $$$FileTempDir _ "/" _ package _ "/" _ tag
 
         #; Empty temp directory first
         if ##class(%File).DirectoryExists(tempDirectory) {
@@ -308,7 +307,7 @@ ClassMethod Pull(
         }
 
         #; Pull the module using ORAS
-        do ..PullOras(registry, package, "", username, password, token, tokenAuthMethod, tempDirectory)
+        do ..PullOras(registry, package, tag, "", username, password, token, tokenAuthMethod, tempDirectory)
 
         #; Find only the tgz file
         set result=##class(%ResultSet).%New("%File:FileSet")
@@ -332,7 +331,7 @@ ClassMethod Pull(
         set hash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
         set hash = ##class(%xsd.hexBinary).LogicalToXSD(hash)
 
-        set verified = ..VerifyModuleHashAndSize(registry, package, "", username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
+        set verified = ..VerifyModuleHashAndSize(registry, package _ ":" _ tag, "", username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
         if 'verified {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Module size and/or hash failed validation!"))
         }
@@ -352,6 +351,7 @@ ClassMethod Pull(
 ClassMethod PullOras(
 	registry As %String,
 	package As %String,
+	tag As %String,
 	namespace As %String,
 	username As %String,
 	password As %String,
@@ -359,11 +359,7 @@ ClassMethod PullOras(
 	tokenAuthMethod As %String,
 	path As %String)
 {
-    set pkgTag = ..GetPackageVersion(registry, package, namespace, username, password, token, tokenAuthMethod, 1)
-    set pkg = $piece(pkgTag, ",", 1)
-    set tag = $$$Semver2Tag($piece(pkgTag, ",", 2))
-
-    set target = ..GetAPITarget(registry, pkg, namespace) _ ":" _ tag
+    set target = ..GetAPITarget(registry, package, namespace) _ ":" _ tag
     set client = ..GetClient(registry, username, password, token, tokenAuthMethod)
 
     #; set up for python call
@@ -376,7 +372,7 @@ ClassMethod PullOras(
 /// Returns the contents of the module.xml for the given package
 ClassMethod GetModuleXML(
 	registry As %String,
-	package As %String,
+	packageAndTag As %String,
 	namespace As %String,
 	username As %String,
 	password As %String,
@@ -385,7 +381,7 @@ ClassMethod GetModuleXML(
 {
     import iris
 
-    target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
+    target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, packageAndTag, namespace)
     client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenAuthMethod)
 
     # loop through the annotations to find the module.xml text
@@ -407,8 +403,8 @@ ClassMethod GetModuleXML(
 ClassMethod GetPackageMetadata(
 	registry As %String,
 	package As %String,
-	namespace As %String,
 	tag As %String,
+	namespace As %String,
 	client As %String) As %String [ Language = python ]
 {
     import iris
@@ -427,39 +423,9 @@ ClassMethod GetPackageMetadata(
     return ""
 }
 
-/// Given a package name, either parses out the tag or determines the latest tag
-/// Params:
-/// 	package : is either in the form <package>:<tag> or <package>
-/// 			     in the latter case, returns semver corresponding to the latest tag
-/// 	asString   : 0 => returns as python tuple of (package, semver)
-/// 			     1 => returns as string of "<package>,<semver>"
-ClassMethod GetPackageVersion(
-	registry As %String,
-	package As %String,
-	namespace As %String,
-	username As %String,
-	password As %String,
-	token As %String,
-	tokenAuthMethod As %String,
-	asString As %Boolean = 0) [ Language = python ]
-{
-    import iris
-
-    if ":" in package:
-        pkg, tag = package.split(":", 1)
-    else:
-        pkg = package
-        tag = iris.cls("%IPM.Repo.Oras.PackageService").GetLatestTagPy(registry, pkg,  namespace, username, password, token, tokenAuthMethod, asString )
-
-    semver = tag.replace("_", "+")
-    if asString:
-        return pkg + "," + semver
-    else:
-        return (pkg, semver)
-}
-
-/// Lists all of the modules and their latest versions in the package
-/// Returns the tag for the highest numbered version
+/// Determines the latest tag for a given package by
+/// 1) listing all of the modules and their latest versions in the package
+/// 2) returning the tag for the highest numbered version
 ClassMethod GetLatestTag(
 	registry As %String,
 	package As %String,
@@ -509,14 +475,14 @@ ClassMethod GetAllTags(
 /// Returns whether the given package is in the registry
 ClassMethod HasModuleHelper(
 	registry As %String,
-	package As %String,
+	packageAndTag As %String,
 	namespace As %String,
 	client As %SYS.Python) As %Boolean [ Language = python ]
 {
     import iris
     # Attempt to get the tags of the specified package
     # If tags are not found, then the package does not exist
-    target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
+    target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, packageAndTag, namespace)
 
     # check if tags is [] through boolean coercion
     try:
@@ -530,13 +496,13 @@ ClassMethod HasModuleHelper(
 /// Gets the URL for the API endpoint, i.e. returns target where <target>/v2/ is the endpoint
 ClassMethod GetAPITarget(
 	registry As %String,
-	package As %String,
+	packageAndOptionalTag As %String,
 	namespace As %String = "") As %String
 {
     if (namespace '= "") {
-        set package = ..AppendURIs(namespace, package)
+        set packageAndOptionalTag = ..AppendURIs(namespace, packageAndOptionalTag)
     }
-    set target = ..AppendURIs(registry, package)
+    set target = ..AppendURIs(registry, packageAndOptionalTag)
     return $replace($replace(target, "http://", ""), "https://", "")
 }
 
@@ -561,7 +527,7 @@ ClassMethod AppendURIs(
 /// Returns whether the given SHA256 hash and file size matches the hash and size in the ORAS manifest for the module
 ClassMethod VerifyModuleHashAndSize(
 	registry As %String,
-	package As %String,
+	packageAndTag As %String,
 	namespace As %String,
 	username As %String,
 	password As %String,
@@ -572,7 +538,7 @@ ClassMethod VerifyModuleHashAndSize(
 {
     import iris
 
-    target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
+    target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, packageAndTag, namespace)
     client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenAuthMethod)
 
     try:

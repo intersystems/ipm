@@ -387,6 +387,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <example description="Installs the most recent 1.x version of HS.JSON available in any configured repository in the current namespace.">
     install HS.JSON 1.x
 </example>
+<example description="Installs the most recent version of HS.JSON from the `registry` repository.">
+    install registry/HS.JSON
+</example>
 <example description="Installs HS.JSON without installing python dependencies">
     install -bypass-py-deps HS.JSON
 </example>
