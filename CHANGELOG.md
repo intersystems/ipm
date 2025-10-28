@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
 
+### Deprecated
+- #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
+
 ## [0.10.4] - 2025-10-21
 
 ### Added

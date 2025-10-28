@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="invoke.ZPM">
+    <Module>
+      <Name>invoke</Name>
+      <Version>0.0.1-snapshot</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>../src</SourcesRoot>
+      <Resource Name="Invoke.Test.CLS"/>
+      <!-- Note: commented out Invokes will fail and are left for comparison between the different outcomes for different CheckStatus values-->
+      <!-- Invoke without setting CheckStatus should check status if it is %Status, otherwise ignore -->
+      <Invoke Class="Invoke.Test" Method="NoStatus"/>
+      <Invoke Class="Invoke.Test" Method="ReturnStatus"/>
+      <Invoke Class="Invoke.Test" Method="ReturnNonStatus"/>
+      <!-- <Invoke Class="Invoke.Test" Method="ReturnError"/> -->
+      <!-- <Invoke Class="Invoke.Test" Method="NonStatusReturn"/> -->
+      <!-- <Invoke Class="Invoke.Test" Method="StatusNotReturned"/> -->
+
+      <!-- Invoke with CheckStatus=0 should not check anything -->
+      <Invoke Class="Invoke.Test" Method="NoStatus" CheckStatus="0"/>
+      <Invoke Class="Invoke.Test" Method="ReturnStatus" CheckStatus="0"/>
+      <Invoke Class="Invoke.Test" Method="ReturnNonStatus" CheckStatus="0"/>
+      <Invoke Class="Invoke.Test" Method="ReturnError" CheckStatus="0"/>
+      <Invoke Class="Invoke.Test" Method="NonStatusReturn" CheckStatus="0"/>
+      <Invoke Class="Invoke.Test" Method="StatusNotReturned" CheckStatus="0"/>
+
+      <!-- Invoke with CheckStatus=1 will assume return type is %Status and check it -->
+      <!-- <Invoke Class="Invoke.Test" Method="NoStatus" CheckStatus="1"/> -->
+      <Invoke Class="Invoke.Test" Method="ReturnStatus" CheckStatus="1"/>
+      <!-- <Invoke Class="Invoke.Test" Method="ReturnNonStatus" CheckStatus="1"/> -->
+      <!-- <Invoke Class="Invoke.Test" Method="ReturnError" CheckStatus="1"/> -->
+      <!-- <Invoke Class="Invoke.Test" Method="NonStatusReturn" CheckStatus="1"/> -->
+      <!-- <Invoke Class="Invoke.Test" Method="StatusNotReturned" CheckStatus="1"/> -->
+    </Module>
+  </Document>
+</Export>
