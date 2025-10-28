@@ -184,7 +184,7 @@ ClassMethod Configure(
         if $data(pModifiers("password-stdin")) {
             // prompt for password using secret input terminal mode
             open $io:(:"S")
-            read "", pwd
+            read "Password: ", pwd
             close $io
             set pModifiers("password") = pwd
         }
