@@ -16,7 +16,12 @@ Property CustomPhase As %IPM.DataType.CustomPhaseName(XMLPROJECTION = "ATTRIBUTE
 
 Property When As %IPM.DataType.PhaseWhen(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "After", SqlFieldName = _WHEN ];
 
-Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = 0 ];
+/// Whether to check the status returned by the invoked method.
+/// <br/>Tri-state value:
+/// <br/>  1: Check status and treat return type as %Status
+/// <br/>  0: Do not check status
+/// <br/>  "": As default, check the status iff the return type is %Status
+Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ Deprecated ];
 
 Property Arg As list Of %String(MAXLEN = 255, XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
 
@@ -74,7 +79,10 @@ Method doInvoke(ByRef pParams) As %Status
     set tSC = $$$OK
     do ..GetArgsArray(.pParams, .args)
     try {
-        if ..CheckStatus {
+        // By default, with no CheckStatus property set, check status iff return type is %Status
+        // In deprecated behavior, CheckStatus=1 means check status regardless of type and CheckStatus=0 means do not check anything
+        set rettype = $$$comMemberKeyGetO(origin,..Class,$$$cCLASSmethod,..Method,$$$cMETHreturntype)
+        if (rettype="%Library.Status" || ..CheckStatus) && (..CheckStatus'=0) {
             set tSC = $classmethod(..Class, ..Method, args...)
         } else {
             do $classmethod(..Class, ..Method, args...)
@@ -82,6 +90,7 @@ Method doInvoke(ByRef pParams) As %Status
     } catch ex {
         set tSC = ex.AsStatus()
     }
+    #; write !, "tSC: " _  tSC
     quit tSC
 }
 

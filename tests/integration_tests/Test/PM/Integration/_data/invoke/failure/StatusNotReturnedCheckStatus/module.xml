@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="invoke.ZPM">
+    <Module>
+      <Name>invoke</Name>
+      <Version>0.0.1-snapshot</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>../../src</SourcesRoot>
+      <Resource Name="Invoke.Test.CLS"/>
+      <!-- Invoke with CheckStatus=1 will assume return type is %Status and check it -->
+      <Invoke Class="Invoke.Test" Method="StatusNotReturned" CheckStatus="1"/>
+    </Module>
+  </Document>
+</Export>
