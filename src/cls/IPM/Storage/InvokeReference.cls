@@ -90,7 +90,6 @@ Method doInvoke(ByRef pParams) As %Status
     } catch ex {
         set tSC = ex.AsStatus()
     }
-    #; write !, "tSC: " _  tSC
     quit tSC
 }
 
