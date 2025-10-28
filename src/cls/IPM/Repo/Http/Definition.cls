@@ -40,6 +40,7 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 <modifier name="publish-url" value="true" description="For HTTP(s) repositories, specifies the URL for package publishing web services."/>
 <modifier name="username" aliases="user" value="true" description="For HTTP(s) repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For HTTP(s) repositories, specifies the password to use when connecting." />
+<modifier name="password-stdin" aliases="pass-stdin" description="For HTTP(s) repositories, specifies the password to use when connecting, but prompt user in secret input terminal mode." />
 <modifier name="token" value="true" description="For HTTP(s) repositories, specifies the key to use when connecting." />
 <modifier name="token-auth-method" value="true" description="Enum of { basic, bearer, apiKey }. Defaults to apiKey. If set to 'basic', token will be included as 'Authorization: Basic &lt;token&gt;'. If set to 'bearer', token will be included as 'Authorization: Bearer &lt;token&gt;'. If set to 'apiKey', token will be included as 'apiKey: &lt;token&gt;'" />
 <modifier name="sslconfig" aliases="ssl" value="true" description="For HTTP(s) repositories, specifies the SSL configuration name to use when connecting." />
