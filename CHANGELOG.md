@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #938 Added flag -export-python-deps to package command
 - #462: The `repo` command for repository configuration now supports secret input terminal mode for passwords with the `-password-stdin` flag
 
+### Changed
+- #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
+
 ### Removed
 - #938 Removed secret flag NewVersion handling in %Publish()
 
