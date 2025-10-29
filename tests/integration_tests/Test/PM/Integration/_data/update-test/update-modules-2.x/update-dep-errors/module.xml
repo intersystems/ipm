@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="update-dep-errors.ZPM">
+    <Module>
+      <Name>update-dep-errors</Name>
+      <Version>2.1.1</Version>
+      <Resource Name="UpdateDepErrors.UpdatePackage.PKG" />
+      <UpdatePackage>UpdateDepErrors.UpdatePackage</UpdatePackage>
+      <Dependencies>
+        <ModuleReference>
+          <Name>update-step-errors</Name>
+          <Version>^2.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

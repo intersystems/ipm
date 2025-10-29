@@ -39,6 +39,7 @@ Method %Activate(ByRef pParams) As %Status
         set tSC = ..Configure(.pParams)
         $$$ThrowOnError(tSC)
 
+        set verbose = $get(pParams("Verbose"))
         // Create Studio project for package if it is loaded in developer mode and no explicit statement to not create it
         set tNoStudioProject = $get(pParams("NoStudioProject"), 0)
         if ..Module.DeveloperMode && 'tNoStudioProject {
@@ -46,8 +47,7 @@ Method %Activate(ByRef pParams) As %Status
             // Do not throw exceptions if failure to create because creating a Studio project should not block activation.
             // Just write the exception if in verbose mode
             set tStudioProjectSC = ..Module.GetStudioProject(.tProject)
-            set tVerbose = $get(pParams("Verbose"))
-            if tVerbose {
+            if verbose {
                 if $$$ISOK(tStudioProjectSC) {
                     write !, "Studio project created/updated: " _ tProject.Name _ ".PRJ"
                 } else {
@@ -56,65 +56,14 @@ Method %Activate(ByRef pParams) As %Status
                 }
             }
         }
-    } catch e {
-        set tSC = e.AsStatus()
-    }
-    quit tSC
-}
-
-Method %PrepareDeploy(ByRef pParams) As %Status
-{
-    set tSC = $$$OK
-    try {
-        set tVerbose = $get(pParams("Verbose"))
-        merge tParams = pParams
-
-        set tNSConfig = ..Module.GetNamespaceConfig()
-
-        set pParams("InitNamespace") = $namespace
-
-        set tNSPostfix = "PACKAGE-" _ $piece($zhorolog, ".")
-        set sysReqs = ..Module.SystemRequirements
-        if $isobject(sysReqs) && (sysReqs.Interoperability = "enabled") {
-            set tNSConfig.EnableEnsemble = 1
-        }
-        set tSC = ##class(%IPM.Utils.Build).InitializeNamespace(tNSPostfix, tVerbose, .tPackageDeployNamespace, tNSConfig)
-        $$$ThrowOnError(tSC)
-        set pParams("PackageDeployNamespace") = tPackageDeployNamespace
-
-        $$$ThrowOnError(..Module.%Reload())
-
-        set tSource = tPackageDeployNamespace _ "-CODE"
-        set orderedResourceList = ..Module.GetOrderedResourceList()
-        set tKey = ""
-        for {
-            set tResource = orderedResourceList.GetNext(.tKey)
-            quit:(tKey="")
-
-            set tName = $piece(tResource.Name, ".", 1, *-1)
-            set tExtension = $$$ucase($piece(tResource.Name, ".", *))
-            if (tExtension = "") || ($extract(tExtension) = "/") {
-                continue
+        if '$get(pParams("Update")) && '..Module.DeveloperMode {
+            if verbose {
+                write !, "Seeding update steps for module = ",..Module.Name, ", for version = ", ..Module.VersionString, !
             }
-
-            set tSC = $case(tExtension,
-                "GBL":##class(%IPM.Utils.Module).AddGlobalMapping(tPackageDeployNamespace, tName, tSource),
-                "INC":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "INC", tSource),
-                "INT":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "INT", tSource),
-                "MAC":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "MAC", tSource),
-                "PKG":##class(%IPM.Utils.Module).AddPackageMapping(tPackageDeployNamespace, tName, tSource),
-                "":##class(%IPM.Utils.Module).AddRoutineMapping(tPackageDeployNamespace, tName, "ALL", tSource),
-                :$$$OK
-            )
-            $$$ThrowOnError(tSC)
+            $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1, verbose))
         }
-        set $namespace = tPackageDeployNamespace
-        write:tVerbose !,"Packaging in namespace: ",$namespace
     } catch e {
         set tSC = e.AsStatus()
-        if $get(tPackageDeployNamespace)'="" {
-            do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
-        }
     }
     quit tSC
 }
@@ -125,32 +74,38 @@ Method %Package(ByRef pParams) As %Status
     try {
         set tVerbose = $get(pParams("Verbose"))
         if ..Module.HaveToDeploy() {
-        $$$ThrowOnError(..MakeDeployed(.pParams))
+            $$$ThrowOnError(..MakeDeployed(.pParams))
         }
 
         set tExportDirectory = $get(pParams("Path"))
-        if (tExportDirectory'="") && ('##class(%File).DirectoryExists(tExportDirectory)) {
-            set tExportDirectory = ##class(%File).NormalizeDirectory(tExportDirectory)
-            if '##class(%File).CreateDirectoryChain(tExportDirectory,.tReturn) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",tExportDirectory,tReturn))
+        if (tExportDirectory'="") {
+            // create temporary subdirectory to prevent clashes
+            set randomDir = $translate($system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
+            set tExportSubDirectory = ##class(%Library.File).NormalizeDirectory(tExportDirectory) _ randomDir _ "/"
+            if '##class(%File).CreateDirectoryChain(tExportSubDirectory,.tReturn) {
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",tExportSubDirectory,tReturn))
                 quit
             }
         }
 
-        set tSC = ..%Export(.pParams,.tExportDirectory)
+        set tSC = ..%Export(.pParams,.tExportSubDirectory)
+        if $$$ISERR(tSC) {
+            quit
+        }
+        // If no path is specified, the above call to %Export will generate a temporary directory
+        if tExportDirectory="" {
+            set tExportDirectory = tExportSubDirectory
+        }
+
+        set tSC = ..OnBeforeArtifact(tExportSubDirectory,tExportSubDirectory,.pParams)
         if $$$ISERR(tSC) {
             quit
         }
 
-        set tSC = ..OnBeforeArtifact(tExportDirectory,tExportDirectory,.pParams)
-        if $$$ISERR(tSC) {
-            quit
-        }
-
-        write:tVerbose !,"Module exported to:",!,$char(9),tExportDirectory,!
+        write:tVerbose !,"Module contents exported to temporary directory:",!,$char(9),tExportSubDirectory,!
 
         set tTgzFile = $extract(tExportDirectory,1,*-1)_".tgz"
-        set tSC = ##class(%IPM.General.Archive).Create(tExportDirectory,tTgzFile,.tOutput)
+        set tSC = ##class(%IPM.General.Archive).Create(tExportSubDirectory,tTgzFile,.tOutput)
         if $$$ISERR(tSC) {
             quit
         }
@@ -173,18 +128,14 @@ Method %Package(ByRef pParams) As %Status
             quit
         }
         set pParams("PackageFile") = tTgzFile
+
     } catch e {
         set tSC = e.AsStatus()
     }
 
-    if '$get(pParams("Package","KeepNamespace")) {
-        set tPackageDeployNamespace = $get(pParams("PackageDeployNamespace"))
-        set tInitNamespace = $get(pParams("InitNamespace"))
-        if (tInitNamespace '= ""), (tPackageDeployNamespace '= ""), tInitNamespace '= $namespace {
-            set $namespace = tInitNamespace
-            do ##class(%IPM.Utils.Build).DeleteNamespace(tPackageDeployNamespace, tVerbose)
-            kill pParams("PackageDeployNamespace"), pParams("InitNamespace")
-        }
+    // Delete the temporary export directory
+    if ($get(tExportSubDirectory)'="") && ##class(%Library.File).DirectoryExists(tExportSubDirectory) {
+        set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.File).RemoveDirectoryTree(tExportSubDirectory))
     }
 
   quit tSC
