@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="update-step-added-curr-version-class.ZPM">
+    <Module>
+      <Name>update-step-added-curr-version-class</Name>
+      <Version>1.2.1</Version>
+      <Resource Name="UpdateStepAddedCurrVersionClass.UpdatePackage.PKG" />
+      <UpdatePackage>UpdateStepAddedCurrVersionClass.UpdatePackage</UpdatePackage>
+    </Module>
+  </Document>
+</Export>

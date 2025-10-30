@@ -2,7 +2,7 @@
 <Export generator="Cache" version="25">
 <Document name="ZPM.ZPM"><Module>
   <Name>ZPM</Name>
-  <Version>0.10.4-SNAPSHOT</Version>
+  <Version>0.10.5-SNAPSHOT</Version>
   <ExternalName>IPM</ExternalName>
   <Description>InterSystems Package Manager (IPM) provides development tools and infrastructure for defining, building, distributing, and installing modules and applications.</Description>
   <Keywords>Package Manager</Keywords>

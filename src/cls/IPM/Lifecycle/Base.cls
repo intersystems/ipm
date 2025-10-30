@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure")};
+Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure","ApplyUpdateSteps")};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -166,23 +166,24 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
 {
     set pOnePhase = $zconvert(pOnePhase, "L")
     quit $case(pOnePhase,
-        "clean":        $listbuild("Clean"),
-        "initialize":   $listbuild("Initialize"),
-        "reload":       $listbuild("Initialize","Reload","*"),
-        "validate":     $listbuild("Initialize","Reload","*","Validate"),
-        "exportdata":   $listbuild("ExportData"),
-        "compile":      $listbuild("Initialize","Reload","*","Validate","Compile"),
-        "activate":     $listbuild("Initialize","Reload","*","Validate","Compile","Activate"),
-        "document":     $listbuild("Document"),
-        "makedeployed": $listbuild("MakeDeployed"),
-        "test":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
-        "package":      $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
-        "verify":       $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
-        "register":     $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
-        "publish":      $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
-        "configure":    $listbuild("Configure"),
-        "unconfigure":  $listbuild("Unconfigure"),
-        :               ""
+        "clean":            $listbuild("Clean"),
+        "initialize":       $listbuild("Initialize"),
+        "reload":           $listbuild("Initialize","Reload","*"),
+        "validate":         $listbuild("Initialize","Reload","*","Validate"),
+        "exportdata":       $listbuild("ExportData"),
+        "compile":          $listbuild("Initialize","Reload","*","Validate","Compile"),
+        "activate":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate"),
+        "document":         $listbuild("Document"),
+        "makedeployed":     $listbuild("MakeDeployed"),
+        "test":             $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Test"),
+        "package":          $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package"),
+        "verify":           $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Verify"),
+        "register":         $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Package","Register"),
+        "publish":          $listbuild("Initialize","Reload","*","Validate","Compile","Activate","Publish"),
+        "applyupdatesteps": $listbuild("Initialize","Reload","*","Validate","Compile","Activate","ApplyUpdateSteps"),
+        "configure":        $listbuild("Configure"),
+        "unconfigure":      $listbuild("Unconfigure"),
+        :                   ""
     )
 }
 
@@ -191,23 +192,24 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
 {
     set phase = $zconvert(pOnePhase, "L")
     quit $case(phase,
-        "clean":        "Clean",
-        "initialize":   "Initialize",
-        "reload":       "Reload",
-        "validate":     "Validate",
-        "exportdata":   "ExportData",
-        "compile":      "Compile",
-        "activate":     "Activate",
-        "document":     "Document",
-        "makedeployed": "MakeDeployed",
-        "test":         "Test",
-        "package":      "Package",
-        "verify":       "Verify",
-        "register":     "Register",
-        "publish":      "Publish",
-        "configure":    "Configure",
-        "unconfigure":  "Unconfigure",
-        :               pOnePhase // return the phase as-is if it's a custom phase name
+        "clean":            "Clean",
+        "initialize":       "Initialize",
+        "reload":           "Reload",
+        "validate":         "Validate",
+        "exportdata":       "ExportData",
+        "compile":          "Compile",
+        "activate":         "Activate",
+        "document":         "Document",
+        "makedeployed":     "MakeDeployed",
+        "test":             "Test",
+        "package":          "Package",
+        "verify":           "Verify",
+        "register":         "Register",
+        "publish":          "Publish",
+        "configure":        "Configure",
+        "unconfigure":      "Unconfigure",
+        "applyupdatesteps": "ApplyUpdateSteps",
+        :                   pOnePhase // return the phase as-is if it's a custom phase name
     )
 }
 
@@ -611,7 +613,7 @@ Method %Reload(ByRef pParams) As %Status
             set tSC = $$$ERROR($$$GeneralError,"Module name mismatch.") quit
         }
 
-        #; Reopen, usefull in Packaging deployed modules
+        #; Reopen, useful in Packaging deployed modules
         set ..Module = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
 
@@ -643,7 +645,7 @@ Method %Reload(ByRef pParams) As %Status
             quit
         }
 
-        $$$ThrowOnError(..InstallPythonRequirements(tRoot, .pParams))
+        $$$ThrowOnError(..InstallOrDownloadPythonRequirements(tRoot, .pParams))
 
         // Reload the module definition
         set tSC = ..Module.%Reload()
@@ -696,12 +698,13 @@ Method %Reload(ByRef pParams) As %Status
     quit tSC
 }
 
-Method InstallPythonRequirements(
+Method InstallOrDownloadPythonRequirements(
 	pRoot As %String = "",
-	ByRef pParams)
+	ByRef pParams,
+	download As %Boolean = 0)
 {
     set cmd = $get(pParams("cmd"))
-    if '$listfind($listbuild("install", "load"), cmd) {
+    if ('download && '$listfind($listbuild("install", "load", "update"), cmd)) {
         quit $$$OK
     }
     set tVerbose = $get(pParams("Verbose"))
@@ -718,32 +721,49 @@ Method InstallPythonRequirements(
     }
     set tSC = $$$OK
     try {
-        do ..Log("requirements.txt START")
-        write:tVerbose !
-
         set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
         if '$system.CLS.IsMthd("%SYS.Python", "Import") {
             throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
         }
+        set processType = ""
+        set stdout = ""
         set tSysModule = ##class(%SYS.Python).Import("sys")
         set tPyMajor = tSysModule."version_info".major
         set tPyMinor = tSysModule."version_info".minor
         set tPyMicro = tSysModule."version_info".micro
         set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
-        set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
-        if tVerbose {
-            write !, "Running "
-            zwrite command
+        if download {
+            set processType = "Download Python wheels"
+            do ..Log(processType _ " START")
+            write:tVerbose !
+            set wheelsPath = ##class(%File).NormalizeFilename("wheels", pRoot)
+            set command = ..ResolvePipCaller(.pParams) _ $listbuild("download", "-r", "requirements.txt", "-d", wheelsPath, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+            if tVerbose {
+                write !, "Running "
+                zwrite command
+            } else {
+                set stdout = ""
+            }
+            set sc = ##class(%IPM.Utils.Module).RunCommand(pRoot, command, .stdout)
+            $$$ThrowOnError(sc)
         } else {
-            set stdout = ""
+            set processType = "requirements.txt"
+            do ..Log(processType _ " START")
+            write:tVerbose !
+            set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+            if tVerbose {
+                write !, "Running "
+                zwrite command
+            } else {
+                set stdout = ""
+            }
+            set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
+            $$$ThrowOnError(tSC)
         }
-        set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
-        $$$ThrowOnError(tSC)
-
-        do ..Log("requirements.txt SUCCESS")
+        do ..Log(processType _ " SUCCESS")
     } catch ex {
         set tSC = ex.AsStatus()
-        do ..Log("requirements.txt FAILURE")
+        do ..Log(processType _ " FAILURE")
     }
     quit tSC
 }
@@ -1153,6 +1173,10 @@ Method %Export(
                 }
             }
         }
+        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
+        if exportPythonDependencies {
+            do ..ExportPythonDependencies(.pParams)
+        }
 
         // Deployed items should be exported as a studio project to a designated directory
         set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
@@ -1208,15 +1232,28 @@ Method %Export(
     quit tSC
 }
 
-Method %PrepareDeploy(ByRef pParams) As %Status [ Abstract ]
+/// Downloads Python wheels for Python dependencies into the /root/wheels directory of the module. Also updates module.xml with the Python Wheel resources.
+Method ExportPythonDependencies(ByRef pParams)
 {
-    set tSC = $$$OK
-    try {
-        // TODO: Implement
-    } catch e {
-        set tSC = e.AsStatus()
+    set root = ##class(%File).NormalizeDirectory("", ..Module.Root)
+    $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
+    set wheelsDir = ##class(%File).NormalizeDirectory("wheels", ..Module.Root)
+    if '##class(%File).DirectoryExists(wheelsDir) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheels directory: "_wheelsDir_" not found."))
     }
-    quit tSC
+    set stmt = ##class(%SQL.Statement).%New()
+    $$$ThrowOnError(stmt.%PrepareClassQuery("%File", "FileSet"))
+    set rset = stmt.%Execute(wheelsDir, "*.whl")
+    $$$ThrowSQLIfError(rset.%SQLCODE,rset.%Message)
+    while rset.%Next(.sc) {
+        set file = rset.%Get("ItemName")
+        set type = rset.%Get("Type")
+        if (type '= "F") || (file = "") {
+            continue
+        }
+    do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
+    }
+    $$$ThrowOnError(sc)
 }
 
 Method %Package(ByRef pParams) As %Status [ Abstract ]
@@ -1684,6 +1721,22 @@ Method %MakeDeployed(ByRef pParams) As %Status
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+Method %ApplyUpdateSteps(ByRef pParams) As %Status
+{
+    set sc = $$$OK
+    try {
+        if $system.Mirror.IsMember() && $system.Mirror.IsPrimary() {
+            write !,"WARNING: You are running update steps on the primary member of a mirror. It is recommended to start the update process on a backup instance to minimize downtime."
+        }
+        set verbose = $get(pParams("Verbose"))
+        // TODO: Add log file param after logging meeting discussion
+        $$$ThrowOnError(..Module.HandleAllUpdateSteps(,,verbose))
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 Method OnDetermineResourceDeployability(
