@@ -42,7 +42,7 @@ Method OnAfterPhase(
                     write !, "Artifact found in "_downloadDirectory_". Will use that instead of downloading a new one."
                 }
             }
-            // If artifact fails to download in dev mode then the directory won't exist but execution won't error either
+            // Check that an artifact was downloaded in DownloadArtifact(). If so, copy contents over to the final destination
             if ##class(%File).DirectoryExists(downloadDirectory) {
                 // copy everything from /<module root>/<resource name>/ into the final destination
                 // overwrite existing files if there are any in destination dir
@@ -79,9 +79,18 @@ Method OnExportItem(
         do ..DownloadArtifact(.params)
         set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
         set exportPath = params("ModuleExportPath")
+        set verbose  = $get(params("Verbose"),0)
+        if (verbose) {
+            write !, "Going to copy extracted contents from "_downloadDirectory_" to "_exportPath
+        }
         // Copy contents over to package directory with pDeleteBeforeCopy = 1
-        do ##class(%File).CopyDir(downloadDirectory, exportPath, 1, , 1)
+        if '##class(%File).CopyDir(downloadDirectory, exportPath, 1, , 1) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_exportPath))
+        }
         set itemHandled = 1
+            if (verbose) {
+            write !, "Copy Succeeded."
+        }
     } catch (ex) {
         set sc = ex.AsStatus()
     }
@@ -131,11 +140,26 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 
     // Unpack artifact in temp location (so that if anything goes wrong, the true destination does not get affected)
     // and copy artifact to destination
-    do ..UnTar(artifactName, PMTempDir, downloadDirectory, verbose)
+    set artifactTarPath = ##class(%File).NormalizeFilename(artifactName, PMTempDir)
+    if (verbose) {
+        write !, "Going to extract contents from "_artifactTarPath_" to "_downloadDirectory
+    }
+    do ##class(%IPM.General.Archive).Extract(artifactTarPath, downloadDirectory)
+    if (verbose) {
+        write !, "Extract Succeeded."
+    }
 }
 
-/// Return the path of the valid artifact
-/// Errors if no valid artifact is found
+/// Returns the path of a valid artifact.<br />
+/// Errors if no valid artifact is found.<br />
+/// @Argument   artifactServer  Server name where the artifact is located.<br />
+/// @Argument   artifactPort    Port to use when connecting to artifactServer.<br />
+/// @Argument   aqlURL          URL endpoint for aql search withing JFrog Artifactory.<br />
+/// @Argument   username        Username used for server authentication.<br />
+/// @Argument   password        Password used for server authentication.<br />
+/// @Argument   bearerToken     Token to use in place of username/password auth.<br />
+/// @Argument   filter          JSON (as %String) to use inside the filtering body in the aql call.<br />
+/// @Argument   verbose         Set to 1 to provide verbose output.<br />
 ClassMethod GetArtifactPath(
 	artifactServer As %String,
 	artifactPort As %String,
@@ -151,7 +175,7 @@ ClassMethod GetArtifactPath(
     set httpRequest.SSLConfiguration = ##class(%IPM.Utils.Module).CreateAndGetSSLConfig()
     set httpRequest.Server = artifactServer
     set httpRequest.Port = artifactPort
-    // Token auth gets priority over baisc auth
+    // Token auth gets priority over basic auth
     if (bearerToken '= "") {
         do httpRequest.SetHeader("Authorization", "Bearer "_bearerToken)
         if (verbose) {
@@ -222,7 +246,7 @@ ClassMethod RetrieveArtifact(
     set httpRequest.Port = artifactPort
 
     if verbose {
-        write !, "Start retrieving artifact at https://"_artifactServer_":"_artifactPort_"/"_artifactPath
+        write !, "Start retrieving artifact at https://"_artifactServer_$select(artifactPort = "": "", 1: ":"_artifactPort)_"/"_artifactPath
     }
     $$$ThrowOnError(httpRequest.Get(artifactPath))
 
@@ -260,107 +284,6 @@ ClassMethod RetrieveArtifact(
     }
 
     return artifactName
-}
-
-/// Utility method to untar a tgz file into a designated (or not) temporary dir, and copy to a destination dir(or back to source dir).
-/// artifactName: the source tgz file name
-/// sourceFileDir: the directory of pSourceFilePath (passed to save the effort of parsing again based on Windows/Unix)
-/// copyToDir: the destination directory for extracted contents to be copied to
-ClassMethod UnTar(
-	artifactName As %String,
-	sourceFileDir As %String,
-	copyToDir As %String,
-	verbose As %Boolean = 0) [ Internal ]
-{
-    // if there is no artifact name, then it means there is nothing to be untarred
-    if (artifactName = "") {
-        if (verbose) {
-            write !, "No artifact name provided, skipping untaring."
-        }
-        return
-    }
-    // normalize
-    set sourceFileDir = ##class(%File).NormalizeDirectory(sourceFileDir)
-    set artifactPath = ##class(%File).NormalizeFilename(artifactName, sourceFileDir)
-
-    // make sure pSourceFilePath and sourceFileDir exist
-    if '##class(%File).DirectoryExists(sourceFileDir) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Directory does not exist: "_sourceFileDir))
-    }
-    if '##class(%File).Exists(artifactPath) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "File does not exist: "_artifactPath))
-    }
-
-    // prepare arguments for $ZF(-100) method call
-    // /LOGCMD used to log the actually triggered command into messages.log
-    set keywords = "/SHELL"_$select(verbose:"/LOGCMD",1:"")
-
-    /* Note that it seems cygwin version tar has trouble recognizing windows path passed in directly, e.g.
-     * tar -C windows/path -(v)xzf windows/path/to/file will fail,
-     * but cd command works fine with cd windows/path and will automatically cd into a mapped equivalent linux path like /cygdrive/c/ for C:\ (verified on cygwin)
-     * so change the strategy to concatenate cd and tar commands:
-     * full command to be called via $ZF(-100): cd pSourFileDir && tar -(v)xzf filename
-     * default behavior is to overwrite existing files if you untar again
-     * tar arguments explained, order sensitive
-     * Note: we cannot do switch above into two separate $ZF(-100) calls because each time $ZF ends, pwd gets reverted to the one in previous stack
-     * sourceFileDir: target dir to extract to, in our use case, it's where the source tgz file lives before extracting
-     * "-(v)xzf": extract with option flags, having "v" as the last one will cause issue so put it as the first
-     * pSourceFilePath: the actualy tgz file path
-     */
-    set args = ""
-    set args($increment(args)) = sourceFileDir
-    set args($increment(args)) = "&&"
-    set args($increment(args)) = "tar"
-    set args($increment(args)) = "-"_$select(verbose:"v",1:"")_"xzf"
-    set args($increment(args)) = artifactName
-
-
-    if (verbose) {
-        set fullCommand = "cd"
-        // write full command if verbose
-        set key = ""
-        while 1 {
-            set key = $order(args(key),1,value)
-            if (key = "") {
-                quit
-            }
-            set fullCommand = fullCommand_" "_value
-        }
-        write !, "Lauching System Command: "_fullCommand
-        write !, "Command and return code will be logged in messages.log"
-        write !
-    }
-
-    set errorCode = $zf(-100, keywords, "cd", .args)
-    // errorCode = 0 means the command gets launched successfully, other integers means getting error(e.g 1 means syntax error)
-    if (errorCode '= 0) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to finish system command due to error code: "_errorCode))
-    }
-
-    if (verbose) {
-        write !, "Command launched successfully."
-    }
-    // After extracting, a new directory /package under sourceFileDir will be created holding the extracted files, so make sure to get to correct level
-    set extractedDir = ##class(%File).NormalizeDirectory(sourceFileDir_$$$SLASH_"package")
-
-    if '##class(%File).DirectoryExists(extractedDir) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Extracted directory does not exist: "_extractedDir))
-    }
-
-    // copy everything in /source/package into the final destination
-    // overwrite existing files if there are any in destination dir
-    if (verbose) {
-        write !, "Going to copy extracted contents from "_extractedDir_" to "_copyToDir
-    }
-
-    // Copy contents over with pDeleteBeforeCopy = 1
-    if '##class(%File).CopyDir(extractedDir, copyToDir, 1, , 1) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_copyToDir))
-    }
-
-    if (verbose) {
-        write !, "Copy Succeeded."
-    }
 }
 
 }
