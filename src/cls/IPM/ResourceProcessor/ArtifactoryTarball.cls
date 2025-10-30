@@ -88,7 +88,7 @@ Method OnExportItem(
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_exportPath))
         }
         set itemHandled = 1
-            if (verbose) {
+        if (verbose) {
             write !, "Copy Succeeded."
         }
     } catch (ex) {
@@ -144,7 +144,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     if (verbose) {
         write !, "Going to extract contents from "_artifactTarPath_" to "_downloadDirectory
     }
-    do ##class(%IPM.General.Archive).Extract(artifactTarPath, downloadDirectory)
+    $$$ThrowOnError(##class(%IPM.General.Archive).Extract(artifactTarPath, downloadDirectory))
     if (verbose) {
         write !, "Extract Succeeded."
     }

@@ -175,7 +175,8 @@ Method ExtractTo(pDest As %String) As %Status
                 set irisdat = 1
                 set fullPath = $extract(fullPath, 1, * - 8) _ "iris.dat"
             }
-            set fs = ##class(%Stream.FileBinary).%OpenId(fullPath)
+            set fs = ##class(%Stream.FileBinary).%OpenId(fullPath, , .sc)
+            $$$ThrowOnError(sc)
             $$$ThrowOnError(fs.CopyFromAndSave(..fileData))
             if irisdat {
                 set to = $extract(fullPath, 1, * - 8) _ "IRIS.DAT"
