@@ -4,7 +4,7 @@ Include (%IPM.Common, %IPM.Formatting)
 /// and unpack that artifact into given directories. <br />
 /// This is currently programmed to work exclusively with JFrog Artifactory but the core logic can be extended
 /// to any other artifact repository if needed. <br />
-Class %IPM.ResourceProcessor.Artifactory Extends %IPM.ResourceProcessor.Abstract
+Class %IPM.ResourceProcessor.ArtifactoryTarball Extends %IPM.ResourceProcessor.Abstract
 {
 
 /// Description of resource processor class (shown in UI).
