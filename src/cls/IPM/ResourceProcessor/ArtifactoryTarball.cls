@@ -154,7 +154,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 /// Errors if no valid artifact is found.<br />
 /// @Argument   artifactServer  Server name where the artifact is located.<br />
 /// @Argument   artifactPort    Port to use when connecting to artifactServer.<br />
-/// @Argument   aqlURL          URL endpoint for aql search withing JFrog Artifactory.<br />
+/// @Argument   aqlURL          URL endpoint for aql search within JFrog Artifactory.<br />
 /// @Argument   username        Username used for server authentication.<br />
 /// @Argument   password        Password used for server authentication.<br />
 /// @Argument   bearerToken     Token to use in place of username/password auth.<br />
