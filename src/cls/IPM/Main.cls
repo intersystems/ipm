@@ -3855,7 +3855,7 @@ ClassMethod Update(ByRef pCommandInfo)
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
-    if '##class(%IPM.Storage.Module).NameExists(moduleName) {
+    if '##class(%IPM.Storage.Module).NameExists(moduleName) && '##class(%IPM.Storage.Module).ExternalNameExists(moduleName) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
     if verbose {
