@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="lock-dep-dep1.ZPM">
+    <Module>
+      <Name>lock-dep-dep1</Name>
+      <Version>0.1.3</Version>
+      <Resource Name="LockDepDep1.PKG" />
+    </Module>
+  </Document>
+</Export>

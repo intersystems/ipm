@@ -414,6 +414,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 <modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
+<modifier name="create-lockfile" dataAlias="CreateLockFile" dataValue="1" description="Upon install, ceates/updates the module's lock file." />
 
 </command>
 
@@ -758,6 +759,25 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
     </example>
 </command>
 
+<command name="ci">
+<summary>Installs a module from a lock file</summary>
+<description>
+    Installs a module from its lock file. Will first install all listed repositories followed by dependency modules and then the base module.
+</description>
+
+<!-- Examples -->
+<example description="Reads from the module-lock.json defined for mymodule and installs the repositories, module, and dependencies">
+    ci mymodule 3.0.0
+</example>
+
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module on which to perform update actions" />
+<parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
+
+<!-- Modifiers -->
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 </commands>
 }
 
@@ -992,6 +1012,8 @@ ClassMethod ShellInternal(
                 do ..ModuleVersion(.tCommandInfo)
             } elseif (tCommandInfo = "information") {
                 do ..Information(.tCommandInfo)
+            } elseif (tCommandInfo = "ci") {
+                do ..CleanInstall(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -2301,6 +2323,9 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
                 }
             }
             $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous))
+            if $get(tParams("CreateLockFile"), 0) {
+                $$$ThrowOnError(##class(%IPM.General.LockFile).WriteToLockFile(tModuleName, .tParams))
+            }
         }
     } else {
         set tPrefix = ""
@@ -3879,6 +3904,107 @@ ClassMethod Update(ByRef pCommandInfo)
         // Call ..Install() in order to install the newer version of the module.
         do ..Install(.pCommandInfo)
     }
+}
+
+ClassMethod CleanInstall(ByRef commandInfo)
+{
+    set moduleName = $get(commandInfo("parameters","module"))
+    merge params = commandInfo("data")
+    $$$ThrowOnError(##class(%IPM.General.LockFile).InstallFromLockFile(moduleName, .params))
+
+
+    /*  COPIED FROM ..INSTALL() BUT REPLACED 't' AND 'p' VARIABLES WITH REGULAR NAMES
+    set registry = ""
+    set moduleName = $get(commandInfo("parameters","module"))
+    if (moduleName["/") {
+        set $listbuild(registry, moduleName) = $listfromstring(moduleName, "/")
+    }
+    if (moduleName = "") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No module name specified."))
+    }
+
+    if moduleName = $$$IPMModuleName {
+        $$$ThrowOnError(..CheckModuleNamespace())
+    }
+    // check if any registries are configured and enabled
+    new SQLCODE, count
+    &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
+    $$$ThrowSQLIfError(SQLCODE,%message)
+    if (SQLCODE = 0) && (count = 0) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
+    }
+
+    set version = $get(commandInfo("parameters","version"))
+    set keywords = $$$GetModifier(commandInfo,"keywords")
+    set synchronous = $$$HasModifier(commandInfo,"synchronous")
+    set force = $$$HasModifier(commandInfo,"force")
+
+    set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+    set searchCriteria.Registry = registry
+    set searchCriteria.Name = $$$lcase(moduleName)
+    set searchCriteria.VersionExpression = version
+    set searchCriteria.Keywords = keywords
+    $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(searchCriteria,.results))
+
+    if (results.Count() > 0) {
+        set result = ""
+        #dim result As %IPM.Storage.QualifiedModuleInfo
+        // Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
+        if ('$$$HasModifier(commandInfo,"prompt") || (results.Count() = 1)) && (keywords = "") {
+            set result = results.GetAt(1)
+        } elseif (results.Count() > 0) {
+            for i=1:1:results.Count() {
+                set resultInfo = results.GetAt(i)
+                set tOptArray(i) = resultInfo.DisplayName_" "_resultInfo.VersionString_" @ "_resultInfo.ServerName
+            }
+
+            set value = ""
+            set response = ##class(%Library.Prompt).GetMenu("Which version?",.value,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
+            if (response '= $$$SuccessResponse) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+            }
+            if (value '= "") {
+                set result = results.GetAt(value)
+            }
+        }
+
+        if (result '= "") {
+            do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.params)
+            merge params = commandInfo("data")
+            set params("DeveloperMode") = $get(params("DeveloperMode"), 0)
+            set params("Force") = force
+            // In the case of an update command, commandInfo has already been populated in ..Update(). The relevant information was then moved to params via the merge command above.
+            // In the case of a install command, params still needs to be populated here.
+            if '$get(params("Update"),0) {
+                set params("cmd") = "install"
+                set params("Install") = 1
+            }
+            if result.Deployed {
+                set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
+                set result.PlatformVersion = platformVersion
+                if ('result.PlatformVersions.Find(platformVersion)) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ moduleName _ "' " _ result.VersionString _ " not supported on this platform " _ platformVersion _ "."))
+                }
+            }
+            zwrite result
+            zwrite params
+            zwrite synchronous
+            $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(result, .params, , synchronous))
+        }
+    } else {
+        if (moduleName '= "") {
+            if (version '= "") {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, moduleName_" "_version_" not found in any repository."))
+            } else {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "'"_moduleName_"' not found in any repository."))
+            }
+        } elseif (keywords '= "") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_keywords_"'"))
+        } else {
+            write !,"No modules found. Are there any repositories configured in the current namespace?"
+        }
+    }
+    */
 }
 
 }

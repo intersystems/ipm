@@ -52,9 +52,9 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 /// This callback method is invoked by the <METHOD>%Save</METHOD> method to
 /// provide notification that the object is being saved. It is called before
 /// any data is written to disk.
-/// 
+///
 /// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
-/// 
+///
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
@@ -66,7 +66,7 @@ Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 
 /// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to
 /// provide notification that the current object is being validated.
-/// 
+///
 /// <P>If this method returns an error then <METHOD>%ValidateObject</METHOD> will fail.
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {
@@ -151,6 +151,34 @@ ClassMethod PublishingServerClose(ByRef qHandle As %Binary) As %Status [ PlaceAf
 
 Method GetPublishingManager(ByRef status) [ Abstract ]
 {
+}
+
+Method GetValuesForLockFile()
+{
+    set values = ##super()
+    set values.type = "http"
+    set values.url = ..URL
+    set values.username = ..Username
+    set values.password = ..Password
+    set values.token = ..Token
+    set values.tokenAuthMethod = ..TokenAuthMethod
+    set values.deploymentEnabled = ..DeploymentEnabled
+    return values
+}
+
+/// Sets values to a repo object as defined by a lock file
+/// This method neither creates nor saves the new repo object, just sets the values
+/// This allows for a bit more abstraction to allow classes to call superclasses to set some values
+Method SetValuesFromLockFile(repoValues As %DynamicObject)
+{
+    do ##super(.repoValues)
+    set ..URL = repoValues.url
+    // TODO: Store credential values in a safer manner
+    set ..Username = repoValues.username
+    set ..Password = repoValues.password
+    set ..Token = repoValues.token
+    set ..TokenAuthMethod = repoValues.tokenAuthMethod
+    set ..DeploymentEnabled = repoValues.deploymentEnabled
 }
 
 Storage Default

@@ -280,6 +280,24 @@ ClassMethod GetOne(
     quit ""
 }
 
+Method GetValuesForLockFile()
+{
+    set values = {}
+    set values.type = ""
+    set values.enabled = ..Enabled
+    set values.overriddenSortOrder = ..OverriddenSortOrder
+    set values.readOnly = ..ReadOnly
+    return values
+}
+
+Method SetValuesFromLockFile(repoValues As %DynamicObject)
+{
+    set ..Name = repoValues.name
+    set ..Enabled = repoValues.enabled
+    set ..OverriddenSortOrder = repoValues.overriddenSortOrder
+    set ..ReadOnly = repoValues.readOnly
+}
+
 Storage Default
 {
 <Data name="RepoDefinitionDefaultData">

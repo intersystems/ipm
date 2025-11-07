@@ -1,0 +1,13 @@
+{
+    "name": "lock-mod-g",
+    "version": "1.0.0",
+    "lockFileVersion": "1",
+    "repositories": {},
+    "dependencies": {
+        "lock-mod-remote": {},
+        "lock-mod-oras": {},
+        "lock-mod-http": {},
+        "lock-mod-filesystem": {},
+        "lock-mod-perforce": {}
+    }
+}

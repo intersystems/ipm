@@ -361,6 +361,25 @@ ClassMethod ScanDirectory(
     quit tSC
 }
 
+Method GetValuesForLockFile()
+{
+    set values = ##super()
+    set values.type = "filesystem"
+    set values.root = ..Root
+    set values.depth = ..Depth
+    return values
+}
+
+/// Sets values to a repo object as defined by a lock file
+/// This method neither creates nor saves the new repo object, just sets the values
+/// This allows for a bit more abstraction to allow classes to call superclasses to set some values
+Method SetValuesFromLockFile(repoValues As %DynamicObject)
+{
+    do ##super(.repoValues)
+    set ..Root = repoValues.root
+    set ..Depth = repoValues.depth
+}
+
 Storage Default
 {
 <Data name="FilesystemRepoDefinitionDefaultData">
