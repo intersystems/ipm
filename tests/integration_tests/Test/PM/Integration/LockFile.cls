@@ -237,10 +237,8 @@ Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
     set expectedLockFilePath = ..#ExpectedFilesDir_moduleName_".json"
     set actualLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(actualLockFilePath).%ToJSON()
     set expectedLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(expectedLockFilePath).%ToJSON()
-    do $$$LogMessage("Actual lock file contents: "_actualLockFileContents)
-    do $$$LogMessage("Expected lock file contents: "_expectedLockFileContents)
-
-    do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" match expected values")
+    do $$$AssertTrue(areLockFilesEqual, "Actual: "_actualLockFileContents_"  - Expected: "_expectedLockFileContents)
+    //do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" match expected values")
 }
 
 /// Takes in the path to two lock files and compares their values
