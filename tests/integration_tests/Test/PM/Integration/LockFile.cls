@@ -232,6 +232,14 @@ Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
     set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
     set lockFilePath = module.Root_..#LockFileName
     set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_moduleName_".json")
+
+    set actualLockFilePath = lockFilePath
+    set expectedLockFilePath = ..#ExpectedFilesDir_moduleName_".json"
+    set actualLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(actualLockFilePath).%ToJSON()
+    set expectedLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(expectedLockFilePath).%ToJSON()
+    do $$$LogMessage("Actual lock file contents: "_actualLockFileContents)
+    do $$$LogMessage("Expected lock file contents: "_expectedLockFileContents)
+
     do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" match expected values")
 }
 
@@ -248,10 +256,6 @@ ClassMethod AreLockFilesEqual(
 {
     set actualLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(actualLockFilePath)
     set expectedLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(expectedLockFilePath)
-    set actual = actualLockFileContents.%ToJSON()
-    set expected = expectedLockFileContents.%ToJSON()
-    zwrite actual
-    zwrite expected
     return actualLockFileContents.%ToJSON() = expectedLockFileContents.%ToJSON()
 }
 
