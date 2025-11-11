@@ -280,6 +280,18 @@ ClassMethod GetOne(
     quit ""
 }
 
+/// Gets values from the repo for setting in a lock file
+/// Being in the base Repo.Definition class, these values will be used across all repository types
+Method GetValuesForLockFile()
+{
+    set values = {}
+    set values.type = ""
+    set values.enabled = ..Enabled
+    set values.overriddenSortOrder = ..OverriddenSortOrder
+    set values.readOnly = ..ReadOnly
+    return values
+}
+
 Storage Default
 {
 <Data name="RepoDefinitionDefaultData">

@@ -153,6 +153,21 @@ Method GetPublishingManager(ByRef status) [ Abstract ]
 {
 }
 
+/// Gets values from the repo for setting in a lock file
+/// First calls same method in the super class for values then adds some class-specific values to the object
+Method GetValuesForLockFile()
+{
+    set values = ##super()
+    set values.type = "http"
+    set values.url = ..URL
+    set values.username = ..Username
+    set values.password = ..Password
+    set values.token = ..Token
+    set values.tokenAuthMethod = ..TokenAuthMethod
+    set values.deploymentEnabled = ..DeploymentEnabled
+    return values
+}
+
 Storage Default
 {
 <Data name="HttpRepoDefinitionDefaultData">
