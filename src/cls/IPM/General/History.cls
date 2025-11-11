@@ -7,10 +7,10 @@ Class %IPM.General.History Extends %Persistent
 /// Action of this history record. Can be load, install, or uninstall
 Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
 
-/// Name of the package being loaded/installed/uninstall. This is not necessarily requried. E.g., when loading a nonexistent directory.
+/// Name of the package being loaded/installed/uninstall. This is not necessarily required. E.g., when loading a nonexistent directory.
 Property Package As %IPM.DataType.ModuleName;
 
-/// Version of the package being loaded/installed/uninstall. This is not necessarily requried. E.g., when loading a nonexistent directory.
+/// Version of the package being loaded/installed/uninstall. This is not necessarily required. E.g., when loading a nonexistent directory.
 Property Version As %IPM.General.SemanticVersion [ Required ];
 
 /// Name of the repository where the package is being installed. For load and uninstall, this will be empty.
@@ -29,10 +29,10 @@ Property TimeStart As %TimeStamp [ Required ];
 Property TimeEnd As %TimeStamp;
 
 /// Namespace where the action is being performed
-Property NameSpace As %String [ InitialExpression = {$NAMESPACE}, Required ];
+Property NameSpace As %String [ InitialExpression = {$namespace}, Required ];
 
 /// User who initiated the action
-Property UserName As %String [ InitialExpression = {$USERNAME}, Required ];
+Property UserName As %Library.Username [ InitialExpression = {$username}, Required ];
 
 /// Status of the action. If the action is still in progress, this will be 0. Otherwise, it will be the status code of the action.
 Property Success As %Status [ InitialExpression = 0, Required ];
@@ -41,101 +41,116 @@ Property Success As %Status [ InitialExpression = 0, Required ];
 Property Committed As %Boolean [ InitialExpression = 0, Required ];
 
 /// The command string that triggered the action
-Property CommandString As %String(MAXLEN = 8192) [ Required ];
+Property CommandString As %String(MAXLEN = "") [ Required ];
 
-ClassMethod Init(Action As %String, Package As %IPM.DataType.ModuleName) As %IPM.General.History [ Private ]
+ClassMethod Init(
+	Action As %String,
+	Package As %IPM.DataType.ModuleName) As %IPM.General.History [ Private ]
 {
-    Set log = ..%New()
-    Set log.TimeStart = $ZDateTime($Now(), 3)
-    Set log.Action = Action
-    Set log.Package = Package
-    Set log.CommandString = $Get($$$ZPMCommandToLog, "<unset>")
-    Set log.NameSpace = $Namespace
-    Set log.UserName = $Username
+    set log = ..%New()
+    set log.TimeStart = $zdatetime($now(), 3)
+    set log.Action = Action
+    set log.Package = Package
+    set log.CommandString = $get($$$ZPMCommandToLog, "<unset>")
+    set log.NameSpace = $namespace
+    set log.UserName = $username
     $$$ThrowOnError(log.SetVersion()) // Set the version to placeholder 0.0.0-0, Will be updated before finalizing
     $$$ThrowOnError(log.%Save()) // Save it now in case Finalize isn't called
-    Quit log
+    quit log
 }
 
 ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
 {
-    Quit ..Init("install", Package)
+    quit ..Init("install", Package)
 }
 
 ClassMethod LoadInit() As %IPM.General.History
 {
     // Package name is not known at this point, so use a placeholder
-    Quit ..Init("load", "")
+    quit ..Init("load", "")
 }
 
 ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
 {
-    Quit ..Init("uninstall", Package)
+    quit ..Init("uninstall", Package)
 }
 
 Method SetSource(ServerName As %String) As %Status
 {
     $$$ThrowOnError(..%Reload())
-    Set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(ServerName)
-    If '$IsObject(server) {
-        Quit $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is not defined.", ServerName))
+    set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(ServerName)
+    if '$isobject(server) {
+        quit $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is not defined.", ServerName))
     }
-    Set ..SourceName = ServerName
-    Set ..SourceMoniker = server.#MONIKER
-    Set ..SourceDetails = server.Details
-    Quit ..%Save()
+    set ..SourceName = ServerName
+    set ..SourceMoniker = server.#MONIKER
+    set ..SourceDetails = server.Details
+    quit ..%Save()
 }
 
 Method SetVersion(pVersion As %IPM.General.SemanticVersion) As %Status
 {
-    If ..%Id() '= "" {
+    // If object is being initalized, this will fail, so set placeholder instead
+    if ..%Id() '= "" {
         $$$ThrowOnError(..%Reload())
     }
-    If $Get(pVersion) = "" {
-        Set pVersion = "0.0.0-0"
+    if $get(pVersion) = "" {
+        set pVersion = "0.0.0-0"
     }
-    Set ..Version = $Select($IsObject(pVersion): pVersion, 1: ##class(%IPM.General.SemanticVersion).FromString(pVersion))
-    Quit ..%Save()
+    set ..Version = $select($isobject(pVersion): pVersion, 1: ##class(%IPM.General.SemanticVersion).FromString(pVersion))
+    quit ..%Save()
 }
 
 Method SetName(pName As %String) As %Status
 {
     $$$ThrowOnError(..%Reload())
-    Set ..Package = pName
-    Quit ..%Save()
+    set ..Package = pName
+    quit ..%Save()
 }
 
-Method Finalize(status As %Status, dev As %Boolean = 0) As %Status
+Method Finalize(
+	status As %Status,
+	dev As %Boolean = 0) As %Status
 {
     $$$ThrowOnError(..%Reload())
-    Set ..Success = status
-    Set ..Committed = (dev = 1) || $$$ISOK(status)
-    Set ..TimeEnd = $ZDateTime($Now(), 3)
-    Return ..%Save()
+    set ..Success = status
+    set ..Committed = (dev = 1) || $$$ISOK(status)
+    set ..TimeEnd = $zdatetime($now(), 3)
+    return ..%Save()
 }
 
 /// @API.Query
-/// Get load/install/uninstall records in the specified namespace
-Query Records(ascend As %Boolean, limit As %Integer, namespace As %String) As %Query(CONTAINID = 1, ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
+/// Get history records in the specified namespace
+Query Records(
+	ascend As %Boolean,
+	limit As %Integer,
+	namespace As %String) As %Query(CONTAINID = 1, ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
 {
 }
 
-ClassMethod RecordsExecute(ByRef qHandle As %Binary, ascend As %Boolean, limit As %Integer, namespace As %String) As %Status [ Internal ]
+ClassMethod RecordsExecute(
+	ByRef qHandle As %Binary,
+	ascend As %Boolean,
+	limit As %Integer,
+	namespace As %String) As %Status [ Internal ]
 {
-    Try {
-        Kill filter
-        Set qHandle = ..GetHistory(.filter, .ascend, .limit, .namespace)
-    } Catch e {
-        Return e.AsStatus()
+    try {
+        kill filter
+        set qHandle = ..GetHistory(.filter, .ascend, .limit, .namespace)
+    } catch e {
+        return e.AsStatus()
     }
-    Return $$$OK
+    return $$$OK
 }
 
-ClassMethod RecordsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = RecordsExecute ]
+ClassMethod RecordsFetch(
+	ByRef qHandle As %Binary,
+	ByRef Row As %List,
+	ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = RecordsExecute ]
 {
-    Try {
-        If qHandle.%Next() {
-            Set Row = $ListBuild(
+    try {
+        if qHandle.%Next() {
+            set Row = $listbuild(
                 qHandle.%Get("Action"),
                 qHandle.%Get("Package"),
                 qHandle.%Get("Version_Major"),
@@ -154,174 +169,200 @@ ClassMethod RecordsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtE
                 qHandle.%Get("Committed"),
                 qHandle.%Get("CommandString")
             )
-            Set AtEnd = 0
-        } Else {
-            Set Row = ""
-            Set AtEnd = 1
+            set AtEnd = 0
+        } else {
+            set Row = ""
+            set AtEnd = 1
         }
-    } Catch ex {
-        Return ex.AsStatus()
+    } catch ex {
+        return ex.AsStatus()
     }
-    Return $$$OK
+    return $$$OK
 }
 
 ClassMethod RecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceAfter = RecordsFetch ]
 {
-    Set qHandle = ""
-    Quit $$$OK
+    set qHandle = ""
+    quit $$$OK
 }
 
 /// Get an SQL "where" clause based on the filter argument
 /// See GetHistory() for the `filter` argument
 /// Output "clause" is the SQL WHERE clause as a string, container zero or more ? placeholders
-/// The "varargs" is an array of values to be substituted in the ? placeholders. 
+/// The "varargs" is an array of values to be substituted in the ? placeholders.
 /// The "varargs" may already be populated with values, and new values will be appended to it.
-ClassMethod ConstructSQLWhere(filter As %String, namespace As %String, Output clause As %String, ByRef varargs As %String) As %Status [ Internal ]
+ClassMethod ConstructSQLWhere(
+	ByRef filter As %String,
+	namespace As %String,
+	Output clause As %String,
+	ByRef varargs As %String) As %Status [ Internal ]
 {
-    Try {
-        Set clause = " WHERE 1 = 1 "
-        Set namespace = $ZStrip($Get(namespace, $Namespace), "<>WC")
-        If (namespace '= "") {
-            Set clause = clause _ " AND NameSpace = ?"
-            Set varargs($Increment(varargs)) = namespace
+    try {
+        set clause = " WHERE 1 = 1 "
+        set namespace = $zstrip($get(namespace, $namespace), "<>WC")
+        if (namespace '= "") {
+            set clause = clause _ " AND NameSpace = ?"
+            set varargs($increment(varargs)) = namespace
         }
-        Set col = ""
-        For {
-            Set col = $Order(filter(col), 1, value)
-            If (col = "") || ($Data(value) # 2 = 0) || ('$Match(col, "^[a-zA-Z][a-zA-Z0-9]*$")) {
-                Quit
+        set col = ""
+        for {
+            set col = $order(filter(col), 1, value)
+            if (col = "") || ($data(value) # 2 = 0) || ('$match(col, "^[a-zA-Z][a-zA-Z0-9]*$")) {
+                quit
             }
             // col is safe from SQL injection because we ensured it's alphanumeric above
-            If $ListFind($ListBuild(">=", "<=", "<>"), $Extract(value, 1, 2)) {
-                Set clause = clause _ " AND " _ col _ $Extract(value, 1, 2) _ "?"
-                Set varargs($Increment(varargs)) = $Extract(value, 3, *)
-            } ElseIf $ListFind($ListBuild(">", "<", "="), $Extract(value, 1, 1)) {
-                Set clause = clause _ " AND " _ col _ $Extract(value, 1) _ "?"
-                Set varargs($Increment(varargs)) = $Extract(value, 2, *)
-            } ElseIf value [ "*" {
-                Set clause = clause _ " AND " _ col _ " LIKE ?"
-                Set varargs($Increment(varargs)) = $Replace(value, "*", "%")
-            } Else {
-                Set clause = clause _ " AND " _ col _ "=?"
-                Set varargs($Increment(varargs)) = value
+            if $listfind($listbuild(">=", "<=", "<>"), $extract(value, 1, 2)) {
+                set clause = clause _ " AND " _ col _ $extract(value, 1, 2) _ "?"
+                set varargs($increment(varargs)) = $extract(value, 3, *)
+            } elseif $listfind($listbuild(">", "<", "="), $extract(value, 1, 1)) {
+                set clause = clause _ " AND " _ col _ $extract(value, 1) _ "?"
+                set varargs($increment(varargs)) = $extract(value, 2, *)
+            } elseif value [ "*" {
+                set clause = clause _ " AND " _ col _ " LIKE ?"
+                set varargs($increment(varargs)) = $replace(value, "*", "%")
+            } else {
+                set clause = clause _ " AND " _ col _ "=?"
+                set varargs($increment(varargs)) = value
             }
         }
-        Set clause = clause _ " " // Ensure there's a space at the end
+        set clause = clause _ " " // Ensure there's a space at the end
     } catch ex {
-        Return ex.AsStatus()
+        return ex.AsStatus()
     }
-    Return $$$OK
+    return $$$OK
 }
 
 /// Get the history of all installations, uninstalls, and loads in given namespace
-/// The filter argument is a multidimensional array with structure 
+/// The filter argument is a multidimensional array with structure
 /// filter(columnName) = value
 /// Where value can optionally start with >, >=, <, <=, =, <> or contain * to indicate a wildcard
-ClassMethod GetHistory(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0, namespace As %String) As %SQL.StatementResult
+ClassMethod GetHistory(
+	ByRef filter,
+	ascend As %Boolean = 0,
+	limit As %Integer = 0,
+	namespace As %String) As %SQL.StatementResult
 {
-    Set limit = +limit // Coerce to number to prevent SQL injection
-    Set query = "SELECT " _ $SELECT(limit>0: "TOP " _ limit, 1: "") _  " * FROM %IPM_General.History "
+    if limit > 0 {
+        set query = "SELECT TOP ? * FROM %IPM_General.History "
+        set varargs($increment(varargs)) = limit
+    } else {
+        set query = "SELECT * FROM %IPM_General.History "
+    }
     $$$ThrowOnError(..ConstructSQLWhere(.filter, .namespace, .where, .varargs))
-    Set query = query _ where
-    Set query = query _ " ORDER BY ID "  _ $Select(ascend: "ASC", 1: "DESC")
-    Quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+    set query = query _ where
+    set query = query _ " ORDER BY ID "  _ $select(ascend: "ASC", 1: "DESC")
+    quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
 }
 
 /// Delete the history of installations, uninstalls, and loads in
-ClassMethod DeleteHistory(ByRef filter, namespace As %String, allowDeleteAll As %String) As %Integer
+ClassMethod DeleteHistory(
+	ByRef filter,
+	namespace As %String,
+	allowDeleteAll As %String) As %Integer
 {
-    Set query = "DELETE FROM %IPM_General.History "
+    set query = "DELETE FROM %IPM_General.History "
     $$$ThrowOnError(..ConstructSQLWhere(.filter, namespace, .where, .varargs))
-    If ($Data(varargs) = 0) && ('allowDeleteAll) {
+    if ($data(varargs) = 0) && ('allowDeleteAll) {
         $$$ThrowOnError("Cannot delete all history records by default. If you want to delete everything, use `history delete -g`.")
     }
-    Set query = query _ where
-    Set rs = ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+    set query = query _ where
+    set rs = ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
     $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-    Quit rs.%ROWCOUNT
+    quit rs.%ROWCOUNT
 }
 
 /// @API.Query
-Query GlobalRecords(ascend As %Boolean, limit As %Integer) As %Query(ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
+Query GlobalRecords(
+	ascend As %Boolean,
+	limit As %Integer) As %Query(ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
 {
 }
 
-ClassMethod GlobalRecordsExecute(ByRef qHandle As %Binary, ascend As %Boolean, limit As %Integer) As %Status [ Internal ]
+ClassMethod GlobalRecordsExecute(
+	ByRef qHandle As %Binary,
+	ascend As %Boolean,
+	limit As %Integer) As %Status [ Internal ]
 {
-    Try {
-        Kill filter
-        Set qHandle = ..GetHistoryGlobally(.filter, .ascend, .limit)
-    } Catch e {
-        Return e.AsStatus()
+    try {
+        kill filter
+        set qHandle = ..GetHistoryGlobally(.filter, .ascend, .limit)
+    } catch e {
+        return e.AsStatus()
     }
-    Return $$$OK
+    return $$$OK
 }
 
-ClassMethod GlobalRecordsFetch(ByRef qHandle As %Binary, ByRef Row As %List, ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = GlobalRecordsExecute ]
+ClassMethod GlobalRecordsFetch(
+	ByRef qHandle As %Binary,
+	ByRef Row As %List,
+	ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = GlobalRecordsExecute ]
 {
-    Try {
-        While qHandle.Count() > 0 {
+    try {
+        while qHandle.Count() > 0 {
             // Always get the first namespace. Remove it from list once corresponding result set is exhausted.
-            Set ns = ""
-            Set rs = qHandle.GetNext(.ns)
+            set ns = ""
+            set rs = qHandle.GetNext(.ns)
             $$$ThrowOnError(..RecordsFetch(rs, .Row, .AtEnd))
-            If AtEnd {
+            if AtEnd {
                 // If rs is empty, there could still be more namespaces to process
-                Do qHandle.RemoveAt(ns, .success)
-                If 'success {
+                do qHandle.RemoveAt(ns, .success)
+                if 'success {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to remove namespace "_ns_" from list"))
                 }
-            } Else {
-                Return $$$OK
+            } else {
+                return $$$OK
             }
         }
         // Only when the list is empty should we return AtEnd = 1 and Row = ""
-        Set Row = "", AtEnd = 1
-        Return $$$OK
-    } Catch ex {
-        Return ex.AsStatus()
+        set Row = "", AtEnd = 1
+        return $$$OK
+    } catch ex {
+        return ex.AsStatus()
     }
-    Return $$$OK
+    return $$$OK
 }
 
 ClassMethod GlobalRecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceAfter = GlobalRecordsFetch ]
 {
     // Should not happen, but just in case
-    If qHandle.Count() '= 0 {
+    if qHandle.Count() '= 0 {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Namespace list not empty in GlobalRecordsFetch()!"))
     }
-    Set qHandle = ""
-    Quit $$$OK
+    set qHandle = ""
+    quit $$$OK
 }
 
 /// Get the history of all installations, uninstalls, and loads in all namespaces
 /// See GetHistory() for the `filter` argument
-ClassMethod GetHistoryGlobally(ByRef filter, ascend As %Boolean = 0, limit As %Integer = 0) As %Library.ArrayOfObjects
+ClassMethod GetHistoryGlobally(
+	ByRef filter,
+	ascend As %Boolean = 0,
+	limit As %Integer = 0) As %Library.ArrayOfObjects
 {
-    Set originalNS = $Namespace
-    New $Namespace
-    Set $Namespace = "%SYS"
-    Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
+    set originalNS = $namespace
+    new $namespace
+    set $namespace = "%SYS"
+    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
     $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-    Set $Namespace = originalNS
-    Set array = ##class(%Library.ArrayOfObjects).%New()
-    While rs.%Next() {
-        Set ns = rs.%Get("Nsp")
-        Set historyRS = ..GetHistory(.filter, ascend, limit, ns)
-        If historyRS = $$$NULLOREF {
-            Continue
+    set $namespace = originalNS
+    set array = ##class(%Library.ArrayOfObjects).%New()
+    while rs.%Next() {
+        set ns = rs.%Get("Nsp")
+        set historyRS = ..GetHistory(.filter, ascend, limit, ns)
+        if historyRS = $$$NULLOREF {
+            continue
         }
-        Do array.SetAt(historyRS, ns)
+        do array.SetAt(historyRS, ns)
     }
-    Return array
+    return array
 }
 
 ClassMethod DisplayOneRecord(id As %Integer)
 {
-    Set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT TOP 1 * FROM %IPM_General.History WHERE ID = ?", id)
-    If rs.%Next() {
-        Do ..ShowColumns(rs, 1)
-    } Else {
+    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT TOP 1 * FROM %IPM_General.History WHERE ID = ?", id)
+    if rs.%Next() {
+        do ..ShowColumns(rs, 1)
+    } else {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "No record found with ID "_id_". Use `history find` command to show all entries. "))
     }
 }
@@ -329,141 +370,155 @@ ClassMethod DisplayOneRecord(id As %Integer)
 /// If detail is 1, will display full details each property on a separate line
 /// If detail is "header", will display the column names using the same style as the data
 /// Otherwise, will display on a single line, with some details omitted
-ClassMethod ShowColumns(rs As %SQL.StatementResult, detail As %Boolean = 0) As %Status [ Internal, Private ]
+ClassMethod ShowColumns(
+	rs As %SQL.StatementResult,
+	detail As %Boolean = 0) As %Status [ Internal, Private ]
 {
-    Set columnStyles = $ListBuild(
-        $ListBuild("ID", $$$Bright),
-        $ListBuild("Action", $$$Red),
-        $ListBuild("Package", $$$Green),
-        $ListBuild("Version", $$$Green),
-        $ListBuild("UserName", $$$Blue),
-        $ListBuild("Namespace", $$$Magenta),
-        $ListBuild("Time", $$$Yellow),
-        $ListBuild("Success", $$$Default),
-        $ListBuild("Committed", $$$Cyan),
-        $ListBuild("CommandString", $$$Red),
-        $ListBuild("Source", $$$Default)
+    set columnStyles = $listbuild(
+        $listbuild("ID", $$$Bright),
+        $listbuild("Action", $$$Red),
+        $listbuild("Package", $$$Green),
+        $listbuild("Version", $$$Green),
+        $listbuild("UserName", $$$Blue),
+        $listbuild("Namespace", $$$Magenta),
+        $listbuild("Time", $$$Yellow),
+        $listbuild("Success", $$$Default),
+        $listbuild("Committed", $$$Cyan),
+        $listbuild("CommandString", $$$Red),
+        $listbuild("Source", $$$Default)
     )
 
-    Set ptr = 0
-    Write !
-    While $ListNext(columnStyles, ptr, pair) {
-        Set $ListBuild(column, style) = pair
-        If detail = "header" {
-            Write $$$FormattedLine(style, column), " "
-            Continue
+    set ptr = 0
+    write !
+    while $listnext(columnStyles, ptr, pair) {
+        set $listbuild(column, style) = pair
+        if detail = "header" {
+            write $$$FormattedLine(style, column), " "
+            continue
         }
-        Set cls = $classname()
-        Set mthd = column_"ToString"
-        If $System.CLS.IsMthd(cls, mthd) {
-            Set value = $classmethod(cls, mthd, rs, detail)
-        } Else {
-            Set value = rs.%Get(column)
+        set cls = $classname()
+        set mthd = column_"ToString"
+        if $system.CLS.IsMthd(cls, mthd) {
+            set value = $classmethod(cls, mthd, rs, detail)
+        } else {
+            set value = rs.%Get(column)
         }
-        Set value = $Replace(value, $Char(13), $$$FormattedLine($$$Dim, "<CR>"))
-        Set value = $Replace(value, $Char(10), $$$FormattedLine($$$Dim, "<LF>"))
-        Set value = $Replace(value, $Char(9), $$$FormattedLine($$$Dim, "<TAB>"))
-        Set value = $$$FormattedLine(style, value)
-        If detail {
-            Write $$$FormattedLine($$$Dim, column), ": ", value, !
-        } Else { 
-            Write value, " " 
-        }
-    }
-    Return $$$OK
-}
-
-ClassMethod VersionToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
-{
-    Set obj = ##class(%IPM.General.History).%OpenId(rs.%Get("ID"))
-    If $IsObject(obj) {
-        Set str = obj.Version.ToString()
-        If str '= "0.0.0-0" {
-            Quit "v"_str
+        set value = $replace(value, $char(13), $$$FormattedLine($$$Dim, "<CR>"))
+        set value = $replace(value, $char(10), $$$FormattedLine($$$Dim, "<LF>"))
+        set value = $replace(value, $char(9), $$$FormattedLine($$$Dim, "<TAB>"))
+        set value = $$$FormattedLine(style, value)
+        if detail {
+            write $$$FormattedLine($$$Dim, column), ": ", value, !
+        } else {
+            write value, " "
         }
     }
-    Quit "<unset>"
+    return $$$OK
 }
 
-ClassMethod TimeToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+ClassMethod VersionToString(
+	rs As %SQL.StatementResult,
+	detail As %Boolean = 0) As %String [ Internal, Private ]
 {
-    If detail {
-        Quit "Started At " _ rs.%Get("TimeStart") _ "; Ended At " _ rs.%Get("TimeEnd")
-    } 
-
-    Set start = rs.%Get("TimeStart")
-    Set end = rs.%Get("TimeEnd")
-    If end = "" {
-        Quit rs.%Get("TimeStart")
-    } 
-    Set diff = $System.SQL.DATEDIFF("ss", start, end)
-
-    Quit $$$FormatText("%1 (%2 sec)", start, diff)
+    set obj = ##class(%IPM.General.History).%OpenId(rs.%Get("ID"))
+    if $isobject(obj) {
+        set str = obj.Version.ToString()
+        if str '= "0.0.0-0" {
+            quit "v"_str
+        }
+    }
+    quit "<unset>"
 }
 
-ClassMethod SourceToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+ClassMethod TimeToString(
+	rs As %SQL.StatementResult,
+	detail As %Boolean = 0) As %String [ Internal, Private ]
 {
-    If rs.%Get("Action") '= "install" {
-        Quit "n/a"
+    if detail {
+        quit "Started At " _ rs.%Get("TimeStart") _ "; Ended At " _ rs.%Get("TimeEnd")
     }
-    If rs.%Get("SourceName") = "" {
-        Quit "<no source set>"
+
+    set start = rs.%Get("TimeStart")
+    set end = rs.%Get("TimeEnd")
+    if end = "" {
+        quit rs.%Get("TimeStart")
     }
-    If detail {
-        Quit rs.%Get("SourceName") _ " (" _ rs.%Get("SourceMoniker") _ "): " _ rs.%Get("SourceDetails")
-    } Else {
-        Quit rs.%Get("SourceName")
-    }
+    set diff = $system.SQL.DATEDIFF("ss", start, end)
+
+    quit $$$FormatText("%1 (%2 sec)", start, diff)
 }
 
-ClassMethod SuccessToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+ClassMethod SourceToString(
+	rs As %SQL.StatementResult,
+	detail As %Boolean = 0) As %String [ Internal, Private ]
 {
-    Set success = rs.%Get("Success")
-    If detail {
-        Quit success
+    if rs.%Get("Action") '= "install" {
+        quit "n/a"
     }
-    Quit $Select($$$ISOK(success): "Success", 1:$System.Status.GetErrorText(success))
+    if rs.%Get("SourceName") = "" {
+        quit "<no source set>"
+    }
+    if detail {
+        quit rs.%Get("SourceName") _ " (" _ rs.%Get("SourceMoniker") _ "): " _ rs.%Get("SourceDetails")
+    } else {
+        quit rs.%Get("SourceName")
+    }
 }
 
-ClassMethod CommittedToString(rs As %SQL.StatementResult, detail As %Boolean = 0) As %String [ Internal, Private ]
+ClassMethod SuccessToString(
+	rs As %SQL.StatementResult,
+	detail As %Boolean = 0) As %String [ Internal, Private ]
 {
-    Quit $Select(rs.%Get("Committed"): "Committed", 1: "Uncommitted")
+    set success = rs.%Get("Success")
+    if detail {
+        quit success
+    }
+    quit $select($$$ISOK(success): "Success", 1:$system.Status.GetErrorText(success))
 }
 
-ClassMethod DisplayQueryResult(rs As %SQL.StatementResult, namespace As %String)
+ClassMethod CommittedToString(
+	rs As %SQL.StatementResult,
+	detail As %Boolean = 0) As %String [ Internal, Private ]
+{
+    quit $select(rs.%Get("Committed"): "Committed", 1: "Uncommitted")
+}
+
+ClassMethod DisplayQueryResult(
+	rs As %SQL.StatementResult,
+	namespace As %String)
 {
     // TODO improve the display output
-    If (rs = $$$NULLOREF) {
-        Write !, "IPM is not enabled for this namespace"
-        Quit
+    if (rs = $$$NULLOREF) {
+        write !, "IPM is not enabled for this namespace"
+        quit
     }
 
-    Set found = 0
-    While rs.%Next() {
-        If 'found {
-            Set found = 1
-            If $Data(namespace) {
-                Write !, "Namespace: ", namespace
+    set found = 0
+    while rs.%Next() {
+        if 'found {
+            set found = 1
+            if $data(namespace) {
+                write !, "Namespace: ", namespace
             }
-            Do ..ShowColumns(rs, "header")
-            Write !
+            do ..ShowColumns(rs, "header")
+            write !
         }
-        Do ..ShowColumns(rs, 0)
+        do ..ShowColumns(rs, 0)
     }
-    If found {
-        Write !
+    if found {
+        write !
     }
 }
 
 ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
 {
-    Set ns = ""
-    For {
-        Set rs = array.GetNext(.ns)
-        If rs = "" {
-            Quit
+    set ns = ""
+    for {
+        set rs = array.GetNext(.ns)
+        if rs = "" {
+            quit
         }
-        Do ..DisplayQueryResult(rs, ns)
+        do ..DisplayQueryResult(rs, ns)
     }
 }
 
@@ -513,11 +568,11 @@ Storage Default
 <Value>CommandString</Value>
 </Value>
 </Data>
-<DataLocation>^%IPM.General.HistoryD</DataLocation>
+<DataLocation>^IPM.General.HistoryD</DataLocation>
 <DefaultData>HistoryDefaultData</DefaultData>
-<IdLocation>^%IPM.General.HistoryD</IdLocation>
-<IndexLocation>^%IPM.General.HistoryI</IndexLocation>
-<StreamLocation>^%IPM.General.HistoryS</StreamLocation>
+<IdLocation>^IPM.General.HistoryD</IdLocation>
+<IndexLocation>^IPM.General.HistoryI</IndexLocation>
+<StreamLocation>^IPM.General.HistoryS</StreamLocation>
 <Type>%Storage.Persistent</Type>
 }
 

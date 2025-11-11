@@ -2168,7 +2168,7 @@ ClassMethod LoadFromRepo(
 
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
-	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 1)
+	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
 	set log = ##class(%IPM.General.History).LoadInit()
 	try {
 		do ..LoadInternal(.pCommandInfo, log)
@@ -2296,7 +2296,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 
     #dim log As %IPM.General.History
 	set log = ##class(%IPM.General.History).InstallInit(tModuleName)
-	set devMode = $get(tParams("DeveloperMode"), 0)
+	set devMode = $get(pCommandInfo("data","DeveloperMode"), 0)
 
 	try {
         set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
