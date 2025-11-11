@@ -132,19 +132,13 @@ Method GetPublishingManager(ByRef status)
     return ##class(%IPM.Repo.Remote.PublishManager).%Get(.status)
 }
 
+/// Gets values from the repo for setting in a lock file
+/// First calls same method in the super class for values then adds some class-specific values to the object
 Method GetValuesForLockFile()
 {
     set values = ##super()
     set values.type = "remote"
     return values
-}
-
-/// Sets values to a repo object as defined by a lock file
-/// This method neither creates nor saves the new repo object, just sets the values
-/// This allows for a bit more abstraction to allow classes to call superclasses to set some values
-Method SetValuesFromLockFile(repoValues As %DynamicObject)
-{
-    do ##super(.repoValues)
 }
 
 Storage Default

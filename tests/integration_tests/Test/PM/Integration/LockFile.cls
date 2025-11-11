@@ -43,19 +43,19 @@ Parameter ModuleJ As String = "lock-mod-j";
 /// 2 dependencies: C & E, both with same transient dependency: A
 Parameter ModuleK As String = "lock-mod-k";
 
-/// TODO: Question: Should the modules have lock files for them by default?
-///         If yes - Will be like how other modules are defined but base install will be the "update a lock file" case
-///         If no  - Modules won't start in their final form but every install will be a "create a lock file" by default
-///       Decision: Yes
-///         Doesn't matter which we choose since "create" & "update" should be identical, just make sure to add a sanity test for the other case
 Method OnBeforeAllTests() As %Status
 {
-    // TODO: Have this in so that dev changes get picked up in testing ns, delete later
-    set sc = $system.OBJ.Load("/home/irisowner/zpm/src/cls/IPM/Main.cls", "ck")
-    do $$$AssertStatusOK(sc, "Successfully imported dev %IPM.Main class")
     // Setup repo for LockFile tests
     set sc = ##class(%IPM.Main).Shell("repo -n lock-file -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/")
     do $$$AssertStatusOK(sc,"Created lock-file repo successfully.")
+    return sc
+}
+
+Method OnAfterAllTests() As %Status
+{
+    // Delete repo for LockFile tests
+    set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file")
+    do $$$AssertStatusOK(sc,"Removed lock-file repo successfully.")
     return sc
 }
 
@@ -66,15 +66,10 @@ Method TestModule0Dependencies()
     set tSC = $$$OK
     try {
         set moduleName = ..#ModuleA
-        // Do an initial install of the module and create a lock file for it
-        set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName)
-        do $$$AssertStatusOK(sc, "Able to install "_moduleName_" and create lock file for it")
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
 
-        // Compare the generated lock file with the expected one
-        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
-        set lockFilePath = module.Root_..#LockFileName
-        set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_moduleName_".json")
-        do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" match expected values")
+        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module0Dependencies.")
     }
@@ -88,6 +83,9 @@ Method TestModule2Dependencies0Transient()
     try {
         set moduleName = ..#ModuleC
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+
+        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies0Transient.")
     }
@@ -101,6 +99,9 @@ Method TestModule1Dependency2Transient()
     try {
         set moduleName = ..#ModuleD
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+
+        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module1Dependency2Transient.")
     }
@@ -114,6 +115,9 @@ Method TestModule2Dependencies1Transient()
     try {
         set moduleName = ..#ModuleF
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+
+        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
     }
@@ -130,21 +134,81 @@ Method TestModuleDependenciesAllRepositoryTypes()
 /// Uses Module H
 Method TestModuleMultipleVersions()
 {
+    set tSC = $$$OK
+    try {
+        set moduleName = ..#ModuleH
+
+        // First test with the latest version of the module
+        set latestVersion = "3.0.0"
+        set latestLockFileName = "lock-mod-h-v3.json"
+
+        // Do an initial install of the latest version of the module and create a lock file for it
+        set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName)
+        do $$$AssertStatusOK(sc, "Able to install "_moduleName_" v"_latestVersion_" and create lock file for it")
+
+        // Compare the generated lock file with the expected one
+        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        set lockFilePath = module.Root_..#LockFileName
+        set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_latestLockFileName)
+        do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" v"_latestVersion_" match expected values")
+
+        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+
+
+
+        // Now test with an older version of the same module
+        set olderLockFileName =  "lock-mod-h-v2.json"
+        set olderVersion = "2.0.0"
+
+        // Do an initial install of the module and create a lock file for it
+        set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName_" "_olderVersion)
+        do $$$AssertStatusOK(sc, "Able to install "_moduleName_" v"_olderVersion_" and create lock file for it")
+
+        // Compare the generated lock file with the expected one
+        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        set lockFilePath = module.Root_..#LockFileName
+        set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_olderLockFileName)
+        do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" v"_olderVersion_" match expected values")
+
+        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
+    }
 }
 
-/// zpm "ci" on a module with no lock file as well as creating a lock file for a module that didn't already have one
+/// Module with no pre-existing lock file
+///     - zpm "ci" should fail due to not being able to locate the lock file
+///     - Test creation of a lock file, for a module that did not already have one.
+///         - Differs from other tests which overwrite pre-existing lock fies
+///         - Both cases SHOULD be functionally equivalent
 /// Uses Module I
 Method TestModuleNoLockFile()
 {
+    set tSC = $$$OK
+    try {
+        set moduleName = ..#ModuleI
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+
+        // Go back to the inital state by deleting lock file for this module as well as uninstalling the module and dependencies at the end of the test
+        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        set lockFilePath = module.Root_..#LockFileName
+        do ##class(%File).Delete(lockFilePath)
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
+    }
 }
 
 /// Try install on a lock file that lists dependencies out of order
 /// Uses Module J
 Method TestModuleDependenciesOutOfOrder()
 {
+    // TODO: Implement with zpm "ci" addition
 }
 
-/// / 2 dependencies for a module have the same transient to add to the lock file
+/// 2 dependencies for a module have the same transient to add to the lock file
 /// Uses Module K
 Method TestModule2DependenciesSameTransient()
 {
@@ -175,7 +239,7 @@ Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
 /// Comparison is done as a string so if the keys are in a different order the comparison will fail, even if data is equivalent
 /// This is intended as the keys being in a different order should alert us to further investigate
 /// Especially for the dependencies list where order is explicitly required (for zpm "ci" to install in correct order)
-///
+/// 
 /// Returns: 1 - if lock files have equivalent contents
 ///          0 - if lock files are different
 ClassMethod AreLockFilesEqual(

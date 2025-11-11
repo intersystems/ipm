@@ -1,6 +1,6 @@
 {
-    "name": "lock-mod-h",
-    "version": "3.0.0",
+    "name": "lock-mod-e",
+    "version": "1.0.0",
     "lockFileVersion": "1",
     "repositories": {
         "lock-file": {
@@ -15,17 +15,6 @@
         "lock-mod-a": {
             "version": "1.0.0",
             "repository": "lock-file"
-        },
-        "lock-mod-b": {
-            "version": "1.0.0",
-            "repository": "lock-file"
-        },
-        "lock-mod-e": {
-            "version": "1.0.0",
-            "repository": "lock-file",
-            "dependencies": {
-                "lock-mod-a": "^1.0.0"
-            }
         }
     }
 }

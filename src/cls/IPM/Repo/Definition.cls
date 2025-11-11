@@ -280,6 +280,8 @@ ClassMethod GetOne(
     quit ""
 }
 
+/// Gets values from the repo for setting in a lock file
+/// Being in the base Repo.Definition class, these values will be used across all repository types
 Method GetValuesForLockFile()
 {
     set values = {}
@@ -288,14 +290,6 @@ Method GetValuesForLockFile()
     set values.overriddenSortOrder = ..OverriddenSortOrder
     set values.readOnly = ..ReadOnly
     return values
-}
-
-Method SetValuesFromLockFile(repoValues As %DynamicObject)
-{
-    set ..Name = repoValues.name
-    set ..Enabled = repoValues.enabled
-    set ..OverriddenSortOrder = repoValues.overriddenSortOrder
-    set ..ReadOnly = repoValues.readOnly
 }
 
 Storage Default
