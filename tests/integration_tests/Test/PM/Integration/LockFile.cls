@@ -248,6 +248,10 @@ ClassMethod AreLockFilesEqual(
 {
     set actualLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(actualLockFilePath)
     set expectedLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(expectedLockFilePath)
+    set actual = actualLockFileContents.%ToJSON()
+    set expected = expectedLockFileContents.%ToJSON()
+    zwrite actual
+    zwrite expected
     return actualLockFileContents.%ToJSON() = expectedLockFileContents.%ToJSON()
 }
 
