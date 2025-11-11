@@ -46,6 +46,8 @@ Parameter ModuleK As String = "lock-mod-k";
 Method OnBeforeAllTests() As %Status
 {
     // Setup repo for LockFile tests
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc,"Deleted all leftover repos from other tests successfully.")
     set sc = ##class(%IPM.Main).Shell("repo -n lock-file -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/")
     do $$$AssertStatusOK(sc,"Created lock-file repo successfully.")
     return sc
@@ -232,13 +234,7 @@ Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
     set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
     set lockFilePath = module.Root_..#LockFileName
     set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_moduleName_".json")
-
-    set actualLockFilePath = lockFilePath
-    set expectedLockFilePath = ..#ExpectedFilesDir_moduleName_".json"
-    set actualLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(actualLockFilePath).%ToJSON()
-    set expectedLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(expectedLockFilePath).%ToJSON()
-    do $$$AssertTrue(areLockFilesEqual, "Actual: "_actualLockFileContents_"  - Expected: "_expectedLockFileContents)
-    //do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" match expected values")
+    do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" match expected values")
 }
 
 /// Takes in the path to two lock files and compares their values
