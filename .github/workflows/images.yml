@@ -13,7 +13,7 @@ env:
   name: |
     iris-community
     irishealth-community
- 
+
 jobs:
   images:
     runs-on: ubuntu-latest
@@ -29,8 +29,7 @@ jobs:
             tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]' | awk '!/(-linux)|([1-4]-preview)|(-em)|(-cd)/' | awk '!/\.[1-4]\./' | sort | uniq)
             for tag in $tags
             do
-              # Skip irishealth-community due to bad interaction with ZPM document type
-              # Also skip 2023.2 because the license has expired
+              # Skip 2023.3 and 2023.2 because the license has expired
               if [ "$tag" = "2023.3" -o "$tag" = "2023.2" ];
                 then
                   continue
@@ -39,4 +38,9 @@ jobs:
             done
           done;
           echo images="[${images%?}]" >> $GITHUB_OUTPUT
-          echo main=${images%%,*} >> $GITHUB_OUTPUT
+
+          # The syntax GitHub expects is `main=string`, rather than `main="string"`
+          # I think this is way too confusing and makes no sense.
+          # Even for bash, `main=string` and `main="string"` should be equivalent except for $var expansions.
+          main=$(echo ${images%%,*} | awk -F'"' '{print $2}')
+          echo "main=$main" >> $GITHUB_OUTPUT

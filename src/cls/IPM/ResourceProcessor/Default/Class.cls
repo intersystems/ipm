@@ -14,36 +14,41 @@ Property FilenameExtension As %String [ InitialExpression = "cls" ];
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-		Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
-		If 'tGlobalScope {
-			Set tNeedExplicitMapping = ..FileExistsInCurrentNS(tName)
-			If tNeedExplicitMapping {
-				Set tPackage = $p(tName,".",1,*-1)
-				Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
-				Set tSC = ##class(%IPM.Utils.Module).AddPackageMapping($namespace,tPackage,tSourceDB)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-			}
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tName = $piece(..ResourceReference.Name,".",1,*-1)
+        set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$get(pParams("Reload","ForceLocalScope"),0)
+        if 'tGlobalScope {
+            set tNeedExplicitMapping = '..ResourceIsMappedToDefaultDB(..ResourceReference.Name)
+            if tNeedExplicitMapping {
+                set tPackage = $piece(tName,".",1,*-1)
+                set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($namespace)
+                set tSC = ##class(%IPM.Utils.Module).AddPackageMapping($namespace,tPackage,tSourceDB)
+                if $$$ISERR(tSC) {
+                    quit
+                }
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+Method OnExportItem(
+	pFullExportPath As %String,
+	pItemName As %String,
+	ByRef pItemParams,
+	ByRef pParams,
+	Output pItemHandled As %Boolean = 0) As %Status
 {
-  If $ListFind($ListBuild("BPL","DTL"), $$$ucase($Piece(pItemName, ".", *))) {
-    Set $Piece(pItemName, ".", *) = "cls"
-  }
-	If (..Format = "") {
-		Set ..Format = $Case(..FilenameExtension,"cls":"UDL",:"XML")
-	}
-	Quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
+    if $listfind($listbuild("BPL","DTL"), $$$ucase($piece(pItemName, ".", *))) {
+        set $piece(pItemName, ".", *) = "cls"
+    }
+    if (..Format = "") {
+        set ..Format = $case(..FilenameExtension,"cls":"UDL",:"XML")
+    }
+    quit ##super(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
 }
 
 }

@@ -15,59 +15,64 @@ Property Directory As %String(MAXLEN = "") [ InitialExpression = "localize" ];
 /// Export format - list of acceptable values may differ by subclass.
 Property Format As %String(VALUELIST = ",XML,UDL") [ InitialExpression = "XML" ];
 
-Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
+Method OnBeforePhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Set tVerbose = $Get(pParams("Verbose"),0)
-	// Handle export of messages file for localization using the LocalizationExport resource processor class.
-	If (..Filename = "") {
-		// Default
-		Set ..Filename = "/localize/"_$Translate($Piece(..ResourceReference.Name,".",1,*-1),".")_".xml"
-	}
-	If (pPhase = "Compile") {
-		// Uses CompileList rather than Compile to support custom document type (.LOC)
-		Set tSC = $System.OBJ.CompileList(..ResourceReference.Name,$Select(tVerbose:"d",1:"-d")_..Flags)
-	}
-	Quit $$$ADDSC(tSC,##class(%IPM.ResourceProcessor.LocalizationExport)$This.OnBeforePhase(pPhase,.pParams))
+    set tSC = $$$OK
+    set tVerbose = $get(pParams("Verbose"),0)
+    // Handle export of messages file for localization using the LocalizationExport resource processor class.
+    if (..Filename = "") {
+        // Default
+        set ..Filename = "/localize/"_$translate($piece(..ResourceReference.Name,".",1,*-1),".")_".xml"
+    }
+    if (pPhase = "Compile") {
+        // Uses CompileList rather than Compile to support custom document type (.LOC)
+        set tSC = $system.OBJ.CompileList(..ResourceReference.Name,$select(tVerbose:"d",1:"-d")_..Flags)
+    }
+    quit $$$ADDSC(tSC,##class(%IPM.ResourceProcessor.LocalizationExport)$this.OnBeforePhase(pPhase,.pParams))
 }
 
-Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
+Method OnPhase(
+	pPhase As %String,
+	ByRef pParams,
+	Output pResourceHandled As %Boolean = 0) As %Status
 {
-	Set tSC = $$$OK
-	Set pResourceHandled = 0
-	Try {
-		If (pPhase = "Compile") {
-			Set pResourceHandled = 1
-		} Else {
-			Set tSC = ##super(pPhase,.pParams,.pResourceHandled)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    set pResourceHandled = 0
+    try {
+        if (pPhase = "Compile") {
+            set pResourceHandled = 1
+        } else {
+            set tSC = ##super(pPhase,.pParams,.pResourceHandled)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tName = $Piece(..ResourceReference.Name,".",1,*-1)
-		Set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$Get(pParams("Reload","ForceLocalScope"),0)
-		If 'tGlobalScope {
-			Set tNeedExplicitMapping = ..FileExistsInCurrentNS(tName)
-			If tNeedExplicitMapping {
-				Set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($Namespace)
-				Set tSC = ##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,,tSourceDB)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-			}
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tName = $piece(..ResourceReference.Name,".",1,*-1)
+        set tGlobalScope = ..ResourceReference.Module.GlobalScope && '$get(pParams("Reload","ForceLocalScope"),0)
+        if 'tGlobalScope {
+            set tNeedExplicitMapping = '..ResourceIsMappedToDefaultDB(tName_".INC")
+            if tNeedExplicitMapping {
+                set tSourceDB = ##class(%IPM.Utils.Module).GetRoutineDatabase($namespace)
+                set tSC = ##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,,tSourceDB)
+                if $$$ISERR(tSC) {
+                    quit
+                }
+            }
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 }

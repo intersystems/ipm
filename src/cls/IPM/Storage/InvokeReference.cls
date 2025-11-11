@@ -9,78 +9,88 @@ Property Class As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ Required 
 
 Property Method As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ Required ];
 
-Property Phase As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "Configure" ];
+Property Phase As %IPM.DataType.PhaseName(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "Configure" ];
 
 /// If provided, the Phase property will be ignored. This CustomPhase will be used and no corresponding lifecycle is required.
-Property CustomPhase As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE");
+Property CustomPhase As %IPM.DataType.CustomPhaseName(XMLPROJECTION = "ATTRIBUTE");
 
-Property When As %String(MAXLEN = 255, VALUELIST = ",Before,After", XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "After", SqlFieldName = _WHEN ];
+Property When As %IPM.DataType.PhaseWhen(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = "After", SqlFieldName = _WHEN ];
 
-Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = 0 ];
+/// Whether to check the status returned by the invoked method.
+/// <br/>Tri-state value:
+/// <br/>  1: Check status and treat return type as %Status
+/// <br/>  0: Do not check status
+/// <br/>  "": As default, check the status iff the return type is %Status
+Property CheckStatus As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ Deprecated ];
 
 Property Arg As list Of %String(MAXLEN = 255, XMLNAME = "Arg", XMLPROJECTION = "ELEMENT");
 
 Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality = parent, Inverse = Invokes, SqlFieldName = ModuleItem ];
 
-Method GetArgsArray(pParams, Output args) As %Status
+Method GetArgsArray(
+	pParams,
+	Output args) As %Status
 {
-  Set args = ..Arg.Count()
-  For i=1:1:..Arg.Count() {
-    Set args(i) = ..Module.%Evaluate(..Arg.GetAt(i), .pParams)
-    If (args(i)=$Char(0)) { Set args(i) = "" }
-  }
-  
-  /// Add custom parameters support for Invoke args
-  Do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..Module,.pParams)
-  Do ##class(%IPM.Storage.ModuleSetting.Default).EvaluateArgs(.args,.customParams)
-  /// Perform a second pass to manage embeded vars, ex:
-  /// <Default Name="MyDir" Value="${mgrdir}MySubDir"></Default>
-  Set i = ""
-  For  {
-  	Set i = $Order(args(i),1,value)
-  	Quit:i=""
-  	Set args(i) = ..Module.%Evaluate(value, .pParams)
-  }
-  	
-  Quit $$$OK
+    set args = ..Arg.Count()
+    for i=1:1:..Arg.Count() {
+        set args(i) = ..Module.%Evaluate(..Arg.GetAt(i), .pParams)
+        if (args(i)=$char(0)) {
+            set args(i) = ""
+        }
+    }
+    // Add custom parameters support for Invoke args
+    do ##class(%IPM.Storage.ModuleSetting.Default).GetCustomParameters(.customParams,..Module,.pParams)
+    do ##class(%IPM.Storage.ModuleSetting.Default).EvaluateArgs(.args,.customParams)
+    // Perform a second pass to manage embeded vars, ex:
+    // <Default Name="MyDir" Value="${mgrdir}MySubDir"></Default>
+    set i = ""
+    for  {
+        set i = $order(args(i),1,value)
+        quit:i=""
+        set args(i) = ..Module.%Evaluate(value, .pParams)
+    }
+    quit $$$OK
 }
 
-Method OnBeforePhase(pPhase As %String, ByRef pParams) As %Status
+Method OnBeforePhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-  Set tPhase = $Select(..CustomPhase'="":..CustomPhase,1:..Phase)
-  If (pPhase '= tPhase) || ("Before" '= ..When) {
-	  Quit $$$OK
-  }
-
-	Quit ..doInvoke(.pParams)
+    set tPhase = $select(..CustomPhase'="":..CustomPhase,1:..Phase)
+    if (pPhase '= tPhase) || ("Before" '= ..When) {
+        quit $$$OK
+    }
+    quit ..doInvoke(.pParams)
 }
 
-Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+Method OnAfterPhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-  Set tPhase = $Select(..CustomPhase'="":..CustomPhase,1:..Phase)
-  If (pPhase '= tPhase) || ("After" '= ..When) {
-	  Quit $$$OK
-  }
-
-	Quit ..doInvoke(.pParams)
+    set tPhase = $select(..CustomPhase'="":..CustomPhase,1:..Phase)
+    if (pPhase '= tPhase) || ("After" '= ..When) {
+        quit $$$OK
+    }
+    quit ..doInvoke(.pParams)
 }
 
 Method doInvoke(ByRef pParams) As %Status
 {
-  Set tSC = $$$OK
-  Do ..GetArgsArray(.pParams, .args)
-
-  Try {
-    If ..CheckStatus {
-      Set tSC = $ClassMethod(..Class, ..Method, args...)
-    } Else {
-      Do $ClassMethod(..Class, ..Method, args...)
+    set tSC = $$$OK
+    do ..GetArgsArray(.pParams, .args)
+    try {
+        // By default, with no CheckStatus property set, check status iff return type is %Status
+        // In deprecated behavior, CheckStatus=1 means check status regardless of type and CheckStatus=0 means do not check anything
+        set rettype = $$$comMemberKeyGetO(origin,..Class,$$$cCLASSmethod,..Method,$$$cMETHreturntype)
+        if (rettype="%Library.Status" || ..CheckStatus) && (..CheckStatus'=0) {
+            set tSC = $classmethod(..Class, ..Method, args...)
+        } else {
+            do $classmethod(..Class, ..Method, args...)
+        }
+    } catch ex {
+        set tSC = ex.AsStatus()
     }
-  } Catch ex {
-    Set tSC = ex.AsStatus()
-  }
-
-  Quit tSC
+    quit tSC
 }
 
 Storage Default

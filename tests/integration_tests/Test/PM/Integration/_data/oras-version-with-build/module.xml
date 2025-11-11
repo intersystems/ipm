@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="oras-version-with-build.ZPM">
+    <Module>
+      <Name>oras-version-with-build</Name>
+      <Version>1.0.0-prerelease+build</Version>
+      <Packaging>module</Packaging>
+    </Module>
+  </Document>
+</Export>

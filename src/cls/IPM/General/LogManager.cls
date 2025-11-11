@@ -12,81 +12,94 @@ Property Threshold As %Integer [ InitialExpression = {$$$ZPMLogWARNING} ];
 
 Method Flush(pThreshold As %Integer = {..Threshold})
 {
-	Set tLastMessage = $$$NULLOREF
-	For tMessageIndex=1:1:..Messages.Count() {
-		Set tMessage = ..Messages.GetAt(tMessageIndex)
-		If (tMessage.Severity >= pThreshold) {
-			If $IsObject(tLastMessage) && (tMessage.GetHash() = tLastMessage.GetHash()) {
-				// Don't repeat the same message, just track the count.
-				Set tMessage.Count = tLastMessage.Count + tMessage.Count
-			} ElseIf $IsObject(tLastMessage) && (tLastMessage.Severity >= pThreshold) {
-				Do tLastMessage.Display()
-			}
-			Set tLastMessage = tMessage
-		}
-	}
-	If $IsObject(tLastMessage) {
-		Do tLastMessage.Display()
-	}
-	
-	Do ..Messages.Clear()
-	Kill ..UniqueMessageHashes
+    set tLastMessage = $$$NULLOREF
+    for tMessageIndex=1:1:..Messages.Count() {
+        set tMessage = ..Messages.GetAt(tMessageIndex)
+        if (tMessage.Severity >= pThreshold) {
+            if $isobject(tLastMessage) && (tMessage.GetHash() = tLastMessage.GetHash()) {
+                // Don't repeat the same message, just track the count.
+                set tMessage.Count = tLastMessage.Count + tMessage.Count
+            } elseif $isobject(tLastMessage) && (tLastMessage.Severity >= pThreshold) {
+                do tLastMessage.Display()
+            }
+            set tLastMessage = tMessage
+        }
+    }
+    if $isobject(tLastMessage) {
+        do tLastMessage.Display()
+    }
+
+    do ..Messages.Clear()
+    kill ..UniqueMessageHashes
 }
 
 /// Flushes out the log of messages before doing the standard singleton cleanup.
 Method %OnClose() As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tSC = ##super()
-	Do ..Flush()
-	Quit tSC
+    set tSC = ##super()
+    do ..Flush()
+    quit tSC
 }
 
 /// @API.Method
-ClassMethod Trace(pMessage As %String, pUnique As %Boolean = 0)
+ClassMethod Trace(
+	pMessage As %String,
+	pUnique As %Boolean = 0)
 {
-	Do ..CreateMessage(pMessage, pUnique, $$$ZPMLogTRACE)
+    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogTRACE)
 }
 
 /// @API.Method
-ClassMethod Info(pMessage As %String, pUnique As %Boolean = 0)
+ClassMethod Info(
+	pMessage As %String,
+	pUnique As %Boolean = 0)
 {
-	Do ..CreateMessage(pMessage, pUnique, $$$ZPMLogINFO)
+    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogINFO)
 }
 
 /// @API.Method
-ClassMethod Warning(pMessage As %String, pUnique As %Boolean = 0)
+ClassMethod Warning(
+	pMessage As %String,
+	pUnique As %Boolean = 0)
 {
-	Do ..CreateMessage(pMessage, pUnique, $$$ZPMLogWARNING)
+    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogWARNING)
 }
 
 /// @API.Method
-ClassMethod Error(pMessage As %String, pUnique As %Boolean = 0)
+ClassMethod Error(
+	pMessage As %String,
+	pUnique As %Boolean = 0)
 {
-	Do ..CreateMessage(pMessage, pUnique, $$$ZPMLogERROR)
+    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogERROR)
 }
 
-ClassMethod CreateMessage(pMessage As %String, pUnique As %Boolean = 0, pSeverity As %Integer) [ Private ]
+ClassMethod CreateMessage(
+	pMessage As %String,
+	pUnique As %Boolean = 0,
+	pSeverity As %Integer) [ Private ]
 {
-	Set tMessage = ##class(%IPM.General.LogManager.Message).%New(pMessage,pSeverity)
-	Set tInstance = ..%Get(.tSC)
-	If $$$ISOK(tSC) {
-		Do tInstance.AddMessage(tMessage,pUnique)
-	} Else {
-		Do tMessage.Display()
-	}
+    set tMessage = ##class(%IPM.General.LogManager.Message).%New(pMessage,pSeverity)
+    set tInstance = ..%Get(.tSC)
+    if $$$ISOK(tSC) {
+        do tInstance.AddMessage(tMessage,pUnique)
+    } else {
+        do tMessage.Display()
+    }
 }
 
-Method AddMessage(pMessage As %IPM.General.LogManager.Message, pUnique As %Boolean = 0) [ Private ]
+Method AddMessage(
+	pMessage As %IPM.General.LogManager.Message,
+	pUnique As %Boolean = 0) [ Private ]
 {
-	Set tHash = pMessage.GetHash()
-	If $Data(..UniqueMessageHashes(tHash),tIndex) {
-		Set ..Messages.GetAt(tIndex).Count = ..Messages.GetAt(tIndex).Count + 1
-	} Else {
-		Do ..Messages.Insert(pMessage)
-		If pUnique {
-			Set ..UniqueMessageHashes(tHash) = ..Messages.Count()
-		}
-	}
+    set tHash = pMessage.GetHash()
+    if $data(..UniqueMessageHashes(tHash),tIndex) {
+        set ..Messages.GetAt(tIndex).Count = ..Messages.GetAt(tIndex).Count + 1
+    } else {
+        do ..Messages.Insert(pMessage)
+        if pUnique {
+            set ..UniqueMessageHashes(tHash) = ..Messages.Count()
+        }
+    }
 }
 
 }

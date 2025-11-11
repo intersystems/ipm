@@ -1,0 +1,45 @@
+services:
+  irishealth:
+    init: true
+    image: irepo.intersystems.com/intersystems/irishealth:2025.1
+    hostname: irishealth
+    ports: 
+      - 1972
+    command: 
+      - --check-caps false
+      - --key /irishealth-shared/iris.key
+    volumes: 
+      - type: bind
+        source: ./irishealth/shared
+        target: /irishealth-shared
+      - type: bind
+        source: ../../../.
+        target: /home/irisowner/sandbox
+    environment:
+      - ISC_DATA_DIRECTORY=/irishealth-shared/iris
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 8gb
+
+# web gateway container
+  webgateway:
+    init: true
+    image: irepo.intersystems.com/intersystems/webgateway:2025.1
+    hostname: webgateway
+    ports:
+    - 80
+    environment:
+    - ISC_DATA_DIRECTORY=/webgateway-shared/durable
+    - ISC_CSP_CONF_FILE=/webgateway-shared/CSP.conf
+    - ISC_CSP_INI_FILE=/webgateway-shared/CSP.ini
+    volumes:
+    - ./webgateway/shared:/webgateway-shared
+    depends_on:
+    - irishealth
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 1gb

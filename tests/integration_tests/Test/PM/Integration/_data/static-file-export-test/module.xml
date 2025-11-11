@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="static-file-export-test.ZPM">
+    <Module>
+      <Name>static-file-export-test</Name>
+      <Version>1.0.0</Version>
+      <Description>Test whether static files (readme.md, changelog.md, licence, requirements.txt) are properly exported</Description>
+      <Packaging>module</Packaging>
+      <AfterInstallMessage>Module installed successfully!</AfterInstallMessage>     
+    </Module>    
+  </Document>
+</Export>

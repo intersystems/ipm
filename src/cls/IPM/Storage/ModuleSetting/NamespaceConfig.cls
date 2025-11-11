@@ -6,9 +6,9 @@ Class %IPM.Storage.ModuleSetting.NamespaceConfig Extends %IPM.Storage.ModuleSett
 Parameter DEFAULTGLOBAL = "^IPM.Storage.ModSet.NSConfig";
 
 /*
-	If this class is eventually used to represent common details for installation of application-packaged modules,
-	the set of options here will likely need future expansion.
-	
+    If this class is eventually used to represent common details for installation of application-packaged modules,
+    the set of options here will likely need future expansion.
+
 */
 /// Set to 1 if the Verify namespace should be Ensemble-enabled
 Property EnableEnsemble As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExpression = 0 ];
@@ -19,9 +19,9 @@ Property EnableHealthShare As %Boolean(XMLPROJECTION = "ATTRIBUTE") [ InitialExp
 
 Method MergeFrom(pOtherConfig As %IPM.Storage.ModuleSetting.NamespaceConfig) As %IPM.Storage.ModuleSetting.NamespaceConfig
 {
-	Set ..EnableEnsemble = ..EnableEnsemble || pOtherConfig.EnableEnsemble
-	Set ..EnableHealthShare = ..EnableHealthShare || pOtherConfig.EnableHealthShare
-	Quit $This
+    set ..EnableEnsemble = ..EnableEnsemble || pOtherConfig.EnableEnsemble
+    set ..EnableHealthShare = ..EnableHealthShare || pOtherConfig.EnableHealthShare
+    quit $this
 }
 
 Storage Default

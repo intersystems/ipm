@@ -2,14 +2,16 @@ name: CI
 on:
   push:
     branches:
-      - master
-      - v1
-      - v1-next
+      - main
+      - v0.7.x
+      - v0.9.x
+      - v0.10.x
   pull_request:
     branches:
-      - master
-      - v1
-      - v1-next
+      - main
+      - v0.7.x
+      - v0.9.x
+      - v0.10.x
   release:
     types:
       - released
@@ -17,7 +19,7 @@ on:
 jobs:
   images:
     uses: ./.github/workflows/images.yml
-  
+
   prepare:
     runs-on: ubuntu-latest
     needs: images
@@ -37,14 +39,14 @@ jobs:
           [ $GITHUB_EVENT_NAME == 'push' ] && VERSION+=-beta && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f4)+1))
           [ $GITHUB_EVENT_NAME == 'pull_request' ] && VERSION+=-dev.${{ github.event.pull_request.number }} && VERSION+=.$(($(git tag -l "v$VERSION.*" | sort -nt. -k4 2>/dev/null | tail -1 | cut -d. -f5)+1))
           echo number=${VERSION} >> $GITHUB_OUTPUT
-  
+
   build:
-    timeout-minutes: 20
-    needs: 
+    timeout-minutes: 45
+    needs:
       - prepare
     strategy:
       fail-fast: false
-      matrix: 
+      matrix:
         image: ${{ fromJson(github.event.inputs.IMAGE || needs.prepare.outputs.images) }}
     runs-on: ubuntu-latest
     steps:
@@ -78,17 +80,34 @@ jobs:
         timeout-minutes: 15
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
-          docker pull docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry
+          docker pull intersystemsdc/iris-community:latest
           docker network create zpm
           REGISTRY=$(docker run --rm -d \
             --network zpm \
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
-            docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
+            intersystemsdc/iris-community:latest \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker exec -i $REGISTRY iris session iris -UUSER << EOF
+            zpm "install zpm-registry"
+            halt
+          EOF
           docker logs $REGISTRY
+      - name: Run ORAS registry
+        timeout-minutes: 5
+        run: |
+          ORAS_IMAGE=ghcr.io/project-zot/zot-linux-amd64:latest
+          docker pull $ORAS_IMAGE
+          ORAS=$(docker run --rm -d \
+            --network zpm \
+            --name oras \
+            -p 5000:5000 \
+            --network-alias oras \
+            $ORAS_IMAGE)
+          sleep 5
+          docker logs $ORAS
       - name: Test and Verify
         timeout-minutes: 15
         run: |
@@ -99,6 +118,7 @@ jobs:
             zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
+          echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
           echo `docker exec -i --workdir /home/irisowner/zpm/ $CONTAINER ls -rtl`
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             zpm "list":1
@@ -116,10 +136,14 @@ jobs:
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
-            docker.pkg.github.com/intersystems-community/zpm-registry/zpm-registry \
+            intersystemsdc/iris-community:latest \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker exec -i $REGISTRY iris session iris -UUSER << EOF
+            zpm "install zpm-registry"
+            halt
+          EOF
           docker logs $REGISTRY
       - name: Test and publish to temporary registry
         timeout-minutes: 15
@@ -127,6 +151,7 @@ jobs:
           CONTAINER=$(docker run --network zpm -d --rm zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
+          echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
             zpm "repo -list":1
@@ -141,29 +166,36 @@ jobs:
           EOF
           docker logs $CONTAINER
           docker stop $CONTAINER
-      # NOTE: commented out until 0.7.1 is released.
-      # - name: Clean install current version and test new one.
-      #   timeout-minutes: 15
-      #   run: |
-      #     curl http://localhost:52773/registry/packages/-/all | jq
-      #     curl http://localhost:52773/registry/packages/zpm/ | jq
-      #     wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
-      #     docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }}
-      #     CONTAINER=`docker ps -lq`
-      #     sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-      #     /bin/echo -e '' \
-      #       'set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")\n' \
-      #       'zpm "list":1\n' \
-      #       'zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1\n' \
-      #       'zpm "repo -list"\n' \
-      #       'zpm "search":1\n' \
-      #       'zpm "install sslclient":1\n' \
-      #       'zpm "install zpm -v":1\n' \
-      #       'zpm "list":1\n' \
-      #       'zpm "version":1\n' \
-      #       'halt\n' \
-      #     | docker exec -i $CONTAINER iris session iris -UUSER
-      #     docker stop $CONTAINER
+      - name: Clean install current version and test new one.
+        timeout-minutes: 15
+        run: |
+          curl http://localhost:52773/registry/packages/-/all | jq
+          curl http://localhost:52773/registry/packages/zpm/ | jq
+          wget https://pm.community.intersystems.com/packages/zpm/latest/installer -O /tmp/zpm.xml
+          CONTAINER=$(docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
+          docker cp . $CONTAINER:/home/irisowner/zpm/
+          echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
+            do $System.OBJ.Load("/home/irisowner/zpm.xml","c")
+            zpm "enable -globally -map -repos -community"
+            zpm "list":1
+            zpm "install dsw":1
+            zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1
+            zpm "repo -list"
+            zpm "search":1
+            zpm "install sslclient":1
+            write "Before upgrade",!
+            zpm "list"
+            zpm "install zpm -v":1
+            write "After upgrade",!
+            zpm "list"
+            set mod = ##class(%IPM.Storage.Module).NameOpen("zpm") set mod.Root="/home/irisowner/zpm/" set mod.DeveloperMode=1 d mod.%Save() kill mod
+            zpm "test zpm -v -only":1
+            zpm "verify zpm -v -only":1
+            halt
+          EOF
+          docker stop $CONTAINER
       - name: Clean install v0.7.x and test migration to latest.
         timeout-minutes: 15
         env:
@@ -171,29 +203,30 @@ jobs:
         run: |
           curl http://localhost:52773/registry/packages/-/all | jq
           curl http://localhost:52773/registry/packages/zpm/ | jq
-          ASSET_NAME='zpm-0.7.3.xml'
-          ASSET_URL=`wget --header "Authorization: token ${GITHUB_TOKEN}" -qO- https://api.github.com/repos/intersystems/ipm/releases | jq -r ".[].assets[] | select(.name == \"${ASSET_NAME}\") | .browser_download_url"`
-          wget $ASSET_URL -O /tmp/zpm.xml
           CONTAINER=$(docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
-          docker cp /tmp/zpm.xml $CONTAINER:/home/irisowner/zpm.xml
           docker cp tests/migration/v0.7-to-v0.9/. $CONTAINER:/tmp/test-package/
+          docker cp . $CONTAINER:/home/irisowner/zpm/
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          docker exec -i $CONTAINER iris session iris -UUSER << EOF 
-            set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")
+          docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
+            s version="0.7.4" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/"_version_"/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
             zpm "list":1
             zpm "install dsw":1
             zpm "repo -r -name registry -url ""http://registry:52773/registry/"" -username admin -password SYS":1
             zpm "repo -list"
             zpm "search":1
             zpm "install sslclient":1
+            write "Before migration",!
+            zpm "list"
             zpm "install zpm -v":1
             zpm "load -dev /tmp/test-package/":1
+            write "After migration",!
+            zpm "list"
             zpm "test ipm-migration-v0.7-to-v0.9 -only -verbose":1
             halt
           EOF
           docker logs $CONTAINER
           docker stop $CONTAINER
-      - name: Clean install and test
+      - name: Clean install and smoke test
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
@@ -215,6 +248,10 @@ jobs:
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O zpm-${{ needs.prepare.outputs.version }}.xml
+      - name: Stop ORAS registry
+        if: always()
+        run: |
+          docker stop oras
       - name: Stop temporary registry
         if: always()
         run: |
@@ -222,24 +259,24 @@ jobs:
           docker stop $CONTAINER
           docker stop registry
           docker network rm zpm
-      - uses: actions/upload-artifact@v3
-        if: matrix.image == ${{ needs.prepare.outputs.main }}
+      - uses: actions/upload-artifact@v4
+        if: matrix.image == needs.prepare.outputs.main
         with:
           name: zpm-${{ needs.prepare.outputs.version }}
           path: zpm-${{ needs.prepare.outputs.version }}.xml
-  
+
   release:
     runs-on: ubuntu-latest
     if: github.event.repository.fork == false
-    needs: 
+    needs:
       - prepare
       - build
     steps:
       - uses: actions/checkout@master
         if: github.event_name == 'release'
         with:
-          ref: master
-      - uses: actions/download-artifact@v3
+          ref: main
+      - uses: actions/download-artifact@v4
         with:
           name: zpm-${{ needs.prepare.outputs.version }}
       - name: Create Beta Release
@@ -252,7 +289,7 @@ jobs:
           tag_name: v${{ needs.prepare.outputs.version }}
           release_name: v${{ needs.prepare.outputs.version }}
           prerelease: ${{ github.event_name != 'release' }}
-      - name: Upload Beta Release Asset
+      - name: Upload Beta Release Asset (versioned)
         uses: actions/upload-release-asset@v1
         if: github.event_name == 'push'
         env:
@@ -261,6 +298,16 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
           asset_name: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_content_type: text/xml
+      - name: Upload Beta Release Asset (versionless)
+        uses: actions/upload-release-asset@v1
+        if: github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_name: zpm.xml
           asset_content_type: text/xml
       - name: Publish release
         if: github.event_name == 'release'
@@ -272,14 +319,14 @@ jobs:
           CONTAINER=$(docker run -d --rm -v $(pwd):/home/irisowner/zpm/ containers.intersystems.com/intersystems/${{ needs.prepare.outputs.main }} --check-caps false)
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
-            set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/Installer.cls","ck")
+            set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/preload/cls/IPM/Installer.cls","ck")
             set sc=##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
             zpm "repo -r -name registry -url ""https://pm.community.intersystems.com/"" -username ${{ secrets.REGISTRY_USERNAME }} -password ${{ secrets.REGISTRY_PASSWORD }}":1
             zpm "publish zpm -v":1
             halt
           EOF
           docker stop $CONTAINER
-      - name: Upload Public Release Asset
+      - name: Upload Public Release Asset (versioned)
         uses: actions/upload-release-asset@v1
         if: github.event_name == 'release'
         env:
@@ -288,6 +335,16 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
           asset_name: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_content_type: text/xml
+      - name: Upload Public Release Asset (versionless)
+        uses: actions/upload-release-asset@v1
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: zpm-${{ needs.prepare.outputs.version }}.xml
+          asset_name: zpm.xml
           asset_content_type: text/xml
       - name: Bump Release number
         if: github.event_name == 'release'

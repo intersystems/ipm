@@ -5,205 +5,272 @@ Class %IPM.Utils.Migration
 
 ClassMethod RunAll(verbose As %Boolean = 1) As %Status
 {
-    Set sc = $$$OK
-    Try {
-        Do ..MigrateZPMToIPM(verbose)
-    } Catch e {
-        Set sc = e.AsStatus()
+    set tOriginalNS = $namespace
+    do ##class(%IPM.Main).GetListNamespace(.list)
+    new $namespace
+    set $namespace = "%SYS"
+    set sourceDB = ##class(%SYS.Namespace).GetPackageDest(tOriginalNS, "%IPM")
+
+    set ns = ""
+    set sc = $$$OK
+    for {
+        set ns = $order(list(ns))
+        // Perform migration for namespaces to which %IPM is mapped from the current namespace's default routine database
+        if ##class(%SYS.Namespace).GetPackageDest(ns, "%IPM") '= sourceDB {
+            continue
+        }
+        if (ns = "") {
+            quit
+        }
+        try {
+            set $namespace = $zstrip(ns,"<>WC")
+            do ..MigrateReposFromIPM09(verbose) // Do this first; MigrateZPMToIPM will fail with <FRAMESTACK> otherwise.
+            do ..MigrateZPMToIPM(verbose)
+        } catch e {
+            set sc = $$$ADDSC(sc, e.AsStatus())
+        }
     }
-    Quit sc
+    quit sc
+}
+
+ClassMethod HasLegacyZPMPackage()
+{
+    set oldTopPackage = "%ZPM.PackageManager."
+    quit $order(^oddCOM(oldTopPackage)) [ oldTopPackage
 }
 
 ClassMethod MigrateZPMToIPM(verbose As %Boolean = 1)
 {
-    Set oldTopPackage = "%ZPM.PackageManager."
-    If $Order(^oddCOM(oldTopPackage)) '[ oldTopPackage {
-        Write:verbose !,"Older IPM version not found; nothing to migrate.",!
-        Quit
+    if verbose {
+        write !, "Migrating ZPM data to IPM... in namespace ", $namespace
+    }
+    if '..HasLegacyZPMPackage() {
+        write:verbose !,"Older IPM version not found; nothing to migrate.",!
+        quit
     }
 
-    Set sc = $$$OK
-    Set successPackageList = ""
-    Set failedPackageList = ""
+    set sc = $$$OK
+    set successPackageList = ""
+    set failedPackageList = ""
 
     // Intentionally runs for current namespace only
-    Try {
+    try {
         // ^ZPM.Dev.ModuleD -> ^IPM.Storage.ModuleD
-        For lockName = $Name(^ZPM.Dev.ModuleD),$Name(^IPM.Storage.ModuleD) {
-            Set locks(lockName) = $System.AutoLock.Lock(lockName,,2)
-            If locks(lockName) = $$$NULLOREF {
+        for lockName = $name(^ZPM.Dev.ModuleD),$name(^IPM.Storage.ModuleD) {
+            set locks(lockName) = $system.AutoLock.Lock(lockName,,2)
+            if locks(lockName) = $$$NULLOREF {
                 $$$ThrowStatus($$$ERROR($$$LockFailedExtent,lockName))
             }
         }
-        Set oldId = ""
-        For {
-            Set oldId = $order(^ZPM.Dev.ModuleD(oldId),1,moduleData)
-            Quit:oldId=""
-            Set moduleName = $ListGet(moduleData,2)
-            Set oneSC = ..MigrateOnePackageToIPM(oldId, moduleName, verbose)
-            If $$$ISOK(oneSC) {
-                Set successPackageList = successPackageList _ $ListBuild(moduleName)
-            } Else {
-                Set failedPackageList = failedPackageList _ $ListBuild(moduleName)
+        set oldId = ""
+        for {
+            set oldId = $order(^ZPM.Dev.ModuleD(oldId),1,moduleData)
+            quit:oldId=""
+            set moduleName = $listget(moduleData,2)
+            set oneSC = ..MigrateOnePackageToIPM(oldId, moduleName, verbose)
+            if $$$ISOK(oneSC) {
+                set successPackageList = successPackageList _ $listbuild(moduleName)
+            } else {
+                set failedPackageList = failedPackageList _ $listbuild(moduleName)
             }
-            Set sc = $$$ADDSC(sc,oneSC)
+            set sc = $$$ADDSC(sc,oneSC)
         }
 
-        Set sc = $$$ADDSC(sc,##class(%IPM.Storage.Module).%BuildIndices(,1,1))
-        Set sc = $$$ADDSC(sc,..MigrateRepoDefinitions())
+        set sc = $$$ADDSC(sc,##class(%IPM.Storage.Module).%BuildIndices(,1,1))
+        set sc = $$$ADDSC(sc,..MigrateRepoDefinitions())
         $$$ThrowOnError(sc)
 
-        If verbose && (successPackageList '= "") {
-            Write !,"Migrated successfully: ",!,$ListToString(successPackageList,$c(13,10))
+        if verbose && (successPackageList '= "") {
+            write !,"Migrated successfully: ",!,$listtostring(successPackageList,$char(13,10))
         }
-    } Catch e {
-        Set sc = e.AsStatus()
+    } catch e {
+        set sc = e.AsStatus()
         // Show these messages even in verbose mode.
-        Write !,"IPM data migration was not fully successful. You may be able to reinstall the impacted packages to correct the issues."
-        If (successPackageList '= "") {
-            Write !,"Migrated successfully: ",!,$ListToString(successPackageList,$c(13,10))
+        write !,"IPM data migration was not fully successful. You may be able to reinstall the impacted packages to correct the issues."
+        if (successPackageList '= "") {
+            write !,"Migrated successfully: ",!,$listtostring(successPackageList,$char(13,10))
         }
-        If (failedPackageList '= "") {
-            Write !,"Failed to migrate: ",!,$ListToString(failedPackageList,$c(13,10))
+        if (failedPackageList '= "") {
+            write !,"Failed to migrate: ",!,$listtostring(failedPackageList,$char(13,10))
         }
-        Write !,$System.Status.GetErrorText(sc)
+        write !,$system.Status.GetErrorText(sc)
     }
-    Write:verbose !
+    write:verbose !
     $$$ThrowOnError(sc)
 }
 
-ClassMethod MigrateOnePackageToIPM(oldId As %Integer, name As %String, verbose As %Boolean = 1)
+ClassMethod MigrateOnePackageToIPM(
+	oldId As %Integer,
+	name As %String,
+	verbose As %Boolean = 1)
 {
-    Set sc = $$$OK
-    Set initTLevel = $TLevel
-    Try {
-        If ##class(%IPM.Storage.Module).NameExists(name) {
-            Write:verbose !,"Package already found in new storage: ",name
-            Quit
+    set sc = $$$OK
+    set initTLevel = $tlevel
+    try {
+        if ##class(%IPM.Storage.Module).NameExists(name) {
+            write:verbose !,"Package already found in new storage: ",name
+            quit
         }
 
-        Write:verbose !,"Migrating storage for ",name," ... "
+        write:verbose !,"Migrating storage for ",name," ... "
 
         // Bring everything over - storage definitions are fortunately compatible.
-        TSTART
-        Kill moduleData
-        Merge moduleData = ^ZPM.Dev.ModuleD(oldId)
+        tstart
+        kill moduleData
+        merge moduleData = ^ZPM.Dev.ModuleD(oldId)
 
         // In ^IPM.Storage.ModuleD(<ID>,"Defaults",n) = $lb($lb(<data>),classname), map classname
         // to equivalent - %ZPM.PackageManager.Developer.ModuleSetting -> %IPM.Storage.ModuleSetting
-        Set defaultKey = ""
-        For {
-            Set defaultKey = $Order(moduleData("Defaults",defaultKey),1,defaultData)
-            Quit:defaultKey=""
-            Set moduleData("Defaults",defaultKey) = $ListBuild($ListGet(defaultData,1),$Replace($ListGet(defaultData,2),"%ZPM.PackageManager.Developer.ModuleSetting","%IPM.Storage.ModuleSetting"))
+        set defaultKey = ""
+        for {
+            set defaultKey = $order(moduleData("Defaults",defaultKey),1,defaultData)
+            quit:defaultKey=""
+            set moduleData("Defaults",defaultKey) = $listbuild($listget(defaultData,1),$replace($listget(defaultData,2),"%ZPM.PackageManager.Developer.ModuleSetting","%IPM.Storage.ModuleSetting"))
         }
 
-        Set newId = $Increment(^IPM.Storage.ModuleD)
-        Merge ^IPM.Storage.ModuleD(newId) = moduleData
+        set newId = $increment(^IPM.Storage.ModuleD)
+        merge ^IPM.Storage.ModuleD(newId) = moduleData
 
         // Make sure loading the object works
-        Set newObj = ##class(%IPM.Storage.Module).%OpenId(newId,,.sc)
+        set newObj = ##class(%IPM.Storage.Module).%OpenId(newId,,.sc)
         $$$ThrowOnError(sc)
 
         // Save object to validate
         $$$ThrowOnError(newObj.%Save())
 
-        Write:verbose "done."
+        write:verbose "done."
 
         // Migrate %ZPM.PackageManager.Developer.Document.ModuleStream to %IPM.StudioDocument.ModuleStream
         // ^ZPM.Dev.ModuleDocD -> ^IPM.StudioDoc.ModuleStreamD
         // Uses objects for the actual data migration to more cleanly handle the stream.
-        If ##class(%IPM.StudioDocument.ModuleStream).NameExists(name) {
-            Write:verbose !,"Document already found in new storage: ",name
-        } Else {
-            Set oldObj = ##class(%ZPM.PackageManager.Developer.Document.ModuleStream).NameOpen(name,,.sc)
+        if ##class(%IPM.StudioDocument.ModuleStream).NameExists(name) {
+            write:verbose !,"Document already found in new storage: ",name
+        } else {
+            set oldObj = $classmethod("%ZPM.PackageManager.Developer.Document.ModuleStream", "NameOpen",name,,.sc)
             $$$ThrowOnError(sc)
-            Set newObj = ##class(%IPM.StudioDocument.ModuleStream).%New()
-            Set newObj.Name = oldObj.Name
-            Set newObj.Hash = oldObj.Hash
-            Set newObj.LastModifiedTimestamp = oldObj.LastModifiedTimestamp
+            set newObj = ##class(%IPM.StudioDocument.ModuleStream).%New()
+            set newObj.Name = oldObj.Name
+            set newObj.Hash = oldObj.Hash
+            set newObj.LastModifiedTimestamp = oldObj.LastModifiedTimestamp
             $$$ThrowOnError(newObj.Contents.CopyFrom(oldObj.Contents))
             $$$ThrowOnError(newObj.%Save())
 
-            Write:verbose !,"Migrated document stream - "_newObj.Name_".ZPM"
+            write:verbose !,"Migrated document stream - "_newObj.Name_".ZPM"
         }
 
-        TCOMMIT
-    } Catch e {
-        Set sc = e.AsStatus()
+        tcommit
+    } catch e {
+        set sc = e.AsStatus()
     }
-    While $TLevel > initTLevel {
-        TROLLBACK 1
+    while $tlevel > initTLevel {
+        trollback 1
     }
-    Quit sc
+    quit sc
 }
 
 ClassMethod MigrateRepoDefinitions(verbose As %Boolean = 1) As %Status
 {
-    Set initTLevel = $TLevel
-    Try {
-        For lockName = $Name(^%ZPM.Client.ServerDefD),$Name(^IPM.Repo.DefinitionD) {
-            Set locks(lockName) = $System.AutoLock.Lock(lockName,,2)
-            If locks(lockName) = $$$NULLOREF {
+    set initTLevel = $tlevel
+    try {
+        for lockName = $name(^%ZPM.Client.ServerDefD),$name(^IPM.Repo.DefinitionD) {
+            set locks(lockName) = $system.AutoLock.Lock(lockName,,2)
+            if locks(lockName) = $$$NULLOREF {
                 $$$ThrowStatus($$$ERROR($$$LockFailedExtent,lockName))
             }
         }
 
-        TSTART
-        Set key = ""
-        For {
-            Set key = $Order(^%ZPM.Client.ServerDefD(key),1,repoData)
-            Quit:key=""
+        tstart
+        set key = ""
+        for {
+            set key = $order(^%ZPM.Client.ServerDefD(key),1,repoData)
+            quit:key=""
 
-            Set repoName = $ListGet(repoData,2)
-            Do ..MigrateOneRepo(key, repoName, verbose)
+            set repoName = $listget(repoData,2)
+            do ..MigrateOneRepo(key, repoName, verbose)
         }
 
         $$$ThrowOnError(##class(%IPM.Repo.Definition).%BuildIndices(,1,1))
         $$$ThrowOnError(##class(%IPM.Repo.Remote.Definition).%BuildIndices(,1,1))
-        TCOMMIT
-    } Catch e {
-        Set sc = e.AsStatus()
+        tcommit
+    } catch e {
+        set sc = e.AsStatus()
     }
-    While $TLevel > initTLevel {
-        TROLLBACK 1
+    while $tlevel > initTLevel {
+        trollback 1
     }
-    Quit sc
+    quit sc
 }
 
-ClassMethod MigrateOneRepo(oldId As %String, name As %String, verbose As %Boolean)
+ClassMethod MigrateOneRepo(
+	oldId As %String,
+	name As %String,
+	verbose As %Boolean)
 {
-    If ##class(%IPM.Repo.Remote.Definition).ServerDefinitionKeyExists(name) {
-        Write:verbose !,"Skipping migrating repo "_name_" - already exists."
-        Quit
+    if ##class(%IPM.Repo.Remote.Definition).ServerDefinitionKeyExists(name) {
+        write:verbose !,"Skipping migrating repo "_name_" - already exists."
+        quit
     }
-    Merge data = ^%ZPM.Client.ServerDefD(oldId)
+    merge data = ^%ZPM.Client.ServerDefD(oldId)
 
-    Set class = $ListGet(data)
-    If (class '= "~%ZPM.PackageManager.Client.RemoteServerDefinition~") {
-        Write:verbose !,"Skipping migrating repo "_name_" - unsupported repo type."
-        Quit
+    set class = $listget(data)
+    if (class '= "~%ZPM.PackageManager.Client.RemoteServerDefinition~") {
+        write:verbose !,"Skipping migrating repo "_name_" - unsupported repo type."
+        quit
     }
 
-    Write:verbose !,"Migrating repo "_name_"... "
+    write:verbose !,"Migrating repo "_name_"... "
 
-    Set $List(data,1) = "~%IPM.Repo.Remote.Definition~"
-    Set data("RepoDefinition") = data
-    Merge data("RemoteRepoDefinition") = data("RemoteServerDefinition")
-    ZKill data
-    ZKill data("RemoteServerDefinition")
+    set $list(data,1) = "~%IPM.Repo.Http.Definition~%IPM.Repo.Remote.Definition~"
+    set data("RepoDefinition") = data
+    merge data("RemoteRepoDefinition") = data("RemoteServerDefinition")
+    zkill data
+    zkill data("RemoteServerDefinition")
 
-    Set newId = $Increment(^IPM.Repo.DefinitionD)
-    Merge ^IPM.Repo.DefinitionD(newId) = data
+    set newId = $increment(^IPM.Repo.DefinitionD)
+    merge ^IPM.Repo.DefinitionD(newId) = data
 
     // Make sure loading/saving the object works
-    Set newObj = ##class(%IPM.Storage.Module).%OpenId(newId,,.sc)
+    set newObj = ##class(%IPM.Repo.Definition).%OpenId(newId,,.sc)
     $$$ThrowOnError(sc)
 
     // Save object to validate
     $$$ThrowOnError(newObj.%Save())
 
-    Write:verbose !,"done."
+    write:verbose !,"done."
+}
+
+ClassMethod MigrateReposFromIPM09(verbose As %Boolean = 1) As %Status
+{
+    if verbose {
+        write !,"Starting IPM repo migration from IPM 0.9..."
+    }
+    set tSC = $$$OK
+    try {
+        if $data(^IPM.Repo.DefinitionD) / 2 = 0 {
+            if verbose {
+                write !,"No IPM repos found; nothing to migrate."
+            }
+            quit
+        }
+        set sub = ""
+        set oldValue = "~%IPM.Repo.Remote.Definition~"
+        set newValue = "~%IPM.Repo.Http.Definition~%IPM.Repo.Remote.Definition~"
+        for {
+            set sub = $order(^IPM.Repo.DefinitionD(sub))
+            if sub = "" {
+                quit
+            }
+            if ($data(^IPM.Repo.DefinitionD(sub,"RepoDefinition"), list) # 2) && ($listget(list, 1) = oldValue){
+                set $list(^IPM.Repo.DefinitionD(sub, "RepoDefinition"), 1) = newValue
+            }
+        }
+        if verbose {
+            write !,"Repos migrated from IPM 0.9."
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 }

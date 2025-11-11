@@ -1,0 +1,3 @@
+text
+
+This file in ipm/ at tests/integration_tests/Test/PM/Integration/_data/file-copy-test/fc-dep-diff-resource/source/

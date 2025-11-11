@@ -12,13 +12,18 @@ on:
         required: true
         type: number
         default: 1
+      timeoutSeconds:
+        description: "Timeout in seconds for each test"
+        required: true
+        type: number
+        default: 120
 
 jobs:
   matrix-setup:
     runs-on: ubuntu-latest
     env:
       PM_URL: https://pm.community.intersystems.com/packages/-/all?allVersions=1
-      JQ_SCRIPT: reduce .[] as $item ([]; if $item.allVersions | length >= ${{ inputs.minVersionCount }} then . + [$item.name] else . end)
+      JQ_SCRIPT: reduce .[] as $item ([]; if ($item.allVersions | length >= ${{ inputs.minVersionCount }}) and ($item.name | contains(" ") | not) then . + [$item.name] else . end)
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -47,19 +52,8 @@ jobs:
           tags: zpm:latest
           build-args: Base=${{ env.IMAGE }}
           outputs: type=docker,dest=/tmp/zpmimage.tar
-      - name: Test Image
-        run: |
-          docker load -i /tmp/zpmimage.tar
-          CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
-          docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
-          docker exec -i $CONTAINER iris session IRIS << EOF
-              zpm "list":1
-              zn "%SYS"
-              zpm "test zpm -v -only":1:1
-          EOF
-          docker container stop $CONTAINER
       - name: Upload Image
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: zpmimage
           path: /tmp/zpmimage.tar
@@ -78,7 +72,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Download Artifact
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: zpmimage
           path: /tmp
@@ -111,12 +105,13 @@ jobs:
               halt
           EOF
             echo "::endgroup::"
-          
+
             echo "::group::Test package $package"
             set +e
-            docker exec -i $CONTAINER iris session IRIS <<- EOF
-                  zpm "install $package":1
-                zpm "$package test -only ${{ env.test-flags }}":1:1
+            timeout ${{ inputs.timeoutSeconds }}s docker exec -i $CONTAINER iris session IRIS <<- EOF
+              zpm "install $package":1
+              zpm "$package test -only ${{ env.test-flags }}":1:1
+              halt
           EOF
 
             if [ $? -ne 0 ]; then
@@ -135,13 +130,3 @@ jobs:
           done
 
           IFS=' '
-
-  summarize:
-    needs:
-      - run-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call package-summary workflow
-        uses: ./.github/workflows/packages-summary.yml
-        with:
-          runId: ${{ github.run_id }}

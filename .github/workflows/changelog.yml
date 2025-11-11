@@ -1,0 +1,33 @@
+name: Changelog Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - v0.9.x
+      - v0.10.x
+    paths:
+      - 'src/**'
+
+jobs:
+  check_changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check for updated CHANGELOG.md
+      run: |
+        # actions/checkout@v4 will merge the feature branch into target branch, hence `HEAD` is not the feature head
+        # While it is probably okay to diff this HEAD against the target branch, we explicitly compare the feature head against the target for readability.
+        if git diff --name-only origin/${{ github.event.pull_request.base.ref }}...${{ github.event.pull_request.head.sha }} | grep -q 'CHANGELOG.md'; then
+          echo "CHANGELOG.md has been updated."
+        else
+          echo -e "\033[31mERROR: CHANGELOG.md has NOT been updated\033[0m"
+          echo "BASE COMMIT: ${{ github.event.pull_request.base.sha }}"
+          echo "HEAD COMMIT: ${{ github.event.pull_request.head.sha }}"
+          exit 1
+        fi

@@ -24,120 +24,127 @@ Property FilenameTranslateAssociator As %String [ InitialExpression = "/_____" ]
 
 Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
-    Set tSC = ##super(pResourceReference)
-    If (..Format = "") {
-        Set ..Format = $Case($$$lcase(..FilenameExtension),"dfi":"UDL",:"XML")
+    set tSC = ##super(pResourceReference)
+    if (..Format = "") {
+        set ..Format = $case($$$lcase(..FilenameExtension),"dfi":"UDL",:"XML")
     }
-    Quit tSC
+    quit tSC
 }
 
-Method OnExportItem(pFullExportPath As %String, pItemName As %String, ByRef pItemParams, ByRef pParams, Output pItemHandled As %Boolean = 0) As %Status
+Method OnExportItem(
+	pFullExportPath As %String,
+	pItemName As %String,
+	ByRef pItemParams,
+	ByRef pParams,
+	Output pItemHandled As %Boolean = 0) As %Status
 {
-	Set tSC = $$$OK
-	Set tVerbose = $Get(pParams("Verbose"))
-	If ..Format = "XML" {
-        Set tSC = $System.OBJ.Export(pItemName,pFullExportPath,"-d")
-	} ElseIf (..Format = "UDL") {
-	    Set tSC = $System.OBJ.ExportUDL(pItemName,pFullExportPath,"-d")
-	}
-	Set pItemHandled = 1
-	If $$$ISOK(tSC),tVerbose {
-		Write !,"Exported '",pItemName,"' to ",pFullExportPath
-	}
-	Quit tSC
+    set tSC = $$$OK
+    set tVerbose = $get(pParams("Verbose"))
+    if ..Format = "XML" {
+        set tSC = $system.OBJ.Export(pItemName,pFullExportPath,"-d"_"/createdirs")
+    } elseif (..Format = "UDL") {
+        set tSC = $system.OBJ.ExportUDL(pItemName,pFullExportPath,"-d"_"/createdirs")
+    }
+    set pItemHandled = 1
+    if $$$ISOK(tSC),tVerbose {
+        write !,"Exported '",pItemName,"' to ",pFullExportPath
+    }
+    quit tSC
 }
 
-Method OnPhase(pPhase As %String, ByRef pParams, Output pResourceHandled As %Boolean = 0) As %Status
+Method OnPhase(
+	pPhase As %String,
+	ByRef pParams,
+	Output pResourceHandled As %Boolean = 0) As %Status
 {
-  Set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
-  If (..ResourceReference.Name '[ "*") || '(((pPhase = "Reload") && tInScope) || tInCurrentPhase) || ..ResourceReference.Generated || ..ResourceReference.Preload {
-    Quit ##super(pPhase, .pParams, .pResourceHandled)
-  }
+    set tInScope = ..ResourceReference.IsInScope(pPhase,.tInCurrentPhase)
+    if (..ResourceReference.Name '[ "*") || '(((pPhase = "Reload") && tInScope) || tInCurrentPhase) || ..ResourceReference.Generated || ..ResourceReference.Preload {
+        quit ##super(pPhase, .pParams, .pResourceHandled)
+    }
 
-  Set tVerbose = $Get(pParams("Verbose"), 0)
-  Set tSC = $$$OK
-  Set pResourceHandled = 0
-  try {
-    Set tNameExt = "." _ $$$lcase($Piece(..ResourceReference.Name, ".", *))
-    Set tName = $Piece(..ResourceReference.Name, ".", 1, *-1)
-    Set tName = $Translate(tName, "*"_..FilenameTranslateIdentifier, "*"_..FilenameTranslateAssociator)
-    Set tRoot = ..ResourceReference.Module.Root
+    set tVerbose = $get(pParams("Verbose"), 0)
+    set tSC = $$$OK
+    set pResourceHandled = 0
+    try {
+        set tNameExt = "." _ $$$lcase($piece(..ResourceReference.Name, ".", *))
+        set tName = $piece(..ResourceReference.Name, ".", 1, *-1)
+        set tName = $translate(tName, "*"_..FilenameTranslateIdentifier, "*"_..FilenameTranslateAssociator)
+        set tRoot = ..ResourceReference.Module.Root
 
-    Set tSubDirectory = $Select(..ResourceReference.Preload:"preload/",1:"")
-    Set tResourceDirectory = tRoot _ "/" _ tSubDirectory
+        set tSubDirectory = $select(..ResourceReference.Preload:"preload/",1:"")
+        set tResourceDirectory = tRoot _ "/" _ tSubDirectory
 
-    Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-    If tSourceRoot'="","\/"'[$Extract(tSourceRoot, *) {
-      Set tSourceRoot = tSourceRoot _ "/"
+        set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+        if tSourceRoot'="","\/"'[$extract(tSourceRoot, *) {
+            set tSourceRoot = tSourceRoot _ "/"
+        }
+        set tDirectory = ..Directory
+        if tDirectory'="","\/"'[$extract(tDirectory, *) {
+            set tDirectory = tDirectory _ "/"
+        } else {
+            set tDirectory = "dfi/"
+        }
+        set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
+        set tFileExt = ".xml"
+        set tWildcards = tName _ tFileExt _ ";" _ tName _ tNameExt
+        if $$$isUNIX {
+            set tWildcards = tWildcards _ tName _ $$$ucase(tFileExt) _ ";" _ tName _ $$$ucase(tNameExt)
+        }
+        do ##class(%IPM.Utils.File).FindFiles(tResourceDirectory, tWildcards, .tList)
+        for i=1:1:tList {
+            set $listbuild(tDocName, tResourcePath) = tList(i)
+            $$$ThrowOnError(..OnLoad(tResourcePath, tVerbose, tInCurrentPhase, .tLoadedList, .pParams))
+        }
+    } catch ex {
+        set tSC = ex.AsStatus()
     }
-    Set tDirectory = ..Directory
-    If tDirectory'="","\/"'[$Extract(tDirectory, *) {
-      Set tDirectory = tDirectory _ "/"
-    } Else {
-      Set tDirectory = "dfi/"
-    }
-    Set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
-    Set tFileExt = ".xml"
-    Set tWildcards = tName _ tFileExt _ ";" _ tName _ tNameExt
-    If $$$isUNIX {
-      Set tWildcards = tWildcards _ tName _ $$$ucase(tFileExt) _ ";" _ tName _ $$$ucase(tNameExt)
-    }
-    Do ##class(%IPM.Utils.File).FindFiles(tResourceDirectory, tWildcards, .tList)
-    For i=1:1:tList {
-      Set $ListBuild(tDocName, tResourcePath) = tList(i)
-      $$$ThrowOnError(..OnLoad(tResourcePath, tVerbose, tInCurrentPhase, .tLoadedList, .pParams))
-    }
-  } 
-  catch ex {
-    Set tSC = ex.AsStatus()
-  }
-  Quit tSC
+    quit tSC
 }
 
 Method OnResolveChildren(ByRef pResourceArray) As %Status
 {
-    Set tItem = ""
-    For {
-        Set tItem = $Order(pResourceArray(tItem))
-        If (tItem = "") {
-            Quit
+    set tItem = ""
+    for {
+        set tItem = $order(pResourceArray(tItem))
+        if (tItem = "") {
+            quit
         }
-        Set tItemName = $Piece(tItem, "." , 1, *-1)
-        Set tFullName = ##class(%DeepSee.UserLibrary.FolderItem).fullNameFromDocumentName(tItem)
+        set tItemName = $piece(tItem, "." , 1, *-1)
+        set tFullName = ##class(%DeepSee.UserLibrary.FolderItem).fullNameFromDocumentName(tItem)
         #dim tObj As %DeepSee.UserLibrary.FolderItem = ##class(%DeepSee.UserLibrary.Utils).%OpenFolderItem(tFullName, .tSC)
-        If ('$IsObject(tObj)) {
-            Kill pResourceArray(tItem)
-            Continue
+        if ('$isobject(tObj)) {
+            kill pResourceArray(tItem)
+            continue
         }
-        If (..Keywords'="") {
-            Set tKeywords = $ListFromString(tObj.keywords)
-            Set tDesiredKeywords = $ListFromString(..Keywords)
-            Set tGood = 1
-            For i=1:1:$ListLength(tDesiredKeywords) {
-                If ('$ListFind(tKeywords, $ListGet(tDesiredKeywords, i))) {
-                    Set tGood = 0
-                    Quit
+        if (..Keywords'="") {
+            set tKeywords = $listfromstring(tObj.keywords)
+            set tDesiredKeywords = $listfromstring(..Keywords)
+            set tGood = 1
+            for i=1:1:$listlength(tDesiredKeywords) {
+                if ('$listfind(tKeywords, $listget(tDesiredKeywords, i))) {
+                    set tGood = 0
+                    quit
                 }
             }
-            If ('tGood) {
-                Kill pResourceArray(tItem)
-                Continue
+            if ('tGood) {
+                kill pResourceArray(tItem)
+                continue
             }
         }
-        Set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-        If tSourceRoot'="","\/"'[$Extract(tSourceRoot, *) {
-            Set tSourceRoot = tSourceRoot _ "/"
+        set tSourceRoot = ..ResourceReference.Module.SourcesRoot
+        if tSourceRoot'="","\/"'[$extract(tSourceRoot, *) {
+            set tSourceRoot = tSourceRoot _ "/"
         }
-        Set tItemName = $Translate(tItemName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)
-        Set pResourceArray(tItem,"RelativePath") = tSourceRoot_..Directory_"/"_tItemName_"."_..FilenameExtension
+        set tItemName = $translate(tItemName, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator)
+        set pResourceArray(tItem,"RelativePath") = tSourceRoot_..Directory_"/"_tItemName_"."_..FilenameExtension
     }
-    Quit $$$OK
+    quit $$$OK
 }
 
 Method OnGetUniqueName(Output pUniqueName)
 {
-    If (..Keywords '= "") {
-        Set pUniqueName = ..Keywords
+    if (..Keywords '= "") {
+        set pUniqueName = ..Keywords
     }
 }
 

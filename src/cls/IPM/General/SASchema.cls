@@ -12,422 +12,430 @@ Parameter XMLNAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
 ClassMethod Install() As %Status
 {
-	Set tStatus = $$$OK
-	Try {
-		Set tStatus = ..OutputToFile(##class(%File).TempFilename())
-		If $$$ISERR(tStatus) {
-			Quit
-		}
-		Set tStatus = ##class(%Studio.SASchemaUtil).loadSchema(..#XMLNAMESPACE,1,1)
-	} Catch e {
-		Set tStatus = e.AsStatus()
-	}
-	Quit tStatus
+    set tStatus = $$$OK
+    try {
+        set tStatus = ..OutputToFile(##class(%File).TempFilename())
+        if $$$ISERR(tStatus) {
+            quit
+        }
+        set tStatus = ##class(%Studio.SASchemaUtil).loadSchema(..#XMLNAMESPACE,1,1)
+    } catch e {
+        set tStatus = e.AsStatus()
+    }
+    quit tStatus
 }
 
 /// Outputs the schema to the current device.
 /// Useful for testing/debugging.
 ClassMethod Display()
 {
-	Try {
-		Set tStream = ##class(%Stream.GlobalCharacter).%New()
-		$$$ThrowOnError(..OutputToStream(tStream))
-		Do tStream.OutputToDevice()
-	} Catch e {
-		Write $System.Status.GetErrorText(e.AsStatus())
-	}
+    try {
+        set tStream = ##class(%Stream.GlobalCharacter).%New()
+        $$$ThrowOnError(..OutputToStream(tStream))
+        do tStream.OutputToDevice()
+    } catch e {
+        write $system.Status.GetErrorText(e.AsStatus())
+    }
 }
 
 /// Overridden to handle wrapped collections and relationships
 ClassMethod GetSchemaForClasses(ByRef pClassList As %String) As %Status
 {
-	Set tSC = $$$OK
-	Do {
-		#; start with list of top-level elements
-		#; find list of all possible elements
- 		Set tClass = $O(pClassList(""))
-		While (tClass '= "") {
-			Set tTopName = ..GetXMLNameForClass(tClass)
-			Set ppDefaultNS = ..XMLName2NameSpace(tTopName)
+    set tSC = $$$OK
+    do {
+        #; start with list of top-level elements
+        #; find list of all possible elements
+        set tClass = $order(pClassList(""))
+        while (tClass '= "") {
+            set tTopName = ..GetXMLNameForClass(tClass)
+            set ppDefaultNS = ..XMLName2NameSpace(tTopName)
 
-			If ppDefaultNS="" {
-				Set tSC=$$$ERROR($$$NoDefaultNamespaceForClass,tClass) Quit
-			}
+            if ppDefaultNS="" {
+                set tSC=$$$ERROR($$$NoDefaultNamespaceForClass,tClass) quit
+            }
 
-			Set ppCurrentNS = ppDefaultNS
-			Set %VisitedClasses(tClass) = ""
-			Set %VisitedElements(tTopName) = ""
-			Set tFixedTopName = ..XMLName2DisplayName(tTopName,ppCurrentNS)
-			If ('+$G(%useronly) || (tClass'["%")) {
-				set ^||%Studio.Schema(ppDefaultNS,ppCurrentNS,tFixedTopName,"top")=1
-			}
-			
-			Set tSC = ..HandleClassElements(ppCurrentNS,ppDefaultNS,tFixedTopName,tClass,.tLocalList,.tRefClasses,.tElementList)
-			If $$$ISERR(tSC) {
-				Quit
-			}
+            set ppCurrentNS = ppDefaultNS
+            set %VisitedClasses(tClass) = ""
+            set %VisitedElements(tTopName) = ""
+            set tFixedTopName = ..XMLName2DisplayName(tTopName,ppCurrentNS)
+            if ('+$get(%useronly) || (tClass'["%")) {
+                set ^||%Studio.Schema(ppDefaultNS,ppCurrentNS,tFixedTopName,"top")=1
+            }
 
-			#; merge elements into list of ALL elements
-			Merge tElementList = tLocalList
+            set tSC = ..HandleClassElements(ppCurrentNS,ppDefaultNS,tFixedTopName,tClass,.tLocalList,.tRefClasses,.tElementList)
+            if $$$ISERR(tSC) {
+                quit
+            }
 
-			Set tClass = $O(pClassList(tClass))
-		}
-		If $$$ISERR(tSC) Quit
+            #; merge elements into list of ALL elements
+            merge tElementList = tLocalList
 
-		#; now walk over set of possible elements
-		#; and make list of what elements are contained by other elements
-		Set tElement = $O(tElementList(""))
-		While (tElement '= "") {
-			#; skip if visited
-			Set tClass = tElementList(tElement)
+            set tClass = $order(pClassList(tClass))
+        }
+        if $$$ISERR(tSC) quit
 
-			If ('$D(%VisitedClasses(tClass)) && '$D(%VisitedElements(tElement))) {
-				Set %VisitedClasses(tClass) = ""
-				Set %VisitedElements(tElement) = ""
-				Kill tLocalList
-				
-				#; see if we need to switch NS
-				Set ppCurrentNS = ..XMLName2NameSpace(tElement)
-				Set tFixedName = ..XMLName2DisplayName(tElement,ppCurrentNS)
-			
-				Set tSC = ..HandleClassElements(ppCurrentNS,ppDefaultNS,tFixedName,tClass,.tLocalList,.tRefClasses,.tElementList)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-				
-				Merge tAllLocalList = tLocalList
-			}
-			Set tElement = $O(tElementList(tElement))
-		}
+        #; now walk over set of possible elements
+        #; and make list of what elements are contained by other elements
+        set tElement = $order(tElementList(""))
+        while (tElement '= "") {
+            #; skip if visited
+            set tClass = tElementList(tElement)
 
-		Merge tElementList = tAllLocalList
+            if ('$data(%VisitedClasses(tClass)) && '$data(%VisitedElements(tElement))) {
+                set %VisitedClasses(tClass) = ""
+                set %VisitedElements(tElement) = ""
+                kill tLocalList
 
-		Set count = 0 // loop counter
-		Set done = '+$D(tRefClasses)
-		While ('done && (count < 100)) {
-			Set count = count + 1
-			// now process list of classes that were referenced by other elements
-			Kill tRefClasses2
-			Set tClass = $O(tRefClasses(""))
-			While (tClass '= "") {
-				Set tElement = ..GetXMLNameForClass(tClass)
+                #; see if we need to switch NS
+                set ppCurrentNS = ..XMLName2NameSpace(tElement)
+                set tFixedName = ..XMLName2DisplayName(tElement,ppCurrentNS)
 
-				If ((..XMLName2NameSpace(tElement)'="") && '$D(%VisitedClasses(tClass))&&'$D(%VisitedElements(tElement))) {
-					Set %VisitedClasses(tClass) = ""
-					Set %VisitedElements(tElement) = ""
-					#; add to list to pick up attrs
-					Set tElementList(tElement) = tClass
+                set tSC = ..HandleClassElements(ppCurrentNS,ppDefaultNS,tFixedName,tClass,.tLocalList,.tRefClasses,.tElementList)
+                if $$$ISERR(tSC) {
+                    quit
+                }
 
-					Kill tLocalList
+                merge tAllLocalList = tLocalList
+            }
+            set tElement = $order(tElementList(tElement))
+        }
 
-					#; write out subelements, if any
-					#; see if we need to switch NS
-					Set ppCurrentNS = ..XMLName2NameSpace(tElement)
-					Set tFixedName = ..XMLName2DisplayName(tElement,ppCurrentNS)
-			
-					Set tSC = ..HandleClassElements(ppCurrentNS,ppDefaultNS,tFixedName,tClass,.tLocalList,.tRefClasses,.tElementList)
-					If $$$ISERR(tSC) {
-						Quit
-					}
-				}
-				Set tClass = $O(tRefClasses(tClass))
-			}
-			
-			#; more to do
-			If ($D(tRefClasses2)) {
-				Set done = 0
-				Kill tRefClasses
-				Merge tRefClasses = tRefClasses2
-			}
-			Else {
-				Set done = 1
-			}
-		}
+        merge tElementList = tAllLocalList
 
-		#; JMD544
-		#; Make sure every topclass gets its attributes processed
- 		Set tClass = $O(pClassList(""))
-		While (tClass '= "") {
-			Set tElementList(..GetXMLNameForClass(tClass)) = tClass
-			Set tClass = $O(pClassList(tClass))
-		}
+        set count = 0 // loop counter
+        set done = '+$data(tRefClasses)
+        while ('done && (count < 100)) {
+            set count = count + 1
+            // now process list of classes that were referenced by other elements
+            kill tRefClasses2
+            set tClass = $order(tRefClasses(""))
+            while (tClass '= "") {
+                set tElement = ..GetXMLNameForClass(tClass)
 
-		#; now walk over set of all possible elements
-		#; and write out attribute definitions for each
-		Set tElement = $O(tElementList(""))
-		While (tElement '= "") {
-			Kill tAttrList
-			Set tClass = tElementList(tElement)
-			Set tSC = ..GetAttrsForClass(tClass,.tAttrList)
-			If $$$ISERR(tSC) Quit
+                if ((..XMLName2NameSpace(tElement)'="") && '$data(%VisitedClasses(tClass))&&'$data(%VisitedElements(tElement))) {
+                    set %VisitedClasses(tClass) = ""
+                    set %VisitedElements(tElement) = ""
+                    #; add to list to pick up attrs
+                    set tElementList(tElement) = tClass
 
-			#; test for additional key attributes for this element
-			#; JMD381
-			For tSearchKey = tClass,tElement {
-				If $D(%saKeyAttrs(tSearchKey)) {
-					Set parcls = $O(%saKeyAttrs(tSearchKey,""))
-					While (parcls '= "") {
-						Set prop = $O(%saKeyAttrs(tSearchKey,parcls,""),1,tAttributeName)
-						While (prop '= "") {
-							If (tAttributeName '= "") {
-								Set tAttrList(tAttributeName) = ""
-							}
-							Set prop = $O(%saKeyAttrs(tSearchKey,parcls,prop),1,tAttributeName)
-						}
-						Set parcls = $O(%saKeyAttrs(tSearchKey,parcls))
-					}
-				}
-			}
+                    kill tLocalList
 
-			If ('+$G(%useronly) || (tClass'["%")) {
-				If $D(tAttrList) {
-					Set tSkip = 0
-					If ($D(%saCategories)) {
-						// check categories
-						Set tCat = $$$UPPER($$$comMemberKeyGet(tClass,$$$cCLASSparameter,"SACATEGORY",$$$cPARAMdefault))
-						If ((tCat="")||'$D(%saCategories(tCat))) {
-							Set tSkip = 1
-						}
-					}
-					If ('tSkip) {
-						#; see if we need to switch NS
-						Set ppCurrentNS = ..XMLName2NameSpace(tElement)
-						Set n = 0
-						set tFixedElementName=..XMLName2DisplayName(tElement,ppCurrentNS)
-						Set tAttr = $O(tAttrList(""))
-						While (tAttr '= "") {
-							Set tType = tAttrList(tAttr)
-							set ^||%Studio.Schema(ppDefaultNS,ppCurrentNS,tFixedElementName,"att",tAttr)=tType
-							Set n = n + 1
-							Set tAttr = $O(tAttrList(tAttr))
-						}
-					}
-				}
-			}
-			Set tElement = $O(tElementList(tElement))
-		}
-		If $$$ISERR(tSC) Quit
+                    #; write out subelements, if any
+                    #; see if we need to switch NS
+                    set ppCurrentNS = ..XMLName2NameSpace(tElement)
+                    set tFixedName = ..XMLName2DisplayName(tElement,ppCurrentNS)
 
-	} While(0)
+                    set tSC = ..HandleClassElements(ppCurrentNS,ppDefaultNS,tFixedName,tClass,.tLocalList,.tRefClasses,.tElementList)
+                    if $$$ISERR(tSC) {
+                        quit
+                    }
+                }
+                set tClass = $order(tRefClasses(tClass))
+            }
 
-	Quit tSC
+            #; more to do
+            if ($data(tRefClasses2)) {
+                set done = 0
+                kill tRefClasses
+                merge tRefClasses = tRefClasses2
+            }
+            else {
+                set done = 1
+            }
+        }
+
+        #; JMD544
+        #; Make sure every topclass gets its attributes processed
+        set tClass = $order(pClassList(""))
+        while (tClass '= "") {
+            set tElementList(..GetXMLNameForClass(tClass)) = tClass
+            set tClass = $order(pClassList(tClass))
+        }
+
+        #; now walk over set of all possible elements
+        #; and write out attribute definitions for each
+        set tElement = $order(tElementList(""))
+        while (tElement '= "") {
+            kill tAttrList
+            set tClass = tElementList(tElement)
+            set tSC = ..GetAttrsForClass(tClass,.tAttrList)
+            if $$$ISERR(tSC) quit
+
+            #; test for additional key attributes for this element
+            #; JMD381
+            for tSearchKey = tClass,tElement {
+                if $data(%saKeyAttrs(tSearchKey)) {
+                    set parcls = $order(%saKeyAttrs(tSearchKey,""))
+                    while (parcls '= "") {
+                        set prop = $order(%saKeyAttrs(tSearchKey,parcls,""),1,tAttributeName)
+                        while (prop '= "") {
+                            if (tAttributeName '= "") {
+                                set tAttrList(tAttributeName) = ""
+                            }
+                            set prop = $order(%saKeyAttrs(tSearchKey,parcls,prop),1,tAttributeName)
+                        }
+                        set parcls = $order(%saKeyAttrs(tSearchKey,parcls))
+                    }
+                }
+            }
+
+            if ('+$get(%useronly) || (tClass'["%")) {
+                if $data(tAttrList) {
+                    set tSkip = 0
+                    if ($data(%saCategories)) {
+                        // check categories
+                        set tCat = $$$UPPER($$$comMemberKeyGet(tClass,$$$cCLASSparameter,"SACATEGORY",$$$cPARAMdefault))
+                        if ((tCat="")||'$data(%saCategories(tCat))) {
+                            set tSkip = 1
+                        }
+                    }
+                    if ('tSkip) {
+                        #; see if we need to switch NS
+                        set ppCurrentNS = ..XMLName2NameSpace(tElement)
+                        set n = 0
+                        set tFixedElementName=..XMLName2DisplayName(tElement,ppCurrentNS)
+                        set tAttr = $order(tAttrList(""))
+                        while (tAttr '= "") {
+                            set tType = tAttrList(tAttr)
+                            set ^||%Studio.Schema(ppDefaultNS,ppCurrentNS,tFixedElementName,"att",tAttr)=tType
+                            set n = n + 1
+                            set tAttr = $order(tAttrList(tAttr))
+                        }
+                    }
+                }
+            }
+            set tElement = $order(tElementList(tElement))
+        }
+        if $$$ISERR(tSC) quit
+
+    } while(0)
+
+    quit tSC
 }
 
-ClassMethod HandleClassElements(pCurrentNS As %String, pDefaultNS As %String, pTopName As %String, pClass As %String, Output pLocalList, ByRef pRefClasses, ByRef pElementList) As %Status
+ClassMethod HandleClassElements(
+	pCurrentNS As %String,
+	pDefaultNS As %String,
+	pTopName As %String,
+	pClass As %String,
+	Output pLocalList,
+	ByRef pRefClasses,
+	ByRef pElementList) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Kill pLocalList
+    set tSC = $$$OK
+    try {
+        kill pLocalList
 
-		#; get list of elements within this top-level
-		Set tSC = ..GetElementsForClass(pClass,.pLocalList,.pRefClasses,.pElementList)
-		If $$$ISERR(tSC) Quit
+        #; get list of elements within this top-level
+        set tSC = ..GetElementsForClass(pClass,.pLocalList,.pRefClasses,.pElementList)
+        if $$$ISERR(tSC) quit
 
-		Set tEl = $O(pLocalList(""))
-		While (tEl '= "") {
-			#; Skip if INCLUDEGROUP = 0
-			Set tIncGroup = $$$comMemberKeyGet(pLocalList(tEl),$$$cCLASSparameter,"XMLINCLUDEINGROUP",$$$cPARAMdefault)
-			If (tIncGroup '= 0) {
-				If ('+$G(%useronly) || (pLocalList(tEl)'["%")) {
-					Set tSkip = 0
-					If ($D(%saCategories)) {
-						// check categories
-						Set tCat = $$$UPPER($$$comMemberKeyGet(pLocalList(tEl),$$$cCLASSparameter,"SACATEGORY",$$$cPARAMdefault))
-						If ((tCat="")||'$D(%saCategories(tCat))) {
-							Set tSkip = 1
-						}
-					}
-					If ('tSkip) {
-						Set tElDisplayName = ..XMLName2DisplayName(tEl,pCurrentNS)
-						Set ^||%Studio.Schema(pDefaultNS,pCurrentNS,pTopName,"sub",tElDisplayName)=""
-						Set tTypeInfo = pLocalList(tEl)
-						If $ListValid(tTypeInfo) && $ListLength(tTypeInfo) && $ListGet(tTypeInfo,3) {
-							// wrapped collection: add another element for the wrapper
-							Set tSubNames = ""
-							Set tSubName = $ListBuild($ListGet(tEl),$ListGet(tTypeInfo))
-							If $ListGet(tTypeInfo,4) = "substitutiongroup" {
-								Set tType = $ListGet(tTypeInfo,2)
-								Kill tSubclassElements
-								Do ..GetXMLElementsForClass(tType,.tSubclassElements)
-								Set tXMLNameKey = ""
-								For {
-									Set tXMLNameKey = $Order(tSubclassElements(tXMLNameKey),1,tSubClassName)
-									If (tXMLNameKey = "") {
-										Quit
-									}
-									If $$$comClassKeyGet(tSubClassName,$$$cCLASSabstract) {
-										Continue
-									}
-									Set pRefClasses(tSubClassName) = ""
-									Set tSubNames = tSubNames_$ListBuild(tXMLNameKey)
-								}
-							} Else {
-								Set tSubNames = $ListBuild(tSubName)
-							}
-							Set tSubNamePointer = 0
-							While $ListNext(tSubNames,tSubNamePointer,tSubName) {
-								Set ^||%Studio.Schema(pDefaultNS,pCurrentNS,tElDisplayName,"sub",..XMLName2DisplayName(tSubName,pCurrentNS))=""
-							}
-						}
-					}
-				}
-			}
-			Set tEl = $O(pLocalList(tEl))
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+        set tEl = $order(pLocalList(""))
+        while (tEl '= "") {
+            #; Skip if INCLUDEGROUP = 0
+            set tIncGroup = $$$comMemberKeyGet(pLocalList(tEl),$$$cCLASSparameter,"XMLINCLUDEINGROUP",$$$cPARAMdefault)
+            if (tIncGroup '= 0) {
+                if ('+$get(%useronly) || (pLocalList(tEl)'["%")) {
+                    set tSkip = 0
+                    if ($data(%saCategories)) {
+                        // check categories
+                        set tCat = $$$UPPER($$$comMemberKeyGet(pLocalList(tEl),$$$cCLASSparameter,"SACATEGORY",$$$cPARAMdefault))
+                        if ((tCat="")||'$data(%saCategories(tCat))) {
+                            set tSkip = 1
+                        }
+                    }
+                    if ('tSkip) {
+                        set tElDisplayName = ..XMLName2DisplayName(tEl,pCurrentNS)
+                        set ^||%Studio.Schema(pDefaultNS,pCurrentNS,pTopName,"sub",tElDisplayName)=""
+                        set tTypeInfo = pLocalList(tEl)
+                        if $listvalid(tTypeInfo) && $listlength(tTypeInfo) && $listget(tTypeInfo,3) {
+                            // wrapped collection: add another element for the wrapper
+                            set tSubNames = ""
+                            set tSubName = $listbuild($listget(tEl),$listget(tTypeInfo))
+                            if $listget(tTypeInfo,4) = "substitutiongroup" {
+                                set tType = $listget(tTypeInfo,2)
+                                kill tSubclassElements
+                                do ..GetXMLElementsForClass(tType,.tSubclassElements)
+                                set tXMLNameKey = ""
+                                for {
+                                    set tXMLNameKey = $order(tSubclassElements(tXMLNameKey),1,tSubClassName)
+                                    if (tXMLNameKey = "") {
+                                        quit
+                                    }
+                                    if $$$comClassKeyGet(tSubClassName,$$$cCLASSabstract) {
+                                        continue
+                                    }
+                                    set pRefClasses(tSubClassName) = ""
+                                    set tSubNames = tSubNames_$listbuild(tXMLNameKey)
+                                }
+                            } else {
+                                set tSubNames = $listbuild(tSubName)
+                            }
+                            set tSubNamePointer = 0
+                            while $listnext(tSubNames,tSubNamePointer,tSubName) {
+                                set ^||%Studio.Schema(pDefaultNS,pCurrentNS,tElDisplayName,"sub",..XMLName2DisplayName(tSubName,pCurrentNS))=""
+                            }
+                        }
+                    }
+                }
+            }
+            set tEl = $order(pLocalList(tEl))
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// Overridden to handle list collections and relationships
-ClassMethod GetElementsForClass(pClass As %String, Output pElementList, Output pReferencedClasses, Output pXMLNameAliases) As %Status
+ClassMethod GetElementsForClass(
+	pClass As %String,
+	Output pElementList,
+	Output pReferencedClasses,
+	Output pXMLNameAliases) As %Status
 {
-	Set tSC = $$$OK
+    set tSC = $$$OK
 
-	Do {
-		#; only deal with compiled classes
-		#; gather properties as attributes or elements
-		If ($$$comClassDefined(pClass)) {
-			Set tAbstract = +$$$comClassKeyGet(pClass,$$$cCLASSabstract)
-			If ('tAbstract) {
-				#; get all properties of this class
-				Set tRS = ##class(%ResultSet).%New("%Dictionary.CompiledClass.MemberSummary")
-				Set tSC = tRS.%Execute(pClass,$$$cCLASSproperty)
-				If $$$ISERR(tSC) Quit
+    do {
+        #; only deal with compiled classes
+        #; gather properties as attributes or elements
+        if ($$$comClassDefined(pClass)) {
+            set tAbstract = +$$$comClassKeyGet(pClass,$$$cCLASSabstract)
+            if ('tAbstract) {
+                #; get all properties of this class
+                set tRS = ##class(%ResultSet).%New("%Dictionary.CompiledClass.MemberSummary")
+                set tSC = tRS.%Execute(pClass,$$$cCLASSproperty)
+                if $$$ISERR(tSC) quit
 
-				While (tRS.%Next(.tSC)) {
-					If $$$ISERR(tSC) Quit
-					Set tName = tRS.Data("Name")
-					If (tName ["%%") Continue  // internal property
-					If $classmethod(pClass,"%Extends","%Persistent")&&(tName="%Concurrency") Continue // omit this one specifically
-					Set tType = $$$comMemberKeyGet(pClass,$$$cCLASSproperty,tName,$$$cPROPtype)
-					Set tCollect = $$$comMemberKeyGet(pClass,$$$cCLASSproperty,tName,$$$cPROPcollection)
-					Set tXML = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLPROJECTION")
-					Set tXMLName = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLNAME")
-					Set tXMLItemName = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLITEMNAME")
-					Set tXMLKey = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLKEYNAME")
-					Set tTypeConstraint = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLTYPECONSTRAINT")
+                while (tRS.%Next(.tSC)) {
+                    if $$$ISERR(tSC) quit
+                    set tName = tRS.Data("Name")
+                    if (tName ["%%") continue  // internal property
+                    if $classmethod(pClass,"%Extends","%Persistent")&&(tName="%Concurrency") continue // omit this one specifically
+                    set tType = $$$comMemberKeyGet(pClass,$$$cCLASSproperty,tName,$$$cPROPtype)
+                    set tCollect = $$$comMemberKeyGet(pClass,$$$cCLASSproperty,tName,$$$cPROPcollection)
+                    set tXML = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLPROJECTION")
+                    set tXMLName = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLNAME")
+                    set tXMLItemName = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLITEMNAME")
+                    set tXMLKey = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLKEYNAME")
+                    set tTypeConstraint = $$$comMemberArrayGet(pClass,$$$cCLASSproperty,tName,$$$cPROPparameter,"XMLTYPECONSTRAINT")
 
-					Set tXML = $ZCVT(tXML,"L")
-					Set tTypeConstraint = $ZCVT(tTypeConstraint,"L")
-					Set:tXML="" tXML=$Case(tCollect,"":"element",:"wrapped")
-					Set:tXMLName="" tXMLName = tName
-	
-					If (tXML = "element") || (tXML = "wrapped") {
-						#; find out if this an object-valued property
-						#; get normalized type of property
-						#; figure out the classtype for the property
-						#; first normalize the type name
-						If ((tType '[ ".") && (tType '[ "%")) {
-							#; assume this type belongs to our package
-							Set tType = $P(pClass,".",1,$L(pClass,".")-1) _ "." _ tType
-						}
-						Set tType = $$$NormalizeClassname(tType)
+                    set tXML = $zconvert(tXML,"L")
+                    set tTypeConstraint = $zconvert(tTypeConstraint,"L")
+                    set:tXML="" tXML=$case(tCollect,"":"element",:"wrapped")
+                    set:tXMLName="" tXMLName = tName
 
-						If ($$$classIsDataType(tType)) {
-							#; add literal element to list
-							Set tDTNS = ..XMLName2NameSpace(..GetXMLNameForClass(pClass))
-							If (tDTNS'="") {
-								If (tCollect="array") {
-									If (tXMLKey '= "") {
-										#; We use the globally visible variable, %saKeyAttrs,
-										#; to track additional elements used as array keys.
-										#; This implementation is not correct; in the general case
-										#; the same element could be used in different contexts with
-										#; different key names. This is not very typical, however.
-										Set %saKeyAttrs($LB(tDTNS,tXMLName),tType,tName) = tXMLKey
-									}
-								}
-								Set pElementList($LB(tDTNS,tXMLName)) = tType
-							}
-						}
-						Else {
-							If (tCollect="array") {
-								If (tXMLKey '= "") {
-									#; See comment above.
-									Set %saKeyAttrs(pClass,tType,tName) = tXMLKey
-								}
-							}
-							
-							Set pReferencedClasses(tType) = ""
-							#; Skip if INCLUDEGROUP = 0
-							Set tIncGroup = +$$$comMemberKeyGet(tType,$$$cCLASSparameter,"XMLINCLUDEINGROUP",$$$cPARAMdefault)
-							If (tIncGroup '= 0) {
-								If (tCollect="") {
-									Set tElements(tXMLName) = tType
-									Set tElementsRef(tXMLName,tName) = "" // JMD517
-								} Else {
-									Set tDTNS = ..XMLName2NameSpace(..GetXMLNameForClass(pClass))
-									Set tReferenceXMLName = ..GetXMLNameForClass(tType)
-									Set tItemNamespace = ..XMLName2NameSpace(tReferenceXMLName)
-									If (tXMLItemName = "") {
-										Set tXMLItemName = ..XMLName2ShortName(tReferenceXMLName)
-									} Else {
-										Set pXMLNameAliases($ListBuild(tItemNamespace,tXMLItemName)) = tType
-									}
-									If (tItemNamespace'="") {
-										Set tIsWrapped = (tXML = "wrapped")
-										Set pElementList($LB(tDTNS,tXMLName)) = $ListBuild(tXMLItemName,tType,tIsWrapped,tTypeConstraint)
-									}
-								}
-							}
-						}
-					}
-				}
-				If $$$ISERR(tSC) Quit
-				
-				#; process elements
-				#; (for each element expand into available subclasses)
-				Set tEl = $O(tElements(""))
-				While (tEl '= "") {
-					Kill tChoiceList
-					Set tSubClass = tElements(tEl)
+                    if (tXML = "element") || (tXML = "wrapped") {
+                        #; find out if this an object-valued property
+                        #; get normalized type of property
+                        #; figure out the classtype for the property
+                        #; first normalize the type name
+                        if ((tType '[ ".") && (tType '[ "%")) {
+                            #; assume this type belongs to our package
+                            set tType = $piece(pClass,".",1,$length(pClass,".")-1) _ "." _ tType
+                        }
+                        set tType = $$$NormalizeClassname(tType)
 
-					if tSubClass'="%Library.RegisteredObject",tSubClass'="%Library.SerialObject",tSubClass'="%Library.Persistent" {
-						Set tSC = ..GetXMLElementsForClass(tSubClass,.tChoiceList)
-						If $$$ISERR(tSC) Quit
-					}
+                        if ($$$classIsDataType(tType)) {
+                            #; add literal element to list
+                            set tDTNS = ..XMLName2NameSpace(..GetXMLNameForClass(pClass))
+                            if (tDTNS'="") {
+                                if (tCollect="array") {
+                                    if (tXMLKey '= "") {
+                                        #; We use the globally visible variable, %saKeyAttrs,
+                                        #; to track additional elements used as array keys.
+                                        #; This implementation is not correct; in the general case
+                                        #; the same element could be used in different contexts with
+                                        #; different key names. This is not very typical, however.
+                                        set %saKeyAttrs($listbuild(tDTNS,tXMLName),tType,tName) = tXMLKey
+                                    }
+                                }
+                                set pElementList($listbuild(tDTNS,tXMLName)) = tType
+                            }
+                        } else {
+                            if (tCollect="array") {
+                                if (tXMLKey '= "") {
+                                    #; See comment above.
+                                    set %saKeyAttrs(pClass,tType,tName) = tXMLKey
+                                }
+                            }
 
-					Set k = $O(tChoiceList(""))
-					While (k'="") {
-						If $D(tElementsRef(tEl)) { // non-collection, reference property
-							// for each property that refers to this, there is an entry
-							Set xn = $O(tElementsRef(tEl,""))
-							While (xn'="") {
-								Set k2 = k
-								Set $List(k2,2) = xn
-								Set pElementList(k2) = tChoiceList(k)
-								Set tType = $$$NormalizeClassname(tChoiceList(k))
-								Set xn = $O(tElementsRef(tEl,xn))
-							}
-						}
-						Else {
-							Set tType = $$$NormalizeClassname(tChoiceList(k))
-							If ('$$$classIsDataType(tType)) {
-								#; JMD544
-								#; Skip if INCLUDEGROUP = 0 OR abstract
-								Set tIncGroup = $$$comMemberKeyGet(tType,$$$cCLASSparameter,"XMLINCLUDEINGROUP",$$$cPARAMdefault)
-								Set tTypeAbstract = +$$$comClassKeyGet(tType,$$$cCLASSabstract)
-								If ('tTypeAbstract && (tIncGroup '= 0)) {
-									Set pElementList(k) = tChoiceList(k)		
-									Set pReferencedClasses(tType) = ""
-								}
-							}
-							Else {
-								Set pElementList(k) = tChoiceList(k)
-							}
-						}
-						Set k = $O(tChoiceList(k))
-					}
-					Set tEl = $O(tElements(tEl))
-				}
-				If $$$ISERR(tSC) Quit
-			}
-		}
-	} While(0)
+                            set pReferencedClasses(tType) = ""
+                            #; Skip if INCLUDEGROUP = 0
+                            set tIncGroup = +$$$comMemberKeyGet(tType,$$$cCLASSparameter,"XMLINCLUDEINGROUP",$$$cPARAMdefault)
+                            if (tIncGroup '= 0) {
+                                if (tCollect="") {
+                                    set tElements(tXMLName) = tType
+                                    set tElementsRef(tXMLName,tName) = "" // JMD517
+                                } else {
+                                    set tDTNS = ..XMLName2NameSpace(..GetXMLNameForClass(pClass))
+                                    set tReferenceXMLName = ..GetXMLNameForClass(tType)
+                                    set tItemNamespace = ..XMLName2NameSpace(tReferenceXMLName)
+                                    if (tXMLItemName = "") {
+                                        set tXMLItemName = ..XMLName2ShortName(tReferenceXMLName)
+                                    } else {
+                                        set pXMLNameAliases($listbuild(tItemNamespace,tXMLItemName)) = tType
+                                    }
+                                    if (tItemNamespace'="") {
+                                        set tIsWrapped = (tXML = "wrapped")
+                                        set pElementList($listbuild(tDTNS,tXMLName)) = $listbuild(tXMLItemName,tType,tIsWrapped,tTypeConstraint)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if $$$ISERR(tSC) quit
 
-	Quit tSC
+                #; process elements
+                #; (for each element expand into available subclasses)
+                set tEl = $order(tElements(""))
+                while (tEl '= "") {
+                    kill tChoiceList
+                    set tSubClass = tElements(tEl)
+
+                    if tSubClass'="%Library.RegisteredObject",tSubClass'="%Library.SerialObject",tSubClass'="%Library.Persistent" {
+                        set tSC = ..GetXMLElementsForClass(tSubClass,.tChoiceList)
+                        if $$$ISERR(tSC) quit
+                    }
+
+                    set k = $order(tChoiceList(""))
+                    while (k'="") {
+                        if $data(tElementsRef(tEl)) { // non-collection, reference property
+                            // for each property that refers to this, there is an entry
+                            set xn = $order(tElementsRef(tEl,""))
+                            while (xn'="") {
+                                set k2 = k
+                                set $list(k2,2) = xn
+                                set pElementList(k2) = tChoiceList(k)
+                                set tType = $$$NormalizeClassname(tChoiceList(k))
+                                set xn = $order(tElementsRef(tEl,xn))
+                            }
+                        } else {
+                            set tType = $$$NormalizeClassname(tChoiceList(k))
+                            if ('$$$classIsDataType(tType)) {
+                                #; JMD544
+                                #; Skip if INCLUDEGROUP = 0 OR abstract
+                                set tIncGroup = $$$comMemberKeyGet(tType,$$$cCLASSparameter,"XMLINCLUDEINGROUP",$$$cPARAMdefault)
+                                set tTypeAbstract = +$$$comClassKeyGet(tType,$$$cCLASSabstract)
+                                if ('tTypeAbstract && (tIncGroup '= 0)) {
+                                    set pElementList(k) = tChoiceList(k)
+                                    set pReferencedClasses(tType) = ""
+                                }
+                            } else {
+                                set pElementList(k) = tChoiceList(k)
+                            }
+                        }
+                        set k = $order(tChoiceList(k))
+                    }
+                    set tEl = $order(tElements(tEl))
+                }
+                if $$$ISERR(tSC) quit
+            }
+        }
+    } while(0)
+
+    quit tSC
 }
 
 }

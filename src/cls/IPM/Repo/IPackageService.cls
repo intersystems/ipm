@@ -1,7 +1,9 @@
 Class %IPM.Repo.IPackageService [ Abstract ]
 {
 
-Method GetModule(pModuleReference As %IPM.Storage.ModuleInfo, Output AsArchive As %Boolean = 0) As %Stream.Object [ Abstract ]
+Method GetModule(
+	pModuleReference As %IPM.Storage.ModuleInfo,
+	Output AsArchive As %Boolean = 0) As %Stream.Object [ Abstract ]
 {
 }
 
@@ -24,13 +26,13 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
 /// Returns 1 if the service supports a particular method.
 ClassMethod Supports(pMethod As %String) As %Boolean
 {
-	Quit 0
+    quit 0
 }
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.
 Method IsAvailable() As %Boolean
 {
-	Quit 1
+    quit 1
 }
 
 }

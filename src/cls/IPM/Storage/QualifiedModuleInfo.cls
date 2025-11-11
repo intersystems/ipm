@@ -8,18 +8,20 @@ Parameter DEFAULTGLOBAL = "^IPM.Storage.QualifyModInfo";
 /// The name of the repository the module is in (The Name property in <class>%IPM.Repo.Definition</class>. <br />
 Property ServerName As %IPM.DataType.RepoName;
 
-Method %OnNew(pServerName As %String = "", pResolvedReference As %IPM.Storage.ModuleInfo = "") As %Status [ Private, ServerOnly = 1 ]
+Method %OnNew(
+	pServerName As %String = "",
+	pResolvedReference As %IPM.Storage.ModuleInfo = "") As %Status [ Private, ServerOnly = 1 ]
 {
-	If (pServerName '= "") {
-		Set ..ServerName = pServerName
-	}
-	If (pResolvedReference '= "") {
-		Set ..Name = pResolvedReference.Name
-		Set ..Version = pResolvedReference.Version
-		Set ..Deployed = pResolvedReference.Deployed
-		Set ..PlatformVersions = pResolvedReference.PlatformVersions
-	}
-	Quit $$$OK
+    if (pServerName '= "") {
+        set ..ServerName = pServerName
+    }
+    if (pResolvedReference '= "") {
+        set ..Name = pResolvedReference.Name
+        set ..Version = pResolvedReference.Version
+        set ..Deployed = pResolvedReference.Deployed
+        set ..PlatformVersions = pResolvedReference.PlatformVersions
+    }
+    quit $$$OK
 }
 
 Storage Default

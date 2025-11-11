@@ -44,7 +44,7 @@ Property Deploy As %Boolean(XMLPROJECTION = "ATTRIBUTE");
 /// For most typical resources (classes, include files, etc.) this is set to the resource name.
 /// For resources starting with /, this is set to "" by default (indicating "not required to be unique").
 /// If a resource processor class is defined, this name can be customized via the OnGetUniqueName method, and override the above behaviors (via <property>OverrideName</property>)
-Property UniqueName As %String(MAXLEN = 255, XMLPROJECTION = "NONE") [ Calculated, SqlComputeCode = {Set {*} = $Case({OverrideName},"":{Name},$c(0):"",:{OverrideName})}, SqlComputed ];
+Property UniqueName As %String(MAXLEN = 255, XMLPROJECTION = "NONE") [ Calculated, SqlComputeCode = {set {*} = $case({OverrideName},"":{Name},$char(0):"",:{OverrideName})}, SqlComputed ];
 
 /// Overridden unique identifier for this resource; provided by resource processor classes.
 Property OverrideName As %String(MAXLEN = 255, XMLPROJECTION = "NONE");
@@ -56,339 +56,356 @@ Index Children On Children(KEYS);
 
 Method ProcessorGet() As %IPM.ResourceProcessor.Abstract
 {
-	// Similar to LifecycleGet in Module.
-	If $IsObject(r%Processor) {
-		Quit r%Processor
-	}
-	Set tProcessorClass = ..ProcessorClass
-	If (tProcessorClass '= "") && '$$$comClassDefined(tProcessorClass) && $$$comClassDefined($$$DefaultProcessorPackageDot_tProcessorClass) {
-		Set tProcessorClass = $$$DefaultProcessorPackageDot_tProcessorClass
-	}
-	If (tProcessorClass = "") {
-		// Default class for resource extension
-		Set tProcessorClass = ..Module.Lifecycle.GetDefaultResourceProcessor(..Name)
-	}
-	If (tProcessorClass = "") || '$$$comClassDefined(tProcessorClass) {
-		Quit $$$NULLOREF
-	}
-	Set r%Processor = $ClassMethod(tProcessorClass,"%New",$this)
-	Quit r%Processor
+    // Similar to LifecycleGet in Module.
+    if $isobject(r%Processor) {
+        quit r%Processor
+    }
+    set tProcessorClass = ..ProcessorClass
+    if (tProcessorClass '= "") && '$$$comClassDefined(tProcessorClass) && $$$comClassDefined($$$DefaultProcessorPackageDot_tProcessorClass) {
+        set tProcessorClass = $$$DefaultProcessorPackageDot_tProcessorClass
+    }
+    if (tProcessorClass = "") {
+        // Default class for resource extension
+        set tProcessorClass = ..Module.Lifecycle.GetDefaultResourceProcessor(..Name)
+    }
+    if (tProcessorClass = "") || '$$$comClassDefined(tProcessorClass) {
+        quit $$$NULLOREF
+    }
+    set r%Processor = $classmethod(tProcessorClass,"%New",$this)
+    quit r%Processor
 }
 
 Method ProcessorClassGet() As %String
 {
-	Quit $Replace(i%ProcessorClass, $$$DefaultProcessorPackageDot, "")
+    quit $replace(i%ProcessorClass, $$$DefaultProcessorPackageDot, "")
 }
 
 Method OverrideNameGet() As %String
 {
-	If $IsObject(..Processor) {
-		// This method may leave tName undefined (the default implementation, actually)
-		Do ..Processor.OnGetUniqueName(.tName)
-	}
-	If '$Data(tName) {
-		// Default
-		Set tName = $Case($Extract(..Name),
-			"/":$c(0),
-			:"")
-	}
-	Quit tName
+    if $isobject(..Processor) {
+        // This method may leave tName undefined (the default implementation, actually)
+        do ..Processor.OnGetUniqueName(.tName)
+    }
+    if '$data(tName) {
+        // Default
+        set tName = $case($extract(..Name),
+            "/":$char(0),
+            :"")
+    }
+    quit tName
 }
 
 /// helper for <method>ResolveChildren</method>
-ClassMethod GetChildren(pResourceName As %String, pModuleName As %String, pCheckModuleOwnership As %Boolean = 1, ByRef pResourceInfoArray, Output pResourceArray) As %Status
+ClassMethod GetChildren(
+	pResourceName As %String,
+	pModuleName As %String,
+	pCheckModuleOwnership As %Boolean = 1,
+	ByRef pResourceInfoArray,
+	Output pResourceArray) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Kill pResourceArray
-		If ($Piece(pResourceName,".",*) = "PKG") {
-			Set tPackage = $Piece(pResourceName,".",1,*-1)_"."
-			
-			If pCheckModuleOwnership {
-				// Build a cache of known packages and classes (within the given package) owned by other modules,
-				// or of individual classes within the package listed separately within the same module.
-				Set tCacheResult = ##class(%SQL.Statement).%ExecDirect(,
-					"select UniqueName from %IPM_Storage.ResourceReference "_
-					"where UniqueName != ? and UniqueName %STARTSWITH ?",
-					pResourceName, tPackage)
-				If (tCacheResult.%SQLCODE < 0) {
-					Set tSC = $$$ERROR($$$SQLCode,tCacheResult.%SQLCODE,tCacheResult.%Message)
-					Quit
-				}
-				While tCacheResult.%Next(.tSC) {
-					$$$ThrowOnError(tSC)
-					Set tResourceCache($$$lcase(tCacheResult.%Get("UniqueName"))) = ""
-				}
-			}
-			// include hidden files by temporarily enable showHidden global for Studio search
-			Set tHidden = $Get(^%SYS("Studio", "ShowHidden"), $Char(0))
-			Set ^%SYS("Studio","ShowHidden") = 1
-			// PKG extension should only cover .CLS files
-			Set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
-        		"select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
-				tPackage_"*.cls")
-			If (tFilesResult.%SQLCODE < 0) {
-				Set tSC = $$$ERROR($$$SQLCode,tFilesResult.%SQLCODE,tFilesResult.%Message)
-				Quit
-			}
-			While tFilesResult.%Next(.tSC) {
-				If $$$ISERR(tSC) {
-					Quit
-				}
-				
-        		Set tFileName = tFilesResult.%Get("Name")
-        		continue:tFileName="IPM.Installer.cls"
-        		Set tName = $Piece(tFileName, ".", 1, *-1)
-        		Set tDeployedClass = -1
-        		Set tCheckName = tFileName
-        		If $$$lcase($Piece(tFileName,".",*))="cls" {
-          			Set tDeployedClass = $$$defClassKeyGet(tName, $$$cCLASSdeployed)
-          			If (tDeployedClass=2) {
-				    	Set tCheckName = $$$defClassKeyGet(tName,$$$cCLASSgeneratedby)
-          			}
-        		}
-				
-				If pCheckModuleOwnership {
-					// Skip resources owned by other modules (using cache).
-					If $Data(tResourceCache($$$lcase(tCheckName))) {
-						Continue
-					}
-					Set tFoundInPackage = 0
-					For tSegment = $Length(tCheckName,".")-2:-1:1 {
-						If $Data(tResourceCache($$$lcase($Piece(tCheckName,".",1,tSegment)_".PKG"))) {
-							Set tFoundInPackage = 1
-							Quit
-						}
-					}
-					If (tFoundInPackage) {
-						Continue
-					}
-				}
-				
-				Merge pResourceArray(tFileName) = pResourceInfoArray
-				If (tDeployedClass = 2) {
-					// Flag stub classes as generated, overriding the setting on the associated package.
-					// An example of this is %IPM.Storage.ResourceReferenceAttributes,
-					// which is generated by %IPM.Storage.ResourceReference.
-					// Opening the class definition results in the error:
-					// "ERROR #5360: Class '%IPM.Storage.ResourceReferenceAttributes' is a stub name and can not be opened"
-					// Note that a class having "GeneratedBy" set is not sufficient to automatically say that it is "generated" for package manager
-					// purposes, as such classes may legitimately be checked in under some circumstances.
-					Set pResourceArray(tFileName,"Generated") = 1
-				}
-			}
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		} Else {
-			If pResourceName '= "" {
-				Merge pResourceArray(pResourceName) = pResourceInfoArray
-			}
-			
-			// For consistency with Package behavior, list any generated stub classes as generated
-			If ($Piece(pResourceName,".",*) = "CLS") {
-				Set tClassName = $Piece(pResourceName,".",1,*-1)
-				If (tClassName '= "") {
-					// Start searching at the classname itself
-					Set tStubClassKey = ""
-					For {
-						Set tStubClassKey = $$$comMemberNext(tClassName,$$$cCLASSclasses,tStubClassKey)
-						If (tStubClassKey = "") {
-							Quit
-						}
-						Merge pResourceArray(tStubClassKey) = pResourceInfoArray
-						Set pResourceArray(tStubClassKey,"Generated") = 1
-					}
-				}
-			}
-		}
-	} Catch tException {
-		Set tSC = tException.AsStatus()
-	}
-	If $Data(tHidden) {
-		If (tHidden = $Char(0)) {
-			Kill ^%SYS("Studio", "ShowHidden")
-		} Else {
-			Set ^%SYS("Studio", "ShowHidden") = tHidden
-		}
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        kill pResourceArray
+        if ($piece(pResourceName,".",*) = "PKG") {
+            set tPackage = $piece(pResourceName,".",1,*-1)_"."
+
+            if pCheckModuleOwnership {
+                // Build a cache of known packages and classes (within the given package) owned by other modules,
+                // or of individual classes within the package listed separately within the same module.
+                set tCacheResult = ##class(%SQL.Statement).%ExecDirect(,
+                    "select UniqueName from %IPM_Storage.ResourceReference "_
+                    "where UniqueName != ? and UniqueName %STARTSWITH ?",
+                    pResourceName, tPackage)
+                if (tCacheResult.%SQLCODE < 0) {
+                    set tSC = $$$ERROR($$$SQLCode,tCacheResult.%SQLCODE,tCacheResult.%Message)
+                    quit
+                }
+                while tCacheResult.%Next(.tSC) {
+                    $$$ThrowOnError(tSC)
+                    set tResourceCache($$$lcase(tCacheResult.%Get("UniqueName"))) = ""
+                }
+            }
+            // include hidden files by temporarily enable showHidden global for Studio search
+            set tHidden = $get(^%SYS("Studio", "ShowHidden"), $char(0))
+            set ^%SYS("Studio","ShowHidden") = 1
+            // PKG extension should only cover .CLS files
+            set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
+                "select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
+                tPackage_"*.cls,"_tPackage_"*.mac,"_tPackage_"*.int,"_tPackage_"*.inc")
+            if (tFilesResult.%SQLCODE < 0) {
+                set tSC = $$$ERROR($$$SQLCode,tFilesResult.%SQLCODE,tFilesResult.%Message)
+                quit
+            }
+            while tFilesResult.%Next(.tSC) {
+                if $$$ISERR(tSC) {
+                    quit
+                }
+
+                set tFileName = tFilesResult.%Get("Name")
+                continue:tFileName="IPM.Installer.cls"
+                set tName = $piece(tFileName, ".", 1, *-1)
+                set tDeployedClass = -1
+                set tCheckName = tFileName
+                if $$$lcase($piece(tFileName,".",*))="cls" {
+                      set tDeployedClass = $$$defClassKeyGet(tName, $$$cCLASSdeployed)
+                      if (tDeployedClass=2) {
+                        set tCheckName = $$$defClassKeyGet(tName,$$$cCLASSgeneratedby)
+                      }
+                }
+
+                if pCheckModuleOwnership {
+                    // Skip resources owned by other modules (using cache).
+                    if $data(tResourceCache($$$lcase(tCheckName))) {
+                        continue
+                    }
+                    set tFoundInPackage = 0
+                    for tSegment = $length(tCheckName,".")-2:-1:1 {
+                        if $data(tResourceCache($$$lcase($piece(tCheckName,".",1,tSegment)_".PKG"))) {
+                            set tFoundInPackage = 1
+                            quit
+                        }
+                    }
+                    if (tFoundInPackage) {
+                        continue
+                    }
+                }
+
+                merge pResourceArray(tFileName) = pResourceInfoArray
+                if (tDeployedClass = 2) {
+                    // Flag stub classes as generated, overriding the setting on the associated package.
+                    // An example of this is %IPM.Storage.ResourceReferenceAttributes,
+                    // which is generated by %IPM.Storage.ResourceReference.
+                    // Opening the class definition results in the error:
+                    // "ERROR #5360: Class '%IPM.Storage.ResourceReferenceAttributes' is a stub name and can not be opened"
+                    // Note that a class having "GeneratedBy" set is not sufficient to automatically say that it is "generated" for package manager
+                    // purposes, as such classes may legitimately be checked in under some circumstances.
+                    set pResourceArray(tFileName,"Generated") = 1
+                }
+            }
+            if $$$ISERR(tSC) {
+                quit
+            }
+        } else {
+            if pResourceName '= "" {
+                merge pResourceArray(pResourceName) = pResourceInfoArray
+            }
+
+            // For consistency with Package behavior, list any generated stub classes as generated
+            if ($piece(pResourceName,".",*) = "CLS") {
+                set tClassName = $piece(pResourceName,".",1,*-1)
+                if (tClassName '= "") {
+                    // Start searching at the classname itself
+                    set tStubClassKey = ""
+                    for {
+                        set tStubClassKey = $$$comMemberNext(tClassName,$$$cCLASSclasses,tStubClassKey)
+                        if (tStubClassKey = "") {
+                            quit
+                        }
+                        merge pResourceArray(tStubClassKey) = pResourceInfoArray
+                        set pResourceArray(tStubClassKey,"Generated") = 1
+                    }
+                }
+            }
+        }
+    } catch tException {
+        set tSC = tException.AsStatus()
+    }
+    if $data(tHidden) {
+        if (tHidden = $char(0)) {
+            kill ^%SYS("Studio", "ShowHidden")
+        } else {
+            set ^%SYS("Studio", "ShowHidden") = tHidden
+        }
+    }
+    quit tSC
 }
 
 /// Updates <property>Children</property> to the contents of <var>pChildren</var>. <br />
 /// @Argument	pChildren			comma delimited string of Studio document names that are contained in this resource
 Method UpdateChildrenFromString(pChildren As %String)
 {
-	// Ensure that we don't try to update mappings each time a resource's children are updated.
-	New $$$ZPMDeferModifyResources
-	Set $$$ZPMDeferModifyResources = 1
-	$$$ThrowOnError(..Children.Clear())
-	Set tList = $ListFromString(pChildren)
-	Set tPtr = 0
-	While $ListNext(tList, tPtr, tChildName) {
-		$$$ThrowOnError(..Children.SetAt("", tChildName))
-	}
-	$$$ThrowOnError(..%Save(0))
+    // Ensure that we don't try to update mappings each time a resource's children are updated.
+    new $$$ZPMDeferModifyResources
+    set $$$ZPMDeferModifyResources = 1
+    $$$ThrowOnError(..Children.Clear())
+    set tList = $listfromstring(pChildren)
+    set tPtr = 0
+    while $listnext(tList, tPtr, tChildName) {
+        $$$ThrowOnError(..Children.SetAt("", tChildName))
+    }
+    $$$ThrowOnError(..%Save(0))
 }
 
 /// Returns true if the resource is in scope for the current module lifecycle operation.
 /// May also be used to test if the resource's scope matches the current phase.
-Method IsInScope(pCurrentPhase As %String = "", Output pInCurrentPhase As %Boolean = 0) As %Boolean
+Method IsInScope(
+	pCurrentPhase As %String = "",
+	Output pInCurrentPhase As %Boolean = 0) As %Boolean
 {
-	If (..Scope = "") {
-		Quit 1
-	}
-	
-	Set tScopeLower = $ZConvert(..Scope,"L")
-	If (tScopeLower = $ZConvert(pCurrentPhase,"L")) {
-		Set pInCurrentPhase = 1
-		Quit 1
-	}
-	
-	Set tPhaseLower = ""
-	Set tPointer = 0
-	Set tInScope = 0
-	While $ListNext(..Module.Lifecycle.PhaseList,tPointer,tPhase) {
-		If ($ZConvert(tPhase,"L") = tScopeLower) {
-			Set tInScope = 1
-			Quit
-		}
-	}
-	Quit tInScope
+    if (..Scope = "") {
+        quit 1
+    }
+
+    set tScopeLower = $zconvert(..Scope,"L")
+    if (tScopeLower = $zconvert(pCurrentPhase,"L")) {
+        set pInCurrentPhase = 1
+        quit 1
+    }
+
+    set tPhaseLower = ""
+    set tPointer = 0
+    set tInScope = 0
+    while $listnext(..Module.Lifecycle.PhaseList,tPointer,tPhase) {
+        if ($zconvert(tPhase,"L") = tScopeLower) {
+            set tInScope = 1
+            quit
+        }
+    }
+    quit tInScope
 }
 
 /// Returns an array of resources composing this resource, with the names as subscripts of <var>pResourceArray</var>.
 /// If <var>pCheckModuleOwnership</var> is 0 (the default is 1), for .PKG resources, all classes in the package will
 /// be included (even if they are actually part of another module).
-Method ResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean = 1) As %Status
+Method ResolveChildren(
+	ByRef pResourceArray,
+	pCheckModuleOwnership As %Boolean = 1) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		// all child classes start with the same array of resource-related info; pre-build it and pass in
-		
-		Set tArrayRepresentation = ..Module.Name
-		Set tArrayRepresentation("Processor") = ..Processor
-		Set tArrayRepresentation("Generated") = ..Generated
-		Set tArrayRepresentation("Preload") = ..Preload
-		Set tArrayRepresentation("Scope") = ..Scope
-		Set tArrayRepresentation("Deploy") = ..Deploy
-	
-		Set tSC = ..GetChildren(..Name, ..Module.Name, pCheckModuleOwnership, .tArrayRepresentation, .tResourceArray)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		// now add further info based on the processor object
-		If $IsObject(..Processor) {
-			Set tSC = ..Processor.OnResolveChildren(.tResourceArray, pCheckModuleOwnership)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		}
-		
-		Merge pResourceArray = tResourceArray
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        // all child classes start with the same array of resource-related info; pre-build it and pass in
+
+        set tArrayRepresentation = ..Module.Name
+        set tArrayRepresentation("Processor") = ..Processor
+        set tArrayRepresentation("Generated") = ..Generated
+        set tArrayRepresentation("Preload") = ..Preload
+        set tArrayRepresentation("Scope") = ..Scope
+        set tArrayRepresentation("Deploy") = ..Deploy
+
+        set tSC = ..GetChildren(..Name, ..Module.Name, pCheckModuleOwnership, .tArrayRepresentation, .tResourceArray)
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        // now add further info based on the processor object
+        if $isobject(..Processor) {
+            set tSC = ..Processor.OnResolveChildren(.tResourceArray, pCheckModuleOwnership)
+            if $$$ISERR(tSC) {
+                quit
+            }
+        }
+
+        merge pResourceArray = tResourceArray
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// For performance reasons, this should be used rather than <method>ResourceNameExists</method>.
-ClassMethod NonNullResourceNameExists(pResourceName As %String, Output pID As %Integer = "") As %Boolean
+ClassMethod NonNullResourceNameExists(
+	pResourceName As %String,
+	Output pID As %Integer = "") As %Boolean
 {
-	// ResourceNameExists is generated as:
-	/*
-	new %ROWCOUNT,SQLCODE,temp
-	 ;---&sql(SELECT %ID INTO :id FROM %IPM_Storage.ResourceReference WHERE (:K1 is not null and UniqueName = :K1) OR (:K1 IS NULL AND UniqueName IS NULL))
- 	 ;--- ** SQL PUBLIC Variables: %ROWCOUNT, %ROWID, %msg, K1, SQLCODE, id
-	do %0do
-	Quit $select('SQLCODE:1,1:0)
-	*/
-	// Because UniqueName may be null (and indeed needs to be in many reasonable cases), this query generates a seriously bogus plan involving a temp table.
-	&sql(SELECT %ID INTO :pID FROM %IPM_Storage.ResourceReference WHERE (:pResourceName is not null and UniqueName = :pResourceName))
-	If SQLCODE = 100 {
-		&sql(SELECT ResourceReference INTO :pID FROM %IPM_Storage.ResourceReference_Children WHERE element_key = :pResourceName)
-	}
-	Quit $Case(SQLCODE,0:1,:0)
+    // ResourceNameExists is generated as:
+    /*
+    new %ROWCOUNT,SQLCODE,temp
+     ;---&sql(SELECT %ID INTO :id FROM %IPM_Storage.ResourceReference WHERE (:K1 is not null and UniqueName = :K1) OR (:K1 IS NULL AND UniqueName IS NULL))
+      ;--- ** SQL PUBLIC Variables: %ROWCOUNT, %ROWID, %msg, K1, SQLCODE, id
+    do %0do
+    Quit $select('SQLCODE:1,1:0)
+    */
+    // Because UniqueName may be null (and indeed needs to be in many reasonable cases), this query generates a seriously bogus plan involving a temp table.
+    &sql(SELECT %ID INTO :pID FROM %IPM_Storage.ResourceReference WHERE (:pResourceName is not null and UniqueName = :pResourceName))
+    if SQLCODE = 100 {
+        &sql(SELECT ResourceReference INTO :pID FROM %IPM_Storage.ResourceReference_Children WHERE element_key = :pResourceName)
+    }
+    quit $case(SQLCODE,0:1,:0)
 }
 
 /// For performance reasons, this should be used rather than <method>ResourceNameOpen</method>.
-ClassMethod NonNullResourceNameOpen(pResourceName As %String, pConcurrency As %Integer = -1, Output pSC As %Status = {$$$OK}) As %IPM.Storage.ResourceReference
+ClassMethod NonNullResourceNameOpen(
+	pResourceName As %String,
+	pConcurrency As %Integer = -1,
+	Output pSC As %Status = {$$$OK}) As %IPM.Storage.ResourceReference
 {
-	// ResourceNameOpen is generated as:
-	/*
-	zResourceNameOpen(K1,concurrency=-1,sc) public { Set:'($data(sc)#2) sc=1
-	 i ..ResourceNameExists(K1,.id){ s return=..%OpenId(id,concurrency,.sc) } Else { s sc=$$Error^%apiOBJ(5770,"ResourceName",K1),return="" }
-	 QUIT return }
-	*/
-	If ..NonNullResourceNameExists(pResourceName,.tID) {
-		Set tResult = ..%OpenId(tID,pConcurrency,.pSC)
-	} Else {
-		Set pSC = $$$ERROR($$$KeyValueNotFoundOpen,"ResourceName",pResourceName)
-		Set tResult = $$$NULLOREF
-	}
-	Quit tResult
+    // ResourceNameOpen is generated as:
+    /*
+    zResourceNameOpen(K1,concurrency=-1,sc) public { Set:'($data(sc)#2) sc=1
+     i ..ResourceNameExists(K1,.id){ s return=..%OpenId(id,concurrency,.sc) } Else { s sc=$$Error^%apiOBJ(5770,"ResourceName",K1),return="" }
+     QUIT return }
+    */
+    if ..NonNullResourceNameExists(pResourceName,.tID) {
+        set tResult = ..%OpenId(tID,pConcurrency,.pSC)
+    } else {
+        set pSC = $$$ERROR($$$KeyValueNotFoundOpen,"ResourceName",pResourceName)
+        set tResult = $$$NULLOREF
+    }
+    quit tResult
 }
 
-ClassMethod GetStatus(InternalName As %String, Output pReferenced As %Boolean, Output pEditable As %Boolean, Output pSourceModuleName As %String, Output pMessage As %String) As %Status
+ClassMethod GetStatus(
+	InternalName As %String,
+	Output pReferenced As %Boolean,
+	Output pEditable As %Boolean,
+	Output pSourceModuleName As %String,
+	Output pMessage As %String) As %Status
 {
-	Set tSC = $$$OK
-	Set pReferenced = 0
-	Set pEditable = 1
-	Set pSourceModuleName = ""
-	Set pMessage = ""
-	Try {
-		// Special case: module itself
-		If ($Piece(InternalName,".",*) = "ZPM") {
-			Set tName = $Piece(InternalName,".",1,*-1)
-			If ##class(%IPM.Storage.Module).NameExists(tName) {
-				Set tModule = ##class(%IPM.Storage.Module).NameOpen(tName,,.tSC)
-				If $$$ISERR(tSC) {
-					Quit
-				}
-				Set pReferenced = 1
-				Set pEditable = 1 //Still allow editing
-				If tModule.IsLocked() {
-					Set pMessage = $$$FormatText("WARNING: Module '%1' is not a snapshot version and should not be modified.", tName)
-				}
-			}
-			Quit
-		}
-		
-		// Otherwise, we're dealing with an actual resource reference.
-		Set tRef = ""
-		If ..ResourceNameExists(InternalName) {
-			Set tRef = ..ResourceNameOpen(InternalName,,.tSC)
-		} ElseIf ($Piece(InternalName,".",*) = "CLS") {
-			// Classes may be included by package.
-			For i=$Length(InternalName,".")-2:-1:1 {
-				Set tPackage = $Piece(InternalName,".",1,i)_".PKG"
-				If ..ResourceNameExists(tPackage) {
-					Set tRef = ..ResourceNameOpen(tPackage,,.tSC)
-					Quit
-				}
-			}
-		}
-		If $$$ISERR(tSC) || (tRef = $$$NULLOREF) {
-			Quit
-		}
-		
-		Set pReferenced = 1
-		Set pEditable = 'tRef.Module.IsLocked() && tRef.Module.DeveloperMode
-		Set pSourceModuleName = tRef.Module.Name
-		If tRef.Module.IsLocked() {
-			Set pMessage = $$$FormatText("WARNING: Module '%1' is a released (non-snapshot) version, so its resources may not be modified.", tRef.Module.Name)
-		} ElseIf 'tRef.Module.DeveloperMode {
-			Set pMessage = $$$FormatText("Module '%1' has not been loaded/installed in development mode, so its resources may not be modified.", tRef.Module.Name)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    set pReferenced = 0
+    set pEditable = 1
+    set pSourceModuleName = ""
+    set pMessage = ""
+    try {
+        // Special case: module itself
+        if ($piece(InternalName,".",*) = "ZPM") {
+            set tName = $piece(InternalName,".",1,*-1)
+            if ##class(%IPM.Storage.Module).NameExists(tName) {
+                set tModule = ##class(%IPM.Storage.Module).NameOpen(tName,,.tSC)
+                if $$$ISERR(tSC) {
+                    quit
+                }
+                set pReferenced = 1
+                set pEditable = 1 //Still allow editing
+                if tModule.IsLocked() {
+                    set pMessage = $$$FormatText("WARNING: Module '%1' is not installed in developer mode and should not be modified.", tName)
+                }
+            }
+            quit
+        }
+
+        // Otherwise, we're dealing with an actual resource reference.
+        set tRef = ""
+        if ..ResourceNameExists(InternalName) {
+            set tRef = ..ResourceNameOpen(InternalName,,.tSC)
+        } elseif ($piece(InternalName,".",*) = "CLS") {
+            // Classes may be included by package.
+            for i=$length(InternalName,".")-2:-1:1 {
+                set tPackage = $piece(InternalName,".",1,i)_".PKG"
+                if ..ResourceNameExists(tPackage) {
+                    set tRef = ..ResourceNameOpen(tPackage,,.tSC)
+                    quit
+                }
+            }
+        }
+        if $$$ISERR(tSC) || (tRef = $$$NULLOREF) {
+            quit
+        }
+
+        set pReferenced = 1
+        set pEditable = 'tRef.Module.IsLocked()
+        set pSourceModuleName = tRef.Module.Name
+        if tRef.Module.IsLocked() {
+            set pMessage = $$$FormatText("Module '%1' has not been loaded/installed in development mode, so its resources may not be modified.", tRef.Module.Name)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
-/// This callback method is invoked by the <METHOD>%Save</METHOD> method to 
-/// provide notification that the object is being saved. It is called before 
+/// This callback method is invoked by the <METHOD>%Save</METHOD> method to
+/// provide notification that the object is being saved. It is called before
 /// any data is written to disk.
 /// 
 /// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
@@ -396,92 +413,90 @@ ClassMethod GetStatus(InternalName As %String, Output pReferenced As %Boolean, O
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
-	Set tSC = $$$OK
-	Try {
-		// Ensure OverrideName is set (if needed).
-		Set ..OverrideName = ..OverrideNameGet()
-		
-		// Normalize resource extension for server resources - should always be upper case.
-    If (..ProcessorClass '= "FileCopy") { 
-      If ($Extract(..Name) '= "/") {
-        Set tExt = $Piece(..Name,".",*)
-        Set ..Name = $Piece(..Name,".",1,*-1)_"."_$ZConvert($Piece(..Name,".",*),"U")
-      }
+    set tSC = $$$OK
+    try {
+        // Ensure OverrideName is set (if needed).
+        set ..OverrideName = ..OverrideNameGet()
+
+        // Normalize resource extension for server resources - should always be upper case.
+        if (..ProcessorClass '= "FileCopy") {
+            if ($extract(..Name) '= "/") {
+                set tExt = $piece(..Name,".",*)
+                set ..Name = $piece(..Name,".",1,*-1)_"."_$zconvert($piece(..Name,".",*),"U")
+            }
+        }
+
+        // See if resource already exists as part of a different module.
+        if ..NonNullResourceNameExists(..UniqueName,.tExistingID) && (tExistingID '= ..%Id()) {
+            set tOtherInstance = ..%OpenId(tExistingID,,.tSC)
+            if $$$ISERR(tSC) {
+                quit
+            }
+            if (tOtherInstance.Module.Name = ..Module.Name) {
+                set tMsg = $$$FormatText("Resource '%1' is listed more than once in module '%2'",..Name,..Module.Name)
+            } else {
+                set tMsg = $$$FormatText("Resource '%1' is explicitly part of module '%2', and cannot also be in module '%3'",..Name,tOtherInstance.Module.Name,..Module.Name)
+            }
+            set tSC = $$$ERROR($$$GeneralError,tMsg)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
     }
-		
-		// See if resource already exists as part of a different module.
-		If ..NonNullResourceNameExists(..UniqueName,.tExistingID) && (tExistingID '= ..%Id()) {
-			Set tOtherInstance = ..%OpenId(tExistingID,,.tSC)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-			If (tOtherInstance.Module.Name = ..Module.Name) {
-				Set tMsg = $$$FormatText("Resource '%1' is listed more than once in module '%2'",..Name,..Module.Name)
-			} Else {
-				Set tMsg = $$$FormatText("Resource '%1' is explicitly part of module '%2', and cannot also be in module '%3'",..Name,tOtherInstance.Module.Name,..Module.Name)
-			}
-			Set tSC = $$$ERROR($$$GeneralError,tMsg)
-		}
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	
-	Quit tSC
+    quit tSC
 }
 
 Trigger OnChange [ Event = INSERT/UPDATE, Foreach = row/object, Time = AFTER ]
 {
-	New tModule,tSC,tEx
-	Set tSC = $$$OK
-	Try {
-		If $Data($$$ZPMDeferModifyResources) {
-			Quit
-		}
-		Set tModule = ##class(%IPM.Storage.Module).%OpenId({ModuleItem},,.tSC)
-		If $$$ISERR(tSC) {
-			Quit
-		}
-		
-		// TODO: Defer somehow, for the event of multiple changes to the same module's resources being %Save'd at the same time??
-		Set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnModifyResources(tModule)
-	} Catch tEx {
-		Set tSC = tEx.AsStatus()
-	}
-	If $$$ISERR(tSC) {
-		Set %ok = 0
-		Set %msg = $System.Status.GetErrorText(tSC)
-	}
+    new tModule,tSC,tEx
+    set tSC = $$$OK
+    try {
+        if $data($$$ZPMDeferModifyResources) {
+            quit
+        }
+        set tModule = ##class(%IPM.Storage.Module).%OpenId({ModuleItem},,.tSC)
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        // TODO: Defer somehow, for the event of multiple changes to the same module's resources being %Save'd at the same time??
+        set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnModifyResources(tModule)
+    } catch tEx {
+        set tSC = tEx.AsStatus()
+    }
+    if $$$ISERR(tSC) {
+        set %ok = 0
+        set %msg = $system.Status.GetErrorText(tSC)
+    }
 }
 
 Method GetSortKey() As %String
 {
-	If $Extract(..Name) = "/" {
-		// CSP/other filesystem resources go last.
-		// These may not be uniquely named (!), so add the current OREF as an integer.
-		Quit "9_"_..Name_"_"_(+$This)
-	} Else {
-		Set tName = $Piece(..Name,".",1,*-1)
-		Set tExtension = $Piece(..Name,".",*)
-		
-		// Packages/classes first (alphabetically and possibly intermixed)
-		// Then routines (alphabetically)
-		// Then includes (alphabetically)
-		// Then everything else, in alphabetical order by extension and then by name.
-		Set tPrefix = $Case(tExtension,
-			"PKG":"1",
-			"CLS":"1",
-			"MAC":"2",
-			"INC":"3",
-			:"4_"_tExtension)
-			
-		// Distinguish resources with names of a common sort order, but different extensions
-		Set tSuffix = $Case(tExtension,
-			"CLS":"_CLS",
-			"PKG":"_PKG",
-			:"")
-			
-		Quit tPrefix_"_"_tName_tSuffix
-	}
+    if $extract(..Name) = "/" {
+        // CSP/other filesystem resources go last.
+        // These may not be uniquely named (!), so add the current OREF as an integer.
+        quit "9_"_..Name_"_"_(+$this)
+    }
+    set tName = $piece(..Name,".",1,*-1)
+    set tExtension = $piece(..Name,".",*)
+
+    // Packages/classes first (alphabetically and possibly intermixed)
+    // Then routines (alphabetically)
+    // Then includes (alphabetically)
+    // Then everything else, in alphabetical order by extension and then by name.
+    set tPrefix = $case(tExtension,
+        "PKG":"1",
+        "CLS":"1",
+        "MAC":"2",
+        "INC":"3",
+        :"4_"_tExtension)
+
+    // Distinguish resources with names of a common sort order, but different extensions
+    set tSuffix = $case(tExtension,
+        "CLS":"_CLS",
+        "PKG":"_PKG",
+        :"")
+
+    quit tPrefix_"_"_tName_tSuffix
 }
 
 Storage Default

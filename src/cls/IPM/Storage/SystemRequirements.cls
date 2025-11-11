@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.Storage.SystemRequirements Extends (%Persistent, %XML.Adaptor)
 {
 
@@ -9,12 +11,12 @@ Property Version As %IPM.General.SemanticVersionExpression(XMLPROJECTION = "NONE
 
 Method VersionStringSet(tValue) As %Status
 {
-	Set i%VersionString = tValue
-	Set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tValue,.tExpression)
-	If $$$ISOK(tSC) {
-		Set ..Version = tExpression
-	}
-	Quit tSC
+    set i%VersionString = tValue
+    set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tValue,.tExpression)
+    if $$$ISOK(tSC) {
+        set ..Version = tExpression
+    }
+    quit tSC
 }
 
 Property Interoperability As %String(VALUELIST = ",enabled,disabled", XMLPROJECTION = "ATTRIBUTE");
@@ -23,78 +25,102 @@ Property Health As %Boolean(XMLPROJECTION = "ATTRIBUTE");
 
 Property IPMVersion As %String(MAXLEN = 256, XMLPROJECTION = "ATTRIBUTE");
 
+Property PythonVersion As %String(MAXLEN = 256, XMLPROJECTION = "ATTRIBUTE");
+
 Method CheckRequirements() As %Status
 {
-	Set tSC = $$$OK
-	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckVersion())
-	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckInteroperability())
-	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckHealth())
-	Set tSC = $SYSTEM.Status.AppendStatus(tSC,..CheckIPMVersion())
-	Return tSC
+    set tSC = $$$OK
+    set tSC = $system.Status.AppendStatus(tSC,..CheckVersion())
+    set tSC = $system.Status.AppendStatus(tSC,..CheckInteroperability())
+    set tSC = $system.Status.AppendStatus(tSC,..CheckHealth())
+    set tSC = $system.Status.AppendStatus(tSC,..CheckIPMVersion())
+    set tSC = $system.Status.AppendStatus(tSC,..CheckPythonVersion())
+    return tSC
 }
 
 Method CheckVersion() As %Status
 {
-  Set tSystemVersion = +$System.Version.GetMajor() _ "." _ +$System.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
-	If (..VersionString = "") { Return $$$OK } 
-	Try {
-		Set CurrentSystemVersion = ##class(%IPM.General.SemanticVersion).FromString(tSystemVersion)
-		If ('..Version.IsSatisfiedBy(CurrentSystemVersion)) {
-			Return $$$ERROR($$$GeneralError,"The module cannot be installed on the current version (" _ tSystemVersion _ ") of the system, version """ _ ..VersionString _ """ is required")
+    set tSystemVersion = +$system.Version.GetMajor() _ "." _ +$system.Version.GetMinor() ;_ "." _ +$System.Version.GetPoint() _ "+" _ $System.Version.GetBuildNumber()
+    if (..VersionString = "") {
+        return $$$OK
     }
-		Return $$$OK
-	} Catch ex {
-		Return $$$ERROR($$$GeneralError, "Unable to check reqired system version")
-	}
+    try {
+        set CurrentSystemVersion = ##class(%IPM.General.SemanticVersion).FromString(tSystemVersion)
+        if ('..Version.IsSatisfiedBy(CurrentSystemVersion)) {
+            return $$$ERROR($$$GeneralError,"The module cannot be installed on the current version (" _ tSystemVersion _ ") of the system, version """ _ ..VersionString _ """ is required")
+    		}
+        return $$$OK
+    } catch ex {
+        return $$$ERROR($$$GeneralError, "Unable to check reqired system version: "_$system.Status.GetErrorText(ex.AsStatus()))
+    }
 }
 
 /// Checks if Interoperability specification is satisfied. Health="true" implies Interoperability="enabled"
 Method CheckInteroperability() As %Status
 {
-	Set tInteroperabilityRequired = $Case(..Interoperability, "enabled":1, :0) || ..Health
-	Set tInteroperabilityEnabled = ..IsInteroperabilityEnabled()
-	If tInteroperabilityRequired && ('tInteroperabilityEnabled) {
-		Return $$$ERROR($$$GeneralError, "This module requires an interoperability-enabled namespace. "_$Namespace_" is not interoperability-enabled.")
-	}
-	Return $$$OK
+    set tInteroperabilityRequired = $case(..Interoperability, "enabled":1, :0) || ..Health
+    set tInteroperabilityEnabled = ..IsInteroperabilityEnabled()
+    if tInteroperabilityRequired && ('tInteroperabilityEnabled) {
+        return $$$ERROR($$$GeneralError, "This module requires an interoperability-enabled namespace. "_$namespace_" is not interoperability-enabled.")
+    }
+    return $$$OK
 }
 
 Method CheckHealth() As %Status
 {
-	set tIsHealthInstance = ..IsHealthInstance()
-	If ..Health && 'tIsHealthInstance {
-		Set msg = "The module requires InterSystems IRIS for Health, HealthConnect, or HealthShare. Current system is not compatible."
-		Return $$$ERROR($$$GeneralError, msg)
-	} ElseIf ..Health = 0 && tIsHealthInstance {
-		Set msg = "The module cannot be installed on InterSystems IRIS for Health, HealthConnect, or HealthShare. Current system is not compatible."
-		Return $$$ERROR($$$GeneralError, msg)
-	}
-	Return $$$OK
+    set tIsHealthInstance = ..IsHealthInstance()
+    if ..Health && 'tIsHealthInstance {
+        set msg = "The module requires InterSystems IRIS for Health, HealthConnect, or HealthShare. Current system is not compatible."
+        return $$$ERROR($$$GeneralError, msg)
+    } elseif ..Health = 0 && tIsHealthInstance {
+        set msg = "The module cannot be installed on InterSystems IRIS for Health, HealthConnect, or HealthShare. Current system is not compatible."
+        return $$$ERROR($$$GeneralError, msg)
+    }
+    return $$$OK
 }
 
 Method CheckIPMVersion() As %Status
 {
-	If ..IPMVersion = "" {
-		Return $$$OK
-	}
-	Do ##class(%IPM.Main).GetVersion("zpm",.out)	
-	Set tVersion = ##class(%IPM.General.SemanticVersion).FromString($ListGet(out("zpm"), 2))
-	$$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(..IPMVersion,.tExpression))
-	If tVersion.Satisfies(tExpression) {
-		Return $$$OK
-	}
-	Return $$$ERROR($$$GeneralError, "The module requires IPM version "_..IPMVersion_". Current IPM version is "_tVersion.ToString())
+    if ..IPMVersion = "" {
+        return $$$OK
+    }
+    do ##class(%IPM.Main).GetVersion($$$IPMModuleName,.out)
+    set tVersion = ##class(%IPM.General.SemanticVersion).FromString($listget(out($$$IPMModuleName), 2))
+    $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(..IPMVersion,.tExpression))
+    if tVersion.Satisfies(tExpression) {
+        return $$$OK
+    }
+    return $$$ERROR($$$GeneralError, "The module requires IPM version "_..IPMVersion_". Current IPM version is "_tVersion.ToString())
+}
+
+Method CheckPythonVersion() As %Status
+{
+    if ..PythonVersion = "" {
+        return $$$OK
+    }
+    set pythonVersion = ##class(%IPM.General.SemanticVersion).FromString(..GetPythonVersion())
+    $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(..PythonVersion,.requiredVersionExpression))
+    if pythonVersion.Satisfies(requiredVersionExpression) {
+        return $$$OK
+    }
+    return $$$ERROR($$$GeneralError, "The module requires Python version " _ ..PythonVersion _ ". Current Python version is " _ pythonVersion.ToString())
+}
+
+ClassMethod GetPythonVersion() [ Language = python ]
+{
+    import sys
+    return f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
 }
 
 ClassMethod IsHealthInstance() As %Boolean
 {
   set cls = "%ZHSLIB.HealthShareMgr", mthd = "IsHealthShareInstance"
-  return $ListFind($System.Version.GetISCComponents(), "Health") || ($System.CLS.IsMthd(cls, mthd) && $ClassMethod(cls, mthd))
+  return $listfind($system.Version.GetISCComponents(), "Health") || ($system.CLS.IsMthd(cls, mthd) && $classmethod(cls, mthd))
 }
 
 ClassMethod IsInteroperabilityEnabled() As %Boolean
 {
-  Return ##class(%EnsembleMgr).IsEnsembleNamespace($NAMESPACE) && ##class(%EnsembleMgr).validateNamespace($NAMESPACE, 1)
+  return ##class(%EnsembleMgr).IsEnsembleNamespace($namespace) && ##class(%EnsembleMgr).validateNamespace($namespace, 1)
 }
 
 Storage Default
@@ -120,6 +146,9 @@ Storage Default
 </Value>
 <Value name="7">
 <Value>IPMVersion</Value>
+</Value>
+<Value name="8">
+<Value>PythonVersion</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.SystemRequirementsD</DataLocation>

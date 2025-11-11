@@ -16,7 +16,7 @@ Relationship Module As %IPM.Storage.Module(XMLPROJECTION = "NONE") [ Cardinality
 Property Source As %String(MAXLEN = 64, XMLPROJECTION = "ATTRIBUTE");
 
 /// Resolved value after evaluating any permitted expressions in <property>Source</property>.
-Property SourceResolved As %String(MAXLEN = 64, XMLPROJECTION = "NONE") [ SqlComputeCode = { Set {*} = ##class(%IPM.Utils.Module).%EvaluateSystemExpression({Source}) }, SqlComputed ];
+Property SourceResolved As %String(MAXLEN = 64, XMLPROJECTION = "NONE") [ SqlComputeCode = { set {*} = ##class(%IPM.Utils.Module).%EvaluateSystemExpression({Source}) }, SqlComputed ];
 
 /// If set to true, this source code is not shipped in application packaging.
 /// (Of course, it must be included in module packaging.)

@@ -10,26 +10,31 @@ Parameter ATTRIBUTES As STRING = "TargetFile";
 /// File to which the module should be exported
 Property TargetFile As %String(MAXLEN = "") [ Required ];
 
-Method OnAfterPhase(pPhase As %String, ByRef pParams) As %Status
+Method OnAfterPhase(
+	pPhase As %String,
+	ByRef pParams) As %Status
 {
-	If (pPhase = "Activate") {
-		Quit ..Export(..ResourceReference.Module,..TargetFile,.pParams)
-	}
-	Quit $$$OK
+    if (pPhase = "Activate") {
+        quit ..Export(..ResourceReference.Module,..TargetFile,.pParams)
+    }
+    quit $$$OK
 }
 
-ClassMethod Export(pModule As %IPM.Storage.Module, pTargetFile As %String, ByRef pParams) As %Status
+ClassMethod Export(
+	pModule As %IPM.Storage.Module,
+	pTargetFile As %String,
+	ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		#dim tProject As %Studio.Project
-		Set tSC = pModule.GetStudioProject(.tProject)
-		$$$ThrowOnError(tSC)
-		Set tSC = tProject.Export(pTargetFile,,0)
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        #dim tProject As %Studio.Project
+        set tSC = pModule.GetStudioProject(.tProject)
+        $$$ThrowOnError(tSC)
+        set tSC = tProject.Export(pTargetFile,"/createdirs",0)
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 }

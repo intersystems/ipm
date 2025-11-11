@@ -35,33 +35,33 @@ Property DisplayName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "name", XMLNAM
 
 Method NameSet(val As %String) As %Status
 {
-	Set i%Name = $$$lcase(val)
-	Set i%DisplayName = val
-	Return $$$OK
+    set i%Name = $$$lcase(val)
+    set i%DisplayName = val
+    return $$$OK
 }
 
 Method DisplayNameSet(val As %String) As %Status
 {
-	If (i%Name '= "") {
-    If (i%Name '= $$$lcase(val)) {
-		  Return $$$ERROR($$$GeneralError, "DisplayName needs to be case sensitive form of module name: "_i%Name)
+    if (i%Name '= "") {
+        if (i%Name '= $$$lcase(val)) {
+            return $$$ERROR($$$GeneralError, "DisplayName needs to be case sensitive form of module name: "_i%Name)
+        }
     }
-  }
-  Set i%DisplayName = val
-	Set i%Name = $$$lcase(val)
-	Return $$$OK
+    set i%DisplayName = val
+    set i%Name = $$$lcase(val)
+    return $$$OK
 }
 
 Method VersionStringSet(tValue) As %Status
 {
-	Set i%VersionString = tValue
-	Set ..Version = ##class(%IPM.General.SemanticVersion).FromString(tValue)
-	Quit $$$OK
+    set i%VersionString = tValue
+    set ..Version = ##class(%IPM.General.SemanticVersion).FromString(tValue)
+    quit $$$OK
 }
 
 Method VersionStringGet() As %String
 {
-	Quit ..Version.ToString()
+    quit ..Version.ToString()
 }
 
 }

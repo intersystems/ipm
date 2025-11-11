@@ -40,7 +40,7 @@ ClassMethod IsValid(%val As %CacheString) As %Status [ ServerOnly = 0 ]
     // Regex check
     if (..#REGEX '= "") {
         try {
-            if '$MATCH(%val, ..#REGEX) {
+            if '$match(%val, ..#REGEX) {
                 return $$$ERROR($$$DTPattern, %val, ..#REGEX)
             }
         } catch e {
@@ -48,6 +48,21 @@ ClassMethod IsValid(%val As %CacheString) As %Status [ ServerOnly = 0 ]
         }
     }
     return $$$OK
+}
+
+ClassMethod FromWildCard(wildcard As %String) As %String
+{
+    set regex = ""
+    for i=1:1:$length(wildcard) {
+        set char = $extract(wildcard, i)
+        if char = "*" {
+            set regex = regex_".*"
+        } else {
+            set regex = regex_char
+        }
+    }
+    // Is there a way to return an instance of this class instead of %String?
+    quit "^(?i)"_regex_"$"
 }
 
 }

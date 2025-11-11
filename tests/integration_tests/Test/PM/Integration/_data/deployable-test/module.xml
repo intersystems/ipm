@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="deployable-test.ZPM">
+    <Module>
+      <Name>deployable-test</Name>
+      <Version>0.0.1-alpha.1+build</Version>
+      <Packaging>module</Packaging>
+      <SystemRequirements Interoperability="enabled"/>
+      <Resource Name="DeployableTest.Main.CLS" Deploy="true"/>
+      <Resource Name="DeployableTest.Routine.MAC" Deploy="true"/>
+      <Resource Name="DeployableTest.Undeployed.CLS"/>
+      <Resource Name="DeployableTest.Production.CLS" Deploy="true"/>
+      <Dependencies>
+        <ModuleReference>
+          <Name>deployable-test-dep</Name>
+          <Version>0.0.1</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>deployable-test-deployed-dep</Name>
+          <Version>0.0.1</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

@@ -17,267 +17,274 @@ Parameter PACKAGING As STRING [ Final ] = "studio-project";
 /// into a Studio project with a set of subordinate Studio projects.
 Method %Package(ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tTarget = $Name(^CacheTemp.ZPMProjectExport($Increment(^CacheTemp.ZPMProjectExport)))
-		Kill @tTarget
-		Set tVerbose = $Get(pParams("Verbose"),0)
-		Set tIncludeDependencies = $Get(pParams("Package","WithDependencies"),0)
-		Set tIncludePackageManager = $Get(pParams("Package","Manager"),0)
-		Set tTargetFile = $Get(pParams("Package","Target"),##class(%Library.File).TempFilename("xml"))
-		
-		// Installer routine - header/main entry point.
-		Set tRtn($i(tRtn)) = " #include %occInclude"
-		Set tRtn($i(tRtn)) = " Do MAIN"
-		Set tRtn($i(tRtn)) = " Quit"
-		
-		// Possibly, include package manager in package and install it if needed.
-		If tIncludePackageManager {
-			If ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName) {
-				Set tIPMModule = ##class(%IPM.Storage.Module).NameOpen($$$IPMModuleName,,.tSC)
-				$$$ThrowOnError(tSC)
-				Do ..PackageOneModule(tIPMModule,tTarget,.pParams,.tModuleLocations,.tRtn)
-			} Else {
-				$$$ThrowStatus($$$ERROR($$$GeneralError,"Attempted to include package manager, but module not defined in this namespace."))
-			}
-		}
-		
-		// Possibly include dependencies in the package, and install them.
-		If tIncludeDependencies {
-			$$$ThrowOnError(..Module.BuildDependencyGraph(.tDependencyGraph))
-			Set tModule = ""
-			For {
-				Set tModule = $Order(tDependencyGraph(tModule),1,tData)
-				If (tModule = "") {
-					Quit
-				}
-				Set tDepthGraph($ListGet(tData),$Increment(tDepthGraph($ListGet(tData)))) = ##class(%IPM.Storage.Module).NameOpen(tModule,,.tSC)
-				$$$ThrowOnError(tSC)
-			}
-			
-			For tDepth=$Order(tDepthGraph(""),-1):-1:1 {
-				For tIndex=1:1:tDepthGraph(tDepth) {
-					Do ..PackageOneModule(tDepthGraph(tDepth,tIndex),tTarget,.pParams,.tModuleLocations,.tRtn)
-				}
-			}
-		}
-		
-		// Export THIS module to a Studio project.
-		Do ..PackageOneModule(..Module,tTarget,.pParams,.tModuleLocations,.tRtn)
-		
-		// Create one Studio project to rule them all
-		Set tMainProjectName = $Replace(..Module.Name,".","_")_"_Bundle"
-		If ##class(%Studio.Project).%ExistsId(tMainProjectName) {
-			$$$ThrowOnError(##class(%Studio.Project).Delete(tMainProjectName))
-		}
-		
-		Set tMainProject = ##class(%Studio.Project).%New()
-		Set tMainProject.Name = tMainProjectName
-		$$$ThrowOnError(tMainProject.AddItem(tTarget_".GBL"))
-		
-		// Installation routine: install sub-projects from globals.
-		Set tPackedDocumentClass = "zTemp.PackageManager.Container"
-		Set tRtn($i(tRtn)) = "MAIN"
-		For tIndex = 1:1:tModuleLocations {
-			Set tModuleName = tModuleLocations(tIndex)
-			Set tIsPackageManager = (tModuleName = $$$IPMModuleName) && (..Module.Name '= $$$IPMModuleName)
-			If tIsPackageManager {
-				Set tRtn($i(tRtn)) = " If '$$$comClassDefined(""%IPM.Main"") {"
-			}
-			If tIncludePackageManager {
-				If (tModuleName = $$$IPMModuleName) {
-					// No-op - handled in PackageOneModule.
-				} Else {
-					Set tUndeployableItems(tModuleName_".ZPM") = ""
-				}
-			}
-			Set tRtn($i(tRtn)) = " Write !,""Installing "","_$$$QUOTE(tModuleName)
-			Set tRtn($i(tRtn)) = " Do Install"_tIndex
-			If tIsPackageManager {
-				Set tRtn($i(tRtn)) = " }"
-				Set tRtn($i(tRtn)) = " Do ##class("_tPackedDocumentClass_").Unpack()"
-			}
-		}
-		Set tRtn($i(tRtn)) = " Quit"
-		Do ..AddInstallRoutine(tMainProject,.tRtn)
-		
-		If $Data(tUndeployableItems) {
-			$$$ThrowOnError(##class(%IPM.Lifecycle.StudioProject.ContainerClass).Create(tPackedDocumentClass,.tUndeployableItems,tVerbose))
-			Do tMainProject.AddItem(tPackedDocumentClass_".CLS")
-		}
-		
-		$$$ThrowOnError(tMainProject.%Save())
-		
-		If tVerbose {
-			Write !!,"Wrapper project:",!
-		}
-		
-		$$$ThrowOnError(tMainProject.DeployToFile(tTargetFile,$Select(tVerbose:"d",1:"-d")))
-		
-		Set tPayloadStream = ##class(%Stream.FileCharacter).%OpenId(tTargetFile,,.tSC)
-		$$$ThrowOnError(tSC)
-		$$$ThrowOnError(..Payload.CopyFrom(tPayloadStream))
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tTarget = $name(^CacheTemp.ZPMProjectExport($increment(^CacheTemp.ZPMProjectExport)))
+        kill @tTarget
+        set tVerbose = $get(pParams("Verbose"),0)
+        set tIncludeDependencies = $get(pParams("Package","WithDependencies"),0)
+        set tIncludePackageManager = $get(pParams("Package","Manager"),0)
+        set tTargetFile = $get(pParams("Package","Target"),##class(%Library.File).TempFilename("xml"))
+
+        // Installer routine - header/main entry point.
+        set tRtn($increment(tRtn)) = " #include %occInclude"
+        set tRtn($increment(tRtn)) = " Do MAIN"
+        set tRtn($increment(tRtn)) = " Quit"
+
+        // Possibly, include package manager in package and install it if needed.
+        if tIncludePackageManager {
+            if ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName) {
+                set tIPMModule = ##class(%IPM.Storage.Module).NameOpen($$$IPMModuleName,,.tSC)
+                $$$ThrowOnError(tSC)
+                do ..PackageOneModule(tIPMModule,tTarget,.pParams,.tModuleLocations,.tRtn)
+            } else {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Attempted to include package manager, but module not defined in this namespace."))
+            }
+        }
+
+        // Possibly include dependencies in the package, and install them.
+        if tIncludeDependencies {
+            $$$ThrowOnError(..Module.BuildDependencyGraph(.tDependencyGraph))
+            set tModule = ""
+            for {
+                set tModule = $order(tDependencyGraph(tModule),1,tData)
+                if (tModule = "") {
+                    quit
+                }
+                set tDepthGraph($listget(tData),$increment(tDepthGraph($listget(tData)))) = ##class(%IPM.Storage.Module).NameOpen(tModule,,.tSC)
+                $$$ThrowOnError(tSC)
+            }
+
+            for tDepth=$order(tDepthGraph(""),-1):-1:1 {
+                for tIndex=1:1:tDepthGraph(tDepth) {
+                    do ..PackageOneModule(tDepthGraph(tDepth,tIndex),tTarget,.pParams,.tModuleLocations,.tRtn)
+                }
+            }
+        }
+
+        // Export THIS module to a Studio project.
+        do ..PackageOneModule(..Module,tTarget,.pParams,.tModuleLocations,.tRtn)
+
+        // Create one Studio project to rule them all
+        set tMainProjectName = $replace(..Module.Name,".","_")_"_Bundle"
+        if ##class(%Studio.Project).%ExistsId(tMainProjectName) {
+            $$$ThrowOnError(##class(%Studio.Project).Delete(tMainProjectName))
+        }
+
+        set tMainProject = ##class(%Studio.Project).%New()
+        set tMainProject.Name = tMainProjectName
+        $$$ThrowOnError(tMainProject.AddItem(tTarget_".GBL"))
+
+        // Installation routine: install sub-projects from globals.
+        set tPackedDocumentClass = "zTemp.PackageManager.Container"
+        set tRtn($increment(tRtn)) = "MAIN"
+        for tIndex = 1:1:tModuleLocations {
+            set tModuleName = tModuleLocations(tIndex)
+            set tIsPackageManager = (tModuleName = $$$IPMModuleName) && (..Module.Name '= $$$IPMModuleName)
+            if tIsPackageManager {
+                set tRtn($increment(tRtn)) = " If '$$$comClassDefined(""%IPM.Main"") {"
+            }
+            if tIncludePackageManager {
+                if (tModuleName = $$$IPMModuleName) {
+                    // No-op - handled in PackageOneModule.
+                } else {
+                    set tUndeployableItems(tModuleName_".ZPM") = ""
+                }
+            }
+            set tRtn($increment(tRtn)) = " Write !,""Installing "","_$$$QUOTE(tModuleName)
+            set tRtn($increment(tRtn)) = " Do Install"_tIndex
+            if tIsPackageManager {
+                set tRtn($increment(tRtn)) = " }"
+                set tRtn($increment(tRtn)) = " Do ##class("_tPackedDocumentClass_").Unpack()"
+            }
+        }
+        set tRtn($increment(tRtn)) = " Quit"
+        do ..AddInstallRoutine(tMainProject,.tRtn)
+
+        if $data(tUndeployableItems) {
+            $$$ThrowOnError(##class(%IPM.Lifecycle.StudioProject.ContainerClass).Create(tPackedDocumentClass,.tUndeployableItems,tVerbose))
+            do tMainProject.AddItem(tPackedDocumentClass_".CLS")
+        }
+
+        $$$ThrowOnError(tMainProject.%Save())
+
+        if tVerbose {
+            write !!,"Wrapper project:",!
+        }
+
+        $$$ThrowOnError(tMainProject.DeployToFile(tTargetFile,$select(tVerbose:"d",1:"-d")_"/createdirs"))
+
+        set tPayloadStream = ##class(%Stream.FileCharacter).%OpenId(tTargetFile,,.tSC)
+        $$$ThrowOnError(tSC)
+        $$$ThrowOnError(..Payload.CopyFrom(tPayloadStream))
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 /// Packages a single module as a subordinate Studio project, and configures the overall installation routine with instructions to install it.
-Method PackageOneModule(pModule As %IPM.Storage.Module, pTargetGlobal As %String, ByRef pParams, ByRef pModuleLocations, ByRef pInstallerCode) [ Internal, Private ]
+Method PackageOneModule(
+	pModule As %IPM.Storage.Module,
+	pTargetGlobal As %String,
+	ByRef pParams,
+	ByRef pModuleLocations,
+	ByRef pInstallerCode) [ Internal, Private ]
 {
-	Set tVerbose = $Get(pParams("Verbose"),0)
-	Set tDeployDefault = $Get(pParams("Package","Deploy"),0)
-	Set tIncludePackageManager = $Get(pParams("Package","Manager"),0)
-	Set tIsPackageManager = (pModule.Name = $$$IPMModuleName)
-	Set tKeepGenerated = $Get(pParams("Package","KeepGenerated"),0)
-	
-	Set pModuleLocations(0,pModule.Name) = $Increment(pModuleLocations)
-	Set pModuleLocations(pModuleLocations) = pModule.Name
-	Set pInstallerCode($i(pInstallerCode)) = "Install"_pModuleLocations_" ;"_pModule.Name
-	
-	#dim tProject,tSourceProject As %Studio.Project
-	// Project for deployed code
-	If tVerbose {
-		Write !!,"Deployed code (",pModule.Name,"):",!
-	}
-	$$$ThrowOnError(pModule.GetStudioProject(.tProject,1,tDeployDefault,"object"))
-	
-	If tIsPackageManager {
-		Set tPackedIPMClass = "zTemp.PackageManager.Container."_$$$IPMModuleName
-		$$$ThrowOnError(##class(%IPM.Lifecycle.StudioProject.ContainerClass).Create(tPackedIPMClass,$$$IPMModuleName_".ZPM",tVerbose))
-		Do tProject.AddItem(tPackedIPMClass_".CLS")
-	}
-	$$$ThrowOnError(tProject.DeployToGbl($Name(@pTargetGlobal@(pModuleLocations,"object")),$Select(tVerbose:"d-k",1:"-d-k"),1))
-	
-	// Project for non-deployed code
-	If tVerbose {
-		Write !!,"Source code (",pModule.Name,"):",!
-	}
-	$$$ThrowOnError(pModule.GetStudioProject(.tSourceProject,0,tDeployDefault,"source"))
-	
-	// Add in static files
-	Set tTempFileManager = ##class(%IPM.Utils.TempFileManager).%Get(.tSC)
-	$$$ThrowOnError(tSC)
-	Set tWorkingDirectory = tTempFileManager.GetTempFolderName()
-	
-	// Notify resource processors for harvest of static files from module root
-	Set tKey = ""
-	For {
-		#dim tResource As %IPM.Storage.ResourceReference
-		Set tResource = pModule.Resources.GetNext(.tKey)
-		Quit:(tKey="")
-		
-		If $IsObject(tResource.Processor) {
-			Set tSC = $Method(tResource.Processor,"OnBeforeArtifact",pModule.Root,tWorkingDirectory,.pParams)
-			If $$$ISERR(tSC) {
-				Quit
-			}
-		}
-	}
-	Set tArchive = ##class(%IPM.Lifecycle.StudioProject.XDataArchive).%New(tWorkingDirectory)
-	$$$ThrowOnError(tArchive.AddToProject(tSourceProject,tVerbose))
-	
-	Set tInstallerClass = ""
-	If '(tIncludePackageManager || tIsPackageManager) && (pModule.InstallerClass '= "") {
-		// Use zTemp package to avoid package collisions, and (more importantly) support installation in %SYS namespace
-		Set tInstallerClass = "zTemp.PackageManager.Installer."_pModule.Name
-		
-		If ##class(%Dictionary.ClassDefinition).%ExistsId(tInstallerClass) {
-			$$$ThrowOnError(##class(%Dictionary.ClassDefinition).%DeleteId(tInstallerClass))
-		}
-		
-		// Copy installer class to a version that doesn't extend %IPM.AbstractInstaller.
-		Set tSourceClass = ##class(%Dictionary.ClassDefinition).%OpenId(pModule.InstallerClass,,.tSC)
-		$$$ThrowOnError(tSC)
-		
-		Set tDestClass = tSourceClass.%ConstructClone(1)
-		Set tDestClass.Super = ""
-		Set tDestClass.Name = tInstallerClass
-		$$$ThrowOnError(tDestClass.%Save())
-		$$$ThrowOnError($System.OBJ.Compile(tInstallerClass,"c-k-d"))
-		$$$ThrowOnError(tSourceProject.AddItem(tInstallerClass,"CLS"))
-		Do tSourceProject.RemoveItem(pModule.InstallerClass,"CLS")
-	}
-	
-	$$$ThrowOnError(tSourceProject.DeployToGbl($Name(@pTargetGlobal@(pModuleLocations,"source")),$Select(tVerbose:"d",1:"-d")_$Select(tKeepGenerated:"k",1:"-k")))
-	
-	// Map %IPM to current routine database
-	If tIsPackageManager {
-		Set pInstallerCode($i(pInstallerCode)) = " Set currentNS = $Namespace"
-		Set pInstallerCode($i(pInstallerCode)) = " Set mapping = ""%IPM"""
-		Set pInstallerCode($i(pInstallerCode)) = " New $Namespace "
-		Set pInstallerCode($i(pInstallerCode)) = " Set $Namespace = ""%SYS"""
-		Set pInstallerCode($i(pInstallerCode)) = " If '##class(Config.MapPackages).Exists(currentNS, mapping) {"
-		Set pInstallerCode($i(pInstallerCode)) = " Kill NSprops"
-		Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(Config.Namespaces).Get(currentNS, .NSprops))"
-		Set pInstallerCode($i(pInstallerCode)) = " Kill tProps"
-		Set pInstallerCode($i(pInstallerCode)) = " Set tProps(""Database"") = $Get(NSprops(""Routines""))"
-		Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(Config.MapPackages).Create(currentNS, mapping, .tProps))"
-		Set pInstallerCode($i(pInstallerCode)) = " }"
-		Set pInstallerCode($i(pInstallerCode)) = " Set $Namespace = currentNS"
-	}	
-	Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(%Studio.Project).InstallFromGbl("_$$$QUOTE($Name(@pTargetGlobal@(pModuleLocations,"object")))_",""-d"",0))"
-	Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(%Studio.Project).InstallFromGbl("_$$$QUOTE($Name(@pTargetGlobal@(pModuleLocations,"source")))_",""-d"",0))"
-	
-	// Unpack static files
-	Set pInstallerCode($i(pInstallerCode)) = " Set tExtractDirectory = ##class(%Library.File).TempFilename()_""d"""
-	$$$ThrowOnError(tArchive.GenerateInstallerCode("tExtractDirectory",.pInstallerCode))
-	
-	If tIsPackageManager {
-		// Note: only unpack package manager module manifest if module was installed.
-		Set pInstallerCode($i(pInstallerCode)) = " Do ##class("_tPackedIPMClass_").Unpack()"
-	}
-	
-	// TODO: Support CSP/other files
-	If tIncludePackageManager || tIsPackageManager {
-		// Just run the Activate lifecycle phase.
-		Set pInstallerCode($i(pInstallerCode)) = " Kill tParams"
-		Set pInstallerCode($i(pInstallerCode)) = " Set tParams(""RootDirectory"") = tExtractDirectory"
-		Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases("_$$$QUOTE(pModule.Name)_",$ListBuild(""Activate""),,.tParams))"
-	} ElseIf (tInstallerClass '= "") {
-		If $$$defMemberDefined(tInstallerClass,$$$cCLASSmethod,"OnInstallComponent") {
-			Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class("_tInstallerClass_").OnInstallComponent(""""))"
-		}
-		If $$$defMemberDefined(tInstallerClass,$$$cCLASSmethod,"OnConfigureComponent") {
-			Set pInstallerCode($i(pInstallerCode)) = " Set tVars(""Lifecycle"") = "_$$$QUOTE($classname())
-			Set pInstallerCode($i(pInstallerCode)) = " Set tVars(""InstallDir"") = tExtractDirectory"
-			Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError(##class("_tInstallerClass_").OnConfigureComponent($Namespace,,.tVars))"
-		}
-		Set pInstallerCode($i(pInstallerCode)) = " $$$ThrowOnError($System.OBJ.Delete("_$$$QUOTE(tInstallerClass)_",""-d""))"
-	}
-	Set pInstallerCode($i(pInstallerCode)) = " Write !,""Successfully installed "","_$$$QUOTE(pModule.Name_" "_pModule.VersionString)
-	Set pInstallerCode($i(pInstallerCode)) = " Quit"
+    set tVerbose = $get(pParams("Verbose"),0)
+    set tDeployDefault = $get(pParams("Package","Deploy"),0)
+    set tIncludePackageManager = $get(pParams("Package","Manager"),0)
+    set tIsPackageManager = (pModule.Name = $$$IPMModuleName)
+    set tKeepGenerated = $get(pParams("Package","KeepGenerated"),0)
+
+    set pModuleLocations(0,pModule.Name) = $increment(pModuleLocations)
+    set pModuleLocations(pModuleLocations) = pModule.Name
+    set pInstallerCode($increment(pInstallerCode)) = "Install"_pModuleLocations_" ;"_pModule.Name
+
+    #dim tProject,tSourceProject As %Studio.Project
+    // Project for deployed code
+    if tVerbose {
+        write !!,"Deployed code (",pModule.Name,"):",!
+    }
+    $$$ThrowOnError(pModule.GetStudioProject(.tProject,1,tDeployDefault,"object"))
+
+    if tIsPackageManager {
+        set tPackedIPMClass = "zTemp.PackageManager.Container."_$$$IPMModuleName
+        $$$ThrowOnError(##class(%IPM.Lifecycle.StudioProject.ContainerClass).Create(tPackedIPMClass,$$$IPMModuleName_".ZPM",tVerbose))
+        do tProject.AddItem(tPackedIPMClass_".CLS")
+    }
+    $$$ThrowOnError(tProject.DeployToGbl($name(@pTargetGlobal@(pModuleLocations,"object")),$select(tVerbose:"d-k",1:"-d-k"),1))
+
+    // Project for non-deployed code
+    if tVerbose {
+        write !!,"Source code (",pModule.Name,"):",!
+    }
+    $$$ThrowOnError(pModule.GetStudioProject(.tSourceProject,0,tDeployDefault,"source"))
+
+    // Add in static files
+    set tTempFileManager = ##class(%IPM.Utils.TempFileManager).%Get(.tSC)
+    $$$ThrowOnError(tSC)
+    set tWorkingDirectory = tTempFileManager.GetTempFolderName()
+
+    // Notify resource processors for harvest of static files from module root
+    set orderedResourceList = pModule.GetOrderedResourceList()
+    set tKey = ""
+    for {
+        #dim tResource As %IPM.Storage.ResourceReference
+        set tResource = orderedResourceList.GetNext(.tKey)
+        quit:(tKey="")
+
+        if $isobject(tResource.Processor) {
+            set tSC = $method(tResource.Processor,"OnBeforeArtifact",pModule.Root,tWorkingDirectory,.pParams)
+            if $$$ISERR(tSC) {
+                quit
+            }
+        }
+    }
+    set tArchive = ##class(%IPM.Lifecycle.StudioProject.XDataArchive).%New(tWorkingDirectory)
+    $$$ThrowOnError(tArchive.AddToProject(tSourceProject,tVerbose))
+
+    set tInstallerClass = ""
+    if '(tIncludePackageManager || tIsPackageManager) && (pModule.InstallerClass '= "") {
+        // Use zTemp package to avoid package collisions, and (more importantly) support installation in %SYS namespace
+        set tInstallerClass = "zTemp.PackageManager.Installer."_pModule.Name
+
+        if ##class(%Dictionary.ClassDefinition).%ExistsId(tInstallerClass) {
+            $$$ThrowOnError(##class(%Dictionary.ClassDefinition).%DeleteId(tInstallerClass))
+        }
+
+        // Copy installer class to a version that doesn't extend %IPM.AbstractInstaller.
+        set tSourceClass = ##class(%Dictionary.ClassDefinition).%OpenId(pModule.InstallerClass,,.tSC)
+        $$$ThrowOnError(tSC)
+
+        set tDestClass = tSourceClass.%ConstructClone(1)
+        set tDestClass.Super = ""
+        set tDestClass.Name = tInstallerClass
+        $$$ThrowOnError(tDestClass.%Save())
+        $$$ThrowOnError($system.OBJ.Compile(tInstallerClass,"c-k-d"))
+        $$$ThrowOnError(tSourceProject.AddItem(tInstallerClass,"CLS"))
+        do tSourceProject.RemoveItem(pModule.InstallerClass,"CLS")
+    }
+
+    $$$ThrowOnError(tSourceProject.DeployToGbl($name(@pTargetGlobal@(pModuleLocations,"source")),$select(tVerbose:"d",1:"-d")_$select(tKeepGenerated:"k",1:"-k")))
+
+    // Map %IPM to current routine database
+    if tIsPackageManager {
+        set pInstallerCode($increment(pInstallerCode)) = " Set currentNS = $Namespace"
+        set pInstallerCode($increment(pInstallerCode)) = " Set mapping = ""%IPM"""
+        set pInstallerCode($increment(pInstallerCode)) = " New $Namespace "
+        set pInstallerCode($increment(pInstallerCode)) = " Set $Namespace = ""%SYS"""
+        set pInstallerCode($increment(pInstallerCode)) = " If '##class(Config.MapPackages).Exists(currentNS, mapping) {"
+        set pInstallerCode($increment(pInstallerCode)) = " Kill NSprops"
+        set pInstallerCode($increment(pInstallerCode)) = " $$$ThrowOnError(##class(Config.Namespaces).Get(currentNS, .NSprops))"
+        set pInstallerCode($increment(pInstallerCode)) = " Kill tProps"
+        set pInstallerCode($increment(pInstallerCode)) = " Set tProps(""Database"") = $Get(NSprops(""Routines""))"
+        set pInstallerCode($increment(pInstallerCode)) = " $$$ThrowOnError(##class(Config.MapPackages).Create(currentNS, mapping, .tProps))"
+        set pInstallerCode($increment(pInstallerCode)) = " }"
+        set pInstallerCode($increment(pInstallerCode)) = " Set $Namespace = currentNS"
+    }
+    set pInstallerCode($increment(pInstallerCode)) = " $$$ThrowOnError(##class(%Studio.Project).InstallFromGbl("_$$$QUOTE($name(@pTargetGlobal@(pModuleLocations,"object")))_",""-d"",0))"
+    set pInstallerCode($increment(pInstallerCode)) = " $$$ThrowOnError(##class(%Studio.Project).InstallFromGbl("_$$$QUOTE($name(@pTargetGlobal@(pModuleLocations,"source")))_",""-d"",0))"
+
+    // Unpack static files
+    set pInstallerCode($increment(pInstallerCode)) = " Set tExtractDirectory = ##class(%Library.File).TempFilename()_""d"""
+    $$$ThrowOnError(tArchive.GenerateInstallerCode("tExtractDirectory",.pInstallerCode))
+
+    if tIsPackageManager {
+        // Note: only unpack package manager module manifest if module was installed.
+        set pInstallerCode($increment(pInstallerCode)) = " Do ##class("_tPackedIPMClass_").Unpack()"
+    }
+
+    // TODO: Support CSP/other files
+    if tIncludePackageManager || tIsPackageManager {
+        // Just run the Activate lifecycle phase.
+        set pInstallerCode($increment(pInstallerCode)) = " Kill tParams"
+        set pInstallerCode($increment(pInstallerCode)) = " Set tParams(""RootDirectory"") = tExtractDirectory"
+        set pInstallerCode($increment(pInstallerCode)) = " $$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases("_$$$QUOTE(pModule.Name)_",$ListBuild(""Activate""),,.tParams))"
+    } elseif (tInstallerClass '= "") {
+        if $$$defMemberDefined(tInstallerClass,$$$cCLASSmethod,"OnInstallComponent") {
+            set pInstallerCode($increment(pInstallerCode)) = " $$$ThrowOnError(##class("_tInstallerClass_").OnInstallComponent(""""))"
+        }
+        if $$$defMemberDefined(tInstallerClass,$$$cCLASSmethod,"OnConfigureComponent") {
+            set pInstallerCode($increment(pInstallerCode)) = " Set tVars(""Lifecycle"") = "_$$$QUOTE($classname())
+            set pInstallerCode($increment(pInstallerCode)) = " Set tVars(""InstallDir"") = tExtractDirectory"
+            set pInstallerCode($increment(pInstallerCode)) = " $$$ThrowOnError(##class("_tInstallerClass_").OnConfigureComponent($Namespace,,.tVars))"
+        }
+        set pInstallerCode($increment(pInstallerCode)) = " $$$ThrowOnError($System.OBJ.Delete("_$$$QUOTE(tInstallerClass)_",""-d""))"
+    }
+    set pInstallerCode($increment(pInstallerCode)) = " Write !,""Successfully installed "","_$$$QUOTE(pModule.Name_" "_pModule.VersionString)
+    set pInstallerCode($increment(pInstallerCode)) = " Quit"
 }
 
 /// Adds an installation routine with the specified code to the project
-Method AddInstallRoutine(pProject As %Studio.Project, ByRef pCode) [ Internal, Private ]
+Method AddInstallRoutine(
+	pProject As %Studio.Project,
+	ByRef pCode) [ Internal, Private ]
 {
-	If ##class(%Library.Routine).Exists("INSTALL.MAC") {
-		$$$ThrowOnError(##class(%Library.Routine).Delete("INSTALL.MAC"))
-	}
-	Set tRoutine = ##class(%Routine).%New("INSTALL.MAC")
-	For tLine=1:1:$Get(pCode) {
-		Do tRoutine.WriteLine($Get(pCode(tLine)))
-	}
-	$$$ThrowOnError(tRoutine.Save())
-	$$$ThrowOnError(tRoutine.Compile("-d"))
-	Do pProject.AddItem("INSTALL.MAC")
+    if ##class(%Library.Routine).Exists("INSTALL.MAC") {
+        $$$ThrowOnError(##class(%Library.Routine).Delete("INSTALL.MAC"))
+    }
+    set tRoutine = ##class(%Routine).%New("INSTALL.MAC")
+    for tLine=1:1:$get(pCode) {
+        do tRoutine.WriteLine($get(pCode(tLine)))
+    }
+    $$$ThrowOnError(tRoutine.Save())
+    $$$ThrowOnError(tRoutine.Compile("-d"))
+    do pProject.AddItem("INSTALL.MAC")
 }
 
 /// Callback from the Verify phase to install the module payload in a different namespace.
 Method OnInstallFromPayload(ByRef pParams) As %Status
 {
-	Set tSC = $$$OK
-	Try {
-		Set tTmpStream = ##class(%Stream.FileBinary).%New()
-		$$$ThrowOnError(tTmpStream.CopyFromAndSave(..Payload))
-		$$$ThrowOnError(##class(%Studio.Project).InstallFromFile(tTmpStream.Filename))
-	} Catch e {
-		Set tSC = e.AsStatus()
-	}
-	Quit tSC
+    set tSC = $$$OK
+    try {
+        set tTmpStream = ##class(%Stream.FileBinary).%New()
+        $$$ThrowOnError(tTmpStream.CopyFromAndSave(..Payload))
+        $$$ThrowOnError(##class(%Studio.Project).InstallFromFile(tTmpStream.Filename))
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
 }
 
 }
-
