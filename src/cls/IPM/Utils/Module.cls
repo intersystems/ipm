@@ -1399,6 +1399,19 @@ ClassMethod LoadNewModule(
 
         $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
 
+        if 'tInstallContext.ModuleIsDependency(tModuleName) {
+            if 'pSynchronous {
+                // Regular async multi-threaded loading of dependencies
+                set tSC = tModule.LoadDependencies("",.params)
+                $$$ThrowOnError(tSC)
+            } else {
+                // Temporary custom loading of dependencies in a synchronous
+                // manner to prevent lock timeouts until lifecycle rework
+                // is complete (HSIEO-4450)
+                do ..SyncLoadDependencies(tModule, .params)
+            }
+        }
+
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
         set tSC = tModule.%Reload()
