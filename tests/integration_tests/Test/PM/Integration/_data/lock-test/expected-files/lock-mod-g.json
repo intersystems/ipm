@@ -1,6 +1,7 @@
 {
     "name": "lock-mod-g",
     "version": "1.0.0",
+    "repository": "lock-file",
     "lockFileVersion": "1",
     "repositories": {},
     "dependencies": {

@@ -1,6 +1,7 @@
 {
     "name": "lock-mod-h",
     "version": "3.0.0",
+    "repository": "lock-file",
     "lockFileVersion": "1",
     "repositories": {
         "lock-file": {

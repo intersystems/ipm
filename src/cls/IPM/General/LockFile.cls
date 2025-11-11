@@ -62,8 +62,6 @@ ClassMethod WriteToLockFile(
             // remove values set to "" for better readability in lock file
             set repoValuesIterator = repoValues.%GetIterator()
             while repoValuesIterator.%GetNext(.key, .value) {
-                // TODO: Do we also want to remove values that are 0?
-                //       OR, have the values removed as a part of the repo definition classes?
                 if (value = "") {
                     do repoValues.%Remove(key)
                 }
@@ -90,9 +88,9 @@ ClassMethod WriteToLockFile(
             do lockFileRepositories.%Set(repo.Name, repoValues)
         }
 
-        // TODO: Should probably add repository field for the base module as well?
         set lockFileJSON = {"name": (module.Name),
                             "version": (module.VersionString),
+                            "repository": (repo.Name),
                             "lockFileVersion": "1"}
         do lockFileJSON.%Set("repositories", lockFileRepositories)
         do lockFileJSON.%Set("dependencies", lockFileDependencies)
