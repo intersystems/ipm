@@ -1,1 +1,32 @@
-{"name":"lock-mod-d","version":"1.0.0","lockFileVersion":"1","repositories":{"lock-file":{"type":"filesystem","enabled":1,"readOnly":0,"root":"/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/","depth":0}},"dependencies":{"lock-mod-a":{"version":"1.0.0","repository":"lock-file"},"lock-mod-b":{"version":"1.0.0","repository":"lock-file"},"lock-mod-c":{"version":"1.0.0","repository":"lock-file","dependencies":{"lock-mod-a":"^1.0.0","lock-mod-b":"^1.0.0"}}}}
+{
+    "name": "lock-mod-d",
+    "version": "1.0.0",
+    "lockFileVersion": "1",
+    "repositories": {
+        "lock-file": {
+            "type": "filesystem",
+            "enabled": 1,
+            "readOnly": 0,
+            "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/",
+            "depth": 0
+        }
+    },
+    "dependencies": {
+        "lock-mod-a": {
+            "version": "1.0.0",
+            "repository": "lock-file"
+        },
+        "lock-mod-b": {
+            "version": "1.0.0",
+            "repository": "lock-file"
+        },
+        "lock-mod-c": {
+            "version": "1.0.0",
+            "repository": "lock-file",
+            "dependencies": {
+                "lock-mod-a": "^1.0.0",
+                "lock-mod-b": "^1.0.0"
+            }
+        }
+    }
+}
