@@ -22,6 +22,8 @@ Parameter TerminalPrompt = "TerminalPrompt";
 
 Parameter PublishTimeout = "publish_timeout";
 
+Parameter DefaultLogEntryLimit = "DefaultLogEntryLimit";
+
 /// A path pointing either to a python executable or a pip executable, controlled by <parameter>UseStandalonePip</parameter>
 /// In the special case where the path is empty, the script tries to resolve the path in the following order:
 /// 1. Where available (typically 2024.2+) - Use PythonRuntimeLibrary in iris.cpf to find the directory containing the python executable
@@ -39,7 +41,7 @@ Parameter UseStandalonePip = "UseStandalonePip";
 /// Default value is 0, where 1.0.0-anystring is considered a pre-release of 1.0.0, hence 1.0.0-anystring < 1.0.0
 Parameter SemVerPostRelease = "SemVerPostRelease";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease";
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status

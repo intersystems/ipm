@@ -697,6 +697,12 @@ ClassMethod Uninstall(
 	ByRef pParams) As %Status
 {
     set tSC = $$$OK
+	set log = ##class(%IPM.General.History).UninstallInit(pModuleName)
+	set module = ..NameOpen(pModuleName,,.tSC)
+	if $isobject(module) {
+		$$$ThrowOnError(log.SetVersion(module.Version))
+	}
+
     try {
         merge tParams = pParams
         set tParams("Clean","Level") = 1 // Simulate clean of module as dependency.
@@ -706,6 +712,8 @@ ClassMethod Uninstall(
     } catch e {
         set tSC = e.AsStatus()
     }
+	set devMode = $get(pParams("DeveloperMode", 0))
+	set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
     quit tSC
 }
 
