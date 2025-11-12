@@ -1,6 +1,6 @@
 Include (%IPM.Common, %IPM.Formatting)
 
-/// Persistent class for history of all installations, uninstalls, and loads in the system. This class is shared among namespaces that share %IPM mappings.
+/// Persistent class for history of all installations, uninstalls, and loads in the system. This class is scoped by namespace.
 Class %IPM.General.History Extends %Persistent
 {
 
@@ -28,9 +28,6 @@ Property TimeStart As %TimeStamp [ Required ];
 /// Time when the action ended. This will be empty if the action is still in progress or ended abnormally.
 Property TimeEnd As %TimeStamp;
 
-/// Namespace where the action is being performed
-Property NameSpace As %String [ InitialExpression = {$namespace}, Required ];
-
 /// User who initiated the action
 Property UserName As %Library.Username [ InitialExpression = {$username}, Required ];
 
@@ -52,7 +49,6 @@ ClassMethod Init(
     set log.Action = Action
     set log.Package = Package
     set log.CommandString = $get($$$ZPMCommandToLog, "<unset>")
-    set log.NameSpace = $namespace
     set log.UserName = $username
     $$$ThrowOnError(log.SetVersion()) // Set the version to placeholder 0.0.0-0, Will be updated before finalizing
     $$$ThrowOnError(log.%Save()) // Save it now in case Finalize isn't called
@@ -120,23 +116,21 @@ Method Finalize(
 }
 
 /// @API.Query
-/// Get history records in the specified namespace
+/// Get history records in the current namespace
 Query Records(
 	ascend As %Boolean,
-	limit As %Integer,
-	namespace As %String) As %Query(CONTAINID = 1, ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
+	limit As %Integer) As %Query(CONTAINID = 1, ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
 {
 }
 
 ClassMethod RecordsExecute(
 	ByRef qHandle As %Binary,
 	ascend As %Boolean,
-	limit As %Integer,
-	namespace As %String) As %Status [ Internal ]
+	limit As %Integer) As %Status [ Internal ]
 {
     try {
         kill filter
-        set qHandle = ..GetHistory(.filter, .ascend, .limit, .namespace)
+        set qHandle = ..GetHistory(.filter, .ascend, .limit, 0)
     } catch e {
         return e.AsStatus()
     }
@@ -163,7 +157,6 @@ ClassMethod RecordsFetch(
                 qHandle.%Get("SourceDetails"),
                 qHandle.%Get("TimeStart"),
                 qHandle.%Get("TimeEnd"),
-                qHandle.%Get("NameSpace"),
                 qHandle.%Get("UserName"),
                 qHandle.%Get("Success"),
                 qHandle.%Get("Committed"),
@@ -193,17 +186,11 @@ ClassMethod RecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceA
 /// The "varargs" may already be populated with values, and new values will be appended to it.
 ClassMethod ConstructSQLWhere(
 	ByRef filter As %String,
-	namespace As %String,
 	Output clause As %String,
 	ByRef varargs As %String) As %Status [ Internal ]
 {
     try {
         set clause = " WHERE 1 = 1 "
-        set namespace = $zstrip($get(namespace, $namespace), "<>WC")
-        if (namespace '= "") {
-            set clause = clause _ " AND NameSpace = ?"
-            set varargs($increment(varargs)) = namespace
-        }
         set col = ""
         for {
             set col = $order(filter(col), 1, value)
@@ -232,7 +219,7 @@ ClassMethod ConstructSQLWhere(
     return $$$OK
 }
 
-/// Get the history of all installations, uninstalls, and loads in given namespace
+/// Get the history of all installations, uninstalls, and loads in current namespace
 /// The filter argument is a multidimensional array with structure
 /// filter(columnName) = value
 /// Where value can optionally start with >, >=, <, <=, =, <> or contain * to indicate a wildcard
@@ -240,7 +227,7 @@ ClassMethod GetHistory(
 	ByRef filter,
 	ascend As %Boolean = 0,
 	limit As %Integer = 0,
-	namespace As %String) As %SQL.StatementResult
+	display As %Boolean = 0)
 {
     if limit > 0 {
         set query = "SELECT TOP ? * FROM %IPM_General.History "
@@ -248,33 +235,49 @@ ClassMethod GetHistory(
     } else {
         set query = "SELECT * FROM %IPM_General.History "
     }
-    $$$ThrowOnError(..ConstructSQLWhere(.filter, .namespace, .where, .varargs))
+    $$$ThrowOnError(..ConstructSQLWhere(.filter, .where, .varargs))
     set query = query _ where
     set query = query _ " ORDER BY ID "  _ $select(ascend: "ASC", 1: "DESC")
-    quit ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+    set rs = ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+    if display {
+        do ##class(%IPM.General.History).DisplayQueryResult(rs, $namespace)
+    }
+    return rs
 }
 
-/// Delete the history of installations, uninstalls, and loads in
-ClassMethod DeleteHistory(
-	ByRef filter,
-	namespace As %String,
-	allowDeleteAll As %String) As %Integer
+/// Delete the history of installations, uninstalls, and loads in current namespace
+ClassMethod DeleteHistory(ByRef filter) As %Integer
 {
     set query = "DELETE FROM %IPM_General.History "
-    $$$ThrowOnError(..ConstructSQLWhere(.filter, namespace, .where, .varargs))
-    if ($data(varargs) = 0) && ('allowDeleteAll) {
-        $$$ThrowOnError("Cannot delete all history records by default. If you want to delete everything, use `history delete -g`.")
-    }
+    $$$ThrowOnError(..ConstructSQLWhere(.filter, .where, .varargs))
     set query = query _ where
     set rs = ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
     $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
     quit rs.%ROWCOUNT
 }
 
+ClassMethod DeleteHistoryGlobally(ByRef filter) As %Integer
+{
+    set originalNS = $namespace
+    new $namespace
+    set $namespace = "%SYS"
+    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    set count = 0
+    while rs.%Next() {
+        set ns = rs.%Get("Nsp")
+        set $namespace = ns
+        set count = count + ..DeleteHistory(.filter)
+    }
+    set $namespace = originalNS
+    quit count
+}
+
 /// @API.Query
+/// todo fix
 Query GlobalRecords(
 	ascend As %Boolean,
-	limit As %Integer) As %Query(ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,NameSpace:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
+	limit As %Integer) As %Query(ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
 {
 }
 
@@ -285,7 +288,7 @@ ClassMethod GlobalRecordsExecute(
 {
     try {
         kill filter
-        set qHandle = ..GetHistoryGlobally(.filter, .ascend, .limit)
+        set qHandle = ..GetHistoryGlobally(.filter, .ascend, .limit, 0)
     } catch e {
         return e.AsStatus()
     }
@@ -337,23 +340,29 @@ ClassMethod GlobalRecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, 
 ClassMethod GetHistoryGlobally(
 	ByRef filter,
 	ascend As %Boolean = 0,
-	limit As %Integer = 0) As %Library.ArrayOfObjects
+	limit As %Integer = 0,
+	display As %Boolean = 1) As %Library.ArrayOfObjects
 {
     set originalNS = $namespace
     new $namespace
     set $namespace = "%SYS"
     set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
     $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-    set $namespace = originalNS
     set array = ##class(%Library.ArrayOfObjects).%New()
     while rs.%Next() {
         set ns = rs.%Get("Nsp")
-        set historyRS = ..GetHistory(.filter, ascend, limit, ns)
+        set $namespace = ns
+        set historyRS = ..GetHistory(.filter, ascend, limit, 0)
         if historyRS = $$$NULLOREF {
             continue
         }
         do array.SetAt(historyRS, ns)
+        if display {
+            do ##class(%IPM.General.History).DisplayQueryResult(historyRS, ns)
+        }
+        // todo fix issue where the returned array is incorrect because the RS is namespace dependent
     }
+    set $namespace = originalNS
     return array
 }
 
@@ -378,9 +387,8 @@ ClassMethod ShowColumns(
         $listbuild("ID", $$$Bright),
         $listbuild("Action", $$$Red),
         $listbuild("Package", $$$Green),
-        $listbuild("Version", $$$Green),
+        $listbuild("Version", $$$Magenta),
         $listbuild("UserName", $$$Blue),
-        $listbuild("Namespace", $$$Magenta),
         $listbuild("Time", $$$Yellow),
         $listbuild("Success", $$$Default),
         $listbuild("Committed", $$$Cyan),
@@ -553,18 +561,15 @@ Storage Default
 <Value>TimeEnd</Value>
 </Value>
 <Value name="10">
-<Value>NameSpace</Value>
-</Value>
-<Value name="11">
 <Value>UserName</Value>
 </Value>
-<Value name="12">
+<Value name="11">
 <Value>Success</Value>
 </Value>
-<Value name="13">
+<Value name="12">
 <Value>Committed</Value>
 </Value>
-<Value name="14">
+<Value name="13">
 <Value>CommandString</Value>
 </Value>
 </Data>

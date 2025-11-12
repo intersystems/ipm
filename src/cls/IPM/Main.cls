@@ -774,7 +774,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show column names that the table can be filtered by">history schema</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
-	<example description="Delete all histories in the namespace">history delete</example>
+	<example description="Delete all histories in the namespace">history delete -confirm</example>
 	<example description="Show details of history item with ID 3">history details 3</example>
 </command>
 
@@ -3690,10 +3690,11 @@ ClassMethod History(ByRef pCommandInfo)
 	merge filter = pCommandInfo("data", "zpm")
 
 	if (action = "find") || (action = "") {
-		set mthd = $select(globally: "GetHistoryGlobally", 1: "GetHistory")
-		set rs = $classmethod("%IPM.General.History", mthd, .filter, ascend, limit)
-		set mthd = $select(globally: "DisplayArray", 1: "DisplayQueryResult")
-		do $classmethod("%IPM.General.History", mthd, rs)
+        if globally {
+            do ##class(%IPM.General.History).GetHistoryGlobally(.filter, ascend, limit, 1)
+        } else {
+            do ##class(%IPM.General.History).GetHistory(.filter, ascend, limit, 1)
+        }
 	} elseif action = "details" {
 		set id = $get(pCommandInfo("parameters", "argument"))
 		do ##class(%IPM.General.History).DisplayOneRecord(id)
@@ -3715,7 +3716,11 @@ ClassMethod History(ByRef pCommandInfo)
 		if ($data(filter) \ 2 = 0) && ('globally) && ('confirm) {
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No filter specified. Should specify at least one column to filter on or pass -confirm to delete all records in the current namespace."))
 		}
-		set count = ##class(%IPM.General.History).DeleteHistory(.filter, $select(globally: "", 1: $namespace), globally)
+        if globally {
+		    set count = ##class(%IPM.General.History).DeleteHistoryGlobally(.filter)
+        } else {
+		    set count = ##class(%IPM.General.History).DeleteHistory(.filter)
+        }
 		write !, "Deleted ", count, " record(s)."
 	} else {
 		$$$ThrowStatus($$$ERROR($$$GeneralError,"Invalid action specified. Use `help history` to see available actions."))
