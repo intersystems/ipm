@@ -8,9 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.5] - Unreleased
 
+### Added
+- #938 Added flag -export-python-deps to package command
+- #462: The `repo` command for repository configuration now supports secret input terminal mode for passwords with the `-password-stdin` flag
+- #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
+
+### Removed
+- #938 Removed secret flag NewVersion handling in %Publish()
+
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
 - #701: Fix misleading help comments about `search` command
+- #958: Update command should not fail early if external name is used
+
+### Deprecated
+- #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
 
 ## [0.10.4] - 2025-10-21
 

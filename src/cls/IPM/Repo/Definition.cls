@@ -181,6 +181,14 @@ ClassMethod Configure(
             set tInstance.ReadOnly = 0
         }
 
+        if $data(pModifiers("password-stdin")) {
+            // prompt for password using secret input terminal mode
+            open $io:(:"S")
+            read "Password: ", pwd
+            close $io
+            set pModifiers("password") = pwd
+        }
+
         $$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
 
         $$$ThrowOnError(tInstance.%Save())

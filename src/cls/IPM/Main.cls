@@ -123,6 +123,7 @@ This command is an alias for `module-action module-name package`
 <parameter name="module" required="true" description="Name of module on which to perform package actions" />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="the specified path to export package." />
 <modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="If specified, exports Python dependencies. If omitted, defaults to false." />
 </command>
 
 <command name="verify" dataPrefix="D">
@@ -3857,7 +3858,7 @@ ClassMethod Update(ByRef pCommandInfo)
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
-    if '##class(%IPM.Storage.Module).NameExists(moduleName) {
+    if '##class(%IPM.Storage.Module).NameExists(moduleName) && '##class(%IPM.Storage.Module).ExternalNameExists(moduleName) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
     if verbose {
