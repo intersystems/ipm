@@ -1,7 +1,7 @@
 Class Test.PM.Integration.FileCopy Extends Test.PM.Integration.Base
 {
 
-Method OnBeforeAllTests() As %Status
+Method Setup() As %Status
 {
     // Setup repo for FileCopy tests
     set tSC = ##class(%IPM.Main).Shell("repo -n integration-tests -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/")
@@ -13,6 +13,7 @@ Method TestModuleNoDependency()
 {
     set tSC = $$$OK
     try {
+        do ..Setup()
         set tSC = ##class(%IPM.Main).Shell("install -dev fc-no-dep")
         do $$$AssertStatusOK(tSC,"Installed fc-no-dep module successfully.")
         set tSC = ##class(%IPM.Main).Shell("fc-no-dep package -only -export-deps 1 -DPath=/usr/irissys/mgr/fc-no-dep/")
@@ -35,6 +36,7 @@ Method TestModuleDependencyDifferentResourceNames()
 {
     set tSC = $$$OK
     try {
+        do ..Setup()
         set tSC = ##class(%IPM.Main).Shell("install -dev fc-dep-diff-resource")
         do $$$AssertStatusOK(tSC,"Installed fc-dep-diff-resource module and dependency successfully.")
         set tSC = ##class(%IPM.Main).Shell("fc-dep-diff-resource package -only -export-deps 1 -DPath=/usr/irissys/mgr/fc-dep-diff-resource/")
@@ -59,6 +61,7 @@ Method TestDependencySameResourceName()
 {
     set tSC = $$$OK
     try {
+        do ..Setup()
         set tSC = ##class(%IPM.Main).Shell("install -dev fc-dep-same-resource")
         do $$$AssertStatusOK(tSC,"Installed fc-dep-same-resource module and dependencies successfully.")
         set tSC = ##class(%IPM.Main).Shell("fc-dep-same-resource package -only -export-deps 1 -DPath=/usr/irissys/mgr/fc-dep-same-resource/")
@@ -86,6 +89,7 @@ Method TestMakeDeployed()
 {
     set tSC = $$$OK
     try {
+        do ..Setup()
         set tSC = ##class(%IPM.Main).Shell("install -dev fc-dep-same-resource")
         do $$$AssertStatusOK(tSC,"Installed fc-dep-same-resource module and dependencies successfully.")
         set tSC = ##class(%IPM.Main).Shell("makedeployed fc-dep-same-resource -r")
@@ -146,6 +150,30 @@ Method TestFileCopyScope()
         do $$$AssertStatusOK(##class(%File).RemoveDirectoryTree(dir))
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestFileCopyScope.")
+    }
+}
+
+Method TestFileCopyExport()
+{
+    set tSC = $$$OK
+    try {
+        set tSC = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
+        do $$$AssertStatusOK(tSC,"Zot repo succesfully configured")
+
+        set tModuleDir = ..GetModuleDir("fc-noslash")
+        set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
+        do $$$AssertStatusOK(tSC,"Module successfully installed")
+
+        set tSC = ##class(%IPM.Main).Shell("publish -r zot fc-noslash -verbose")
+        do $$$AssertStatusOK(tSC,"Module successfully published")
+
+        set tSC = ##class(%IPM.Main).Shell("uninstall fc-noslash -verbose")
+        do $$$AssertStatusOK(tSC,"Module successfully uninstalled")
+
+        set tSC = ##class(%IPM.Main).Shell("install fc-noslash -verbose")
+        do $$$AssertStatusOK(tSC,"Module successfully installed")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestFileCopyExport.")
     }
 }
 
