@@ -140,6 +140,20 @@ Method GetPublishingManager(ByRef status)
     return ##class(%IPM.Repo.Oras.PublishManager).%Get(.status)
 }
 
+/// Gets values from the repo for setting in a lock file
+/// First calls same method in the super class for values then adds some class-specific values to the object
+Method SetValuesForLockFile(ByRef repository As %IPM.General.LockFile.Repository)
+{
+    do ##super(.repository)
+    set repository.Type = "oras"
+    set repository.OrasNamespace = ..Namespace
+}
+
+Method LockFileTypeGet() As %String
+{
+    return "oras"
+}
+
 Storage Default
 {
 <Data name="OrasRepoDefinitionDefaultData">
