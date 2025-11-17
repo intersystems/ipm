@@ -142,12 +142,16 @@ Method GetPublishingManager(ByRef status)
 
 /// Gets values from the repo for setting in a lock file
 /// First calls same method in the super class for values then adds some class-specific values to the object
-Method GetValuesForLockFile()
+Method SetValuesForLockFile(ByRef repository As %IPM.General.LockFile.Repository)
 {
-    set values = ##super()
-    set values.type = "oras"
-    set values.orasNamespace = ..Namespace
-    return values
+    do ##super(.repository)
+    set repository.Type = "oras"
+    set repository.OrasNamespace = ..Namespace
+}
+
+Method LockFileTypeGet() As %String
+{
+    return "oras"
 }
 
 Storage Default

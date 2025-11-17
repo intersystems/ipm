@@ -282,14 +282,12 @@ ClassMethod GetOne(
 
 /// Gets values from the repo for setting in a lock file
 /// Being in the base Repo.Definition class, these values will be used across all repository types
-Method GetValuesForLockFile()
+Method SetValuesForLockFile(ByRef repository As %IPM.General.LockFile.Repository)
 {
-    set values = {}
-    set values.type = ""
-    set values.enabled = ..Enabled
-    set values.overriddenSortOrder = ..OverriddenSortOrder
-    set values.readOnly = ..ReadOnly
-    return values
+    set repository.Type = ""
+    set repository.Enabled = ..Enabled
+    set repository.OverriddenSortOrder = ..OverriddenSortOrder
+    set repository.ReadOnly = ..ReadOnly
 }
 
 Storage Default

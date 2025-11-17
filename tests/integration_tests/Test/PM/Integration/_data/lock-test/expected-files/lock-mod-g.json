@@ -1,7 +1,7 @@
 {
     "name": "lock-mod-g",
     "version": "1.0.0",
-    "repository": "lock-file",
+    "repository": "lock-file-edge",
     "lockFileVersion": "1",
     "repositories": {},
     "dependencies": {

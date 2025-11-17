@@ -43,34 +43,44 @@ Parameter ModuleJ As String = "lock-mod-j";
 /// 2 dependencies: C & E, both with same transient dependency: A
 Parameter ModuleK As String = "lock-mod-k";
 
+/// Module with complex set of nested dependencies
+/// Dependencies D, E, & F
+///     - D -> C -> A & B
+///     - E -> A
+///     - F -> E & B
+Parameter ModuleL As String = "lock-mod-l";
+
 Method OnBeforeAllTests() As %Status
 {
-    // Setup repo for LockFile tests
+    // Setup repos for LockFile tests
     set sc = ##class(%IPM.Main).Shell("repo -delete-all")
     do $$$AssertStatusOK(sc,"Deleted all leftover repos from other tests successfully.")
-    set sc = ##class(%IPM.Main).Shell("repo -n lock-file -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/")
-    do $$$AssertStatusOK(sc,"Created lock-file repo successfully.")
+    set sc = ##class(%IPM.Main).Shell("repo -n lock-file-base -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/")
+    do $$$AssertStatusOK(sc,"Created lock-file-base repo successfully.")
+    set sc = ##class(%IPM.Main).Shell("repo -n lock-file-edge -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-edge-cases/")
+    do $$$AssertStatusOK(sc,"Created lock-file-edge repo successfully.")
     return sc
 }
 
 Method OnAfterAllTests() As %Status
 {
-    // Delete repo for LockFile tests
-    set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file")
-    do $$$AssertStatusOK(sc,"Removed lock-file repo successfully.")
+    // Delete repos for LockFile tests
+    set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-base")
+    do $$$AssertStatusOK(sc,"Removed lock-file-base repo successfully.")
+    set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-edge")
+    do $$$AssertStatusOK(sc,"Removed lock-file-edge repo successfully.")
     return sc
 }
 
 /// Module with 0 dependencies
 /// Uses Module A
-Method TestModule0Dependencies()
+Method Test01Module0Dependencies()
 {
-    set tSC = $$$OK
     try {
         set moduleName = ..#ModuleA
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
 
-        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        // Go back to the initial state by uninstalling the module and dependencies at the end of the test
         do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module0Dependencies.")
@@ -79,14 +89,13 @@ Method TestModule0Dependencies()
 
 /// Module with 2 direct dependencies (they themselves don't have deps)
 /// Uses Module C
-Method TestModule2Dependencies0Transient()
+Method Test02Module2Dependencies0Transient()
 {
-    set tSC = $$$OK
     try {
         set moduleName = ..#ModuleC
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
 
-        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        // Go back to the initial state by uninstalling the module and dependencies at the end of the test
         do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies0Transient.")
@@ -95,14 +104,13 @@ Method TestModule2Dependencies0Transient()
 
 /// Module with dependency that has transient dependencies
 /// Uses Module D
-Method TestModule1Dependency2Transient()
+Method Test03Module1Dependency2Transient()
 {
-    set tSC = $$$OK
     try {
         set moduleName = ..#ModuleD
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
 
-        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        // Go back to the initial state by uninstalling the module and dependencies at the end of the test
         do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module1Dependency2Transient.")
@@ -111,14 +119,13 @@ Method TestModule1Dependency2Transient()
 
 /// Module with 1 dep (with transient), 1 dep (without transient)
 /// Uses Module F
-Method TestModule2Dependencies1Transient()
+Method Test04Module2Dependencies1Transient()
 {
-    set tSC = $$$OK
     try {
         set moduleName = ..#ModuleF
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
 
-        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        // Go back to the initial state by uninstalling the module and dependencies at the end of the test
         do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
@@ -128,15 +135,14 @@ Method TestModule2Dependencies1Transient()
 /// Edge cases below:
 /// All repository types
 /// Uses Module G
-Method TestModuleDependenciesAllRepositoryTypes()
+Method Test05ModuleDependenciesAllRepositoryTypes()
 {
 }
 
 /// Module with multiple versions: Can both specify a version and defaults to latest (highest #) version
 /// Uses Module H
-Method TestModuleMultipleVersions()
+Method Test06ModuleMultipleVersions()
 {
-    set tSC = $$$OK
     try {
         set moduleName = ..#ModuleH
 
@@ -154,7 +160,7 @@ Method TestModuleMultipleVersions()
         set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_latestLockFileName)
         do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" v"_latestVersion_" match expected values")
 
-        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        // Go back to the initial state by uninstalling the module and dependencies at the end of the test
         do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
 
 
@@ -173,7 +179,7 @@ Method TestModuleMultipleVersions()
         set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_olderLockFileName)
         do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" v"_olderVersion_" match expected values")
 
-        // Go back to the inital state by uninstalling the module and dependencies at the end of the test
+        // Go back to the initial state by uninstalling the module and dependencies at the end of the test
         do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
@@ -183,20 +189,21 @@ Method TestModuleMultipleVersions()
 /// Module with no pre-existing lock file
 ///     - zpm "ci" should fail due to not being able to locate the lock file
 ///     - Test creation of a lock file, for a module that did not already have one.
-///         - Differs from other tests which overwrite pre-existing lock fies
+///         - Differs from other tests which overwrite pre-existing lock files
 ///         - Both cases SHOULD be functionally equivalent
 /// Uses Module I
-Method TestModuleNoLockFile()
+Method Test07ModuleNoLockFile()
 {
-    set tSC = $$$OK
     try {
         set moduleName = ..#ModuleI
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
 
-        // Go back to the inital state by deleting lock file for this module as well as uninstalling the module and dependencies at the end of the test
+        // Go back to the initial state by deleting lock file for this module as well as uninstalling the module and dependencies at the end of the test
         set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
         set lockFilePath = module.Root_..#LockFileName
-        do ##class(%File).Delete(lockFilePath)
+        if '##class(%File).Delete(lockFilePath) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to delete lock file located at: %1", lockFilePath)))
+        }
         do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
@@ -205,21 +212,32 @@ Method TestModuleNoLockFile()
 
 /// Try install on a lock file that lists dependencies out of order
 /// Uses Module J
-Method TestModuleDependenciesOutOfOrder()
+Method Test08ModuleDependenciesOutOfOrder()
 {
     // TODO: Implement with zpm "ci" addition
 }
 
 /// 2 dependencies for a module have the same transient to add to the lock file
 /// Uses Module K
-Method TestModule2DependenciesSameTransient()
+Method Test09Module2DependenciesSameTransient()
 {
-    set tSC = $$$OK
     try {
         set moduleName = ..#ModuleK
         do ..AssertInstallCreatesLockFileAsExpected(moduleName)
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2DependenciesSameTransient.")
+    }
+}
+
+/// Tests writing and installing from a lock file for a module with a more complex nested dependencies setup
+/// Uses Module L
+Method Test10ComplexNestedDependencies()
+{
+    try {
+        set moduleName = ..#ModuleL
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestComplexNestedDependencies.")
     }
 }
 

@@ -1,123 +1,125 @@
-Class %IPM.General.LockFile
+/// This class is used for interacting with a lock file for a given module
+/// Covers functionality for both creating a lock file and installing from a lock file
+Class %IPM.General.LockFile Extends (%RegisteredObject, %JSON.Adaptor)
 {
 
 /// Name of the JSON lock file
 Parameter LockFileName As String = "module-lock.json";
 
-/// For a given module name, this will write it's lock file and save it under the module's root
-ClassMethod WriteToLockFile(
+Property ModuleName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "name", MAXLEN = "");
+
+Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = "");
+
+Property Repository As %String(%JSONFIELDNAME = "repository", MAXLEN = "");
+
+Property LockFileVersion As %String(%JSONFIELDNAME = "lockFileVersion", MAXLEN = "") [ InitialExpression = "1" ];
+
+Property Repositories As array Of %IPM.General.LockFile.Repository(%JSONFIELDNAME = "repositories");
+
+Property Dependencies As array Of %IPM.General.LockFile.Dependency(%JSONFIELDNAME = "dependencies");
+
+ClassMethod CreateLockFileForModule(
 	baseModName As %String,
-	ByRef params) As %Status
+	ByRef params)
 {
     set sc = $$$OK
     try {
         set verbose = $get(params("Verbose"), 0)
-        set module = ##class(%IPM.Storage.Module).NameOpen(baseModName)
-        do module.BuildDependencyGraph(.tDependencyGraph)
+        set module = ##class(%IPM.Storage.Module).NameOpen(baseModName, .sc)
+        $$$ThrowOnError(sc)
 
         if (verbose) {
-            write !, "Creating lock file for module "_module.ExternalName
+            write !, "Creating lock file for module "_module.DisplayName
         }
 
-        // Iterate over module dependency graph
+        /// Create lock file object and set values for the base module
+        set lockFile = ##class(%IPM.General.LockFile).%New()
+        set lockFile.ModuleName = module.Name
+        set lockFile.VersionString = module.VersionString
+        set lockFile.Repository = module.Repository
+
+        // Create dependency list of least dependent module to most dependent from dependency graph
+        $$$ThrowOnError(module.BuildDependencyGraph(.dependencyGraph))
+        do ##class(%IPM.Utils.Module).ConstructInvertedDependencyGraph(.dependencyGraph, .inverted)
+        set dependencyList = ##class(%IPM.Utils.Module).GetFlatDependencyListFromInvertedDependencyGraph(.inverted)
+
+        // Iterate over module dependency list
         // For each module:
         //      1. Set values for module name, version, repository (name), and direct dependencies
         //      2. Add repository information to the list (if the module is from a new repo)
-        set lockFileRepositories = {}
-        set lockFileDependencies = {}
+        set repositoriesFound = ""
         set moduleName = ""
-        for {
-            set moduleName = $order(tDependencyGraph(moduleName))
-            quit:moduleName=""
-            set mod = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        for i = 1:1:dependencyList.Count() {
+            set moduleName = dependencyList.GetAt(i).Name
+            set mod = ##class(%IPM.Storage.Module).NameOpen(moduleName, .sc)
+            $$$ThrowOnError(sc)
 
             if (verbose) {
-                write !, "Adding "_mod.ExternalName_" to the lock file"
+                write !, "Adding "_mod.DisplayName_" to the lock file"
             }
 
             // DEPENDENCY STUFF
-            set dependencyVal = {}
-            set dependencyVal.version = mod.VersionString
-            set dependencyVal.repository = mod.Repository
-            set dependencyVal.dependencies = {}
+            set dependencyVal = ##class(%IPM.General.LockFile.Dependency).%New()
+            set dependencyVal.VersionString = mod.VersionString
+            set dependencyVal.Repository = mod.Repository
             set depKey = ""
             for {
                 set depMod = mod.Dependencies.GetNext(.depKey)
                 quit:depKey=""
-                do dependencyVal.dependencies.%Set(depMod.Name, depMod.VersionString)
+                $$$ThrowOnError(dependencyVal.Dependencies.SetAt(depMod.VersionString, depMod.Name))
             }
-            if dependencyVal.dependencies.%Size() '> 0 {
-                do dependencyVal.%Remove("dependencies")
-            }
-            do lockFileDependencies.%Set(mod.Name, dependencyVal)
+            $$$ThrowOnError(lockFile.Dependencies.SetAt(dependencyVal, mod.Name))
 
 
             // REPOSITORY STUFF:
             set repo = ..GetRepo(mod.Repository)
             // If repository already exists, skip creating a new entry for it
-            if lockFileRepositories.%Get(repo.Name) {
+            if $listfind(repositoriesFound, repo.Name) {
                 continue
             }
-            set repoValues = repo.GetValuesForLockFile()
-            // remove values set to "" for better readability in lock file
-            set repoValuesIterator = repoValues.%GetIterator()
-            while repoValuesIterator.%GetNext(.key, .value) {
-                if (value = "") {
-                    do repoValues.%Remove(key)
-                }
-            }
+            set repositoriesFound = repositoriesFound_$listbuild(repo.Name)
             if (verbose) {
                 write !, "Adding new repository to the lock file: "_repo.Name
             }
-            do lockFileRepositories.%Set(repo.Name, repoValues)
+            set repoVal = ##class(%IPM.General.LockFile.Repository).%New()
+            do repo.SetValuesForLockFile(.repoVal)
+            $$$ThrowOnError(lockFile.Repositories.SetAt(repoVal, repo.Name))
         }
         // Add repository for base module if not already added by a dependency
         set repo = ..GetRepo(module.Repository)
-        if 'lockFileRepositories.%Get(repo.Name) {
-            set repoValues = repo.GetValuesForLockFile()
-            // remove values set to "" for better readability in lock file
-            set repoValuesIterator = repoValues.%GetIterator()
-            while repoValuesIterator.%GetNext(.key, .value) {
-                if (value = "") {
-                    do repoValues.%Remove(key)
-                }
-            }
+        if '$listfind(repositoriesFound, repo.Name) {
             if (verbose) {
                 write !, "Adding new repository to the lock file: "_repo.Name
             }
-            do lockFileRepositories.%Set(repo.Name, repoValues)
+            set repoVal = ##class(%IPM.General.LockFile.Repository).%New()
+            do repo.SetValuesForLockFile(.repoVal)
+            $$$ThrowOnError(lockFile.Repositories.SetAt(repoVal, repo.Name))
         }
 
-        set lockFileJSON = {"name": (module.Name),
-                            "version": (module.VersionString),
-                            "repository": (repo.Name),
-                            "lockFileVersion": "1"}
-        do lockFileJSON.%Set("repositories", lockFileRepositories)
-        do lockFileJSON.%Set("dependencies", lockFileDependencies)
+        do lockFile.%JSONExportToString(.lockFileJSON)
 
         set lockFilePath = module.Root_..#LockFileName
         if (verbose) {
             write !, "Saving lock file for "_module.Name_" to: "_lockFilePath
         }
         set file = ##class(%File).%New(lockFilePath)
-        do file.Open("WSN")
-        do file.Write(lockFileJSON.%ToJSON())
+        $$$ThrowOnError(file.Open("WSN"))
+        $$$ThrowOnError(file.Write(lockFileJSON))
     } catch (ex) {
         set sc = ex.AsStatus()
     }
-    return sc
+    $$$ThrowOnError(sc)
 }
 
 /// Returns a repo based on its name
 ClassMethod GetRepo(repoName As %String) As %IPM.Repo.Definition [ Internal ]
 {
-    set query = "SELECT * FROM %IPM_Repo.Definition WHERE Name = ?"
-    set tRes = ##class(%SQL.Statement).%ExecDirect(, query, repoName)
-    if (tRes.%SQLCODE < 0) {
-        throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-    }
-    while tRes.%Next() {
-        return ##class(%IPM.Repo.Definition).%OpenId(tRes.%Get("Id"))
+    if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName, .id) {
+        set repo = ##class(%IPM.Repo.Definition).%OpenId(id, , .sc)
+        $$$ThrowOnError(sc)
+        return repo
+    } else {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Tried getting repo ""%1"" but none found with that name", repoName)))
     }
 }
 

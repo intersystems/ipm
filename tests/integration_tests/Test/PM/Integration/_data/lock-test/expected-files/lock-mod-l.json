@@ -1,6 +1,6 @@
 {
-    "name": "lock-mod-h",
-    "version": "3.0.0",
+    "name": "lock-mod-l",
+    "version": "1.0.0",
     "repository": "lock-file-edge",
     "lockFileVersion": "1",
     "repositories": {
@@ -28,11 +28,34 @@
             "version": "1.0.0",
             "repository": "lock-file-base"
         },
+        "lock-mod-c": {
+            "version": "1.0.0",
+            "repository": "lock-file-base",
+            "dependencies": {
+                "lock-mod-a": "^1.0.0",
+                "lock-mod-b": "^1.0.0"
+            }
+        },
+        "lock-mod-d": {
+            "version": "1.0.0",
+            "repository": "lock-file-base",
+            "dependencies": {
+                "lock-mod-c": "^1.0.0"
+            }
+        },
         "lock-mod-e": {
             "version": "1.0.0",
             "repository": "lock-file-base",
             "dependencies": {
                 "lock-mod-a": "^1.0.0"
+            }
+        },
+        "lock-mod-f": {
+            "version": "1.0.0",
+            "repository": "lock-file-base",
+            "dependencies": {
+                "lock-mod-b": "^1.0.0",
+                "lock-mod-e": "^1.0.0"
             }
         }
     }
