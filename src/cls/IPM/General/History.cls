@@ -7,11 +7,17 @@ Class %IPM.General.History Extends %Persistent
 /// Action of this history record. Can be load, install, or uninstall
 Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
 
+Index ActionIndex On Action;
+
 /// Name of the package being loaded/installed/uninstall. This is not necessarily required, e.g. when loading a nonexistent directory.
 Property Package As %IPM.DataType.ModuleName;
 
+Index PackageIndex On Package;
+
 /// Version of the package being loaded/installed/uninstall. This is not necessarily required, e.g. when loading a nonexistent directory.
 Property Version As %IPM.General.SemanticVersion [ Required ];
+
+Index VersionIndex On Version;
 
 /// Name of the repository where the package is being installed. For load and uninstall this will be empty.
 Property SourceName As %IPM.DataType.RepoName(MAXLEN = 100);
@@ -51,7 +57,7 @@ ClassMethod Init(
     set log.Package = Package
     set log.CommandString = $get($$$ZPMCommandToLog, "<unset>")
     set log.UserName = $username
-    $$$ThrowOnError(log.SetVersion()) // Set the version to placeholder 0.0.0-0, Will be updated before finalizing
+    $$$ThrowOnError(log.SetVersion()) // Set the version to placeholder 0.0.0-0; will be updated before finalizing
     $$$ThrowOnError(log.%Save()) // Save it now in case Finalize isn't called
     quit log
 }
@@ -131,7 +137,7 @@ ClassMethod RecordsExecute(
 {
     try {
         kill filter
-        set qHandle = ..GetHistory(.filter, .ascend, .limit, 0)
+        set qHandle = ..GetHistory(.filter, .ascend, .limit)
     } catch e {
         return e.AsStatus()
     }
@@ -227,8 +233,7 @@ ClassMethod ConstructSQLWhere(
 ClassMethod GetHistory(
 	ByRef filter,
 	ascend As %Boolean = 0,
-	limit As %Integer = 0,
-	display As %Boolean = 0)
+	limit As %Integer = 0)
 {
     if limit > 0 {
         set query = "SELECT TOP ? * FROM %IPM_General.History "
@@ -240,9 +245,6 @@ ClassMethod GetHistory(
     set query = query _ where
     set query = query _ " ORDER BY ID "  _ $select(ascend: "ASC", 1: "DESC")
     set rs = ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
-    if display {
-        do ##class(%IPM.General.History).DisplayQueryResult(rs, $namespace)
-    }
     return rs
 }
 
@@ -275,7 +277,6 @@ ClassMethod DeleteHistoryGlobally(ByRef filter) As %Integer
 }
 
 /// @API.Query
-/// todo fix
 Query GlobalRecords(
 	ascend As %Boolean,
 	limit As %Integer) As %Query(ROWSPEC = "Action:%String,Package:%String,Version_Major:%Integer,Version_Minor:%Integer,Version_Patch:%Integer,Version_Prerelease:%String,Version_Build:%String,SourceName:%String,SourceMoniker:%String,SourceDetails:%String,TimeStart:%String,TimeEnd:%String,UserName:%String,Success:%String,Committed:%String,CommandString:%String") [ SqlProc ]
@@ -289,7 +290,7 @@ ClassMethod GlobalRecordsExecute(
 {
     try {
         kill filter
-        set qHandle = ..GetHistoryGlobally(.filter, .ascend, .limit, 0)
+        set qHandle = ..GetHistoryGlobally(.filter, .ascend, .limit)
     } catch e {
         return e.AsStatus()
     }
@@ -341,8 +342,7 @@ ClassMethod GlobalRecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, 
 ClassMethod GetHistoryGlobally(
 	ByRef filter,
 	ascend As %Boolean = 0,
-	limit As %Integer = 0,
-	display As %Boolean = 1) As %Library.ArrayOfObjects
+	limit As %Integer = 0) As %Library.ArrayOfObjects
 {
     set originalNS = $namespace
     new $namespace
@@ -353,15 +353,11 @@ ClassMethod GetHistoryGlobally(
     while rs.%Next() {
         set ns = rs.%Get("Nsp")
         set $namespace = ns
-        set historyRS = ..GetHistory(.filter, ascend, limit, 0)
+        set historyRS = ..GetHistory(.filter, ascend, limit)
         if historyRS = $$$NULLOREF {
             continue
         }
         do array.SetAt(historyRS, ns)
-        if display {
-            do ##class(%IPM.General.History).DisplayQueryResult(historyRS, ns)
-        }
-        // todo fix issue where the returned array is incorrect because the RS is namespace dependent
     }
     set $namespace = originalNS
     return array
@@ -521,14 +517,18 @@ ClassMethod DisplayQueryResult(
 
 ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
 {
+    set originalNS = $namespace
+    new $namespace
     set ns = ""
     for {
         set rs = array.GetNext(.ns)
         if rs = "" {
             quit
         }
+        set $namespace = ns
         do ..DisplayQueryResult(rs, ns)
     }
+    set $namespace = originalNS
 }
 
 Storage Default

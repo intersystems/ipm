@@ -765,7 +765,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<modifier name="sort" aliases="asc" value="true" description="List the history logs in a specific order. Allowed values are asc and desc. Default behaviour is to list logs in descending order of %ID."/>
 	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. If set to 0, all logs will be displayed. If omitted, will use the value returned by `zpm &quot;config get DefaultLogEntryLimit&quot;`."/>
 	<modifier name="confirm" value="false" description="If present, will delete all records in the current namespace. Ignored if -globally is passed too."/>
-	<parameter name="action" required="true" description="One of history actions: find (default), details, delete, schema" />
+	<parameter name="action" required="false" description="One of history actions: find (default), details, delete, schema" />
 	<parameter name="argument" required="false" description="Argument for `details` command" />
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
 	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
@@ -3691,9 +3691,11 @@ ClassMethod History(ByRef pCommandInfo)
 
 	if (action = "find") || (action = "") {
         if globally {
-            do ##class(%IPM.General.History).GetHistoryGlobally(.filter, ascend, limit, 1)
+            set array = ##class(%IPM.General.History).GetHistoryGlobally(.filter, ascend, limit)
+            do ##class(%IPM.General.History).DisplayArray(array)
         } else {
-            do ##class(%IPM.General.History).GetHistory(.filter, ascend, limit, 1)
+            set rs = ##class(%IPM.General.History).GetHistory(.filter, ascend, limit)
+            do ##class(%IPM.General.History).DisplayQueryResult(rs, $namespace)
         }
 	} elseif action = "details" {
 		set id = $get(pCommandInfo("parameters", "argument"))
