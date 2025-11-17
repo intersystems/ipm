@@ -7,19 +7,19 @@ Class %IPM.General.History Extends %Persistent
 /// Action of this history record. Can be load, install, or uninstall
 Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
 
-/// Name of the package being loaded/installed/uninstall. This is not necessarily required. E.g., when loading a nonexistent directory.
+/// Name of the package being loaded/installed/uninstall. This is not necessarily required, e.g. when loading a nonexistent directory.
 Property Package As %IPM.DataType.ModuleName;
 
-/// Version of the package being loaded/installed/uninstall. This is not necessarily required. E.g., when loading a nonexistent directory.
+/// Version of the package being loaded/installed/uninstall. This is not necessarily required, e.g. when loading a nonexistent directory.
 Property Version As %IPM.General.SemanticVersion [ Required ];
 
-/// Name of the repository where the package is being installed. For load and uninstall, this will be empty.
+/// Name of the repository where the package is being installed. For load and uninstall this will be empty.
 Property SourceName As %IPM.DataType.RepoName(MAXLEN = 100);
 
-/// Moniker of the repository where the package is being installed. For load and uninstall, this will be empty.
+/// Moniker of the repository where the package is being installed. For load and uninstall this will be empty.
 Property SourceMoniker As %IPM.DataType.RepoMoniker(MAXLEN = 100);
 
-/// Details of the repository where the package is being installed. For load and uninstall, this will be empty.
+/// Details of the repository where the package is being installed. For load and uninstall this will be empty.
 Property SourceDetails As %String(MAXLEN = "");
 
 /// Time when the action started
@@ -34,7 +34,8 @@ Property UserName As %Library.Username [ InitialExpression = {$username}, Requir
 /// Status of the action. If the action is still in progress, this will be 0. Otherwise, it will be the status code of the action.
 Property Success As %Status [ InitialExpression = 0, Required ];
 
-/// Whether the action is committed. In non developer mode, this indicates whether the action was successful. In developer mode, this is always true.
+/// Whether the action has been commited "to disk" so to speak. A non-commited action has been rolled back.
+/// In non developer mode, this indicates whether the action was successful. In developer mode, this is always true.
 Property Committed As %Boolean [ InitialExpression = 0, Required ];
 
 /// The command string that triggered the action
@@ -60,10 +61,10 @@ ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.His
     quit ..Init("install", Package)
 }
 
-ClassMethod LoadInit() As %IPM.General.History
+ClassMethod LoadInit(Package As %IPM.DataType.ModuleName = "") As %IPM.General.History
 {
-    // Package name is not known at this point, so use a placeholder
-    quit ..Init("load", "")
+    // Package name may not known at this point, so use a placeholder
+    quit ..Init("load", Package)
 }
 
 ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History

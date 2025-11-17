@@ -221,13 +221,14 @@ ClassMethod LoadQualifiedReference(
 	pReference As %IPM.Storage.QualifiedModuleInfo,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pSynchronous As %Boolean = 0) As %Status
+	pSynchronous As %Boolean = 0,
+	pLogged As %Boolean = 0) As %Status
 {
     set tSC = $$$OK
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pSynchronous)
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pSynchronous, pLogged)
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -242,7 +243,8 @@ ClassMethod LoadModuleReference(
 	pPlatformVersion As %String,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pSynchronous As %Boolean = 0) As %Status
+	pSynchronous As %Boolean = 0,
+	pLogged As %Boolean = 0) As %Status
 {
     // Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
     set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
@@ -260,9 +262,16 @@ ClassMethod LoadModuleReference(
 		if $data(pParams("CommandToLog"), command) # 2 {
 			set $$$ZPMCommandToLog = command
 		}
-		set log = ##class(%IPM.General.History).InstallInit(pModuleName)
-		$$$ThrowOnError(log.SetSource(pServerName))
-		$$$ThrowOnError(log.SetVersion(pVersion))
+        // install of parent module is already being logged, so don't duplicate
+        if pLogged = 0 {
+            if $get(pParams("cmd")) = "install" {
+                set log = ##class(%IPM.General.History).InstallInit(pModuleName)
+            } else {
+                set log = ##class(%IPM.General.History).LoadInit(pModuleName)
+            }
+            $$$ThrowOnError(log.SetSource(pServerName))
+            $$$ThrowOnError(log.SetVersion(pVersion))
+        }
 
         set tVerbose = $get(pParams("Verbose"))
 

@@ -2169,7 +2169,7 @@ ClassMethod LoadFromRepo(
 ClassMethod Load(ByRef pCommandInfo) [ Internal ]
 {
 	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
-	set log = ##class(%IPM.General.History).LoadInit()
+	set log = ##class(%IPM.General.History).LoadInit("")
 	try {
 		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
@@ -2348,7 +2348,7 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
                 }
 				$$$ThrowOnError(log.SetSource(tResult.ServerName))
 				$$$ThrowOnError(log.SetVersion(tResult.Version))
-                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous))
+                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous, 1))
             }
         } else {
             set tPrefix = ""
