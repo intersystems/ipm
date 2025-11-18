@@ -160,6 +160,14 @@ Method ExtractTo(pDest As %String) As %Status
                 return sc
             }
         } else {
+            // First create subdirectories for the path if they don't already exist
+            set path = pDest_..name
+            set directory = ##class(%File).GetDirectory(path)
+            if '##class(%File).DirectoryExists(directory) {
+                if '##class(%File).CreateDirectoryChain(directory, .ret) {
+                    return $$$ERROR($$$GeneralError, $$$FormatText("Error creating directory chain %1: %2", directory, ret))
+                }
+            }
             #; no idea, why it's needed, but IRIS.DAT filename not allowed
             set irisdat = 0
             set fullPath = ##class(%File).NormalizeFilename(..name, pDest)
@@ -167,10 +175,8 @@ Method ExtractTo(pDest As %String) As %Status
                 set irisdat = 1
                 set fullPath = $extract(fullPath, 1, * - 8) _ "iris.dat"
             }
-            set fs = ##class(%Stream.FileBinary).%New()
-            set fs.Filename = fullPath
-            do fs.CopyFromAndSave(..fileData)
-            $$$ThrowOnError(fs.LinkToFile(fullPath))
+            set fs = ##class(%Stream.FileBinary).%OpenId(fullPath, , .sc)
+            $$$ThrowOnError(sc)
             $$$ThrowOnError(fs.CopyFromAndSave(..fileData))
             if irisdat {
                 set to = $extract(fullPath, 1, * - 8) _ "IRIS.DAT"

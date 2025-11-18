@@ -1,57 +1,57 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-    <Document name="ZPM.ZPM">
-        <Module>
-            <Name>ZPM</Name>
-            <Version>0.10.5-SNAPSHOT</Version>
-            <ExternalName>IPM</ExternalName>
-            <Description>InterSystems Package Manager (IPM) provides development tools and
-                infrastructure for defining, building, distributing, and installing modules and
-                applications.</Description>
-            <Keywords>Package Manager</Keywords>
-            <Author>
-                <Organization>InterSystems Corporation</Organization>
-            </Author>
-            <Packaging>module</Packaging>
-            <SourcesRoot>src</SourcesRoot>
-            <Resource Name="%IPM.PKG" />
-            <Resource Name="%IPM.Common.INC" />
-            <Resource Name="%IPM.Formatting.INC" />
-            <Resource Name="IPM.Installer.CLS" Preload="true" />
-            <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test" />
-            <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify" />
-            <Invoke Class="IPM.Installer" Method="Map" Phase="Reload" When="Before" />
-            <Invoke Class="IPM.Installer" Method="MapIfLegacy" Phase="Compile" When="After" />
-            <Invoke Class="IPM.Installer" Method="InstallORASIfMissing" Phase="Activate"
-                When="After" />
-            <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" />
-            <Invoke Class="%IPM.Utils.Migration" Method="RunAll">
-                <Arg>${verbose}</Arg>
-            </Invoke>
+  <Document name="ZPM.ZPM">
+    <Module>
+      <Name>ZPM</Name>
+      <Version>0.10.5-SNAPSHOT</Version>
+      <ExternalName>IPM</ExternalName>
+      <Description>InterSystems Package Manager (IPM) provides development tools and
+        infrastructure for defining, building, distributing, and installing modules and
+        applications.</Description>
+      <Keywords>Package Manager</Keywords>
+      <Author>
+        <Organization>InterSystems Corporation</Organization>
+      </Author>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="%IPM.PKG" />
+      <Resource Name="%IPM.Common.INC" />
+      <Resource Name="%IPM.Formatting.INC" />
+      <Resource Name="IPM.Installer.CLS" Preload="true" />
+      <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test" />
+      <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify" />
+      <Invoke Class="IPM.Installer" Method="Map" Phase="Reload" When="Before" />
+      <Invoke Class="IPM.Installer" Method="MapIfLegacy" Phase="Compile" When="After" />
+      <Invoke Class="IPM.Installer" Method="InstallORASIfMissing" Phase="Activate"
+        When="After" />
+      <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" />
+      <Invoke Class="%IPM.Utils.Migration" Method="RunAll">
+        <Arg>${verbose}</Arg>
+      </Invoke>
 
-            <!-- Requires 2022.1+ due to Embedded Python -->
-            <SystemRequirements Version=">=2022.1" />
+      <!-- Requires 2022.1+ due to Embedded Python -->
+      <SystemRequirements Version=">=2022.1" />
 
-            <!-- List of python wheels for offline installation – oras and its transitive
+      <!-- List of python wheels for offline installation – oras and its transitive
             dependencies -->
-            <PythonWheel Name="attrs-25.1.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="certifi-2025.1.31-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="charset_normalizer-2.1.1-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="idna-3.10-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="jsonschema-4.23.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="jsonschema_specifications-2024.10.1-py3-none-any.whl"
-                ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="oras-0.1.30-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="referencing-0.36.2-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="requests-2.32.3-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="typing_extensions-4.12.2-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="urllib3-2.3.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="attrs-25.1.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="certifi-2025.1.31-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="charset_normalizer-2.1.1-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="idna-3.10-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="jsonschema-4.23.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="jsonschema_specifications-2024.10.1-py3-none-any.whl"
+        ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="oras-0.1.30-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="referencing-0.36.2-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="requests-2.32.3-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="typing_extensions-4.12.2-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="urllib3-2.3.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
 
-            <!-- Pure python implementation of rpds-py for offline installation or behind a
+      <!-- Pure python implementation of rpds-py for offline installation or behind a
             firewall.
     This intentionally and necessarily masks possible installation of the real rpds-py package
     for the sake of working in a container environment with durable %SYS. -->
-            <FileCopy Name="modules/python/rpds.py" Target="${mgrdir}python/rpds.py" />
-        </Module>
-    </Document>
+      <FileCopy Name="modules/python/rpds.py" Target="${mgrdir}python/rpds.py" />
+    </Module>
+  </Document>
 </Export>

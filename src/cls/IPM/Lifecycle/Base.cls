@@ -645,7 +645,7 @@ Method %Reload(ByRef pParams) As %Status
             quit
         }
 
-        $$$ThrowOnError(..InstallPythonRequirements(tRoot, .pParams))
+        $$$ThrowOnError(..InstallOrDownloadPythonRequirements(tRoot, .pParams))
 
         // Reload the module definition
         set tSC = ..Module.%Reload()
@@ -698,12 +698,13 @@ Method %Reload(ByRef pParams) As %Status
     quit tSC
 }
 
-Method InstallPythonRequirements(
+Method InstallOrDownloadPythonRequirements(
 	pRoot As %String = "",
-	ByRef pParams)
+	ByRef pParams,
+	download As %Boolean = 0)
 {
     set cmd = $get(pParams("cmd"))
-    if '$listfind($listbuild("install", "load"), cmd) {
+    if ('download && '$listfind($listbuild("install", "load", "update"), cmd)) {
         quit $$$OK
     }
     set tVerbose = $get(pParams("Verbose"))
@@ -720,32 +721,49 @@ Method InstallPythonRequirements(
     }
     set tSC = $$$OK
     try {
-        do ..Log("requirements.txt START")
-        write:tVerbose !
-
         set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
         if '$system.CLS.IsMthd("%SYS.Python", "Import") {
             throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
         }
+        set processType = ""
+        set stdout = ""
         set tSysModule = ##class(%SYS.Python).Import("sys")
         set tPyMajor = tSysModule."version_info".major
         set tPyMinor = tSysModule."version_info".minor
         set tPyMicro = tSysModule."version_info".micro
         set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
-        set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
-        if tVerbose {
-            write !, "Running "
-            zwrite command
+        if download {
+            set processType = "Download Python wheels"
+            do ..Log(processType _ " START")
+            write:tVerbose !
+            set wheelsPath = ##class(%File).NormalizeFilename("wheels", pRoot)
+            set command = ..ResolvePipCaller(.pParams) _ $listbuild("download", "-r", "requirements.txt", "-d", wheelsPath, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+            if tVerbose {
+                write !, "Running "
+                zwrite command
+            } else {
+                set stdout = ""
+            }
+            set sc = ##class(%IPM.Utils.Module).RunCommand(pRoot, command, .stdout)
+            $$$ThrowOnError(sc)
         } else {
-            set stdout = ""
+            set processType = "requirements.txt"
+            do ..Log(processType _ " START")
+            write:tVerbose !
+            set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+            if tVerbose {
+                write !, "Running "
+                zwrite command
+            } else {
+                set stdout = ""
+            }
+            set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
+            $$$ThrowOnError(tSC)
         }
-        set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
-        $$$ThrowOnError(tSC)
-
-        do ..Log("requirements.txt SUCCESS")
+        do ..Log(processType _ " SUCCESS")
     } catch ex {
         set tSC = ex.AsStatus()
-        do ..Log("requirements.txt FAILURE")
+        do ..Log(processType _ " FAILURE")
     }
     quit tSC
 }
@@ -1140,6 +1158,10 @@ Method %Export(
                 }
             }
         }
+        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
+        if exportPythonDependencies {
+            do ..ExportPythonDependencies(.pParams)
+        }
 
         // Deployed items should be exported as a studio project to a designated directory
         set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
@@ -1193,6 +1215,30 @@ Method %Export(
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Downloads Python wheels for Python dependencies into the /root/wheels directory of the module. Also updates module.xml with the Python Wheel resources.
+Method ExportPythonDependencies(ByRef pParams)
+{
+    set root = ##class(%File).NormalizeDirectory("", ..Module.Root)
+    $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
+    set wheelsDir = ##class(%File).NormalizeDirectory("wheels", ..Module.Root)
+    if '##class(%File).DirectoryExists(wheelsDir) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheels directory: "_wheelsDir_" not found."))
+    }
+    set stmt = ##class(%SQL.Statement).%New()
+    $$$ThrowOnError(stmt.%PrepareClassQuery("%File", "FileSet"))
+    set rset = stmt.%Execute(wheelsDir, "*.whl")
+    $$$ThrowSQLIfError(rset.%SQLCODE,rset.%Message)
+    while rset.%Next(.sc) {
+        set file = rset.%Get("ItemName")
+        set type = rset.%Get("Type")
+        if (type '= "F") || (file = "") {
+            continue
+        }
+    do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
+    }
+    $$$ThrowOnError(sc)
 }
 
 Method %Package(ByRef pParams) As %Status [ Abstract ]

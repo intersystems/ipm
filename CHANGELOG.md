@@ -8,21 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.5] - Unreleased
 
 ### Added
+- #938 Added flag -export-python-deps to package command
+- #462: The `repo` command for repository configuration now supports secret input terminal mode for passwords with the `-password-stdin` flag
+- #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
 
 ### Changed
+- #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
 - #885: Always synchronously load dependencies and let each module do multi-threading as needed
 to load using multicompile instead of trying to do own multi-threading of item load which causes
 lock contention by bypassing IRIS compiler.
 
-### Deprecated
-- #885: `-synchronous` flag since loading dependencies synchronously is now the default behavior.
-
 ### Removed
+- #938 Removed secret flag NewVersion handling in %Publish()
 
 ### Fixed
+- #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
+- #958: Update command should not fail early if external name is used
 
-### Security
-
+### Deprecated
+- #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
+- #885: `-synchronous` flag since loading dependencies synchronously is now the default behavior.
 
 ## [0.10.4] - 2025-10-21
 
