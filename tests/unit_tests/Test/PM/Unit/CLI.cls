@@ -55,9 +55,11 @@ Method TestParser()
 	set tResults(tCommands)="list-installed"
 	set tResults(tCommands,"modifiers","tree")=""
 
-	set tCommands($increment(tCommands)) = "install SomeModule"
+	set tCommands($increment(tCommands)) = "install SomeModule -synchronous"
 	set tResults(tCommands)="install"
 	set tResults(tCommands,"parameters","module")="SomeModule"
+	set tResults(tCommands,"modifiers","synchronous")=""
+	set tResults(tCommands,"modifiers","synchronous","deprecated")=1
 
 	set tCommands($increment(tCommands)) = "install SomeModule 0.0.1-prerelease.42+snapshot"
 	set tResults(tCommands)="install"
