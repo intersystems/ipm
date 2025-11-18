@@ -4,17 +4,17 @@ Include (%IPM.Common, %IPM.Formatting)
 Class %IPM.General.History Extends %Persistent
 {
 
-/// Action of this history record. Can be load, install, or uninstall
-Property Action As %String(VALUELIST = ",load,install,uninstall") [ Required ];
+/// Action of this history record. Can be load, install, uninstall or update
+Property Action As %String(VALUELIST = ",load,install,uninstall,update") [ Required ];
 
 Index ActionIndex On Action;
 
-/// Name of the package being loaded/installed/uninstall. This is not necessarily required, e.g. when loading a nonexistent directory.
+/// Name of the package being logged. This is not necessarily required, e.g. when loading a nonexistent directory.
 Property Package As %IPM.DataType.ModuleName;
 
 Index PackageIndex On Package;
 
-/// Version of the package being loaded/installed/uninstall. This is not necessarily required, e.g. when loading a nonexistent directory.
+/// Version of the package being logged. This is not necessarily required, e.g. when loading a nonexistent directory.
 Property Version As %IPM.General.SemanticVersion [ Required ];
 
 Index VersionIndex On Version;
@@ -76,6 +76,11 @@ ClassMethod LoadInit(Package As %IPM.DataType.ModuleName = "") As %IPM.General.H
 ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
 {
     quit ..Init("uninstall", Package)
+}
+
+ClassMethod UpdateInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
+{
+    quit ..Init("update", Package)
 }
 
 Method SetSource(ServerName As %String) As %Status

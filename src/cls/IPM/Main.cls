@@ -760,7 +760,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 
 <command name="history" aliases="log" dataPrefix="D">
 	<summary>Manage history of package installation/uninstallation.</summary>
-	<description>Manage history of package installation/uninstallation. Commands logged are install, load, and uninstall. By default, all entries will be affected. To specify filters, use the -Dcol=val syntax. See examples for more.</description>
+	<description>Manage history of package installation/uninstallation. Commands logged are install, load, uninstall, and update. By default, all entries will be affected. To specify filters, use the -Dcol=val syntax. See examples for more.</description>
 	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
 	<modifier name="sort" aliases="asc" value="true" description="List the history logs in a specific order. Allowed values are asc and desc. Default behaviour is to list logs in descending order of %ID."/>
 	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. If set to 0, all logs will be displayed. If omitted, will use the value returned by `zpm &quot;config get DefaultLogEntryLimit&quot;`."/>
@@ -769,6 +769,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<parameter name="argument" required="false" description="Argument for `details` command" />
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
 	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
+	<example description="Show history of all packages in the current namespace where the command has been committed `to disk`. Note that committed != successful, as all actions in dev mode will be committed regardless of success.">history find -DCommitted=1</example>
 	<example description="Show history of all packages in the current namespace where start time is later than 2000-01-01 00:00:00">history find -DTimeStart=">2000-01-01 00:00:00"</example>
 	<example description="Show 5 history records in the current namespace in ascending order">history find -sort asc -limit 5</example>
 	<example description="Show column names that the table can be filtered by">history schema</example>
@@ -2166,10 +2167,16 @@ ClassMethod LoadFromRepo(
     quit tDirectoryName
 }
 
-ClassMethod Load(ByRef pCommandInfo) [ Internal ]
+ClassMethod Load(
+	ByRef pCommandInfo,
+	pLog As %IPM.General.History = "") [ Internal ]
 {
 	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
-	set log = ##class(%IPM.General.History).LoadInit("")
+    if pLog = "" {
+	    set log = ##class(%IPM.General.History).LoadInit("")
+    } else {
+        set log = pLog
+    }
 	try {
 		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
@@ -2267,38 +2274,45 @@ ClassMethod CheckModuleNamespace() As %Status
     quit $$$OK
 }
 
-ClassMethod Install(ByRef pCommandInfo) [ Internal ]
+ClassMethod Install(
+	ByRef pCommandInfo,
+	pLog As %IPM.General.History = "") [ Internal ]
 {
+    set devMode = $get(pCommandInfo("data","DeveloperMode"), 0)
     set tRegistry = ""
     set tModuleName = $get(pCommandInfo("parameters","module"))
     if (tModuleName["/") {
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
     }
-    if (tModuleName = "") {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "No module name specified."))
-    }
 
-    if tModuleName = $$$IPMModuleName {
-        $$$ThrowOnError(..CheckModuleNamespace())
+    if pLog = "" {
+        #dim log As %IPM.General.History
+        set log = ##class(%IPM.General.History).InstallInit(tModuleName)
+    } else {
+        set log = pLog
     }
-    // check if any registries are configured and enabled
-    new SQLCODE, count
-    &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
-    $$$ThrowSQLIfError(SQLCODE,%message)
-    if (SQLCODE = 0) && (count = 0) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
-    }
-
-    set tVersion = $get(pCommandInfo("parameters","version"))
-    set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
-    set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
-    set tForce = $$$HasModifier(pCommandInfo,"force")
-
-    #dim log As %IPM.General.History
-	set log = ##class(%IPM.General.History).InstallInit(tModuleName)
-	set devMode = $get(pCommandInfo("data","DeveloperMode"), 0)
 
 	try {
+        if (tModuleName = "") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "No module name specified."))
+        }
+
+        if tModuleName = $$$IPMModuleName {
+            $$$ThrowOnError(..CheckModuleNamespace())
+        }
+        // check if any registries are configured and enabled
+        new SQLCODE, count
+        &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
+        $$$ThrowSQLIfError(SQLCODE,%message)
+        if (SQLCODE = 0) && (count = 0) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
+        }
+
+        set tVersion = $get(pCommandInfo("parameters","version"))
+        set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
+        set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
+        set tForce = $$$HasModifier(pCommandInfo,"force")
+
         set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
         set tSearchCriteria.Registry = tRegistry
         set tSearchCriteria.Name = $$$lcase(tModuleName)
@@ -3975,13 +3989,14 @@ ClassMethod Update(ByRef pCommandInfo)
     set pCommandInfo("data","cmd") = "update"
     set pCommandInfo("data","Update") = 1
     set pCommandInfo("data","ModuleName") = moduleName
+    set log = ##class(%IPM.General.History).UpdateInit(moduleName)
     if path '= "" {
         // A path to a tarball is specified. Call ..Load() in order to load the newer version of the module.
         set pCommandInfo("parameters","path") = path
-        do ..Load(.pCommandInfo)
+        do ..Load(.pCommandInfo, log)
     } else {
         // Call ..Install() in order to install the newer version of the module.
-        do ..Install(.pCommandInfo)
+        do ..Install(.pCommandInfo, log)
     }
 }
 

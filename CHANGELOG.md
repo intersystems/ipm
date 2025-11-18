@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #938 Added flag -export-python-deps to package command
 - #462: The `repo` command for repository configuration now supports secret input terminal mode for passwords with the `-password-stdin` flag
 - #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
-- #578 Added functionality to record and display zpm history of install, uninstall, and load
+- #578 Added functionality to record and display IPM history of install, uninstall, load, and update
 
 ### Removed
 - #938 Removed secret flag NewVersion handling in %Publish()

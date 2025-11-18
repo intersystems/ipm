@@ -12,7 +12,7 @@ Method TestSimpleHistory()
     set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
     do $$$AssertStatusOK(tSC,"History deleted successfully")
 
-    set tModuleDir = ..GetModuleDir(..#SimpleModuleName)
+    set tModuleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
 
     // Load module
     set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
@@ -92,13 +92,17 @@ Method TestSimpleHistory()
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"oras")
         do $$$AssertEquals(rs.%Get("SourceName"),"zot")
     }
+
+    // Cleanup: unconfigure Zot repo
+    set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
+    do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
 }
 
 /// Creates a history log entry for each of load, install, and uninstall in the current namespace
 Method DoLoadUninstallInstall()
 {
     // set up load, install, uninstall entries
-    set tModuleDir = ..GetModuleDir(..#SimpleModuleName)
+    set tModuleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
     set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
     do $$$AssertStatusOK(tSC,"Loaded module successfully")
     set tSC = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
@@ -172,6 +176,10 @@ Method TestHistoryModifiers()
         set count = count + 1
     }
     do $$$AssertEquals(count, 1, "One entries for mv expected, but "_count_" found")
+
+    // Cleanup: unconfigure Zot repo
+    set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
+    do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
 }
 
 Method TestInvalidHistoryCommands()
@@ -346,6 +354,10 @@ Method TestMultipleNamespaces()
 
     #; set count = ..GetGlobalHistoryCount(namespaces)
     #; do $$$AssertEquals(count, 0, "Zero entries expected globally, but "_count_" found")
+
+    // Cleanup: unconfigure Zot repo
+    set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
+    do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
 }
 
 /// Creates a new namespace and switches into it
@@ -389,6 +401,63 @@ Method GetGlobalHistoryCount(
         }
     }
     return count
+}
+
+Method TestUpdate()
+{
+    // Load 1.0.0
+    set tModuleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
+
+    // Load module
+    set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
+    do $$$AssertStatusOK(tSC,"Loaded module successfully")
+
+    // get history
+    set rs = ##class(%IPM.General.History).GetHistory(,,1)
+    while rs.%Next() {
+        do $$$AssertTrue(rs.%Get("ID") '= "")
+        do $$$AssertEquals(rs.%Get("Action"),"load")
+        do $$$AssertEquals(rs.%Get("Package"),..#SimpleModuleName)
+        do $$$AssertEquals(rs.%Get("Version_Major"),"1")
+        do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
+        do $$$AssertEquals(rs.%Get("Version_Patch"),"0")
+        do $$$AssertEquals(rs.%Get("UserName"),"irisowner")
+        do $$$AssertTrue(rs.%Get("TimeStart") '= "")
+        do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
+        do $$$AssertEquals(rs.%Get("Success"),1)
+        do $$$AssertEquals(rs.%Get("Committed"),1)
+        set expectedCommandString = "load -verbose " _ tModuleDir
+        do $$$AssertEquals(rs.%Get("CommandString"),expectedCommandString)
+        do $$$AssertEquals(rs.%Get("SourceDetails"),"")
+        do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
+        do $$$AssertEquals(rs.%Get("SourceName"),"")
+    }
+
+    // Update to 2.0.0
+    set tModuleDir = ..GetModuleDir(..#SimpleModuleName _ "/2.0.0")
+    set commandString = "update " _ ..#SimpleModuleName _ " -verbose -path " _ tModuleDir
+    set tSC = ##class(%IPM.Main).Shell(commandString)
+    do $$$AssertStatusOK(tSC,"Update module successfully")
+
+    // get history
+    set rs = ##class(%IPM.General.History).GetHistory(,,1)
+    while rs.%Next() {
+        do $$$AssertTrue(rs.%Get("ID") '= "")
+        do $$$AssertEquals(rs.%Get("Action"),"update")
+        do $$$AssertEquals(rs.%Get("Package"),..#SimpleModuleName)
+        do $$$AssertEquals(rs.%Get("Version_Major"),"2")
+        do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
+        do $$$AssertEquals(rs.%Get("Version_Patch"),"0")
+        do $$$AssertEquals(rs.%Get("UserName"),"irisowner")
+        do $$$AssertTrue(rs.%Get("TimeStart") '= "")
+        do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
+        do $$$AssertEquals(rs.%Get("Success"),1)
+        do $$$AssertEquals(rs.%Get("Committed"),1)
+        do $$$AssertEquals(rs.%Get("CommandString"),commandString)
+        do $$$AssertEquals(rs.%Get("SourceDetails"),"")
+        do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
+        do $$$AssertEquals(rs.%Get("SourceName"),"")
+    }
 }
 
 }
