@@ -258,7 +258,7 @@ Method TestMultipleNamespaces()
     set originalNS = $namespace
 
     // (pre-cleanup) delete previous entries
-    set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
+    set tSC = ##class(%IPM.Main).Shell("history delete -g -confirm")
     do $$$AssertStatusOK(tSC,"History deleted successfully")
 
     // perform actions in this current namespace
@@ -287,10 +287,10 @@ Method TestMultipleNamespaces()
     while rs.%Next() {
         set count = count + 1
     }
-    do $$$AssertEquals(count, 3, "Three entries in " _ $namespace _ " expected, but "_count_" found")
+    do $$$AssertEquals(count, 3, "3 entries in " _ $namespace _ " expected, but "_count_" found")
 
     set count = ..GetGlobalHistoryCount(namespaces)
-    do $$$AssertEquals(count, 6, "Six entries expected globally, but "_count_" found")
+    do $$$AssertEquals(count, 6, "6 entries expected globally, but "_count_" found")
 
     // test namespace specific and global history for new NS
     set $namespace = newNamespace
@@ -300,64 +300,59 @@ Method TestMultipleNamespaces()
     while rs.%Next() {
         set count = count + 1
     }
-    do $$$AssertEquals(count, 3, "Three entries in " _ $namespace _ " expected, but "_count_" found")
+    do $$$AssertEquals(count, 3, "3 entries in " _ $namespace _ " expected, but "_count_" found")
 
     set count = ..GetGlobalHistoryCount(namespaces)
-    do $$$AssertEquals(count, 6, "Six entries expected globally, but "_count_" found")
+    do $$$AssertEquals(count, 6, "6 entries expected globally, but "_count_" found")
 
     // Test history deletion
     // The new namespace is mapped to the orginal one, so they share the %IPM.General.History table
     // todo figure out why delete doesn't work; something about the mappings is throwing it off
 
-    #; write !, "Testing history deletion in ", $namespace
-    #; set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
-    #; do $$$AssertStatusOK(tSC,"History deleted successfully")
+    write !, "Testing history deletion in ", $namespace
+    set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
+    do $$$AssertStatusOK(tSC,"History deleted successfully")
 
-    #; set $namespace = originalNS
-    #; set rs = ##class(%IPM.General.History).GetHistory()
-    #; set count = 0
-    #; while rs.%Next() {
-    #;     set count = count + 1
-    #; }
-    #; do $$$AssertEquals(count, 0, "Zero entries in " _ $namespace _ " expected, but "_count_" found")
-    #; set count = ..GetGlobalHistoryCount(namespaces)
-    #; do $$$AssertEquals(count, 0, "Zero entries expected globally, but "_count_" found")
+    set $namespace = originalNS
+    set rs = ##class(%IPM.General.History).GetHistory()
+    set count = 0
+    while rs.%Next() {
+        set count = count + 1
+    }
+    do $$$AssertEquals(count, 3, "3 entries in " _ $namespace _ " expected, but "_count_" found")
+    set count = ..GetGlobalHistoryCount(namespaces)
+    do $$$AssertEquals(count, 3, "3 entries expected globally, but "_count_" found")
 
-    #; set count = ..GetGlobalHistoryCount(namespaces)
-    #; do $$$AssertEquals(count, 3, "Three entries expected globally, but "_count_" found")
+    // delete history globally so no entries are left
+    write !, "Testing global history deletion"
+    set count = ##class(%IPM.General.History).DeleteHistoryGlobally()
+    do $$$AssertEquals(count, 3, "3 deletions in " _ $namespace _ " expected, but " _ count _" performed")
 
-    #; // delete history globally so no entries are left
-    #; write !, "Testing global history deletion"
-    #; #; set tSC = ##class(%IPM.Main).Shell("history delete -g -confirm")
-    #; #; do $$$AssertStatusOK(tSC,"Global history deleted successfully")
-    #; set deleted = ##class(%IPM.General.History).DeleteHistoryGlobally()
-    #; do $$$AssertEquals(count, 3, "Three deletions in " _ $namespace _ " expected, but "_count_" performed")
+    set rs = ##class(%IPM.General.History).GetHistory()
+    set count = 0
+    while rs.%Next() {
+        set count = count + 1
+    }
+    do $$$AssertEquals(count, 0, "0 entries in " _ $namespace _ " expected, but " _ count _ " found")
 
-    #; set rs = ##class(%IPM.General.History).GetHistory()
-    #; set count = 0
-    #; while rs.%Next() {
-    #;     set count = count + 1
-    #; }
-    #; do $$$AssertEquals(count, 0, "Zero entries in " _ $namespace _ " expected, but "_count_" found")
+    set count = ..GetGlobalHistoryCount(namespaces)
+    do $$$AssertEquals(count, 0, "0 entries expected globally, but "_count_" found")
 
-    #; set count = ..GetGlobalHistoryCount(namespaces)
-    #; do $$$AssertEquals(count, 0, "Zero entries expected globally, but "_count_" found")
+    // check in the other namespace
+    set $namespace = originalNS
+    write !, "Checking in ", $namespace
+    set rs = ##class(%IPM.General.History).GetHistory()
+    set count = 0
+    while rs.%Next() {
+        set count = count + 1
+    }
+    do $$$AssertEquals(count, 0, "0 entries in " _ $namespace _ " expected, but "_count_" found")
 
-    #; // check in the other namespace
-    #; set $namespace = originalNS
-    #; write !, "Checking in ", $namespace
-    #; set rs = ##class(%IPM.General.History).GetHistory()
-    #; set count = 0
-    #; while rs.%Next() {
-    #;     set count = count + 1
-    #; }
-    #; do $$$AssertEquals(count, 0, "Zero entries in " _ $namespace _ " expected, but "_count_" found")
-
-    #; set count = ..GetGlobalHistoryCount(namespaces)
-    #; do $$$AssertEquals(count, 0, "Zero entries expected globally, but "_count_" found")
-
+    set count = ..GetGlobalHistoryCount(namespaces)
+    do $$$AssertEquals(count, 0, "0 entries expected globally, but "_count_" found")
 
     // Cleanup
+    set $namespace = originalNS
     do ..Cleanup()
 }
 
@@ -384,10 +379,13 @@ Method CreateNewNamespace() As %String
     return newNamespace
 }
 
-Method GetGlobalHistoryCount(
+ClassMethod GetGlobalHistoryCount(
 	namespaces As %List,
 	limit As %Integer = 0) As %Integer
 {
+    new $namespace
+    set originalNS = $namespace
+
     set array = ##class(%IPM.General.History).GetHistoryGlobally(,,limit)
     set count = 0
     set pointer = 0
@@ -396,11 +394,15 @@ Method GetGlobalHistoryCount(
         if rs = "" {
             continue
         }
-        write !, "ns ", ns,!
+        set $namespace = ns
+        set subcount = 0
         while rs.%Next() {
-            set count = count + 1
+            set subcount = subcount + 1
         }
+        write !, subcount _ " entries found in " _ ns, !
+        set count = count + subcount
     }
+    set $namespace = originalNS
     return count
 }
 

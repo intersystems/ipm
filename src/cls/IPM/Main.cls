@@ -765,6 +765,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<modifier name="sort" aliases="asc" value="true" description="List the history logs in a specific order. Allowed values are asc and desc. Default behaviour is to list logs in descending order of %ID."/>
 	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. If set to 0, all logs will be displayed. If omitted, will use the value returned by `zpm &quot;config get DefaultLogEntryLimit&quot;`."/>
 	<modifier name="confirm" value="false" description="If present, will delete all records in the current namespace. Ignored if -globally is passed too."/>
+    <modifier name="verbose" aliases="v" dataAlias="verbose" dataValue="1" description="Produces verbose output from the command." />
 	<parameter name="action" required="false" description="One of history actions: find (default), details, delete, schema" />
 	<parameter name="argument" required="false" description="Argument for `details` command" />
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
@@ -3694,8 +3695,8 @@ $$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameEx
 
 ClassMethod History(ByRef pCommandInfo)
 {
+    set verbose = $get(pCommandInfo("data","verbose"))
 	set action = $get(pCommandInfo("parameters", "action"))
-
 	set globally = $$$HasModifier(pCommandInfo, "globally")
 	set ascend = ($$$GetModifier(pCommandInfo, "sort") = "asc")
 	set confirm = $$$HasModifier(pCommandInfo, "confirm")
@@ -3733,7 +3734,7 @@ ClassMethod History(ByRef pCommandInfo)
 			$$$ThrowStatus($$$ERROR($$$GeneralError,"No filter specified. Should specify at least one column to filter on or pass -confirm to delete all records in the current namespace."))
 		}
         if globally {
-		    set count = ##class(%IPM.General.History).DeleteHistoryGlobally(.filter)
+		    set count = ##class(%IPM.General.History).DeleteHistoryGlobally(.filter, verbose)
         } else {
 		    set count = ##class(%IPM.General.History).DeleteHistory(.filter)
         }

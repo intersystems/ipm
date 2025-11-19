@@ -264,7 +264,9 @@ ClassMethod DeleteHistory(ByRef filter) As %Integer
     quit rs.%ROWCOUNT
 }
 
-ClassMethod DeleteHistoryGlobally(ByRef filter) As %Integer
+ClassMethod DeleteHistoryGlobally(
+	ByRef filter,
+	verbose As %Boolean = 0) As %Integer
 {
     set originalNS = $namespace
     new $namespace
@@ -275,7 +277,13 @@ ClassMethod DeleteHistoryGlobally(ByRef filter) As %Integer
     while rs.%Next() {
         set ns = rs.%Get("Nsp")
         set $namespace = ns
-        set count = count + ..DeleteHistory(.filter)
+        if ##class(%Dictionary.ClassDefinition).%Exists($listbuild("%IPM.General.History")) {
+            set subcount = ..DeleteHistory(.filter)
+            set count = count + subcount
+            if verbose {
+                write !, "Deleted " _ subcount _ " record(s) from " _ ns, !
+            }
+        }
     }
     set $namespace = originalNS
     quit count
