@@ -19,6 +19,10 @@ Property IncludeSnapshots As %Boolean;
 
 Property Keywords As list Of %String;
 
+/// This is actually a tri-state.
+/// 0: don't show every version
+/// 1: do show every version
+/// empty: resolving dependencies
 Property AllVersions As %Boolean;
 
 Method KeywordsSet(%value) As %Status
