@@ -1,24 +1,32 @@
 {
-    "objectscript.conn": {
-        "active": true,
-        "port": 52774,
-        "host": "localhost",
-        "username": "_system",
-        "password": "SYS",
-        "ns": "USER"
+  "objectscript.conn": {
+    "active": true,
+    "docker-compose": {
+      "service": "iris"
     },
-    // Force formatting rules
-    "intersystems.testingManager.client.relativeTestRoot": "tests/unit_tests",
-    "objectscript.multilineMethodArgs": true,
-    "intersystems.language-server.formatting.expandClassNames": false,
-    "intersystems.language-server.formatting.commands.case": "lower",
-    "intersystems.language-server.formatting.commands.length": "long",
-    "intersystems.language-server.formatting.system.case": "lower",
-    "intersystems.language-server.formatting.system.length": "long",
-    // Force tab size and indent using spaces
-    "editor.tabSize": 4,
-    "editor.detectIndentation": false,
-    "editor.insertSpaces": true,
-    "editor.formatOnSave": true,
-    "files.trimTrailingWhitespace": true
+    "username": "_system",
+    "password": "SYS",
+    "ns": "USER"
+  },
+  // Non-default export settings needed so Testing Manager extension can find sources when doing coverage runs
+  "objectscript.export": {
+    "addCategory": true,
+    "map": {
+      "%(.*)": "$1"
+    }
+  },
+  // Force formatting rules
+  "intersystems.testingManager.client.relativeTestRoot": "tests/unit_tests",
+  "objectscript.multilineMethodArgs": true,
+  "intersystems.language-server.formatting.expandClassNames": false,
+  "intersystems.language-server.formatting.commands.case": "lower",
+  "intersystems.language-server.formatting.commands.length": "long",
+  "intersystems.language-server.formatting.system.case": "lower",
+  "intersystems.language-server.formatting.system.length": "long",
+  // Force tab size and indent using spaces
+  "editor.tabSize": 4,
+  "editor.detectIndentation": false,
+  "editor.insertSpaces": true,
+  "editor.formatOnSave": true,
+  "files.trimTrailingWhitespace": true
 }
