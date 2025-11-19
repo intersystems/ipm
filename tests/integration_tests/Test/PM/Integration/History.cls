@@ -93,9 +93,8 @@ Method TestSimpleHistory()
         do $$$AssertEquals(rs.%Get("SourceName"),"zot")
     }
 
-    // Cleanup: unconfigure Zot repo
-    set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
-    do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
+    // Cleanup
+    do ..Cleanup()
 }
 
 /// Creates a history log entry for each of load, install, and uninstall in the current namespace
@@ -177,9 +176,8 @@ Method TestHistoryModifiers()
     }
     do $$$AssertEquals(count, 1, "One entries for mv expected, but "_count_" found")
 
-    // Cleanup: unconfigure Zot repo
-    set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
-    do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
+    // Cleanup
+    do ..Cleanup()
 }
 
 Method TestInvalidHistoryCommands()
@@ -247,6 +245,9 @@ Method TestDevMode()
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
     }
+
+    // Cleanup
+    do ..Cleanup()
 }
 
 /// Creates entries in the history log in two namespaces
@@ -355,9 +356,9 @@ Method TestMultipleNamespaces()
     #; set count = ..GetGlobalHistoryCount(namespaces)
     #; do $$$AssertEquals(count, 0, "Zero entries expected globally, but "_count_" found")
 
-    // Cleanup: unconfigure Zot repo
-    set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
-    do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
+
+    // Cleanup
+    do ..Cleanup()
 }
 
 /// Creates a new namespace and switches into it
@@ -457,6 +458,21 @@ Method TestUpdate()
         do $$$AssertEquals(rs.%Get("SourceDetails"),"")
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
+    }
+
+    // Cleanup
+    do ..Cleanup()
+}
+
+/// Uninstall all modules and unconfigure Zot
+Method Cleanup()
+{
+    set tSC = ##class(%IPM.Main).Shell("uninstall -all")
+    do $$$AssertStatusOK(tSC,"All modules uninstalled")
+
+    if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists("zot") {
+        set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
+        do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
     }
 }
 
