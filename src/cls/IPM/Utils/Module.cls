@@ -123,10 +123,12 @@ ClassMethod LoadDependencies(
                     if ($tlevel = 0) && ($get(pParams("Multicompile","Verbose"),$get(pParams("Verbose"),0))) {
                         write !,"Queuing module load: ",tModuleName," ",tVersion," @ ",tServerName
                     }
+					merge tParams = pParams
+					set tParams("CommandToLog") = $get($$$ZPMCommandToLog, "<unset>")
                     set tSC = pWorkQueue.QueueCallback(
                         "##class("_$classname()_").LoadModuleReference",
                         "##class("_$classname()_").LoadCompleted",
-                        tServerName, tModuleName, tVersion, $get(tDeployed), $get(tPlatformVersion), .pParams, .pDependencyGraph)
+                        tServerName, tModuleName, tVersion, $get(tDeployed), $get(tPlatformVersion), .tParams, .pDependencyGraph)
                     $$$ThrowOnError(tSC)
                 } else {
                     // Remove this module from dependencies.
@@ -219,13 +221,14 @@ ClassMethod LoadQualifiedReference(
 	pReference As %IPM.Storage.QualifiedModuleInfo,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pSynchronous As %Boolean = 0) As %Status
+	pSynchronous As %Boolean = 0,
+	pLogged As %Boolean = 0) As %Status
 {
     set tSC = $$$OK
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pSynchronous)
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pSynchronous, pLogged)
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -240,7 +243,8 @@ ClassMethod LoadModuleReference(
 	pPlatformVersion As %String,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pSynchronous As %Boolean = 0) As %Status
+	pSynchronous As %Boolean = 0,
+	pLogged As %Boolean = 0) As %Status
 {
     // Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
     set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
@@ -253,6 +257,20 @@ ClassMethod LoadModuleReference(
         // Backward-compatibility: if params isn't an array, use it as qstruct
         if $data(pParams) = 1 {
             set qstruct = pParams
+        }
+		// If spawned from a work queue, $$$ZPMCommandToLog will be undefined in the spawned process.
+		if $data(pParams("CommandToLog"), command) # 2 {
+			set $$$ZPMCommandToLog = command
+		}
+        // install of parent module is already being logged, so don't duplicate
+        if pLogged = 0 {
+            if $get(pParams("cmd")) = "install" {
+                set log = ##class(%IPM.General.History).InstallInit(pModuleName)
+            } else {
+                set log = ##class(%IPM.General.History).LoadInit(pModuleName)
+            }
+            $$$ThrowOnError(log.SetSource(pServerName))
+            $$$ThrowOnError(log.SetVersion(pVersion))
         }
 
         set tVerbose = $get(pParams("Verbose"))
@@ -398,6 +416,14 @@ ClassMethod LoadModuleReference(
             set tSC = e.AsStatus()
         }
     }
+    if $isobject($get(log)) {
+		if $data(tDeveloperMode) # 2 {
+			set devMode = $get(tDeveloperMode, 0)
+		} else {
+			set devMode = $get(pParams("DeveloperMode"), 0)
+		}
+		set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+	}
     quit tSC
 }
 
@@ -407,7 +433,8 @@ ClassMethod LoadModuleFromArchive(
 	pArchiveStream As %Stream.Object,
 	ByRef pParams,
 	pRepository As %String = "",
-	pSynchronous As %Boolean = 0) As %Status
+	pSynchronous As %Boolean = 0,
+	pLog As %IPM.General.History) As %Status
 {
     set tSC = $$$OK
     try {
@@ -438,7 +465,7 @@ ClassMethod LoadModuleFromArchive(
 
         set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
         set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-        set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository,pSynchronous)
+        set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository, pSynchronous, .pLog)
         set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         if $$$ISERR(tSC) {
             quit
@@ -454,7 +481,8 @@ ClassMethod LoadModuleFromDirectory(
 	ByRef pParams,
 	pOverrideDeveloperMode As %Boolean = 0,
 	pRepository As %String = "",
-	pSynchronous As %Boolean = 0) As %Status
+	pSynchronous As %Boolean = 0,
+	pLog As %IPM.General.History) As %Status
 {
     set tSC = $$$OK
     try {
@@ -472,7 +500,7 @@ ClassMethod LoadModuleFromDirectory(
             // Propagate all params except developer mode to dependencies
             set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
         }
-        set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pSynchronous)
+        set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pSynchronous,.pLog)
         if $$$ISERR(tSC) {
             quit
         }
@@ -1231,8 +1259,12 @@ ClassMethod LoadNewModule(
 	pDirectory As %String,
 	ByRef pParams,
 	pRepository As %String = "",
-	pSynchronous As %Boolean = 0) As %Status
+	pSynchronous As %Boolean = 0,
+	pLog As %IPM.General.History) As %Status
 {
+	if $data(pLog) # 2 = 0 {
+		set pLog = ""
+	}
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
@@ -1350,6 +1382,10 @@ ClassMethod LoadNewModule(
 
         set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
+		if $isobject(pLog) {
+			$$$ThrowOnError(pLog.SetName(tModuleName))
+			$$$ThrowOnError(pLog.SetVersion(tModule.VersionString))
+		}
         set tModule.Repository = pRepository
 
         if $data(params("DeveloperMode"),tDeveloperMode) {
