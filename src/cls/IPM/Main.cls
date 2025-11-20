@@ -2555,7 +2555,7 @@ ClassMethod ActiveNamespacesClose(qHandle As %Binary) As %Status [ PlaceAfter = 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
     set tSearchString = $get(pCommandInfo("parameters","searchString"),"")
-      	if $data(pCommandInfo("modifiers","python")) {
+    if $data(pCommandInfo("modifiers","python")) {
 		set list = ""
 		$$$ThrowOnError(..GetPythonInstalledLibs(.list))
 		merge tModifiers = pCommandInfo("modifiers")
