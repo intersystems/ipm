@@ -531,7 +531,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
-<modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of ZPM modules." />
+<modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of IPM modules." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
