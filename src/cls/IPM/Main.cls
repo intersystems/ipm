@@ -3902,7 +3902,7 @@ ClassMethod Update(ByRef pCommandInfo)
     }
     //verify the module is pinned
     if ##class(%IPM.Storage.PinnedModule).IsModulePinned(moduleName) {
-         $$$ThrowStatus($$$ERROR($$$GeneralError, "The module "_moduleName_" is pinned unable to install"))
+         $$$ThrowStatus($$$ERROR($$$GeneralError, "The module "_moduleName_" is pinned unable to update."))
     }
     if verbose {
         if path '= "" {
