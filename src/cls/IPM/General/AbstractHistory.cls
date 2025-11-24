@@ -49,7 +49,7 @@ Property Phases As list Of %IPM.General.HistoryPhase;
 
 ClassMethod Init(
 	Action As %String,
-	Package As %IPM.DataType.ModuleName) As %IPM.General.History [ Private ]
+	Package As %IPM.DataType.ModuleName) As %IPM.General.AbstractHistory [ Private ]
 {
     set log = ..%New()
     set log.TimeStart = $zdatetime($now(), 3)

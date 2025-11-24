@@ -772,6 +772,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
 	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
 	<example description="Show history of all packages in the current namespace where the command has been committed `to disk`. Note that committed != successful, as all actions in dev mode will be committed regardless of success.">history find -DCommitted=1</example>
+	<example description="Show history of all packages in the current namespace where the command has errored">history find -DSucess="0*"</example>
 	<example description="Show history of all packages in the current namespace where start time is later than 2000-01-01 00:00:00">history find -DTimeStart=">2000-01-01 00:00:00"</example>
 	<example description="Show 5 history records in the current namespace in ascending order">history find -sort asc -limit 5</example>
 	<example description="Show column names that the table can be filtered by">history schema</example>

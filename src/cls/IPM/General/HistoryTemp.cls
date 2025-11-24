@@ -8,7 +8,7 @@ Property PersistedTwin As %IPM.General.History;
 /// Initalize both this temporary version and the persistent version
 ClassMethod Init(
 	Action As %String,
-	Package As %IPM.DataType.ModuleName) As %IPM.General.History [ Private ]
+	Package As %IPM.DataType.ModuleName) As %IPM.General.HistoryTemp [ Private ]
 {
     set log = ##super(Action, Package)
     set twin = ##class(%IPM.General.History).%New()
