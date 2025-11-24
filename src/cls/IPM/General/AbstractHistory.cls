@@ -62,23 +62,23 @@ ClassMethod Init(
     quit log
 }
 
-ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
+ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.AbstractHistory
 {
     quit ..Init("install", Package)
 }
 
-ClassMethod LoadInit(Package As %IPM.DataType.ModuleName = "") As %IPM.General.History
+ClassMethod LoadInit(Package As %IPM.DataType.ModuleName = "") As %IPM.General.AbstractHistory
 {
     // Package name may not known at this point, so use a placeholder
     quit ..Init("load", Package)
 }
 
-ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
+ClassMethod UninstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.AbstractHistory
 {
     quit ..Init("uninstall", Package)
 }
 
-ClassMethod UpdateInit(Package As %IPM.DataType.ModuleName) As %IPM.General.History
+ClassMethod UpdateInit(Package As %IPM.DataType.ModuleName) As %IPM.General.AbstractHistory
 {
     quit ..Init("update", Package)
 }
