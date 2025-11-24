@@ -445,7 +445,8 @@ ClassMethod ExecutePhases(
 	pModuleName As %String,
 	pPhases As %List,
 	pIsComplete As %Boolean = 0,
-	ByRef pParams) As %Status
+	ByRef pParams,
+	pLog As %IPM.General.History = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -571,6 +572,10 @@ ClassMethod ExecutePhases(
                 write !,"["_tModule.DisplayName_"]",$char(9),"Module object refreshed."
                 continue
             }
+            // history logging for phases
+            if pLog '= "" {
+                do pLog.InitPhase(tOnePhase)
+            }
 
             set tSC = $$$OK
             try {
@@ -664,6 +669,9 @@ ClassMethod ExecutePhases(
                 $$$ThrowOnError(tSC)
             } catch e {
                 set tSC = e.AsStatus()
+                if pLog '= "" {
+                    do pLog.FinalizePhase(tOnePhase, e.AsStatus())
+                }
             }
 
             if $$$ISERR(tSC) {
@@ -675,6 +683,10 @@ ClassMethod ExecutePhases(
                 write " ("_($zhorolog-tStart)_" s)"
             }
             $$$ThrowOnError(tSC)
+
+            if pLog '= "" {
+                do pLog.FinalizePhase(tOnePhase, $$$OK)
+            }
         }
         if tOverallTiming {
             write !,"["_tModule.DisplayName_"]",$char(9),"(total time: ",($zhorolog-tFullStart)," s)"
@@ -708,7 +720,7 @@ ClassMethod Uninstall(
         set tParams("Clean","Level") = 1 // Simulate clean of module as dependency.
         set tParams("Clean","Force") = pForce
         set tParams("Clean","Recurse") = pRecurse
-        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(pModuleName,$listbuild("Clean"),,.tParams)
+        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(pModuleName,$listbuild("Clean"),,.tParams, log)
     } catch e {
         set tSC = e.AsStatus()
     }

@@ -5,6 +5,23 @@ Parameter SimpleModuleName As STRING = "simplest-module";
 
 Parameter HistoryNSName As STRING = "HISTORY";
 
+Method OnAfterOneTest(testname As %String) As %Status
+{
+    set tSC = ##class(%IPM.Main).Shell("uninstall -all")
+    do $$$AssertStatusOK(tSC,"All modules uninstalled")
+
+    if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists("zot") {
+        set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
+        do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
+    }
+
+    // delete entries
+    set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
+    do $$$AssertStatusOK(tSC,"History deleted successfully")
+
+    return tSC
+}
+
 /// Tests basic load, uninstall, and install
 Method TestSimpleHistory()
 {
@@ -69,7 +86,8 @@ Method TestSimpleHistory()
     }
 
     // Install module
-    set tSC = ##class(%IPM.Main).Shell("install -verbose zot/" _ ..#SimpleModuleName)
+    set command = "install -verbose zot/" _ ..#SimpleModuleName _ " 1.0.0"
+    set tSC = ##class(%IPM.Main).Shell(command)
     do $$$AssertStatusOK(tSC,"Installed module successfully")
 
     // get history
@@ -86,31 +104,29 @@ Method TestSimpleHistory()
         do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
         do $$$AssertEquals(rs.%Get("Success"),1)
         do $$$AssertEquals(rs.%Get("Committed"),1)
-        set expectedCommandString = "install -verbose zot/" _ ..#SimpleModuleName
-        do $$$AssertEquals(rs.%Get("CommandString"),expectedCommandString)
+        do $$$AssertEquals(rs.%Get("CommandString"),command)
         do $$$AssertEquals(rs.%Get("SourceDetails"),"http://oras:5000")
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"oras")
         do $$$AssertEquals(rs.%Get("SourceName"),"zot")
     }
-
-    // Cleanup
-    do ..Cleanup()
 }
 
 /// Creates a history log entry for each of load, install, and uninstall in the current namespace
-Method DoLoadUninstallInstall()
+Method DoLoadUninstallInstall(
+	moduleName As %String,
+	moduleVersion As %String)
 {
     // set up load, install, uninstall entries
-    set tModuleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
+    set tModuleDir = ..GetModuleDir(moduleName _  "/" _ moduleVersion)
     set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
     do $$$AssertStatusOK(tSC,"Loaded module successfully")
     set tSC = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
     do $$$AssertStatusOK(tSC,"Zot repo configured succesfully")
-    set tSC = ##class(%IPM.Main).Shell("publish simplest-module -verbose -r zot")
+    set tSC = ##class(%IPM.Main).Shell("publish " _ moduleName _ " -verbose -r zot -export-deps 1")
     do $$$AssertStatusOK(tSC,"Published module successfully")
-    set tSC = ##class(%IPM.Main).Shell("uninstall -verbose " _ ..#SimpleModuleName)
+    set tSC = ##class(%IPM.Main).Shell("uninstall -r -verbose " _ moduleName)
     do $$$AssertStatusOK(tSC,"Uninstalled module successfully")
-    set tSC = ##class(%IPM.Main).Shell("install -verbose " _ ..#SimpleModuleName)
+    set tSC = ##class(%IPM.Main).Shell("install -verbose " _ moduleName _ " " _ moduleVersion)
     do $$$AssertStatusOK(tSC,"Installed module successfully")
 }
 
@@ -121,7 +137,7 @@ Method TestHistoryModifiers()
     do $$$AssertStatusOK(tSC,"History deleted successfully")
 
     // Populate history log entries
-    do ..DoLoadUninstallInstall()
+    do ..DoLoadUninstallInstall(..#SimpleModuleName, "1.0.0")
 
     // test filter by action
     set actions = $listbuild("load", "install", "uninstall")
@@ -175,9 +191,6 @@ Method TestHistoryModifiers()
         set count = count + 1
     }
     do $$$AssertEquals(count, 1, "One entries for mv expected, but "_count_" found")
-
-    // Cleanup
-    do ..Cleanup()
 }
 
 Method TestInvalidHistoryCommands()
@@ -245,9 +258,6 @@ Method TestDevMode()
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
     }
-
-    // Cleanup
-    do ..Cleanup()
 }
 
 /// Creates entries in the history log in two namespaces
@@ -262,7 +272,7 @@ Method TestMultipleNamespaces()
     do $$$AssertStatusOK(tSC,"History deleted successfully")
 
     // perform actions in this current namespace
-    do ..DoLoadUninstallInstall()
+    do ..DoLoadUninstallInstall(..#SimpleModuleName, "1.0.0")
 
     // create new namespace and perform actions in it
     set newNamespace = ..CreateNewNamespace()
@@ -277,7 +287,7 @@ Method TestMultipleNamespaces()
 
     // populate history log
     write !, "Populating history log in ", $namespace
-    do ..DoLoadUninstallInstall()
+    do ..DoLoadUninstallInstall(..#SimpleModuleName, "1.0.0")
 
     // test namespace specific and global history starting with original NS
     set $namespace = originalNS
@@ -353,7 +363,6 @@ Method TestMultipleNamespaces()
 
     // Cleanup
     set $namespace = originalNS
-    do ..Cleanup()
 }
 
 /// Creates a new namespace and switches into it
@@ -461,20 +470,236 @@ Method TestUpdate()
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
     }
-
-    // Cleanup
-    do ..Cleanup()
 }
 
-/// Uninstall all modules and unconfigure Zot
-Method Cleanup()
+Method TestPhases()
 {
-    set tSC = ##class(%IPM.Main).Shell("uninstall -all")
-    do $$$AssertStatusOK(tSC,"All modules uninstalled")
+    // Populate history log entries
+    do ..DoLoadUninstallInstall(..#SimpleModuleName, "1.0.0")
 
-    if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists("zot") {
-        set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
-        do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
+    // verify the phases have been populated appropriately
+    set actions = $listbuild("load", "install")
+    set pointer = 0
+    while $listnext(actions,pointer,action) {
+        set filter("action") = action
+        set rs = ##class(%IPM.General.History).GetHistory(.filter,,10)
+        while rs.%Next() {
+            set phases = rs.%Get("Phases")
+            // 5 phases expected: Initialize, Reload, Validate, Compile, Activate
+            do $$$AssertEquals($listlength(phases), 5)
+
+            set initialize = $listget($listget(phases, 1), 1)
+            do $$$AssertEquals($listget(initialize, 1),"Initialize")
+            do $$$AssertTrue($listget(initialize, 2)'="")
+            do $$$AssertTrue($listget(initialize, 3)'="")
+            do $$$AssertEquals($listget(initialize, 4), $$$OK)
+
+            set reload = $listget($listget(phases, 2), 1)
+            do $$$AssertEquals($listget(reload, 1),"Reload")
+            do $$$AssertTrue($listget(reload, 2)'="")
+            do $$$AssertTrue($listget(reload, 3)'="")
+            do $$$AssertEquals($listget(reload, 4), $$$OK)
+
+            set validate = $listget($listget(phases, 3), 1)
+            do $$$AssertEquals($listget(validate, 1),"Validate")
+            do $$$AssertTrue($listget(validate, 2)'="")
+            do $$$AssertTrue($listget(validate, 3)'="")
+            do $$$AssertEquals($listget(validate, 4), $$$OK)
+
+            set compile = $listget($listget(phases, 4), 1)
+            do $$$AssertEquals($listget(compile, 1),"Compile")
+            do $$$AssertTrue($listget(compile, 2)'="")
+            do $$$AssertTrue($listget(compile, 3)'="")
+            do $$$AssertEquals($listget(compile, 4), $$$OK)
+
+            set activate = $listget($listget(phases, 5), 1)
+            do $$$AssertEquals($listget(activate, 1),"Activate")
+            do $$$AssertTrue($listget(activate, 2)'="")
+            do $$$AssertTrue($listget(activate, 3)'="")
+            do $$$AssertEquals($listget(activate, 4), $$$OK)
+        }
+    }
+    // Uninstall only has the clean phase
+    set filter("action") = "uninstall"
+    set rs = ##class(%IPM.General.History).GetHistory(.filter,,10)
+    while rs.%Next() {
+        set phases = rs.%Get("Phases")
+        do $$$AssertEquals($listlength(phases), 1)
+
+        set initialize = $listget($listget(phases, 1), 1)
+        do $$$AssertEquals($listget(initialize, 1),"Clean")
+        do $$$AssertTrue($listget(initialize, 2)'="")
+        do $$$AssertTrue($listget(initialize, 3)'="")
+        do $$$AssertEquals($listget(initialize, 4), $$$OK)
+    }
+}
+
+/// An action that fails should properly document the failing phase
+Method TestFailingPhases()
+{
+    set tModuleDir = ..GetModuleDir("invoke/failure/NonStatusReturnCheckStatus")
+    set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
+
+    set rs = ##class(%IPM.General.History).GetHistory(.filter,,1)
+    while rs.%Next() {
+        // Check history log entry is good
+        do $$$AssertTrue(rs.%Get("ID") '= "")
+        do $$$AssertEquals(rs.%Get("Action"),"load")
+        do $$$AssertEquals(rs.%Get("Package"),"NonStatusReturnCheckStatus")
+        do $$$AssertEquals(rs.%Get("Version_Major"),"0")
+        do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
+        do $$$AssertEquals(rs.%Get("Version_Patch"),"1")
+        do $$$AssertEquals(rs.%Get("Version_Prerelease"),"snapshot")
+        do $$$AssertEquals(rs.%Get("UserName"),"irisowner")
+        do $$$AssertTrue(rs.%Get("TimeStart") '= "")
+        do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
+        do $$$AssertNotEquals(rs.%Get("Success"),$$$OK)
+        do $$$AssertEquals(rs.%Get("Committed"),0)
+        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose " _ tModuleDir)
+        do $$$AssertEquals(rs.%Get("SourceDetails"),"")
+        do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
+        do $$$AssertEquals(rs.%Get("SourceName"),"")
+
+        set phases = rs.%Get("Phases")
+        // 5 phases expected: Initialize, Reload, Validate, Compile, Activate
+        do $$$AssertEquals($listlength(phases), 5)
+
+        set initialize = $listget($listget(phases, 1), 1)
+        do $$$AssertEquals($listget(initialize, 1),"Initialize")
+        do $$$AssertTrue($listget(initialize, 2)'="")
+        do $$$AssertTrue($listget(initialize, 3)'="")
+        do $$$AssertEquals($listget(initialize, 4), $$$OK)
+
+        set reload = $listget($listget(phases, 2), 1)
+        do $$$AssertEquals($listget(reload, 1),"Reload")
+        do $$$AssertTrue($listget(reload, 2)'="")
+        do $$$AssertTrue($listget(reload, 3)'="")
+        do $$$AssertEquals($listget(reload, 4), $$$OK)
+
+        set validate = $listget($listget(phases, 3), 1)
+        do $$$AssertEquals($listget(validate, 1),"Validate")
+        do $$$AssertTrue($listget(validate, 2)'="")
+        do $$$AssertTrue($listget(validate, 3)'="")
+        do $$$AssertEquals($listget(validate, 4), $$$OK)
+
+        set compile = $listget($listget(phases, 4), 1)
+        do $$$AssertEquals($listget(compile, 1),"Compile")
+        do $$$AssertTrue($listget(compile, 2)'="")
+        do $$$AssertTrue($listget(compile, 3)'="")
+        do $$$AssertEquals($listget(compile, 4), $$$OK)
+
+        set activate = $listget($listget(phases, 5), 1)
+        do $$$AssertEquals($listget(activate, 1),"Activate")
+        do $$$AssertTrue($listget(activate, 2)'="")
+        do $$$AssertEquals($listget(activate, 3),"")
+        do $$$AssertNotEquals($listget(activate, 4), $$$OK)
+    }
+}
+
+Method TestWithDependencies()
+{
+    // Populate history log entries
+    do ..DoLoadUninstallInstall(..#SimpleModuleName, "3.0.0")
+    set moduleName = ..#SimpleModuleName
+    set depName = ..#SimpleModuleName _ "-dep"
+
+    // check both parent and child module have all 3 load, install, and uninstall entries with proper phases
+
+    // parent module: simplest-module
+    set filter("package")=moduleName
+    set rs = ##class(%IPM.General.History).GetHistory(.filter,,10)
+    set actions = $listbuild("load", "install", "uninstall")
+    set pointer = 0
+    while $listnext(actions,pointer,action) {
+        set filter("action") = action
+        set rs = ##class(%IPM.General.History).GetHistory(.filter,,10)
+        set count = 0
+        while rs.%Next() {
+            do $$$AssertTrue(rs.%Get("ID") '= "")
+            do $$$AssertEquals(rs.%Get("Action"),action)
+            do $$$AssertEquals(rs.%Get("Package"),moduleName)
+            do $$$AssertEquals(rs.%Get("Version_Major"),"3")
+            do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
+            do $$$AssertEquals(rs.%Get("Version_Patch"),"0")
+            do $$$AssertEquals(rs.%Get("UserName"),"irisowner")
+            do $$$AssertTrue(rs.%Get("TimeStart") '= "")
+            do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
+            do $$$AssertEquals(rs.%Get("Success"),1)
+            do $$$AssertEquals(rs.%Get("Committed"),1)
+            set count = count + 1
+        }
+        do $$$AssertEquals(count, 1, "Only one " _ action _ " action")
+    }
+
+    // child module: simplest-module-dep
+    set filter("package")=depName
+    set rs = ##class(%IPM.General.History).GetHistory(.filter,,10)
+    set actions = $listbuild("load", "install", "uninstall")
+    set pointer = 0
+    while $listnext(actions,pointer,action) {
+        set filter("action") = action
+        set rs = ##class(%IPM.General.History).GetHistory(.filter,,10)
+        set count = 0
+        while rs.%Next() {
+            do $$$AssertTrue(rs.%Get("ID") '= "")
+            do $$$AssertEquals(rs.%Get("Action"),action)
+            do $$$AssertEquals(rs.%Get("Package"),depName)
+            do $$$AssertEquals(rs.%Get("Version_Major"),"1")
+            do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
+            do $$$AssertEquals(rs.%Get("Version_Patch"),"0")
+            do $$$AssertEquals(rs.%Get("UserName"),"irisowner")
+            do $$$AssertTrue(rs.%Get("TimeStart") '= "")
+            do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
+            do $$$AssertEquals(rs.%Get("Success"),1)
+            do $$$AssertEquals(rs.%Get("Committed"),1)
+            set count = count + 1
+        }
+        do $$$AssertEquals(count, 1, "Only one " _ action _ " action")
+
+        // check phases
+        set phases = rs.%Get("Phases")
+        if (action = "load") || (action = "install") {
+            // 5 phases expected: Initialize, Reload, Validate, Compile, Activate
+            do $$$AssertEquals($listlength(phases), 5)
+
+            set initialize = $listget($listget(phases, 1), 1)
+            do $$$AssertEquals($listget(initialize, 1),"Initialize")
+            do $$$AssertTrue($listget(initialize, 2)'="")
+            do $$$AssertTrue($listget(initialize, 3)'="")
+            do $$$AssertEquals($listget(initialize, 4), $$$OK)
+
+            set reload = $listget($listget(phases, 2), 1)
+            do $$$AssertEquals($listget(reload, 1),"Reload")
+            do $$$AssertTrue($listget(reload, 2)'="")
+            do $$$AssertTrue($listget(reload, 3)'="")
+            do $$$AssertEquals($listget(reload, 4), $$$OK)
+
+            set validate = $listget($listget(phases, 3), 1)
+            do $$$AssertEquals($listget(validate, 1),"Validate")
+            do $$$AssertTrue($listget(validate, 2)'="")
+            do $$$AssertTrue($listget(validate, 3)'="")
+            do $$$AssertEquals($listget(validate, 4), $$$OK)
+
+            set compile = $listget($listget(phases, 4), 1)
+            do $$$AssertEquals($listget(compile, 1),"Compile")
+            do $$$AssertTrue($listget(compile, 2)'="")
+            do $$$AssertTrue($listget(compile, 3)'="")
+            do $$$AssertEquals($listget(compile, 4), $$$OK)
+
+            set activate = $listget($listget(phases, 5), 1)
+            do $$$AssertEquals($listget(activate, 1),"Activate")
+            do $$$AssertTrue($listget(activate, 2)'="")
+            do $$$AssertTrue($listget(activate, 3)'="")
+            do $$$AssertEquals($listget(activate, 4), $$$OK)
+        } else {
+            // uninstall only has one phase
+            do $$$AssertEquals($listlength(phases), 1)
+            set initialize = $listget($listget(phases, 1), 1)
+            do $$$AssertEquals($listget(initialize, 1),"Clean")
+            do $$$AssertTrue($listget(initialize, 2)'="")
+            do $$$AssertTrue($listget(initialize, 3)'="")
+            do $$$AssertEquals($listget(initialize, 4), $$$OK)
+        }
     }
 }
 

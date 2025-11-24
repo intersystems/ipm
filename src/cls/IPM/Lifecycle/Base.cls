@@ -9,6 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
+/// Should be kept in sync with %IPM.DataType.PhaseName.VALUELIST
 Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure","ApplyUpdateSteps")};
 
 Property Payload As %Stream.Object [ Private ];
@@ -426,6 +427,7 @@ Method %Clean(ByRef pParams) As %Status
         }
 
         if tRecurse {
+
             for i=1:1:..Module.Dependencies.Count() {
                 set tModName = ..Module.Dependencies.GetAt(i).Name
                 if $data(pParams("Clean","Cycle",tModName)) {
@@ -433,11 +435,24 @@ Method %Clean(ByRef pParams) As %Status
                 }
                 zkill pParams("Clean","Skip",tModName)
                 if ##class(%IPM.Storage.Module).NameExists(tModName) {
+                    // Log uninstalls of dependents
+                    set log = ##class(%IPM.General.History).UninstallInit(tModName)
+                    do log.InitPhase("Clean")
                     set tModObj = ##class(%IPM.Storage.Module).NameOpen(tModName,,.tModSC)
                     if $$$ISERR(tModSC) {
                         write !,"WARNING: "_$system.Status.GetErrorText(tModSC)
+                        do log.FinalizePhase("Clean", tModSC)
+                        set status = log.Finalize(tModSC)
+                        if '$$$ISOK(status) {
+                            set tSC = $system.Status.AppendStatus(tSC, status)
+                        }
                         continue
                     }
+                    set tSC = log.SetVersion(tModObj.Version)
+                    if $$$ISERR(tSC) {
+                        quit
+                    }
+
                     kill tParams
                     merge tParams = pParams
                     zkill:'tRecurse tParams("Clean","Force")
@@ -445,15 +460,27 @@ Method %Clean(ByRef pParams) As %Status
                     set tParams("Clean","Nested") = 1
                     set tSC = tModObj.Lifecycle.Clean(.tParams)
                     if $$$ISERR(tSC) {
+                        do log.FinalizePhase("Clean", tSC)
+                        set status = log.Finalize(tSC)
+                        if $$$ISERR(status) {
+                            set tSC = $system.Status.AppendStatus(tSC, status)
+                        }
                         quit
                     }
                     if '$data(tParams("Clean","Skip",tModName)) {
                         set tSC = ##class(%IPM.Storage.Module).NameDelete(tModName)
                         if $$$ISERR(tSC) {
+                            do log.FinalizePhase("Clean", tSC)
+                            set status = log.Finalize(tSC)
+                            if $$$ISERR(status) {
+                                set tSC = $system.Status.AppendStatus(tSC, status)
+                            }
                             quit
                         }
                         write:tVerbose !,"Deleted ",tModName
                     }
+                    do log.FinalizePhase("Clean", $$$OK)
+                    set tSC = log.Finalize($$$OK)
                 }
             }
             if $$$ISERR(tSC) {

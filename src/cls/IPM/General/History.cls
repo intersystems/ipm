@@ -47,6 +47,8 @@ Property Committed As %Boolean [ InitialExpression = 0, Required ];
 /// The command string that triggered the action
 Property CommandString As %String(MAXLEN = "") [ Required ];
 
+Property Phases As list Of %IPM.General.HistoryPhase;
+
 ClassMethod Init(
 	Action As %String,
 	Package As %IPM.DataType.ModuleName) As %IPM.General.History [ Private ]
@@ -376,11 +378,13 @@ ClassMethod GetHistoryGlobally(
     return array
 }
 
-ClassMethod DisplayOneRecord(id As %Integer)
+ClassMethod DisplayOneRecord(
+	id As %Integer,
+	showPhases As %Boolean = 0)
 {
     set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT TOP 1 * FROM %IPM_General.History WHERE ID = ?", id)
     if rs.%Next() {
-        do ..ShowColumns(rs, 1)
+        do ..ShowColumns(rs, 1, showPhases)
     } else {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "No record found with ID "_id_". Use `history find` command to show all entries. "))
     }
@@ -391,7 +395,8 @@ ClassMethod DisplayOneRecord(id As %Integer)
 /// Otherwise, will display on a single line, with some details omitted
 ClassMethod ShowColumns(
 	rs As %SQL.StatementResult,
-	detail As %Boolean = 0) As %Status [ Internal, Private ]
+	detail As %Boolean = 0,
+	showPhases As %Boolean = 0) As %Status [ Internal, Private ]
 {
     set columnStyles = $listbuild(
         $listbuild("ID", $$$Bright),
@@ -431,7 +436,52 @@ ClassMethod ShowColumns(
             write value, " "
         }
     }
+
+    if showPhases {
+        do ..ShowPhases(rs)
+    }
     return $$$OK
+}
+
+ClassMethod ShowPhases(rs As %SQL.StatementResult) As %Status [ Internal, Private ]
+{
+    write !,$$$FormattedLine($$$Dim, "Phases"), ": ", !
+    set phases = rs.%Get("Phases")
+    if $listlength(phases) > 0 {
+        // Display a header row first
+        set phaseColumnStyles = $listbuild(
+            $listbuild("Name", $$$Red),
+            $listbuild("Time", $$$Yellow),
+            $listbuild("Success", $$$Default)
+        )
+        set ptr = 0
+        while $listnext(phaseColumnStyles, ptr, pair) {
+            set $listbuild(column, style) = pair
+            write $$$FormattedLine(style, column), " "
+        }
+        write !!
+
+        set ptr = 0
+        while $listnext(phases, ptr, phase) {
+            // display phase name
+            set name = $listget($listget(phase,1),1)
+            write $$$FormattedLine($$$Red, name), " "
+
+            // display phase timing
+            set start = $listget($listget(phase,1),2)
+            set end = $listget($listget(phase,1),3)
+            if end = "" {
+                write $$$FormattedLine($$$Yellow, start), " "
+            } else {
+                set diff = $system.SQL.Functions.DATEDIFF("ss", start, end)
+                write $$$FormattedLine($$$Yellow, $$$FormatText("%1 (%2 sec)", start, diff)), " "
+            }
+
+            // display phase success
+            set success = $listget($listget(phase,1),4)
+            write $select($$$ISOK(success): "Success", 1:$system.Status.GetErrorText(success)), !
+        }
+    }
 }
 
 ClassMethod VersionToString(
@@ -461,7 +511,7 @@ ClassMethod TimeToString(
     if end = "" {
         quit rs.%Get("TimeStart")
     }
-    set diff = $system.SQL.DATEDIFF("ss", start, end)
+    set diff = $system.SQL.Functions.DATEDIFF("ss", start, end)
 
     quit $$$FormatText("%1 (%2 sec)", start, diff)
 }
@@ -544,6 +594,46 @@ ClassMethod DisplayArray(array As %Library.ArrayOfObjects)
     set $namespace = originalNS
 }
 
+Method InitPhase(name As %String)
+{
+    set phase = ##class(%IPM.General.HistoryPhase).%New()
+    set phase.Name = name
+    set phase.TimeStart = $zdatetime($now(), 3)
+    $$$ThrowOnError(..Phases.Insert(phase))
+    $$$ThrowOnError(..%Save()) // Save it now in case Finalize isn't called
+}
+
+Method FinalizePhase(
+	name As %String,
+	status As %String)
+{
+    if ..Phases.Size = 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No phase logs found"))
+    }
+    // Most likely the last phase in the list so check there first
+    set phase = ..Phases.GetAt(..Phases.Size)
+    if phase.Name = name {
+        set phase.Success = status
+        set phase.TimeEnd = $zdatetime($now(), 3)
+        $$$ThrowOnError(..%Save())
+    } else {
+        // look through the rest of the phases
+        set key = ""
+        for {
+            set phase = ..Phases.GetNext(.key)
+            if phase.Name = name {
+                set phase.Success = status
+                set phase.TimeEnd = $zdatetime($now(), 3)
+                $$$ThrowOnError(..%Save())
+                quit
+            }
+            if key = "" {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "No log for phase " _ name _ " found"))
+            }
+        }
+    }
+}
+
 Storage Default
 {
 <Data name="HistoryDefaultData">
@@ -585,6 +675,9 @@ Storage Default
 </Value>
 <Value name="13">
 <Value>CommandString</Value>
+</Value>
+<Value name="14">
+<Value>Phases</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.General.HistoryD</DataLocation>

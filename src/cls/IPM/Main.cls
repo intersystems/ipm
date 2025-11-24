@@ -764,6 +764,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
 	<modifier name="sort" aliases="asc" value="true" description="List the history logs in a specific order. Allowed values are asc and desc. Default behaviour is to list logs in descending order of %ID."/>
 	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. If set to 0, all logs will be displayed. If omitted, will use the value returned by `zpm &quot;config get DefaultLogEntryLimit&quot;`."/>
+    <modifier name="showPhases" aliases="p,phases" description="Show lifecycle phase information in details view." />
 	<modifier name="confirm" value="false" description="If present, will delete all records in the current namespace. Ignored if -globally is passed too."/>
     <modifier name="verbose" aliases="v" dataAlias="verbose" dataValue="1" description="Produces verbose output from the command." />
 	<parameter name="action" required="false" description="One of history actions: find (default), details, delete, schema" />
@@ -777,7 +778,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
 	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
 	<example description="Delete all histories in the namespace">history delete -confirm</example>
-	<example description="Show details of history item with ID 3">history details 3</example>
+	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
 </command>
 
 </commands>
@@ -2363,7 +2364,7 @@ ClassMethod Install(
                 }
 				$$$ThrowOnError(log.SetSource(tResult.ServerName))
 				$$$ThrowOnError(log.SetVersion(tResult.Version))
-                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous, 1))
+                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous, log))
             }
         } else {
             set tPrefix = ""
@@ -3714,7 +3715,8 @@ ClassMethod History(ByRef pCommandInfo)
         }
 	} elseif action = "details" {
 		set id = $get(pCommandInfo("parameters", "argument"))
-		do ##class(%IPM.General.History).DisplayOneRecord(id)
+	    set showPhases = $$$HasModifier(pCommandInfo, "showPhases")
+		do ##class(%IPM.General.History).DisplayOneRecord(id, showPhases)
 	} elseif action = "schema" {
 		$$$ThrowOnError($system.SQL.Schema.GetAllColumns("%IPM_General.History", , .columns))
 		write "Columns available for filtering are: "
