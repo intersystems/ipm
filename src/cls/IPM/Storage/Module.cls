@@ -446,7 +446,7 @@ ClassMethod ExecutePhases(
 	pPhases As %List,
 	pIsComplete As %Boolean = 0,
 	ByRef pParams,
-	pLog As %IPM.General.History = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -709,7 +709,7 @@ ClassMethod Uninstall(
 	ByRef pParams) As %Status
 {
     set tSC = $$$OK
-	set log = ##class(%IPM.General.History).UninstallInit(pModuleName)
+	set log = ##class(%IPM.General.HistoryTemp).UninstallInit(pModuleName)
 	set module = ..NameOpen(pModuleName,,.tSC)
 	if $isobject(module) {
 		$$$ThrowOnError(log.SetVersion(module.Version))

@@ -222,7 +222,7 @@ ClassMethod LoadQualifiedReference(
 	ByRef pParams,
 	ByRef pDependencyGraph,
 	pSynchronous As %Boolean = 0,
-	pLog As %IPM.General.History = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -244,7 +244,7 @@ ClassMethod LoadModuleReference(
 	ByRef pParams,
 	ByRef pDependencyGraph,
 	pSynchronous As %Boolean = 0,
-	pLog As %IPM.General.History = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     // if install of module is already being logged, don't duplicate
     set prelogged = $case(pLog, "": 0, :1)
@@ -267,9 +267,9 @@ ClassMethod LoadModuleReference(
 		}
         if pLog = "" {
             if $get(pParams("cmd")) = "install" {
-                set log = ##class(%IPM.General.History).InstallInit(pModuleName)
+                set log = ##class(%IPM.General.HistoryTemp).InstallInit(pModuleName)
             } else {
-                set log = ##class(%IPM.General.History).LoadInit(pModuleName)
+                set log = ##class(%IPM.General.HistoryTemp).LoadInit(pModuleName)
             }
             $$$ThrowOnError(log.SetSource(pServerName))
             $$$ThrowOnError(log.SetVersion(pVersion))
@@ -438,7 +438,7 @@ ClassMethod LoadModuleFromArchive(
 	ByRef pParams,
 	pRepository As %String = "",
 	pSynchronous As %Boolean = 0,
-	pLog As %IPM.General.History) As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -486,7 +486,7 @@ ClassMethod LoadModuleFromDirectory(
 	pOverrideDeveloperMode As %Boolean = 0,
 	pRepository As %String = "",
 	pSynchronous As %Boolean = 0,
-	pLog As %IPM.General.History = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -1277,7 +1277,7 @@ ClassMethod LoadNewModule(
 	ByRef pParams,
 	pRepository As %String = "",
 	pSynchronous As %Boolean = 0,
-	pLog As %IPM.General.History) As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
 	if $data(pLog) # 2 = 0 {
 		set pLog = ""

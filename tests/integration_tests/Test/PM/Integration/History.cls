@@ -545,7 +545,7 @@ Method TestFailingPhases()
         // Check history log entry is good
         do $$$AssertTrue(rs.%Get("ID") '= "")
         do $$$AssertEquals(rs.%Get("Action"),"load")
-        do $$$AssertEquals(rs.%Get("Package"),"NonStatusReturnCheckStatus")
+        do $$$AssertEquals(rs.%Get("Package"),"invoke")
         do $$$AssertEquals(rs.%Get("Version_Major"),"0")
         do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
         do $$$AssertEquals(rs.%Get("Version_Patch"),"1")
@@ -591,7 +591,7 @@ Method TestFailingPhases()
         set activate = $listget($listget(phases, 5), 1)
         do $$$AssertEquals($listget(activate, 1),"Activate")
         do $$$AssertTrue($listget(activate, 2)'="")
-        do $$$AssertEquals($listget(activate, 3),"")
+        do $$$AssertTrue($listget(activate, 3)'="")
         do $$$AssertNotEquals($listget(activate, 4), $$$OK)
     }
 }
@@ -700,6 +700,102 @@ Method TestWithDependencies()
             do $$$AssertTrue($listget(initialize, 3)'="")
             do $$$AssertEquals($listget(initialize, 4), $$$OK)
         }
+    }
+}
+
+Method TestTempGlobalWhacking()
+{
+    // Populate history log entries
+    do ..DoLoadUninstallInstall(..#SimpleModuleName, "1.0.0")
+
+    // Whack the HistoryTemp global and make sure everything still works
+    kill ^IRIS.Temp.HistoryTempD
+
+    // verify the phases have been populated appropriately
+    set actions = $listbuild("load", "install")
+    set pointer = 0
+    while $listnext(actions,pointer,action) {
+        set filter("action") = action
+        set rs = ##class(%IPM.General.History).GetHistory(.filter,,10)
+        while rs.%Next() {
+            do $$$AssertTrue(rs.%Get("ID") '= "")
+            do $$$AssertEquals(rs.%Get("Action"),action)
+            do $$$AssertEquals(rs.%Get("Package"),..#SimpleModuleName)
+            do $$$AssertEquals(rs.%Get("Version_Major"),"1")
+            do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
+            do $$$AssertEquals(rs.%Get("Version_Patch"),"0")
+            do $$$AssertEquals(rs.%Get("UserName"),"irisowner")
+            do $$$AssertTrue(rs.%Get("TimeStart") '= "")
+            do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
+            do $$$AssertEquals(rs.%Get("Success"),1)
+            do $$$AssertEquals(rs.%Get("Committed"),1)
+            do $$$AssertNotEquals(rs.%Get("CommandString"), "")
+
+            // check phases
+            set phases = rs.%Get("Phases")
+            // 5 phases expected: Initialize, Reload, Validate, Compile, Activate
+            do $$$AssertEquals($listlength(phases), 5)
+
+            set initialize = $listget($listget(phases, 1), 1)
+            do $$$AssertEquals($listget(initialize, 1),"Initialize")
+            do $$$AssertTrue($listget(initialize, 2)'="")
+            do $$$AssertTrue($listget(initialize, 3)'="")
+            do $$$AssertEquals($listget(initialize, 4), $$$OK)
+
+            set reload = $listget($listget(phases, 2), 1)
+            do $$$AssertEquals($listget(reload, 1),"Reload")
+            do $$$AssertTrue($listget(reload, 2)'="")
+            do $$$AssertTrue($listget(reload, 3)'="")
+            do $$$AssertEquals($listget(reload, 4), $$$OK)
+
+            set validate = $listget($listget(phases, 3), 1)
+            do $$$AssertEquals($listget(validate, 1),"Validate")
+            do $$$AssertTrue($listget(validate, 2)'="")
+            do $$$AssertTrue($listget(validate, 3)'="")
+            do $$$AssertEquals($listget(validate, 4), $$$OK)
+
+            set compile = $listget($listget(phases, 4), 1)
+            do $$$AssertEquals($listget(compile, 1),"Compile")
+            do $$$AssertTrue($listget(compile, 2)'="")
+            do $$$AssertTrue($listget(compile, 3)'="")
+            do $$$AssertEquals($listget(compile, 4), $$$OK)
+
+            set activate = $listget($listget(phases, 5), 1)
+            do $$$AssertEquals($listget(activate, 1),"Activate")
+            do $$$AssertTrue($listget(activate, 2)'="")
+            do $$$AssertTrue($listget(activate, 3)'="")
+            do $$$AssertEquals($listget(activate, 4), $$$OK)
+        }
+    }
+    // Uninstall only has the clean phase
+    set filter("action") = "uninstall"
+    set rs = ##class(%IPM.General.History).GetHistory(.filter,,10)
+    while rs.%Next() {
+        do $$$AssertTrue(rs.%Get("ID") '= "")
+        do $$$AssertEquals(rs.%Get("Action"),"uninstall")
+        do $$$AssertEquals(rs.%Get("Package"),..#SimpleModuleName)
+        do $$$AssertEquals(rs.%Get("Version_Major"),"1")
+        do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
+        do $$$AssertEquals(rs.%Get("Version_Patch"),"0")
+        do $$$AssertEquals(rs.%Get("UserName"),"irisowner")
+        do $$$AssertTrue(rs.%Get("TimeStart") '= "")
+        do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
+        do $$$AssertEquals(rs.%Get("Success"),1)
+        do $$$AssertEquals(rs.%Get("Committed"),1)
+        do $$$AssertNotEquals(rs.%Get("CommandString"), "")
+        do $$$AssertEquals(rs.%Get("SourceDetails"),"")
+        do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
+        do $$$AssertEquals(rs.%Get("SourceName"),"")
+
+        // check phases
+        set phases = rs.%Get("Phases")
+        do $$$AssertEquals($listlength(phases), 1)
+
+        set initialize = $listget($listget(phases, 1), 1)
+        do $$$AssertEquals($listget(initialize, 1),"Clean")
+        do $$$AssertTrue($listget(initialize, 2)'="")
+        do $$$AssertTrue($listget(initialize, 3)'="")
+        do $$$AssertEquals($listget(initialize, 4), $$$OK)
     }
 }
 

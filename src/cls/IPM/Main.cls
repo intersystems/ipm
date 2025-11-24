@@ -2171,11 +2171,11 @@ ClassMethod LoadFromRepo(
 
 ClassMethod Load(
 	ByRef pCommandInfo,
-	pLog As %IPM.General.History = "") [ Internal ]
+	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
 {
 	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
     if pLog = "" {
-	    set log = ##class(%IPM.General.History).LoadInit("")
+	    set log = ##class(%IPM.General.HistoryTemp).LoadInit("")
     } else {
         set log = pLog
     }
@@ -2190,7 +2190,7 @@ ClassMethod Load(
 
 ClassMethod LoadInternal(
 	ByRef pCommandInfo,
-	pLog As %IPM.General.History) [ Internal ]
+	pLog As %IPM.General.AbstractHistory) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
     set isAbsolutePath = ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) = tDirectoryName)
@@ -2278,7 +2278,7 @@ ClassMethod CheckModuleNamespace() As %Status
 
 ClassMethod Install(
 	ByRef pCommandInfo,
-	pLog As %IPM.General.History = "") [ Internal ]
+	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
 {
     set devMode = $get(pCommandInfo("data","DeveloperMode"), 0)
     set tRegistry = ""
@@ -2288,8 +2288,7 @@ ClassMethod Install(
     }
 
     if pLog = "" {
-        #dim log As %IPM.General.History
-        set log = ##class(%IPM.General.History).InstallInit(tModuleName)
+        set log = ##class(%IPM.General.HistoryTemp).InstallInit(tModuleName)
     } else {
         set log = pLog
     }
@@ -3992,7 +3991,7 @@ ClassMethod Update(ByRef pCommandInfo)
     set pCommandInfo("data","cmd") = "update"
     set pCommandInfo("data","Update") = 1
     set pCommandInfo("data","ModuleName") = moduleName
-    set log = ##class(%IPM.General.History).UpdateInit(moduleName)
+    set log = ##class(%IPM.General.HistoryTemp).UpdateInit(moduleName)
     if path '= "" {
         // A path to a tarball is specified. Call ..Load() in order to load the newer version of the module.
         set pCommandInfo("parameters","path") = path

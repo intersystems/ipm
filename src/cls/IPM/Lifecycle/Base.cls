@@ -436,7 +436,7 @@ Method %Clean(ByRef pParams) As %Status
                 zkill pParams("Clean","Skip",tModName)
                 if ##class(%IPM.Storage.Module).NameExists(tModName) {
                     // Log uninstalls of dependents
-                    set log = ##class(%IPM.General.History).UninstallInit(tModName)
+                    set log = ##class(%IPM.General.HistoryTemp).UninstallInit(tModName)
                     do log.InitPhase("Clean")
                     set tModObj = ##class(%IPM.Storage.Module).NameOpen(tModName,,.tModSC)
                     if $$$ISERR(tModSC) {
