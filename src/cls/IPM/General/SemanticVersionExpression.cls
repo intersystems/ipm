@@ -43,7 +43,9 @@ Method ExpressionSet(value As %String) As %Status
                 set andExpr = merged
             }
         }
-        do ..AnyOf.Insert(andExpr)
+        if (andExpr.ToResolvedString() '= "") {
+            do ..AnyOf.Insert(andExpr)
+        }
     } else {
         set options = $listfromstring(value,"||")
         set ptr = 0
@@ -102,7 +104,9 @@ ClassMethod FromString(
 
 Method IsSatisfiedBy(version As %IPM.General.SemanticVersion) As %Boolean
 {
-    set satisfied = (..AnyOf.Count() = 0)
+    if (..AnyOf.Count() = 0) {
+        return 1
+    }
     for i=1:1:..AnyOf.Count() {
         if ..AnyOf.GetAt(i).IsSatisfiedBy(version) {
             return 1
