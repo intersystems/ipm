@@ -221,6 +221,194 @@ Method IsSatisfiedBy(version As %IPM.General.SemanticVersion) As %Boolean
 	quit ..InRange(version)
 }
 
+/// Find the intersection of two ranges.
+/// Returns a new Range object representing the intersection.
+/// Return "" if there is no intersection.
+/// Example: Merge(">=1.0.0 <3.0.0", ">1.1.0 <3.4.0") returns ">1.1.0 <3.0.0"
+ClassMethod Intersect(
+	range1 As %IPM.General.SemanticVersionExpression.Range,
+	range2 As %IPM.General.SemanticVersionExpression.Range) As %IPM.General.SemanticVersionExpression.Range
+{
+    // Collect all comparators from both ranges
+    set lowerBounds = ##class(%ListOfObjects).%New()  // List of >= or > comparators
+    set upperBounds = ##class(%ListOfObjects).%New()  // List of < or <= comparators
+    set exactMatches = ##class(%ListOfObjects).%New()  // List of = comparators
+
+    // Process comparators from ranges
+    do ..ProcessComparators(range1,.lowerBounds,.upperBounds,.exactMatches)
+    do ..ProcessComparators(range2,.lowerBounds,.upperBounds,.exactMatches)
+
+    // If any exact matches exist, they must all be equal and the final range is just that version
+    if (exactMatches.Count() > 0) {
+        set firstExact = exactMatches.GetAt(1)
+        for i = 2:1:exactMatches.Count() {
+            set comp = exactMatches.GetAt(i)
+            if (firstExact.Major '= comp.Major) || (firstExact.Minor '= comp.Minor) || (firstExact.Patch '= comp.Patch) || (firstExact.Prerelease '= comp.Prerelease) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Exact version matches do not agree: %1 and %2", firstExact.ToResolvedString(), comp.ToResolvedString())))
+            }
+        }
+        // All exact matches agree; return that version
+        return firstExact
+    }
+
+    // Find the most restrictive lower bound (the maximum of all lower bounds)
+    set maxLowerBound = ""
+    for i = 1:1:lowerBounds.Count() {
+        set comp = lowerBounds.GetAt(i)
+        if (maxLowerBound = "") {
+            set maxLowerBound = comp
+        } else {
+            // Compare the two bounds and keep the more restrictive one
+            if ..CompareVersions(maxLowerBound, comp) < 0 {
+                // comp is more restrictive (higher version or stricter operator)
+                set maxLowerBound = comp
+            }
+        }
+    }
+
+    // Find the most restrictive upper bound (the minimum of all upper bounds)
+    set minUpperBound = ""
+    set ptr = 0
+    for i = 1:1:upperBounds.Count() {
+        set comp = upperBounds.GetAt(i)
+        if (minUpperBound = "") {
+            set minUpperBound = comp
+        } else {
+            // Compare the two bounds and keep the more restrictive one
+            if ..CompareVersions(minUpperBound, comp) > 0 {
+                // comp is more restrictive (lower version or stricter operator)
+                set minUpperBound = comp
+            }
+        }
+    }
+
+    // Validate that the intersection is non-empty
+    if (maxLowerBound '= "") && (minUpperBound '= "") {
+        if '..IsIntersectionValid(maxLowerBound, minUpperBound) {
+            return ""
+        }
+    }
+
+    // Build the merged range
+    set mergedExpression = ""
+    if (maxLowerBound '= "") {
+        set mergedExpression = maxLowerBound.ToResolvedString()
+    }
+    if (minUpperBound '= "") {
+        if (mergedExpression '= "") {
+            set mergedExpression = mergedExpression_" "
+        }
+        set mergedExpression = mergedExpression_minUpperBound.ToResolvedString()
+    }
+
+    if (mergedExpression = "") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Cannot merge ranges %1 and %2: no valid comparators found", maxLowerBound.ToResolvedString(), minUpperBound.ToResolvedString())))
+    }
+
+    // Create and return the merged range
+    set sc = ..FromString(mergedExpression, .mergedRange)
+    $$$ThrowOnError(sc)
+
+    return mergedRange
+}
+
+ClassMethod ProcessComparators(
+	range As %IPM.General.SemanticVersionExpression.Range,
+	ByRef lowerBounds As %ListOfObjects,
+	ByRef upperBounds As %ListOfObjects,
+	ByRef exactMatches As %ListOfObjects)
+{
+    for i=1:1:range.Comparators.Count() {
+        set comp = range.Comparators.GetAt(i)
+        if (comp.Operator = ">=") || (comp.Operator = ">") {
+            do lowerBounds.Insert(comp)
+        } elseif (comp.Operator = "<") || (comp.Operator = "<=") {
+            do upperBounds.Insert(comp)
+        } elseif (comp.Operator = "=") {
+            do exactMatches.Insert(comp)
+        }
+    }
+}
+
+/// Helper method to compare two version comparators
+/// Returns: 1 if comp1 > comp2, -1 if comp1 < comp2, 0 if equal
+ClassMethod CompareVersions(
+	comp1 As %IPM.General.SemanticVersionExpression.Comparator,
+	comp2 As %IPM.General.SemanticVersionExpression.Comparator)
+{
+    // Create semantic versions for comparison
+    set v1 = ##class(%IPM.General.SemanticVersion).%New()
+    set v1.Major = comp1.Major
+    set v1.Minor = comp1.Minor
+    set v1.Patch = comp1.Patch
+    set v1.Prerelease = comp1.Prerelease
+
+    set v2 = ##class(%IPM.General.SemanticVersion).%New()
+    set v2.Major = comp2.Major
+    set v2.Minor = comp2.Minor
+    set v2.Patch = comp2.Patch
+    set v2.Prerelease = comp2.Prerelease
+
+    // Compare versions
+    if v1.Follows(v2) {
+        set result = 1
+    } elseif v2.Follows(v1) {
+        set result = -1
+    } else {
+        // Versions are equal, compare operators
+        // For lower bounds: > is more restrictive than >=
+        // For upper bounds: < is more restrictive than <=
+        if (comp1.Operator = ">") && (comp2.Operator = ">=") {
+            set result = 1
+        } elseif (comp1.Operator = ">=") && (comp2.Operator = ">") {
+            set result = -1
+        } elseif (comp1.Operator = "<") && (comp2.Operator = "<=") {
+            set result = -1
+        } elseif (comp1.Operator = "<=") && (comp2.Operator = "<") {
+            set result = 1
+        } else {
+            set result = 0
+        }
+    }
+    return result
+}
+
+/// Helper method to validate that lower bound < upper bound. Returns 1 if so, else 0.
+ClassMethod IsIntersectionValid(
+	lowerBound As %IPM.General.SemanticVersionExpression.Comparator,
+	upperBound As %IPM.General.SemanticVersionExpression.Comparator)
+{
+    // Create semantic versions for comparison
+    set vLower = ##class(%IPM.General.SemanticVersion).%New()
+    set vLower.Major = lowerBound.Major
+    set vLower.Minor = lowerBound.Minor
+    set vLower.Patch = lowerBound.Patch
+    set vLower.Prerelease = lowerBound.Prerelease
+
+    set vUpper = ##class(%IPM.General.SemanticVersion).%New()
+    set vUpper.Major = upperBound.Major
+    set vUpper.Minor = upperBound.Minor
+    set vUpper.Patch = upperBound.Patch
+    set vUpper.Prerelease = upperBound.Prerelease
+
+    // Check if lower bound is less than upper bound
+    if vUpper.Follows(vLower) {
+        // Valid: upper > lower
+        return 1
+    }
+    if vLower.Follows(vUpper) {
+        // Invalid: lower > upper
+        return 0
+    }
+    // Versions are equal, check operators
+    // Valid cases: >=X and <=X (allows exactly X)
+    // Invalid cases: >X and <X (no version can satisfy both)
+    if (lowerBound.Operator = ">") || (upperBound.Operator = "<") {
+        return 0
+    }
+    return 1
+}
+
 Storage Default
 {
 <Data name="RangeState">

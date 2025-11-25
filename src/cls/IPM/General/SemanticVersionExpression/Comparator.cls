@@ -79,7 +79,7 @@ ClassMethod FromString(
     set tSC = e.AsStatus()
   }
   if $$$ISERR(tSC) {
-    set tSC = $system.Status.EmbedStatus($$$ERROR($$$GeneralError,"Error parsing semantic version expression: "_pExpr),tSC)
+    set tSC = $system.Status.EmbedStatus($$$ERROR($$$GeneralError,"Error parsing semantic version expression comparator: "_pExpr),tSC)
   }
   quit tSC
 }
