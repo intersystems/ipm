@@ -797,10 +797,9 @@ ClassMethod HasScope(
     quit $listfind(tPhases, scopeItem) > 0
 }
 
-/// Test performance of BuildDependencyGraph* methods
+/// Test performance of BuildDependencyGraph* methods and verify graph equality
 ClassMethod DepGraph(modPath As %String)
 {
-	kill ^mtempki
 	set mod = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(modPath, .found)
 	if 'found {
 		write !, "Did not find module"
@@ -815,78 +814,88 @@ ClassMethod DepGraph(modPath As %String)
 	set elapsed1 = $zhorolog-start
 	write !,elapsed1," seconds elapsed.",!
 
-	kill arr1
-	set key = ""
-	while 1 {
-		set key = $order(^mtempki(key),1,value)
-		if (key = "") {
-			quit
-		}
-		set arr1(value,key) = ""
-	}
-
-	write !,"===== OPTIMIZED BuildDependencyGraphOptimized ====="
-	kill ^mtempki
-	set start = $zhorolog
-	write !,"Starting optimized build dep graph..."
-    kill graph2, searchList2
-	set sc2 = mod.BuildDependencyGraphOptimized(.graph2, , , , , , , 1, , , , .searchList2, 1)
-	set elapsed2 = $zhorolog-start
-	write !,elapsed2," seconds elapsed.",!
-
-	kill arr2
-	set key = ""
-	while 1 {
-		set key = $order(^mtempki(key),1,value)
-		if (key = "") {
-			quit
-		}
-		set arr2(value,key) = ""
-	}
-
 	write !,"===== ITERATIVE BuildDependencyGraphIterative ====="
-	kill ^mtempki
 	set start = $zhorolog
 	write !,"Starting iterative build dep graph..."
     kill graph3
-	set sc3 = mod.BuildDependencyGraphIterative(.graph3, , , 1)
+    set sc3 = mod.BuildDependencyGraphIterative(.graph3)
 	set elapsed3 = $zhorolog-start
 	write !,elapsed3," seconds elapsed.",!
 
-	kill arr3
-	set key = ""
-	while 1 {
-		set key = $order(^mtempki(key),1,value)
-		if (key = "") {
-			quit
-		}
-		set arr3(value,key) = ""
-	}
-
-	write !!,"===== COMPARISON ====="
+	write !
+	write !,"===== COMPARISON ====="
 	write !,"Original time:     ",elapsed1," seconds"
-	write !,"Optimized time:    ",elapsed2," seconds"
 	write !,"Iterative time:    ",elapsed3," seconds"
 	if (elapsed1 > 0) {
-		set improvement2 = ((elapsed1 - elapsed2) / elapsed1) * 100
 		set improvement3 = ((elapsed1 - elapsed3) / elapsed1) * 100
-		write !,"Optimized improv:  ",$fnumber(improvement2,"",2),"%"
 		write !,"Iterative improv:  ",$fnumber(improvement3,"",2),"%"
 	}
-	write !!,"Module visit counts:"
-	write !,"Original method:"
-	zwrite arr1
-    zwrite graph1
-	write !,"Optimized method:"
-	zwrite arr2
-    zwrite graph2
-	write !,"Iterative method:"
-	zwrite arr3
-    zwrite graph3
+
+	// Compare graphs for equality
+	write !
+	write !,"===== GRAPH COMPARISON ====="
+
+	set graphsMatch = 1
+	set mismatchDetails = ""
+
+	// Compare all keys in graph1 vs graph3
+	set key = ""
+	for {
+		set key = $order(graph1(key))
+		quit:key=""
+
+		if '$data(graph3(key)) {
+			set graphsMatch = 0
+			set mismatchDetails = mismatchDetails_$char(10)_"  Original has module '"_key_"' but Iterative does not"
+		} else {
+			// Compare the dependency info (depth, server, version, displayName)
+			if graph1(key) '= graph3(key) {
+				set graphsMatch = 0
+				set mismatchDetails = mismatchDetails_$char(10)_"  graph1('"_key_"')="_graph1(key)
+				set mismatchDetails = mismatchDetails_$char(10)_"  graph3('"_key_"')="_graph3(key)
+			}
+
+			// Compare dependency relationships (subkeys)
+			set subkey = ""
+			for {
+				set subkey = $order(graph1(key, subkey))
+				quit:subkey=""
+
+				if '$data(graph3(key, subkey)) {
+					set graphsMatch = 0
+					set mismatchDetails = mismatchDetails_$char(10)_"  Original has '"_key_"'->>'"_subkey_"' but Iterative does not"
+				} elseif graph1(key, subkey) '= graph3(key, subkey) {
+					set graphsMatch = 0
+					set mismatchDetails = mismatchDetails_$char(10)_"  graph1('"_key_"','"_subkey_"')="_graph1(key, subkey)
+					set mismatchDetails = mismatchDetails_$char(10)_"  graph3('"_key_"','"_subkey_"')="_graph3(key, subkey)
+				}
+			}
+		}
+	}
+
+	// Check for keys in graph3 but not in graph1
+	set key = ""
+	for {
+		set key = $order(graph3(key))
+		quit:key=""
+
+		if '$data(graph1(key)) {
+			set graphsMatch = 0
+			set mismatchDetails = mismatchDetails_$char(10)_"  Iterative has module '"_key_"' but Original does not"
+		}
+	}
+
+	if graphsMatch {
+		write !,"✓ Both methods produce IDENTICAL graphs"
+	} else {
+		write !,"✗ Graphs DIFFER:",mismatchDetails
+	}
+
+	write !
 	write !,"Status codes:"
-	write !,"Original:  " zwrite sc1
-	write !,"Optimized: " zwrite sc2
-	write !,"Iterative: " zwrite sc3
+	write !,"Original:  sc1=",sc1
+	write !,"Iterative: sc3=",sc3
+	write !
 }
 
 /// Builds a dependency graph for this module using a dual-pass recursive depth-first algorithm.
@@ -940,7 +949,6 @@ Method BuildDependencyGraph(
     #define FUZZY 2
     #define SCOPE "Scope"
 
-    set ^mtempki(..Name) = $increment(^mtempki(..Name))
     set tSC = $$$OK
     try {
         kill tSubModules
@@ -1252,442 +1260,6 @@ Method BuildDependencyGraph(
     quit tSC
 }
 
-/// Builds a dependency graph using a single-pass recursive algorithm with dependency classification.
-/// <p>
-/// <b>Algorithm:</b> This optimized version eliminates the dual-pass approach by classifying dependencies first:
-/// <ol>
-/// <li><b>Classification:</b> Separates dependencies into exact (semantic version) and fuzzy (version expression) categories before processing</li>
-/// <li><b>Exact Processing:</b> Processes all exact dependencies with fail-fast behavior - immediately recurses at line 1635</li>
-/// <li><b>Fuzzy Processing:</b> Processes all fuzzy dependencies with backtracking - tries multiple candidates and recurses at line 1676</li>
-/// <li><b>Caching:</b> Uses direct subscript lookup for repository searches and manifest caching (server^name^version) to avoid duplicate retrievals</li>
-/// <li><b>Breadth-First Resolution:</b> Resolves accumulated dependencies level-by-level at top level (pDepth=1)</li>
-/// </ol>
-/// This approach reduces module visits by ~50% compared to the dual-pass algorithm by eliminating redundant second-pass recursion.
-/// <p>
-/// <b>Output:</b> <var>pDependencyGraph</var> is an array where keys are module names and values are lists containing:
-/// <ul>
-/// <li>Depth in the dependency tree (1 for direct dependencies, 2 for transitive, etc.)</li>
-/// <li>Server from which the module will be obtained (empty if already installed)</li>
-/// <li>Version string of the module to be installed</li>
-/// </ul>
-/// <p>
-/// <b>Parameters:</b><br>
-/// <var>pDependencyGraph</var> - Output array of resolved dependencies<br>
-/// <var>pDepth</var> - Maximum depth to resolve (1=direct only, 2=direct+transitive, 0=unlimited). Default: 1<br>
-/// <var>pForceSnapshotReload</var> - If true, reload cached snapshots from repositories. Default: false<br>
-/// <var>qstruct</var> - Controls which repositories are queried<br>
-/// <var>pPhases</var> - Lifecycle phases to execute; determines which scoped dependencies are considered. Empty=all<br>
-/// <var>pSubModules</var> - Output parameter returning discovered submodules<br>
-/// <var>pModulePath</var> - Internal: Path of modules for cycle detection. Default: current module name<br>
-/// <var>pIgnoreInstalledModules</var> - If true, don't use already-installed modules. Default: false<br>
-/// <var>pKnownDependencies</var> - Known dependencies to exclude from installed check. Default: current module's dependencies<br>
-/// <var>pPermitDowngrade</var> - If true, allow downgrading installed modules. Default: false<br>
-/// <var>pCheckNestedScoped</var> - If true, check scoped dependencies against root module phases. Default: false<br>
-/// <var>pSearchList</var> - Output parameter returning list of searched repositories<br>
-/// <var>pIncludeDisplayName</var> - If true, include display names in output. Default: false<br>
-/// <var>pManifestCache</var> - Internal: Cache of retrieved module manifests by server^name^version key
-Method BuildDependencyGraphOptimized(
-	ByRef pDependencyGraph,
-	pDepth As %Integer = 1,
-	pForceSnapshotReload As %Boolean = 0,
-	ByRef qstruct,
-	pPhases As %String = "",
-	ByRef pSubModules,
-	pModulePath As %List = {$listbuild(..Name)},
-	pIgnoreInstalledModules As %Boolean = 0,
-	pKnownDependencies As %List = {..GetKnownDependencies(..Name)},
-	pPermitDowngrade As %Boolean = 0,
-	pCheckNestedScoped As %Boolean = 0,
-	ByRef pSearchList,
-	pIncludeDisplayName As %Boolean = 0,
-	ByRef pManifestCache) As %Status [ Internal ]
-{
-    #define SCOPE "Scope"
-
-    set ^mtempki(..Name) = $increment(^mtempki(..Name))
-    set tSC = $$$OK
-    try {
-        kill tSubModules
-        // Create an instance of the repository manager singleton (or get the existing one)
-        #dim tRepositoryManager As %IPM.Repo.Manager
-        set tRepositoryManager = ##class(%IPM.Repo.Manager).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
-        // Initialize cache at top level
-        if (pDepth = 1) {
-            kill pManifestCache
-        }
-
-        // May want to pass phases to subsequent calls
-        set tPhases = $case(pCheckNestedScoped, 1: pPhases, : "")
-
-        // ===== OPTIMIZATION 1: Classify dependencies by type first =====
-        kill exactDeps, fuzzyDeps
-        set exactCount = 0
-        set fuzzyCount = 0
-
-        for i=1:1:..Dependencies.Count() {
-            #dim tDep As %IPM.Storage.ModuleReference
-            set tDep = ..Dependencies.GetAt(i)
-            set tModulePath = pModulePath
-
-            // Skip out-of-scope dependencies
-            if '..HasScope(pPhases,tDep.Scope) {
-                continue
-            } elseif (tDep.Scope '= "") && (pModulePath = $listbuild(..Name)) {
-                // Exclude the root module from cyclic dependency checking if the dependency is scoped.
-                set tModulePath = ""
-            }
-
-            // Ensure this dependency is not an ancestor in the chain of dependencies getting to this point
-            if $listfind(tModulePath,tDep.Name) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cyclic dependency detected in module '%1': %2",..Name,$listtostring(tModulePath_$listbuild(tDep.Name)," -> ")))
-                quit
-            }
-
-            // Test whether dependency version is a valid semantic version
-            set tIsExactVersion = +##class(%IPM.General.SemanticVersion).IsValid(tDep.VersionString)
-            kill %objlasterror
-
-            // Classify as exact or fuzzy - store index and path (not object reference)
-            if tIsExactVersion {
-                set exactCount = exactCount + 1
-                set exactDeps(exactCount) = $listbuild(i, tModulePath)
-            } else {
-                set fuzzyCount = fuzzyCount + 1
-                set fuzzyDeps(fuzzyCount) = $listbuild(i, tModulePath)
-            }
-        }
-        if $$$ISERR(tSC) {
-            quit
-        }
-
-        // ===== OPTIMIZATION 2: Process exact dependencies first (fail-fast) =====
-        set idx = ""
-        for {
-            set idx = $order(exactDeps(idx), 1, depInfo)
-            quit:idx=""
-
-            set $listbuild(depIndex, tModulePath) = depInfo
-            set tDep = ..Dependencies.GetAt(depIndex)
-            set tSC = ..ProcessSingleDependency(tDep, tModulePath, 1, /*isExact*/
-                .pDependencyGraph, pDepth, pForceSnapshotReload, .qstruct,
-                tPhases, .pSubModules, pIgnoreInstalledModules, pKnownDependencies,
-                pPermitDowngrade, .pSearchList, pIncludeDisplayName, tRepositoryManager, .pManifestCache)
-
-            // Fail fast for exact versions
-            if $$$ISERR(tSC) {
-                quit
-            }
-        }
-        if $$$ISERR(tSC) {
-            quit
-        }
-
-        // ===== OPTIMIZATION 3: Process fuzzy dependencies (with backtracking) =====
-        set idx = ""
-        for {
-            set idx = $order(fuzzyDeps(idx), 1, depInfo)
-            quit:idx=""
-
-            set $listbuild(depIndex, tModulePath) = depInfo
-            set tDep = ..Dependencies.GetAt(depIndex)
-            set tSC = ..ProcessSingleDependency(tDep, tModulePath, 0, /*isFuzzy*/
-                .pDependencyGraph, pDepth, pForceSnapshotReload, .qstruct,
-                tPhases, .pSubModules, pIgnoreInstalledModules, pKnownDependencies,
-                pPermitDowngrade, .pSearchList, pIncludeDisplayName, tRepositoryManager, .pManifestCache)
-
-            // For fuzzy, we continue even if one fails (try others)
-            // Final validation happens in breadth-first phase
-            if $$$ISERR(tSC) {
-                // Log but don't fail immediately for fuzzy
-                // The error will surface during breadth-first resolution
-            }
-        }
-
-        // ===== Breadth-first dependency resolution for depth 1 =====
-        if (pDepth = 1) {
-            while $data(pSubModules(pDepth)) {
-                set tModName = ""
-                for {
-                    set tModName = $order(pSubModules(pDepth,tModName),1,tModule)
-                    quit:tModName=""
-                    set tModulePath = $case($get(pSubModules(pDepth,tModName,$$$SCOPE)),"":pModulePath,:"")
-                    set tSC = tModule.BuildDependencyGraphOptimized(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,tPhases,.pSubModules,tModulePath_$listbuild(tModName),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName,.pManifestCache)
-                    if $$$ISERR(tSC) {
-                        quit
-                    }
-                }
-                if $$$ISERR(tSC) {
-                    quit
-                }
-                set pDepth = pDepth + 1
-            }
-            if $$$ISERR(tSC) {
-                quit
-            }
-
-            // Ensure cyclic dependencies (possible with scopes) are removed from the graph
-            kill pDependencyGraph(..Name)
-            set tDependencyKey = ""
-            for {
-                set tDependencyKey = $order(pDependencyGraph(tDependencyKey))
-                if (tDependencyKey = "") {
-                    quit
-                }
-
-                set tDependencySource = $order(pDependencyGraph(tDependencyKey,..Name))
-                if ($piece(tDependencySource," ") = ..Name) {
-                    kill pDependencyGraph(tDependencyKey,tDependencySource)
-                }
-            }
-        }
-    } catch e {
-        set tSC = e.AsStatus()
-    }
-    quit tSC
-}
-
-/// Helper method to process a single dependency (exact or fuzzy).
-/// This consolidates the common logic between exact and fuzzy dependency resolution.
-/// Enhanced with manifest caching for better performance.
-/// <p>
-/// <var>pDep</var> is the dependency reference to process.<br>
-/// <var>pModulePath</var> is the path of modules leading to this dependency (for cycle detection).<br>
-/// <var>pIsExact</var> indicates whether this is an exact version (1) or fuzzy version (0).<br>
-/// <var>pManifestCache</var> is a cache of retrieved module manifests by server^name^version key.<br>
-/// Other parameters match BuildDependencyGraph.
-Method ProcessSingleDependency(
-	pDep As %IPM.Storage.ModuleReference,
-	pModulePath As %List,
-	pIsExact As %Boolean,
-	ByRef pDependencyGraph,
-	pDepth As %Integer,
-	pForceSnapshotReload As %Boolean,
-	ByRef qstruct,
-	pPhases As %String,
-	ByRef pSubModules,
-	pIgnoreInstalledModules As %Boolean,
-	pKnownDependencies As %List,
-	pPermitDowngrade As %Boolean,
-	ByRef pSearchList,
-	pIncludeDisplayName As %Boolean,
-	pRepositoryManager As %IPM.Repo.Manager,
-	ByRef pManifestCache) As %Status [ Internal, Private ]
-{
-    #define SCOPE "Scope"
-
-    set tSC = $$$OK
-    try {
-        // Build cumulative version requirement string
-        #dim tSearchExpr As %IPM.General.SemanticVersionExpression
-        set tSearchExpr = pDep.Version.%ConstructClone(1)
-        set tConstraintList = $listbuild(..Name_" "_..VersionString_": "_pDep.VersionString)
-        set tSourcePath = ""
-        for {
-            set tSourcePath = $order(pDependencyGraph(pDep.Name,tSourcePath),1,tOtherReq)
-            quit:tSourcePath=""
-
-            set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tOtherReq,.tExpr)
-            if $$$ISERR(tSC) {
-                quit
-            }
-            set tSearchExpr = tSearchExpr.And(tExpr)
-            set tConstraintList = tConstraintList_$listbuild(tSourcePath_": "_tOtherReq)
-        }
-        if $$$ISERR(tSC) {
-            quit
-        }
-
-        if 'pIgnoreInstalledModules {
-            // Also apply requirements presented by other installed modules
-            set tOtherDeps = pKnownDependencies
-            set tExistingDepKey = ""
-            for {
-                set tExistingDepKey = $order(pDependencyGraph(tExistingDepKey))
-                if (tExistingDepKey = "") {
-                    quit
-                }
-                set tOtherDeps = tOtherDeps_$listbuild(tExistingDepKey)
-            }
-
-            set tSC = ##class(%IPM.Utils.Module).GetRequiredVersionExpression(pDep.Name,tOtherDeps,.tInstalledReqExpr,.tInstalledConstraintList)
-            if $$$ISERR(tSC) {
-                quit
-            }
-            set tSearchExpr = tSearchExpr.And(tInstalledReqExpr)
-            set tConstraintList = tConstraintList_tInstalledConstraintList
-        }
-
-        // See if we already have a version that satisfies the dependency:
-        set tDepFound = $data(pDependencyGraph(pDep.Name),tDepInfo)
-        set tPreviousDepth = 0
-        set tServerName = ""
-        set tVersion = ""
-        if tDepFound {
-            set $listbuild(tPreviousDepth,tServerName,tVersion) = tDepInfo
-        }
-
-        // Check if installed version satisfies requirements
-        if ('pIgnoreInstalledModules) && ..NameExists(pDep.Name) {
-            set tLocalObj = ..NameOpen(pDep.Name,,.tSC)
-            if $$$ISERR(tSC) {
-                quit
-            }
-
-            set tInstalledVersionValid = tLocalObj.Version.Satisfies(tSearchExpr) && ((tVersion = "") || (tVersion = tLocalObj.VersionString))
-            if tInstalledVersionValid && '(tLocalObj.Version.IsSnapshot() && pForceSnapshotReload) {
-                set tLocalMod = 1
-                set tDepth = $select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
-                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",tLocalObj.VersionString)
-                if (pIncludeDisplayName) {
-                    set pDependencyGraph(pDep.Name) = pDependencyGraph(pDep.Name)_$listbuild(pDep.DisplayName)
-                }
-                set pDependencyGraph(pDep.Name,..Name_" "_..VersionString) = pDep.VersionString
-                set pSubModules(tDepth,pDep.Name) = tLocalObj
-                set pSubModules(tDepth,pDep.Name,$$$SCOPE) = pDep.Scope
-                quit  // Success - no need to search repositories
-            }
-
-            if 'pPermitDowngrade {
-                // Add a minimum of the currently-installed version as a constraint.
-                set tRangeString = ">="_tLocalObj.VersionString
-                set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tRangeString,.tCurrentlyInstalledExpr)
-                $$$ThrowOnError(tSC)
-                set tSearchExpr = tSearchExpr.And(tCurrentlyInstalledExpr)
-                set tConstraintList = tConstraintList_$listbuild(tLocalObj.Name_": "_tRangeString_" (currently installed, downgrade not permitted)")
-            }
-        }
-
-        // ===== OPTIMIZATION: Improved repository search caching with direct subscript lookup =====
-        set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-        set tSearchCriteria.Name = pDep.Name
-        set searchExprStr = tSearchExpr.ToResolvedString()
-        set tSearchCriteria.VersionExpression = searchExprStr
-
-        // Direct subscript lookup instead of linear scan
-        if $data(pSearchList(pDep.Name, searchExprStr), tQualifiedReferences) {
-            // Cache hit!
-        } else {
-            // Cache miss - search repositories
-            set tSC = pRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
-            if $$$ISERR(tSC) {
-                quit
-            }
-            set pSearchList(pDep.Name, searchExprStr) = tQualifiedReferences
-        }
-
-        if (tQualifiedReferences.Count() = 0) {
-            set tMsg = $$$FormatText("Could not find satisfactory version of %1 in any repositories. Required by: %2",pDep.Name,$listtostring(tConstraintList,"; "))
-            set tSC = $$$ERROR($$$GeneralError,tMsg)
-            quit
-        }
-
-        // Try candidates based on whether this is exact or fuzzy matching
-        if pIsExact {
-            // ===== EXACT: Take first match, fail immediately on error =====
-            set tQualifiedReference = tQualifiedReferences.GetAt(1)
-
-            // ===== CACHE OPTIMIZATION: Reuse retrieved manifests =====
-            set manifestKey = tQualifiedReference.ServerName_"^"_tQualifiedReference.Name_"^"_tQualifiedReference.VersionString
-            if $data(pManifestCache(manifestKey), tModule) {
-                // Cache hit - reuse module object!
-            } else {
-                set tSC = pRepositoryManager.RetrieveModuleManifest(tQualifiedReference,.tManifest)
-                if $$$ISERR(tSC) {
-                    quit
-                }
-
-                #dim tModule As %IPM.Storage.Module
-                set tModule = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(tManifest,.tFound)
-                if 'tFound {
-                    $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to construct module object for %1 %2 from repository %3",tQualifiedReference.Name,tQualifiedReference.VersionString,tQualifiedReference.ServerName)))
-                }
-                set pManifestCache(manifestKey) = tModule
-            }
-
-            set tDepth = $select(
-                tPreviousDepth=0:pDepth,
-                tPreviousDepth>pDepth:tPreviousDepth,
-                1:pDepth)
-
-            set pDependencyGraph(pDep.Name) = $listbuild(pDepth, tQualifiedReference.ServerName, tModule.VersionString, tQualifiedReference.Deployed, tQualifiedReference.PlatformVersion)
-            if (pIncludeDisplayName) {
-                set pDependencyGraph(pDep.Name) = pDependencyGraph(pDep.Name)_$listbuild(pDep.DisplayName)
-            }
-            set pDependencyGraph(pDep.Name,..Name_" "_..VersionString) = pDep.VersionString
-            set pSubModules(tDepth,pDep.Name) = tModule
-            set pSubModules(tDepth,pDep.Name,$$$SCOPE) = pDep.Scope
-
-            // Immediately resolve exact dependencies recursively
-            set tSC = tModule.BuildDependencyGraphOptimized(.pDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,pPhases,.pSubModules,pModulePath_$listbuild(pDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName,.pManifestCache)
-
-        } else {
-            // ===== FUZZY: Try each candidate, backtrack on failure =====
-            set tResultFound = 0
-            for j=1:1:tQualifiedReferences.Count() {
-                kill tDependencyGraph,tSubModules
-                merge tDependencyGraph = pDependencyGraph
-                merge tSubModules = pSubModules
-                set tQualifiedReference = tQualifiedReferences.GetAt(j)
-
-                // ===== CACHE OPTIMIZATION: Reuse retrieved manifests =====
-                set manifestKey = tQualifiedReference.ServerName_"^"_tQualifiedReference.Name_"^"_tQualifiedReference.VersionString
-                if $data(pManifestCache(manifestKey), tModule) {
-                    // Cache hit - reuse module object!
-                } else {
-                    set tSC = pRepositoryManager.RetrieveModuleManifest(tQualifiedReference,.tManifest)
-                    if $$$ISERR(tSC) {
-                        quit
-                    }
-
-                    set tModule = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(tManifest,.tFound)
-                    if 'tFound {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to construct module object for %1 %2 from repository %3",tQualifiedReference.Name,tQualifiedReference.VersionString,tQualifiedReference.ServerName)))
-                    }
-                    set pManifestCache(manifestKey) = tModule
-                }
-
-                set tDepth = $select(
-                    tPreviousDepth=0:pDepth,
-                    tPreviousDepth>pDepth:tPreviousDepth,
-                    1:pDepth)
-
-                set tDependencyGraph(pDep.Name) = $listbuild(tDepth,tQualifiedReference.ServerName,tModule.VersionString)
-                if (pIncludeDisplayName) {
-                    set tDependencyGraph(pDep.Name) = tDependencyGraph(pDep.Name)_$listbuild(pDep.DisplayName)
-                }
-                set tDependencyGraph(pDep.Name,..Name_" "_..VersionString) = pDep.VersionString
-                set tSubModules(tDepth,pDep.Name) = tModule
-
-                // For fuzzy version matching, preview the next graph step; move to the next version if it would lead to failure.
-                set tPossibleSC = tModule.BuildDependencyGraphOptimized(.tDependencyGraph,pDepth+1,pForceSnapshotReload,.qstruct,pPhases,.tSubModules,pModulePath_$listbuild(pDep.Name),pIgnoreInstalledModules,pKnownDependencies,pPermitDowngrade,,.pSearchList,pIncludeDisplayName,.pManifestCache)
-                if $$$ISOK(tPossibleSC) {
-                    // We have a match - commit the changes
-                    merge pDependencyGraph = tDependencyGraph
-                    merge pSubModules = tSubModules
-                    set tResultFound = 1
-                    quit
-                }
-            }
-            if $$$ISERR(tSC) {
-                quit
-            }
-
-            // If no candidate worked, use last one (let breadth-first detect error)
-            if 'tResultFound {
-                merge pDependencyGraph = tDependencyGraph
-                merge pSubModules = tSubModules
-                set pSubModules(tDepth,pDep.Name,$$$SCOPE) = pDep.Scope
-            }
-        }
-
-    } catch e {
-        set tSC = e.AsStatus()
-    }
-    quit tSC
-}
-
 /// Builds a dependency graph using a fully iterative breadth-first algorithm
 /// with no recursive calls (which result in massive slowdowns in ObjectScript).
 /// <p>
@@ -1720,96 +1292,80 @@ Method ProcessSingleDependency(
 /// <var>pPhases</var> - Lifecycle phases to execute; determines which scoped dependencies are considered. Empty=all<br>
 /// <var>pIgnoreInstalledModules</var> - If true, don't use already-installed modules.<br>
 /// <var>pPermitDowngrade</var> - If true, allow downgrading installed modules.<br>
+/// <var>pCheckNestedScoped</var> - If true, check scoped dependencies against root module phases.<br>
 Method BuildDependencyGraphIterative(
 	ByRef pDependencyGraph,
 	pForceSnapshotReload As %Boolean = 0,
 	pPhases As %String = "",
 	pIgnoreInstalledModules As %Boolean = 0,
-	pPermitDowngrade As %Boolean = 0) As %Status [ Internal ]
+	pPermitDowngrade As %Boolean = 0,
+	pCheckNestedScoped As %Boolean = 0) As %Status [ Internal ]
 {
-    #define SCOPE "Scope"
-
-    set ^mtempki(..Name) = $increment(^mtempki(..Name))
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
-        // Initialize internal variables (no longer passed as parameters due to iterative approach)
-        kill pManifestCache, pSearchList, qstruct, pSubModules
-        set pDepth = 1
-        set pModulePath = $listbuild(..Name)
-        set pKnownDependencies = ..GetKnownDependencies(..Name)
-        set pCheckNestedScoped = 0
-
-        // Initialize caches and repository manager
-        #dim tRepositoryManager As %IPM.Repo.Manager
-        set tRepositoryManager = ##class(%IPM.Repo.Manager).%Get(.tSC)
-        $$$ThrowOnError(tSC)
+        // Initialize internal variables
+        kill manifestCache, repoSearchCache, moduleCache, workQueue
+        set knownDependencies = ..GetKnownDependencies(..Name)
 
         // Initialize work queue with root module
         // Queue structure: workQueue(depth, moduleName) = $listbuild(modulePath, scope)
-        // Store module objects separately in moduleCache
-        set workQueue(1, ..Name) = $listbuild(pModulePath, "")
+        // Store module objects separately in moduleCache: moduleCache(moduleName) = moduleObject
+        set workQueue(1, ..Name) = $listbuild($listbuild(..Name), "")
         set moduleCache(..Name) = $this
-        set currentDepth = 1
-
-        set tPhases = $case(pCheckNestedScoped, 1: pPhases, : "")
+        set phases = $case(pCheckNestedScoped, 1: pPhases, : "")
 
         // ===== ITERATIVE BREADTH-FIRST PROCESSING =====
+        set currentDepth = 1
         while $data(workQueue(currentDepth)) {
-            set tModName = ""
+            set modName = ""
             for {
-                set tModName = $order(workQueue(currentDepth, tModName), 1, queueData)
-                quit:tModName=""
-
-                set ^mtempki(tModName) = $increment(^mtempki(tModName))
+                set modName = $order(workQueue(currentDepth, modName), 1, queueData)
+                quit:modName=""
 
                 // Unpack queue data and retrieve module object
-                set $listbuild(tModulePath, tScope) = queueData
-                set tModule = moduleCache(tModName)
+                set $listbuild(modulePath, scope) = queueData
+                set moduleObj = moduleCache(modName)
 
                 // Adjust module path for scoped dependencies
-                if (tScope '= "") && ($listlength(tModulePath) = 1) {
-                    set tModulePath = ""
+                if (scope '= "") && ($listlength(modulePath) = 1) {
+                    set modulePath = ""
                 }
 
                 // ===== Process this module's dependencies =====
                 kill exactDeps, fuzzyDeps
-                set exactCount = 0
-                set fuzzyCount = 0
 
                 // Classify dependencies - store MODULE NAME and dependency INDEX
-                for i=1:1:tModule.Dependencies.Count() {
-                    #dim tDep As %IPM.Storage.ModuleReference
-                    set tDep = tModule.Dependencies.GetAt(i)
-                    set tDepModulePath = tModulePath
+                for i=1:1:moduleObj.Dependencies.Count() {
+                    #dim dep As %IPM.Storage.ModuleReference
+                    set dep = moduleObj.Dependencies.GetAt(i)
+                    set depModulePath = modulePath
 
                     // Skip out-of-scope dependencies
-                    if '..HasScope(tPhases, tDep.Scope) {
+                    if '..HasScope(phases, dep.Scope) {
                         continue
-                    } elseif (tDep.Scope '= "") && ($listlength(tModulePath) <= 1) {
-                        set tDepModulePath = ""
+                    } elseif (dep.Scope '= "") && ($listlength(modulePath) <= 1) {
+                        set depModulePath = ""
                     }
 
                     // Check for cycles
-                    if $listfind(tDepModulePath, tDep.Name) {
-                        set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Cyclic dependency detected in module '%1': %2",tModName,$listtostring(tDepModulePath_$listbuild(tDep.Name)," -> ")))
-                        quit
+                    if $listfind(depModulePath, dep.Name) {
+                        set msg = $$$FormatText("Cyclic dependency detected in module '%1': %2",modName,$listtostring(depModulePath_$listbuild(dep.Name)," -> "))
+                        $$$ThrowStatus($$$ERROR($$$GeneralError,msg))
                     }
 
                     // Classify as exact or fuzzy - store dependency index, module name, module path
-                    set tIsExactVersion = +##class(%IPM.General.SemanticVersion).IsValid(tDep.VersionString)
+                    set isExactVersion = +##class(%IPM.General.SemanticVersion).IsValid(dep.VersionString)
                     kill %objlasterror
 
-                    if tIsExactVersion {
-                        set exactCount = exactCount + 1
-                        set exactDeps(exactCount) = $listbuild(i, tModName, tDepModulePath)
+                    if isExactVersion {
+                        set exactDeps($increment(exactDeps)) = $listbuild(i, depModulePath)
                     } else {
-                        set fuzzyCount = fuzzyCount + 1
-                        set fuzzyDeps(fuzzyCount) = $listbuild(i, tModName, tDepModulePath)
+                        set fuzzyDeps($increment(fuzzyDeps)) = $listbuild(i, depModulePath)
                     }
                 }
-                if $$$ISERR(tSC) {
-                    quit
-                }
+
+                // This is how this module will be referenced in the dep graph
+                set moduleReferenceInGraph = moduleObj.Name _ " " _ moduleObj.VersionString
 
                 // Process exact dependencies (fail-fast)
                 set idx = ""
@@ -1817,21 +1373,18 @@ Method BuildDependencyGraphIterative(
                     set idx = $order(exactDeps(idx), 1, depData)
                     quit:idx=""
 
-                    set $listbuild(depIndex, parentModName, tDepModulePath) = depData
-                    set tParentMod = moduleCache(parentModName)
-                    set tDep = tParentMod.Dependencies.GetAt(depIndex)
-                    set tSC = ..ProcessSingleDependencyIterative(tDep, tDepModulePath, 1,
-                        .pDependencyGraph, currentDepth, pForceSnapshotReload, .qstruct,
-                        tPhases, pIgnoreInstalledModules, pKnownDependencies,
-                        pPermitDowngrade, .pSearchList, tRepositoryManager,
-                        .pManifestCache, tParentMod.Name, tParentMod.VersionString, .workQueue, .moduleCache)
-
-                    if $$$ISERR(tSC) {
-                        quit
-                    }
-                }
-                if $$$ISERR(tSC) {
-                    quit
+                    set $listbuild(depIndex, depModulePath) = depData
+                    set dep = moduleObj.Dependencies.GetAt(depIndex)
+                    set sc = ..ProcessSingleDependencyIterative(1 /* Exact */,
+                        // Local parameters
+                        dep, depModulePath, currentDepth, knownDependencies, phases, moduleReferenceInGraph,
+                        // External parameters
+                        pForceSnapshotReload, pIgnoreInstalledModules, pPermitDowngrade,
+                        // Working data
+                        .pDependencyGraph, .workQueue,
+                        // Caches
+                        .repoSearchCache, .manifestCache, .moduleCache)
+                    $$$ThrowOnError(sc)
                 }
 
                 // Process fuzzy dependencies (with backtracking)
@@ -1840,284 +1393,284 @@ Method BuildDependencyGraphIterative(
                     set idx = $order(fuzzyDeps(idx), 1, depData)
                     quit:idx=""
 
-                    set $listbuild(depIndex, parentModName, tDepModulePath) = depData
-                    set tParentMod = moduleCache(parentModName)
-                    set tDep = tParentMod.Dependencies.GetAt(depIndex)
-                    set tSC = ..ProcessSingleDependencyIterative(tDep, tDepModulePath, 0,
-                        .pDependencyGraph, currentDepth, pForceSnapshotReload, .qstruct,
-                        tPhases, pIgnoreInstalledModules, pKnownDependencies,
-                        pPermitDowngrade, .pSearchList, tRepositoryManager,
-                        .pManifestCache, tParentMod.Name, tParentMod.VersionString, .workQueue, .moduleCache)
-
+                    set $listbuild(depIndex, depModulePath) = depData
+                    set dep = moduleObj.Dependencies.GetAt(depIndex)
+                    set sc = ..ProcessSingleDependencyIterative(0 /* Fuzzy */,
+                        // Local parameters
+                        dep, depModulePath, currentDepth, knownDependencies, phases, moduleReferenceInGraph,
+                        // External parameters
+                        pForceSnapshotReload, pIgnoreInstalledModules, pPermitDowngrade,
+                        // Working data
+                        .pDependencyGraph, .workQueue,
+                        // Caches
+                        .repoSearchCache, .manifestCache, .moduleCache)
                     // For fuzzy, continue even if one fails
-                    if $$$ISERR(tSC) {
+                    if $$$ISERR(sc) {
                         // Error will surface later if unresolvable
                     }
                 }
-            }
-            if $$$ISERR(tSC) {
-                quit
             }
 
             // Move to next depth level
             kill workQueue(currentDepth)
             set currentDepth = currentDepth + 1
         }
-        if $$$ISERR(tSC) {
-            quit
-        }
 
         // Clean up cyclic dependencies from graph
         kill pDependencyGraph(..Name)
-        set tDependencyKey = ""
+        set depKey = ""
         for {
-            set tDependencyKey = $order(pDependencyGraph(tDependencyKey))
-            if (tDependencyKey = "") {
+            set depKey = $order(pDependencyGraph(depKey))
+            if (depKey = "") {
                 quit
             }
 
-            set tDependencySource = $order(pDependencyGraph(tDependencyKey,..Name))
-            if ($piece(tDependencySource," ") = ..Name) {
-                kill pDependencyGraph(tDependencyKey,tDependencySource)
+            set depSource = $order(pDependencyGraph(depKey,..Name))
+            if ($piece(depSource," ") = ..Name) {
+                kill pDependencyGraph(depKey,depSource)
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
-/// Helper for iterative breadth-first processing. Similar to ProcessSingleDependency but adds to work queue instead of recursing.
+/// Helper for iterative breadth-first processing. Processes a single dependency,
+/// updating the dependency graph and work queue as needed.
+/// <p>
+/// <b>Parameters:</b><br>
+/// <var>pIsExact</var> - If true, dependency has exact semantic version; else fuzzy version expression<br>
+/// <var>pDep</var> - Dependency module reference object<br>
+/// <var>pModulePath</var> - Path of modules leading to this dependency (for cycle detection)<br>
+/// <var>pDepth</var> - Current depth in the dependency tree<br>
+/// <var>pKnownDependencies</var> - Known dependencies to exclude from installed check<br>
+/// <var>pPhases</var> - Lifecycle phases to execute; determines which scoped dependencies are considered<br>
+/// <var>pParentInfo</var> - String identifying the parent module and version requiring this dependency<br>
+/// <var>pForceSnapshotReload</var> - If true, reload cached snapshots from repositories<br>
+/// <var>pIgnoreInstalledModules</var> - If true, don't use already-installed modules<br>
+/// <var>pPermitDowngrade</var> - If true, allow downgrading installed modules<br>
+/// <var>pDependencyGraph</var> - Working dependency graph array<br>
+/// <var>pWorkQueue</var> - Working work queue array<br>
+/// <var>pRepoSearchCache</var> - Cache of repository search results<br>
+/// <var>pManifestCache</var> - Cache of retrieved module manifests<br>
+/// <var>pModuleCache</var> - Cache of loaded module objects<br>
 Method ProcessSingleDependencyIterative(
+	pIsExact As %Boolean,
 	pDep As %IPM.Storage.ModuleReference,
 	pModulePath As %List,
-	pIsExact As %Boolean,
-	ByRef pDependencyGraph,
 	pDepth As %Integer,
-	pForceSnapshotReload As %Boolean,
-	ByRef qstruct,
-	pPhases As %String,
-	pIgnoreInstalledModules As %Boolean,
 	pKnownDependencies As %List,
+	pPhases As %String,
+	pParentInfo As %String,
+	pForceSnapshotReload As %Boolean,
+	pIgnoreInstalledModules As %Boolean,
 	pPermitDowngrade As %Boolean,
-	ByRef pSearchList,
-	pRepositoryManager As %IPM.Repo.Manager,
-	ByRef pManifestCache,
-	pParentName As %String,
-	pParentVersion As %String,
+	ByRef pDependencyGraph,
 	ByRef pWorkQueue,
+	ByRef pRepoSearchCache,
+	ByRef pManifestCache,
 	ByRef pModuleCache) As %Status [ Internal, Private ]
 {
-    #define SCOPE "Scope"
-
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
-        // Build cumulative version requirement string
-        #dim tSearchExpr As %IPM.General.SemanticVersionExpression
-        set tSearchExpr = pDep.Version.%ConstructClone(1)
-        set tConstraintList = $listbuild(pParentName_" "_pParentVersion_": "_pDep.VersionString)
-        set tSourcePath = ""
-        for {
-            set tSourcePath = $order(pDependencyGraph(pDep.Name,tSourcePath),1,tOtherReq)
-            quit:tSourcePath=""
+        // Initialize caches and repository manager
+        #dim repoManager As %IPM.Repo.Manager
+        set repoManager = ##class(%IPM.Repo.Manager).%Get(.sc)
+        $$$ThrowOnError(sc)
 
-            set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tOtherReq,.tExpr)
-            if $$$ISERR(tSC) {
-                quit
-            }
-            set tSearchExpr = tSearchExpr.And(tExpr)
-            set tConstraintList = tConstraintList_$listbuild(tSourcePath_": "_tOtherReq)
-        }
-        if $$$ISERR(tSC) {
-            quit
+        // Build cumulative version requirement string
+        #dim searchExpr As %IPM.General.SemanticVersionExpression
+        set searchExpr = pDep.Version.%ConstructClone(1)
+        set constraintList = $listbuild(pParentInfo_": "_pDep.VersionString)
+        set sourcePath = ""
+        for {
+            set sourcePath = $order(pDependencyGraph(pDep.Name,sourcePath),1,otherReq)
+            quit:sourcePath=""
+
+            set sc = ##class(%IPM.General.SemanticVersionExpression).FromString(otherReq,.tExpr)
+            $$$ThrowOnError(sc)
+            set searchExpr = searchExpr.And(tExpr)
+            set constraintList = constraintList_$listbuild(sourcePath_": "_otherReq)
         }
 
         if 'pIgnoreInstalledModules {
             // Apply requirements from other installed modules
-            set tOtherDeps = pKnownDependencies
-            set tExistingDepKey = ""
+            set otherDepsList = pKnownDependencies
+            set existingDepKey = ""
             for {
-                set tExistingDepKey = $order(pDependencyGraph(tExistingDepKey))
-                if (tExistingDepKey = "") {
+                set existingDepKey = $order(pDependencyGraph(existingDepKey))
+                if (existingDepKey = "") {
                     quit
                 }
-                set tOtherDeps = tOtherDeps_$listbuild(tExistingDepKey)
+                set otherDepsList = otherDepsList_$listbuild(existingDepKey)
             }
 
-            set tSC = ##class(%IPM.Utils.Module).GetRequiredVersionExpression(pDep.Name,tOtherDeps,.tInstalledReqExpr,.tInstalledConstraintList)
-            if $$$ISERR(tSC) {
-                quit
-            }
-            set tSearchExpr = tSearchExpr.And(tInstalledReqExpr)
-            set tConstraintList = tConstraintList_tInstalledConstraintList
+            set sc = ##class(%IPM.Utils.Module).GetRequiredVersionExpression(
+                pDep.Name,otherDepsList,.installedReqExpr,.installedConstraintList
+            )
+            $$$ThrowOnError(sc)
+            set searchExpr = searchExpr.And(installedReqExpr)
+            set constraintList = constraintList_installedConstraintList
         }
 
         // Check if we already have a satisfactory version
-        set tDepFound = $data(pDependencyGraph(pDep.Name),tDepInfo)
-        set tPreviousDepth = 0
-        set tServerName = ""
-        set tVersion = ""
-        if tDepFound {
-            set $listbuild(tPreviousDepth,tServerName,tVersion) = tDepInfo
+        set previousDepth = 0
+        set serverName = ""
+        set version = ""
+        if $data(pDependencyGraph(pDep.Name),depInfo) {
+            set $listbuild(previousDepth,serverName,version) = depInfo
         }
 
         // Check if installed version satisfies requirements
         if ('pIgnoreInstalledModules) && ..NameExists(pDep.Name) {
-            set tLocalObj = ..NameOpen(pDep.Name,,.tSC)
-            if $$$ISERR(tSC) {
-                quit
-            }
+            set localObj = ..NameOpen(pDep.Name,,.sc)
+            $$$ThrowOnError(sc)
 
-            set tInstalledVersionValid = tLocalObj.Version.Satisfies(tSearchExpr) && ((tVersion = "") || (tVersion = tLocalObj.VersionString))
-            if tInstalledVersionValid && '(tLocalObj.Version.IsSnapshot() && pForceSnapshotReload) {
-                set tDepth = $select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
-                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",tLocalObj.VersionString,pDep.DisplayName)
-                set pDependencyGraph(pDep.Name,pParentName_" "_pParentVersion) = pDep.VersionString
+            set installedVersionValid =
+                localObj.Version.Satisfies(searchExpr) &&
+                ((version = "") || (version = localObj.VersionString))
+            if installedVersionValid && '(localObj.Version.IsSnapshot() && pForceSnapshotReload) {
+                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName)
+                set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
                 // Add to work queue for next depth
                 set pWorkQueue(pDepth + 1, pDep.Name) = $listbuild(pModulePath_$listbuild(pDep.Name), pDep.Scope)
-                set pModuleCache(pDep.Name) = tLocalObj
-                quit  // Success
+                set pModuleCache(pDep.Name) = localObj
+                // Success
+                quit
             }
 
             if 'pPermitDowngrade {
-                set tRangeString = ">="_tLocalObj.VersionString
-                set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tRangeString,.tCurrentlyInstalledExpr)
+                set rangeString = ">="_localObj.VersionString
+                set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(rangeString,.currentlyInstalledExpr)
                 $$$ThrowOnError(tSC)
-                set tSearchExpr = tSearchExpr.And(tCurrentlyInstalledExpr)
-                set tConstraintList = tConstraintList_$listbuild(tLocalObj.Name_": "_tRangeString_" (currently installed, downgrade not permitted)")
+                set searchExpr = searchExpr.And(currentlyInstalledExpr)
+                set constraintList = constraintList_$listbuild(localObj.Name_": "_rangeString_" (currently installed, downgrade not permitted)")
             }
         }
 
         // Repository search with caching
-        set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-        set tSearchCriteria.Name = pDep.Name
-        set searchExprStr = tSearchExpr.ToResolvedString()
-        set tSearchCriteria.VersionExpression = searchExprStr
+        set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+        set searchCriteria.Name = pDep.Name
+        set searchExprStr = searchExpr.ToResolvedString()
+        set searchCriteria.VersionExpression = searchExprStr
 
-        if $data(pSearchList(pDep.Name, searchExprStr), tQualifiedReferences) {
-            // Cache hit
-        } else {
-            set tSC = pRepositoryManager.SearchRepositoriesForModule(tSearchCriteria,.tQualifiedReferences,pForceSnapshotReload)
-            if $$$ISERR(tSC) {
-                quit
-            }
-            set pSearchList(pDep.Name, searchExprStr) = tQualifiedReferences
+        if '$data(pRepoSearchCache(pDep.Name, searchExprStr), qualifiedReferences) {
+            // Cache miss so search
+            set sc = repoManager.SearchRepositoriesForModule(searchCriteria,.qualifiedReferences,pForceSnapshotReload)
+            $$$ThrowOnError(sc)
+            set pRepoSearchCache(pDep.Name, searchExprStr) = qualifiedReferences
         }
 
-        if (tQualifiedReferences.Count() = 0) {
-            set tMsg = $$$FormatText("Could not find satisfactory version of %1 in any repositories. Required by: %2",pDep.Name,$listtostring(tConstraintList,"; "))
-            set tSC = $$$ERROR($$$GeneralError,tMsg)
-            quit
+        if (qualifiedReferences.Count() = 0) {
+            set msg = $$$FormatText("Could not find satisfactory version of %1 in any repositories. Required by: %2",pDep.Name,$listtostring(constraintList,"; "))
+            $$$ThrowStatus($$$ERROR($$$GeneralError,msg))
         }
 
         // Process based on exact vs fuzzy
         if pIsExact {
             // EXACT: Take first match
-            set tQualifiedReference = tQualifiedReferences.GetAt(1)
+            #dim qualifiedReference As %IPM.Storage.QualifiedModuleInfo
+            set qualifiedReference = qualifiedReferences.GetAt(1)
 
             // Retrieve and cache manifest
-            set manifestKey = tQualifiedReference.ServerName_"^"_tQualifiedReference.Name_"^"_tQualifiedReference.VersionString
-            if $data(pManifestCache(manifestKey), tModule) {
-                // Cache hit
-            } else {
-                set tSC = pRepositoryManager.RetrieveModuleManifest(tQualifiedReference,.tManifest)
-                if $$$ISERR(tSC) {
-                    quit
-                }
+            set manifestKey = qualifiedReference.ServerName_"^"_qualifiedReference.Name_"^"_qualifiedReference.VersionString
+            if '$data(pManifestCache(manifestKey), moduleObj) {
+                // Cache miss so retrieve
+                set sc = repoManager.RetrieveModuleManifest(qualifiedReference,.manifest)
+                $$$ThrowOnError(sc)
 
-                #dim tModule As %IPM.Storage.Module
-                set tModule = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(tManifest,.tFound)
-                if 'tFound {
-                    $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to construct module object for %1 %2 from repository %3",tQualifiedReference.Name,tQualifiedReference.VersionString,tQualifiedReference.ServerName)))
+                #dim moduleObj As %IPM.Storage.Module
+                set moduleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(manifest,.found)
+                if 'found {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to construct module object for %1 %2 from repository %3",qualifiedReference.Name,qualifiedReference.VersionString,qualifiedReference.ServerName)))
                 }
-                set pManifestCache(manifestKey) = tModule
+                set pManifestCache(manifestKey) = moduleObj
             }
 
-            set tDepth = $select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
-            set pDependencyGraph(pDep.Name) = $listbuild(pDepth, tQualifiedReference.ServerName, tModule.VersionString, tQualifiedReference.Deployed, tQualifiedReference.PlatformVersion,pDep.DisplayName)
-            set pDependencyGraph(pDep.Name,pParentName_" "_pParentVersion) = pDep.VersionString
+            set pDependencyGraph(pDep.Name) = $listbuild(
+                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, qualifiedReference.Deployed, qualifiedReference.PlatformVersion,pDep.DisplayName
+            )
+            set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
-            // Add to work queue instead of recursing
+            // Add to work queue for processing at next depth
             set pWorkQueue(pDepth + 1, pDep.Name) = $listbuild(pModulePath_$listbuild(pDep.Name), pDep.Scope)
-            set pModuleCache(pDep.Name) = tModule
-
+            set pModuleCache(pDep.Name) = moduleObj
         } else {
             // FUZZY: Try candidates with backtracking
-            set tResultFound = 0
-            for j=1:1:tQualifiedReferences.Count() {
-                kill tDependencyGraph, tTempQueue
-                merge tDependencyGraph = pDependencyGraph
-                set tQualifiedReference = tQualifiedReferences.GetAt(j)
+            set resultFound = 0
+            for j=1:1:qualifiedReferences.Count() {
+                kill dependencyGraph
+                merge dependencyGraph = pDependencyGraph
+                set qualifiedReference = qualifiedReferences.GetAt(j)
 
                 // Retrieve and cache manifest
-                set manifestKey = tQualifiedReference.ServerName_"^"_tQualifiedReference.Name_"^"_tQualifiedReference.VersionString
-                if $data(pManifestCache(manifestKey), tModule) {
-                    // Cache hit
-                } else {
-                    set tSC = pRepositoryManager.RetrieveModuleManifest(tQualifiedReference,.tManifest)
+                set manifestKey = qualifiedReference.ServerName_"^"_qualifiedReference.Name_"^"_qualifiedReference.VersionString
+                if '$data(pManifestCache(manifestKey), moduleObj) {
+                    // Cache miss so retrieve
+                    set tSC = repoManager.RetrieveModuleManifest(qualifiedReference,.manifest)
                     if $$$ISERR(tSC) {
                         quit
                     }
 
-                    set tModule = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(tManifest,.tFound)
-                    if 'tFound {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to construct module object for %1 %2 from repository %3",tQualifiedReference.Name,tQualifiedReference.VersionString,tQualifiedReference.ServerName)))
+                    set moduleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(manifest,.found)
+                    if 'found {
+                        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to construct module object for %1 %2 from repository %3",qualifiedReference.Name,qualifiedReference.VersionString,qualifiedReference.ServerName)))
                     }
-                    set pManifestCache(manifestKey) = tModule
+                    set pManifestCache(manifestKey) = moduleObj
                 }
 
-                set tDepth = $select(tPreviousDepth=0:pDepth,tPreviousDepth>pDepth:tPreviousDepth,1:pDepth)
-                set tDependencyGraph(pDep.Name) = $listbuild(tDepth,tQualifiedReference.ServerName,tModule.VersionString,pDep.DisplayName)
-                set tDependencyGraph(pDep.Name,pParentName_" "_pParentVersion) = pDep.VersionString
+                // During fuzzy matching, we need to use the higher depth to ensure further processing
+                // occurs if needed.
+                set depth = $select(previousDepth=0:pDepth,previousDepth>pDepth:previousDepth,1:pDepth)
+                set dependencyGraph(pDep.Name) = $listbuild(
+                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName
+                )
+                set dependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
                 // For fuzzy: quick validation check without full recursion
                 // Just verify the module's immediate dependencies don't conflict
-                set tValidCandidate = 1
-                for k=1:1:tModule.Dependencies.Count() {
-                    #dim tSubDep As %IPM.Storage.ModuleReference
-                    set tSubDep = tModule.Dependencies.GetAt(k)
+                set validCandidate = 1
+                for k=1:1:moduleObj.Dependencies.Count() {
+                    #dim subDep As %IPM.Storage.ModuleReference
+                    set subDep = moduleObj.Dependencies.GetAt(k)
 
                     // Check if this dependency conflicts with what we already have
-                    if $data(tDependencyGraph(tSubDep.Name), tExistingInfo) {
-                        set tExistingVersion = $listget(tExistingInfo, 3)
-                        if (tExistingVersion '= "") {
+                    if $data(dependencyGraph(subDep.Name), existingInfo) {
+                        set existingVersion = $listget(existingInfo, 3)
+                        if (existingVersion '= "") {
                             // Quick version compatibility check
-                            set tSubVer = ##class(%IPM.General.SemanticVersion).FromString(tExistingVersion)
-                            if '$isobject(tSubVer) || 'tSubVer.Satisfies(tSubDep.Version) {
-                                set tValidCandidate = 0
+                            set subVer = ##class(%IPM.General.SemanticVersion).FromString(existingVersion)
+                            if '$isobject(subVer) || 'subVer.Satisfies(subDep.Version) {
+                                set validCandidate = 0
                                 quit
                             }
                         }
                     }
                 }
 
-                if tValidCandidate {
+                if validCandidate {
                     // Accept this candidate
-                    merge pDependencyGraph = tDependencyGraph
+                    merge pDependencyGraph = dependencyGraph
                     set pWorkQueue(pDepth + 1, pDep.Name) = $listbuild(pModulePath_$listbuild(pDep.Name), pDep.Scope)
-                    set pModuleCache(pDep.Name) = tModule
-                    set tResultFound = 1
+                    set pModuleCache(pDep.Name) = moduleObj
+                    set resultFound = 1
                     quit
                 }
             }
 
-            if $$$ISERR(tSC) {
-                quit
-            }
-
             // If no candidate worked, use last one and let errors surface later
-            if 'tResultFound {
-                merge pDependencyGraph = tDependencyGraph
+            if 'resultFound {
+                merge pDependencyGraph = dependencyGraph
                 set pWorkQueue(pDepth + 1, pDep.Name) = $listbuild(pModulePath_$listbuild(pDep.Name), pDep.Scope)
-                set pModuleCache(pDep.Name) = tModule
+                set pModuleCache(pDep.Name) = moduleObj
             }
         }
-
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod GetKnownDependencies(pModuleName As %String) As %List
