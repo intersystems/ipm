@@ -205,7 +205,7 @@ Method AddWebApps(
             set tPath = props("Path")
         }else{
             set tAppName = $listget(tAppList,i)
-            set tAutheEnabled = 64 //Unauthenticated
+            set tAutheEnabled = $$$AuthePassword
         }
         set ..TemplateResources(tAppName) = tAppName
         set ..TemplateResources(tAppName, "Url") = tAppName
@@ -218,14 +218,13 @@ Method AddWebApps(
             set tCSPDir = ##class(%File).NormalizeDirectory(##class(%File).ParentDirectoryName(##class(%File).ManagerDirectory())_"/csp")
             set ..TemplateResources(tAppName,"Directory") = $replace(tPath,tCSPDir,"${cspdir}")
             set cspapps = cspapps_$listbuild(tAppName)
-
         }
-        if ( tAutheEnabled = 32 ) {
+        if ( tAutheEnabled = $$$AuthePassword ) {
             set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 0
             set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
-        } elseif ( tAutheEnabled = 64 ) {
-            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 0
-            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
+        } elseif ( tAutheEnabled = $$$AutheUnauthenticated ) {
+            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 1
+            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 0
         } elseif ( tAutheEnabled = 96 ) {
             set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 1
             set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
