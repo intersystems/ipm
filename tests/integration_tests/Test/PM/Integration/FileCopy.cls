@@ -172,6 +172,11 @@ Method TestFileCopyExport()
 
         set tSC = ##class(%IPM.Main).Shell("install fc-noslash -verbose")
         do $$$AssertStatusOK(tSC,"Module successfully installed")
+
+        // cleanup by unconfiguring zot
+        set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
+        do $$$AssertStatusOK(tSC,"Zot repo succesfully configured")
+
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestFileCopyExport.")
     }
