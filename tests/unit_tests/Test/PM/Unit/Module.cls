@@ -51,4 +51,13 @@ Method TestGetModuleDefaultsFromXML()
   do $$$AssertEquals(count, 3)
 }
 
+Method TestFixUndefinedCLIGenCommand()
+{
+	set tWebAppList = "/test/test"
+	set tPath = ##class(%File).NormalizeDirectory("test-path")
+    set tTemplate = ##class(%IPM.Storage.ModuleTemplate).NewTemplate(tPath, "testmodule", "1.0.0", "test module verification", "testmod")
+    set sc = tTemplate.AddWebApps(tWebAppList, .tCSPapps)
+    do $$$AssertStatusOK(sc, "AddWebApps method must now process web app list without error.")
+}
+
 }
