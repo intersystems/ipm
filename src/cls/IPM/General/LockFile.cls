@@ -8,7 +8,7 @@ Parameter LockFileName As String = "module-lock.json";
 
 Property ModuleName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "name", MAXLEN = "");
 
-Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = "");
+Property VersionString As %String(%JSONFIELDNAME = "version", MAXLEN = 100);
 
 Property Repository As %String(%JSONFIELDNAME = "repository", MAXLEN = "");
 
@@ -69,7 +69,6 @@ ClassMethod CreateLockFileForModule(
                 $$$ThrowOnError(dependencyVal.Dependencies.SetAt(depMod.VersionString, depMod.Name))
             }
             $$$ThrowOnError(lockFile.Dependencies.SetAt(dependencyVal, mod.Name))
-
 
             // REPOSITORY STUFF:
             set repo = ..GetRepo(mod.Repository)

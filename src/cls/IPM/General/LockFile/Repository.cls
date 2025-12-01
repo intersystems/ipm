@@ -1,7 +1,7 @@
 Class %IPM.General.LockFile.Repository Extends (%RegisteredObject, %JSON.Adaptor)
 {
 
-Property Type As %String(%JSONFIELDNAME = "type");
+Property Type As %String(%JSONFIELDNAME = "type", MAXLEN = "");
 
 Property Enabled As %Boolean(%JSONFIELDNAME = "enabled");
 
