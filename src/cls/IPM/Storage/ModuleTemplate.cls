@@ -254,6 +254,19 @@ Method AddWebApps(
         set tMap("ServeFilesTimeout") = "ServeFilesTimeout"
         set tMap("TwoFactorEnabled") = "TwoFactorEnabled"
         set tMap("TwoFactorEnabled","default") = 0
+        // cors
+        // verify the Cors defined. this check used for "gen" command
+        // NOTE: These mappings are skipped if the properties do not exist,so they will not cause any conflicts.
+        set tMap("CorsAllowlist")="CorsAllowlist"
+        set tMap("CorsAllowlist","default") = $select($data(..TemplateResources(tAppName,"CorsCredentialsAllowed"),tcors):tcors,1:"CorsAllowlist")
+        set tMap("CorsCredentialsAllowed")="CorsCredentialsAllowed"
+        set tMap("CorsCredentialsAllowed","default") = $select($data(..TemplateResources(tAppName,"CorsCredentialsAllowed"),tCorsAllowed):tCorsAllowed,1:1)
+        set tMap("CorsHeadersList")="CorsHeadersList"
+        set tMap("CorsHeadersList","default") = $select($data(..TemplateResources(tAppName,"CorsHeadersList"),tCorsHeaders):tCorsHeaders,1:"CorsHeadersList")
+        //jwt
+        set tMap("JWTAccessTokenTimeout")="JWTAccessTokenTimeout"
+        set tMap("JWTAuthEnabled")="JWTAuthEnabled"
+        set tMap("JWTRefreshTokenTimeout")="JWTRefreshTokenTimeout"
 
         set tAttr = ""
         for {
@@ -273,6 +286,24 @@ Method SetSourcePathForCSPApp(
 	pPath) As %Status
 {
     set ..TemplateResources(pCSPApp,"Path") = pPath
+}
+
+Method DefineReminWebAppProps(ByRef props)
+{
+    //add cors origin details
+    set props("CorsAllowlist") = ""
+    set props("CorsCredentialsAllowed") = 0
+    // add cors headers
+    set props("CorsHeadersList") = ""
+    set props("DeepSeeEnabled") = 0
+    set props("JWTAuthEnabled") = 0
+    set props("JWTRefreshTokenTimeout") = 900
+    set props("JWTAccessTokenTimeout") = 60
+    set props("WSGIAppLocation") = ""
+    set props("WSGIAppName") = ""
+    set props("WSGICallable") = ""
+    set props("WSGIDebug") = ""
+    set props("WSGIType") = ""
 }
 
 ClassMethod GetGlobalsList(Output globals As %List) As %Status
@@ -341,6 +372,40 @@ Method SetAuthorProps(
     set tAuthor.Notes = pNotes
     set ..Author = tAuthor
     return $$$OK
+}
+
+Method SetCORSProps(
+	pApps As %String = "",
+	ByRef pCors As %String = "") As %Status
+{
+    set tAppList = ""
+    set pApps = $zstrip(pApps,"<>W")
+    if ( pApps = "*" ) {
+        do ..GetCSPApplications(.tAppList)
+    } else {
+        set tAppList = $listfromstring(pApps,",")
+    }
+    set ptr=0
+    while $listnext(tAppList,ptr,tWebpApp){
+        set ..TemplateResources(tWebpApp,"CorsCredentialsAllowed") = pCors("enableCors")
+        set ..TemplateResources(tWebpApp,"CorsHeadersList") = pCors("allowedHeaders")
+        set ..TemplateResources(tWebpApp,"CorsAllowlist") = pCors("allowedOrigins")
+    }
+    return $$$OK
+}
+
+Method ValidateCorsOrigin(pAllowedOrigins As %String = "")
+{
+    new $namespace
+    set $namespace = "%SYS"
+    set tOriginsList = $listfromstring(pAllowedOrigins,",")
+    set ptr = 0
+    set sc = 1
+    while $listnext(tOriginsList, ptr, origin){
+        set sc = ##class(Security.Applications).ValidateCorsOrigin(origin)
+        if $$$ISERR(sc) return sc
+    }
+    return sc
 }
 
 ClassMethod NewTemplate(
@@ -515,6 +580,10 @@ Method SetTemplateProps() As %Status
     set ..TemplateResources("rest","PasswordAuthEnabled") = 1
     set ..TemplateResources("rest","UnauthenticatedEnabled") = 0
     set ..TemplateResources("rest","Recurse") = 1
+    ;cors
+    set ..TemplateResources("rest","CorsAllowlist") = "http://www.example.com"
+    set ..TemplateResources("rest","CorsCredentialsAllowed") = 1
+    set ..TemplateResources("rest","CorsHeadersList") = "Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Credentials, Access-Control-Max-Age, Access-Control-Expose-Headers, Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
 
     // WEB APP
     set ..TemplateResources("web") = "/web"

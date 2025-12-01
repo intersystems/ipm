@@ -1272,6 +1272,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 
     do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)
 
+    #dim tTemplate As %IPM.Storage.ModuleTemplate
     set tTemplate = ##class(%IPM.Storage.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
     return:'$isobject(tTemplate)
 
@@ -1304,6 +1305,28 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
         }
         do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
 
+#If $$$CacheVersionMajor>=2025
+        write !,"Cross-Origin Settings:"
+        do ##class(%Library.Prompt).GetYesNo("Configure Access-Control-Allow-Credentials?: ",.tEnableCors,1,3)
+        if tEnableCors {
+            do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Headers: ",.tAllowedHeaders,,32767,"comma seperated values e.g: Access-Control-Allow-Origin,Access-Control-Allow-Headers")
+            while (1){
+                do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Origins: ",.tAllowedOrigins,,32767,"comma seperated values e.g: http://www.example.com")
+                if tAllowedOrigins="" quit
+                set sc = tTemplate.ValidateCorsOrigin(tAllowedOrigins)
+                if $$$ISERR(sc) {
+                    do ..DisplayError(sc)
+                    set tAllowedOrigins = ""
+                    continue
+                }
+                quit
+            }
+            set tCors("enableCors") = tEnableCors
+            set tCors("allowedHeaders") = tAllowedHeaders
+            set tCors("allowedOrigins") = tAllowedOrigins
+            do tTemplate.SetCORSProps(tWebAppList,.tCors)
+        }
+#EndIf
         do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps)
         for i=1:1:$listlength(tCSPapps) {
             set tCSPPath = ""

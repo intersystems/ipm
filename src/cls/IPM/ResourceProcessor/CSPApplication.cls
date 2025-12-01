@@ -17,6 +17,8 @@ Parameter ATTRIBUTES = {""_
     // Not in all reasonably modern versions of %Installer.CSPApplication
     "DispatchClass,MatchRoles,"_
 
+    //CORS properties have not yet been added to the <class>%IPM.ResourceProcessor.CSPApplication</class> applications, so they were included manually.
+    "CorsCredentialsAllowed,CorsHeadersList,CorsAllowlist,"_
     // The rest of these are in all reasonably modern versions of %Installer.CSPApplication
     // From: Write ##class(%IPM.ResourceProcessor.CSPApplication).GetInheritedProperties()
     // "Grant" removed (since it's replaced by "MatchRoles")
@@ -66,6 +68,15 @@ Property Directory As %String(ATTRIBUTEREQUIRED = 0, MAXLEN = 1024) [ Required ]
 
 /// PermittedClasses default
 Property PermittedClasses As %String(MAXLEN = 32767);
+
+/// CorsCredentialsAllowed
+Property CorsCredentialsAllowed As %Boolean [ InitialExpression = 0 ];
+
+/// Required CORS headers (Access-Control-Allow-*)
+Property CorsHeadersList As %String(MAXLEN = 32767);
+
+/// Allowed CORS origins (e.g., http://www.example.com)
+Property CorsAllowlist As %String(MAXLEN = 32767);
 
 Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [ Private, ServerOnly = 1 ]
 {
@@ -274,6 +285,15 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
         set tSpecial("DelegatedAuthEnabled") = ""
         set tSpecial("KerberosAuthEnabled") = ""
         set tSpecial("Url") = ""
+
+        // Cors properties
+        set tMap("CorsAllowlist")="CorsAllowlist"
+        set tMap("CorsCredentialsAllowed")="CorsCredentialsAllowed"
+        set tMap("CorsHeadersList")="CorsHeadersList"
+        //jwt
+        set tMap("JWTAccessTokenTimeout")="JWTAccessTokenTimeout"
+        set tMap("JWTAuthEnabled")="JWTAuthEnabled"
+        set tMap("JWTRefreshTokenTimeout")="JWTRefreshTokenTimeout"
 
         set tProperties("AutheEnabled") = (..PasswordAuthEnabled * $$$AutheCache) +
             (..UnauthenticatedEnabled * $$$AutheUnauthenticated) +

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="cors-rest-apps.ZPM">
+    <Module>
+      <Name>cors-rest-apps</Name>
+      <Version>1.0.0</Version>
+      <Description>cors enabling testing on webapplication</Description>
+      <Keywords>cors</Keywords>
+      <Packaging>module</Packaging>
+      <Resource Name="CorsTest.PKG"/>
+      <CSPApplication
+      CookiePath="/testcors"
+      CorsAllowlist="https://www.example.com,https://pm.intersystems.com"
+      CorsCredentialsAllowed="1"
+      JWTAccessTokenTimeout="60"
+      JWTAuthEnabled="1"
+      JWTRefreshTokenTimeout="900"
+      CorsHeadersList="Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Credentials, Access-Control-Max-Age, Access-Control-Expose-Headers, Access-Control-Request-Method, Access-Control-Request-Headers"
+      PasswordAuthEnabled="1"
+      Recurse="1"
+      UnauthenticatedEnabled="0"
+      Url="/testcors"
+      UseCookies="2"/>
+      <LifecycleClass>%IPM.Lifecycle.Module</LifecycleClass>
+      <SourcesRoot>src</SourcesRoot>
+    </Module>
+  </Document>
+</Export>
