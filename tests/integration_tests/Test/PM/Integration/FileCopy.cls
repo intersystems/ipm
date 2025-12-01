@@ -1,7 +1,7 @@
 Class Test.PM.Integration.FileCopy Extends Test.PM.Integration.Base
 {
 
-Method Setup() As %Status
+Method OnBeforeAllTests() As %Status
 {
     // Setup repo for FileCopy tests
     set status = ##class(%IPM.Main).Shell("repo -n integration-tests -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/")
@@ -13,7 +13,6 @@ Method TestModuleNoDependency()
 {
     set status = $$$OK
     try {
-        do ..Setup()
         set status = ##class(%IPM.Main).Shell("install -dev fc-no-dep")
         do $$$AssertStatusOK(status,"Installed fc-no-dep module successfully.")
         set status = ##class(%IPM.Main).Shell("fc-no-dep package -only -export-deps 1 -DPath=/usr/irissys/mgr/fc-no-dep/")
@@ -36,7 +35,6 @@ Method TestModuleDependencyDifferentResourceNames()
 {
     set status = $$$OK
     try {
-        do ..Setup()
         set status = ##class(%IPM.Main).Shell("install -dev fc-dep-diff-resource")
         do $$$AssertStatusOK(status,"Installed fc-dep-diff-resource module and dependency successfully.")
         set status = ##class(%IPM.Main).Shell("fc-dep-diff-resource package -only -export-deps 1 -DPath=/usr/irissys/mgr/fc-dep-diff-resource/")
@@ -61,7 +59,6 @@ Method TestDependencySameResourceName()
 {
     set status = $$$OK
     try {
-        do ..Setup()
         set status = ##class(%IPM.Main).Shell("install -dev fc-dep-same-resource")
         do $$$AssertStatusOK(status,"Installed fc-dep-same-resource module and dependencies successfully.")
         set status = ##class(%IPM.Main).Shell("fc-dep-same-resource package -only -export-deps 1 -DPath=/usr/irissys/mgr/fc-dep-same-resource/")
@@ -89,7 +86,6 @@ Method TestMakeDeployed()
 {
     set status = $$$OK
     try {
-        do ..Setup()
         set status = ##class(%IPM.Main).Shell("install -dev fc-dep-same-resource")
         do $$$AssertStatusOK(status,"Installed fc-dep-same-resource module and dependencies successfully.")
         set status = ##class(%IPM.Main).Shell("makedeployed fc-dep-same-resource -r")
