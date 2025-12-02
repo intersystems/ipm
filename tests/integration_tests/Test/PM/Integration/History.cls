@@ -1,3 +1,12 @@
+/// Integration test suite for IPM history log.
+/// Tests various aspects of the history log including:
+/// - Basic history entry creation for load, install, and uninstall operations
+/// - History filtering by action type, package name, and other criteria
+/// - Multi-namespace history tracking and management
+/// - Phase tracking during module operations
+/// - Error handling and failed operation tracking
+/// - History deletion (local and global)
+/// - Dev mode behavior with uncommitted operations
 Class Test.PM.Integration.History Extends Test.PM.Integration.Base
 {
 
@@ -5,6 +14,8 @@ Parameter SimpleModuleName As STRING = "simplest-module";
 
 Parameter HistoryNSName As STRING = "HISTORY";
 
+/// Cleanup method executed after each test to ensure a clean state.
+/// Uninstalls all modules, removes the test repository configuration, and clears all history entries.
 Method OnAfterOneTest(testname As %String) As %Status
 {
     set tSC = ##class(%IPM.Main).Shell("uninstall -all")
@@ -22,7 +33,14 @@ Method OnAfterOneTest(testname As %String) As %Status
     return tSC
 }
 
-/// Tests basic load, uninstall, and install
+/// Tests basic history logging for load, uninstall, and install operations.
+/// Verifies that history entries are created with all expected fields populated correctly including:
+/// - Action type (load, uninstall, install)
+/// - Module version information
+/// - Timestamps
+/// - Success and committed status
+/// - Command strings
+/// - Source information (for install operations)
 Method TestSimpleHistory()
 {
     // delete previous entries
@@ -111,7 +129,13 @@ Method TestSimpleHistory()
     }
 }
 
-/// Creates a history log entry for each of load, install, and uninstall in the current namespace
+/// Helper method that creates history log entries for load, install, and uninstall operations.
+/// Used by multiple tests to set up a consistent test state with representative history entries.
+/// <p>Parameters:
+/// <ul>
+/// <li>moduleName - The name of the module to operate on</li>
+/// <li>moduleVersion - The semantic version of the module</li>
+/// </ul>
 Method DoLoadUninstallInstall(
 	moduleName As %String,
 	moduleVersion As %String)
@@ -130,6 +154,12 @@ Method DoLoadUninstallInstall(
     do $$$AssertStatusOK(tSC,"Installed module successfully")
 }
 
+/// Tests history filtering and query modifiers.
+/// Verifies that the GetHistory API correctly supports:
+/// - Filtering by action type (load, install, uninstall)
+/// - Filtering by package name
+/// - Limiting the number of results returned
+/// Ensures that filters work in combination and return accurate results.
 Method TestHistoryModifiers()
 {
     // delete previous entries
@@ -193,6 +223,10 @@ Method TestHistoryModifiers()
     do $$$AssertEquals(count, 1, "One entries for mv expected, but "_count_" found")
 }
 
+/// Tests that invalid history commands return appropriate error status.
+/// Verifies error handling for:
+/// - Invalid history subcommands
+/// - Invalid history detail IDs (0, non-numeric)
 Method TestInvalidHistoryCommands()
 {
     set command = "history blah"
@@ -208,6 +242,10 @@ Method TestInvalidHistoryCommands()
     do $$$AssertStatusNotOK(tSC,"Invalid command: "_command)
 }
 
+/// Tests history logging behavior in dev mode vs non-dev mode.
+/// Verifies that:
+/// - Failed operations without -dev flag create uncommitted history entries (Committed=0)
+/// - Failed operations with -dev flag create committed history entries (Committed=1)
 Method TestDevMode()
 {
     set tModuleDir = ..GetModuleDir("malformed-module")
@@ -260,8 +298,12 @@ Method TestDevMode()
     }
 }
 
-/// Creates entries in the history log in two namespaces
-/// Checks that local and global find and delete work
+/// Tests multi-namespace history tracking and management.
+/// Creates history entries in two different namespaces and verifies:
+/// - Namespace-specific history queries return only entries for that namespace
+/// - Global history queries return entries from all namespaces
+/// - Namespace-specific deletion only affects the current namespace
+/// - Global deletion removes entries from all namespaces
 Method TestMultipleNamespaces()
 {
     new $namespace
@@ -316,9 +358,7 @@ Method TestMultipleNamespaces()
     do $$$AssertEquals(count, 6, "6 entries expected globally, but "_count_" found")
 
     // Test history deletion
-    // The new namespace is mapped to the orginal one, so they share the %IPM.General.History table
-    // todo figure out why delete doesn't work; something about the mappings is throwing it off
-
+    // start with local namespace-specific deletion
     write !, "Testing history deletion in ", $namespace
     set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
     do $$$AssertStatusOK(tSC,"History deleted successfully")
@@ -365,7 +405,12 @@ Method TestMultipleNamespaces()
     set $namespace = originalNS
 }
 
-/// Creates a new namespace and switches into it
+/// Helper method that creates and configures a new test namespace.
+/// The new namespace is configured with proper mappings for:
+/// - Unit test globals
+/// - IPM package manager routines and classes
+/// - IPM repository configuration
+/// Returns the name of the newly created namespace.
 Method CreateNewNamespace() As %String
 {
     set currentNS = $namespace
@@ -388,6 +433,14 @@ Method CreateNewNamespace() As %String
     return newNamespace
 }
 
+/// Helper method that counts history entries across multiple namespaces.
+/// Iterates through the provided list of namespaces and counts all history entries.
+/// <p>Parameters:
+/// <ul>
+/// <li>namespaces - List of namespace names to query</li>
+/// <li>limit - Optional limit on number of entries to retrieve per namespace (0 = unlimited)</li>
+/// </ul>
+/// Returns the total count of history entries across all specified namespaces.
 ClassMethod GetGlobalHistoryCount(
 	namespaces As %List,
 	limit As %Integer = 0) As %Integer
@@ -415,6 +468,11 @@ ClassMethod GetGlobalHistoryCount(
     return count
 }
 
+/// Tests history logging for module update operations.
+/// Verifies that:
+/// - Initial load creates a history entry with version 1.0.0
+/// - Update to 2.0.0 creates a history entry with action "update" and the new version
+/// - All expected fields are populated correctly including command string and version information
 Method TestUpdate()
 {
     // Load 1.0.0
@@ -472,6 +530,12 @@ Method TestUpdate()
     }
 }
 
+/// Tests that history entries correctly record all phases of module operations.
+/// Verifies that:
+/// - Load and install operations record 5 phases: Initialize, Reload, Validate, Compile, Activate
+/// - Uninstall operations record only the Clean phase
+/// - Each phase includes start time, end time, and status
+/// - All phases complete successfully ($$$OK status)
 Method TestPhases()
 {
     // Populate history log entries
@@ -534,7 +598,12 @@ Method TestPhases()
     }
 }
 
-/// An action that fails should properly document the failing phase
+/// Tests that failed operations properly record which phase failed.
+/// Loads a malformed module that fails during the Activate phase and verifies:
+/// - History entry shows the operation as unsuccessful
+/// - History entry is not committed as it is not in dev mode (Committed=0)
+/// - All phases up to and including the failing phase are recorded
+/// - The failing phase has a non-OK status while earlier phases have OK status
 Method TestFailingPhases()
 {
     set tModuleDir = ..GetModuleDir("invoke/failure/NonStatusReturnCheckStatus")
@@ -596,6 +665,12 @@ Method TestFailingPhases()
     }
 }
 
+/// Tests history logging for modules with dependencies.
+/// Loads a module that has a dependency and verifies that:
+/// - Both parent and child modules have separate history entries
+/// - Load, install, and uninstall operations are tracked for both modules
+/// - Phase information is correctly recorded for both parent and child
+/// - Dependency module (simplest-module-dep) has correct version information
 Method TestWithDependencies()
 {
     // Populate history log entries
@@ -703,6 +778,12 @@ Method TestWithDependencies()
     }
 }
 
+/// Tests history retrieval after the temporary history global has been deleted.
+/// Verifies that:
+/// - History can be populated normally
+/// - Deleting the ^IRIS.Temp.HistoryTempD global doesn't break history retrieval
+/// - Phase information is still accessible after the temp global is removed
+/// This ensures resilience against data loss or cleanup operations.
 Method TestTempGlobalWhacking()
 {
     // Populate history log entries

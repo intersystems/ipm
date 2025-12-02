@@ -14,14 +14,14 @@ Property Action As %String(VALUELIST = ",load,install,uninstall,update") [ Requi
 /// Name of the package being logged. This is not necessarily required, e.g. when loading a nonexistent directory.
 Property Package As %IPM.DataType.ModuleName;
 
-/// Version of the package being logged. This is not necessarily required, e.g. when loading a nonexistent directory.
+/// Version of the package being logged. This will sometimes be the default 0.0.0-0 until the actual version is found.
 Property Version As %IPM.General.SemanticVersion [ Required ];
 
 /// Name of the repository where the package is being installed. For load and uninstall this will be empty.
-Property SourceName As %IPM.DataType.RepoName(MAXLEN = 100);
+Property SourceName As %IPM.DataType.RepoName;
 
 /// Moniker of the repository where the package is being installed. For load and uninstall this will be empty.
-Property SourceMoniker As %IPM.DataType.RepoMoniker(MAXLEN = 100);
+Property SourceMoniker As %IPM.DataType.RepoMoniker;
 
 /// Details of the repository where the package is being installed. For load and uninstall this will be empty.
 Property SourceDetails As %String(MAXLEN = "");
@@ -38,7 +38,7 @@ Property UserName As %Library.Username [ InitialExpression = {$username}, Requir
 /// Status of the action. If the action is still in progress, this will be 0. Otherwise, it will be the status code of the action.
 Property Success As %Status [ InitialExpression = 0, Required ];
 
-/// Whether the action has been commited "to disk" so to speak. A non-commited action has been rolled back.
+/// Whether the action has been permanantly written "to disk". A non-committed action has been rolled back.
 /// In non developer mode, this indicates whether the action was successful. In developer mode, this is always true.
 Property Committed As %Boolean [ InitialExpression = 0, Required ];
 
@@ -98,7 +98,7 @@ Method SetSource(ServerName As %String) As %Status
 
 Method SetVersion(pVersion As %IPM.General.SemanticVersion) As %Status
 {
-    // If object is being initalized, this will fail, so set placeholder instead
+    // If object is being initialized, this will fail, so set placeholder instead
     if ..%Id() '= "" {
         $$$ThrowOnError(..%Reload())
     }
@@ -138,7 +138,7 @@ Method InitPhase(name As %String)
 
 Method FinalizePhase(
 	name As %String,
-	status As %String)
+	status As %Status)
 {
     if ..Phases.Size = 0 {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "No phase logs found"))
