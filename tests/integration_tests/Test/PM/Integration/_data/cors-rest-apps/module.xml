@@ -8,7 +8,7 @@
       <Keywords>cors</Keywords>
       <Packaging>module</Packaging>
       <Resource Name="CorsTest.PKG"/>
-      <CSPApplication
+      <WebApplication
       CookiePath="/testcors"
       CorsAllowlist="https://www.example.com,https://pm.intersystems.com"
       CorsCredentialsAllowed="1"
