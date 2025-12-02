@@ -1307,23 +1307,23 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 
 #If $$$CacheVersionMajor>=2025
         write !,"Cross-Origin Settings:"
-        do ##class(%Library.Prompt).GetYesNo("Configure Access-Control-Allow-Credentials?: ",.tEnableCors,1,3)
-        if tEnableCors {
-            do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Headers: ",.tAllowedHeaders,,32767,"comma seperated values e.g: Access-Control-Allow-Origin,Access-Control-Allow-Headers")
+        do ##class(%Library.Prompt).GetYesNo("Configure Access-Control-Allow-Credentials?: ",.enableCors,1,3)
+        if enableCors {
+            do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Headers: ",.allowedHeaders,,32767,"comma seperated values e.g: Access-Control-Allow-Origin,Access-Control-Allow-Headers")
             while (1){
-                do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Origins: ",.tAllowedOrigins,,32767,"comma seperated values e.g: http://www.example.com")
-                if tAllowedOrigins="" quit
-                set sc = tTemplate.ValidateCorsOrigin(tAllowedOrigins)
+                do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Origins: ",.allowedOrigins,,32767,"comma seperated values e.g: http://www.example.com")
+                if allowedOrigins="" quit
+                set sc = tTemplate.ValidateCorsOrigin(allowedOrigins)
                 if $$$ISERR(sc) {
                     do ..DisplayError(sc)
-                    set tAllowedOrigins = ""
+                    set allowedOrigins = ""
                     continue
                 }
                 quit
             }
-            set tCors("enableCors") = tEnableCors
-            set tCors("allowedHeaders") = tAllowedHeaders
-            set tCors("allowedOrigins") = tAllowedOrigins
+            set tCors("enableCors") = enableCors
+            set tCors("allowedHeaders") = allowedHeaders
+            set tCors("allowedOrigins") = allowedOrigins
             do tTemplate.SetCORSProps(tWebAppList,.tCors)
         }
 #EndIf

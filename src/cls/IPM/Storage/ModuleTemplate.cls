@@ -378,32 +378,32 @@ Method SetCORSProps(
 	pApps As %String = "",
 	ByRef pCors As %String = "") As %Status
 {
-    set tAppList = ""
+    set appList = ""
     set pApps = $zstrip(pApps,"<>W")
     if ( pApps = "*" ) {
-        do ..GetCSPApplications(.tAppList)
+        do ..GetCSPApplications(.appList)
     } else {
-        set tAppList = $listfromstring(pApps,",")
+        set appList = $listfromstring(pApps,",")
     }
     set ptr=0
-    while $listnext(tAppList,ptr,tWebpApp){
-        set ..TemplateResources(tWebpApp,"CorsCredentialsAllowed") = pCors("enableCors")
-        set ..TemplateResources(tWebpApp,"CorsHeadersList") = pCors("allowedHeaders")
-        set ..TemplateResources(tWebpApp,"CorsAllowlist") = pCors("allowedOrigins")
+    while $listnext(appList, ptr, webpApp){
+        set ..TemplateResources(webpApp,"CorsCredentialsAllowed") = pCors("enableCors")
+        set ..TemplateResources(webpApp,"CorsHeadersList") = pCors("allowedHeaders")
+        set ..TemplateResources(webpApp,"CorsAllowlist") = pCors("allowedOrigins")
     }
     return $$$OK
 }
 
-Method ValidateCorsOrigin(pAllowedOrigins As %String = "")
+Method ValidateCorsOrigin(pAllowedOrigins As %String = "") As %Status
 {
     new $namespace
     set $namespace = "%SYS"
-    set tOriginsList = $listfromstring(pAllowedOrigins,",")
+    set originsList = $listfromstring(pAllowedOrigins,",")
     set ptr = 0
-    set sc = 1
-    while $listnext(tOriginsList, ptr, origin){
+    set sc = $$$OK
+    while $listnext(originsList, ptr, origin){
         set sc = ##class(Security.Applications).ValidateCorsOrigin(origin)
-        if $$$ISERR(sc) return sc
+        if $$$ISERR(sc) quit
     }
     return sc
 }

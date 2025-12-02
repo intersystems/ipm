@@ -8,15 +8,13 @@ Parameter WebAppName As STRING = "/testcors";
 /// create web application using <CspApplcation> tag
 Method TestCORSEnabledViaCSPAppTag()
 {
-    #define NormalizeDirectory(%path)   ##class(%File).NormalizeDirectory(%path)
-    #define UTRoot                      ^UnitTestRoot
-
-    set testRoot = $$$NormalizeDirectory($get($$$UTRoot))
-    set moduleDir = $$$NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/")
+    set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+    set moduleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/")
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",moduleDir)
 
     do $$$LogMessage("loading via <CspApplication> tag")
-    if ##class(%File).Exists(moduleDir_"/module.xml"){
-        set status= ##class(%File).Delete(moduleDir_"/module.xml")
+    if ##class(%File).Exists(moduleFile){
+        set status= ##class(%File).Delete(moduleFile)
         do $$$AssertStatusOK(status,"Removed the 'module.xml' file from "_moduleDir)
     }
     set status = ..GenerateTemplate(moduleDir)
@@ -33,23 +31,21 @@ Method TestCORSEnabledViaCSPAppTag()
 /// create web application using <WebApplcation> tag
 Method TestCORSEnabledViaWebAppTag()
 {
-    #define NormalizeDirectory(%path)   ##class(%File).NormalizeDirectory(%path)
-    #define UTRoot                      ^UnitTestRoot
-
     do $$$LogMessage("loading via <WebApplcation> tag")
-    set testRoot = $$$NormalizeDirectory($get($$$UTRoot))
-    set moduleDir = $$$NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/webapp/")
+    set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+    set moduleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/webapp/")
     if '##class(%File).DirectoryExists(moduleDir) {
         do ##class(%File).CreateDirectoryChain(moduleDir)
     }
-    if ##class(%File).Exists(moduleDir_"/module.xml"){
-        set status= ##class(%File).Delete(moduleDir_"/module.xml")
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",moduleDir)
+    if ##class(%File).Exists(moduleFile){
+        set status= ##class(%File).Delete(moduleFile)
         do $$$AssertStatusOK(status,"Removed the 'module.xml' file from "_moduleDir)
     }
     do $$$LogMessage("Creating module.xml with <WebApplcation> tag")
     set moduleStream = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||ModuleWithWebApTag").Data
     set fileStream = ##class(%Stream.FileBinary).%New()
-    set fileStream.Filename=moduleDir_"/module.xml"
+    set fileStream.Filename=moduleFile
     set status= fileStream.CopyFromAndSave(moduleStream)
     do $$$AssertStatusOK(status,"Created module.xml manually on "_moduleDir_" successfully.")
 
@@ -65,52 +61,48 @@ Method VerifyCORSSettings()
 {
     new $namespace
     set $namespace = "%SYS"
-    set status = ##class(Security.Applications).Get(..#WebAppName,.tProps)
+    set status = ##class(Security.Applications).Get(..#WebAppName,.props)
     do $$$AssertStatusOK(status,"Web applciation "_..#WebAppName_" created scuccessfully")
-    if $data(tProps("CorsAllowlist"),tCorsAllowlist)&&(tCorsAllowlist'="") {
+    if $data(props("CorsAllowlist"),corsAllowlist)&&(corsAllowlist'="") {
         do $$$AssertStatusOK(1,"CorsAllowlist values are defined")
-        do $$$LogMessage(tCorsAllowlist)
+        do $$$LogMessage(corsAllowlist)
     }
-    if $data(tProps("CorsCredentialsAllowed"),tCorsAllow)&&(tCorsAllow'="") {
+    if $data(props("CorsCredentialsAllowed"),corsAllow)&&(corsAllow'="") {
         do $$$AssertStatusOK(1,"CorsCredentialsAllowed values are defined")
-        do $$$LogMessage(tCorsAllow)
+        do $$$LogMessage(corsAllow)
     }
-    if $data(tProps("CorsHeadersList"),tCorsHeadersList)&&(tCorsHeadersList'="") {
+    if $data(props("CorsHeadersList"),corsHeadersList)&&(corsHeadersList'="") {
         do $$$AssertStatusOK(1,"CorsHeadersList values are defined")
-        do $$$LogMessage(tCorsHeadersList)
+        do $$$LogMessage(corsHeadersList)
     }
 }
 
 ClassMethod GenerateTemplate(pPath As %String = "") As %Status
 {
     return:(pPath="") $$$OK
-    set tTemplate = ##class(%IPM.Storage.ModuleTemplate).%New()
-    //do tTemplate.SetTemplateProps()
-    set tTemplate.Name = ..#CommonPathPrefix
-    set tTemplate.VersionString = "1.0.0"
-    set tTemplate.Description = "cors enabling testing on webapplication"
-    set tTemplate.Keywords = "cors"
+    set template = ##class(%IPM.Storage.ModuleTemplate).%New()
+    set template.Name = ..#CommonPathPrefix
+    set template.VersionString = "1.0.0"
+    set template.Description = "cors enabling testing on webapplication"
+    set template.Keywords = "cors"
 
-    set tTemplate.Packaging = "module"
-    set tTemplate.SourcesRoot = "src"
-
-    //set tTemplate.TemplateResources("cls") = "MyPackage.Demo.CLS"
-    //set tTemplate.TemplateResources("cls","Directory") = "cls"
+    set template.Packaging = "module"
+    set template.SourcesRoot = "src"
 
     // REST APP
-    set tTemplate.TemplateResources(..#WebAppName) = ..#WebAppName
-    set tTemplate.TemplateResources(..#WebAppName,"Url") = ..#WebAppName
-    set tTemplate.TemplateResources(..#WebAppName,"CookiePath") = ..#WebAppName
-    set tTemplate.TemplateResources(..#WebAppName,"UseCookies") = 2
-    set tTemplate.TemplateResources(..#WebAppName,"PasswordAuthEnabled") = 1
-    set tTemplate.TemplateResources(..#WebAppName,"UnauthenticatedEnabled") = 0
-    set tTemplate.TemplateResources(..#WebAppName,"Recurse") = 1
+    set template.TemplateResources(..#WebAppName) = ..#WebAppName
+    set template.TemplateResources(..#WebAppName,"Url") = ..#WebAppName
+    set template.TemplateResources(..#WebAppName,"CookiePath") = ..#WebAppName
+    set template.TemplateResources(..#WebAppName,"UseCookies") = 2
+    set template.TemplateResources(..#WebAppName,"PasswordAuthEnabled") = 1
+    set template.TemplateResources(..#WebAppName,"UnauthenticatedEnabled") = 0
+    set template.TemplateResources(..#WebAppName,"Recurse") = 1
     ;cors
-    set tTemplate.TemplateResources(..#WebAppName,"CorsAllowlist") = "https://www.example.com,https://pm.intersystems.com"
-    set tTemplate.TemplateResources(..#WebAppName,"CorsCredentialsAllowed") = 1
-    set tTemplate.TemplateResources(..#WebAppName,"CorsHeadersList") = "Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Credentials, Access-Control-Max-Age, Access-Control-Expose-Headers, Access-Control-Request-Method, Access-Control-Request-Headers"
-    do tTemplate.ProcessResources()
-    return tTemplate.SaveFile(pPath)
+    set template.TemplateResources(..#WebAppName,"CorsAllowlist") = "https://www.example.com,https://pm.intersystems.com"
+    set template.TemplateResources(..#WebAppName,"CorsCredentialsAllowed") = 1
+    set template.TemplateResources(..#WebAppName,"CorsHeadersList") = "Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Credentials, Access-Control-Max-Age, Access-Control-Expose-Headers, Access-Control-Request-Method, Access-Control-Request-Headers"
+    do template.ProcessResources()
+    return template.SaveFile(pPath)
 }
 
 XData ModuleWithWebApTag [ MimeType = application/xml ]

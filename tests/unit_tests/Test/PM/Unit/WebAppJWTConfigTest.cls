@@ -1,4 +1,4 @@
-Class Test.PM.Unit.WebApJWTConfigTest Extends %UnitTest.TestCase
+Class Test.PM.Unit.WebAppJWTConfigTest Extends %UnitTest.TestCase
 {
 
 Parameter CommonPathPrefix As STRING = "cors-rest-apps";
@@ -8,16 +8,13 @@ Parameter WebAppName As STRING = "/testcors";
 /// create web application using <CspApplcation> tag
 Method TestJWTEnabledViaCspAppTag()
 {
-    #define NormalizeDirectory(%path)   ##class(%File).NormalizeDirectory(%path)
-    #define UTRoot                      ^UnitTestRoot
-
-    set testRoot = $$$NormalizeDirectory($get($$$UTRoot))
-    set moduleDir = $$$NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/")
-
+    set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+    set moduleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/")
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",moduleDir)
     do $$$LogMessage("loading via <CspApplication> tag")
 
-    if ##class(%File).DirectoryExists(moduleDir_"/module.xml"){
-        set status= ##class(%File).Delete(moduleDir_"/module.xml")
+    if ##class(%File).DirectoryExists(moduleFile){
+        set status= ##class(%File).Delete(moduleFile)
         do $$$AssertStatusOK(status,"file already exist.So, Removed the 'module.xml' file from "_moduleDir)
     }
     set status = ..GenerateTemplate(moduleDir)
@@ -34,23 +31,21 @@ Method TestJWTEnabledViaCspAppTag()
 /// create web application using <WebApplcation> tag
 Method TestJWTEnabledViaWebAppTag()
 {
-    #define NormalizeDirectory(%path)   ##class(%File).NormalizeDirectory(%path)
-    #define UTRoot                      ^UnitTestRoot
-
     do $$$LogMessage("loading via <WebApplcation> tag")
-    set testRoot = $$$NormalizeDirectory($get($$$UTRoot))
-    set moduleDir = $$$NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/webapp/")
+    set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+    set moduleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/webapp/")
     if '##class(%File).DirectoryExists(moduleDir) {
         do ##class(%File).CreateDirectoryChain(moduleDir)
     }
-    if ##class(%File).Exists(moduleDir_"/module.xml"){
-        set status= ##class(%File).Delete(moduleDir_"/module.xml")
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",moduleDir)
+    if ##class(%File).Exists(moduleFile){
+        set status= ##class(%File).Delete(moduleFile)
         do $$$AssertStatusOK(status,"Removed the 'module.xml' file from "_moduleDir)
     }
     do $$$LogMessage("Creating module.xml with <WebApplcation> tag")
     set moduleStream = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||ModuleWithWebApTag").Data
     set fileStream = ##class(%Stream.FileBinary).%New()
-    set fileStream.Filename=moduleDir_"/module.xml"
+    set fileStream.Filename=moduleFile
     set status= fileStream.CopyFromAndSave(moduleStream)
     do $$$AssertStatusOK(status,"Created module.xml manually on "_moduleDir_" successfully.")
 
@@ -66,18 +61,18 @@ Method VerifyJWTConfiguration()
 {
     new $namespace
     set $namespace = "%SYS"
-    set status = ##class(Security.Applications).Get(..#WebAppName,.tProps)
+    set status = ##class(Security.Applications).Get(..#WebAppName,.props)
     do $$$AssertStatusOK(status,"Web applciation "_..#WebAppName_" created scuccessfully")
     do $$$LogMessage("Validating JWT configuration")
-    if $data(tProps("JWTAccessTokenTimeout"),tJWTAccessTokenTimeout) {
+    if $data(props("JWTAccessTokenTimeout"),tJWTAccessTokenTimeout) {
         do $$$AssertStatusOK(1,"JWTAccessTokenTimeout value is defined")
         do $$$LogMessage(tJWTAccessTokenTimeout)
     }
-    if $data(tProps("JWTAuthEnabled"),tJWTAuthEnabled) {
+    if $data(props("JWTAuthEnabled"),tJWTAuthEnabled) {
         do $$$AssertStatusOK(1,"JWTAuthEnabled value is defined")
         do $$$LogMessage(tJWTAuthEnabled)
     }
-    if $data(tProps("JWTRefreshTokenTimeout"),tJWTRefreshTokenTimeout) {
+    if $data(props("JWTRefreshTokenTimeout"),tJWTRefreshTokenTimeout) {
         do $$$AssertStatusOK(1,"JWTRefreshTokenTimeout value is defined")
         do $$$LogMessage(tJWTRefreshTokenTimeout)
     }
@@ -86,33 +81,29 @@ Method VerifyJWTConfiguration()
 ClassMethod GenerateTemplate(pPath As %String = "") As %Status
 {
     return:(pPath="") $$$OK
-    set tTemplate = ##class(%IPM.Storage.ModuleTemplate).%New()
-    //do tTemplate.SetTemplateProps()
-    set tTemplate.Name = ..#CommonPathPrefix
-    set tTemplate.VersionString = "1.0.0"
-    set tTemplate.Description = "cors enabling testing on webapplication"
-    set tTemplate.Keywords = "cors"
+    set template = ##class(%IPM.Storage.ModuleTemplate).%New()
+    set template.Name = ..#CommonPathPrefix
+    set template.VersionString = "1.0.0"
+    set template.Description = "cors enabling testing on webapplication"
+    set template.Keywords = "cors"
 
-    set tTemplate.Packaging = "module"
-    set tTemplate.SourcesRoot = "src"
-
-    //set tTemplate.TemplateResources("cls") = "MyPackage.Demo.CLS"
-    //set tTemplate.TemplateResources("cls","Directory") = "cls"
+    set template.Packaging = "module"
+    set template.SourcesRoot = "src"
 
     // REST APP
-    set tTemplate.TemplateResources(..#WebAppName) = ..#WebAppName
-    set tTemplate.TemplateResources(..#WebAppName,"Url") = ..#WebAppName
-    set tTemplate.TemplateResources(..#WebAppName,"CookiePath") = ..#WebAppName
-    set tTemplate.TemplateResources(..#WebAppName,"UseCookies") = 2
-    set tTemplate.TemplateResources(..#WebAppName,"PasswordAuthEnabled") = 1
-    set tTemplate.TemplateResources(..#WebAppName,"UnauthenticatedEnabled") = 0
-    set tTemplate.TemplateResources(..#WebAppName,"Recurse") = 1
+    set template.TemplateResources(..#WebAppName) = ..#WebAppName
+    set template.TemplateResources(..#WebAppName,"Url") = ..#WebAppName
+    set template.TemplateResources(..#WebAppName,"CookiePath") = ..#WebAppName
+    set template.TemplateResources(..#WebAppName,"UseCookies") = 2
+    set template.TemplateResources(..#WebAppName,"PasswordAuthEnabled") = 1
+    set template.TemplateResources(..#WebAppName,"UnauthenticatedEnabled") = 0
+    set template.TemplateResources(..#WebAppName,"Recurse") = 1
     ;cors
-    set tTemplate.TemplateResources(..#WebAppName,"JWTAccessTokenTimeout") = 60
-    set tTemplate.TemplateResources(..#WebAppName,"JWTAuthEnabled") = 1
-    set tTemplate.TemplateResources(..#WebAppName,"JWTRefreshTokenTimeout") = 900
-    do tTemplate.ProcessResources()
-    return tTemplate.SaveFile(pPath)
+    set template.TemplateResources(..#WebAppName,"JWTAccessTokenTimeout") = 60
+    set template.TemplateResources(..#WebAppName,"JWTAuthEnabled") = 1
+    set template.TemplateResources(..#WebAppName,"JWTRefreshTokenTimeout") = 900
+    do template.ProcessResources()
+    return template.SaveFile(pPath)
 }
 
 XData ModuleWithWebApTag [ MimeType = application/xml ]
