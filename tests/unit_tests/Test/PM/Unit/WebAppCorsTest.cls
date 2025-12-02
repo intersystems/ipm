@@ -5,29 +5,6 @@ Parameter CommonPathPrefix As STRING = "cors-rest-apps";
 
 Parameter WebAppName As STRING = "/testcors";
 
-/// create web application using <CspApplcation> tag
-Method TestCORSEnabledViaCSPAppTag()
-{
-    set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
-    set moduleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/")
-    set moduleFile = ##class(%File).NormalizeFilename("module.xml",moduleDir)
-
-    do $$$LogMessage("loading via <CspApplication> tag")
-    if ##class(%File).Exists(moduleFile){
-        set status= ##class(%File).Delete(moduleFile)
-        do $$$AssertStatusOK(status,"Removed the 'module.xml' file from "_moduleDir)
-    }
-    set status = ..GenerateTemplate(moduleDir)
-    do $$$AssertStatusOK(status,"Creating module.xml on "_moduleDir_"  successfully. ")
-
-    set status = ##class(%IPM.Main).Shell("load "_moduleDir)
-    do $$$AssertStatusOK(status,"Loaded "_..#CommonPathPrefix_" module successfully. "_moduleDir)
-    do ..VerifyCORSSettings()
-
-    set status = ##class(%IPM.Main).Shell("uninstall "_..#CommonPathPrefix)
-    do $$$AssertStatusOK(status,"uninstalled "_..#CommonPathPrefix_" module successfully.")
-}
-
 /// create web application using <WebApplcation> tag
 Method TestCORSEnabledViaWebAppTag()
 {
@@ -75,34 +52,6 @@ Method VerifyCORSSettings()
         do $$$AssertStatusOK(1,"CorsHeadersList values are defined")
         do $$$LogMessage(corsHeadersList)
     }
-}
-
-ClassMethod GenerateTemplate(pPath As %String = "") As %Status
-{
-    return:(pPath="") $$$OK
-    set template = ##class(%IPM.Storage.ModuleTemplate).%New()
-    set template.Name = ..#CommonPathPrefix
-    set template.VersionString = "1.0.0"
-    set template.Description = "cors enabling testing on webapplication"
-    set template.Keywords = "cors"
-
-    set template.Packaging = "module"
-    set template.SourcesRoot = "src"
-
-    // REST APP
-    set template.TemplateResources(..#WebAppName) = ..#WebAppName
-    set template.TemplateResources(..#WebAppName,"Url") = ..#WebAppName
-    set template.TemplateResources(..#WebAppName,"CookiePath") = ..#WebAppName
-    set template.TemplateResources(..#WebAppName,"UseCookies") = 2
-    set template.TemplateResources(..#WebAppName,"PasswordAuthEnabled") = 1
-    set template.TemplateResources(..#WebAppName,"UnauthenticatedEnabled") = 0
-    set template.TemplateResources(..#WebAppName,"Recurse") = 1
-    ;cors
-    set template.TemplateResources(..#WebAppName,"CorsAllowlist") = "https://www.example.com,https://pm.intersystems.com"
-    set template.TemplateResources(..#WebAppName,"CorsCredentialsAllowed") = 1
-    set template.TemplateResources(..#WebAppName,"CorsHeadersList") = "Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Credentials, Access-Control-Max-Age, Access-Control-Expose-Headers, Access-Control-Request-Method, Access-Control-Request-Headers"
-    do template.ProcessResources()
-    return template.SaveFile(pPath)
 }
 
 XData ModuleWithWebApTag [ MimeType = application/xml ]

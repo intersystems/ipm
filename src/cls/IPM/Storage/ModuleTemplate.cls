@@ -254,19 +254,6 @@ Method AddWebApps(
         set tMap("ServeFilesTimeout") = "ServeFilesTimeout"
         set tMap("TwoFactorEnabled") = "TwoFactorEnabled"
         set tMap("TwoFactorEnabled","default") = 0
-        // cors
-        // verify the Cors defined. this check used for "gen" command
-        // NOTE: These mappings are skipped if the properties do not exist,so they will not cause any conflicts.
-        set tMap("CorsAllowlist")="CorsAllowlist"
-        set tMap("CorsAllowlist","default") = $select($data(..TemplateResources(tAppName,"CorsCredentialsAllowed"),tcors):tcors,1:"CorsAllowlist")
-        set tMap("CorsCredentialsAllowed")="CorsCredentialsAllowed"
-        set tMap("CorsCredentialsAllowed","default") = $select($data(..TemplateResources(tAppName,"CorsCredentialsAllowed"),tCorsAllowed):tCorsAllowed,1:1)
-        set tMap("CorsHeadersList")="CorsHeadersList"
-        set tMap("CorsHeadersList","default") = $select($data(..TemplateResources(tAppName,"CorsHeadersList"),tCorsHeaders):tCorsHeaders,1:"CorsHeadersList")
-        //jwt
-        set tMap("JWTAccessTokenTimeout")="JWTAccessTokenTimeout"
-        set tMap("JWTAuthEnabled")="JWTAuthEnabled"
-        set tMap("JWTRefreshTokenTimeout")="JWTRefreshTokenTimeout"
 
         set tAttr = ""
         for {
@@ -376,7 +363,7 @@ Method SetAuthorProps(
 
 Method SetCORSProps(
 	pApps As %String = "",
-	ByRef pCors As %String = "") As %Status
+	ByRef pCors As %String = "")
 {
     set appList = ""
     set pApps = $zstrip(pApps,"<>W")
@@ -385,13 +372,31 @@ Method SetCORSProps(
     } else {
         set appList = $listfromstring(pApps,",")
     }
-    set ptr=0
+    set ptr = 0
     while $listnext(appList, ptr, webpApp){
         set ..TemplateResources(webpApp,"CorsCredentialsAllowed") = pCors("enableCors")
         set ..TemplateResources(webpApp,"CorsHeadersList") = pCors("allowedHeaders")
         set ..TemplateResources(webpApp,"CorsAllowlist") = pCors("allowedOrigins")
     }
-    return $$$OK
+}
+
+Method SetJWTProps(
+	pApps As %String = "",
+	ByRef pJWT As %String = "")
+{
+    set appList = ""
+    set pApps = $zstrip(pApps,"<>W")
+    if ( pApps = "*" ) {
+        do ..GetCSPApplications(.appList)
+    } else {
+        set appList = $listfromstring(pApps,",")
+    }
+    set ptr = 0
+    while $listnext(appList, ptr, webpApp){
+        set ..TemplateResources(webpApp,"JWTAccessTokenTimeout") = pJWT("JWTAccessTokenTO")
+        set ..TemplateResources(webpApp,"JWTAuthEnabled") = pJWT("allowedHeaders")
+        set ..TemplateResources(webpApp,"JWTRefreshTokenTimeout") = pJWT("JWTRefreshTokenTO")
+    }
 }
 
 Method ValidateCorsOrigin(pAllowedOrigins As %String = "") As %Status
@@ -660,9 +665,9 @@ XData XSLT
     </Export>
   </xsl:template>
   <xsl:template match="Resource[@Url]">
-    <CSPApplication>
+    <WebApplication>
         <xsl:apply-templates select="@*[local-name() != 'Name']" />
-    </CSPApplication>
+    </WebApplication>
   </xsl:template>
   <xsl:template match="node()">
     <xsl:copy>
