@@ -2557,10 +2557,10 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
     set tSearchString = $get(pCommandInfo("parameters","searchString"),"")
     if $data(pCommandInfo("modifiers","python")) {
 		set list = ""
-		$$$ThrowOnError(..GetPythonInstalledLibs(.list))
+		do ..GetPythonInstalledLibs(.list)
 		merge tModifiers = pCommandInfo("modifiers")
 		do ..DisplayModules(.list,,,, .tModifiers)
-		quit $$$OK
+		quit
 	}
     if (''$data(pCommandInfo("modifiers","tree"))) {
         // Show tree of dependencies as well.
@@ -3891,17 +3891,17 @@ ClassMethod Update(ByRef pCommandInfo)
     }
 }
 
-ClassMethod GetPythonInstalledLibs(Output list) As %Status
+ClassMethod GetPythonInstalledLibs(Output list)
 {
 	set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
 	if '$system.CLS.IsMthd("%SYS.Python", "Import") {
-		throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
+        $$$ThrowOnError($$$ERROR($$$PythonGeneralError,"Embedded Python is not available in this instance."))
 	}
 	set pyLibList = {}.%FromJSON(..GetPythonLibrariesList(target))
-    // Styling: Omit headers and separators to maintain consistency with native zpm list command output.
+    // Styling: Omit headers and separators to maintain consistency with native IPM list command output.
 	if $isobject(pyLibList) {
 		if pyLibList.%IsDefined("error") {
-			throw ##class(%Exception.General).%New(pyLibList.error)
+            $$$ThrowOnError($$$ERROR($$$PythonGeneralError,pyLibList.error))
 		}
 		set iter = pyLibList.%GetIterator()
 		set width=0
@@ -3913,7 +3913,6 @@ ClassMethod GetPythonInstalledLibs(Output list) As %Status
 		}
 		set list("width") = width
 	}
-	return $$$OK
 }
 
 ClassMethod GetPythonLibrariesList(PythonPath As %String) As %String [ Language = python ]
