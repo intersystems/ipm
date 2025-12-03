@@ -1,6 +1,6 @@
 /// This class validates that CORS headers and allowed origins are configured correctly,
 /// and that JWT authentication is properly set up in the <b>&lt;WebApplication&gt;</b> configuration section.
-Class Test.PM.Integration.ConfigCorsAndJWTInWebAppTest Extends Test.PM.Integration.Base
+Class Test.PM.Integration.ResourceProcessor.WebApplication Extends Test.PM.Integration.Base
 {
 
 Parameter CommonPathPrefix As STRING = "cors-rest-apps";
