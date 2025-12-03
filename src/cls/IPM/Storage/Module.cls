@@ -805,9 +805,7 @@ ClassMethod HasScope(
 /// <li>Version string of the module to be installed</li>
 /// </ul>
 /// <p>
-/// If <var>pDepth</var> is 1, only direct dependencies are resolved.
-/// If it is 2, dependencies of dependencies are also resolved, and so on.
-/// If it is 0, dependencies are resolved to any depth.
+/// <var>pDepth</var> specifies how deep dependencies have been resolved so far. It starts at 1 for direct dependencies of the root module, and increments by 1 for each level of recursion.
 /// <p>
 /// If <var>pForceSnapshotReload</var> is 1, then any cached snapshot of available modules is reloaded from the repository server(s).
 /// <p>

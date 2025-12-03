@@ -48,7 +48,7 @@ XData Schema [ Internal, MimeType = application/xml ]
     <!-- Parameter required? -->
     <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
 
-    <!-- Whether the modifier is deprecated -->
+    <!-- Whether the parameter is deprecated -->
     <xs:attribute name="deprecated" type="xs:boolean" use="optional" default="false"/>
 
     <!-- Description of what this parameter does -->
