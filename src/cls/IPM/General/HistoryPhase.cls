@@ -8,7 +8,7 @@ Class %IPM.General.HistoryPhase Extends %SerialObject
 Property Name As %String [ Required ];
 
 /// Time when the phase started
-Property TimeStart As %TimeStamp [ Required ];
+Property TimeStart As %TimeStamp [ InitialExpression = {$zdatetime($now(), 3)}, Required ];
 
 /// Time when the phase ended. This will be empty if the phase is still in progress or ended abnormally.
 Property TimeEnd As %TimeStamp;

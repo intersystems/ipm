@@ -27,7 +27,7 @@ Property SourceMoniker As %IPM.DataType.RepoMoniker;
 Property SourceDetails As %String(MAXLEN = "");
 
 /// Time when the action started
-Property TimeStart As %TimeStamp [ Required ];
+Property TimeStart As %TimeStamp [ InitialExpression = {$zdatetime($now(), 3)}, Required ];
 
 /// Time when the action ended. This will be empty if the action is still in progress or ended abnormally.
 Property TimeEnd As %TimeStamp;
@@ -52,7 +52,6 @@ ClassMethod Init(
 	Package As %IPM.DataType.ModuleName) As %IPM.General.AbstractHistory [ Private ]
 {
     set log = ..%New()
-    set log.TimeStart = $zdatetime($now(), 3)
     set log.Action = Action
     set log.Package = Package
     set log.CommandString = $get($$$ZPMCommandToLog, "<unset>")
@@ -86,7 +85,7 @@ ClassMethod UpdateInit(Package As %IPM.DataType.ModuleName) As %IPM.General.Abst
 Method SetSource(ServerName As %String) As %Status
 {
     $$$ThrowOnError(..%Reload())
-    set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(ServerName)
+    set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(ServerName, 0)
     if '$isobject(server) {
         quit $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is not defined.", ServerName))
     }
@@ -131,7 +130,6 @@ Method InitPhase(name As %String)
 {
     set phase = ##class(%IPM.General.HistoryPhase).%New()
     set phase.Name = name
-    set phase.TimeStart = $zdatetime($now(), 3)
     $$$ThrowOnError(..Phases.Insert(phase))
     $$$ThrowOnError(..%Save()) // Save it now in case Finalize isn't called
 }

@@ -9,8 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-/// Should be kept in sync with %IPM.DataType.PhaseName.VALUELIST
-Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure","ApplyUpdateSteps")};
+Parameter PHASES = {$listfromstring($extract(##class(%IPM.DataType.PhaseName).#VALUELIST,2,*))};
 
 Property Payload As %Stream.Object [ Private ];
 
