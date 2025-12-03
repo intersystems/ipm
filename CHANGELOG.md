@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #885: Always synchronously load dependencies and let each module do multi-threading as needed
 to load using multicompile instead of trying to do own multi-threading of item load which causes
 lock contention by bypassing IRIS compiler.
+- #481: Improve BuildDependencyGraph performance by doing the following:
+ - Eliminate recursion and use iteration.
+ - Remove depth first search and do pure breadth first search.
+ - Have better caching of results for module searches by collapsing search expressions (reducing expressions that are intersections).
 
 ### Removed
 - #938 Removed secret flag NewVersion handling in %Publish()
