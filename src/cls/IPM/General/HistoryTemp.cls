@@ -43,6 +43,8 @@ Method %OnClose() As %Status [ Private, ServerOnly = 1 ]
         set ..PersistedTwin.Success = ..Success
         set ..PersistedTwin.Committed = ..Committed
         set ..PersistedTwin.Phases = ..Phases
+        // Mark as finalized and record should be locked
+        set ..PersistedTwin.Finalized = 1
     }
     quit ..%Save()
 }

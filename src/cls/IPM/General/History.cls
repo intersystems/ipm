@@ -10,6 +10,28 @@ Index PackageIndex On Package;
 
 Index VersionIndex On Version;
 
+Property Finalized As %Boolean [ InitialExpression = 0 ];
+
+Trigger PreventSQLUpdates [ Event = UPDATE, Foreach = row ]
+{
+    // History records should never be modified via SQL
+    // Note: Foreach = row means this only fires for SQL operations, not object %Save()
+    set %msg = "Cannot edit history log entries"
+    set %ok = 0
+}
+
+Method %OnBeforeSave(insert As %Boolean) As %Status [ Private ]
+{
+    // Prevent updates to finalized records
+    if 'insert {
+        // Use GetStored() to get the database value, not the in-memory value
+        if ..FinalizedGetStored(..%Id()) = 1 {
+            return $$$ERROR($$$GeneralError, "Cannot edit finalized history log entries")
+        }
+    }
+    return $$$OK
+}
+
 /// @API.Query
 /// Get history records in the current namespace
 Query Records(
@@ -519,6 +541,9 @@ Storage Default
 </Value>
 <Value name="14">
 <Value>Phases</Value>
+</Value>
+<Value name="15">
+<Value>Finalized</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.General.HistoryD</DataLocation>

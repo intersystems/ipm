@@ -18,19 +18,19 @@ Parameter HistoryNSName As STRING = "HISTORY";
 /// Uninstalls all modules, removes the test repository configuration, and clears all history entries.
 Method OnAfterOneTest(testname As %String) As %Status
 {
-    set tSC = ##class(%IPM.Main).Shell("uninstall -all")
-    do $$$AssertStatusOK(tSC,"All modules uninstalled")
+    set sc = ##class(%IPM.Main).Shell("uninstall -all")
+    do $$$AssertStatusOK(sc,"All modules uninstalled")
 
     if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists("zot") {
-        set tSC = ##class(%IPM.Main).Shell("repo -n zot -delete")
-        do $$$AssertStatusOK(tSC,"Zot repo unconfigured succesfully")
+        set sc = ##class(%IPM.Main).Shell("repo -n zot -delete")
+        do $$$AssertStatusOK(sc,"Zot repo unconfigured succesfully")
     }
 
     // delete entries
-    set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
-    do $$$AssertStatusOK(tSC,"History deleted successfully")
+    set sc = ##class(%IPM.Main).Shell("history delete -confirm")
+    do $$$AssertStatusOK(sc,"History deleted successfully")
 
-    return tSC
+    return sc
 }
 
 /// Tests basic history logging for load, uninstall, and install operations.
@@ -44,14 +44,14 @@ Method OnAfterOneTest(testname As %String) As %Status
 Method TestSimpleHistory()
 {
     // delete previous entries
-    set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
-    do $$$AssertStatusOK(tSC,"History deleted successfully")
+    set sc = ##class(%IPM.Main).Shell("history delete -confirm")
+    do $$$AssertStatusOK(sc,"History deleted successfully")
 
-    set tModuleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
+    set moduleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
 
     // Load module
-    set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
-    do $$$AssertStatusOK(tSC,"Loaded module successfully")
+    set sc = ##class(%IPM.Main).Shell("load -verbose " _ moduleDir)
+    do $$$AssertStatusOK(sc,"Loaded module successfully")
 
     // get history
     set rs = ##class(%IPM.General.History).GetHistory(,,1)
@@ -67,21 +67,21 @@ Method TestSimpleHistory()
         do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
         do $$$AssertEquals(rs.%Get("Success"),1)
         do $$$AssertEquals(rs.%Get("Committed"),1)
-        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose " _ tModuleDir)
+        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose " _ moduleDir)
         do $$$AssertEquals(rs.%Get("SourceDetails"),"")
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
     }
 
     // Publish module to test install
-    set tSC = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
-    do $$$AssertStatusOK(tSC,"Zot repo configured succesfully")
-    set tSC = ##class(%IPM.Main).Shell("publish simplest-module -verbose -r zot")
-    do $$$AssertStatusOK(tSC,"Published module successfully")
+    set sc = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
+    do $$$AssertStatusOK(sc,"Zot repo configured succesfully")
+    set sc = ##class(%IPM.Main).Shell("publish simplest-module -verbose -r zot")
+    do $$$AssertStatusOK(sc,"Published module successfully")
 
     // Uninstall module
-    set tSC = ##class(%IPM.Main).Shell("uninstall -verbose " _ ..#SimpleModuleName)
-    do $$$AssertStatusOK(tSC,"Uninstalled module successfully")
+    set sc = ##class(%IPM.Main).Shell("uninstall -verbose " _ ..#SimpleModuleName)
+    do $$$AssertStatusOK(sc,"Uninstalled module successfully")
 
     // get history
     set rs = ##class(%IPM.General.History).GetHistory(,,1)
@@ -105,8 +105,8 @@ Method TestSimpleHistory()
 
     // Install module
     set command = "install -verbose zot/" _ ..#SimpleModuleName _ " 1.0.0"
-    set tSC = ##class(%IPM.Main).Shell(command)
-    do $$$AssertStatusOK(tSC,"Installed module successfully")
+    set sc = ##class(%IPM.Main).Shell(command)
+    do $$$AssertStatusOK(sc,"Installed module successfully")
 
     // get history
     set rs = ##class(%IPM.General.History).GetHistory(,,1)
@@ -141,17 +141,17 @@ Method DoLoadUninstallInstall(
 	moduleVersion As %String)
 {
     // set up load, install, uninstall entries
-    set tModuleDir = ..GetModuleDir(moduleName _  "/" _ moduleVersion)
-    set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
-    do $$$AssertStatusOK(tSC,"Loaded module successfully")
-    set tSC = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
-    do $$$AssertStatusOK(tSC,"Zot repo configured succesfully")
-    set tSC = ##class(%IPM.Main).Shell("publish " _ moduleName _ " -verbose -r zot -export-deps 1")
-    do $$$AssertStatusOK(tSC,"Published module successfully")
-    set tSC = ##class(%IPM.Main).Shell("uninstall -r -verbose " _ moduleName)
-    do $$$AssertStatusOK(tSC,"Uninstalled module successfully")
-    set tSC = ##class(%IPM.Main).Shell("install -verbose " _ moduleName _ " " _ moduleVersion)
-    do $$$AssertStatusOK(tSC,"Installed module successfully")
+    set moduleDir = ..GetModuleDir(moduleName _  "/" _ moduleVersion)
+    set sc = ##class(%IPM.Main).Shell("load -verbose " _ moduleDir)
+    do $$$AssertStatusOK(sc,"Loaded module successfully")
+    set sc = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
+    do $$$AssertStatusOK(sc,"Zot repo configured succesfully")
+    set sc = ##class(%IPM.Main).Shell("publish " _ moduleName _ " -verbose -r zot -export-deps 1")
+    do $$$AssertStatusOK(sc,"Published module successfully")
+    set sc = ##class(%IPM.Main).Shell("uninstall -r -verbose " _ moduleName)
+    do $$$AssertStatusOK(sc,"Uninstalled module successfully")
+    set sc = ##class(%IPM.Main).Shell("install -verbose " _ moduleName _ " " _ moduleVersion)
+    do $$$AssertStatusOK(sc,"Installed module successfully")
 }
 
 /// Tests history filtering and query modifiers.
@@ -163,8 +163,8 @@ Method DoLoadUninstallInstall(
 Method TestHistoryModifiers()
 {
     // delete previous entries
-    set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
-    do $$$AssertStatusOK(tSC,"History deleted successfully")
+    set sc = ##class(%IPM.Main).Shell("history delete -confirm")
+    do $$$AssertStatusOK(sc,"History deleted successfully")
 
     // Populate history log entries
     do ..DoLoadUninstallInstall(..#SimpleModuleName, "1.0.0")
@@ -192,8 +192,8 @@ Method TestHistoryModifiers()
     do $$$AssertEquals(count, 2, "Only two actions shown")
 
     // install different module
-    set tSC = ##class(%IPM.Main).Shell("load -verbose " _ ..GetModuleDir("module-version"))
-    do $$$AssertStatusOK(tSC,"Loaded module successfully")
+    set sc = ##class(%IPM.Main).Shell("load -verbose " _ ..GetModuleDir("module-version"))
+    do $$$AssertStatusOK(sc,"Loaded module successfully")
 
     // test filter by module
     kill filter
@@ -230,16 +230,16 @@ Method TestHistoryModifiers()
 Method TestInvalidHistoryCommands()
 {
     set command = "history blah"
-    set tSC = ##class(%IPM.Main).Shell(command)
-    do $$$AssertStatusNotOK(tSC,"Invalid command: "_command)
+    set sc = ##class(%IPM.Main).Shell(command)
+    do $$$AssertStatusNotOK(sc,"Invalid command: "_command)
 
     set command = "history details 0"
-    set tSC = ##class(%IPM.Main).Shell(command)
-    do $$$AssertStatusNotOK(tSC,"Invalid command: "_command)
+    set sc = ##class(%IPM.Main).Shell(command)
+    do $$$AssertStatusNotOK(sc,"Invalid command: "_command)
 
     set command = "history details blah"
-    set tSC = ##class(%IPM.Main).Shell(command)
-    do $$$AssertStatusNotOK(tSC,"Invalid command: "_command)
+    set sc = ##class(%IPM.Main).Shell(command)
+    do $$$AssertStatusNotOK(sc,"Invalid command: "_command)
 }
 
 /// Tests history logging behavior in dev mode vs non-dev mode.
@@ -248,9 +248,9 @@ Method TestInvalidHistoryCommands()
 /// - Failed operations with -dev flag create committed history entries (Committed=1)
 Method TestDevMode()
 {
-    set tModuleDir = ..GetModuleDir("malformed-module")
-    set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
-    do $$$AssertStatusNotOK(tSC,"Malformed module not loaded")
+    set moduleDir = ..GetModuleDir("malformed-module")
+    set sc = ##class(%IPM.Main).Shell("load -verbose " _ moduleDir)
+    do $$$AssertStatusNotOK(sc,"Malformed module not loaded")
 
     // no dev mode means it shouldn't be committed
     set rs = ##class(%IPM.General.History).GetHistory(.filter,,1)
@@ -267,14 +267,14 @@ Method TestDevMode()
         do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
         do $$$AssertNotEquals(rs.%Get("Success"),1)
         do $$$AssertEquals(rs.%Get("Committed"),0)
-        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose " _ tModuleDir)
+        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose " _ moduleDir)
         do $$$AssertEquals(rs.%Get("SourceDetails"),"")
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
     }
 
-    set tSC = ##class(%IPM.Main).Shell("load -verbose -dev " _ tModuleDir)
-    do $$$AssertStatusNotOK(tSC,"Malformed module not loaded")
+    set sc = ##class(%IPM.Main).Shell("load -verbose -dev " _ moduleDir)
+    do $$$AssertStatusNotOK(sc,"Malformed module not loaded")
 
     // dev mode means it should be committed
     set rs = ##class(%IPM.General.History).GetHistory(.filter,,1)
@@ -291,7 +291,7 @@ Method TestDevMode()
         do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
         do $$$AssertNotEquals(rs.%Get("Success"),1)
         do $$$AssertEquals(rs.%Get("Committed"),1)
-        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose -dev " _ tModuleDir)
+        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose -dev " _ moduleDir)
         do $$$AssertEquals(rs.%Get("SourceDetails"),"")
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
@@ -310,8 +310,8 @@ Method TestMultipleNamespaces()
     set originalNS = $namespace
 
     // (pre-cleanup) delete previous entries
-    set tSC = ##class(%IPM.Main).Shell("history delete -g -confirm")
-    do $$$AssertStatusOK(tSC,"History deleted successfully")
+    set sc = ##class(%IPM.Main).Shell("history delete -g -confirm")
+    do $$$AssertStatusOK(sc,"History deleted successfully")
 
     // perform actions in this current namespace
     do ..DoLoadUninstallInstall(..#SimpleModuleName, "1.0.0")
@@ -324,8 +324,8 @@ Method TestMultipleNamespaces()
     set namespaces = $listbuild(originalNS, newNamespace)
 
     // delete previous entries
-    set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
-    do $$$AssertStatusOK(tSC,"History deleted successfully")
+    set sc = ##class(%IPM.Main).Shell("history delete -confirm")
+    do $$$AssertStatusOK(sc,"History deleted successfully")
 
     // populate history log
     write !, "Populating history log in ", $namespace
@@ -360,8 +360,8 @@ Method TestMultipleNamespaces()
     // Test history deletion
     // start with local namespace-specific deletion
     write !, "Testing history deletion in ", $namespace
-    set tSC = ##class(%IPM.Main).Shell("history delete -confirm")
-    do $$$AssertStatusOK(tSC,"History deleted successfully")
+    set sc = ##class(%IPM.Main).Shell("history delete -confirm")
+    do $$$AssertStatusOK(sc,"History deleted successfully")
 
     set $namespace = originalNS
     set rs = ##class(%IPM.General.History).GetHistory()
@@ -476,11 +476,11 @@ ClassMethod GetGlobalHistoryCount(
 Method TestUpdate()
 {
     // Load 1.0.0
-    set tModuleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
+    set moduleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
 
     // Load module
-    set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
-    do $$$AssertStatusOK(tSC,"Loaded module successfully")
+    set sc = ##class(%IPM.Main).Shell("load -verbose " _ moduleDir)
+    do $$$AssertStatusOK(sc,"Loaded module successfully")
 
     // get history
     set rs = ##class(%IPM.General.History).GetHistory(,,1)
@@ -496,7 +496,7 @@ Method TestUpdate()
         do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
         do $$$AssertEquals(rs.%Get("Success"),1)
         do $$$AssertEquals(rs.%Get("Committed"),1)
-        set expectedCommandString = "load -verbose " _ tModuleDir
+        set expectedCommandString = "load -verbose " _ moduleDir
         do $$$AssertEquals(rs.%Get("CommandString"),expectedCommandString)
         do $$$AssertEquals(rs.%Get("SourceDetails"),"")
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
@@ -504,10 +504,10 @@ Method TestUpdate()
     }
 
     // Update to 2.0.0
-    set tModuleDir = ..GetModuleDir(..#SimpleModuleName _ "/2.0.0")
-    set commandString = "update " _ ..#SimpleModuleName _ " -verbose -path " _ tModuleDir
-    set tSC = ##class(%IPM.Main).Shell(commandString)
-    do $$$AssertStatusOK(tSC,"Update module successfully")
+    set moduleDir = ..GetModuleDir(..#SimpleModuleName _ "/2.0.0")
+    set commandString = "update " _ ..#SimpleModuleName _ " -verbose -path " _ moduleDir
+    set sc = ##class(%IPM.Main).Shell(commandString)
+    do $$$AssertStatusOK(sc,"Update module successfully")
 
     // get history
     set rs = ##class(%IPM.General.History).GetHistory(,,1)
@@ -606,8 +606,8 @@ Method TestPhases()
 /// - The failing phase has a non-OK status while earlier phases have OK status
 Method TestFailingPhases()
 {
-    set tModuleDir = ..GetModuleDir("invoke/failure/NonStatusReturnCheckStatus")
-    set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
+    set moduleDir = ..GetModuleDir("invoke/failure/NonStatusReturnCheckStatus")
+    set sc = ##class(%IPM.Main).Shell("load -verbose " _ moduleDir)
 
     set rs = ##class(%IPM.General.History).GetHistory(.filter,,1)
     while rs.%Next() {
@@ -624,7 +624,7 @@ Method TestFailingPhases()
         do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
         do $$$AssertNotEquals(rs.%Get("Success"),$$$OK)
         do $$$AssertEquals(rs.%Get("Committed"),0)
-        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose " _ tModuleDir)
+        do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose " _ moduleDir)
         do $$$AssertEquals(rs.%Get("SourceDetails"),"")
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
@@ -878,6 +878,71 @@ Method TestTempGlobalWhacking()
         do $$$AssertTrue($listget(initialize, 3)'="")
         do $$$AssertEquals($listget(initialize, 4), $$$OK)
     }
+}
+
+/// Tests that finalized history records are locked and cannot be edited.
+/// Verifies that:
+/// - History records are created successfully
+/// - History records are marked as finalized after HistoryTemp closes
+/// - Attempts to directly edit finalized History records are blocked
+/// - Subsequent operations can still create new records normally
+/// - Attempts to modify History records with SQL are blocked
+Method TestFinalizedRecordsLocked()
+{
+    // delete previous entries
+    set sc = ##class(%IPM.Main).Shell("history delete -confirm")
+    do $$$AssertStatusOK(sc,"History deleted successfully")
+
+    set moduleDir = ..GetModuleDir(..#SimpleModuleName _ "/1.0.0")
+
+    // Load a module - creates and finalizes a history entry
+    set sc = ##class(%IPM.Main).Shell("load -verbose " _ moduleDir)
+    do $$$AssertStatusOK(sc,"Loaded module successfully")
+
+    // Get the history record
+    set rs = ##class(%IPM.General.History).GetHistory(,,1)
+    do $$$AssertTrue(rs.%Next(), "Should have at least one history record")
+    set historyId = rs.%Get("ID")
+
+    // Verify it's finalized
+    set historyObj = ##class(%IPM.General.History).%OpenId(historyId)
+    do $$$AssertTrue($isobject(historyObj), "Should be able to open history record")
+    do $$$AssertEquals(historyObj.Finalized, 1, "History record should be finalized")
+
+    // Try to edit it - should fail
+    set historyObj.Package = "modified-name"
+    set sc = historyObj.%Save()
+    do $$$AssertStatusNotOK(sc, "Should not be able to edit finalized record")
+    set errorText = $system.Status.GetErrorText(sc)
+    do $$$AssertTrue(errorText [ "Cannot edit finalized", "Error message should mention finalized records")
+
+    // Verify the record was not modified (reload from database)
+    $$$ThrowOnError(historyObj.%Reload())
+    do $$$AssertEquals(historyObj.Package, ..#SimpleModuleName,"Package name should not have been changed")
+
+    // Verify a subsequent operation still works
+    set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#SimpleModuleName)
+    do $$$AssertStatusOK(sc, "Subsequent operations should still work")
+
+    // Verify we now have two history records
+    set rs = ##class(%IPM.General.History).GetHistory()
+    set count = 0
+    while rs.%Next() {
+        set count = count + 1
+    }
+    do $$$AssertEquals(count, 2, "Should have two history records after uninstall")
+
+    // Test SQL update protection - history records should never be modifiable via SQL
+    set sqlStatement = ##class(%SQL.Statement).%New()
+    set sc = sqlStatement.%Prepare("UPDATE %IPM_General.History SET Package = ? WHERE ID = ?")
+    do $$$AssertStatusOK(sc, "SQL prepare should succeed")
+    set sqlResult = sqlStatement.%Execute("sql-modified-name", historyId)
+    do $$$AssertEquals(sqlResult.%SQLCODE, -132, "SQL update should fail with SQLCODE -132")
+    do $$$AssertTrue(sqlResult.%Message [ "Cannot edit history", "SQL error message should mention history records cannot be edited")
+
+    // Verify the record was not modified via SQL
+    $$$ThrowOnError(historyObj.%Reload())
+    do $$$AssertEquals(historyObj.Package, ..#SimpleModuleName, "Package name should still not be changed after SQL attempt")
 }
 
 }
