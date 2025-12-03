@@ -1,17 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-    <Document name="lock-mod-g.ZPM">
+  <Document name="lock-mod-oras.ZPM">
     <Module>
-      <Name>lock-mod-g</Name>
-      <Version>3.0.0</Version>
-      <Resource Name="LockModG.PKG" />
+      <Name>lock-mod-oras</Name>
+      <Version>1.0.0</Version>
+      <Resource Name="LockModORAS.PKG" />
       <Dependencies>
         <ModuleReference>
           <Name>lock-mod-remote</Name>
-          <Version>^1.0.0</Version>
-        </ModuleReference>
-        <ModuleReference>
-          <Name>lock-mod-oras</Name>
           <Version>^1.0.0</Version>
         </ModuleReference>
         <ModuleReference>

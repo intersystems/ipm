@@ -137,6 +137,54 @@ Method Test04Module2Dependencies1Transient()
 /// Uses Module G
 Method Test05ModuleDependenciesAllRepositoryTypes()
 {
+    set sc = $$$OK
+    try {
+        // The first step is to publish the modules to their specified repo types. Need to add a repo for the initial module files first though
+        set sc = ##class(%IPM.Main).Shell("repo -n lock-file-other-repos -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-other-repos/")
+        do $$$AssertStatusOK(sc,"Created lock-file-other-repos repo successfully.")
+
+        // Publish a module to a remote repository
+        set remoteRepo = "lock-file-remote"
+        set remoteMod = "lock-mod-remote"
+        do ##class(%IPM.Main).Shell("install "_remoteMod)
+        // Add remote repo for this test stack and push the module there
+        set sc = ##class(%IPM.Main).Shell("repo -r -name "_remoteRepo_" -url http://registry:52773/registry -username admin -password SYS")
+        do $$$AssertStatusOK(sc, "Successfully set up remote repo")
+        set sc = ##class(%IPM.Main).Shell("publish "_remoteMod_" -r "_remoteRepo_" -v -export-deps 1")
+        do $$$AssertStatusOK(sc, "Successfully published module to remote repo")
+        // Uninstall mod and to then be installed from remote repo
+        do ##class(%IPM.Main).Shell("uninstall "_remoteMod)
+
+        // Publish a module to an ORAS repository
+        set orasRepo = "lock-file-oras"
+        set orasMod = "lock-mod-oras"
+        do ##class(%IPM.Main).Shell("install "_orasMod)
+        // Add oras repo for this test stack and push the module there
+        set sc = ##class(%IPM.Main).Shell("repo -o -name "_orasRepo_" -url http://oras:5000 -publish 1")
+        do $$$AssertStatusOK(sc, "Successfully set up ORAS repo")
+        set sc = ##class(%IPM.Main).Shell("publish "_orasMod_" -r "_orasRepo_" -v -export-deps 1")
+        do $$$AssertStatusOK(sc, "Successfully published module to ORAS repo")
+        // Uninstall mod and to then be installed from ORAS repo
+        do ##class(%IPM.Main).Shell("uninstall -r "_orasMod)
+
+        // Remove repo for files to other repo types so we don't pull the filesystem module by accident
+        set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-other-repos")
+        do $$$AssertStatusOK(sc,"Removed lock-file-other-repos repo successfully.")
+
+        // Now that modules and repositories are set up, do the actual test
+        set moduleName = "lock-mod-oras"
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+
+        // Go back to the initial state by uninstalling the module, dependencies, and repositories used for this test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+        do $$$AssertStatusOK(sc, "Uninstalled "_moduleName_" and dependencies at the end of the test")
+        do ##class(%IPM.Main).Shell("repo -delete -name "_remoteRepo)
+        do $$$AssertStatusOK(sc, "Removed "_remoteRepo_" at the end of the test")
+        do ##class(%IPM.Main).Shell("repo -delete -name "_orasRepo)
+        do $$$AssertStatusOK(sc, "Removed "_orasRepo_" at the end of the test")
+    } catch (ex) {
+        set sc = ex.AsStatus()
+    }
 }
 
 /// Module with multiple versions: Can both specify a version and defaults to latest (highest #) version
@@ -266,9 +314,14 @@ ClassMethod AreLockFilesEqual(
 	actualLockFilePath As %String,
 	expectedLockFilePath As %String) As %Boolean
 {
+    try {
     set actualLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(actualLockFilePath)
     set expectedLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(expectedLockFilePath)
     return actualLockFileContents.%ToJSON() = expectedLockFileContents.%ToJSON()
+    } catch (ex) {
+        // Should error if we fail to open either the actual or expected file
+        return ex.AsStatus()
+    }
 }
 
 }
