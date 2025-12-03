@@ -1,6 +1,6 @@
 Include (%occErrors, %syGluedef, %IPM.Common)
 
-Class %IPM.Lifecycle.Base Extends %RegisteredObject [ Abstract ]
+Class %IPM.Lifecycle.Base Extends %RegisteredObject [ Abstract, DependsOn = %IPM.DataType.PhaseName ]
 {
 
 Property Module As %IPM.Storage.Module [ Private ];
