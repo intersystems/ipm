@@ -138,7 +138,7 @@ This command is an alias for `module-action module-name verify`
 This command is an alias for `module-action module-name publish`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
-<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
 </command>
 
@@ -175,10 +175,10 @@ This command is an alias for `module-action module-name makedeployed`
 
 <command name="unpublish">
 <description>
-Delete package from registry
+Delete package from repository
 </description>
-<example description="Delete all versions of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName all</example>
-<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName 1.0.0</example>
+<example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName all</example>
+<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName 1.0.0</example>
 <parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
 <parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
 
@@ -387,6 +387,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <!-- Examples -->
 <example description="Installs the most recent 1.x version of HS.JSON available in any configured repository in the current namespace.">
     install HS.JSON 1.x
+</example>
+<example description="Installs the most recent version of HS.JSON from the `registry` repository.">
+    install registry/HS.JSON
 </example>
 <example description="Installs HS.JSON without installing python dependencies">
     install -bypass-py-deps HS.JSON
@@ -648,8 +651,8 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 </command>
 
 <command name="search" aliases="find">
-<description>Shows all modules in current registry or namespaces</description>
-<example description="Shows all modules in current registry">search -r</example>
+<description>Shows all modules matching the search string in all configured registries</description>
+<example description="Shows all versions of all modules starting with `zpm`">search -versions zpm*</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
 <modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
 <modifier name="versions" dataAlias="AllVersions" dataValue="1" description="Shows all versions for each module." />

@@ -201,6 +201,20 @@ Method OnItemRelativePath(pItemName As %String) As %String
     quit ..ResourceReference.Name_$piece(pItemName,..Name,2)
 }
 
+/// WebApplication resources are configuration-only and should not be exported as database items.
+/// This method marks the resource as handled to prevent the default export logic from
+/// attempting to export it using $$Export
+Method OnExportItem(
+	pFullExportPath As %String,
+	pItemName As %String,
+	ByRef pItemParams,
+	ByRef pParams,
+	Output pItemHandled As %Boolean = 0) As %Status
+{
+    set pItemHandled = 1
+    quit $$$OK
+}
+
 /// Check if the provided properties exist in Security.Applications.
 /// Returns a list of properties that do not exist.
 ClassMethod DoPropertiesExist(pPropList As %Library.List) As %Library.List [ Internal, Private ]
