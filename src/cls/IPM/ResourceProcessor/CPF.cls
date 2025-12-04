@@ -53,6 +53,8 @@ Method OnCustomPhase(
 
 Method DoMerge(ByRef pParams) As %Status
 {
+    set tempFile = ""
+    set sc = $$$OK
     try {
         set verbose = $get(pParams("Verbose"))
         set root = ..ResourceReference.Module.Root
@@ -65,17 +67,41 @@ Method DoMerge(ByRef pParams) As %Status
             $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
         }
 
-        set stream = ##class(%Stream.FileCharacter).%New()
-        $$$ThrowOnError(stream.LinkToFile(filename))
+        // Read the CPF file and evaluate system expressions
+        set inputStream = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(inputStream.LinkToFile(filename))
+
+        // Create a temporary file for the processed CPF
+        set tempFileManager = ##class(%IPM.Utils.TempFileManager).%Get(.status)
+        $$$ThrowOnError(status)
+        set tempFile = tempFileManager.GetTempFileName("cpf")
+        if verbose {
+            write !, "Evaluating system expressions using temporary file at " _ tempFile,!
+        }
+        set outputStream = ##class(%Stream.FileCharacter).%New()
+        set outputStream.Filename = tempFile
+
+        // Process each line, evaluating system expressions
+        while 'inputStream.AtEnd {
+            set line = inputStream.ReadLine()
+            set processedLine = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(line)
+            set processedLine = ##class(%IPM.Utils.Module).%EvaluateMacro(processedLine)
+            $$$ThrowOnError(outputStream.WriteLine(processedLine))
+        }
+        $$$ThrowOnError(outputStream.%Save())
+
         if verbose {
             write !, "Merging CPF file: ", filename, !
-            do stream.OutputToDevice()
+            // OutputToDevice() without a len argument will rewind to the beginning of the stream
+            $$$ThrowOnError(outputStream.OutputToDevice())
         }
-        do ..MergeCPF(filename)
+
+        do ..MergeCPF(tempFile)
     } catch ex {
-        return ex.AsStatus()
+        set sc = ex.AsStatus()
     }
-    return $$$OK
+
+    return sc
 }
 
 ClassMethod MergeCPF(file As %String)
