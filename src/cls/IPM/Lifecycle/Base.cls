@@ -426,7 +426,6 @@ Method %Clean(ByRef pParams) As %Status
         }
 
         if tRecurse {
-
             for i=1:1:..Module.Dependencies.Count() {
                 set tModName = ..Module.Dependencies.GetAt(i).Name
                 if $data(pParams("Clean","Cycle",tModName)) {

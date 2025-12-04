@@ -447,7 +447,6 @@ ClassMethod DisplayQueryResult(
 	rs As %SQL.StatementResult,
 	namespace As %String)
 {
-    // TODO improve the display output
     if (rs = $$$NULLOREF) {
         write !, "IPM is not enabled for this namespace"
         quit

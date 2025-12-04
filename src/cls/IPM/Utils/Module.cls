@@ -60,10 +60,6 @@ ClassMethod LoadModuleReference(
         if $data(pParams) = 1 {
             set qstruct = pParams
         }
-		// If spawned from a work queue, $$$ZPMCommandToLog will be undefined in the spawned process.
-		if $data(pParams("CommandToLog"), command) # 2 {
-			set $$$ZPMCommandToLog = command
-		}
         if pLog = "" {
             if $get(pParams("cmd")) = "install" {
                 set log = ##class(%IPM.General.HistoryTemp).InstallInit(pModuleName)
