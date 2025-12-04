@@ -189,18 +189,41 @@ Method OnPhase(
             zkill ^UnitTestRoot
             $$$ThrowOnError(tSC)
 
-            if $data(pParams("UnitTest","JUnitOutput"),tJUnitFile) {
-                set tPostfix = "-"_$zconvert(pPhase,"L")_"-"
-                if (..Package '= "") {
-                    set tPostfix = tPostfix_$replace(..Package,".","-")_"-PKG"
-                } elseif (..Class '= "") {
-                    set tPostfix = tPostfix_$replace(..Class,".","-")_"-CLS"
+             if $data(pParams("UnitTest"))>1 {
+                set outputType=""
+                for {
+                    set outputType = $order(pParams("UnitTest",outputType),1,fileName)
+                    quit:outputType=""
+                    set tPostfix = "-"_$$$lcase(pPhase)_"-"
+                    if (..Package '= "") {
+                        set tPostfix = tPostfix_$replace(..Package,".","-")_"-PKG"
+                    } elseif (..Class '= "") {
+                        set tPostfix = tPostfix_$replace(..Class,".","-")_"-CLS"
+                    }
+                    set outputClass = "%IPM.Test."_outputType
+                    if '$$$defClassDefined(outputClass) {
+                        $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputType_" output format does not exist."))
+                    }
+                    set extension = $select(outputType="JsonOutput":".json",outputType="ToonOutput":".toon",outputType="YamlOutput":".yaml",1:".xml")
+                    set fileName = $piece(fileName,".",1,*-1)_tPostfix_extension
+                    set tSC = $classmethod(outputClass,"ToFile",fileName)
+                    $$$ThrowOnError(tSC)
                 }
-                set tJUnitFile = $piece(tJUnitFile,".",1,*-1)_tPostfix_".xml"
-                set tSC = ##class(%IPM.Test.JUnitOutput).ToFile(tJUnitFile)
-                $$$ThrowOnError(tSC)
             }
-
+            write !
+            if $data(pParams("outputformat"),outputFormat)||('tVerbose) {
+                write !,"Test result summary",!
+                // TODO: Move this default format to ^IPM.Config.Test("outputFormat") rather than keeping it hardcoded.
+                set:$get(outputFormat)="" outputFormat="Toon"
+                set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
+                if '$$$defClassDefined(outputClass) {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputType_" output format does not exist."))
+                }
+                set defaultTestStatus = "failed"
+                set tSC = $classmethod(outputClass,"OutputToDevice",,defaultTestStatus)
+                $$$ThrowOnError(tSC)
+                write !
+            }
             // By default, detect and report unit test failures as an error from this phase
             if $get(pParams("UnitTest","FailuresAreFatal"),1) {
                 do ##class(%IPM.Test.Manager).OutputFailures()
