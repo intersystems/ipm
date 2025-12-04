@@ -886,7 +886,7 @@ Method TestTempGlobalWhacking()
 /// - History records are marked as finalized after HistoryTemp closes
 /// - Attempts to directly edit finalized History records are blocked
 /// - Subsequent operations can still create new records normally
-/// - Attempts to modify History records with SQL are blocked
+/// - Attempts to modify finalized History records with SQL are blocked
 Method TestFinalizedRecordsLocked()
 {
     // delete previous entries
@@ -914,7 +914,7 @@ Method TestFinalizedRecordsLocked()
     set sc = historyObj.%Save()
     do $$$AssertStatusNotOK(sc, "Should not be able to edit finalized record")
     set errorText = $system.Status.GetErrorText(sc)
-    do $$$AssertTrue(errorText [ "Cannot edit finalized", "Error message should mention finalized records")
+    do $$$AssertTrue(errorText [ "Cannot edit finalized history log records", "Error message should mention finalized records")
 
     // Verify the record was not modified (reload from database)
     $$$ThrowOnError(historyObj.%Reload())
@@ -932,13 +932,13 @@ Method TestFinalizedRecordsLocked()
     }
     do $$$AssertEquals(count, 2, "Should have two history records after uninstall")
 
-    // Test SQL update protection - history records should never be modifiable via SQL
+    // Test SQL update protection
     set sqlStatement = ##class(%SQL.Statement).%New()
     set sc = sqlStatement.%Prepare("UPDATE %IPM_General.History SET Package = ? WHERE ID = ?")
     do $$$AssertStatusOK(sc, "SQL prepare should succeed")
     set sqlResult = sqlStatement.%Execute("sql-modified-name", historyId)
     do $$$AssertEquals(sqlResult.%SQLCODE, -132, "SQL update should fail with SQLCODE -132")
-    do $$$AssertTrue(sqlResult.%Message [ "Cannot edit history", "SQL error message should mention history records cannot be edited")
+    do $$$AssertTrue(sqlResult.%Message [ "Cannot edit finalized history log records", "SQL error message should mention history records cannot be edited")
 
     // Verify the record was not modified via SQL
     $$$ThrowOnError(historyObj.%Reload())
