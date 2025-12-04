@@ -11,7 +11,6 @@ services:
     volumes:
       - ~/iris.key:/usr/irissys/mgr/iris.key
       - ./:/home/irisowner/zpm/
-      - ~/p4/kiyer_mac_m3/healthshare/appmodules/:/home/irisowner/appmodules/
     command:
       - -a
       - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'

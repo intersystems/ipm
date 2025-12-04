@@ -89,16 +89,6 @@ Method ToResolvedString() As %String
     quit ""
 }
 
-ClassMethod Test(
-	x,
-	y)
-{
-    zwrite ..FromString(x, .a)
-    zwrite ..FromString(y, .b)
-    set merged = a.And(b)
-    set merged2 = b.And(a)
-}
-
 ClassMethod FromString(
 	string As %String,
 	Output expr As %IPM.General.SemanticVersionExpression) As %Status

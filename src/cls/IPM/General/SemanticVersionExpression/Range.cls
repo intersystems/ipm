@@ -247,8 +247,10 @@ ClassMethod Intersect(
                 $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Exact version matches do not agree: %1 and %2", firstExact.ToResolvedString(), comp.ToResolvedString())))
             }
         }
-        // All exact matches agree; return that version
-        return firstExact
+        // All exact matches agree; return that version after converting to range
+        set sc = ..FromString(firstExact.ToString(), .firstExactRange)
+        $$$ThrowOnError(sc)
+        return firstExactRange
     }
 
     // Find the most restrictive lower bound (the maximum of all lower bounds)
