@@ -35,6 +35,10 @@ Make any necessary changes, compile them (which should be handled by VS Code on 
 docker exec -it ipm-iris-1 /bin/bash
 $ iris session iris
 ```
+OR as a single line:
+```bash
+docker exec -it ipm-iris-1 /bin/bash -c "iris session iris"
+```
 If you need to shut down all the containers (either to switch to another branch or to revert back to a clean state) involved in the `docker-compose.yml`, run the following command in the project folder:
 ```bash
 docker compose down --remove-orphans --volumes
