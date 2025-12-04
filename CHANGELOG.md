@@ -27,7 +27,10 @@ lock contention by bypassing IRIS compiler.
 
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
+- #701: Fix misleading help comments about `search` command
 - #958: Update command should not fail early if external name is used
+- #965: FileCopy on a directory with a Name without the leading slash now works
+- #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status

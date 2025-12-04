@@ -1760,7 +1760,11 @@ Method GetResourceRelativePath(
 	pResource As %String,
 	pExtension As %String) As %String
 {
-    if ($get(pExtension) = "") {
+    // directories do not have an extension, so pResource will be empty
+    if ($get(pResource) = "") {
+        set tName = pExtension
+        set tExtension = ""
+    } elseif ($get(pExtension) = "") {
         set tName = $piece(pResource,".",1,*-1)
         set tExtension = $piece(pResource,".",*)
     } else {
@@ -1800,6 +1804,7 @@ Method GetResourceRelativePath(
         "BPL":$translate(tName,".%","/")_".cls",
         "GBL":$translate(tName,"%,("")","___")_".xml",
         "DFI":$translate(tName,"-","/")_".dfi",
+        "":tName,
         : tName _ "." _$$$lcase(tExtension)
     )
 

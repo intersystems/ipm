@@ -48,7 +48,7 @@ XData Schema [ Internal, MimeType = application/xml ]
     <!-- Parameter required? -->
     <xs:attribute name="required" type="xs:boolean" use="optional" default="false"/>
 
-    <!-- Whether the modifier is deprecated -->
+    <!-- Whether the parameter is deprecated -->
     <xs:attribute name="deprecated" type="xs:boolean" use="optional" default="false"/>
 
     <!-- Description of what this parameter does -->
@@ -323,7 +323,7 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
                                     do %code.WriteLine(" Set pCommandStructure("_tName_","_$$$QUOTE(tMap(tCommChild))_") = "_tDescContent)
                                 }
                             } else {
-                                // Common to bother modifier and parameter
+                                // Common to both modifier and parameter
                                 set tChildName = $$$QUOTE(tMap(tCommChild,"a","name"))
                                 set tRequired = $case($get(tMap(tCommChild,"a","required")),"true":1,:0)
                                 set tDeprecated = $case($get(tMap(tCommChild,"a","deprecated")),"true":1,:0)
