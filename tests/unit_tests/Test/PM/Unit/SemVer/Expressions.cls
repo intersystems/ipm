@@ -211,6 +211,14 @@ Method TestIntersection()
     do $$$AssertStatusOK(sc)
     do $$$AssertEquals(expr1.And(expr2).ToResolvedString(),">=2.0.0 <3.0.0")
 
+    // Wildcard range with specific range
+    set sc = ##class(%IPM.General.SemanticVersionExpression).FromString("*",.expr1)
+    do $$$AssertStatusOK(sc)
+    set sc = ##class(%IPM.General.SemanticVersionExpression).FromString(">=2.5.0 <3.0.0",.expr2)
+    do $$$AssertStatusOK(sc)
+    do $$$AssertEquals(expr1.And(expr2).ToResolvedString(),">=2.5.0 <3.0.0")
+    do $$$AssertEquals(expr2.And(expr1).ToResolvedString(),">=2.5.0 <3.0.0")
+
     // range and single version
     set sc = ##class(%IPM.General.SemanticVersionExpression).FromString(">=1.0.0 <3.0.0",.expr1)
     do $$$AssertStatusOK(sc)

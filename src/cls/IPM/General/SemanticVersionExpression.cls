@@ -89,6 +89,16 @@ Method ToResolvedString() As %String
     quit ""
 }
 
+ClassMethod Test(
+	x,
+	y)
+{
+    zwrite ..FromString(x, .a)
+    zwrite ..FromString(y, .b)
+    set merged = a.And(b)
+    set merged2 = b.And(a)
+}
+
 ClassMethod FromString(
 	string As %String,
 	Output expr As %IPM.General.SemanticVersionExpression) As %Status
@@ -119,6 +129,16 @@ Method IsSatisfiedBy(version As %IPM.General.SemanticVersion) As %Boolean
 Method And(versionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
 {
     if versionExpression.Expression '= "" {
+        if (..AnyOf.Count() = 0) {
+            // If current is empty, just copy in the new one
+            set ..AnyOf = versionExpression.AnyOf
+            set i%Expression = versionExpression.Expression
+            return $this
+        }
+        if (versionExpression.AnyOf.Count() = 0) {
+            // If the new one is empty, just return existing
+            return $this
+        }
         set current = ..%ConstructClone(1)
         do ..AnyOf.Clear()
         // Need to do an And on all possible combinations of the AnyOf lists
@@ -134,11 +154,12 @@ Method And(versionExpression As %IPM.General.SemanticVersionExpression) As %IPM.
         }
         set resolvedString = ..ToResolvedString()
         if (resolvedString = "") {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "No overlapping versions in AND operation for %1 and %2", current.ToResolvedString(), versionExpression.ToResolvedString()))
+            set msg = $$$FormatText("No overlapping versions in AND operation for %1 and %2",current.ToResolvedString(), versionExpression.ToResolvedString())
+            $$$ThrowStatus($$$ERROR($$$GeneralError,msg))
         }
         set i%Expression = resolvedString
     }
-    quit $this
+    return $this
 }
 
 Method Or(versionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
