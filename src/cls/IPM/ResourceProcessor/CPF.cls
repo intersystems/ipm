@@ -101,9 +101,6 @@ Method DoMerge(ByRef pParams) As %Status
         set sc = ex.AsStatus()
     }
 
-    // Clean up temporary file
-    $$$ThrowOnError(tempFileManager.Cleanup())
-
     return sc
 }
 
