@@ -5,7 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [0.10.5] - Unreleased
 
 ### Added
@@ -16,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
+- #885: Always synchronously load dependencies and let each module do multi-threading as needed
+to load using multicompile instead of trying to do own multi-threading of item load which causes
+lock contention by bypassing IRIS compiler.
 
 ### Removed
 - #938 Removed secret flag NewVersion handling in %Publish()
@@ -29,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
+- #885: `-synchronous` flag since loading dependencies synchronously is now the default behavior.
 
 ## [0.10.4] - 2025-10-21
 
