@@ -5,9 +5,6 @@ ROUTINE %IPM.Common [Type=INC]
 #; Helper for XML import of documents
 #define ZPMStudioDocumentModule %IPMStudioDocumentModule
 
-#; Local % Variable to track modules already handled for a given end goal
-#define ZPMHandledModules %IPMHandledModules
-
 #; Local % Variable to indicate that ^Sources update trigger should not be run for modifications to individual resources
 #define ZPMDeferModifyResources %IPMDeferModifyResources
 
@@ -38,8 +35,8 @@ ROUTINE %IPM.Common [Type=INC]
 
 #; Log levels
 #define ZPMLogTRACE		0
-#define ZPMLogINFO			1
-#define ZPMLogWARNING		2
+#define ZPMLogINFO		1
+#define ZPMLogWARNING	2
 #define ZPMLogERROR		3
 
 #; System method/special variable wrappers
