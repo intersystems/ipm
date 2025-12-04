@@ -72,7 +72,9 @@ Method DoMerge(ByRef pParams) As %Status
         $$$ThrowOnError(inputStream.LinkToFile(filename))
 
         // Create a temporary file for the processed CPF
-        set tempFile = ##class(%File).TempFilename("cpf")
+        set tempFileManager = ##class(%IPM.Utils.TempFileManager).%Get(.status)
+        $$$ThrowOnError(status)
+        set tempFile = tempFileManager.GetTempFileName("cpf")
         if verbose {
             write !, "Evaluating system expressions using temporary file at " _ tempFile,!
         }
@@ -90,9 +92,8 @@ Method DoMerge(ByRef pParams) As %Status
 
         if verbose {
             write !, "Merging CPF file: ", filename, !
-            set displayStream = ##class(%Stream.FileCharacter).%New()
-            $$$ThrowOnError(displayStream.LinkToFile(tempFile))
-            do displayStream.OutputToDevice()
+            // OutputToDevice() without a len argument will rewind to the beginning of the stream
+            $$$ThrowOnError(outputStream.OutputToDevice())
         }
 
         do ..MergeCPF(tempFile)
@@ -101,9 +102,7 @@ Method DoMerge(ByRef pParams) As %Status
     }
 
     // Clean up temporary file
-    if (tempFile '= "") && ##class(%File).Exists(tempFile) {
-        do ##class(%File).Delete(tempFile)
-    }
+    $$$ThrowOnError(tempFileManager.Cleanup())
 
     return sc
 }

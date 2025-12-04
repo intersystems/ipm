@@ -55,6 +55,19 @@ Method TestCPFMerge()
 
     // Test Web Application
     do $$$AssertTrue(##class(Security.Applications).Exists("/csp/my-test-webapp"))
+
+    // Cleanup: Remove resources created by the test
+    set sc = ##class(Config.MapPackages).Delete("%SYS", "MyPackage")
+    do $$$AssertStatusOK(sc, "Cleaned up package mapping: MyPackage")
+
+    set sc = ##class(Security.Roles).Delete("MyTestRole")
+    do $$$AssertStatusOK(sc, "Cleaned up role: MyTestRole")
+
+    set sc = ##class(Security.Resources).Delete("MyTestResource")
+    do $$$AssertStatusOK(sc, "Cleaned up resource: MyTestResource")
+
+    set sc = ##class(Security.Applications).Delete("/csp/my-test-webapp")
+    do $$$AssertStatusOK(sc, "Cleaned up web application: /csp/my-test-webapp")
 }
 
 Method TestSystemExpressions()
@@ -90,6 +103,13 @@ Method TestSystemExpressions()
     do $$$AssertStatusOK(sc, "Retrieved web application properties successfully")
     do $$$AssertEquals(webAppProps("NameSpace"), originalNamespace, "Web app namespace set correctly using {$ns} expression")
     do $$$AssertEquals(webAppProps("AutheEnabled"), $$$AutheUnauthenticated, "Web app authentication set correctly using $$$AutheUnauthenticated macro")
+
+    // Cleanup: Remove the web application and role created by the test
+    set sc = ##class(Security.Applications).Delete(webAppName)
+    do $$$AssertStatusOK(sc, "Cleaned up web application: "_webAppName)
+
+    set sc = ##class(Security.Roles).Delete(roleName)
+    do $$$AssertStatusOK(sc, "Cleaned up role: "_roleName)
 }
 
 }
