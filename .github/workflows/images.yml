@@ -13,7 +13,7 @@ env:
   name: |
     iris-community
     irishealth-community
- 
+
 jobs:
   images:
     runs-on: ubuntu-latest

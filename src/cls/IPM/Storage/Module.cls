@@ -445,7 +445,8 @@ ClassMethod ExecutePhases(
 	pModuleName As %String,
 	pPhases As %List,
 	pIsComplete As %Boolean = 0,
-	ByRef pParams) As %Status
+	ByRef pParams,
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -562,6 +563,10 @@ ClassMethod ExecutePhases(
                 write !,"["_tModule.DisplayName_"]",$char(9),"Module object refreshed."
                 continue
             }
+            // history logging for phases
+            if pLog '= "" {
+                do pLog.InitPhase(tOnePhase)
+            }
 
             set tSC = $$$OK
             try {
@@ -655,6 +660,9 @@ ClassMethod ExecutePhases(
                 $$$ThrowOnError(tSC)
             } catch e {
                 set tSC = e.AsStatus()
+                if pLog '= "" {
+                    do pLog.FinalizePhase(tOnePhase, e.AsStatus())
+                }
             }
 
             if $$$ISERR(tSC) {
@@ -666,6 +674,10 @@ ClassMethod ExecutePhases(
                 write " ("_($zhorolog-tStart)_" s)"
             }
             $$$ThrowOnError(tSC)
+
+            if pLog '= "" {
+                do pLog.FinalizePhase(tOnePhase, $$$OK)
+            }
         }
         if tOverallTiming {
             write !,"["_tModule.DisplayName_"]",$char(9),"(total time: ",($zhorolog-tFullStart)," s)"
@@ -688,15 +700,23 @@ ClassMethod Uninstall(
 	ByRef pParams) As %Status
 {
     set tSC = $$$OK
+	set log = ##class(%IPM.General.HistoryTemp).UninstallInit(pModuleName)
+	set module = ..NameOpen(pModuleName,,.tSC)
+	if $isobject(module) {
+		$$$ThrowOnError(log.SetVersion(module.Version))
+	}
+
     try {
         merge tParams = pParams
         set tParams("Clean","Level") = 1 // Simulate clean of module as dependency.
         set tParams("Clean","Force") = pForce
         set tParams("Clean","Recurse") = pRecurse
-        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(pModuleName,$listbuild("Clean"),,.tParams)
+        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(pModuleName,$listbuild("Clean"),,.tParams, log)
     } catch e {
         set tSC = e.AsStatus()
     }
+	set devMode = $get(pParams("DeveloperMode", 0))
+	set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
     quit tSC
 }
 

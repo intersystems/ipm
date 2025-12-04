@@ -8,6 +8,11 @@ ROUTINE %IPM.Common [Type=INC]
 #; Local % Variable to indicate that ^Sources update trigger should not be run for modifications to individual resources
 #define ZPMDeferModifyResources %IPMDeferModifyResources
 
+#; Local % Variable to memorize the command string
+#; Useful because each install/load/uninstall command can potentially affect multiple packages
+#; The log entry for each package should include the same command
+#define ZPMCommandToLog %IPMCommandToLog
+
 #; Default packages for package manager, module lifecycle classes and resource processors
 #define ZPMRootPackage "%IPM"
 

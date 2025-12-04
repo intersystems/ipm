@@ -67,7 +67,9 @@ ClassMethod AppendEnd(ByRef content)
     Set content($Increment(content)) = $$$ENDTAGQ
 }
 
-ClassMethod AppendContent(ByRef dest, ByRef src)
+ClassMethod AppendContent(
+	ByRef dest,
+	ByRef src)
 {
     For i = 1:1:$Get(src) {
         Set dest($Increment(dest)) = src(i)
@@ -103,7 +105,9 @@ ClassMethod ReadFromRoutine(Output output)
     }
 }
 
-ClassMethod CompareContents(ByRef content1, ByRef content2) As %Boolean
+ClassMethod CompareContents(
+	ByRef content1,
+	ByRef content2) As %Boolean
 {
     If $Data(content1) '= $Data(content2) {
         Quit 0
@@ -119,7 +123,9 @@ ClassMethod CompareContents(ByRef content1, ByRef content2) As %Boolean
     Return 1
 }
 
-ClassMethod ContentToString(ByRef content, LineSep As %String = "\n") As %String
+ClassMethod ContentToString(
+	ByRef content,
+	LineSep As %String = "\n") As %String
 {
     Set str = ""
     For i = 1:1:$Get(content) {
@@ -164,7 +170,9 @@ ClassMethod GetInitial(Output content)
 
 /// Construct the expected content of the routine after the language extension is updated.
 /// Also construct the expected "found" value indicating if an older language extension was found.
-ClassMethod GetExpected(Output content, Output found)
+ClassMethod GetExpected(
+	Output content,
+	Output found)
 {
 }
 
