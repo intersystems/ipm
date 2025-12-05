@@ -5,7 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [0.10.5] - Unreleased
 
 ### Added
@@ -14,15 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
 - #961: Adding creation of a lock file for a module by using the `-create-lockfile` flag on install.
 
+### Changed
+- #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
+- #885: Always synchronously load dependencies and let each module do multi-threading as needed
+to load using multicompile instead of trying to do own multi-threading of item load which causes
+lock contention by bypassing IRIS compiler.
+
 ### Removed
 - #938 Removed secret flag NewVersion handling in %Publish()
 
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
+- #701: Fix misleading help comments about `search` command
 - #958: Update command should not fail early if external name is used
+- #965: FileCopy on a directory with a Name without the leading slash now works
+- #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
+- #885: `-synchronous` flag since loading dependencies synchronously is now the default behavior.
 
 ## [0.10.4] - 2025-10-21
 

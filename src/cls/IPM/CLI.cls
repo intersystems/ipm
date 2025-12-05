@@ -401,7 +401,9 @@ ClassMethod %HelpForCommandExamples(
 /// Parses a command, validating it based on the Commands XData block and structuring output as follows:
 /// pCommandInfo = "<command name>"
 /// pCommandInfo("modifiers","<modifier-name>") = "<modifier-value>"
+/// pCommandInfo("modifiers","<modifier-name>","deprecated") = 0/1
 /// pCommandInfo("parameters","<parameter-name>") = "<parameter-value>"
+/// pCommandInfo("parameters","<parameter-name>","deprecated") = 0/1
 /// pCommandInfo("data","<data-name>") = "<data-value>"
 ClassMethod %ParseCommandInput(
 	pCommandString As %String,
@@ -649,6 +651,25 @@ ClassMethod %ParseCommandInput(
 
             if (tState = $$$ESCAPECHAR) {
                 set tState = tPreEscapeState
+            }
+        }
+
+        // Add in deprecated info to parameters and modifiers
+        set tCommandName = $get(pCommandInfo)
+        if (tCommandName '= "") {
+            for tType="parameters","modifiers" {
+                set tKey = ""
+                while 1 {
+                    set tKey = $order(pCommandInfo(tType,tKey))
+                    if (tKey = "") {
+                        quit
+                    }
+                    // Only include deprecated subscript if parameter/modifier is deprecated
+                    set tIsDeprecated = $get(tCommandStructure(tCommandName,tType,tKey,"deprecated"),0)
+                    if tIsDeprecated {
+                        set pCommandInfo(tType,tKey,"deprecated") = 1
+                    }
+                }
             }
         }
         if ($get(pCommandInfo) '= "") {

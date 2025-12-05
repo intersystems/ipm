@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="webapp-export-test.ZPM">
+    <Module>
+      <Name>webapp-export-test</Name>
+      <Version>1.0.0</Version>
+      <Description>Test module to verify WebApplication with Path attribute can be exported without error 6080</Description>
+      <Packaging>module</Packaging>
+
+      <WebApplication
+        Name="/webapp-export-test"
+        NameSpace="{$namespace}"
+        Path="{$cspdir}webapp-export-test/"
+        Recurse="1"
+        ServeFiles="1"
+        CookiePath="/webapp-export-test"
+        UseCookies="2"
+      />
+
+    </Module>
+  </Document>
+</Export>
