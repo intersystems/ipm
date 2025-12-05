@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+    <Document name="lock-mod-l.ZPM">
+    <Module>
+      <Name>lock-mod-l</Name>
+      <Version>1.0.0</Version>
+      <Resource Name="LockModL.PKG" />
+      <Dependencies>
+        <ModuleReference>
+          <Name>lock-mod-d</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>lock-mod-e</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>lock-mod-f</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

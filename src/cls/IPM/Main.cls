@@ -416,6 +416,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
+<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
 
 </command>
 
@@ -2320,6 +2321,9 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
                 }
             }
             $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams))
+            if $get(tParams("CreateLockFile"), 0) {
+                do ##class(%IPM.General.LockFile).CreateLockFileForModule(tModuleName, .tParams)
+            }
         }
     } else {
         set tPrefix = ""

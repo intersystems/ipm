@@ -1,6 +1,6 @@
 Include (%syPrompt, %IPM.Common)
 
-Class %IPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %IPM.CLI.Commands) [ Abstract ]
+Class %IPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %IPM.CLI.Commands, %JSON.Adaptor) [ Abstract ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Repo.Definition";
@@ -21,7 +21,10 @@ Parameter MaxDisplayTabCount As INTEGER = 3;
 
 Index ServerDefinitionKey On Name [ Unique ];
 
-Property Name As %String(MAXLEN = 100) [ Required ];
+/// String "type" identifier used in lock files
+Property LockFileType As %String(MAXLEN = 100) [ Calculated, ReadOnly ];
+
+Property Name As %IPM.DataType.RepoName [ Required ];
 
 Property Enabled As %Boolean [ InitialExpression = 1 ];
 

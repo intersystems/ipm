@@ -132,6 +132,23 @@ Method GetPublishingManager(ByRef status)
     return ##class(%IPM.Repo.Remote.PublishManager).%Get(.status)
 }
 
+Method LockFileTypeGet()
+{
+    return "remote"
+}
+
+XData LockFileMapping
+{
+<Mapping xmlns="http://www.intersystems.com/jsonmapping">
+  <Property Name="LockFileType" FieldName="type" />
+  <Property Name="Enabled" FieldName="enabled" />
+  <Property Name="OverriddenSortOrder" FieldName="overriddenSortOrder" />
+  <Property Name="ReadOnly" FieldName="readOnly" />
+  <Property Name="URL" FieldName="url" />
+  <Property Name="DeploymentEnabled" FieldName="deploymentEnabled" />
+</Mapping>
+}
+
 Storage Default
 {
 <Data name="RemoteRepoDefinitionDefaultData">
