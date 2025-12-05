@@ -11,7 +11,7 @@ Index Name On Name [ Unique ];
 
 Property GlobalScope As %Boolean;
 
-Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version") [ InitialExpression = "0.0.1+snapshot", Required ];
+Property VersionString As %IPM.DataType.VersionString(XMLNAME = "Version") [ InitialExpression = "0.0.1+snapshot", Required ];
 
 /// Does not need comparison method to be code generated because that comparing <property>VersionString</property> is good enough.
 Property Version As %IPM.General.SemanticVersion(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ Required ];

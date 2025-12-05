@@ -153,16 +153,6 @@ Method GetPublishingManager(ByRef status) [ Abstract ]
 {
 }
 
-/// Gets values from the repo for setting in a lock file
-/// First calls same method in the super class for values then adds some class-specific values to the object
-Method SetValuesForLockFile(ByRef repository As %IPM.General.LockFile.Repository)
-{
-    do ##super(.repository)
-    set repository.Type = "http"
-    set repository.URL = ..URL
-    set repository.DeploymentEnabled = ..DeploymentEnabled
-}
-
 Storage Default
 {
 <Data name="HttpRepoDefinitionDefaultData">

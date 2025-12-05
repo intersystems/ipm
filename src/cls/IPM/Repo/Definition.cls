@@ -1,6 +1,6 @@
 Include (%syPrompt, %IPM.Common)
 
-Class %IPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %IPM.CLI.Commands) [ Abstract ]
+Class %IPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %IPM.CLI.Commands, %JSON.Adaptor) [ Abstract ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Repo.Definition";
@@ -21,7 +21,10 @@ Parameter MaxDisplayTabCount As INTEGER = 3;
 
 Index ServerDefinitionKey On Name [ Unique ];
 
-Property Name As %String(MAXLEN = 100) [ Required ];
+/// String "type" identifier used in lock files
+Property LockFileType As %String(MAXLEN = 100) [ Calculated, ReadOnly ];
+
+Property Name As %IPM.DataType.RepoName [ Required ];
 
 Property Enabled As %Boolean [ InitialExpression = 1 ];
 
@@ -278,16 +281,6 @@ ClassMethod GetOne(
     }
     set sc = $$$ERROR($$$GeneralError, "Unable to find a unique repo of type " _ $classname())
     quit ""
-}
-
-/// Gets values from the repo for setting in a lock file
-/// Being in the base Repo.Definition class, these values will be used across all repository types
-Method SetValuesForLockFile(ByRef repository As %IPM.General.LockFile.Repository)
-{
-    set repository.Type = ""
-    set repository.Enabled = ..Enabled
-    set repository.OverriddenSortOrder = ..OverriddenSortOrder
-    set repository.ReadOnly = ..ReadOnly
 }
 
 Storage Default

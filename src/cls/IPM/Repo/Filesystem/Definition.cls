@@ -361,14 +361,21 @@ ClassMethod ScanDirectory(
     quit tSC
 }
 
-/// Gets values from the repo for setting in a lock file
-/// First calls same method in the super class for values then adds some class-specific values to the object
-Method SetValuesForLockFile(ByRef repository As %IPM.General.LockFile.Repository)
+Method LockFileTypeGet()
 {
-    do ##super(.repository)
-    set repository.Type = "filesystem"
-    set repository.Root = ..Root
-    set repository.Depth = ..Depth
+    return "filesystem"
+}
+
+XData LockFileMapping
+{
+<Mapping xmlns="http://www.intersystems.com/jsonmapping">
+  <Property Name="LockFileType" FieldName="type" />
+  <Property Name="Enabled" FieldName="enabled" />
+  <Property Name="OverriddenSortOrder" FieldName="overriddenSortOrder" />
+  <Property Name="ReadOnly" FieldName="readOnly" />
+  <Property Name="Root" FieldName="root" />
+  <Property Name="Depth" FieldName="depth" />
+</Mapping>
 }
 
 Storage Default
