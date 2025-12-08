@@ -54,11 +54,13 @@ Method TestOras()
     do ..RunCommand("repo -publish 1 -n oci")
 
     // Install from default
+    do ..RunCommand("uninstall " _ Name)
     do ..AssertNoException("install " _ Name)
 
     // Clean up
     do ..RunCommand("repo -delete-all")
     do ..RunCommand("repo -reset-defaults")
+    do ..RunCommand("uninstall " _ Name)
 }
 
 Method RunCommand(pCommand As %String)
