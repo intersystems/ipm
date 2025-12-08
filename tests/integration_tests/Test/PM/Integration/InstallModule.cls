@@ -164,6 +164,73 @@ Method TestDevMode()
     $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall update-simple"))
 }
 
+/// Verify that attempting to install/load the same version fails with informational message
+/// unless -force flag is used, and that reinstall command always works
+Method TestSameVersionInstallPrevention()
+{
+    set sc = ##class(%IPM.Main).Shell("install -v update-simple 2.1.1")
+    do $$$AssertStatusOK(sc,"Installed update-simple 2.1.1")
+
+    // Test install command with same version - should fail with informational message
+    set sc = ##class(%IPM.Main).Shell("install -v update-simple 2.1.1")
+    do $$$AssertStatusNotOK(sc,"Trying to install same version of update-simple without -force flag fails")
+    do $$$AssertTrue($system.Status.GetOneErrorText(sc) [ "update-simple version 2.1.1 is already installed.", "Error message indicates version is already installed")
+
+    // Test install command with same version and -force flag - should succeed
+    set sc = ##class(%IPM.Main).Shell("install -v -force update-simple 2.1.1")
+    do $$$AssertStatusOK(sc,"Trying to install same version of update-simple with -force flag succeeds")
+
+    // Test reinstall command - should always work
+    set sc = ##class(%IPM.Main).Shell("reinstall update-simple")
+    do $$$AssertStatusOK(sc,"Reinstalling update-simple with reinstall command succeeds")
+
+    // Clean up the module after test is completed
+    $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall update-simple"))
+}
+
+/// Verify that load command also prevents same-version installation with a message
+Method TestSameVersionLoadPrevention()
+{
+    // Get test root and prepare module directory
+    set tTestRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+    set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/simple-module/")
+
+    // First load
+    set sc = ##class(%IPM.Main).Shell("load "_tModuleDir)
+    do $$$AssertStatusOK(sc,"Loaded SimpleModule from directory")
+
+    // Try to load same version again - should fail with informational message
+    set sc = ##class(%IPM.Main).Shell("load "_tModuleDir)
+    do $$$AssertStatusNotOK(sc,"Trying to load same version without -force flag fails")
+    do $$$AssertTrue($system.Status.GetOneErrorText(sc) [ "simplemodule version 0.0.1+snapshot is already installed.", "Error message indicates version is already installed")
+
+    // Try to load with -force flag - should succeed
+    set sc = ##class(%IPM.Main).Shell("load -force "_tModuleDir)
+    do $$$AssertStatusOK(sc,"Trying to load same version with -force flag succeeds")
+
+    // Clean up the module after test is completed
+    $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall SimpleModule"))
+}
+
+/// Verify that PermitReinstall parameter allows same-version installation without -force flag
+Method TestPermitReinstallParameter()
+{
+    // Get test root and prepare module directory
+    set tTestRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+    set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/permit-reinstall/")
+
+    // First load
+    set sc = ##class(%IPM.Main).Shell("load "_tModuleDir)
+    do $$$AssertStatusOK(sc,"Loaded PermitReinstall module")
+
+    // Try to load same version again - should succeed because PermitReinstall=1 in module.xml
+    set sc = ##class(%IPM.Main).Shell("load "_tModuleDir)
+    do $$$AssertStatusOK(sc,"Loading same version with PermitReinstall=1 parameter succeeds")
+
+    // Clean up the module after test is completed
+    $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall PermitReinstall"))
+}
+
 Method ConfirmUpdateStepsExist(
 	updateStepsToSeed As %DynamicArray,
 	doesExist As %Boolean)

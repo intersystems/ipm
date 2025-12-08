@@ -5,36 +5,36 @@ Class Test.PM.Integration.FileBinaryTar Extends %UnitTest.TestCase
 
 Method TestPackageAndExtract()
 {
-  Set tSC = $$$OK
-  Try {
-    Set tTestRoot = ##class(%File).NormalizeDirectory($Get(^UnitTestRoot))
+  set tSC = $$$OK
+  try {
+    set tTestRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
 
-    Set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/simple-module/")
-    Set tSC = ##class(%IPM.Main).Shell("load "_tModuleDir)
-    Do $$$AssertStatusOK(tSC,"Loaded SimpleModule module successfully.")
+    set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/simple-module/")
+    set tSC = ##class(%IPM.Main).Shell("load "_tModuleDir)
+    do $$$AssertStatusOK(tSC,"Loaded SimpleModule module successfully.")
 
-    Set tempDir = ##class(%Library.File).TempFilename()_"dir"
-    Set tSC = ##class(%IPM.Main).Shell("simplemodule package -only -DPath="_tempDir)
-    Do $$$AssertStatusOK(tSC,"Packaged SimpleModule successfully.")
+    set tempDir = ##class(%Library.File).TempFilename()_"dir"
+    set tSC = ##class(%IPM.Main).Shell("simplemodule package -only -DPath="_tempDir)
+    do $$$AssertStatusOK(tSC,"Packaged SimpleModule successfully.")
 
-    Set outFile = ##class(%Library.File).TempFilename()
-    Set outDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).TempFilename()_"dir-out")
-    Do ##class(%Library.File).CreateDirectoryChain(outDir)
-    Do $$$AssertEquals($zf(-100,"/STDOUT="""_outFile_"""/STDERR="""_outFile_"""","tar","-xvf",tempDir_".tgz","-C",outDir),0)
+    set outFile = ##class(%Library.File).TempFilename()
+    set outDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).TempFilename()_"dir-out")
+    do ##class(%Library.File).CreateDirectoryChain(outDir)
+    do $$$AssertEquals($zf(-100,"/STDOUT="""_outFile_"""/STDERR="""_outFile_"""","tar","-xvf",tempDir_".tgz","-C",outDir),0)
 
-    Do $$$AssertNotTrue(##class(%File).DirectoryExists(outDir_"src/cls/Test/Test"))
-    Do $$$AssertNotTrue(##class(%File).DirectoryExists(outDir_"src/src"))
-    Do $$$AssertNotTrue(##class(%File).DirectoryExists(outDir_"simplemodule"))
-    Do $$$AssertTrue(##class(%File).Exists(outDir_"src/cls/Test/Test.cls"))
-    Do $$$AssertTrue(##class(%File).Exists(outDir_"module.xml"))
+    do $$$AssertNotTrue(##class(%File).DirectoryExists(outDir_"src/cls/Test/Test"))
+    do $$$AssertNotTrue(##class(%File).DirectoryExists(outDir_"src/src"))
+    do $$$AssertNotTrue(##class(%File).DirectoryExists(outDir_"simplemodule"))
+    do $$$AssertTrue(##class(%File).Exists(outDir_"src/cls/Test/Test.cls"))
+    do $$$AssertTrue(##class(%File).Exists(outDir_"module.xml"))
 
-    Set tSC = ##class(%IPM.Main).Shell("load "_tempDir_".tgz")
-    Do $$$AssertStatusOK(tSC,"Loaded SimpleModule module successfully from .tgz file.")
+    set tSC = ##class(%IPM.Main).Shell("load -force "_tempDir_".tgz")
+    do $$$AssertStatusOK(tSC,"Loaded SimpleModule module successfully from .tgz file.")
 
-    Set tSC = ##class(%IPM.Main).Shell("load "_outDir)
-    Do $$$AssertStatusOK(tSC,"Loaded SimpleModule module successfully from package directory.")
-  } Catch e {
-    Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+    set tSC = ##class(%IPM.Main).Shell("load -force "_outDir)
+    do $$$AssertStatusOK(tSC,"Loaded SimpleModule module successfully from package directory.")
+  } catch e {
+    do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
   }
 }
 

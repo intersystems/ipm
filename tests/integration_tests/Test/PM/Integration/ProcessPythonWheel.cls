@@ -15,6 +15,13 @@ Parameter PackageWithPythonDepsLocation = "package-with-python-deps";
 
 Parameter ExportPackageWithPythonDepsLocation = "export-package-with-python-deps";
 
+Method OnAfterOneTest() As %Status
+{
+    // Uninstall modules
+    set status = ##class(%IPM.Main).Shell("uninstall -all")
+    return status
+}
+
 /// The PythonWheel resource processor expects to install wheels from the dist directory, as opposed to source code
 ClassMethod GenerateWheel()
 {

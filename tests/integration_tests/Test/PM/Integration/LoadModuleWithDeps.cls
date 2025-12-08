@@ -3,6 +3,13 @@ Class Test.PM.Integration.LoadModuleWithDeps Extends Test.PM.Integration.Base
 
 Parameter ModuleFolder = "load-export";
 
+Method OnAfterOneTest() As %Status
+{
+    // Uninstall modules
+    set status = ##class(%IPM.Main).Shell("uninstall -all")
+    return status
+}
+
 Method TestLoadModuleWithDependencies() As %Status
 {
     /// Load from folder

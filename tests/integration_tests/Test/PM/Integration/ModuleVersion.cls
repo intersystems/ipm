@@ -71,6 +71,8 @@ Method TestModuleVersion()
         set sc = ##class(%IPM.Main).Shell("modver mv " _ args)
         if expected = "" {
             do $$$AssertStatusNotOK(sc, "Module-version failed as expected")
+            set sc = ##class(%IPM.Main).Shell("uninstall mv")
+            do $$$AssertStatusOK(sc, "Module 'mv' successfully uninstalled between test cases.")
             continue
         }
         do $$$AssertStatusOK(sc, "Module-version executed successfully")

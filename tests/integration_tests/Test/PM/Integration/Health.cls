@@ -5,7 +5,14 @@ Parameter CommonPathPrefix As STRING = "health-test";
 
 Method OnBeforeAllTests() As %Status
 {
-  Quit ##class(%Library.EnsembleMgr).EnableNamespace($Namespace)
+  quit ##class(%Library.EnsembleMgr).EnableNamespace($namespace)
+}
+
+Method OnAfterOneTest() As %Status
+{
+    // Uninstall modules
+    set status = ##class(%IPM.Main).Shell("uninstall -all")
+    return status
 }
 
 Method TestHealthTrue()

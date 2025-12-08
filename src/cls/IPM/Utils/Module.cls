@@ -1075,6 +1075,16 @@ ClassMethod LoadNewModule(
                 $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
             set cmd = $get(params("cmd"))
+            // Check for same-version install/load
+            if ((cmd = "install") || (cmd = "load")) && (fromVersionString = toVersionString) {
+                set permitReinstall = $get(params("PermitReinstall"), 0)
+                set forceFlag = $get(params("Force"), 0)
+                set isReinstall = $get(params("Reinstall"), 0)
+                if 'forceFlag && 'permitReinstall && 'isReinstall {
+                    set msg = $$$FormatText("%1 version %2 is already installed.", newModuleObj.Name, fromVersionString)
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+                }
+            }
             if ((cmd = "install") || (cmd = "load")) && '$get(params("Force"),0) && '$get(params("DeveloperMode"),0) && (toVersion.Follows(fromVersion)) && (newModuleObj.UpdatePackage '= "") {
                 set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.", newModuleObj.Name, fromVersionString, toVersionString)
                 $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
