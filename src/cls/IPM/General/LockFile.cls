@@ -55,7 +55,7 @@ ClassMethod CreateLockFileForModule(
             write !, "Adding "_mod.DisplayName_" to the lock file"
         }
 
-        // DEPENDENCY STUFF
+        // Add the dependency to the lock file
         set dependencyVal = ##class(%IPM.General.LockFile.Dependency).%New()
         set dependencyVal.VersionString = mod.VersionString
         set dependencyVal.Repository = mod.Repository
@@ -67,22 +67,13 @@ ClassMethod CreateLockFileForModule(
         }
         $$$ThrowOnError(lockFile.Dependencies.SetAt(dependencyVal, mod.Name))
 
-        // REPOSITORY STUFF:
-        set repo = ..GetRepo(mod.Repository)
-        if 'lockFile.Repositories.IsDefined(repo.Name) {
-            if (verbose) {
-                write !, "Adding new repository to the lock file: "_repo.Name
-            }
-            $$$ThrowOnError(lockFile.Repositories.SetAt(repo, repo.Name))
-        }
+        // Add the dependency's repository to the lock file
+        do AddRepositoryToLockFile(.lockFile, mod.Repository, verbose)
     }
     // Add repository for base module if not already added by a dependency
-    set repo = ..GetRepo(module.Repository)
-    if 'lockFile.Repositories.IsDefined(repo.Name) {
-        if (verbose) {
-            write !, "Adding new repository to the lock file: "_repo.Name
-        }
-        $$$ThrowOnError(lockFile.Repositories.SetAt(repo, repo.Name))
+    // Skip undefined repositories as that means the module was installed via the zpm "load" command
+    if (module.Repository '= "") {
+        do AddRepositoryToLockFile(.lockFile, module.Repository, verbose)
     }
 
     $$$ThrowOnError(lockFile.%JSONExportToStream(.lockFileJSON, "LockFileMapping"))
@@ -94,6 +85,21 @@ ClassMethod CreateLockFileForModule(
     set file = ##class(%File).%New(lockFilePath)
     $$$ThrowOnError(file.Open("WSN"))
     $$$ThrowOnError(file.CopyFrom(lockFileJSON))
+}
+
+/// Adds a module's repository to the lock file
+ClassMethod AddRepositoryToLockFile(
+	ByRef lockFile As %IPM.General.LockFile,
+	repositoryName As %String,
+	verbose As %Boolean = 0) [ Internal ]
+{
+    set repo = ..GetRepo(repositoryName)
+    if 'lockFile.Repositories.IsDefined(repo.Name) {
+        if (verbose) {
+            write !, "Adding new repository to the lock file: "_repo.Name
+        }
+        $$$ThrowOnError(lockFile.Repositories.SetAt(repo, repo.Name))
+    }
 }
 
 /// Returns a repo based on its name

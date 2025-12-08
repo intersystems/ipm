@@ -1434,6 +1434,15 @@ ClassMethod LoadNewModule(
         }
         $$$ThrowOnError(tSC)
         do tModule.WriteAfterInstallMessage()
+
+        // After install of modules and dependencies is completed, create the lock file for the module if flag specified
+        if $get(params("CreateLockFile"), 0) {
+            try {
+                do ##class(%IPM.General.LockFile).CreateLockFileForModule(tModuleName, .params)
+            } catch (ex) {
+                write !, $$$FormattedLine($$$Red, $$$FormatText("Error creating lock file for %1 - %2", tModuleName, ex.DisplayString())), !
+            }
+        }
     } catch e {
         set tSC = e.AsStatus()
     }
