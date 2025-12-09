@@ -2123,7 +2123,7 @@ ClassMethod RunCommand(
         $$$ThrowOnError(..ReadFileToStream(stderr, .pErrOutput, $get(stderrTmp)))
 
         if (pRetCode'=0) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Running command "_$get(cmd)_" returned error. Return code: "_pRetCode))
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Running os command '"_$listtostring(pCmd, " ")_"' failed with return code: "_pRetCode))
         }
     } catch (ex) {
         set tSC = ex.AsStatus()
