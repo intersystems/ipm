@@ -530,7 +530,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
-
+<modifier name="pinned" aliases="p" description="If specified, lists pinned IPM modules." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -758,6 +758,22 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
     <example description="Show detailed information about the current ZPM environment">
         info -verbose
     </example>
+</command>
+
+<command name="pin" dataPrefix="P">
+    <description>Marks specific module as pinned to prevent future automatic ZPM operations.</description>
+    <example description="Marks specific module as pinned to prevent future automatic upgrades.">
+        pin HS.JSON
+    </example>
+    <parameter name="module" required="true" description="Name of the module to pin." />
+</command>
+
+<command name="unpin" dataPrefix="P">
+    <description>Removes the pinned status from an installed module, allowing future ZPM operations.</description>
+    <example description="Removes the pinned status from an installed module, allowing future ZPM operations.">
+        unpin HS.JSON
+    </example>
+    <parameter name="module" required="true" description="Name of the module unpin." />
 </command>
 
 </commands>
@@ -997,6 +1013,10 @@ ClassMethod ShellInternal(
                 do ..ModuleVersion(.tCommandInfo)
             } elseif (tCommandInfo = "information") {
                 do ..Information(.tCommandInfo)
+            } elseif (tCommandInfo = "pin") {
+                do ..Pin(.tCommandInfo)
+            } elseif (tCommandInfo = "unpin") {
+                do ..UnPin(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -1221,7 +1241,9 @@ ClassMethod GetListModules(
         $$$ThrowOnError(tSC)
         set name = tRes.Name
         set list = list + 1
-        set list(list) = $listbuild(name, tRes.VersionString, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
+        set IsModulePinned=$select(##class(%IPM.Storage.PinnedModule).IsModulePinned(name):"-Pinned",1:"")
+
+        set list(list) = $listbuild(name, tRes.VersionString_IsModulePinned, tRes.ExternalName, tRes.DeveloperMode, tRes.Root)
         if hasLastUpdated {
             set list(list) = list(list) _ $listbuild(tRes.LastUpdated)
         }
@@ -2268,6 +2290,10 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
         $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
     }
 
+    //verify the module is pinned
+    if ##class(%IPM.Storage.PinnedModule).IsModulePinned(tModuleName) {
+         $$$ThrowStatus($$$ERROR($$$GeneralError, "The module "_tModuleName_" is pinned unable to install"))
+    }
     set tVersion = $get(pCommandInfo("parameters","version"))
     set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
     set tForce = $$$HasModifier(pCommandInfo,"force")
@@ -2359,6 +2385,10 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
         $$$ThrowOnError(..CheckModuleNamespace())
     }
 
+    //verify the module is pinned
+    if ##class(%IPM.Storage.PinnedModule).IsModulePinned(tModuleName) {
+         $$$ThrowStatus($$$ERROR($$$GeneralError, "The module "_tModuleName_" is pinned unable to reinstall"))
+    }
     set tVersionString = tModule.Version.ToString()
     write !,"Reinstalling ",tModuleName," ",tVersionString
     set pCommandInfo("parameters","version") = tVersionString
@@ -2373,11 +2403,16 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
         return
     } else {
-        set tModuleName = pCommandInfo("parameters","module")
+        set tModuleName = $get(pCommandInfo("parameters","module"))
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
         }
         set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
+
+        //verify the module is pinned
+        if ##class(%IPM.Storage.PinnedModule).IsModulePinned(tModuleName) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "The module "_tModuleName_" is pinned unable to uninstall"))
+        }
         $$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
     }
 }
@@ -2571,6 +2606,13 @@ ClassMethod ActiveNamespacesClose(qHandle As %Binary) As %Status [ PlaceAfter = 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
     set tSearchString = $get(pCommandInfo("parameters","searchString"),"")
+    // list pinned modules
+    if $data(pCommandInfo("modifiers","pinned")) {
+		merge tModifiers = pCommandInfo("modifiers")
+        do ##class(%IPM.Storage.PinnedModule).GetAllPinnedModules(.list)
+		do ..DisplayModules(.list,,,, .tModifiers)
+		quit $$$OK
+    }
     if (''$data(pCommandInfo("modifiers","tree"))) {
         // Show tree of dependencies as well.
         // Modules that are dependencies for no other are shown at the top level.
@@ -3877,6 +3919,10 @@ ClassMethod Update(ByRef pCommandInfo)
     if '##class(%IPM.Storage.Module).NameExists(moduleName) && '##class(%IPM.Storage.Module).ExternalNameExists(moduleName) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
+    //verify the module is pinned
+    if ##class(%IPM.Storage.PinnedModule).IsModulePinned(moduleName) {
+         $$$ThrowStatus($$$ERROR($$$GeneralError, "The module "_moduleName_" is pinned unable to update."))
+    }
     if verbose {
         if path '= "" {
             write !,"Resolving version of module specified by -path flag: ",path," to update",!
@@ -3898,6 +3944,22 @@ ClassMethod Update(ByRef pCommandInfo)
         // Call ..Install() in order to install the newer version of the module.
         do ..Install(.pCommandInfo)
     }
+}
+
+ClassMethod Pin(ByRef pCommandInfo) As %Status
+{
+    set sc = ##class(%IPM.Storage.PinnedModule).PinModule(pCommandInfo("parameters","module"))
+    $$$ThrowOnError(sc)
+    write "Module "_pCommandInfo("parameters","module")_" is now pinned"
+    return 1
+}
+
+ClassMethod UnPin(ByRef pCommandInfo) As %Status
+{
+    set sc = ##class(%IPM.Storage.PinnedModule).UnPinModule(pCommandInfo("parameters","module"))
+    $$$ThrowOnError(sc)
+    write "Module "_pCommandInfo("parameters","module")_" is now unpinned"
+    return 1
 }
 
 }

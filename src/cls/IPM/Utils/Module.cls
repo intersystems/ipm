@@ -613,6 +613,8 @@ ClassMethod UninstallAll(
         do ##class(%IPM.Main).GetListModules(,,.modList)
         for i = 1:1:modList {
             set name = $listget(modList(i),1)
+            ;prevent from uninstall the pinned module
+            continue:##class(%IPM.Storage.PinnedModule).IsModulePinned(name)
             set simpleModList(name) = ""
             // list of modules must be from here because modules without dependencies won't appear in %IPM_Storage.ModuleItem_Dependencies
             set tModuleNames(name) = ""

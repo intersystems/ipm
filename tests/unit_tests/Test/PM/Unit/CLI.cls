@@ -2,6 +2,9 @@
 Class Test.PM.Unit.CLI Extends %UnitTest.TestCase
 {
 
+/// lightweight library used for python pip installation and uninstallation.
+Parameter TestZPMModule = "web-fslog";
+
 Method TestParser()
 {
 
@@ -219,10 +222,11 @@ Method CompareModifiers(
 	}
 }
 
-Method RunCommand(pCommand As %String)
+Method RunCommand(pCommand As %String) As %Status
 {
-	do ##class(%IPM.Main).Shell(pCommand)
+	set sc = ##class(%IPM.Main).Shell(pCommand)
 	do $$$LogMessage("Run command: "_pCommand)
+    return sc
 }
 
 Method AssertNoException(pCommand As %String)
@@ -285,6 +289,30 @@ Method CompareArrays(
         set tRef2 = $query(@tRef2)
     }
     quit tEqual
+}
+
+Method TestCLIPinnedCommand()
+{
+    set sc = $$$OK
+    set tCommandsList = $listbuild("list -p", "list -pinned")
+    set ptr=0
+    while $listnext(tCommandsList,ptr,tCommand) {
+        do ..RunCommand(tCommand)
+    }
+    set i = $increment(tCommands)
+    set tCommands(i) = "list-installed -p"
+	set tResults(tCommands)="list-installed"
+	set tResults(tCommands,"modifiers","pinned")=""
+	// Verify output matches
+    kill tParsedCommandInfo,tExpectedCommandInfo
+    do $$$AssertStatusOK(##class(%IPM.Main).%ParseCommandInput(tCommands(i),.tParsedCommandInfo))
+    merge tExpectedCommandInfo = tResults(i)
+    if $$$AssertTrue(..CompareArrays(.tParsedCommandInfo,.tExpectedCommandInfo,.tMessage),"Parsed correctly: "_tCommands(i)) {
+        do $$$LogMessage(tMessage)
+        write !,"Expected:",! zwrite tExpectedCommandInfo
+        write !,"Actual:",! zwrite tParsedCommandInfo
+    }
+    quit sc
 }
 
 }
