@@ -1,0 +1,3 @@
+[Actions]
+CreateRole:Name=${namespace}-MyTestRole
+CreateApplication:Name=/ipm/cpfwebapp,NameSpace=${ns},AutheEnabled=$$$AutheUnauthenticated
