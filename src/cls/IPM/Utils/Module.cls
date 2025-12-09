@@ -2126,11 +2126,7 @@ ClassMethod RunCommand(
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Running command returned error."))
         }
     } catch (ex) {
-        if (ex.Code = 34) {
-            set tSC = $$$ERROR($$$GeneralError, "Command " _ $get(cmd) _ " not found.")
-        } else {
-            set tSC = ex.AsStatus()
-        }
+        set tSC = ex.AsStatus()
     }
     if $get(currentDirectory)'="" {
         do ##class(%SYSTEM.Process).CurrentDirectory(currentDirectory)
