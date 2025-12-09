@@ -2123,7 +2123,7 @@ ClassMethod RunCommand(
         $$$ThrowOnError(..ReadFileToStream(stderr, .pErrOutput, $get(stderrTmp)))
 
         if (pRetCode'=0) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Running command returned error."))
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Running command "_$get(cmd)_" returned error. Return code: "_pRetCode))
         }
     } catch (ex) {
         set tSC = ex.AsStatus()
