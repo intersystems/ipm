@@ -8,20 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.5] - Unreleased
 
 ### Added
+
 - #938 Added flag -export-python-deps to package command
 - #462: The `repo` command for repository configuration now supports secret input terminal mode for passwords with the `-password-stdin` flag
 - #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
 
 ### Changed
+
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
 - #885: Always synchronously load dependencies and let each module do multi-threading as needed
-to load using multicompile instead of trying to do own multi-threading of item load which causes
-lock contention by bypassing IRIS compiler.
+  to load using multicompile instead of trying to do own multi-threading of item load which causes
+  lock contention by bypassing IRIS compiler.
+- #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.
 
 ### Removed
+
 - #938 Removed secret flag NewVersion handling in %Publish()
 
 ### Fixed
+
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
 - #701: Fix misleading help comments about `search` command
 - #958: Update command should not fail early if external name is used
@@ -29,18 +34,21 @@ lock contention by bypassing IRIS compiler.
 - #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 
 ### Deprecated
+
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
 - #885: `-synchronous` flag since loading dependencies synchronously is now the default behavior.
 
 ## [0.10.4] - 2025-10-21
 
 ### Added
+
 - #874: Modules can now specify required Python version in `<SystemRequirements>` in `module.xml`
 - #909: IPM now warns when Python 3.13 or higher is installed (IRIS incompatibility)
 - #850: Re-added `<SystemSetting>` Resource Processor for backwards compatibility
 - #550: Add a new "update" command and framework to support in-place module updates. install/load of a module to newer version than currently installed will be blocked by default if module has UpdatePackage defined.
 
 ### Fixed
+
 - #899: Fixed CLI parser parses modifiers incorrectly
 - #299: Prevent Japanese (and other UNICODE) characters from being garbled when outputting unit test results
 - #819: Drastically increase `zpm "info"` speed when many dependent packages have been installed
@@ -57,6 +65,7 @@ lock contention by bypassing IRIS compiler.
 - #930: Fix issue where `load` didn't work on GitHub URLs
 
 ### Changed
+
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
 - #706: `load` now only accepts absolute paths
 - #278: Modules will now be installed at a well-defined default location: `$System.Util.DataDirectory()/ipm/<packagename>/<version>/`
@@ -69,6 +78,7 @@ lock contention by bypassing IRIS compiler.
 ## [0.10.3] - 2025-09-17
 
 ### Fixed
+
 - #829: Fixed export of resources with null Directory attribute
 - #832: Fixed places that export to possibly-nonexistent directories by adding /createdirs (needed in 2025.2+)
 - #823: Fixed selectively undeploying classes within a package
@@ -80,6 +90,7 @@ lock contention by bypassing IRIS compiler.
 - #839: SemVer expression "And" (as used in dependency resolution) fixed for complex ranges
 
 ### Changed
+
 - Format all files and add consistent formatting settings, format on save etc.
 - #848: Resource processing should be done in order of granularity
 - #779: Module parameters specified in `<Defaults>` in the module.xml are used when loading/installing the module and not just when the module itself runs its lifecycle phases
@@ -87,6 +98,7 @@ lock contention by bypassing IRIS compiler.
 ## [0.10.2] - 2025-06-04
 
 ### Fixed
+
 - #809: Fixed installation of rpds.py in containers using durable %SYS
 - #811: Issues when upgrading from earlier IPM versions with cross-namespace differences
 - #796: Installation on environments without Flexible Python Runtime
@@ -96,13 +108,15 @@ lock contention by bypassing IRIS compiler.
 ## [0.10.1] - 2025-04-24
 
 ### Fixed
+
 - #797 Windows: IPM now uses the Python Runtime Library path from iris.cpf if defined
 
 ## [0.10.0] - 2025-04-16
 
-*Important*: The minimum supported InterSystems IRIS version is now *2022.1*. For earlier IRIS versions, use IPM 0.9.x.
+_Important_: The minimum supported InterSystems IRIS version is now _2022.1_. For earlier IRIS versions, use IPM 0.9.x.
 
 ### Added
+
 - #474 Added compatibility to load ".tar.gz" archives in addition to ".tgz"
 - #469 Added ability to include an `IPMVersion` in `SystemRequirement` of module.xml
 - #530 Added a `CustomPhase` attribute to `<Invoke>` that doesn't require a corresponding %method in lifecycle class.
@@ -126,6 +140,7 @@ lock contention by bypassing IRIS compiler.
 - #793: Add support for -synchronous flag to install command (added to load in #746)
 
 ### Changed
+
 - The minimum supported IRIS version for this release is 2022.1.
 - #702 Preload now happens as part of the new `Initialize` lifecycle phase. `zpm "<module> reload -only"` will no longer auto compile resources in `/preload` directory.
 - #726 When running `zpm "load ..."` on a nonexistent path, it now returns an error instead of silently failing with a $$$OK status.
@@ -135,6 +150,7 @@ lock contention by bypassing IRIS compiler.
 - #769: Lifecycle phase `Package` is now run as part of `Publish`.
 
 ### Fixed
+
 - #474: When loading a .tgz/.tar.gz package, automatically locate the top-most module.xml in case there is nested directory structure (e.g., GitHub releases)
 - #635: When calling the "package" command, the directory is now normalized to include trailing slash (or backslash).
 - #696: Fix a bug that caused error status to be ignored when publishing a module.
@@ -161,9 +177,11 @@ lock contention by bypassing IRIS compiler.
 ## [0.9.2] - 2025-02-24
 
 ### Added
+
 - #682 When downloading IPM via the `enable` command from a remote registry, allow user to pass in the registry name (or get the only existent one), instead of the deployment enabled registry.
 
 ### Fixed
+
 - #684 Fixed banner display issues in interactive `zpm` shell.
 - #682 When enabling IPM in a namespace using local IPM caches, check for existence of `<iris-root>/lib/ipm/` beforing querying it.
 - #682 Use more standard wording of mapping when enabling IPM
@@ -174,23 +192,27 @@ lock contention by bypassing IRIS compiler.
 - #745 Allow publishing of deployments without developer mode
 
 ### Security
+
 - #697 When publishing modules, will get an status with error message (instead of just a boolean) in case of failures.
 
 ## [0.9.1] - 2024-12-18
 
 ### Added
+
 - #663 Added support for mapping of repository settings along with, or in addition to, IPM package and routines
 - #663 Added functionality to always unmap repository settings when IPM package and routines are unmapped
 - #663 Added support for unmapping of repository settings alone
 - #663 Added support for `enable -community`, which resets repository settings to default and maps IPM along with repo settings globally
 
 ### Fixed
+
 - #663 Improved error output and instructions in the language extension when "zpm" is run from a namespace without IPM
 - #757: Fixed a bug where mappings are not getting created when they should.
 
 ## [0.9.0] - 2024-12-16
 
 ### Added
+
 - #364 Added ability to restrict the installation to IRIS or IRIS for Health platform to the SystemRequirements attribute
 - #518 Added ability to show source file location when running `list-installed`. E.g., `zpm "list-installed -showsource"`.
 - #538 Added ability to customize caller to PipCaller and UseStandalonePip through `config set`, which are empty by default and can be used to override the auto-detection of pip.
@@ -200,6 +222,7 @@ lock contention by bypassing IRIS compiler.
 - #647 Added ability to add extra flags when installing python dependencies using pip
 
 ### Changed
+
 - IPM is now namespace-specific rather than being installed in %SYS and being available instance-wide.
 - HSIEO-9484: Add additional argument to buildDepsGraph to allow putting in an additional list element of dependency's DisplayName
 - HSIEO-9484: Add additional property DisplayName to %IPM.Storage.ModuleReference
@@ -209,6 +232,7 @@ lock contention by bypassing IRIS compiler.
 - #527: IPM 0.9.x+ ignores the casing of resources when matching files on disk even on case-sensitive filesystems
 
 ### Fixed
+
 - HSIEO-11006: Fix conditions for marking code as deployed
 - HSIEO-10884: Bug Fix - FileCopy to check for $ variables in path
 - HSIEO-11006: Fix conditions for marking code as deployed
@@ -250,4 +274,5 @@ lock contention by bypassing IRIS compiler.
 - #776: Loading packages fails on 8-bit IRIS installations in certain locales
 
 ### Deprecated
+
 - #593 CSPApplication is deprecated in favor of WebApplication. User will be warned when installing a package containing CSPApplication.
