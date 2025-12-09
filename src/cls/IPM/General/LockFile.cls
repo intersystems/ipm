@@ -30,7 +30,7 @@ ClassMethod CreateLockFileForModule(
         write !, "Creating lock file for module "_module.DisplayName
     }
 
-    /// Create lock file object and set values for the base module
+    // Create lock file object and set values for the base module
     set lockFile = ##class(%IPM.General.LockFile).%New()
     set lockFile.ModuleName = module.Name
     set lockFile.VersionString = module.VersionString
