@@ -46,7 +46,12 @@ Method %OnClose() As %Status [ Private, ServerOnly = 1 ]
         // Mark as finalized and record should be locked
         set ..PersistedTwin.Finalized = 1
     }
-    quit ..%Save()
+    // Ensure the persisted twin is saved
+    set sc = ..%Save()
+
+    // Delete this temp entry as it's no longer needed
+    set sc = $$$ADDSC(sc, ..%DeleteId(..%Id()))
+    quit sc
 }
 
 Storage Default
