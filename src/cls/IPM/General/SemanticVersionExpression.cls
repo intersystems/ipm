@@ -19,7 +19,7 @@ Method %OnNew(rangeExpr As %String = "") As %Status [ Private, ServerOnly = 1 ]
 Method ExpressionSet(value As %String) As %Status
 {
     if (value [ "&&") && (value [ "||") {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot mix '&&' and '||' in a single expression"))
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Cannot mix '&&' and '||' in a single expression"))
     }
     if (value [ "&&") {
         set reqs = $listfromstring(value,"&&")
@@ -27,7 +27,7 @@ Method ExpressionSet(value As %String) As %Status
         set andExpr = ""
         while $listnext(reqs,ptr,rangeExpr) {
             set rangeExpr = $zstrip(rangeExpr,"<>W")
-            set rangeExpr = $zstrip(rangeExpr, "*", "()")
+            set rangeExpr = $zstrip(rangeExpr,"*","()")
             set sc = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
             $$$ThrowOnError(sc)
             if option.ToResolvedString() = "" {
@@ -38,7 +38,7 @@ Method ExpressionSet(value As %String) As %Status
             } else {
                 set merged = ##class(%IPM.General.SemanticVersionExpression.Range).Intersect(andExpr, option)
                 if (merged = "") {
-                    $$$ThrowStatus($$$ERROR($$$GeneralError, "No overlapping versions in && operation for %1 and %2", andExpr.ToResolvedString(), option.ToResolvedString()))
+                    $$$ThrowStatus($$$ERROR($$$GeneralError,"No overlapping versions in && operation for %1 and %2", andExpr.ToResolvedString(), option.ToResolvedString()))
                 }
                 set andExpr = merged
             }
@@ -51,7 +51,7 @@ Method ExpressionSet(value As %String) As %Status
         set ptr = 0
         while $listnext(options,ptr,rangeExpr) {
             set rangeExpr = $zstrip(rangeExpr,"<>W")
-            set rangeExpr = $zstrip(rangeExpr, "*", "()")
+            set rangeExpr = $zstrip(rangeExpr,"*","()")
             set sc = ##class(%IPM.General.SemanticVersionExpression.Range).FromString(rangeExpr,.option)
             $$$ThrowOnError(sc)
             if option.ToResolvedString() = "" {
@@ -62,7 +62,8 @@ Method ExpressionSet(value As %String) As %Status
     }
     set i%Expression = value
     // note: we throw errors and just return $$$Ok at the end because the returned status isn't
-    // used by the caller
+    // used by the caller. Its still needed though since without it, there will be errors at runtime
+    // whenever this setter is used.
     return $$$OK
 }
 
@@ -144,7 +145,7 @@ Method And(versionExpression As %IPM.General.SemanticVersionExpression) As %IPM.
         }
         set resolvedString = ..ToResolvedString()
         if (resolvedString = "") {
-            set msg = $$$FormatText("No overlapping versions in AND operation for %1 and %2",current.ToResolvedString(), versionExpression.ToResolvedString())
+            set msg = $$$FormatText("No overlapping versions in AND operation for %1 and %2",current.ToResolvedString(),versionExpression.ToResolvedString())
             $$$ThrowStatus($$$ERROR($$$GeneralError,msg))
         }
         set i%Expression = resolvedString
