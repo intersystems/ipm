@@ -918,10 +918,6 @@ Method %Compile(ByRef pParams) As %Status
             $$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlCreate())
         }
 
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
-
         // Compile items within the module that are compilable using OnPhase
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1036,13 +1032,6 @@ Method %Compile(ByRef pParams) As %Status
                 }
 
                 set tNoCompileLock = '$get(pParams("NoLock"))
-                if $$$IsISCWorker && 'tNoCompileLock {
-                    // Customized locking - takes out shared locks on dependencies to avoid conflicts between parallel module loads.
-                    set tSC = ##class(%IPM.Utils.LockManager).LockClassesRecursive(.tLockManager,.tCompileArray,.tLockedClasses)
-                    $$$ThrowOnError(tSC)
-                    set tNoCompileLock = 1
-                }
-
                 // Actually do the compile
                 if $data(tCompileArray)>1 {
                     set tCompiledSomething = 1
@@ -1096,10 +1085,6 @@ Method %Test(ByRef pParams) As %Status
 {
     set tSC = $$$OK
     try {
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
-
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
@@ -1147,7 +1132,7 @@ Method %Export(
         }
 
         set tExportDependencies = $get(pParams("ExportDependencies"), ..#EXPORTDEPENDENCIES)
-        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,1,.pDependencyGraph)
+        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph)
         if $$$ISERR(tSC) {
             quit
         }
@@ -1353,10 +1338,6 @@ Method %Verify(ByRef pParams) As %Status
                 }
             }
         }
-
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1638,7 +1619,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 
         // Default implementation: see which resources are expicitly flagged with Deploy = true.
         // Build an array of those, then mark them as deployed.
-        $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,1,.pDependencyGraph))
+        $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,.pDependencyGraph))
 
         set tModuleKey = ""
         for {
@@ -1779,7 +1760,11 @@ Method GetResourceRelativePath(
 	pResource As %String,
 	pExtension As %String) As %String
 {
-    if ($get(pExtension) = "") {
+    // directories do not have an extension, so pResource will be empty
+    if ($get(pResource) = "") {
+        set tName = pExtension
+        set tExtension = ""
+    } elseif ($get(pExtension) = "") {
         set tName = $piece(pResource,".",1,*-1)
         set tExtension = $piece(pResource,".",*)
     } else {
@@ -1819,6 +1804,7 @@ Method GetResourceRelativePath(
         "BPL":$translate(tName,".%","/")_".cls",
         "GBL":$translate(tName,"%,("")","___")_".xml",
         "DFI":$translate(tName,"-","/")_".dfi",
+        "":tName,
         : tName _ "." _$$$lcase(tExtension)
     )
 
