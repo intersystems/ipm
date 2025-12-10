@@ -6,14 +6,12 @@
     "repositories": {
         "lock-file-base": {
             "type": "filesystem",
-            "enabled": true,
             "readOnly": false,
             "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/",
             "depth": 0
         },
         "lock-file-edge": {
             "type": "filesystem",
-            "enabled": true,
             "readOnly": false,
             "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-edge-cases/",
             "depth": 0
