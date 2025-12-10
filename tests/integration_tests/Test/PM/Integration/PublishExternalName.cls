@@ -69,6 +69,11 @@ Method TestInterchangeableNames()
     // Cleanup by unpublishing
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
+    // Verify cannot install now
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#DefaultName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install module with default name")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install module with external name")
 
 
     // Test 2: Publish with external name using -use-ext flag and install using internal name
@@ -86,9 +91,14 @@ Method TestInterchangeableNames()
     // Cleanup by unpublishing
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
+    // Verify cannot install now
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#DefaultName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install module with default name")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install module with external name")
 
 
-    // Test 3: Publish with external name without -use-ext flag and install using internal name
+    // Test 3: Publish with external name without -use-ext flag (will appear in repo under internal name) and install using internal name
     set sc = ##class(%IPM.Main).Shell("publish " _ ..#ExternalName _ " -verbose -r zot")
     do $$$AssertStatusOK(sc,"Published module successfully with external name")
 
@@ -101,8 +111,34 @@ Method TestInterchangeableNames()
     do $$$AssertStatusOK(sc, "Successfully installed module with default name")
 
     // Cleanup by unpublishing
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#DefaultName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install module with default name")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install module with external name")
+
+
+    // Test 4: Publish with external name without -use-ext flag and install using external name
+    set sc = ##class(%IPM.Main).Shell("publish " _ ..#ExternalName _ " -verbose -r zot")
+    do $$$AssertStatusOK(sc,"Published module successfully with external name")
+
+    // Uninstall module
+    set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled module with default name")
+
+    // Install using internal name
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusOK(sc, "Successfully installed module with external name")
+
+    // Cleanup by unpublishing
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
+    do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#DefaultName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install module with default name")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install module with external name")
+
 
 
     // Cleanup by uninstalling module and removing zot repo

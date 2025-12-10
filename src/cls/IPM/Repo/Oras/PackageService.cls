@@ -131,6 +131,44 @@ Method ListModulesFromTagString(
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
         $$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
+        #; Filter by module name if requested - check both Name and ExternalName
+        if (searchCriteria.Name '= "") {
+            #; Optimization: First check if package name already matches (fast path)
+            set packageNameMatches = ($$$lcase(name) = $$$lcase(searchCriteria.Name))
+
+            if 'packageNameMatches {
+                #; Package name doesn't match - fetch module.xml to check Name and ExternalName
+                set moduleXMLText = ..GetModuleXML(..Location, name _ ":" _ tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+
+                if (moduleXMLText '= "") {
+                    #; Parse just Name and ExternalName from XML
+                    set moduleObj = ..ParseModuleXMLForNameCheck(moduleXMLText, .sc)
+
+                    if $$$ISERR(sc) {
+                        #; Skip this package if XML parsing fails
+                        continue
+                    }
+
+                    #; Check if search name matches either Name or ExternalName (case-insensitive)
+                    set matchesName = ($$$lcase(moduleObj.Name) = $$$lcase(searchCriteria.Name))
+                    set matchesExternalName = 0
+
+                    if (moduleObj.ExternalName '= "") {
+                        set matchesExternalName = ($$$lcase(moduleObj.ExternalName) = $$$lcase(searchCriteria.Name))
+                    }
+
+                    #; Only include if at least one matches
+                    if 'matchesName && 'matchesExternalName {
+                        continue
+                    }
+                } else {
+                    #; No module.xml available - skip this package
+                    continue
+                }
+            }
+            #; If packageNameMatches is true, proceed without additional checks
+        }
+
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
         // `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
         set tModRef.Name = name
@@ -213,10 +251,6 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
             if (package="") {
                 continue
             }
-            #; filter by module name if requested
-            if (name'="") && (package'=name) {
-                continue
-            }
             #; collect all versions for this package in tList
             do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
         }
@@ -225,6 +259,36 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
         do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
     }
     return tList
+}
+
+/// Lightweight parse of module.xml to extract Name and ExternalName only
+/// Returns a Module object with Name and ExternalName populated
+ClassMethod ParseModuleXMLForNameCheck(
+	moduleXML As %String,
+	Output sc As %Status) As %IPM.Storage.Module
+{
+    set sc = $$$OK
+    set moduleObj = ""
+
+    try {
+        #; Create stream from XML text
+        set stream = ##class(%Stream.GlobalCharacter).%New()
+        do stream.Write(moduleXML)
+
+        #; Parse XML into Module object
+        set reader = ##class(%XML.Reader).%New()
+        set sc = reader.OpenStream(stream)
+        $$$ThrowOnError(sc)
+
+        do reader.Correlate("Module", "%IPM.Storage.Module")
+        do reader.Next(.moduleObj, .sc)
+        $$$ThrowOnError(sc)
+
+    } catch e {
+        set sc = e.AsStatus()
+    }
+
+    quit moduleObj
 }
 
 // ** ORAS FUNCTIONS **
