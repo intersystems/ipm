@@ -1219,6 +1219,7 @@ Method ProcessSingleDependencyIterative(
     quit sc
 }
 
+/// Retrieves all known dependencies for a module, including transitive dependencies.
 ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 {
     set tStatement = ##class(%SQL.Statement).%New()

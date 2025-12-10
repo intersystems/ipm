@@ -270,7 +270,6 @@ ClassMethod Intersect(
 
     // Find the most restrictive upper bound (the minimum of all upper bounds)
     set minUpperBound = ""
-    set ptr = 0
     for i = 1:1:upperBounds.Count() {
         set comp = upperBounds.GetAt(i)
         if (minUpperBound = "") {
