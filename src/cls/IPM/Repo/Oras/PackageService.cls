@@ -133,12 +133,26 @@ Method ListModulesFromTagString(
 
         #; Filter by module name if requested - check both Name and ExternalName
         if (searchCriteria.Name '= "") {
+            #; Extract the package name without namespace prefix for comparison
+            #; Package name from ORAS may be "namespace/modulename" or just "modulename"
+            set packageNameWithoutNamespace = name
+            if (name [ "/") {
+                #; Extract everything after the last "/"
+                for i=$length(name):-1:1 {
+                    if ($extract(name, i) = "/") {
+                        set packageNameWithoutNamespace = $extract(name, i+1, *)
+                        quit
+                    }
+                }
+            }
+
             #; Optimization: First check if package name already matches (fast path)
-            set packageNameMatches = ($$$lcase(name) = $$$lcase(searchCriteria.Name))
+            set packageNameMatches = ($$$lcase(packageNameWithoutNamespace) = $$$lcase(searchCriteria.Name))
 
             if 'packageNameMatches {
                 #; Package name doesn't match - fetch module.xml to check Name and ExternalName
-                set moduleXMLText = ..GetModuleXML(..Location, name _ ":" _ tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+                #; Note: pass empty namespace since 'name' already includes the full path
+                set moduleXMLText = ..GetModuleXML(..Location, name _ ":" _ tag, "", ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
                 if (moduleXMLText '= "") {
                     #; Parse just Name and ExternalName from XML
@@ -200,63 +214,66 @@ Method ListModulesFromTagString(
     }
 }
 
+/// Lists the modules available in this repository that satisfy the search criteria
+/// Note: for ORAS repositories only, the internal name and external name can be used interchangeably
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")
 {
     #; Get ORAS client
     set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
     #; Parse search criteria
-    set name = $$$lcase(pSearchCriteria.Name)
     set tVersionExpression = pSearchCriteria.VersionExpression
     set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
     $$$ThrowOnError(tSC)
-
-    #; If namespace is defined, add it to the package URI being searched for
-    if (name'="") && (..Namespace'="") {
-        set name = ..AppendURIs(..Namespace, name)
-    }
 
     #; Get all modules
     set tList = ##class(%Library.ListOfObjects).%New()
 
     #; get all versions
-    // When no namespace is specified, we can only call "v2/_catalog" to get all the packages. In case of error, fail descriptively
-    if (..Namespace = "") {
-        set request = ..GetHttpRequest()
-        #; Make GET request
-        // response is a JSON structure like {"repositories":["package1", "package2", ...]}
-        set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
-        $$$ThrowOnError(tSC)
-        set response=request.HttpResponse
-        if (response.StatusCode'=200) {
-            // TODO improve error processing
-            set msg = "Error: ORAS namespace is not set and the call to /v2/_catalog endpoint failed"
+    // Use /v2/_catalog to enumerate all packages, then filter appropriately
+    set request = ..GetHttpRequest()
+    #; Make GET request
+    // response is a JSON structure like {"repositories":["package1", "package2", ...]}
+    set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
+    $$$ThrowOnError(tSC)
+    set response=request.HttpResponse
+    if (response.StatusCode'=200) {
+        // TODO improve error processing
+        set msg = "Error: Call to /v2/_catalog endpoint failed"
+        if (..Namespace = "") {
             set msg = msg _ $char(10,13) _ "Either set an ORAS namespace or ensure the ORAS server supports the /v2/_catalog endpoint"
-            set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.Data.Read()
-            $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+        }
+        set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.Data.Read()
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    }
+
+    #; Handle results
+    set json = ""
+    while 'response.Data.AtEnd {
+        set json = json _ response.Data.Read()
+    }
+    set data = ##class(%DynamicAbstractObject).%FromJSON(json)
+    set iter = data.repositories.%GetIterator()
+    // Iterate through each package
+    // key is the index
+    // package is the package name
+    // type is always "string"
+    while iter.%GetNext(.key, .package, .type) {
+        if (package="") {
+            continue
         }
 
-        #; Handle results
-        set json = ""
-        while 'response.Data.AtEnd {
-            set json = json _ response.Data.Read()
-        }
-        set data = ##class(%DynamicAbstractObject).%FromJSON(json)
-        set iter = data.repositories.%GetIterator()
-        // Iterate through each package
-        // key is the index
-        // package is the package name
-        // type is always "string"
-        while iter.%GetNext(.key, .package, .type) {
-            if (package="") {
+        #; If namespace is configured, only consider packages in that namespace
+        if (..Namespace '= "") {
+            set namespacePrefix = ..Namespace _ "/"
+            #; Skip packages not in this namespace
+            if ($extract(package, 1, $length(namespacePrefix)) '= namespacePrefix) {
                 continue
             }
-            #; collect all versions for this package in tList
-            do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
         }
-    } else {
-        // TODO: Make this work properly for the case where name is empty (searching in a repo with a namespace)
-        do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
+
+        #; collect all versions for this package in tList
+        do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
     }
     return tList
 }

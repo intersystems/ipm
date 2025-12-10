@@ -140,6 +140,49 @@ Method TestInterchangeableNames()
     do $$$AssertStatusNotOK(sc, "Correctly failed to install module with external name")
 
 
+    // Test 5: Test with namespace - publish with -use-ext and install using default name
+    // Reconfigure zot repo with namespace
+    set sc = ##class(%IPM.Main).Shell("repo -n zot -ns test")
+    do $$$AssertStatusOK(sc, "Reconfigured zot repo with namespace 'test'")
+
+    // Publish with -use-ext (will be stored as test/external-name)
+    set sc = ##class(%IPM.Main).Shell("publish " _ ..#DefaultName _ " -verbose -r zot -use-ext")
+    do $$$AssertStatusOK(sc, "Published module with -use-ext in namespaced repo")
+
+    // Uninstall module
+    set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled module")
+
+    // Install using default name (should find test/external-name and match via module.xml)
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully installed module with default name from namespaced repo")
+
+    // Cleanup
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
+    do $$$AssertStatusOK(sc, "Unpublished external name from namespaced repo")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#DefaultName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install after unpublish")
+
+
+    // Test 6: Test with namespace - publish without -use-ext and install using external name
+    // Publish without -use-ext (will be stored as test/default-name)
+    set sc = ##class(%IPM.Main).Shell("publish " _ ..#DefaultName _ " -verbose -r zot")
+    do $$$AssertStatusOK(sc, "Published module without -use-ext in namespaced repo")
+
+    // Uninstall module
+    set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled module")
+
+    // Install using external name (should find test/default-name and match via module.xml)
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusOK(sc, "Successfully installed module with external name from namespaced repo")
+
+    // Cleanup
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
+    do $$$AssertStatusOK(sc, "Unpublished default name from namespaced repo")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install after unpublish")
+
 
     // Cleanup by uninstalling module and removing zot repo
     $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName))

@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
 - #950: Added support for listing installed Python packages using `list -python`, `list -py` and `list-installed -python`
 - #822: The CPF resource processor now supports system expressions and macros in CPF merge files
-- #578 Added functionality to record and display IPM history of install, uninstall, load, and update
-- #959: External name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
+- #578: Added functionality to record and display IPM history of install, uninstall, load, and update
+- #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
 - #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 
 ### Changed
@@ -24,7 +24,7 @@ to load using multicompile instead of trying to do own multi-threading of item l
 lock contention by bypassing IRIS compiler.
 
 ### Removed
-- #938 Removed secret flag NewVersion handling in %Publish()
+- #938: Removed secret flag NewVersion handling in %Publish()
 
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
@@ -34,6 +34,7 @@ lock contention by bypassing IRIS compiler.
 - #965: FileCopy on a directory with a Name without the leading slash now works
 - #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 - #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.
+- #789: Fix error when listing modules for an ORAS repo with a specified namespace.
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
