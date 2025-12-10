@@ -53,7 +53,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
         }
 
         #; Push file
-        $$$ThrowOnError(..Push(..Location, repo, ..Namespace, tempDirectory, tag, metaDataString, ..Username, ..Password, ..Token, ..TokenAuthMethod))
+        $$$ThrowOnError(..Push(..Location, repo, tag, ..Namespace, tempDirectory, metaDataString, ..Username, ..Password, ..Token, ..TokenAuthMethod))
     } catch ex {
         set status = ex.AsStatus()
     }
@@ -81,7 +81,7 @@ Method Unpublish(
     if (packageVersion = "all") {
         do ..DeleteModule(..Location, packageName, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
     } else {
-        do ..DeleteTagsPy(..Location, packageName, ..Namespace, packageVersion, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+        do ..DeleteTags(..Location, packageName, $$$Semver2Tag(packageVersion), ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
     }
     return $$$OK
 }
@@ -90,13 +90,13 @@ Method Unpublish(
 /// Existing tags will be overwritten
 /// Params:
 /// 	package - string name of package to push to, e.g. test-artifact
-/// 	tags    - comma separated strings of tags, e.g. "1.0.0,latest"
+/// 	tags    - comma separated string of tags, e.g. "1.0.0,latest"
 ClassMethod Push(
 	registry As %String,
 	package As %String,
+	tags As %String,
 	namespace As %String,
 	path As %String,
-	tags As %String,
 	metadata As %String,
 	username As %String,
 	password As %String,
@@ -117,7 +117,7 @@ ClassMethod Push(
     set tags = $zstrip(tags,"*W")
 
     try {
-        do ..PushPy(registry, repo, namespace, tags, path, metadata, username, password, token, tokenAuthMethod)
+        do ..PushOras(registry, repo, tags, namespace, path, metadata, username, password, token, tokenAuthMethod)
     } catch e {
         if e.Name = "<OBJECT DISPATCH>" {
             set eStatus = e.AsStatus()
@@ -131,11 +131,11 @@ ClassMethod Push(
 }
 
 /// Publishes/pushes the package using ORAS
-ClassMethod PushPy(
+ClassMethod PushOras(
 	registry As %String,
 	package As %String,
-	namespace As %String,
 	tags As %String,
+	namespace As %String,
 	directoryPath As %String,
 	metadata As %String,
 	username As %String,
@@ -147,42 +147,39 @@ ClassMethod PushPy(
     import os, sys
     import json
     import re
+    import contextlib
 
     # Get all files in the directory and fully specify path
-    file_paths = [os.path.join(directoryPath, f) for f in os.listdir(directoryPath)]
+    with os.scandir(directoryPath) as it:
+        file_paths = [os.path.join(directoryPath, entry.name) for entry in it if entry.is_file()]
     client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenAuthMethod)
     regex = re.compile(r"^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$")
+
+    # Annotations are manifest.xml and other metadata
+    manifest_annotations = json.loads(metadata) if metadata else {}
 
     # Push once for each tag
     for tag in tags.split(","):
         if not regex.search(tag):
             raise ValueError(f"Invalid OCI tag: {tag}")
 
-        # Annotations are manifest.xml and other metadata
-        manifest_annotations = json.loads(metadata)
-
-        # TODO write a context manager for stdout/stderr redirection
-        # Suppress console output
-        sys.stdout = open(os.devnull, "w")
-
-        try:
-            target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
-            res = client.push(files=file_paths, target=target, disable_path_validation=True, manifest_annotations=manifest_annotations)
-        except Exception as e:
-            print("Error: ", repr(e), file=sys.stderr)
-            sys.stdout = sys.__stdout__
-            raise e
-
-        # Reenable console output
-        sys.stdout = sys.__stdout__
+        # Suppress console output using a context manager
+        with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
+            try:
+                target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
+                res = client.push(files=file_paths, target=target, disable_path_validation=True, manifest_annotations=manifest_annotations)
+            except Exception as e:
+                # stderr is unaffected by redirect_stdout
+                print("Error: ", repr(e), file=sys.stderr)
+                raise e
 }
 
 /// Deletes the specified tags from the module
-ClassMethod DeleteTagsPy(
+ClassMethod DeleteTags(
 	registry As %String,
 	package As %String,
-	namespace As %String,
 	tags As %String,
+	namespace As %String,
 	username As %String,
 	password As %String,
 	token As %String,
@@ -214,7 +211,7 @@ ClassMethod DeleteModule(
     set client = ##class(%IPM.Repo.Oras.PackageService).GetClient(registry, username, password, token, tokenAuthMethod)
     try {
         set tags = client."get_tags"(target)
-        do ..DeleteTagsPy(registry, package, namespace, tags, username, password, token, tokenAuthMethod)
+        do ..DeleteTags(registry, package, tags, namespace, username, password, token, tokenAuthMethod)
     } catch sc {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to delete: " _ sc.DisplayString()))
     }
