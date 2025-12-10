@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #950: Added support for listing installed Python packages using `list -python`, `list -py` and `list-installed -python`
 - #822: The CPF resource processor now supports system expressions and macros in CPF merge files
 - #578 Added functionality to record and display IPM history of install, uninstall, load, and update
+- #959: External name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
+- #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 
 ### Changed
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies

@@ -177,11 +177,11 @@ This command is an alias for `module-action module-name makedeployed`
 <description>
 Delete package from repository
 </description>
-<example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName all</example>
-<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName 1.0.0</example>
+<example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublishMyModuleName all</example>
+<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository named MyRepo">unpublish MyRepo/MyModuleName 1.0.0</example>
 <parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
 <parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
-
+<modifier name="force" aliases="f" value="false" description="Will delete module from the repository without prompting user for confirmation. Still requires authorization from the repository" />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
@@ -2471,6 +2471,7 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 {
+    #; merge ^mtempdc($zhorolog,"pCommandInfo") = pCommandInfo
     if ( ($get(pCommandInfo("parameters","module"))="") || ($get(pCommandInfo("parameters","version"))="") ) {
         set tCommandInfo("parameters","command") = "unpublish"
         do ..%Help(.tCommandInfo)
@@ -2503,23 +2504,26 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 
         if (isEnabled) {
             set tResult = 0
-            if ($$$lcase(tVersion)="all") {
-                write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
-                set tHelp = "Enter ""Yes"" if you want to delete all package versions."
-                set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
-            } else {
-                write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
-                set tHelp = "Enter ""Yes"" if you want to delete selected package version."
-                set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+            set force = $data(pCommandInfo("modifiers","force"))
+            if 'force {
+                if ($$$lcase(tVersion)="all") {
+                    write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
+                    set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                    set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+                } else {
+                    write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
+                    set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+                    set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+                }
+
+                set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+
+                if (tResponse '= $$$SuccessResponse) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+                }
             }
 
-            set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
-
-            if (tResponse '= $$$SuccessResponse) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-            }
-
-            if (tResult) {
+            if (tResult || force) {
                 $$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
                 write !!,"Package deleted"
             }
