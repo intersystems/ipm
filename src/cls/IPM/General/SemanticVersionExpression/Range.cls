@@ -235,8 +235,8 @@ ClassMethod Intersect(
     set exactMatches = ##class(%ListOfObjects).%New()  // List of = comparators
 
     // Process comparators from ranges
-    do ..ProcessComparators(range1,.lowerBounds,.upperBounds,.exactMatches)
-    do ..ProcessComparators(range2,.lowerBounds,.upperBounds,.exactMatches)
+    do ..GroupComparators(range1,.lowerBounds,.upperBounds,.exactMatches)
+    do ..GroupComparators(range2,.lowerBounds,.upperBounds,.exactMatches)
 
     // If any exact matches exist, they must all be equal and the final range is just that version
     if (exactMatches.Count() > 0) {
@@ -314,11 +314,12 @@ ClassMethod Intersect(
     return mergedRange
 }
 
-ClassMethod ProcessComparators(
+/// Group comparators into lower bounds, upper bounds, and exact matches.
+ClassMethod GroupComparators(
 	range As %IPM.General.SemanticVersionExpression.Range,
 	ByRef lowerBounds As %ListOfObjects,
 	ByRef upperBounds As %ListOfObjects,
-	ByRef exactMatches As %ListOfObjects)
+	ByRef exactMatches As %ListOfObjects) [ Internal, Private ]
 {
     for i=1:1:range.Comparators.Count() {
         set comp = range.Comparators.GetAt(i)
@@ -336,20 +337,11 @@ ClassMethod ProcessComparators(
 /// Returns: 1 if comp1 > comp2, -1 if comp1 < comp2, 0 if equal
 ClassMethod CompareVersions(
 	comp1 As %IPM.General.SemanticVersionExpression.Comparator,
-	comp2 As %IPM.General.SemanticVersionExpression.Comparator)
+	comp2 As %IPM.General.SemanticVersionExpression.Comparator) As %Integer [ Internal, Private ]
 {
     // Create semantic versions for comparison
-    set v1 = ##class(%IPM.General.SemanticVersion).%New()
-    set v1.Major = comp1.Major
-    set v1.Minor = comp1.Minor
-    set v1.Patch = comp1.Patch
-    set v1.Prerelease = comp1.Prerelease
-
-    set v2 = ##class(%IPM.General.SemanticVersion).%New()
-    set v2.Major = comp2.Major
-    set v2.Minor = comp2.Minor
-    set v2.Patch = comp2.Patch
-    set v2.Prerelease = comp2.Prerelease
+    set v1 = comp1.ExtractToSemanticVersion()
+    set v2 = comp2.ExtractToSemanticVersion()
 
     // Compare versions
     if v1.Follows(v2) {
@@ -378,20 +370,11 @@ ClassMethod CompareVersions(
 /// Helper method to validate that lower bound < upper bound. Returns 1 if so, else 0.
 ClassMethod IsIntersectionValid(
 	lowerBound As %IPM.General.SemanticVersionExpression.Comparator,
-	upperBound As %IPM.General.SemanticVersionExpression.Comparator)
+	upperBound As %IPM.General.SemanticVersionExpression.Comparator) As %Boolean [ Internal, Private ]
 {
     // Create semantic versions for comparison
-    set vLower = ##class(%IPM.General.SemanticVersion).%New()
-    set vLower.Major = lowerBound.Major
-    set vLower.Minor = lowerBound.Minor
-    set vLower.Patch = lowerBound.Patch
-    set vLower.Prerelease = lowerBound.Prerelease
-
-    set vUpper = ##class(%IPM.General.SemanticVersion).%New()
-    set vUpper.Major = upperBound.Major
-    set vUpper.Minor = upperBound.Minor
-    set vUpper.Patch = upperBound.Patch
-    set vUpper.Prerelease = upperBound.Prerelease
+    set vLower = lowerBound.ExtractToSemanticVersion()
+    set vUpper = upperBound.ExtractToSemanticVersion()
 
     // Check if lower bound is less than upper bound
     if vUpper.Follows(vLower) {
