@@ -2123,14 +2123,10 @@ ClassMethod RunCommand(
         $$$ThrowOnError(..ReadFileToStream(stderr, .pErrOutput, $get(stderrTmp)))
 
         if (pRetCode'=0) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Running command returned error."))
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Running os command '"_$listtostring(pCmd, " ")_"' failed with return code: "_pRetCode))
         }
     } catch (ex) {
-        if (ex.Code = 34) {
-            set tSC = $$$ERROR($$$GeneralError, "Command " _ $get(cmd) _ " not found.")
-        } else {
-            set tSC = ex.AsStatus()
-        }
+        set tSC = ex.AsStatus()
     }
     if $get(currentDirectory)'="" {
         do ##class(%SYSTEM.Process).CurrentDirectory(currentDirectory)

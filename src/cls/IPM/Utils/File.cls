@@ -139,12 +139,12 @@ ClassMethod MakeDirectoryWriteable(
         kill pOutputLog
         kill pErrLog
         if $$$isWINDOWS {
-            set pCmd = $listbuild("attrib","-r"_##class(%Library.File).NormalizeDirectory(pDirectory)_"*.*","/s")
+            set pCmd = $listbuild("attrib", "-r", ##class(%Library.File).NormalizeDirectory(pDirectory)_"*.*", "/s")
             set stdout = ""
         } elseif $$$isUNIX {
-            set pCmd = $listbuild("chmod","-R","775",##class(%Library.File).NormalizeDirectory(pDirectory))
+            set pCmd = $listbuild("chmod", "-R", "775", ##class(%Library.File).NormalizeDirectory(pDirectory))
         }
-        set tSC = ##class(%IPM.Utils.Module).RunCommand(, pCmd,.stdout)
+        set tSC = ##class(%IPM.Utils.Module).RunCommand(, pCmd, .stdout)
         $$$ThrowOnError(tSC)
         if ($get(pErrLog(1))'="") {
             set error = pErrLog(1)
