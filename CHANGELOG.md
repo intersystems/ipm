@@ -5,7 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [0.10.5] - Unreleased
 
 ### Added
@@ -26,10 +25,15 @@ lock contention by bypassing IRIS compiler.
 
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
+- #701: Fix misleading help comments about `search` command
 - #958: Update command should not fail early if external name is used
+- #965: FileCopy on a directory with a Name without the leading slash now works
+- #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
+- #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
+- #885: `-synchronous` flag since loading dependencies synchronously is now the default behavior.
 
 ## [0.10.4] - 2025-10-21
 

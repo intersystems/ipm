@@ -51,11 +51,7 @@ Method RootSet(%val) As %Status
 /// Returns a client to interact with this server.
 Method GetPackageService() As %IPM.Repo.IPackageService
 {
-    set tService = ##class(%IPM.Repo.Filesystem.PackageService).%New(..Root)
-    if '$$$IsISCWorker && tService.IsAvailable() {
-        $$$ThrowOnError(..BuildCache())
-    }
-    quit tService
+    return ##class(%IPM.Repo.Filesystem.PackageService).%New(..Root)
 }
 
 /// Handles modifiers/data attributes provided from the package manager shell.
@@ -119,7 +115,7 @@ Trigger RootChanged [ Event = UPDATE, Foreach = row/object ]
 }
 
 Method BuildCache(
-	pPurge As %Boolean = {'$$$IsISCWorker},
+	pPurge As %Boolean = 1,
 	pVerbose As %Integer = 0,
 	pAutoDetectDepth As %Boolean = 0) As %Status
 {

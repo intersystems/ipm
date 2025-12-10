@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Export generator="Cache" version="25">
+  <Document name="fc-noslash.ZPM">
+    <Module>
+      <Name>fc-noslash</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <FileCopy Name="foo/bar/" Target="${libdir}foo/bar/"/>
+    </Module>
+  </Document>
+</Export>

@@ -138,7 +138,7 @@ This command is an alias for `module-action module-name verify`
 This command is an alias for `module-action module-name publish`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
-<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
 </command>
 
@@ -176,10 +176,10 @@ This command is an alias for `module-action module-name makedeployed`
 
 <command name="unpublish">
 <description>
-Delete package from registry
+Delete package from repository
 </description>
-<example description="Delete all versions of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName all</example>
-<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName 1.0.0</example>
+<example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName all</example>
+<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName 1.0.0</example>
 <parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
 <parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
 
@@ -289,7 +289,7 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
-<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
+<modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
 
@@ -367,7 +367,6 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
                     "latest": ""
                 },
                 "custom_modifiers": {
-                    "NoMapping": 1,
                     "Deploy.Parameter": "TESTDEPLOY"
                 }
             }
@@ -389,6 +388,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <!-- Examples -->
 <example description="Installs the most recent 1.x version of HS.JSON available in any configured repository in the current namespace.">
     install HS.JSON 1.x
+</example>
+<example description="Installs the most recent version of HS.JSON from the `registry` repository.">
+    install registry/HS.JSON
 </example>
 <example description="Installs HS.JSON without installing python dependencies">
     install -bypass-py-deps HS.JSON
@@ -414,7 +416,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
-<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
+<modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
 
@@ -651,8 +653,8 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 </command>
 
 <command name="search" aliases="find">
-<description>Shows all modules in current registry or namespaces</description>
-<example description="Shows all modules in current registry">search -r</example>
+<description>Shows all modules matching the search string in all configured registries</description>
+<example description="Shows all versions of all modules starting with `zpm`">search -versions zpm*</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
 <modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
 <modifier name="versions" dataAlias="AllVersions" dataValue="1" description="Shows all versions for each module." />
@@ -929,6 +931,9 @@ ClassMethod ShellInternal(
             // Parse command
             $$$ThrowOnError(..%ParseCommandInput(tCommand,.tParsedCommandInfo))
 
+            // Warn for deprecated parameters/modifiers
+            do ..WarnOnDeprecatedModifiersOrParameters(.tParsedCommandInfo)
+
             // Merge defaults first so they can be overwritten by commands
             do ..GetNamespaceDefaultModifiers(.tDefaultArray)
             merge tCommandInfo("data") = tDefaultArray
@@ -1008,6 +1013,22 @@ ClassMethod ShellInternal(
             quit
         }
         write !
+    }
+}
+
+/// Warn for deprecated parameters/modifiers
+ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal, Private ]
+{
+    for key = "modifiers", "parameters" {
+        set name = ""
+        for {
+            set name = $order(pCommandInfo(key,name))
+            quit:name=""
+            if ($get(pCommandInfo(key,name,"deprecated"),0)) {
+                set singularKey = $zconvert($extract(key,1),"U") _ $extract(key,2,*-1)
+                write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: %1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name)),!
+            }
+        }
     }
 }
 
@@ -2154,7 +2175,6 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
         // if the path is to a directory (not a file) and it is not a URL, it must be absolute
         $$$ThrowStatus($$$ERROR($$$GeneralError,"The specified path must be absolute."))
     }
-    set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     set tForce = $$$HasModifier(pCommandInfo,"force")
     merge tParams = pCommandInfo("data")
     // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
@@ -2204,7 +2224,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
+    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams)
     set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
     $$$ThrowOnError(tSC)
 }
@@ -2253,7 +2273,6 @@ ClassMethod Install(ByRef pCommandInfo) [ Internal ]
 
     set tVersion = $get(pCommandInfo("parameters","version"))
     set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
-    set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     set tForce = $$$HasModifier(pCommandInfo,"force")
 
     set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()

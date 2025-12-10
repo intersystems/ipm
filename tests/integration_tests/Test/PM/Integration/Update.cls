@@ -46,6 +46,7 @@ Method OnBeforeAllTests() As %Status
 Method TestAllNoErrorModulesNoMirror()
 {
   if $system.Mirror.IsMember() {
+    do $$$AssertSkipped("Skipping test since this is a mirror member")
     return
   }
   // Simple module without dependencies
