@@ -6,7 +6,7 @@ services:
       - TEST_REGISTRY=http://registry:52773/registry/
       - TEST_REGISTRY_USER=admin
       - TEST_REGISTRY_PASSWORD=SYS
-    ports: 
+    ports:
       - 52774:52773
     volumes:
       - ~/iris.key:/usr/irissys/mgr/iris.key
@@ -17,7 +17,7 @@ services:
   registry:
     image: intersystemsdc/iris-community:preview
     restart: always
-    ports: 
+    ports:
       - 52775:52773
     environment:
       - IRISPASSWORD=SYS
@@ -28,7 +28,7 @@ services:
   sandbox:
     build: ./tests/sandbox/
     restart: always
-    ports: 
+    ports:
       - 52776:52773
     environment:
       - IRISPASSWORD=SYS
@@ -38,10 +38,10 @@ services:
       - ./:/home/irisowner/zpm/
       - ./tests/sandbox/:/home/irisowner/sandbox/
     command:
-      - -a 
+      - -a
       - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
   oras:
-    image: ghcr.io/project-zot/zot-linux-arm64:latest
+    image: ghcr.io/project-zot/zot-linux-amd64:latest
     restart: always
     ports:
       - 5001:5000
