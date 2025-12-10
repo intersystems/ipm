@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.5] - Unreleased
+## [0.11.0] - Unreleased
 
 ### Added
 - #938 Added flag -export-python-deps to package command
@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #885: Always synchronously load dependencies and let each module do multi-threading as needed
 to load using multicompile instead of trying to do own multi-threading of item load which causes
 lock contention by bypassing IRIS compiler.
+- #889: The `load` and `install` commands can no longer be used to reinstall the same version as a currently installed module. Instead, use the `-force` flag, the `reinstall` command, or include the `PermitReinstall` default parameter in module.xml
 
 ### Removed
 - #938 Removed secret flag NewVersion handling in %Publish()

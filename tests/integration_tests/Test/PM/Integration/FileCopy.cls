@@ -9,6 +9,13 @@ Method OnBeforeAllTests() As %Status
     return status
 }
 
+Method OnAfterOneTest() As %Status
+{
+    // Uninstall modules
+    set status = ##class(%IPM.Main).Shell("uninstall -all")
+    return status
+}
+
 Method TestModuleNoDependency()
 {
     set status = $$$OK

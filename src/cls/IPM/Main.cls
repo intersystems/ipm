@@ -2342,6 +2342,8 @@ ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
     // Overriding defaults in the "data" array:
     // For now this is just the "UpdateSnapshots" flag but it could be more eventually.
     set tData("UpdateSnapshots") = 1
+    // Set Reinstall flag to allow same-version installation
+    set tData("Reinstall") = 1
 
     // Note that pCommandInfo("data") may override the default of UpdateSnapshots=1.
     merge tData = pCommandInfo("data")
