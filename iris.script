@@ -3,8 +3,8 @@
   do ##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
   zpm "repo -r -name registry -url https://pm.community.intersystems.com/"
   do $System.SQL.PurgeAllNamespaces()
-  halt
 
-  // Currently broken for %IPM due to differing default behavior for packages starting with % - vscode-per-namespace-settings passes through as-is, IPM expects to strip %.
   do ##class(%IPM.Main).Shell("install vscode-per-namespace-settings")
-  set ^UnitTestRoot="/usr/irissys/.vscode/%SYS/UnitTestRoot"
+  do ##class(%IPM.Main).Shell("install TestCoverage")
+  set ^UnitTestRoot="/usr/irissys/.vscode/USER/UnitTestRoot"
+  halt

@@ -89,7 +89,7 @@ jobs:
             --network-alias registry \
             intersystemsdc/iris-community:latest \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
-          sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $REGISTRY iris session iris -UUSER << EOF
             zpm "install zpm-registry"
             halt
@@ -116,7 +116,7 @@ jobs:
             -e TEST_REGISTRY_USER=admin \
             -e TEST_REGISTRY_PASSWORD=SYS \
             zpm ${{ steps.image.outputs.flags }})
-          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
           echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
           echo `docker exec -i --workdir /home/irisowner/zpm/ $CONTAINER ls -rtl`
@@ -139,7 +139,7 @@ jobs:
             intersystemsdc/iris-community:latest \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
           REGISTRY=`docker ps -lq`
-          sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $REGISTRY iris session iris -UUSER << EOF
             zpm "install zpm-registry"
             halt
@@ -149,7 +149,7 @@ jobs:
         timeout-minutes: 15
         run: |
           CONTAINER=$(docker run --network zpm -d --rm zpm ${{ steps.image.outputs.flags }})
-          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/
           echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
@@ -175,7 +175,7 @@ jobs:
           CONTAINER=$(docker run --network zpm --rm -d -v /tmp/zpm.xml:/home/irisowner/zpm.xml ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
           docker cp . $CONTAINER:/home/irisowner/zpm/
           echo `docker exec -i --user root $CONTAINER chmod -R 777 /home/irisowner/zpm/`
-          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
             do $System.OBJ.Load("/home/irisowner/zpm.xml","c")
             zpm "enable -globally -map -repos -community"
@@ -206,7 +206,7 @@ jobs:
           CONTAINER=$(docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
           docker cp tests/migration/v0.7-to-v0.9/. $CONTAINER:/tmp/test-package/
           docker cp . $CONTAINER:/home/irisowner/zpm/
-          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $CONTAINER iris session iris -UUSER << 'EOF'
             s version="0.7.4" s r=##class(%Net.HttpRequest).%New(),r.Server="pm.community.intersystems.com",r.SSLConfiguration="ISC.FeatureTracker.SSL.Config" d r.Get("/packages/zpm/"_version_"/installer"),$system.OBJ.LoadStream(r.HttpResponse.Data,"c")
             zpm "list":1
@@ -232,7 +232,7 @@ jobs:
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O /tmp/zpm.xml
           CONTAINER=$(docker run --network zpm --rm -d ${{ steps.image.outputs.name }} ${{ steps.image.outputs.flags }})
           docker cp /tmp/zpm.xml $CONTAINER:/home/irisowner/zpm.xml
-          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $CONTAINER iris session iris -U%SYS << EOF
             set sc = ##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm.xml", "ck")
             if +sc=0 do ##class(%SYSTEM.Process).Terminate(,1)
@@ -317,7 +317,7 @@ jobs:
           sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION}<\/Version>/" module.xml
           cat module.xml
           CONTAINER=$(docker run -d --rm -v $(pwd):/home/irisowner/zpm/ containers.intersystems.com/intersystems/${{ needs.prepare.outputs.main }} --check-caps false)
-          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+          sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $CONTAINER iris session iris -UUSER << EOF
             set sc=##class(%SYSTEM.OBJ).Load("/home/irisowner/zpm/preload/cls/IPM/Installer.cls","ck")
             set sc=##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
