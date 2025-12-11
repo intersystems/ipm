@@ -23,13 +23,14 @@ ClassMethod CreateAndGetSSLConfig(ByRef pProperties) As %String
 ClassMethod LoadQualifiedReference(
 	pReference As %IPM.Storage.QualifiedModuleInfo,
 	ByRef pParams,
-	ByRef pDependencyGraph) As %Status
+	ByRef pDependencyGraph,
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph)
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog)
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -43,8 +44,12 @@ ClassMethod LoadModuleReference(
 	pDeployed As %Boolean,
 	pPlatformVersion As %String,
 	ByRef pParams,
-	ByRef pDependencyGraph) As %Status
+	ByRef pDependencyGraph,
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
+    // if install of module is already being logged, don't duplicate
+    set prelogged = $case(pLog, "": 0, :1)
+
     // Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
     set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
 
@@ -54,6 +59,17 @@ ClassMethod LoadModuleReference(
         // Backward-compatibility: if params isn't an array, use it as qstruct
         if $data(pParams) = 1 {
             set qstruct = pParams
+        }
+        if pLog = "" {
+            if $get(pParams("cmd")) = "install" {
+                set log = ##class(%IPM.General.HistoryTemp).InstallInit(pModuleName)
+            } else {
+                set log = ##class(%IPM.General.HistoryTemp).LoadInit(pModuleName)
+            }
+            $$$ThrowOnError(log.SetSource(pServerName))
+            $$$ThrowOnError(log.SetVersion(pVersion))
+        } else {
+            set log = pLog
         }
 
         set tVerbose = $get(pParams("Verbose"))
@@ -119,7 +135,7 @@ ClassMethod LoadModuleReference(
             }
             set dotModules = ##class(%File).NormalizeDirectory(".modules", tDirectory)
             set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-            set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName)
+            set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName,log)
             set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         } else {
             set tAsArchive = -1
@@ -153,7 +169,7 @@ ClassMethod LoadModuleReference(
             do tTmpStream.CopyFromAndSave(tPayload)
 
             if (tAsArchive) {
-                set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName)
+                set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName,log)
             } else {
                 // Old format (TODO: officially deprecate): try loading a .xml file
 
@@ -187,6 +203,14 @@ ClassMethod LoadModuleReference(
             set tSC = e.AsStatus()
         }
     }
+    if $isobject($get(log)) && (prelogged=0) {
+		if $data(tDeveloperMode) # 2 {
+			set devMode = $get(tDeveloperMode, 0)
+		} else {
+			set devMode = $get(pParams("DeveloperMode"), 0)
+		}
+		set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+	}
     quit tSC
 }
 
@@ -195,7 +219,8 @@ ClassMethod LoadModuleFromArchive(
 	pModuleVersion As %String,
 	pArchiveStream As %Stream.Object,
 	ByRef pParams,
-	pRepository As %String = "") As %Status
+	pRepository As %String = "",
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -226,7 +251,7 @@ ClassMethod LoadModuleFromArchive(
 
         set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
         set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-        set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository)
+        set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository, pLog)
         set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         if $$$ISERR(tSC) {
             quit
@@ -241,7 +266,8 @@ ClassMethod LoadModuleFromDirectory(
 	pDirectory As %String,
 	ByRef pParams,
 	pOverrideDeveloperMode As %Boolean = 0,
-	pRepository As %String = "") As %Status
+	pRepository As %String = "",
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -259,7 +285,7 @@ ClassMethod LoadModuleFromDirectory(
             // Propagate all params except developer mode to dependencies
             set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
         }
-        set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository)
+        set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pLog)
         if $$$ISERR(tSC) {
             quit
         }
@@ -1017,8 +1043,12 @@ ClassMethod ExportDocumentForObject(
 ClassMethod LoadNewModule(
 	pDirectory As %String,
 	ByRef pParams,
-	pRepository As %String = "") As %Status
+	pRepository As %String = "",
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
+	if $data(pLog) # 2 = 0 {
+		set pLog = ""
+	}
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
@@ -1123,6 +1153,10 @@ ClassMethod LoadNewModule(
 
         set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
+		if $isobject(pLog) {
+			$$$ThrowOnError(pLog.SetName(tModuleName))
+			$$$ThrowOnError(pLog.SetVersion(tModule.VersionString))
+		}
         set tModule.Repository = pRepository
 
         if $data(params("DeveloperMode"),tDeveloperMode) {
@@ -1170,7 +1204,7 @@ ClassMethod LoadNewModule(
         }
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
-        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params)
+        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
             tcommit
         }
@@ -1179,8 +1213,10 @@ ClassMethod LoadNewModule(
     } catch e {
         set tSC = e.AsStatus()
     }
-    while ($tlevel > tInitTLevel) {
-        trollback 1
+    if $tlevel > tInitTLevel {
+        while ($tlevel > tInitTLevel) {
+            trollback 1
+        }
     }
     quit tSC
 }

@@ -11,7 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #938 Added flag -export-python-deps to package command
 - #462: The `repo` command for repository configuration now supports secret input terminal mode for passwords with the `-password-stdin` flag
 - #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
+- #950: Added support for listing installed Python packages using `list -python`, `list -py` and `list-installed -python`
 - #822: The CPF resource processor now supports system expressions and macros in CPF merge files
+- #578 Added functionality to record and display IPM history of install, uninstall, load, and update
 - #961: Adding creation of a lock file for a module by using the `-create-lockfile` flag on install.
 
 ### Changed
@@ -27,6 +29,7 @@ lock contention by bypassing IRIS compiler.
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
 - #701: Fix misleading help comments about `search` command
 - #958: Update command should not fail early if external name is used
+- #970: fix: Resolve <UNDEFINED> error in 'generate' command WebApp processing
 - #965: FileCopy on a directory with a Name without the leading slash now works
 - #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 - #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.

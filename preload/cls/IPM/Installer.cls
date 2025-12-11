@@ -111,6 +111,7 @@ ClassMethod ZPMInit(
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("PipCaller", "", 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("UseStandalonePip", "", 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("SemVerPostRelease", 0, 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("DefaultLogEntryLimit",20, 0))
     quit $$$OK
 }
 

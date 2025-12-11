@@ -6,7 +6,9 @@ Parameter IsAbstractTestCase As Boolean = 0;
 
 /// Construct the expected content of the routine after the language extension is updated.
 /// Also construct the expected "found" value indicating if an older language extension was found.
-ClassMethod GetExpected(Output content, Output found)
+ClassMethod GetExpected(
+	Output content,
+	Output found)
 {
     Set found = 0
 
