@@ -21,7 +21,7 @@ Parameter MaxDisplayTabCount As INTEGER = 3;
 
 Index ServerDefinitionKey On Name [ Unique ];
 
-Property Name As %String(MAXLEN = 100) [ Required ];
+Property Name As %IPM.DataType.RepoName [ Required ];
 
 Property Enabled As %Boolean [ InitialExpression = 1 ];
 
