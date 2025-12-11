@@ -27,6 +27,7 @@ lock contention by bypassing IRIS compiler.
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
 - #701: Fix misleading help comments about `search` command
 - #958: Update command should not fail early if external name is used
+- #970: fix: Resolve <UNDEFINED> error in 'generate' command WebApp processing
 - #965: FileCopy on a directory with a Name without the leading slash now works
 - #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 - #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.
