@@ -357,11 +357,6 @@ ClassMethod ScanDirectory(
     quit tSC
 }
 
-Method LockFileTypeGet()
-{
-    return "filesystem"
-}
-
 XData LockFileMapping
 {
 <Mapping xmlns="http://www.intersystems.com/jsonmapping">

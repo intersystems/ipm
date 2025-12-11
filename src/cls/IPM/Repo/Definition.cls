@@ -283,6 +283,11 @@ ClassMethod GetOne(
     quit ""
 }
 
+Method LockFileTypeGet()
+{
+    return ..#MONIKER
+}
+
 Storage Default
 {
 <Data name="RepoDefinitionDefaultData">

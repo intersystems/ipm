@@ -134,7 +134,7 @@ Method GetPublishingManager(ByRef status)
 
 Method LockFileTypeGet()
 {
-    return "remote"
+    return ..#MONIKERALIAS
 }
 
 XData LockFileMapping

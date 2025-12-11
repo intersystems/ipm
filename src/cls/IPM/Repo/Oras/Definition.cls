@@ -140,11 +140,6 @@ Method GetPublishingManager(ByRef status)
     return ##class(%IPM.Repo.Oras.PublishManager).%Get(.status)
 }
 
-Method LockFileTypeGet()
-{
-    return "oras"
-}
-
 XData LockFileMapping
 {
 <Mapping xmlns="http://www.intersystems.com/jsonmapping">
