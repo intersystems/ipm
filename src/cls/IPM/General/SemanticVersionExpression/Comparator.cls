@@ -1,4 +1,4 @@
-Class %IPM.General.SemanticVersionExpression.Comparator Extends (%IPM.General.SemanticVersionExpression.IComparable, IPM.General.SemanticVersion.Properties)
+Class %IPM.General.SemanticVersionExpression.Comparator Extends (%IPM.General.SemanticVersionExpression.IComparable, %IPM.General.SemanticVersion.Properties)
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVer.Comp";

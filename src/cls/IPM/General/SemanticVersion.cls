@@ -1,4 +1,4 @@
-Class %IPM.General.SemanticVersion Extends (%SerialObject, IPM.General.SemanticVersion.Properties) [ StorageStrategy = "" ]
+Class %IPM.General.SemanticVersion Extends (%SerialObject, %IPM.General.SemanticVersion.Properties) [ StorageStrategy = "" ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemanticVersion";

@@ -1,5 +1,5 @@
 /// Properties class for Semantic Versioning
-Class IPM.General.SemanticVersion.Properties Extends (%RegisteredObject, %XML.Adaptor)
+Class %IPM.General.SemanticVersion.Properties Extends (%RegisteredObject, %XML.Adaptor)
 {
 
 Property Major As %Integer(MINVAL = 0) [ Required ];
