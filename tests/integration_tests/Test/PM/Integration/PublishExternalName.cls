@@ -17,7 +17,7 @@ Method TestExternalName()
     set sc = ##class(%IPM.Main).Shell("repo -o -name oras -url http://oras:5000 -publish 1")
     do $$$AssertStatusOK(sc, "Added ORAS repo")
 
-    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir))
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.1"))
     do $$$AssertStatusOK(sc, "Loaded module")
 
     set sc = ##class(%IPM.Main).Shell($$$FormatText("publish %1 -use-ext", ..#DefaultName))
@@ -49,7 +49,7 @@ Method TestInterchangeableNames()
 
     // Load module
     set moduleDir = ..GetModuleDir(..#Folder)
-    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir))
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.1"))
     do $$$AssertStatusOK(sc, "Loaded module")
 
     // Test 1: Publish with default name and install using external name
@@ -180,6 +180,69 @@ Method TestInterchangeableNames()
     // Cleanup
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
     do $$$AssertStatusOK(sc, "Unpublished default name from namespaced repo")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install after unpublish")
+
+
+    // Cleanup by uninstalling module and removing zot repo
+    $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n zot -delete"))
+}
+
+/// Test that update works with external name as well as default name
+Method TestInterchangeableNameUpdate()
+{
+    set moduleDir = ..GetModuleDir(..#Folder)
+    // Test 1: Publish with default name, update with external name
+    set sc = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.2"))
+    do $$$AssertStatusOK(sc, "Loaded module succesfully!")
+
+    // Publish module
+    set sc = ##class(%IPM.Main).Shell("publish " _ ..#DefaultName _ " -verbose -r zot")
+    do $$$AssertStatusOK(sc,"Published module successfully with default name")
+
+    // Uninstall module
+    set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled module")
+
+    // Load version 0.0.1
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.1"))
+    do $$$AssertStatusOK(sc, "Loaded module succesfully!")
+
+    // Update to version 0.0.2 using external name
+    set sc = ##class(%IPM.Main).Shell("update " _ ..#ExternalName _ " 0.0.2")
+    do $$$AssertStatusOK(sc, "Updated module succesfully!")
+
+    //Cleanup
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
+    do $$$AssertStatusOK(sc, "Unpublished default name from repo")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#DefaultName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install after unpublish")
+
+    // Test 2: Publish with external name, update with default name
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.2"))
+    do $$$AssertStatusOK(sc, "Loaded module succesfully!")
+
+    // Publish module
+    set sc = ##class(%IPM.Main).Shell("publish " _ ..#DefaultName _ " -verbose -r zot -use-ext")
+    do $$$AssertStatusOK(sc,"Published module successfully with external name")
+
+    // Uninstall module
+    set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled module")
+
+    // Load version 0.0.1
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.1"))
+    do $$$AssertStatusOK(sc, "Loaded module succesfully!")
+
+    // Update to version 0.0.2 using default name
+    set sc = ##class(%IPM.Main).Shell("update " _ ..#DefaultName _ " 0.0.2")
+    do $$$AssertStatusOK(sc, "Updated module succesfully!")
+
+    //Cleanup
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
+    do $$$AssertStatusOK(sc, "Unpublished default name from repo")
     set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
     do $$$AssertStatusNotOK(sc, "Correctly failed to install after unpublish")
 

@@ -1145,7 +1145,7 @@ ClassMethod LoadNewModule(
 
         if foundNewModuleObj {
             // Check that on an update command with -path flag, the module in the path matches the base module specified for update.
-            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
+            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) && (newModuleObj.ExternalName '= commandLineModuleName){
               set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
               $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }

@@ -160,8 +160,12 @@ Method ListModulesFromTagString(
 
                 if (moduleXMLText '= "") {
                     // Parse module.xml
-                    set moduleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromString(moduleXMLText, .found)
-
+                    try {
+                        set moduleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromString(moduleXMLText, .found)
+                    } catch ex {
+                        // if a single module.xml fails to parse, move onto the next one instead of failing completely
+                        continue
+                    }
                     if 'found {
                         continue
                     }

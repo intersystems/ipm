@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="default-name.ZPM">
+    <Module>
+      <Name>default-name</Name>
+      <ExternalName>external-name</ExternalName>
+      <Version>0.0.2</Version>
+      <Packaging>module</Packaging>
+    </Module>
+  </Document>
+</Export>
