@@ -177,7 +177,7 @@ This command is an alias for `module-action module-name makedeployed`
 <description>
 Delete package from repository
 </description>
-<example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublishMyModuleName all</example>
+<example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName all</example>
 <example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository named MyRepo">unpublish MyRepo/MyModuleName 1.0.0</example>
 <parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
 <parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
@@ -2471,7 +2471,6 @@ ClassMethod RunOnePhase(ByRef pCommandInfo) [ Internal ]
 
 ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 {
-    #; merge ^mtempdc($zhorolog,"pCommandInfo") = pCommandInfo
     if ( ($get(pCommandInfo("parameters","module"))="") || ($get(pCommandInfo("parameters","version"))="") ) {
         set tCommandInfo("parameters","command") = "unpublish"
         do ..%Help(.tCommandInfo)

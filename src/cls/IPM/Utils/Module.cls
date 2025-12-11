@@ -328,6 +328,19 @@ ClassMethod GetModuleObjectFromStream(
     return $get(moduleObj)
 }
 
+/// Given a string, tries to correlate it to an instance of <class>%IPM.Storage.Module</class>.
+/// Throws errors.
+ClassMethod GetModuleObjectFromString(
+	moduleXML As %String,
+	Output found As %Boolean) As %IPM.Storage.Module
+{
+    #; Create stream from XML text
+    set stream = ##class(%Stream.GlobalCharacter).%New()
+    do stream.Write(moduleXML)
+
+    return ..GetModuleObjectFromStream(stream, .found)
+}
+
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
 ClassMethod GetRequiredVersionExpression(

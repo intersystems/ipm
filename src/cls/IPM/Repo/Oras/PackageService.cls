@@ -107,13 +107,13 @@ Method ListModulesFromTagString(
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
     set pointer = 0
     while $listnext(allVersionsList,pointer,moduleVersion) {
-        #; filter by version
+        // filter by version
         set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(moduleVersion))
         if 'tVersion.Satisfies(semverExpr) {
             continue
         }
 
-        #; Special case: if we provided an explicit build number, require it.
+        // Special case: if we provided an explicit build number, require it.
         if ##class(%IPM.General.SemanticVersion).IsValid(searchCriteria.VersionExpression,.specificVersion) && (specificVersion.Build '= "") && (specificVersion.Build '= tVersion.Build) {
             continue
         }
@@ -126,15 +126,15 @@ Method ListModulesFromTagString(
             set tag = tag _ $$$OrasTagPlatformSeparator _ platformVersion
         }
 
-        #; get metadata from annotations
+        // get metadata from annotations
         set metadata = ..GetPackageMetadata(..Location, name, tag, "", client)
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
         $$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
-        #; Filter by module name if requested - check both Name and ExternalName
+        // Filter by module name if requested - check both Name and ExternalName
         if (searchCriteria.Name '= "") {
-            #; Extract the package name without namespace prefix for comparison
-            #; Package name from ORAS may be "namespace/modulename" or just "modulename"
+            // Extract the package name without namespace prefix for comparison
+            // Package name from ORAS may be "namespace/modulename" or just "modulename"
             set packageNameWithoutNamespace = name
             if (name [ "/") {
                 #; Extract everything after the last "/"
@@ -146,41 +146,47 @@ Method ListModulesFromTagString(
                 }
             }
 
-            #; Optimization: First check if package name already matches (fast path)
-            set packageNameMatches = ($$$lcase(packageNameWithoutNamespace) = $$$lcase(searchCriteria.Name))
+            // First check if package name already matches
+            if ($$$lcase(packageNameWithoutNamespace) = $$$lcase(searchCriteria.Name)) {
+                set packageNameMatches = 1
+            } else {
+                set packageNameMatches = 0
+            }
 
             if 'packageNameMatches {
-                #; Package name doesn't match - fetch module.xml to check Name and ExternalName
-                #; Note: pass empty namespace since 'name' already includes the full path
+                // Package name doesn't match - fetch module.xml to check namespaced Name and ExternalName
+                // Note: pass empty namespace since 'name' already includes the full path
                 set moduleXMLText = ..GetModuleXML(..Location, name _ ":" _ tag, "", ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
                 if (moduleXMLText '= "") {
-                    #; Parse just Name and ExternalName from XML
-                    set moduleObj = ..ParseModuleXMLForNameCheck(moduleXMLText, .sc)
+                    // Parse module.xml
+                    set moduleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromString(moduleXMLText, .found)
 
-                    if $$$ISERR(sc) {
-                        #; Skip this package if XML parsing fails
+                    if 'found {
                         continue
                     }
 
-                    #; Check if search name matches either Name or ExternalName (case-insensitive)
-                    set matchesName = ($$$lcase(moduleObj.Name) = $$$lcase(searchCriteria.Name))
+                    // Check if search name matches either Name or ExternalName (case-insensitive)
+                    set matchesName = 0
                     set matchesExternalName = 0
 
-                    if (moduleObj.ExternalName '= "") {
-                        set matchesExternalName = ($$$lcase(moduleObj.ExternalName) = $$$lcase(searchCriteria.Name))
+                    if ($$$lcase(moduleObj.Name) = $$$lcase(searchCriteria.Name)) {
+                        set matchesName = 1
+                    }
+                    if (moduleObj.ExternalName '= "") && ($$$lcase(moduleObj.ExternalName) = $$$lcase(searchCriteria.Name)) {
+                        set matchesExternalName = 1
                     }
 
-                    #; Only include if at least one matches
+                    // Only include if at least one matches
                     if 'matchesName && 'matchesExternalName {
                         continue
                     }
                 } else {
-                    #; No module.xml available - skip this package
+                    // No module.xml available - skip this module
                     continue
                 }
             }
-            #; If packageNameMatches is true, proceed without additional checks
+            // If packageNameMatches is true, proceed without additional checks
         }
 
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
@@ -240,9 +246,6 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
     if (response.StatusCode'=200) {
         // TODO improve error processing
         set msg = "Error: Call to /v2/_catalog endpoint failed"
-        if (..Namespace = "") {
-            set msg = msg _ $char(10,13) _ "Either set an ORAS namespace or ensure the ORAS server supports the /v2/_catalog endpoint"
-        }
         set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.Data.Read()
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
@@ -263,53 +266,22 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
             continue
         }
 
-        #; If namespace is configured, only consider packages in that namespace
+        // If namespace is configured, only consider packages in that namespace
         if (..Namespace '= "") {
             set namespacePrefix = ..Namespace _ "/"
-            #; Skip packages not in this namespace
+            // Skip packages not in this namespace
             if ($extract(package, 1, $length(namespacePrefix)) '= namespacePrefix) {
                 continue
             }
         }
 
-        #; collect all versions for this package in tList
+        // collect all versions for this package in tList
         do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
     }
     return tList
 }
 
-/// Lightweight parse of module.xml to extract Name and ExternalName only
-/// Returns a Module object with Name and ExternalName populated
-ClassMethod ParseModuleXMLForNameCheck(
-	moduleXML As %String,
-	Output sc As %Status) As %IPM.Storage.Module
-{
-    set sc = $$$OK
-    set moduleObj = ""
-
-    try {
-        #; Create stream from XML text
-        set stream = ##class(%Stream.GlobalCharacter).%New()
-        do stream.Write(moduleXML)
-
-        #; Parse XML into Module object
-        set reader = ##class(%XML.Reader).%New()
-        set sc = reader.OpenStream(stream)
-        $$$ThrowOnError(sc)
-
-        do reader.Correlate("Module", "%IPM.Storage.Module")
-        do reader.Next(.moduleObj, .sc)
-        $$$ThrowOnError(sc)
-
-    } catch e {
-        set sc = e.AsStatus()
-    }
-
-    quit moduleObj
-}
-
-// ** ORAS FUNCTIONS **
-
+/// ** ORAS FUNCTIONS **
 /// Returns an authenticated ORAS client
 ClassMethod GetClient(
 	registry As %String,
@@ -472,8 +444,8 @@ ClassMethod GetModuleXML(
         annotations = manifest.get('annotations', {})
         module_xml = annotations.get('com.intersystems.ipm.module.v1+xml')
         if module_xml:
-            # remove all whitespace
-            return "".join(module_xml.split())
+            # remove extraneous whitespace
+            return module_xml.strip()
     except Exception as ex:
         print("Exception: %s" % str(ex))
 
