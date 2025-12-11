@@ -6,26 +6,32 @@ Class %IPM.General.LockFile Extends (%RegisteredObject, %JSON.Adaptor)
 /// Name of the JSON lock file
 Parameter LockFileName As String = "module-lock.json";
 
+/// Name of the module the lock file is for
 Property ModuleName As %IPM.DataType.ModuleName(%JSONFIELDNAME = "name") [ Required ];
 
+/// Version string of the module
 Property VersionString As %IPM.DataType.VersionString(%JSONFIELDNAME = "version") [ Required ];
 
+/// Repository where the base module used to create the lock file comes from
 Property Repository As %IPM.DataType.RepoName(%JSONFIELDNAME = "repository");
 
+/// Version of the lock file schema used in creating the lock file
 Property LockFileVersion As %String(%JSONFIELDNAME = "lockFileVersion", MAXLEN = "") [ InitialExpression = "1" ];
 
+/// Array of repository definitions from where at least one of the base module or dependency comes from
 Property Repositories As array Of %IPM.Repo.Definition(%JSONFIELDNAME = "repositories");
 
+/// Array of dependency modules required by the module. Ordered by least dependent to most dependent
 Property Dependencies As array Of %IPM.General.LockFile.Dependency(%JSONFIELDNAME = "dependencies");
 
+/// When given the name of a module, creates the lock file for it and saves it to module.Root_..#LockFileName
+/// flatDependencyList is the output from ##class(%IPM.Utils.Module).GetFlatDependencyListFromInvertedDependencyGraph()
 ClassMethod CreateLockFileForModule(
-	baseModName As %String,
+	module As %IPM.Storage.Module,
+	ByRef flatDependencyList,
 	ByRef params)
 {
     set verbose = $get(params("Verbose"), 0)
-    set module = ##class(%IPM.Storage.Module).NameOpen(baseModName, .sc)
-    $$$ThrowOnError(sc)
-
     if (verbose) {
         write !, "Creating lock file for module "_module.DisplayName
     }
@@ -36,19 +42,14 @@ ClassMethod CreateLockFileForModule(
     set lockFile.VersionString = module.VersionString
     set lockFile.Repository = module.Repository
 
-    // Create dependency list of least dependent module to most dependent from dependency graph
-    $$$ThrowOnError(module.BuildDependencyGraph(.dependencyGraph))
-    do ##class(%IPM.Utils.Module).ConstructInvertedDependencyGraph(.dependencyGraph, .inverted)
-    set dependencyList = ##class(%IPM.Utils.Module).GetFlatDependencyListFromInvertedDependencyGraph(.inverted)
-
     // Iterate over module dependency list
     // For each module:
     //      1. Set values for module name, version, repository (name), and direct dependencies
     //      2. Add repository information to the list (if the module is from a new repo)
     set moduleName = ""
-    for i = 1:1:dependencyList.Count() {
-        set moduleName = dependencyList.GetAt(i).Name
-        set mod = ##class(%IPM.Storage.Module).NameOpen(moduleName, .sc)
+    for i = 1:1:flatDependencyList.Count() {
+        set moduleName = flatDependencyList.GetAt(i).Name
+        set mod = ##class(%IPM.Storage.Module).NameOpen(moduleName, 0, .sc)
         $$$ThrowOnError(sc)
 
         if (verbose) {
@@ -82,9 +83,10 @@ ClassMethod CreateLockFileForModule(
     if (verbose) {
         write !, "Saving lock file for "_module.Name_" to: "_lockFilePath
     }
-    set file = ##class(%File).%New(lockFilePath)
-    $$$ThrowOnError(file.Open("WSN"))
+    set file = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(file.LinkToFile(lockFilePath))
     $$$ThrowOnError(file.CopyFrom(lockFileJSON))
+    $$$ThrowOnError(file.%Save())
 }
 
 /// Adds a module's repository to the lock file

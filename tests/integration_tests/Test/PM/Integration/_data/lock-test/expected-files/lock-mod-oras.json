@@ -13,8 +13,7 @@
         "lock-file-oras": {
             "type": "oras",
             "readOnly": false,
-            "url": "http://oras:5000",
-            "deploymentEnabled": true
+            "url": "http://oras:5000"
         },
         "lock-file-remote": {
             "type": "remote",
