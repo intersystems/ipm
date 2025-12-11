@@ -519,6 +519,9 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <example description="Shows all installed modules in tree format.">
     list-installed -tree
 </example>
+<example description="Shows all installed Python packages.">
+    list -python
+</example>
 
 <!-- Parameters -->
 <parameter name="searchString" description="Search string, * can be used." />
@@ -530,7 +533,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
-
+<modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of IPM modules." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -2571,6 +2574,13 @@ ClassMethod ActiveNamespacesClose(qHandle As %Binary) As %Status [ PlaceAfter = 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
     set tSearchString = $get(pCommandInfo("parameters","searchString"),"")
+    if $data(pCommandInfo("modifiers","python")) {
+		set list = ""
+		do ..GetPythonInstalledLibs(.list)
+		merge tModifiers = pCommandInfo("modifiers")
+		do ..DisplayModules(.list,,,, .tModifiers)
+		quit
+	}
     if (''$data(pCommandInfo("modifiers","tree"))) {
         // Show tree of dependencies as well.
         // Modules that are dependencies for no other are shown at the top level.
@@ -3898,6 +3908,73 @@ ClassMethod Update(ByRef pCommandInfo)
         // Call ..Install() in order to install the newer version of the module.
         do ..Install(.pCommandInfo)
     }
+}
+
+ClassMethod GetPythonInstalledLibs(Output list)
+{
+	set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
+	if '$system.CLS.IsMthd("%SYS.Python", "Import") {
+        $$$ThrowOnError($$$ERROR($$$PythonGeneralError,"Embedded Python is not available in this instance."))
+	}
+	set pyLibList = {}.%FromJSON(..GetPythonLibrariesList(target))
+    // Styling: Omit headers and separators to maintain consistency with native IPM list command output.
+	if $isobject(pyLibList) {
+		if pyLibList.%IsDefined("error") {
+            $$$ThrowOnError($$$ERROR($$$PythonGeneralError,pyLibList.error))
+		}
+		set iter = pyLibList.%GetIterator()
+		set width=0
+		while iter.%GetNext(.key,.val) {
+			set list($increment(list))=$listbuild(key,val)
+			if width < $length(key) {
+        		set width = $length(key)
+     		 }
+		}
+		set list("width") = width
+	}
+}
+
+ClassMethod GetPythonLibrariesList(PythonPath As %String) As %String [ Language = python ]
+{
+import sys
+import json
+from pathlib import Path
+
+try:
+    # Convert to Path object
+    target = Path(PythonPath)
+
+    # Validate directory exists
+    if not target.exists():
+        return json.dumps({"error": f"Path not found: {PythonPath}"})
+
+    # use site-packages if present
+    site_packages = target / "site-packages"
+    if site_packages.exists():
+        target = site_packages
+
+    # add to sys.path
+    sys.path.insert(0, str(target))
+
+    packages = {}
+
+    # scan *.dist-info directories
+    for dist in target.glob("*.dist-info"):
+        parts = dist.name.split("-")
+        if len(parts) >= 2:
+            name = parts[0]
+            version = parts[1].split(".dist")[0]
+            packages[name] = version
+
+    # If no packages found
+    if not packages:
+        return json.dumps({"warning": "No Python packages found", "path": str(target)})
+
+    return json.dumps(packages)
+
+except Exception as e:
+    # Return error as JSON string
+    return json.dumps({"error": str(e)})
 }
 
 }

@@ -287,4 +287,30 @@ Method CompareArrays(
     quit tEqual
 }
 
+/// Test that the 'list -python' command correctly retrieves and formats Python packages.
+Method TestListPython() As %Status
+{
+    set sc = $$$OK
+    set commandsList = $listbuild("list -python", "list -py", "list-installed -python", "list-installed -py")
+    set ptr=0
+    while $listnext(commandsList,ptr,command) {
+        do ..RunCommand(command)
+    }
+    ;
+    set i = $increment(commands)
+    set commands(i) = "list-installed -python"
+	set results(commands)="list-installed"
+	set results(commands,"modifiers","python")=""
+	// Verify output matches
+    kill parsedCommandInfo,expectedCommandInfo
+    do $$$AssertStatusOK(##class(%IPM.Main).%ParseCommandInput(commands(i),.parsedCommandInfo))
+    merge expectedCommandInfo = results(i)
+    if $$$AssertTrue(..CompareArrays(.parsedCommandInfo,.expectedCommandInfo,.tMessage),"Parsed correctly: "_commands(i)) {
+        do $$$LogMessage(tMessage)
+        write !,"Expected:",! zwrite expectedCommandInfo
+        write !,"Actual:",! zwrite parsedCommandInfo
+    }
+    quit sc
+}
+
 }
