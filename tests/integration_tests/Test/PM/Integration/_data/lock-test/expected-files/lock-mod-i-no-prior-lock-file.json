@@ -1,7 +1,7 @@
 {
-    "name": "lock-mod-oras",
+    "name": "lock-mod-i-no-prior-lock-file",
     "version": "1.0.0",
-    "repository": "lock-file-oras",
+    "repository": "lock-file-edge",
     "lockFileVersion": "1",
     "repositories": {
         "lock-file-base": {
@@ -10,15 +10,11 @@
             "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/",
             "depth": 0
         },
-        "lock-file-oras": {
-            "type": "oras",
+        "lock-file-edge": {
+            "type": "filesystem",
             "readOnly": false,
-            "url": "http://oras:5000"
-        },
-        "lock-file-remote": {
-            "type": "remote",
-            "readOnly": false,
-            "url": "http://registry:52773/registry"
+            "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-edge-cases/",
+            "depth": 0
         }
     },
     "dependencies": {
@@ -30,17 +26,12 @@
             "version": "1.0.0",
             "repository": "lock-file-base"
         },
-        "lock-mod-c-2-deps-0-transient": {
+        "lock-mod-e-1-dep-0-transient": {
             "version": "1.0.0",
             "repository": "lock-file-base",
             "dependencies": {
-                "lock-mod-a-no-deps": "^1.0.0",
-                "lock-mod-b-no-deps": "^1.0.0"
+                "lock-mod-a-no-deps": "^1.0.0"
             }
-        },
-        "lock-mod-remote": {
-            "version": "1.0.0",
-            "repository": "lock-file-remote"
         }
     }
 }

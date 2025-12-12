@@ -1,17 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-  <Document name="lock-mod-oras.ZPM">
+    <Document name="lock-mod-l-complex-deps.ZPM">
     <Module>
-      <Name>lock-mod-oras</Name>
+      <Name>lock-mod-l-complex-deps</Name>
       <Version>1.0.0</Version>
-      <Resource Name="LockModORAS.PKG" />
+      <Resource Name="LockModL.PKG" />
       <Dependencies>
         <ModuleReference>
-          <Name>lock-mod-remote</Name>
+          <Name>lock-mod-d-1-dep-2-transient</Name>
           <Version>^1.0.0</Version>
         </ModuleReference>
         <ModuleReference>
-          <Name>lock-mod-c-2-deps-0-transient</Name>
+          <Name>lock-mod-e-1-dep-0-transient</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>lock-mod-f-2-deps-1-transient</Name>
           <Version>^1.0.0</Version>
         </ModuleReference>
       </Dependencies>

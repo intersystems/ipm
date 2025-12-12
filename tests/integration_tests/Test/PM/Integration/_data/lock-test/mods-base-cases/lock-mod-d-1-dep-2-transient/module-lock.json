@@ -1,7 +1,7 @@
 {
-    "name": "lock-mod-oras",
+    "name": "lock-mod-d-1-dep-2-transient",
     "version": "1.0.0",
-    "repository": "lock-file-oras",
+    "repository": "lock-file-base",
     "lockFileVersion": "1",
     "repositories": {
         "lock-file-base": {
@@ -9,16 +9,6 @@
             "readOnly": false,
             "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/",
             "depth": 0
-        },
-        "lock-file-oras": {
-            "type": "oras",
-            "readOnly": false,
-            "url": "http://oras:5000"
-        },
-        "lock-file-remote": {
-            "type": "remote",
-            "readOnly": false,
-            "url": "http://registry:52773/registry"
         }
     },
     "dependencies": {
@@ -37,10 +27,6 @@
                 "lock-mod-a-no-deps": "^1.0.0",
                 "lock-mod-b-no-deps": "^1.0.0"
             }
-        },
-        "lock-mod-remote": {
-            "version": "1.0.0",
-            "repository": "lock-file-remote"
         }
     }
 }
