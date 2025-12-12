@@ -16,7 +16,7 @@ Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version") [ InitialEx
 /// Does not need comparison method to be code generated because that comparing <property>VersionString</property> is good enough.
 Property Version As %IPM.General.SemanticVersion(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ Required ];
 
-Property ExternalName As %String(MAXLEN = 255);
+Property ExternalName As %IPM.DataType.ModuleName;
 
 Index ExternalName On ExternalName [ Unique ];
 
