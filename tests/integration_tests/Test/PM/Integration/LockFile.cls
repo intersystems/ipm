@@ -8,47 +8,47 @@ Parameter LockFileName As String = "module-lock.json";
 Parameter ExpectedFilesDir As String = "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/expected-files/";
 
 /// Module with 0 dependencies
-Parameter ModuleA As String = "lock-mod-a";
+Parameter ModuleA As String = "lock-mod-a-no-deps";
 
 /// Module with 0 dependencies
-Parameter ModuleB As String = "lock-mod-b";
+Parameter ModuleB As String = "lock-mod-b-no-deps";
 
 /// Module with 2 deps w/o transient (A & B)
-Parameter ModuleC As String = "lock-mod-c";
+Parameter ModuleC As String = "lock-mod-c-2-deps-0-transient";
 
 /// Module with 1 dep w/ 2 transient (C)
-Parameter ModuleD As String = "lock-mod-d";
+Parameter ModuleD As String = "lock-mod-d-1-dep-2-transient";
 
 /// Module with 1 dep w/o transient (A)
-Parameter ModuleE As String = "lock-mod-e";
+Parameter ModuleE As String = "lock-mod-e-1-dep-0-transient";
 
 /// Module with 1 dep w/ 1 transient & 1 dep w/o transient (E & B)
-Parameter ModuleF As String = "lock-mod-f";
+Parameter ModuleF As String = "lock-mod-f-2-deps-1-transient";
 
 /// Module with dependencies for all repository types (Module remote, Module oras, Module http, Module filesystem, & Module perforce)
-Parameter ModuleG As String = "lock-mod-g";
+Parameter ModuleG As String = "lock-mod-g-all-repo-types";
 
 /// Module with multiple versions
 ///     - v2: Base equivalent to Module F
 ///     - v3: Adds dependency Module A
-Parameter ModuleH As String = "lock-mod-h";
+Parameter ModuleH As String = "lock-mod-h-multiple-versions";
 
 /// Base equivalent to Module F, just deleted the lock file
-Parameter ModuleI As String = "lock-mod-i";
+Parameter ModuleI As String = "lock-mod-i-no-prior-lock-file";
 
 /// Base equivalent to Module D, but different lock file
 /// Lock file as A->C->B instead of A->B->C (C is dependent on B)
-Parameter ModuleJ As String = "lock-mod-j";
+Parameter ModuleJ As String = "lock-mod-j-deps-misordered";
 
 /// 2 dependencies: C & E, both with same transient dependency: A
-Parameter ModuleK As String = "lock-mod-k";
+Parameter ModuleK As String = "lock-mod-k-common-transient";
 
 /// Module with complex set of nested dependencies
 /// Dependencies D, E, & F
 ///     - D -> C -> A & B
 ///     - E -> A
 ///     - F -> E & B
-Parameter ModuleL As String = "lock-mod-l";
+Parameter ModuleL As String = "lock-mod-l-complex-deps";
 
 Method OnBeforeAllTests() As %Status
 {
@@ -192,7 +192,7 @@ Method Test06ModuleMultipleVersions()
 
         // First test with the latest version of the module
         set latestVersion = "3.0.0"
-        set latestLockFileName = "lock-mod-h-v3.json"
+        set latestLockFileName = "lock-mod-h-multiple-versions-v3.json"
 
         // Do an initial install of the latest version of the module and create a lock file for it
         set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName)
@@ -210,7 +210,7 @@ Method Test06ModuleMultipleVersions()
 
 
         // Now test with an older version of the same module
-        set olderLockFileName =  "lock-mod-h-v2.json"
+        set olderLockFileName =  "lock-mod-h-multiple-versions-v2.json"
         set olderVersion = "2.0.0"
 
         // Do an initial install of the module and create a lock file for it
@@ -302,7 +302,7 @@ Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
 /// Comparison is done as a string so if the keys are in a different order the comparison will fail, even if data is equivalent
 /// This is intended as the keys being in a different order should alert us to further investigate
 /// Especially for the dependencies list where order is explicitly required (for zpm "ci" to install in correct order)
-/// 
+///
 /// Returns: 1 - if lock files have equivalent contents
 ///          0 - if lock files are different
 ClassMethod AreLockFilesEqual(
