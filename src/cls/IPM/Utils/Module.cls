@@ -1182,6 +1182,10 @@ ClassMethod LoadNewModule(
         $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
 
         kill params("ModuleName") // Ensure module name is not passed down to dependency loads
+        // If lock file is to be created, add the module name to params so lock file is just created for base module and not any of the dependency modules loaded
+        if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
+            set params("LockFileModule") = tModule.Name
+        }
         do ..LoadDependencies(tModule, .params)
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
@@ -1253,6 +1257,15 @@ ClassMethod LoadDependencies(
         }
         set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString,$get(tDeployed), $get(tPlatformVersion), .pParams)
         $$$ThrowOnError(sc)
+    }
+
+    // Create lock file if specified for this module
+    if $get(pParams("CreateLockFile"), 0) && (pModule.Name = $get(pParams("LockFileModule"))) {
+        try {
+            do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .tParams)
+        } catch (ex) {
+            write !, $$$FormatText("Error creating lock file for %1 - %2", pModule.Name, ex.DisplayString()), !
+        }
     }
 }
 

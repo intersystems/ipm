@@ -1,6 +1,6 @@
 Include (%syPrompt, %IPM.Common)
 
-Class %IPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %IPM.CLI.Commands) [ Abstract ]
+Class %IPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %IPM.CLI.Commands, %JSON.Adaptor) [ Abstract ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Repo.Definition";
@@ -20,6 +20,9 @@ Parameter MONIKERALIAS As STRING [ Abstract ];
 Parameter MaxDisplayTabCount As INTEGER = 3;
 
 Index ServerDefinitionKey On Name [ Unique ];
+
+/// String "type" identifier used in lock files
+Property LockFileType As %String(MAXLEN = 100) [ Calculated, ReadOnly ];
 
 Property Name As %IPM.DataType.RepoName [ Required ];
 
@@ -278,6 +281,11 @@ ClassMethod GetOne(
     }
     set sc = $$$ERROR($$$GeneralError, "Unable to find a unique repo of type " _ $classname())
     quit ""
+}
+
+Method LockFileTypeGet()
+{
+    return ..#MONIKER
 }
 
 Storage Default
