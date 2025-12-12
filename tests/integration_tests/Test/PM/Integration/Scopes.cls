@@ -5,49 +5,49 @@ Class Test.PM.Integration.Scopes Extends Test.PM.Integration.Base
 Method TestEverything()
 {
 	#dim tModule As %IPM.Storage.Module
-	
-	New $Namespace
-	Set tOrigNS = $Namespace
-	Try {
-		If '$$$AssertStatusOK(..Setup()) {
-			Quit
+
+	new $namespace
+	set tOrigNS = $namespace
+	try {
+		if '$$$AssertStatusOK(..Setup()) {
+			quit
 		}
-		
+
 		// In client namespace:
-		Set $Namespace = ..#CLIENTNS
-		
+		set $namespace = ..#CLIENTNS
+
 		// Create modules
-		For i=1:1:4 {
-			Kill tModule
-			Quit:'$$$AssertStatusOK(..ReadXDataToModule(tOrigNS,"ServerModule"_i,.tModule),"Loaded module from XData block ServerModule"_i)
-			Set tModules(i) = tModule
+		for i=1:1:4 {
+			kill tModule
+			quit:'$$$AssertStatusOK(..ReadXDataToModule(tOrigNS,"ServerModule"_i,.tModule),"Loaded module from XData block ServerModule"_i)
+			set tModules(i) = tModule
 		}
-		
-		Kill tGraph
-		For i=2:1:4 {
-			For tEndPhase = "Activate","Test","Package","Verify" {
-				Set tModule = tModules(i)
-				Kill tGraph
-				Set tSC = tModule.BuildDependencyGraph(.tGraph,,,,tModule.Lifecycle.GetCompletePhases($ListBuild(tEndPhase)))
-				Do $$$AssertStatusOK(tSC,"Built dependency graph for module "_tModule.Name_" "_tModule.VersionString_" phase "_tEndPhase)
-				
+
+		kill tGraph
+		for i=2:1:4 {
+			for tEndPhase = "Activate","Test","Package","Verify" {
+				set tModule = tModules(i)
+				kill tGraph
+				set tSC = tModule.BuildDependencyGraph(.tGraph,,,,tModule.Lifecycle.GetCompletePhases($listbuild(tEndPhase)))
+				do $$$AssertStatusOK(tSC,"Built dependency graph for module "_tModule.Name_" "_tModule.VersionString_" phase "_tEndPhase)
+
 				// Cases where there should be an HS.JSON dependency reported
-				If (i = 2) ||
+				if (i = 2) ||
 					((i = 3) && (tEndPhase = "Test")) ||
 					((i = 4) && (tEndPhase = "Verify")) {
-					Do $$$AssertTrue($Data(tGraph("hs.unittest1")))
-				} Else {
-					Do $$$AssertNotTrue($Data(tGraph("hs.unittest1")))
+					do $$$AssertTrue($data(tGraph("hs.unittest1")))
+				} else {
+					do $$$AssertNotTrue($data(tGraph("hs.unittest1")))
 				}
 			}
 		}
-	} Catch e {
-		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+	} catch e {
+		do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
 	}
-	
+
 	// Cleanup
-	Set $Namespace = tOrigNS
-	Do $$$AssertStatusOK(..TearDown())
+	set $namespace = tOrigNS
+	do $$$AssertStatusOK(..TearDown())
 }
 
 XData ServerModule1 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
