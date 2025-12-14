@@ -313,4 +313,23 @@ Method TestListPython() As %Status
     quit sc
 }
 
+Method TestAutoPurgeOldHistory() As %Status
+{
+    set sc = $$$OK
+    set commandsList = $listbuild("config set HistoryRetain 10", "config get HistoryRetain")
+    set ptr = 0
+    while $listnext(commandsList,ptr,command) {
+        do ..RunCommand(command)
+    }
+    do $$$LogMessage("Update HistoryRetain from 10 days to 1 day")
+    do ..RunCommand("config set HistoryRetain 1")
+    do $$$LogMessage("Purging old history entries older than 1 day")
+    do ##class(%IPM.General.History).AutPurgeOldHistory()
+    set afterPurge = ##class(%IPM.General.History).GetHistoryLastPurge("history_retain")
+    do $$$LogMessage("After purge timestamp: "_afterPurge)
+    do $$$LogMessage("rest set the HistoryRetain to default value by deleting the config")
+    do ..RunCommand("config delete HistoryRetain")
+    quit sc
+}
+
 }

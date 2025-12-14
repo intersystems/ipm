@@ -785,6 +785,9 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
 	<example description="Delete all histories in the namespace">history delete -confirm</example>
 	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
+    <example description="Enable history auto-purge. Example: config set HistoryRetain 10.">config set HistoryRetain "days" </example>
+    <example description="Disable history auto-purge">config set HistoryRetain 0</example>
+    <example description="Display the current history retention setting.">config get HistoryRetain</example>
 </command>
 
 </commands>
@@ -806,6 +809,7 @@ ClassMethod Shell(
 {
     set tSC = $$$OK
     do ..ShellInternal(pCommand,.tException)
+    do ##class(%IPM.General.History).AutPurgeOldHistory()
     if $isobject(tException) {
         if pTerminateOnError {
             do $system.Process.Terminate($job,1)

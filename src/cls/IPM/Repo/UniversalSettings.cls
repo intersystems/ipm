@@ -41,7 +41,9 @@ Parameter UseStandalonePip = "UseStandalonePip";
 /// Default value is 0, where 1.0.0-anystring is considered a pre-release of 1.0.0, hence 1.0.0-anystring < 1.0.0
 Parameter SemVerPostRelease = "SemVerPostRelease";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit";
+Parameter HistoryRetain = "history_retain";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -179,6 +181,13 @@ ClassMethod SetAnalyticsAvailable(
 	overwrite As %Boolean = 1) As %Boolean
 {
     return ..SetValue(..#analytics, +val, overwrite)
+}
+
+ClassMethod GetHistoryRetain(
+	val As %String,
+	overwrite As %Boolean = 1) As %Integer
+{
+    return ..GetValue(..#HistoryRetain)
 }
 
 }
