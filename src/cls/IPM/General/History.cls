@@ -168,7 +168,7 @@ ClassMethod AutPurgeOldHistory()
     quit:(+retainDays <=0)
 
     set cutoffDate = $system.SQL.Functions.DATEADD("d", -retainDays, +$horolog)
-    set filter("TimeStart") = "<='" _ cutoffDate+"'"
+    set filter("TimeStart") = "<='" _cutoffDate_"'"
     set tSC = ..DeleteHistoryGlobally(.filter, 0)
     do ..SetHistoryLastPurge()
 }
