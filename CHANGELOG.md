@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #950: Added support for listing installed Python packages using `list -python`, `list -py` and `list-installed -python`
 - #822: The CPF resource processor now supports system expressions and macros in CPF merge files
 - #578: Added functionality to record and display IPM history of install, uninstall, load, and update
+- #961: Adding creation of a lock file for a module by using the `-create-lockfile` flag on install.
 - #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
 - #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 
@@ -22,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #885: Always synchronously load dependencies and let each module do multi-threading as needed
 to load using multicompile instead of trying to do own multi-threading of item load which causes
 lock contention by bypassing IRIS compiler.
+- #481: Improve BuildDependencyGraph performance by doing the following:
+ - Eliminate recursion and use iteration.
+ - Remove depth first search and do pure breadth first search.
+ - Have better caching of results for module searches by collapsing search expressions (reducing expressions that are intersections).
 
 ### Removed
 - #938: Removed secret flag NewVersion handling in %Publish()

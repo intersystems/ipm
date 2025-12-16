@@ -1,4 +1,4 @@
-Class %IPM.General.SemanticVersionExpression.Comparator Extends %IPM.General.SemanticVersionExpression.IComparable
+Class %IPM.General.SemanticVersionExpression.Comparator Extends (%IPM.General.SemanticVersionExpression.IComparable, %IPM.General.SemanticVersion.Properties)
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVer.Comp";
@@ -6,16 +6,6 @@ Parameter DEFAULTGLOBAL = "^IPM.General.SemVer.Comp";
 Property Expression As %String [ ReadOnly ];
 
 Property Operator As %String(VALUELIST = ",=,<,<=,>,>=") [ InitialExpression = "=", Required ];
-
-Property Major As %Integer(MINVAL = 0) [ Required ];
-
-Property Minor As %Integer(MINVAL = 0) [ Required ];
-
-Property Patch As %Integer(MINVAL = 0) [ Required ];
-
-Property Prerelease As %String(MAXLEN = 100);
-
-Property Build As %String(MAXLEN = 100);
 
 Method %OnNew(pExpr As %String) As %Status [ Private, ServerOnly = 1 ]
 {
@@ -79,7 +69,7 @@ ClassMethod FromString(
     set tSC = e.AsStatus()
   }
   if $$$ISERR(tSC) {
-    set tSC = $system.Status.EmbedStatus($$$ERROR($$$GeneralError,"Error parsing semantic version expression: "_pExpr),tSC)
+    set tSC = $system.Status.EmbedStatus($$$ERROR($$$GeneralError,"Error parsing semantic version expression comparator: "_pExpr),tSC)
   }
   quit tSC
 }
@@ -132,7 +122,20 @@ Method Evaluate(pVersion As %IPM.General.SemanticVersion) As %Boolean
 
 Method IsSatisfiedBy(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
-  quit ..Evaluate(pVersion)
+    quit ..Evaluate(pVersion)
+}
+
+/// Extract the comparator to a SemanticVersion object for comparison purposes.
+/// Essentially drops the Operator property.
+/// Build metadata is not included in the extracted SemanticVersion because it should not be used in comparisons.
+Method ExtractToSemanticVersion() As %IPM.General.SemanticVersion
+{
+    set version = ##class(%IPM.General.SemanticVersion).%New()
+    set version.Major = ..Major
+    set version.Minor = ..Minor
+    set version.Patch = ..Patch
+    set version.Prerelease = ..Prerelease
+    quit version
 }
 
 Storage Default
