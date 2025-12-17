@@ -2154,6 +2154,8 @@ ClassMethod ShowModulesForRepository(
             set list(list, "AllVersions") = tRes.AllVersions
         }
     }
+    // Also need to throw an error if there are no results and tSC is set
+    $$$ThrowOnError(tSC)
     set list("width") = width
     write !
     do ..DisplayModules(.list)

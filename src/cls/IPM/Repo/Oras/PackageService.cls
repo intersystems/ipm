@@ -135,23 +135,10 @@ Method ListModulesFromTagString(
         if (searchCriteria.Name '= "") {
             // Extract the package name without namespace prefix for comparison
             // Package name from ORAS may be "namespace/modulename" or just "modulename"
-            set packageNameWithoutNamespace = name
-            if (name [ "/") {
-                #; Extract everything after the last "/"
-                for i=$length(name):-1:1 {
-                    if ($extract(name, i) = "/") {
-                        set packageNameWithoutNamespace = $extract(name, i+1, *)
-                        quit
-                    }
-                }
-            }
+            set packageNameWithoutNamespace = $piece(name, "/", *)
 
             // First check if package name already matches
-            if ($$$lcase(packageNameWithoutNamespace) = $$$lcase(searchCriteria.Name)) {
-                set packageNameMatches = 1
-            } else {
-                set packageNameMatches = 0
-            }
+            set packageNameMatches = ($$$lcase(packageNameWithoutNamespace) = $$$lcase(searchCriteria.Name))
 
             if 'packageNameMatches {
                 // Package name doesn't match - fetch module.xml to check namespaced Name and ExternalName
@@ -171,15 +158,8 @@ Method ListModulesFromTagString(
                     }
 
                     // Check if search name matches either Name or ExternalName (case-insensitive)
-                    set matchesName = 0
-                    set matchesExternalName = 0
-
-                    if ($$$lcase(moduleObj.Name) = $$$lcase(searchCriteria.Name)) {
-                        set matchesName = 1
-                    }
-                    if (moduleObj.ExternalName '= "") && ($$$lcase(moduleObj.ExternalName) = $$$lcase(searchCriteria.Name)) {
-                        set matchesExternalName = 1
-                    }
+                    set matchesName = ($$$lcase(moduleObj.Name) = $$$lcase(searchCriteria.Name))
+                    set matchesExternalName = ((moduleObj.ExternalName '= "") && ($$$lcase(moduleObj.ExternalName) = $$$lcase(searchCriteria.Name)))
 
                     // Only include if at least one matches
                     if 'matchesName && 'matchesExternalName {
@@ -228,59 +208,60 @@ Method ListModulesFromTagString(
 /// Note: for ORAS repositories only, the internal name and external name can be used interchangeably
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")
 {
-    #; Get ORAS client
+    // Get ORAS client
     set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
-    #; Parse search criteria
+    // Parse search criteria
     set tVersionExpression = pSearchCriteria.VersionExpression
     set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
     $$$ThrowOnError(tSC)
 
-    #; Get all modules
+    // Collect list of modules
     set tList = ##class(%Library.ListOfObjects).%New()
 
-    #; get all versions
     // Use /v2/_catalog to enumerate all packages, then filter appropriately
+    // Note: not every registry supports this endpoint, but without it, searching becomes much harder without using registry-specific endpoints
     set request = ..GetHttpRequest()
-    #; Make GET request
+    // Make GET request
     // response is a JSON structure like {"repositories":["package1", "package2", ...]}
     set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
     $$$ThrowOnError(tSC)
     set response=request.HttpResponse
-    if (response.StatusCode'=200) {
-        // TODO improve error processing
-        set msg = "Error: Call to /v2/_catalog endpoint failed"
-        set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.Data.Read()
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-    }
-
-    #; Handle results
-    set json = ""
-    while 'response.Data.AtEnd {
-        set json = json _ response.Data.Read()
-    }
-    set data = ##class(%DynamicAbstractObject).%FromJSON(json)
-    set iter = data.repositories.%GetIterator()
-    // Iterate through each package
-    // key is the index
-    // package is the package name
-    // type is always "string"
-    while iter.%GetNext(.key, .package, .type) {
-        if (package="") {
-            continue
-        }
-
-        // If namespace is configured, only consider packages in that namespace
-        if (..Namespace '= "") {
-            set namespacePrefix = ..Namespace _ "/"
-            // Skip packages not in this namespace
-            if ($extract(package, 1, $length(namespacePrefix)) '= namespacePrefix) {
+    if (response.StatusCode=200) {
+        // Handle results
+        set data = ##class(%DynamicAbstractObject).%FromJSON(response.Data)
+        set iter = data.repositories.%GetIterator()
+        // Iterate through each package
+        // key is the index
+        // package is the package name
+        // type is always "string"
+        while iter.%GetNext(.key, .package, .type) {
+            if (package="") {
                 continue
             }
-        }
 
-        // collect all versions for this package in tList
-        do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
+            // If namespace is configured, only consider packages in that namespace
+            if (..Namespace '= "") {
+                set namespacePrefix = ..Namespace _ "/"
+                // Skip packages not in this namespace
+                if ($extract(package, 1, $length(namespacePrefix)) '= namespacePrefix) {
+                    continue
+                }
+            }
+
+            // collect all versions for this package in tList
+            do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
+        }
+    } else {
+        // Endpoint failed, but if the name is specified, still try to find it
+        if pSearchCriteria.Name '= "" {
+            do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, pSearchCriteria.Name, .tList)
+        } else {
+            // otherwise error out
+            set msg = "Error: Call to /v2/_catalog endpoint failed. This registry may not support it."
+            set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.ReasonPhrase
+            $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+        }
     }
     return tList
 }
