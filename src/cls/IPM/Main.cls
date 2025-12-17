@@ -809,7 +809,7 @@ ClassMethod Shell(
 {
     set tSC = $$$OK
     do ..ShellInternal(pCommand,.tException)
-    do ##class(%IPM.General.History).AutPurgeOldHistory()
+    do ##class(%IPM.General.History).AutoPurgeOldHistory()
     if $isobject(tException) {
         if pTerminateOnError {
             do $system.Process.Terminate($job,1)

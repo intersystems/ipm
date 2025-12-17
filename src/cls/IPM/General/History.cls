@@ -159,13 +159,15 @@ ClassMethod DeleteHistory(ByRef filter) As %Integer
 }
 
 /// Automatically purge old history based on retention settings
-ClassMethod AutPurgeOldHistory()
+ClassMethod AutoPurgeOldHistory()
 {
     if ..GetHistoryLastPurge() = +$horolog {
         quit
     }
     set retainDays = ##class(%IPM.Repo.UniversalSettings).GetHistoryRetain()
-    quit:(+retainDays <=0)
+    if +retainDays <=0 {
+        quit
+    }
 
     set cutoffDate = $system.SQL.Functions.DATEADD("d", -retainDays, +$horolog)
     set filter("TimeStart") = "<='" _cutoffDate_"'"

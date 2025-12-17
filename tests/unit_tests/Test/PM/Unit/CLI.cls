@@ -324,7 +324,7 @@ Method TestAutoPurgeOldHistory() As %Status
     do $$$LogMessage("Update HistoryRetain from 10 days to 1 day")
     do ..RunCommand("config set HistoryRetain 1")
     do $$$LogMessage("Purging old history entries older than 1 day")
-    do ##class(%IPM.General.History).AutPurgeOldHistory()
+    do ##class(%IPM.General.History).AutoPurgeOldHistory()
     set afterPurge = ##class(%IPM.General.History).GetHistoryLastPurge("history_retain")
     do $$$LogMessage("After purge timestamp: "_afterPurge)
     do $$$LogMessage("rest set the HistoryRetain to default value by deleting the config")
