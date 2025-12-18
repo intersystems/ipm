@@ -178,7 +178,9 @@ ClassMethod AutoPurgeOldHistory()
 ClassMethod SetHistoryLastPurge(indx As %String = {##class(%IPM.Repo.UniversalSettings).#HistoryRetain})
 {
     new $namespace
-    return:(indx="") ""
+    if indx="" {
+        quit
+    }
     set $namespace = "%SYS"
     set ^IPM.settings(indx,"lastPurge") = +$horolog
 }
@@ -186,7 +188,9 @@ ClassMethod SetHistoryLastPurge(indx As %String = {##class(%IPM.Repo.UniversalSe
 ClassMethod GetHistoryLastPurge(indx As %String = {##class(%IPM.Repo.UniversalSettings).#HistoryRetain}) As %Integer
 {
     new $namespace
-    return:(indx="") ""
+    if indx="" {
+        quit
+    }
     set $namespace = "%SYS"
     return $get(^IPM.settings(indx,"lastPurge"))
 }
