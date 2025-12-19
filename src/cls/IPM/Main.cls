@@ -1077,7 +1077,7 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
     if (name'["*") {
         try {
             if '..IsIPMEnabled(name) {
-                write $$$FormattedLine($$$Red," IPM is not enabled in this namespace.")
+                write $$$FormattedLine($$$Red,"IPM is not enabled in the "_name_" namespace.")
             } else {
                 set $namespace = name
             }
@@ -1105,14 +1105,15 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
         try {
             set selectedNamespace = $select($data(list(value), ns): $listget(ns), 1: value)
             if '..IsIPMEnabled(selectedNamespace) {
-                write $$$FormattedLine($$$Red," IPM is not enabled in this namespace.")
+                write $$$FormattedLine($$$Red," IPM is not enabled for the selected "_selectedNamespace_" namespace.")
                 hang 0.5
-                write $char(13),*27,"[K",*27,"[A"
+                // Clear the current line and move the cursor up to remove the error message
+                write $$$ClearLineAndMoveUp
                 continue
             }
             set $namespace = selectedNamespace
         } catch e {
-            write $char(13),*27,"[K",*27,"[A"
+            write $$$ClearLineAndMoveUp
             continue
         }
         quit
