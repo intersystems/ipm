@@ -2154,7 +2154,7 @@ ClassMethod ShowModulesForRepository(
             set list(list, "AllVersions") = tRes.AllVersions
         }
     }
-    // Also need to throw an error if there are no results and tSC is set
+    // Throw an error if there are no results and tSC is set
     $$$ThrowOnError(tSC)
     set list("width") = width
     write !
@@ -2511,13 +2511,13 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
             set force = $data(pCommandInfo("modifiers","force"))
             if 'force {
                 if ($$$lcase(tVersion)="all") {
-                    write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
+                    write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action!")
                     set tHelp = "Enter ""Yes"" if you want to delete all package versions."
                     set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
                 } else {
-                    write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
+                    write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action!")
                     set tHelp = "Enter ""Yes"" if you want to delete selected package version."
-                    set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+                    set tMsg = "Are you sure you want to delete the package """_tModuleName_" version "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
                 }
 
                 set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
@@ -2529,7 +2529,8 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 
             if (tResult || force) {
                 $$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
-                write !!,"Package deleted"
+                set msg = "Package deleted" _ $case(force, 1:" forcefully without user confirmation", :"")
+                write !!, msg
             }
         } else {
             write !,"The package could not be deleted (the registry denied the request)",!

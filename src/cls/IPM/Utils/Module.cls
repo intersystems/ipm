@@ -334,7 +334,7 @@ ClassMethod GetModuleObjectFromString(
 	moduleXML As %String,
 	Output found As %Boolean) As %IPM.Storage.Module
 {
-    #; Create stream from XML text
+    // Create stream from XML text
     set stream = ##class(%Stream.GlobalCharacter).%New()
     do stream.Write(moduleXML)
 

@@ -140,8 +140,9 @@ Method ListModulesFromTagString(
             // First check if package name already matches
             set packageNameMatches = ($$$lcase(packageNameWithoutNamespace) = $$$lcase(searchCriteria.Name))
 
+            // If packageNameMatches is true, proceed without additional checks
+            // Otherwise fetch module.xml to check namespaced Name and ExternalName
             if 'packageNameMatches {
-                // Package name doesn't match - fetch module.xml to check namespaced Name and ExternalName
                 // Note: pass empty namespace since 'name' already includes the full path
                 set moduleXMLText = ..GetModuleXML(..Location, name _ ":" _ tag, "", ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
@@ -170,7 +171,6 @@ Method ListModulesFromTagString(
                     continue
                 }
             }
-            // If packageNameMatches is true, proceed without additional checks
         }
 
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
@@ -254,8 +254,12 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
         }
     } else {
         // Endpoint failed, but if the name is specified, still try to find it
-        if pSearchCriteria.Name '= "" {
-            do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, pSearchCriteria.Name, .tList)
+        set name = pSearchCriteria.Name
+        if (name '= "") {
+            if ..Namespace '= "" {
+                set name = ..AppendURIs(..Namespace, name)
+            }
+            do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
         } else {
             // otherwise error out
             set msg = "Error: Call to /v2/_catalog endpoint failed. This registry may not support it."
