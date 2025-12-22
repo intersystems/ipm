@@ -1121,6 +1121,9 @@ Method ProcessSingleDependencyIterative(
         set searchCriteria.Name = pDep.Name
         set searchExprStr = searchExpr.ToResolvedString()
         set searchCriteria.VersionExpression = searchExprStr
+        if searchExprStr = "" {
+            set searchExprStr = "*"
+        }
 
         if '$data(pRepoSearchCache(pDep.Name, searchExprStr), qualifiedReferences) {
             // Cache miss so search
