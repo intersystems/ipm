@@ -57,6 +57,40 @@ ClassMethod EvaluateAttribute(
     return attribute
 }
 
+ClassMethod ResolvePlaceholders(ByRef customParams)
+{
+    set found = 1
+    set maxLevels = 20
+
+    while (found && (maxLevels > 0)) {
+        set found = 0
+        set maxLevels = maxLevels - 1
+        set param = ""
+
+        for {
+            set param = $order(customParams(param), 1, data)
+            quit:param=""
+            continue:data'["${"
+
+            set varExpr = "${" _ $piece($piece(data, "${", 2), "}") _ "}"
+            set resolved = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(varExpr)
+
+            if resolved = varExpr {
+                set internalVar = $piece($piece(data, "${", 2), "}")
+                set resolved = $get(customParams(internalVar), varExpr)
+            }
+
+            if resolved '= varExpr {
+                set prefix = $piece(data, "${", 1)
+                set suffix = $piece(data, "}", 2, *)
+                set customParams(param) = prefix _ resolved _ suffix
+                set found = 1
+            }
+
+        }
+    }
+}
+
 Storage Default
 {
 <Data name="DefaultState">
