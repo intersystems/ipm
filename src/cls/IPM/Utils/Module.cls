@@ -1110,6 +1110,11 @@ ClassMethod LoadNewModule(
             set toVersionString = newModuleObj.VersionString
             // Cannot simply get name from pParams because load command doesn't take in module name
             set moduleCurrent = ##class(%IPM.Storage.Module).NameOpen(newModuleObj.Name)
+
+            // If installing new version of IPM, clean up old mappings
+            if newModuleObj.Name=$$$IPMModuleName {
+                $$$ThrowOnError(##class(IPM.Installer).CleanupOldMappings())
+            }
         }
         if moduleCurrent '= "" {
             set fromVersion = moduleCurrent.Version
