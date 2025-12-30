@@ -10,7 +10,7 @@ Parameter ModuleName As STRING = "demo-module1";
 /// 1. Generates a 'module.xml' from XData with deep variable dependencies.
 /// 2. Executes IPM Shell 'load' to verify multi-pass expansion.
 /// 3. Ensures no unresolved placeholders remain after the load process.
-Method TestNestedPlaceholderIntegration()
+Method TestNestedPlaceholderVar()
 {
     do $$$LogMessage(" start Loading the "_..#ModuleName_" module")
     set status = ..CreateModuleXml(.moduleDir)
