@@ -43,6 +43,7 @@ lock contention by bypassing IRIS compiler.
 - #789: Fix error when listing modules for an ORAS repo with a specified namespace.
 - #999, #1000: Installing IPM cleans up stale mappings used in old versions of IPM
 - #1007: The `${ipmDir}` expression now works in the `<Arg>` of an `<Invoke>`
+- #1015: Fix dependency resolution bugs where `*` as the version requirement and intersecting ranges wouldn't work properly.
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
