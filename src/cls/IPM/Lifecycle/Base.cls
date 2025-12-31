@@ -751,7 +751,6 @@ Method InstallOrDownloadPythonRequirements(
             throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
         }
         set processType = ""
-        set stdout = ""
         set tSysModule = ##class(%SYS.Python).Import("sys")
         set tPyMajor = tSysModule."version_info".major
         set tPyMinor = tSysModule."version_info".minor
