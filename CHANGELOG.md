@@ -42,6 +42,7 @@ lock contention by bypassing IRIS compiler.
 - #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.
 - #789: Fix error when listing modules for an ORAS repo with a specified namespace.
 - #999, #1000: Installing IPM cleans up stale mappings used in old versions of IPM
+- #1007: The `${ipmDir}` expression now works in the `<Arg>` of an `<Invoke>`
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
