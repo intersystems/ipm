@@ -313,4 +313,17 @@ Method TestListPython() As %Status
     quit sc
 }
 
+Method TestUninstallWithoutModuleName()
+{
+    do $$$LogMessage("Run Uninstall command with out module name")
+    do ..RunCommand("unsintall")
+    do ..RunCommand("install objectscript-math")
+     set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
+    do $$$AssertTrue(exists, "Module installed successfully.")
+    do ..RunCommand("uninstall objectscript-math")
+    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
+    do $$$AssertNotTrue(exists, "Module removed successfully.")
+    quit $$$OK
+}
+
 }

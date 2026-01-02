@@ -2448,7 +2448,10 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
         return
     } else {
-        set tModuleName = pCommandInfo("parameters","module")
+        set tModuleName = $get(pCommandInfo("parameters","module"))
+        if (tModuleName = "") {
+            $$$ThrowOnError($$$ERROR($$$GeneralError, "Module name is required for uninstall."))
+        }
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
         }
