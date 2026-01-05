@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?><Export generator="IRIS" version="26">
+<Document name="HealthShare.Scope.ZPM">
+    <Module>
+      <Name>HealthShare.Scope</Name>
+      <ExternalName>Scope</ExternalName>
+      <Version>1.0.0+snapshot</Version>
+      <Description>Test module for scope</Description>
+      <Packaging>module</Packaging>
+      <Resource Name="HS.ScopedClass.CLS" Scope="test"/>
+    </Module>
+</Document></Export>
