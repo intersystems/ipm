@@ -1183,10 +1183,12 @@ Method %Export(
                 }
             }
         }
+        /*
         set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
         if exportPythonDependencies {
             do ..ExportPythonDependencies(.pParams)
         }
+        */
 
         // Deployed items should be exported as a studio project to a designated directory
         set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
@@ -1207,6 +1209,11 @@ Method %Export(
             kill tSingleModuleArray
             merge tSingleModuleArray = tResourceArray(tModuleName)
             do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
+        }
+
+        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
+        if exportPythonDependencies {
+            do ..ExportPythonDependencies(.pParams)
         }
 
         // Export the deployed project to the target directory, if it's non-empty
