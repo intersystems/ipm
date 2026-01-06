@@ -1183,12 +1183,6 @@ Method %Export(
                 }
             }
         }
-        /*
-        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
-        if exportPythonDependencies {
-            do ..ExportPythonDependencies(.pParams)
-        }
-        */
 
         // Deployed items should be exported as a studio project to a designated directory
         set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
