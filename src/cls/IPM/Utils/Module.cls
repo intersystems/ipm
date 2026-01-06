@@ -1116,7 +1116,7 @@ ClassMethod LoadNewModule(
 
             // If installing new version of IPM, clean up old mappings
             if newModuleObj.Name=$$$IPMModuleName {
-                $$$ThrowOnError(..CleanupOldMappings())
+                $$$ThrowOnError(##class(IPM.Installer).CleanupOldMappings())
             }
         }
         if moduleCurrent '= "" {
@@ -2434,37 +2434,6 @@ ClassMethod GetDeployedProjectPath(root As %String) As %String
 ClassMethod GetDeployedProjectName(moduleName As %String) As %String [ CodeMode = expression ]
 {
 moduleName_$$$DeployedProjectSuffix
-}
-
-/// This method is called directly in LoadNewModule() instead of with an <Invoke> in the module.xml
-/// because the old mappings break load/install before any <Invokes> can be run.
-ClassMethod CleanupOldMappings() As %Status
-{
-    set sc = $$$OK
-    // Cleanup old mappings from oddStudioDocument
-    set key = ""
-    for {
-        set key = $order(^oddStudioDocument(key))
-        quit:key=""
-        if (key["%ZPM.PackageManager") || (key["%ZHSLIB.PackageManager") {
-            kill ^oddStudioDocument(key)
-        }
-    }
-
-    set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(BEGIN):(""%ZP"")","IRISLIB")
-    if $$$ISERR(status) {
-        set sc = $$$ADDSC(sc, status)
-    }
-    set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""%ZP""):(""A"")","IRISSYS")
-    if $$$ISERR(status) {
-        set sc = $$$ADDSC(sc, status)
-    }
-    set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
-    if $$$ISERR(status) {
-        set sc = $$$ADDSC(sc, status)
-    }
-
-    return sc
 }
 
 }

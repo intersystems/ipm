@@ -1322,6 +1322,7 @@ Method %Verify(ByRef pParams) As %Status
 
                 // Map the package manager itself equivalently in the VERIFY namespace.
                 $$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",tInitNS,,tNewNamespace))
+                $$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("IPM.*",tInitNS,,tNewNamespace))
                 $$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",tInitNS,tNewNamespace))
 
                 // Map globals for %IPM.Repo.Definition and %IPM.Repo.Filesystem.Cache
