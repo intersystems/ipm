@@ -276,8 +276,11 @@ ClassMethod LoadModuleFromDirectory(
         write:tVerbose !,"Loading from ",pDirectory,!
         merge tParams = pParams
         if $get(pParams("Install")) || $get(pParams("Update")) {
-            zkill tParams("Install")
-            zkill tParams("Update")
+            if $get(pParams("Update"),0) {
+                set tParams("cmd") = "update"
+            } else {
+                zkill tParams("Install")
+            }
         } else {
             // Propagate all params except DeveloperMode, UpdateSnapshots, IgnoreInstalled to dependencies
             set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
