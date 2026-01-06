@@ -3,9 +3,11 @@ Class Test.PM.Integration.BuildDependencyGraph Extends Test.PM.Integration.Base
 
 Method OnBeforeAllTests() As %Status
 {
-    set sc = $$$OK
     kill ^IPMTest
     set ^IPMTest("BuildDependencyGraphCount") = 0
+
+    set sc = ##class(%IPM.Main).Shell("repo -n build-dependency-graph -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/build-dependency-graph-loop/")
+    do $$$AssertStatusOK(sc, "Created build-dependency-graph repo successfully.")
     return sc
 }
 
@@ -33,8 +35,10 @@ Method TestBuildDependencyGraphCount()
 
 Method OnAfterAllTests() As %Status
 {
-    set sc = $$$OK
     kill ^IPMTest
+
+    set sc = ##class(%IPM.Main).Shell("repo -delete -name build-dependency-graph")
+    do $$$AssertStatusOK(sc, "Deleted build-dependency-graph repo successfully.")
     return sc
 }
 
