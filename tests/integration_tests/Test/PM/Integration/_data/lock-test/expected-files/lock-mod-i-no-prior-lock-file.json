@@ -1,0 +1,37 @@
+{
+    "name": "lock-mod-i-no-prior-lock-file",
+    "version": "1.0.0",
+    "repository": "lock-file-edge",
+    "lockFileVersion": "1",
+    "repositories": {
+        "lock-file-base": {
+            "type": "filesystem",
+            "readOnly": false,
+            "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/",
+            "depth": 0
+        },
+        "lock-file-edge": {
+            "type": "filesystem",
+            "readOnly": false,
+            "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-edge-cases/",
+            "depth": 0
+        }
+    },
+    "dependencies": {
+        "lock-mod-a-no-deps": {
+            "version": "1.0.0",
+            "repository": "lock-file-base"
+        },
+        "lock-mod-b-no-deps": {
+            "version": "1.0.0",
+            "repository": "lock-file-base"
+        },
+        "lock-mod-e-1-dep-0-transient": {
+            "version": "1.0.0",
+            "repository": "lock-file-base",
+            "dependencies": {
+                "lock-mod-a-no-deps": "^1.0.0"
+            }
+        }
+    }
+}
