@@ -159,40 +159,41 @@ ClassMethod DeleteHistory(ByRef filter) As %Integer
 }
 
 /// Automatically purge old history based on retention settings
-ClassMethod AutoPurgeOldHistory()
+ClassMethod AutoPurgeOldHistory() As %Status
 {
+    set sc = $$$OK
     if ..GetHistoryLastPurge() = +$horolog {
-        quit
+        quit sc
     }
     set retainDays = ##class(%IPM.Repo.UniversalSettings).GetHistoryRetain()
     if +retainDays <=0 {
-        quit
+        quit sc
     }
-
     set cutoffDate = $system.SQL.Functions.DATEADD("d", -retainDays, +$horolog)
     set filter("TimeStart") = "<='" _cutoffDate_"'"
-    set tSC = ..DeleteHistoryGlobally(.filter, 0)
-    do ..SetHistoryLastPurge()
+    try {
+        set count = ..DeleteHistoryGlobally(.filter, 0)
+        do ..SetHistoryLastPurge()
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    return sc
 }
 
-ClassMethod SetHistoryLastPurge(indx As %String = {##class(%IPM.Repo.UniversalSettings).#HistoryRetain})
+ClassMethod SetHistoryLastPurge()
 {
     new $namespace
-    if indx="" {
-        quit
-    }
+    set index = ##class(%IPM.Repo.UniversalSettings).#HistoryRetain
     set $namespace = "%SYS"
-    set ^IPM.settings(indx,"lastPurge") = +$horolog
+    set ^IPM.settings(index, "lastPurge") = +$horolog
 }
 
-ClassMethod GetHistoryLastPurge(indx As %String = {##class(%IPM.Repo.UniversalSettings).#HistoryRetain}) As %Integer
+ClassMethod GetHistoryLastPurge() As %String
 {
     new $namespace
-    if indx="" {
-        quit
-    }
+    set index = ##class(%IPM.Repo.UniversalSettings).#HistoryRetain
     set $namespace = "%SYS"
-    return $get(^IPM.settings(indx,"lastPurge"))
+    return $get(^IPM.settings(index, "lastPurge"))
 }
 
 ClassMethod DeleteHistoryGlobally(

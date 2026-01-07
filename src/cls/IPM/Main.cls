@@ -163,6 +163,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format." />
 <modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
 </command>
 
 <command name="makedeployed">
@@ -290,6 +291,7 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
+<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -416,6 +418,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
+<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
 
 </command>
 
@@ -785,7 +788,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
 	<example description="Delete all histories in the namespace">history delete -confirm</example>
 	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
-    <example description="Enable history auto-purge. Example: config set HistoryRetain 10.">config set HistoryRetain "days" </example>
+    <example description="Enable history auto-purge. Example: config set HistoryRetain 30.">config set HistoryRetain "days" </example>
     <example description="Disable history auto-purge">config set HistoryRetain 0</example>
     <example description="Display the current history retention setting.">config get HistoryRetain</example>
 </command>
@@ -807,9 +810,11 @@ ClassMethod Shell(
 	pTerminateOnError As %Boolean = 0,
 	pHaltOnComplete As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set tSC = ##class(%IPM.General.History).AutoPurgeOldHistory()
+    if $$$ISERR(tSC) {
+        return tSC
+    }
     do ..ShellInternal(pCommand,.tException)
-    do ##class(%IPM.General.History).AutoPurgeOldHistory()
     if $isobject(tException) {
         if pTerminateOnError {
             do $system.Process.Terminate($job,1)

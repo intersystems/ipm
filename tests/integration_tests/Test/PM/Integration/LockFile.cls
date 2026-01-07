@@ -1,0 +1,322 @@
+Class Test.PM.Integration.LockFile Extends Test.PM.Integration.Base
+{
+
+/// Name of the JSON lock file
+Parameter LockFileName As String = "module-lock.json";
+
+/// Directory where files for expected lock file contents are located
+Parameter ExpectedFilesDir As String = "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/expected-files/";
+
+/// Module with 0 dependencies
+Parameter ModuleA As String = "lock-mod-a-no-deps";
+
+/// Module with 0 dependencies
+Parameter ModuleB As String = "lock-mod-b-no-deps";
+
+/// Module with 2 deps w/o transient (A & B)
+Parameter ModuleC As String = "lock-mod-c-2-deps-0-transient";
+
+/// Module with 1 dep w/ 2 transient (C)
+Parameter ModuleD As String = "lock-mod-d-1-dep-2-transient";
+
+/// Module with 1 dep w/o transient (A)
+Parameter ModuleE As String = "lock-mod-e-1-dep-0-transient";
+
+/// Module with 1 dep w/ 1 transient & 1 dep w/o transient (E & B)
+Parameter ModuleF As String = "lock-mod-f-2-deps-1-transient";
+
+/// Module with dependencies for all repository types (Module remote, Module oras, Module http, Module filesystem, & Module perforce)
+Parameter ModuleG As String = "lock-mod-g-all-repo-types";
+
+/// Module with multiple versions
+///     - v2: Base equivalent to Module F
+///     - v3: Adds dependency Module A
+Parameter ModuleH As String = "lock-mod-h-multiple-versions";
+
+/// Base equivalent to Module F, just deleted the lock file
+Parameter ModuleI As String = "lock-mod-i-no-prior-lock-file";
+
+/// Base equivalent to Module D, but different lock file
+/// Lock file as A->C->B instead of A->B->C (C is dependent on B)
+Parameter ModuleJ As String = "lock-mod-j-deps-misordered";
+
+/// 2 dependencies: C & E, both with same transient dependency: A
+Parameter ModuleK As String = "lock-mod-k-common-transient";
+
+/// Module with complex set of nested dependencies
+/// Dependencies D, E, & F
+///     - D -> C -> A & B
+///     - E -> A
+///     - F -> E & B
+Parameter ModuleL As String = "lock-mod-l-complex-deps";
+
+Method OnBeforeAllTests() As %Status
+{
+    // Setup repos for LockFile tests
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc,"Deleted all leftover repos from other tests successfully.")
+    set sc = ##class(%IPM.Main).Shell("repo -n lock-file-base -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/")
+    do $$$AssertStatusOK(sc,"Created lock-file-base repo successfully.")
+    set sc = ##class(%IPM.Main).Shell("repo -n lock-file-edge -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-edge-cases/")
+    do $$$AssertStatusOK(sc,"Created lock-file-edge repo successfully.")
+    return sc
+}
+
+Method OnAfterAllTests() As %Status
+{
+    // Delete repos for LockFile tests
+    set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-base")
+    do $$$AssertStatusOK(sc,"Removed lock-file-base repo successfully.")
+    set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-edge")
+    do $$$AssertStatusOK(sc,"Removed lock-file-edge repo successfully.")
+    return sc
+}
+
+Method OnAfterOneTest() As %Status
+{
+    // Make test environment clean by uninstalling all modules at the end of each test
+    set sc = ##class(%IPM.Main).Shell("uninstall -all")
+    do $$$AssertStatusOK(sc, "Successfully uninstalled all modules after test")
+    return sc
+}
+
+/// Module with 0 dependencies
+/// Uses Module A
+Method Test01Module0Dependencies()
+{
+    try {
+        set moduleName = ..#ModuleA
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module0Dependencies.")
+    }
+}
+
+/// Module with 2 direct dependencies (they themselves don't have deps)
+/// Uses Module C
+Method Test02Module2Dependencies0Transient()
+{
+    try {
+        set moduleName = ..#ModuleC
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies0Transient.")
+    }
+}
+
+/// Module with dependency that has transient dependencies
+/// Uses Module D
+Method Test03Module1Dependency2Transient()
+{
+    try {
+        set moduleName = ..#ModuleD
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module1Dependency2Transient.")
+    }
+}
+
+/// Module with 1 dep (with transient), 1 dep (without transient)
+/// Uses Module F
+Method Test04Module2Dependencies1Transient()
+{
+    try {
+        set moduleName = ..#ModuleF
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
+    }
+}
+
+/// Edge cases below:
+/// All repository types
+/// Uses Module G
+Method Test05ModuleDependenciesAllRepositoryTypes()
+{
+    set sc = $$$OK
+    try {
+        // The first step is to publish the modules to their specified repo types. Need to add a repo for the initial module files first though
+        set sc = ##class(%IPM.Main).Shell("repo -n lock-file-other-repos -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-other-repos/")
+        do $$$AssertStatusOK(sc,"Created lock-file-other-repos repo successfully.")
+
+        // Publish a module to a remote repository
+        set remoteRepo = "lock-file-remote"
+        set remoteMod = "lock-mod-remote"
+        do ##class(%IPM.Main).Shell("install "_remoteMod)
+        // Add remote repo for this test stack and push the module there
+        set sc = ##class(%IPM.Main).Shell("repo -r -name "_remoteRepo_" -url http://registry:52773/registry -username admin -password SYS")
+        do $$$AssertStatusOK(sc, "Successfully set up remote repo")
+        set sc = ##class(%IPM.Main).Shell("publish "_remoteMod_" -r "_remoteRepo_" -v -export-deps 1")
+        do $$$AssertStatusOK(sc, "Successfully published module to remote repo")
+        // Uninstall mod and to then be installed from remote repo
+        do ##class(%IPM.Main).Shell("uninstall "_remoteMod)
+
+        // Publish a module to an ORAS repository
+        set orasRepo = "lock-file-oras"
+        set orasMod = "lock-mod-oras"
+        do ##class(%IPM.Main).Shell("install "_orasMod)
+        // Add oras repo for this test stack and push the module there
+        set sc = ##class(%IPM.Main).Shell("repo -o -name "_orasRepo_" -url http://oras:5000 -publish 1")
+        do $$$AssertStatusOK(sc, "Successfully set up ORAS repo")
+        set sc = ##class(%IPM.Main).Shell("publish "_orasMod_" -r "_orasRepo_" -v -export-deps 1")
+        do $$$AssertStatusOK(sc, "Successfully published module to ORAS repo")
+        // Uninstall mod and to then be installed from ORAS repo
+        do ##class(%IPM.Main).Shell("uninstall -r "_orasMod)
+
+        // Remove repo for files to other repo types so we don't pull the filesystem module by accident
+        set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-other-repos")
+        do $$$AssertStatusOK(sc,"Removed lock-file-other-repos repo successfully.")
+
+        // Now that modules and repositories are set up, do the actual test
+        set moduleName = "lock-mod-oras"
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+
+        // Go back to the initial state by uninstalling the module, dependencies, and repositories used for this test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+        do $$$AssertStatusOK(sc, "Uninstalled "_moduleName_" and dependencies at the end of the test")
+        do ##class(%IPM.Main).Shell("repo -delete -name "_remoteRepo)
+        do $$$AssertStatusOK(sc, "Removed "_remoteRepo_" at the end of the test")
+        do ##class(%IPM.Main).Shell("repo -delete -name "_orasRepo)
+        do $$$AssertStatusOK(sc, "Removed "_orasRepo_" at the end of the test")
+    } catch (ex) {
+        set sc = ex.AsStatus()
+    }
+}
+
+/// Module with multiple versions: Can both specify a version and defaults to latest (highest #) version
+/// Uses Module H
+Method Test06ModuleMultipleVersions()
+{
+    try {
+        set moduleName = ..#ModuleH
+
+        // First test with the latest version of the module
+        set latestVersion = "3.0.0"
+        set latestLockFileName = "lock-mod-h-multiple-versions-v3.json"
+
+        // Do an initial install of the latest version of the module and create a lock file for it
+        set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName)
+        do $$$AssertStatusOK(sc, "Able to install "_moduleName_" v"_latestVersion_" and create lock file for it")
+
+        // Compare the generated lock file with the expected one
+        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        set lockFilePath = module.Root_..#LockFileName
+        set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_latestLockFileName)
+        do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" v"_latestVersion_" match expected values")
+
+        // Go back to the initial state by uninstalling the module and dependencies at the end of the test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+
+
+
+        // Now test with an older version of the same module
+        set olderLockFileName =  "lock-mod-h-multiple-versions-v2.json"
+        set olderVersion = "2.0.0"
+
+        // Do an initial install of the module and create a lock file for it
+        set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName_" "_olderVersion)
+        do $$$AssertStatusOK(sc, "Able to install "_moduleName_" v"_olderVersion_" and create lock file for it")
+
+        // Compare the generated lock file with the expected one
+        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        set lockFilePath = module.Root_..#LockFileName
+        set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_olderLockFileName)
+        do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" v"_olderVersion_" match expected values")
+
+        // Go back to the initial state by uninstalling the module and dependencies at the end of the test
+        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
+    }
+}
+
+/// Module with no pre-existing lock file
+///     - [TODO, with "ci" command] zpm "ci" should fail due to not being able to locate the lock file
+///     - Test creation of a lock file, for a module that did not already have one.
+///         - Differs from other tests which overwrite pre-existing lock files
+///         - Both cases SHOULD be functionally equivalent
+/// Uses Module I
+Method Test07ModuleNoLockFile()
+{
+    try {
+        set moduleName = ..#ModuleI
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+
+        // Go back to the initial state by deleting lock file for this module at the end of the test
+        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        set lockFilePath = module.Root_..#LockFileName
+        if '##class(%File).Delete(lockFilePath) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to delete lock file located at: %1", lockFilePath)))
+        }
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2Dependencies1Transient.")
+    }
+}
+
+/// Try install on a lock file that lists dependencies out of order
+/// Uses Module J
+Method Test08ModuleDependenciesOutOfOrder()
+{
+    // TODO: Implement with zpm "ci" addition
+}
+
+/// 2 dependencies for a module have the same transient to add to the lock file
+/// Uses Module K
+Method Test09Module2DependenciesSameTransient()
+{
+    try {
+        set moduleName = ..#ModuleK
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Module2DependenciesSameTransient.")
+    }
+}
+
+/// Tests writing and installing from a lock file for a module with a more complex nested dependencies setup
+/// Uses Module L
+Method Test10ComplexNestedDependencies()
+{
+    try {
+        set moduleName = ..#ModuleL
+        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestComplexNestedDependencies.")
+    }
+}
+
+/// Base cases of creating and installing from a lock file
+Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
+{
+    // Do an initial install of the module and create a lock file for it
+    set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName)
+    do $$$AssertStatusOK(sc, "Able to install "_moduleName_" and create lock file for it")
+
+    // Compare the generated lock file with the expected one
+    set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+    set lockFilePath = module.Root_..#LockFileName
+    set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_moduleName_".json")
+    do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" match expected values")
+}
+
+/// Takes in the path to two lock files and compares their values
+/// Comparison is done as a string so if the keys are in a different order the comparison will fail, even if data is equivalent
+/// This is intended as the keys being in a different order should alert us to further investigate
+/// Especially for the dependencies list where order is explicitly required (for zpm "ci" to install in correct order)
+///
+/// Returns: 1 - if lock files have equivalent contents
+///          0 - if lock files are different
+ClassMethod AreLockFilesEqual(
+	actualLockFilePath As %String,
+	expectedLockFilePath As %String) As %Boolean
+{
+    try {
+    set actualLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(actualLockFilePath)
+    set expectedLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(expectedLockFilePath)
+    return actualLockFileContents.%ToJSON() = expectedLockFileContents.%ToJSON()
+    } catch (ex) {
+        // Should error if we fail to open either the actual or expected file
+        return ex.AsStatus()
+    }
+}
+
+}
