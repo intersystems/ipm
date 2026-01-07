@@ -219,8 +219,7 @@ Method CompareModifiers(
 	}
 }
 
-// This method returns the %Status for checking the success or failure of executed commands.
-
+/// This method returns the %Status for checking the success or failure of executed commands.
 Method RunCommand(pCommand As %String) As %Status
 {
 	set status = ##class(%IPM.Main).Shell(pCommand)
@@ -318,7 +317,7 @@ Method TestListPython() As %Status
 
 Method TestUninstallWithoutModuleName()
 {
-    do $$$LogMessage("Run Uninstall command with out module name")
+    do $$$LogMessage("Run Uninstall command without module name")
     set status = ..RunCommand("uninstall")
     do $$$AssertStatusNotOK(status, $system.Status.GetErrorText(status))
     set status = ..RunCommand("install objectscript-math")

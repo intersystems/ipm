@@ -2449,9 +2449,8 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         return
     } else {
         set tModuleName = $get(pCommandInfo("parameters","module"))
-        // Ensure a module name is specified with the uninstall command if -all is not used.
         if (tModuleName = "") {
-            $$$ThrowOnError($$$ERROR($$$GeneralError, "Module name is required for uninstall."))
+            $$$ThrowOnError($$$ERROR($$$GeneralError, "A module name must be specified for uninstall unless the -all flag is used."))
         }
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
