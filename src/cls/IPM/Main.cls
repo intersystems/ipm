@@ -2215,16 +2215,11 @@ ClassMethod Load(
 	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
-ClassMethod ExecuteCOS(ByRef tCommandInfo)
+ClassMethod ExecuteCOS(ByRef commandInfo)
 {
     new $namespace
-    try {
-        write !
-        xecute tCommandInfo("parameters","expression")
-    } catch ex {
-        set sc = ex.AsStatus()
-        $$$ThrowOnError(sc)
-    }
+    write !
+    xecute commandInfo("parameters","expression")
 }
 
 ClassMethod LoadInternal(
