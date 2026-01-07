@@ -87,6 +87,8 @@ Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
 Property UpdatePackage As %Dictionary.Classname;
 
+Property PythonDependencies As array Of %IPM.Storage.PythonReference(XMLPROJECTION = "NONE");
+
 /// Iterates through all of a module's update step classes and tries to either execute or seed those steps.
 /// seedSteps: (Default) 0 = Execute Steps | 1 = Seeds Steps
 Method HandleAllUpdateSteps(
@@ -1917,6 +1919,11 @@ Storage Default
 <Value name="29">
 <Value>UpdatePackage</Value>
 </Value>
+</Data>
+<Data name="PythonDependencies">
+<Attribute>PythonDependencies</Attribute>
+<Structure>subnode</Structure>
+<Subscript>"PythonDependencies"</Subscript>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>
 <DefaultData>ModuleDefaultData</DefaultData>
