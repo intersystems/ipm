@@ -869,10 +869,6 @@ Method BuildDependencyGraph(
 {
     set sc = $$$OK
     try {
-        if $data(^IPMTest("BuildDependencyGraphCount")) {
-            do $increment(^IPMTest("BuildDependencyGraphCount"))
-        }
-
         // Initialize internal variables
         kill manifestCache, repoSearchCache, moduleCache, workQueue
         set knownDependencies = ..GetKnownDependencies(..Name)
