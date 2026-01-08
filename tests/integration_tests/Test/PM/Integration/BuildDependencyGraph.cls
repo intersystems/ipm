@@ -18,23 +18,27 @@ Method OnBeforeAllTests() As %Status
     // Build wrapped implementation
     set newImp = ##class(%Stream.TmpCharacter).%New()
 
-    do newImp.WriteLine(
+    set sc = newImp.WriteLine(
         "    set ^CacheTemp.BuildDependencyGraph($job)=$increment(^CacheTemp.BuildDependencyGraph($job))"
     )
+    do $$$AssertStatusOK(sc, "Wrote new line into BuildDependencyGraph() successfully.")
 
     // Rewind original and copy it
     do methodDef.Implementation.Rewind()
     while 'methodDef.Implementation.AtEnd {
-        do newImp.WriteLine(methodDef.Implementation.ReadLine())
+        set sc = newImp.WriteLine(methodDef.Implementation.ReadLine())
+        do $$$AssertStatusOK(sc, "Copied original line into new definition of BuildDependencyGraph() successfully.")
     }
 
     // Replace implementation
     set methodDef.Implementation = newImp
-    do methodDef.%Save()
+    set sc = methodDef.%Save()
+    do $$$AssertStatusOK(sc, "Saved new method definition for BuildDependencyGraph() successfully.")
 
     // Recompile the class
-    do $system.OBJ.Compile("%IPM.Storage.Module", "cuk")
-    return $$$OK
+    set sc = $system.OBJ.Compile("%IPM.Storage.Module", "cuk")
+    do $$$AssertStatusOK(sc, "Compiled test definition of %IPM.Storage.Module successfully.")
+    return sc
 }
 
 /// Counts the number of times that BuildDependencyGraph() gets invoked on test modules' installation to catch regressions
@@ -57,17 +61,20 @@ Method OnAfterAllTests() As %Status
 
     if $data(^CacheTemp.BuildDependencyGraph("orig", $job)) {
         set imp = ##class(%Stream.TmpCharacter).%New()
-        do imp.Write(^CacheTemp.BuildDependencyGraph("orig", $job))
+        set sc = imp.Write(^CacheTemp.BuildDependencyGraph("orig", $job))
+        do $$$AssertStatusOK(sc, "Wrote back original method definition of BuildDependencyGraph() successfully.")
         set methodDef.Implementation = imp
-        do methodDef.%Save()
-        do $system.OBJ.Compile("%IPM.Storage.Module", "cuk")
+        set sc = methodDef.%Save()
+        do $$$AssertStatusOK(sc, "Saved original method definition of BuildDependencyGraph() successfully.")
+        set sc = $system.OBJ.Compile("%IPM.Storage.Module", "cuk")
+        do $$$AssertStatusOK(sc, "Compiled original definition of %IPM.Storage.Module successfully.")
     }
 
     kill ^CacheTemp.BuildDependencyGraph($job)
 
     set sc = ##class(%IPM.Main).Shell("repo -delete -name build-dependency-graph")
     do $$$AssertStatusOK(sc, "Deleted build-dependency-graph repo successfully.")
-    return $$$OK
+    return sc
 }
 
 }
