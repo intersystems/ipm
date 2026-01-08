@@ -282,8 +282,11 @@ ClassMethod LoadModuleFromDirectory(
                 zkill tParams("Install")
             }
         } else {
-            // Propagate all params except developer mode to dependencies
+            // Propagate all params except DeveloperMode, UpdateSnapshots, IgnoreInstalled to dependencies
             set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
+            // Do not pass these down so BuildDependencyGraph() does not get called more than necessary
+            kill tParams("UpdateSnapshots")
+            kill tParams("IgnoreInstalled")
         }
         set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pLog)
         if $$$ISERR(tSC) {
