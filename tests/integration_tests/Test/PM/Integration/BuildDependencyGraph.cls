@@ -44,14 +44,8 @@ Method TestBuildDependencyGraphCount()
     set params("IgnoreInstalled") = 1
     set params("UpdateSnapshots") = 1
 
-    write !, "TTTTT", !
-    zwrite $get(^CacheTemp.BuildDependencyGraph($job),0)
-
     set sc = ##class(%IPM.Utils.Module).LoadNewModule(..GetModuleDir("build-dependency-graph-loop/module-a"), .params)
     do $$$AssertStatusOK(sc)
-
-    write !, "SSSSSSS", !
-    zwrite $get(^CacheTemp.BuildDependencyGraph($job),0)
 
     do $$$AssertTrue($get(^CacheTemp.BuildDependencyGraph($job), 0) > 0)
     do $$$AssertTrue($get(^CacheTemp.BuildDependencyGraph($job), 0) < 4)
