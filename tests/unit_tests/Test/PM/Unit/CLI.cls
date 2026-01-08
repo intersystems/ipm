@@ -313,4 +313,70 @@ Method TestListPython() As %Status
     quit sc
 }
 
+/// Verifies the behavior of the -bypass-deps (and alias -bd) flag during the load and install process.
+/// Ensures that the primary module is loaded but the dependency resolution graph is skipped.
+Method TestByPassIPMDepsModifier()
+{
+    set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+    set dependencyModules = $listbuild("objectscript-math","LocalizationLab","irisjwt")
+
+    set ptr = 0
+    while $listnext(dependencyModules,ptr,module) {
+        set exists = ##class(%IPM.Storage.Module).NameExists(module)
+        if exists{
+            do $$$AssertTrue(exists, module_" is already installed. So uninstalling for testing -bypass-deps.")
+            set status = ##class(%IPM.Main).Shell("uninstall "_module)
+            do $$$AssertStatusOK(status,"Uninstalled module: "_module)
+        }
+    }
+    set moduleStr="<?xml version=""1.0"" encoding=""UTF-8""?><Export generator=""Cache"" version=""25"">"_
+            "<Document name=""demo-module1.ZPM""><Module><Name>demo-module1</Name><Version>1.0.0</Version>"_
+            "<Description>description</Description><Dependencies><ModuleReference>"_
+            "<Name>objectscript-math</Name><Version>0.0.5</Version></ModuleReference><ModuleReference><Name>LocalizationLab</Name><Version>1.0.0</Version>"_
+            "</ModuleReference><ModuleReference><Name>irisjwt</Name><Version>1.0.0</Version>"_
+            "</ModuleReference></Dependencies><Packaging>module</Packaging><SourcesRoot>src</SourcesRoot></Module></Document></Export>"
+    set moduleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/bypass-deps/")
+
+    if '##class(%File).Exists(moduleDir) {
+        set status = ##class(%File).CreateDirectoryChain(moduleDir,.status)
+        do $$$AssertStatusOK(status,"Created module.xml file in directory: "_moduleDir)
+        set fileStream = ##class(%Stream.FileBinary).%New()
+        set fileStream.Filename = ##class(%File).NormalizeFilename("module.xml",moduleDir)
+        do fileStream.Write(moduleStr)
+        set status = fileStream.%Save()
+        do $$$AssertStatusOK(status,"module file created on directory "_moduleDir)
+    }
+    set status = ##class(%IPM.Main).Shell("load " _ moduleDir_" -bypass-deps")
+    do $$$AssertStatusOK(status,"Loaded SimpleApp demo-module1 with -bypass-deps successfully." _ moduleDir)
+
+    do $$$LogMessage("Verifying that dependencies were not installed...")
+    set ptr=0
+    while $listnext(dependencyModules,ptr,module) {
+        set found = 0
+        set exists = ##class(%IPM.Storage.Module).NameExists(module)
+        do $$$AssertTrue('exists, "Dependency module '"_module_"' not installed when loading with -bypass-deps.")
+    }
+
+    do $$$LogMessage("Now loading the module without -bypass-deps to verify dependencies get installed...")
+
+     // Now load again without -bypass-deps to verify dependencies get installed
+    set status = ##class(%IPM.Main).Shell("load " _ moduleDir)
+    do $$$AssertStatusOK(status,"Module demo-module1 is loaded without -bypass-deps")
+
+    set ptr=0
+    while $listnext(dependencyModules,ptr,module) {
+        set found = 0
+        set exists = ##class(%IPM.Storage.Module).NameExists(module)
+        do $$$AssertTrue(exists, "Dependency module '"_module_"' should be installed when loading without -bypass-deps.")
+    }
+
+    do $$$LogMessage("uninstalling the demo-module1 and its dependencies...")
+    set status = ##class(%IPM.Main).Shell("uninstall demo-module1 -r")
+    do $$$AssertStatusOK(status,"Uninstalled demo-module1 and its dependencies successfully.")
+
+    do $$$LogMessage("Deleting the created directory...")
+    set status = ##class(%File).RemoveDirectoryTree(moduleDir)
+    do $$$AssertStatusOK(status, "Directory deleted successfully")
+}
+
 }
