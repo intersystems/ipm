@@ -15,6 +15,8 @@ Parameter PackageWithPythonDepsLocation = "package-with-python-deps";
 
 Parameter ExportPackageWithPythonDepsLocation = "export-package-with-python-deps";
 
+Parameter PublishWithPythonDepsLocation = "publish-with-python-deps";
+
 /// The PythonWheel resource processor expects to install wheels from the dist directory, as opposed to source code
 ClassMethod GenerateWheel()
 {
@@ -197,6 +199,47 @@ Method TestPackageWithPythonDeps() As %Status
     do $$$AssertStatusOK(sc, "Uninstalled module")
     set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
     do $$$AssertStatusOK(sc, "Deleted local filesystem repo")
+}
+
+/// Test publishing with the -export-python-deps flag
+Method TestPublishWithPythonDeps() As %Status
+{
+    set moduleName = "publish-with-python-deps"
+
+    // Create a filesystem repository
+    set dir = ..GetModuleDir("python-deps-tests", ..#PublishWithPythonDepsLocation)
+    set sc = ##class(%IPM.Main).Shell("repo -fs -name localrepo -path "_dir)
+    do $$$AssertStatusOK(sc, "Configured local filesystem repo")
+
+    // Install module from local filesystem repo
+    set sc = ##class(%IPM.Main).Shell("install -v localrepo/"_moduleName)
+    do $$$AssertStatusOK(sc, "Installed module from local filesystem repo")
+
+    // Create a remote repository for publishing
+    set sc = ##class(%IPM.Main).Shell("repo -r -name remote -url http://registry:52773/registry -username admin -password SYS")
+    do $$$AssertStatusOK(sc, "Configured remote repo")
+
+    // Publish module to remote repository
+    set sc = ##class(%IPM.Main).Shell("publish -v "_moduleName_" -r remote -export-python-deps")
+    do $$$AssertStatusOK(sc, "Published module "_moduleName_" to remote repository")
+
+    // Uninstall module that came from filesystem repository
+    set sc = ##class(%IPM.Main).Shell("uninstall "_moduleName)
+    do $$$AssertStatusOK(sc, "Uninstalled module successfully")
+
+    // Install published module from remote repository
+    set sc = ##class(%IPM.Main).Shell("install -v remote/"_moduleName)
+    do $$$AssertStatusOK(sc, "Successfully installed published module "_moduleName_" from remote repository")
+
+    // Uninstall the module used for this test
+    set sc = ##class(%IPM.Main).Shell("uninstall "_moduleName)
+    do $$$AssertStatusOK(sc, "Uninstalled module "_moduleName_" successfully")
+
+    // Remove the repositories used for this test
+    set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
+    do $$$AssertStatusOK(sc, "Removed local filesystem repo")
+    set sc = ##class(%IPM.Main).Shell("repo -delete -n remote")
+    do $$$AssertStatusOK(sc, "Removed remote repo")
 }
 
 }
