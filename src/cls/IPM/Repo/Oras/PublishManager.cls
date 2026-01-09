@@ -1,7 +1,9 @@
 Class %IPM.Repo.Oras.PublishManager Extends %IPM.General.Singleton
 {
 
-Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boolean) As %IPM.Repo.IPublishService
+Method CheckServiceCache(
+	pRepositoryName As %String,
+	Output pAvailable As %Boolean) As %IPM.Repo.IPublishService
 {
 	// TODO actually implement cache
 	Set pAvailable = 0
@@ -17,7 +19,11 @@ Method CheckServiceCache(pRepositoryName As %String, Output pAvailable As %Boole
 	Return tClient
 }
 
-Method CheckUnpublishEnabled(Output isEnabled As %Boolean, pRepositoryName As %String, pPackageName As %String, pPackageVersion As %String) As %Status
+Method CheckUnpublishEnabled(
+	Output isEnabled As %Boolean,
+	pRepositoryName As %String,
+	pPackageName As %String,
+	pPackageVersion As %String) As %Status
 {
     Set tSC = $$$OK
 	Set isEnabled = 0
@@ -34,7 +40,10 @@ Method CheckUnpublishEnabled(Output isEnabled As %Boolean, pRepositoryName As %S
 	Return tSC
 }
 
-Method Unpublish(pRepositoryName As %String, pPackageName As %String, pPackageVersion As %String) As %Status
+Method Unpublish(
+	pRepositoryName As %String,
+	pPackageName As %String,
+	pPackageVersion As %String) As %Status
 {
 	Set tSC = $$$OK
 

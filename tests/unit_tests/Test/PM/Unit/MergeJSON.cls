@@ -85,12 +85,16 @@ Method TestMergeDynamicObjects()
     }
 }
 
-ClassMethod Equal(j1 As %IPM.DataType.Any, j2 As %IPM.DataType.Any) As %Boolean
+ClassMethod Equal(
+	j1 As %IPM.DataType.Any,
+	j2 As %IPM.DataType.Any) As %Boolean
 {
     Quit ..IsSubset(j1, j2) && ..IsSubset(j2, j1)
 }
 
-ClassMethod IsSubset(j1 As %IPM.DataType.Any, j2 As %IPM.DataType.Any) As %Boolean
+ClassMethod IsSubset(
+	j1 As %IPM.DataType.Any,
+	j2 As %IPM.DataType.Any) As %Boolean
 {
     If j1 = j2 {
         Return 1

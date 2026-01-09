@@ -55,9 +55,11 @@ Method TestParser()
 	set tResults(tCommands)="list-installed"
 	set tResults(tCommands,"modifiers","tree")=""
 
-	set tCommands($increment(tCommands)) = "install SomeModule"
+	set tCommands($increment(tCommands)) = "install SomeModule -synchronous"
 	set tResults(tCommands)="install"
 	set tResults(tCommands,"parameters","module")="SomeModule"
+	set tResults(tCommands,"modifiers","synchronous")=""
+	set tResults(tCommands,"modifiers","synchronous","deprecated")=1
 
 	set tCommands($increment(tCommands)) = "install SomeModule 0.0.1-prerelease.42+snapshot"
 	set tResults(tCommands)="install"
@@ -283,6 +285,32 @@ Method CompareArrays(
         set tRef2 = $query(@tRef2)
     }
     quit tEqual
+}
+
+/// Test that the 'list -python' command correctly retrieves and formats Python packages.
+Method TestListPython() As %Status
+{
+    set sc = $$$OK
+    set commandsList = $listbuild("list -python", "list -py", "list-installed -python", "list-installed -py")
+    set ptr=0
+    while $listnext(commandsList,ptr,command) {
+        do ..RunCommand(command)
+    }
+    ;
+    set i = $increment(commands)
+    set commands(i) = "list-installed -python"
+	set results(commands)="list-installed"
+	set results(commands,"modifiers","python")=""
+	// Verify output matches
+    kill parsedCommandInfo,expectedCommandInfo
+    do $$$AssertStatusOK(##class(%IPM.Main).%ParseCommandInput(commands(i),.parsedCommandInfo))
+    merge expectedCommandInfo = results(i)
+    if $$$AssertTrue(..CompareArrays(.parsedCommandInfo,.expectedCommandInfo,.tMessage),"Parsed correctly: "_commands(i)) {
+        do $$$LogMessage(tMessage)
+        write !,"Expected:",! zwrite expectedCommandInfo
+        write !,"Actual:",! zwrite parsedCommandInfo
+    }
+    quit sc
 }
 
 }

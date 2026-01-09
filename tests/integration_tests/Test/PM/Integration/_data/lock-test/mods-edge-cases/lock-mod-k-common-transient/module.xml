@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+    <Document name="lock-mod-k-common-transient.ZPM">
+    <Module>
+      <Name>lock-mod-k-common-transient</Name>
+      <Version>1.0.0</Version>
+      <Resource Name="LockModK.PKG" />
+      <Dependencies>
+        <ModuleReference>
+          <Name>lock-mod-c-2-deps-0-transient</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>lock-mod-e-1-dep-0-transient</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

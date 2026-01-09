@@ -1,6 +1,6 @@
 Include (%occErrors, %syGluedef, %IPM.Common)
 
-Class %IPM.Lifecycle.Base Extends %RegisteredObject [ Abstract ]
+Class %IPM.Lifecycle.Base Extends %RegisteredObject [ Abstract, DependsOn = %IPM.DataType.PhaseName ]
 {
 
 Property Module As %IPM.Storage.Module [ Private ];
@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure","ApplyUpdateSteps")};
+Parameter PHASES = {$listfromstring($extract(##class(%IPM.DataType.PhaseName).#VALUELIST,2,*))};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -433,11 +433,24 @@ Method %Clean(ByRef pParams) As %Status
                 }
                 zkill pParams("Clean","Skip",tModName)
                 if ##class(%IPM.Storage.Module).NameExists(tModName) {
+                    // Log uninstalls of dependents
+                    set log = ##class(%IPM.General.HistoryTemp).UninstallInit(tModName)
+                    do log.InitPhase("Clean")
                     set tModObj = ##class(%IPM.Storage.Module).NameOpen(tModName,,.tModSC)
                     if $$$ISERR(tModSC) {
                         write !,"WARNING: "_$system.Status.GetErrorText(tModSC)
+                        do log.FinalizePhase("Clean", tModSC)
+                        set status = log.Finalize(tModSC)
+                        if '$$$ISOK(status) {
+                            set tSC = $system.Status.AppendStatus(tSC, status)
+                        }
                         continue
                     }
+                    set tSC = log.SetVersion(tModObj.Version)
+                    if $$$ISERR(tSC) {
+                        quit
+                    }
+
                     kill tParams
                     merge tParams = pParams
                     zkill:'tRecurse tParams("Clean","Force")
@@ -445,15 +458,27 @@ Method %Clean(ByRef pParams) As %Status
                     set tParams("Clean","Nested") = 1
                     set tSC = tModObj.Lifecycle.Clean(.tParams)
                     if $$$ISERR(tSC) {
+                        do log.FinalizePhase("Clean", tSC)
+                        set status = log.Finalize(tSC)
+                        if $$$ISERR(status) {
+                            set tSC = $system.Status.AppendStatus(tSC, status)
+                        }
                         quit
                     }
                     if '$data(tParams("Clean","Skip",tModName)) {
                         set tSC = ##class(%IPM.Storage.Module).NameDelete(tModName)
                         if $$$ISERR(tSC) {
+                            do log.FinalizePhase("Clean", tSC)
+                            set status = log.Finalize(tSC)
+                            if $$$ISERR(status) {
+                                set tSC = $system.Status.AppendStatus(tSC, status)
+                            }
                             quit
                         }
                         write:tVerbose !,"Deleted ",tModName
                     }
+                    do log.FinalizePhase("Clean", $$$OK)
+                    set tSC = log.Finalize($$$OK)
                 }
             }
             if $$$ISERR(tSC) {
@@ -918,10 +943,6 @@ Method %Compile(ByRef pParams) As %Status
             $$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlCreate())
         }
 
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
-
         // Compile items within the module that are compilable using OnPhase
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1036,13 +1057,6 @@ Method %Compile(ByRef pParams) As %Status
                 }
 
                 set tNoCompileLock = '$get(pParams("NoLock"))
-                if $$$IsISCWorker && 'tNoCompileLock {
-                    // Customized locking - takes out shared locks on dependencies to avoid conflicts between parallel module loads.
-                    set tSC = ##class(%IPM.Utils.LockManager).LockClassesRecursive(.tLockManager,.tCompileArray,.tLockedClasses)
-                    $$$ThrowOnError(tSC)
-                    set tNoCompileLock = 1
-                }
-
                 // Actually do the compile
                 if $data(tCompileArray)>1 {
                     set tCompiledSomething = 1
@@ -1096,10 +1110,6 @@ Method %Test(ByRef pParams) As %Status
 {
     set tSC = $$$OK
     try {
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
-
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
@@ -1147,7 +1157,7 @@ Method %Export(
         }
 
         set tExportDependencies = $get(pParams("ExportDependencies"), ..#EXPORTDEPENDENCIES)
-        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,1,.pDependencyGraph)
+        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph)
         if $$$ISERR(tSC) {
             quit
         }
@@ -1353,10 +1363,6 @@ Method %Verify(ByRef pParams) As %Status
                 }
             }
         }
-
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1638,7 +1644,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 
         // Default implementation: see which resources are expicitly flagged with Deploy = true.
         // Build an array of those, then mark them as deployed.
-        $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,1,.pDependencyGraph))
+        $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,.pDependencyGraph))
 
         set tModuleKey = ""
         for {
@@ -1779,7 +1785,11 @@ Method GetResourceRelativePath(
 	pResource As %String,
 	pExtension As %String) As %String
 {
-    if ($get(pExtension) = "") {
+    // directories do not have an extension, so pResource will be empty
+    if ($get(pResource) = "") {
+        set tName = pExtension
+        set tExtension = ""
+    } elseif ($get(pExtension) = "") {
         set tName = $piece(pResource,".",1,*-1)
         set tExtension = $piece(pResource,".",*)
     } else {
@@ -1819,6 +1829,7 @@ Method GetResourceRelativePath(
         "BPL":$translate(tName,".%","/")_".cls",
         "GBL":$translate(tName,"%,("")","___")_".xml",
         "DFI":$translate(tName,"-","/")_".dfi",
+        "":tName,
         : tName _ "." _$$$lcase(tExtension)
     )
 

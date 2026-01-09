@@ -97,7 +97,9 @@ Method TestFromPythonList(list As %SYS.Python) As %List
     Do $$$AssertEquals(output, original)
 }
 
-Method AssertPythonListsEqual(list1 As %SYS.Python, list2 As %SYS.Python) As %Boolean
+Method AssertPythonListsEqual(
+	list1 As %SYS.Python,
+	list2 As %SYS.Python) As %Boolean
 {
     Set list1 = ##class(%IPM.Utils.EmbeddedPython).FromPythonList(list1)
     Set list2 = ##class(%IPM.Utils.EmbeddedPython).FromPythonList(list2)

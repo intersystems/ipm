@@ -11,7 +11,9 @@ Method TestUnwrappedWrapped()
     Do ..RunTestCase("_data/mapping-test-unwrapped","MappingTestUnwrapped")
 }
 
-Method RunTestCase(subdirectory As %String, packageName As %String)
+Method RunTestCase(
+	subdirectory As %String,
+	packageName As %String)
 {
     Try {
         Set tTestRoot = $Get(^UnitTestRoot)

@@ -194,33 +194,42 @@ Method AddWebApps(
 
     new $namespace
     set $namespace = "%SYS"
+    set (matchRoles,dispatchClass,autheEnabled,path)=""
     for i=1:1:$listlength(tAppList) {
-        set app = ##class(Security.Applications).Get($listget(tAppList,i),.props)
-        set tAppName = props("Name")
+        set app = ##class(Security.Applications).Get($listget(tAppList,i), .props)
+        if $$$ISOK(app) {
+            set tAppName = props("Name")
+            set matchRoles = props("MatchRoles")
+            set autheEnabled = props("AutheEnabled")
+            set dispatchClass = props("DispatchClass")
+            set path = props("Path")
+        } else {
+            set tAppName = $listget(tAppList,i)
+            set autheEnabled = $$$AuthePassword
+        }
         set ..TemplateResources(tAppName) = tAppName
         set ..TemplateResources(tAppName, "Url") = tAppName
-        if props("MatchRoles")["%DB_"_curns {
-            set props("MatchRoles") = $replace(props("MatchRoles"),"%DB_"_curns,"{$dbrole}")
+        if matchRoles["%DB_"_curns {
+            set props("MatchRoles") = $replace(matchRoles,"%DB_"_curns,"{$dbrole}")
         }
-        if (props("DispatchClass")'="") {
-            set ..TemplateResources(tAppName,"DispatchClass") = props("DispatchClass")
+        if (dispatchClass'="") {
+            set ..TemplateResources(tAppName,"DispatchClass") = dispatchClass
         } else {
             set tCSPDir = ##class(%File).NormalizeDirectory(##class(%File).ParentDirectoryName(##class(%File).ManagerDirectory())_"/csp")
-            set ..TemplateResources(tAppName,"Directory") = $replace(props("Path"),tCSPDir,"${cspdir}")
+            set ..TemplateResources(tAppName,"Directory") = $replace(path,tCSPDir,"${cspdir}")
             set cspapps = cspapps_$listbuild(tAppName)
-
         }
-        if ( props("AutheEnabled") = 32 ) {
+        if ( autheEnabled = $$$AuthePassword ) {
             set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 0
             set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
-        } elseif ( props("AutheEnabled") = 64 ) {
-            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 0
-            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
-        } elseif ( props("AutheEnabled") = 96 ) {
+        } elseif ( autheEnabled = $$$AutheUnauthenticated ) {
+            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 1
+            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 0
+        } elseif ( autheEnabled = 96 ) {
             set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 1
             set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
         } else {
-            set ..TemplateResources(tAppName,"AuthenticationMethods") = props("AutheEnabled")
+            set ..TemplateResources(tAppName,"AuthenticationMethods") = autheEnabled
         }
 
         // Map subscript of application properties to %Installer.CSPApplication properties
