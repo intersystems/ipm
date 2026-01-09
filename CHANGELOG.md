@@ -69,7 +69,7 @@ lock contention by bypassing IRIS compiler.
 - #928: `zpm "info"` now recognizes existence of configured ORAS registries
 - #930: Fix issue where `load` didn't work on GitHub URLs
 - #1011: Hidden flags IgnoreInstalled and UpdateSnapshots cause redundant calling of BuildDependencyGraph()
-- #1014: After FileCopy respects scope change #864, some modules cannot be installed
+- #1014: After FileCopy respects scope change #864, compileable resources with specified Scope cause Compile phase to fail on install
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
