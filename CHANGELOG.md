@@ -13,8 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
 - #950: Added support for listing installed Python packages using `list -python`, `list -py` and `list-installed -python`
 - #822: The CPF resource processor now supports system expressions and macros in CPF merge files
-- #578 Added functionality to record and display IPM history of install, uninstall, load, and update
+- #578: Added functionality to record and display IPM history of install, uninstall, load, and update
 - #961: Adding creation of a lock file for a module by using the `-create-lockfile` flag on install.
+- #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
+- #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 - #992: Implement automatic history purge logic
 
 ### Changed
@@ -28,7 +30,7 @@ lock contention by bypassing IRIS compiler.
  - Have better caching of results for module searches by collapsing search expressions (reducing expressions that are intersections).
 
 ### Removed
-- #938 Removed secret flag NewVersion handling in %Publish()
+- #938: Removed secret flag NewVersion handling in %Publish()
 
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
@@ -38,6 +40,7 @@ lock contention by bypassing IRIS compiler.
 - #965: FileCopy on a directory with a Name without the leading slash now works
 - #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 - #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.
+- #789: Fix error when listing modules for an ORAS repo with a specified namespace.
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
@@ -66,6 +69,8 @@ lock contention by bypassing IRIS compiler.
 - #924: Make "module" parameter not required for "uninstall" command so -all modifier works
 - #928: `zpm "info"` now recognizes existence of configured ORAS registries
 - #930: Fix issue where `load` didn't work on GitHub URLs
+- #1011: Hidden flags IgnoreInstalled and UpdateSnapshots cause redundant calling of BuildDependencyGraph()
+- #1014: After FileCopy respects scope change #864, some modules cannot be installed
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
