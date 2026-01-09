@@ -302,7 +302,7 @@ Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
 /// Comparison is done as a string so if the keys are in a different order the comparison will fail, even if data is equivalent
 /// This is intended as the keys being in a different order should alert us to further investigate
 /// Especially for the dependencies list where order is explicitly required (for zpm "ci" to install in correct order)
-///
+/// 
 /// Returns: 1 - if lock files have equivalent contents
 ///          0 - if lock files are different
 ClassMethod AreLockFilesEqual(
