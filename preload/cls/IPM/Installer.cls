@@ -421,29 +421,51 @@ ClassMethod CreateTempDir() As %String
 ClassMethod CleanupOldMappings() As %Status
 {
     set sc = $$$OK
-    // Cleanup old mappings from oddStudioDocument
-    set key = ""
-    for {
-        set key = $order(^oddStudioDocument(key))
-        quit:key=""
-        if (key["%ZPM.PackageManager") || (key["%ZHSLIB.PackageManager") {
-            kill ^oddStudioDocument(key)
-        }
+    // Get list of all namespaces
+    new $namespace
+    set $namespace = "%SYS"
+    set status = ##class(%SYS.Namespace).ListAll(.nsList)
+    if $$$ISERR(status) {
+        return status
     }
 
-    // These mappings were suggested as a temporary workaround for IRIS 2023.x,
-    // but whose underlying issues have been resolved in 2024.1 and later.
-    set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(BEGIN):(""%ZP"")","IRISLIB")
-    if $$$ISERR(status) {
-        set sc = $$$ADDSC(sc, status)
-    }
-    set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""%ZP""):(""A"")","IRISSYS")
-    if $$$ISERR(status) {
-        set sc = $$$ADDSC(sc, status)
-    }
-    set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
-    if $$$ISERR(status) {
-        set sc = $$$ADDSC(sc, status)
+    // Iterate through each namespace and remove old mappings
+    set namespace = ""
+    for {
+        set namespace = $order(nsList(namespace))
+        if namespace = "" {
+            quit
+        }
+        set $namespace = namespace
+        // check if IPM is installed in this namespace
+        if '$$$comClassDefined("%IPM.Utils.Module") {
+            continue
+        }
+
+        // Cleanup old mappings from oddStudioDocument
+        set key = ""
+        for {
+            set key = $order(^oddStudioDocument(key))
+            quit:key=""
+            if (key["%ZPM.PackageManager") || (key["%ZHSLIB.PackageManager") {
+                kill ^oddStudioDocument(key)
+            }
+        }
+
+        // These mappings were suggested as a temporary workaround for IRIS 2023.x,
+        // but whose underlying issues have been resolved in 2024.1 and later.
+        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(BEGIN):(""%ZP"")","IRISLIB")
+        if $$$ISERR(status) {
+            set sc = $$$ADDSC(sc, status)
+        }
+        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""%ZP""):(""A"")","IRISSYS")
+        if $$$ISERR(status) {
+            set sc = $$$ADDSC(sc, status)
+        }
+        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
+        if $$$ISERR(status) {
+            set sc = $$$ADDSC(sc, status)
+        }
     }
 
     return sc
