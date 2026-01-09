@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #822: The CPF resource processor now supports system expressions and macros in CPF merge files
 - #578 Added functionality to record and display IPM history of install, uninstall, load, and update
 - #961: Adding creation of a lock file for a module by using the `-create-lockfile` flag on install.
-
+- #973: Enables CORS and JWT configuration for WebApplications in module xml
 ### Changed
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
 - #885: Always synchronously load dependencies and let each module do multi-threading as needed
