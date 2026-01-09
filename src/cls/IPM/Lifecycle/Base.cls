@@ -967,7 +967,7 @@ Method %Compile(ByRef pParams) As %Status
             set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
 
-            if '$data(tHandledMap(tResource.Name)) && $isobject(tResource.Processor) {
+            if '$data(tHandledMap(tResource.Name)) && $isobject(tResource.Processor) && tResource.IsInScope("Compile") {
                 if tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject {
                     if tVerbose {
                         write !, tResource.Name_" was loaded as deployed code, so compilation isn't needed."
