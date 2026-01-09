@@ -50,6 +50,22 @@ Method TestEverything()
 	do $$$AssertStatusOK(..TearDown())
 }
 
+/// Validates that scoped classes do not compile on normal install
+Method TestScopedClassInstall()
+{
+    set sc = $$$OK
+    try {
+        set moduleDir = ..GetModuleDir("scope")
+        set status = ##class(%IPM.Main).Shell("load -verbose "_moduleDir)
+        do $$$AssertStatusOK(status, "Module scope successfully installed.")
+
+        // Normal install: Scoped class should not exist
+        do $$$AssertNotTrue($classmethod("%Dictionary.ClassDefinition","%ExistsId","HS.ScopedClass"),"Scoped class should NOT exist after normal install")
+    } catch ex {
+        do $$$AssertStatusOK(ex.AsStatus(), "Unexpected failure in TestScopedClassCompile")
+    }
+}
+
 XData ServerModule1 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
 {
 <?xml version="1.0"?>
