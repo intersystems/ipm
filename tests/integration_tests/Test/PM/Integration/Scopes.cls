@@ -56,14 +56,14 @@ Method TestScopedResourceInstall()
 {
     set sc = $$$OK
     try {
-        set moduleDir = ..GetModuleDir("scope-class")
+        set moduleDir = ..GetModuleDir("scope-test/scope-class")
         set status = ##class(%IPM.Main).Shell("load -verbose "_moduleDir)
         do $$$AssertStatusOK(status, "Module ScopeClass successfully installed.")
 
         // Normal install: Scoped class should not exist
         do $$$AssertNotTrue($classmethod("%Dictionary.ClassDefinition", "%ExistsId", "HS.ScopedClass"), "Scoped class should NOT exist after normal install")
 
-        set moduleDir = ..GetModuleDir("scope-package")
+        set moduleDir = ..GetModuleDir("scope-test/scope-package")
         set status = ##class(%IPM.Main).Shell("load -verbose "_moduleDir)
         do $$$AssertStatusOK(status, "Module ScopePackage successfully installed.")
 
