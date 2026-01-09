@@ -331,6 +331,19 @@ ClassMethod GetModuleObjectFromStream(
     return $get(moduleObj)
 }
 
+/// Given a string, tries to correlate it to an instance of <class>%IPM.Storage.Module</class>.
+/// Throws errors.
+ClassMethod GetModuleObjectFromString(
+	moduleXML As %String,
+	Output found As %Boolean) As %IPM.Storage.Module
+{
+    // Create stream from XML text
+    set stream = ##class(%Stream.GlobalCharacter).%New()
+    do stream.Write(moduleXML)
+
+    return ..GetModuleObjectFromStream(stream, .found)
+}
+
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
 ClassMethod GetRequiredVersionExpression(
@@ -1135,7 +1148,7 @@ ClassMethod LoadNewModule(
 
         if foundNewModuleObj {
             // Check that on an update command with -path flag, the module in the path matches the base module specified for update.
-            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
+            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) && (newModuleObj.ExternalName '= commandLineModuleName){
               set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
               $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
