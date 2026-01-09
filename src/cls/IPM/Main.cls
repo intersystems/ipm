@@ -1305,13 +1305,13 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
         }
         do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
 
-#If $$$CacheVersionMajor>=2025
+#if $$$CacheVersionMajor>=2025
         //cors
         write !,"Cross-Origin Settings:"
         do ##class(%Library.Prompt).GetYesNo("Configure Access-Control-Allow-Credentials:",.enableCors)
         if enableCors {
             do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Headers:",.allowedHeaders,,32767,"comma seperated values e.g: Access-Control-Allow-Origin,Access-Control-Allow-Headers")
-            while (1){
+            while (1) {
                 do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Origins:",.allowedOrigins,,32767,"comma seperated values e.g: http://www.example.com")
                 if allowedOrigins="" quit
                 set sc = tTemplate.ValidateCorsOrigin(allowedOrigins)
@@ -1327,9 +1327,9 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
             set corsConfig("allowedOrigins") = allowedOrigins
             do tTemplate.SetCORSProps(tWebAppList,.corsConfig)
         }
-#EndIf
+#endif
 
-#If $$$CacheVersionMajor>=2024
+#if $$$CacheVersionMajor>=2024
         //jwt
         write !,"JWT Authentication"
         do ##class(%Library.Prompt).GetYesNo("Configure JWT Authentication: ",.enableJWT)
@@ -1341,7 +1341,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
             set jwtconfig("JWTRefreshTokenTO") = JWTRefreshTokenTO
             do tTemplate.SetJWTProps(tWebAppList,.jwtconfig)
         }
-#EndIf
+#endif
 
         do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps)
         for i=1:1:$listlength(tCSPapps) {

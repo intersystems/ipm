@@ -185,7 +185,7 @@ Method AddWebApps(
 {
     set tAppList = ""
     set pApps = $zstrip(pApps,"<>W")
-    if ( pApps = "*" ) {
+    if (pApps = "*") {
         do ..GetCSPApplications(.tAppList)
     } else {
         set tAppList = $listfromstring(pApps,",")
@@ -362,40 +362,40 @@ Method SetAuthorProps(
 }
 
 Method SetCORSProps(
-	pApps As %String = "",
-	ByRef pCors As %String = "")
+	apps As %String = "",
+	ByRef cors)
 {
     set appList = ""
-    set pApps = $zstrip(pApps,"<>W")
-    if ( pApps = "*" ) {
-        do ..GetCSPApplications(.appList)
+    set apps = $zstrip(apps,"<>W")
+    if (apps = "*") {
+        $$$ThrowOnError(..GetCSPApplications(.appList))
     } else {
-        set appList = $listfromstring(pApps,",")
+        set appList = $listfromstring(apps,",")
     }
     set ptr = 0
-    while $listnext(appList, ptr, webpApp){
-        set ..TemplateResources(webpApp,"CorsCredentialsAllowed") = pCors("enableCors")
-        set ..TemplateResources(webpApp,"CorsHeadersList") = pCors("allowedHeaders")
-        set ..TemplateResources(webpApp,"CorsAllowlist") = pCors("allowedOrigins")
+    while $listnext(appList, ptr, webpApp) {
+        set ..TemplateResources(webpApp,"CorsCredentialsAllowed") = cors("enableCors")
+        set ..TemplateResources(webpApp,"CorsHeadersList") = cors("allowedHeaders")
+        set ..TemplateResources(webpApp,"CorsAllowlist") = cors("allowedOrigins")
     }
 }
 
 Method SetJWTProps(
-	pApps As %String = "",
-	ByRef pJWT As %String = "")
+	apps As %String = "",
+	ByRef jwt)
 {
     set appList = ""
-    set pApps = $zstrip(pApps,"<>W")
-    if ( pApps = "*" ) {
-        do ..GetCSPApplications(.appList)
+    set apps = $zstrip(apps,"<>W")
+    if (apps = "*") {
+        $$$ThrowOnError(..GetCSPApplications(.appList))
     } else {
-        set appList = $listfromstring(pApps,",")
+        set appList = $listfromstring(apps,",")
     }
     set ptr = 0
-    while $listnext(appList, ptr, webpApp){
-        set ..TemplateResources(webpApp,"JWTAccessTokenTimeout") = pJWT("JWTAccessTokenTO")
-        set ..TemplateResources(webpApp,"JWTAuthEnabled") = pJWT("allowedHeaders")
-        set ..TemplateResources(webpApp,"JWTRefreshTokenTimeout") = pJWT("JWTRefreshTokenTO")
+    while $listnext(appList, ptr, webpApp) {
+        set ..TemplateResources(webpApp,"JWTAccessTokenTimeout") = jwt("JWTAccessTokenTO")
+        set ..TemplateResources(webpApp,"JWTAuthEnabled") = jwt("allowedHeaders")
+        set ..TemplateResources(webpApp,"JWTRefreshTokenTimeout") = jwt("JWTRefreshTokenTO")
     }
 }
 
@@ -585,7 +585,8 @@ Method SetTemplateProps() As %Status
     set ..TemplateResources("rest","PasswordAuthEnabled") = 1
     set ..TemplateResources("rest","UnauthenticatedEnabled") = 0
     set ..TemplateResources("rest","Recurse") = 1
-    ;cors
+
+    //CORS
     set ..TemplateResources("rest","CorsAllowlist") = "http://www.example.com"
     set ..TemplateResources("rest","CorsCredentialsAllowed") = 1
     set ..TemplateResources("rest","CorsHeadersList") = "Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Credentials, Access-Control-Max-Age, Access-Control-Expose-Headers, Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
