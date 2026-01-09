@@ -339,16 +339,26 @@ ClassMethod CompareVersions(
 	comp2 As %IPM.General.SemanticVersionExpression.Comparator) As %Integer [ Internal, Private ]
 {
     // Create semantic versions for comparison
+    // For range intersection purposes, we need to compare versions numerically
+    // to determine which bound is more restrictive, ignoring prerelease semantics
     set v1 = comp1.ExtractToSemanticVersion()
     set v2 = comp2.ExtractToSemanticVersion()
 
-    // Compare versions
-    if v1.Follows(v2) {
+    // Compare major.minor.patch numerically
+    if (v1.Major > v2.Major) {
         set result = 1
-    } elseif v2.Follows(v1) {
+    } elseif (v1.Major < v2.Major) {
+        set result = -1
+    } elseif (v1.Minor > v2.Minor) {
+        set result = 1
+    } elseif (v1.Minor < v2.Minor) {
+        set result = -1
+    } elseif (v1.Patch > v2.Patch) {
+        set result = 1
+    } elseif (v1.Patch < v2.Patch) {
         set result = -1
     } else {
-        // Versions are equal, compare operators
+        // Major.minor.patch are equal: compare operators
         // For lower bounds: > is more restrictive than >=
         // For upper bounds: < is more restrictive than <=
         if (comp1.Operator = ">") && (comp2.Operator = ">=") {
