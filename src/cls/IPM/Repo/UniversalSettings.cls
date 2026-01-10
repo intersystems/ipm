@@ -41,6 +41,7 @@ Parameter UseStandalonePip = "UseStandalonePip";
 /// Default value is 0, where 1.0.0-anystring is considered a pre-release of 1.0.0, hence 1.0.0-anystring < 1.0.0
 Parameter SemVerPostRelease = "SemVerPostRelease";
 
+
 /// Configuration setting name used to determine the number of days
 /// to retain IPM history records before they are eligible for cleanup.
 Parameter HistoryRetain = "history_retain";
@@ -48,7 +49,9 @@ Parameter HistoryRetain = "history_retain";
 /// Specifies the serialization format (JSON, TOON, YAML) for unit and integration test results in the shell.
 Parameter TestReportFormat = "TestReportFormat";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat";
+Parameter ModuleRoot = "ModuleRoot";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -112,6 +115,8 @@ ClassMethod UpdateOne(
     if key = "TestReportFormat" {
         // Validate format value before saving it
         set sc = ..SetTestReportFormat(value)
+    } elseif key = "ModuleRoot" {
+        $$$ThrowOnError(..CheckDirPermission(value))
     } else {
         set sc = ..SetValue($parameter(..%ClassName(1),key), value)
     }
@@ -213,6 +218,26 @@ ClassMethod SetTestReportFormat(
 ClassMethod GetTestReportFormat() As %String
 {
     return ..GetValue(..#TestReportFormat)
+}
+
+ClassMethod GetMouleRoot() As %String
+{
+    return ..GetValue(..#ModuleRoot)
+}
+
+ClassMethod CheckDirPermission(directory As %String = "") As %Status
+{
+    set status = $$$OK
+    if directory="" {
+        return $$$ERROR($$$DirectoryNameRequired)
+    }
+    set directory = ##class(%File).NormalizeDirectory(directory)
+    if '##class(%File).DirectoryExists(directory) {
+        set status = $$$ERROR($$$DirectoryNotFound)
+    } elseif '##class(%File).Writeable(directory) {
+         set status = $$$ERROR($$$GeneralError,"No write permission on directory "_directory)
+    }
+    return status
 }
 
 }
