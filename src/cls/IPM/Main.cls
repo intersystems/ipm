@@ -983,8 +983,7 @@ ClassMethod ShellInternal(
             } elseif (tCommandInfo = "load") {
                 do ..Load(.tCommandInfo)
             } elseif (tCommandInfo = "exec") {
-                write !
-                xecute tCommandInfo("parameters","expression")
+                do ..ExecuteCOS(.tCommandInfo)
             } elseif (tCommandInfo = "install") {
                 do ..Install(.tCommandInfo)
             } elseif (tCommandInfo = "reinstall") {
@@ -2216,6 +2215,13 @@ ClassMethod Load(
 		throw Ex
 	}
 	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+}
+
+ClassMethod ExecuteCOS(ByRef commandInfo)
+{
+    new $namespace
+    write !
+    xecute commandInfo("parameters","expression")
 }
 
 ClassMethod LoadInternal(
