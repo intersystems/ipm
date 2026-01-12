@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #822: The CPF resource processor now supports system expressions and macros in CPF merge files
 - #578 Added functionality to record and display IPM history of install, uninstall, load, and update
 - #961: Adding creation of a lock file for a module by using the `-create-lockfile` flag on install.
+- #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
+- #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 - #1024: Added flag -export-python-deps to publish command
 
 ### Changed
