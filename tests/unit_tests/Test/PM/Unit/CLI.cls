@@ -219,10 +219,11 @@ Method CompareModifiers(
 	}
 }
 
-Method RunCommand(pCommand As %String)
+Method RunCommand(pCommand As %String) As %Status
 {
-	do ##class(%IPM.Main).Shell(pCommand)
+	set status = ##class(%IPM.Main).Shell(pCommand)
 	do $$$LogMessage("Run command: "_pCommand)
+    return status
 }
 
 Method AssertNoException(pCommand As %String)
@@ -311,6 +312,77 @@ Method TestListPython() As %Status
         write !,"Actual:",! zwrite parsedCommandInfo
     }
     quit sc
+}
+
+Method TestUninstallWithCleanModifier()
+{
+    set module = "objectscript-math"
+    do $$$LogMessage("Testing: Uninstall with -clean flag to remove source directory.")
+
+    //TestRepository method removed the registry configuration. So reconfigure while testing
+    do ##class(%IPM.Main).GetVersion("zpm",.out)
+    if $get(out)="" {
+        do $$$LogMessage("No registry configured. So started configuring https://pm.community.intersystems.com")
+        set status = ..RunCommand("repo -remote -n registry -url https://pm.community.intersystems.com/ -user """" -pass """"")
+        do $$$AssertStatusOK(status, "Registory configured successfully")
+    }
+
+    // 1. Setup: Ensure module is installed
+    if '##class(%IPM.Storage.Module).NameExists(module) {
+        do $$$LogMessage("Module "_module_" not found. Installing...")
+        set status = ..RunCommand("install "_module)
+        do $$$AssertStatusOK(status, "Setup: Module installed successfully.")
+    }
+
+    // 2. Capture the root directory path
+    set moduleObj = ##class(%IPM.Storage.Module).NameOpen(module)
+    set moduleRootDir = moduleObj.Root
+    do $$$AssertNotEquals(moduleRootDir, "", "Verified module root directory path: "_moduleRootDir)
+
+    // 3. Test Standard Uninstall (Should NOT delete directory)
+    do $$$LogMessage("Step 1: Uninstalling "_module_" without -clean flag.")
+    set status = ..RunCommand("uninstall "_module)
+    do $$$AssertStatusOK(status, "Standard uninstall completed.")
+
+    set dirExists = ##class(%File).DirectoryExists(moduleRootDir)
+    do $$$AssertTrue(dirExists, "Verification: Directory still exists after standard uninstall (as expected).")
+
+    // 4. Re-install for Clean Test
+    do $$$LogMessage("Step 2: Re-installing for -clean flag test.")
+    set status = ..RunCommand("install "_module)
+    do $$$AssertStatusOK(status, "Module re-installed successfully.")
+
+    // 5. Test Uninstall with -c (Should delete directory)
+    do $$$LogMessage("Step 3: Uninstalling "_module_" with -clean flag.")
+    set status = ..RunCommand("uninstall "_module_" -c")
+    do $$$AssertStatusOK(status, "Clean uninstall completed.")
+
+    set dirDeleted = '##class(%File).DirectoryExists(moduleRootDir)
+    do $$$AssertTrue(dirDeleted, "Verification: Source directory was physically deleted from the file system.")
+
+    do $$$LogMessage("Repeating this test for the UnvierslSettings 'CleanOnUninsall'")
+    // ZPMInit method configuratio from installer
+    /// bydefualt keep this flag as 0
+    set status = ##class(%IPM.Repo.UniversalSettings).SetValue("CleanOnUninstall",0, 0)
+    do $$$AssertStatusOK(status, "initial setup for CleanOnUninstall done.")
+
+    do $$$LogMessage("Step 4: Re-installing for CleanOnUninstall settings test.")
+    set status = ..RunCommand("install "_module)
+    do $$$AssertStatusOK(status, "Module re-installed successfully.")
+
+    do $$$LogMessage("Step 5: Updating the CleanOnUninstall settings to 1.")
+    set status = ##class(%IPM.Repo.UniversalSettings).UpdateOne("CleanOnUninstall",1)
+    do $$$AssertStatusOK(status, "Updated the CleanOnUninstall to 1.")
+
+    do $$$LogMessage("Step 6: Uninstall the module without -clean flag")
+    set status = ..RunCommand("uninstall "_module)
+    do $$$AssertStatusOK(status, "Clean uninstall completed.")
+
+    set dirDeleted = '##class(%File).DirectoryExists(moduleRootDir)
+    do $$$AssertTrue(dirDeleted, "Verification: Source directory was physically deleted from the file system.")
+
+    do ##class(%IPM.Repo.UniversalSettings).ResetToDefault("CleanOnUninstall")
+    do $$$LogMessage("CleanOnUninstall configuration restored")
 }
 
 }

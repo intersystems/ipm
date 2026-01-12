@@ -480,6 +480,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
+<modifier name="clean" aliases="c"  description="Remove the module source directory during uninstall." />
 
 </command>
 
@@ -2455,6 +2456,12 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
             $$$ThrowOnError(..CheckModuleNamespace())
         }
         set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
+        if $data(pCommandInfo("modifiers","clean")) {
+            set tParams("Clean","clean") = pCommandInfo("modifiers","clean")
+        }
+        if $get(pCommandInfo("data","Verbose")) {
+            set tParams("Clean","Verbose") = 1
+        }
         $$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))
     }
 }
