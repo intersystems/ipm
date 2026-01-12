@@ -125,21 +125,21 @@ Method TestFileCopyScope()
         set mgrDir = $system.Util.ManagerDirectory()
         do $$$AssertTrue(##class(%File).Exists(ipmDir _ "FileCopy/testmodule/cls/Test.cls"), "Test.cls in " _ ipmDir _ "FileCopy/testmodule/cls exists")
         do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Test/test1.txt"), mgrDir _ "FileCopy/Scope/Test/test1.txt does not exist")
-        do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Scope/Test/test2.txt does not exist")
+        do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Scope/Verify/test2.txt does not exist")
 
         // call <module> test
         set status = ##class(%IPM.Main).Shell("testmodule test -v")
         do $$$AssertStatusOK(status,"Test phase succeeded")
         // The Scope="test" file should be copied
         do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Test/test1.txt"), mgrDir _ "FileCopy/Scope/Test/test1.txt does exist")
-        do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Scope/Test/test2.txt does not exist")
+        do $$$AssertNotTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Scope/Verify/test2.txt does not exist")
 
         // call <module> verify
         set status = ##class(%IPM.Main).Shell("testmodule verify -v")
         do $$$AssertStatusOK(status,"Verify phase succeeded")
         // The Scope="verify" file should be copied
         do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Test/test1.txt"), mgrDir _ "FileCopy/Scope/Test/test1.txt does exist")
-        do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Verify/Test/test2.txt does exist")
+        do $$$AssertTrue(##class(%File).Exists(mgrDir _ "FileCopy/Scope/Verify/test2.txt"), mgrDir _ "FileCopy/Verify/Verify/test2.txt does exist")
 
         // Clean up by deleting the copied directory
         set dir = mgrDir _ "FileCopy/"

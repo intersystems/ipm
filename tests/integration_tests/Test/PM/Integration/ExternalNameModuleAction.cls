@@ -9,27 +9,27 @@ Parameter ExternalName = "ext-name-mod-action";
 
 Method TestExternalNameModuleAction()
 {
-    Set dir = ..GetModuleDir(..#Folder)
-    Set sc = ##class(%IPM.Main).Shell("load "_dir)
-    Do $$$AssertStatusOK(sc, "Successfully loaded module")
+    set dir = ..GetModuleDir(..#Folder)
+    set sc = ##class(%IPM.Main).Shell("load "_dir)
+    do $$$AssertStatusOK(sc, "Successfully loaded module")
 
-    Set sc = ##class(%IPM.Main).Shell(..#DefaultName_" greeting")
-    Do $$$AssertStatusOK(sc, "Successfully executed action by default name")
+    set sc = ##class(%IPM.Main).Shell(..#DefaultName_" greeting")
+    do $$$AssertStatusOK(sc, "Successfully executed action by default name")
 
-    Set sc = ##class(%IPM.Main).Shell(..#ExternalName_" greeting")
-    Do $$$AssertStatusOK(sc, "Successfully executed action by external name")
+    set sc = ##class(%IPM.Main).Shell(..#ExternalName_" greeting")
+    do $$$AssertStatusOK(sc, "Successfully executed action by external name")
 
-    Set sc = ##class(%IPM.Main).Shell(..#DefaultName_" package")
-    Do $$$AssertStatusOK(sc, "Successfully package by default name")
+    set sc = ##class(%IPM.Main).Shell(..#DefaultName_" package")
+    do $$$AssertStatusOK(sc, "Successfully package by default name")
 
-    Set sc = ##class(%IPM.Main).Shell(..#ExternalName_" package")
-    Do $$$AssertStatusOK(sc, "Successfully package by external name")
+    set sc = ##class(%IPM.Main).Shell(..#ExternalName_" package")
+    do $$$AssertStatusOK(sc, "Successfully package by external name")
 
-    Set sc = ##class(%IPM.Main).Shell("package "_..#DefaultName)
-    Do $$$AssertStatusOK(sc, "Successfully package by default name")
+    set sc = ##class(%IPM.Main).Shell("package "_..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully package by default name")
 
-    Set sc = ##class(%IPM.Main).Shell("package "_..#ExternalName)
-    Do $$$AssertStatusOK(sc, "Successfully package by external name")
+    set sc = ##class(%IPM.Main).Shell("package "_..#ExternalName)
+    do $$$AssertStatusOK(sc, "Successfully package by external name")
 }
 
 }
