@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+    <Document name="publish-with-python-deps-base.ZPM">
+    <Module>
+      <Name>publish-with-python-deps-base</Name>
+      <Version>1.0.0</Version>
+      <Resource Name="Base.PKG" />
+      <Dependencies>
+        <ModuleReference>
+          <Name>publish-with-python-deps-dep</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

@@ -1203,11 +1203,12 @@ Method %Export(
             kill tSingleModuleArray
             merge tSingleModuleArray = tResourceArray(tModuleName)
             do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
-        }
 
-        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
-        if exportPythonDependencies {
-            do ..ExportPythonDependencies(.pParams)
+            set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
+            if exportPythonDependencies {
+                set pyDepMod = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
+                do ..ExportPythonDependencies(pyDepMod, .pParams)
+            }
         }
 
         // Export the deployed project to the target directory, if it's non-empty
@@ -1244,13 +1245,16 @@ Method %Export(
 }
 
 /// Downloads Python wheels for Python dependencies into the /root/wheels directory of the module. Also updates module.xml with the Python Wheel resources.
-Method ExportPythonDependencies(ByRef pParams)
+Method ExportPythonDependencies(
+	module As %IPM.Storage.Module,
+	ByRef pParams)
 {
-    set root = ##class(%File).NormalizeDirectory("", ..Module.Root)
+    set root = ##class(%File).NormalizeDirectory("", module.Root)
     $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
-    set wheelsDir = ##class(%File).NormalizeDirectory("wheels", ..Module.Root)
+    set wheelsDir = ##class(%File).NormalizeDirectory("wheels", module.Root)
     if '##class(%File).DirectoryExists(wheelsDir) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheels directory: "_wheelsDir_" not found."))
+        write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        quit
     }
     set stmt = ##class(%SQL.Statement).%New()
     $$$ThrowOnError(stmt.%PrepareClassQuery("%File", "FileSet"))
@@ -1262,7 +1266,7 @@ Method ExportPythonDependencies(ByRef pParams)
         if (type '= "F") || (file = "") {
             continue
         }
-    do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
+        do ##class(%IPM.StudioDocument.Module).AddPythonWheels(module.Name, file)
     }
     $$$ThrowOnError(sc)
 }

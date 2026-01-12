@@ -204,8 +204,16 @@ Method TestPackageWithPythonDeps() As %Status
 /// Test publishing with the -export-python-deps flag
 Method TestPublishWithPythonDeps() As %Status
 {
-    set moduleName = "publish-with-python-deps"
+    // First test the case where the module itself has python dependencies
+    do ..PublishTestHandler("publish-with-python-deps-dep")
 
+    // Next test the case where the base module has no ptyhon dependencies but dependency module does
+    do ..PublishTestHandler("publish-with-python-deps-base")
+}
+
+/// Handler method for publish test suite
+Method PublishTestHandler(moduleName As %String)
+{
     // Create a filesystem repository
     set dir = ..GetModuleDir("python-deps-tests", ..#PublishWithPythonDepsLocation)
     set sc = ##class(%IPM.Main).Shell("repo -fs -name localrepo -path "_dir)
@@ -220,7 +228,7 @@ Method TestPublishWithPythonDeps() As %Status
     do $$$AssertStatusOK(sc, "Configured remote repo")
 
     // Publish module to remote repository
-    set sc = ##class(%IPM.Main).Shell("publish -v "_moduleName_" -r remote -export-python-deps")
+    set sc = ##class(%IPM.Main).Shell("publish -v "_moduleName_" -r remote -export-python-deps -export-deps 1")
     do $$$AssertStatusOK(sc, "Published module "_moduleName_" to remote repository")
 
     // Uninstall module that came from filesystem repository
