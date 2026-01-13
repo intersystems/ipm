@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.5] - Unreleased
 
 ### Added
-- #938 Added flag -export-python-deps to package command
+- #938: Added flag -export-python-deps to package command
 - #462: The `repo` command for repository configuration now supports secret input terminal mode for passwords with the `-password-stdin` flag
 - #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
 - #950: Added support for listing installed Python packages using `list -python`, `list -py` and `list-installed -python`
@@ -41,6 +41,10 @@ lock contention by bypassing IRIS compiler.
 - #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 - #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.
 - #789: Fix error when listing modules for an ORAS repo with a specified namespace.
+- #999, #1000: Installing IPM cleans up stale mappings used in old versions of IPM
+- #1007: The `${ipmDir}` expression now works in the `<Arg>` of an `<Invoke>`
+- #1015: Fix dependency resolution bugs where `*` as the version requirement and intersecting ranges wouldn't work properly.
+- #1036: The `update` command no longer propagates developer mode to dependencies
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status

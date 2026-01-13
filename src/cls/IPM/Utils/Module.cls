@@ -274,20 +274,23 @@ ClassMethod LoadModuleFromDirectory(
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         write:tVerbose !,"Loading from ",pDirectory,!
+
+        // Propagate all params to dependencies except those that should only apply to the top level module
+        // pParams("Install") indicates this is a top-level module
         merge tParams = pParams
-        if $get(pParams("Install")) || $get(pParams("Update")) {
-            if $get(pParams("Update"),0) {
-                set tParams("cmd") = "update"
-            } else {
-                zkill tParams("Install")
-            }
-        } else {
-            // Propagate all params except DeveloperMode, UpdateSnapshots, IgnoreInstalled to dependencies
-            set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
+        if '$get(pParams("Install")) {
+            set tParams("DeveloperMode") = pOverrideDeveloperMode
             // Do not pass these down so BuildDependencyGraph() does not get called more than necessary
             kill tParams("UpdateSnapshots")
             kill tParams("IgnoreInstalled")
         }
+
+        if $get(pParams("Update")) {
+            set tParams("cmd") = "update"
+        } elseif $get(pParams("Install")) {
+            zkill tParams("Install")
+        }
+
         set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pLog)
         if $$$ISERR(tSC) {
             quit
@@ -1248,11 +1251,11 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-    set sc = pModule.BuildDependencyGraph(.depdendencyGraph,,reloadSnapshots,,"",,,,ignoreInstalled,,permitDowngrade)
+    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,"",,,,ignoreInstalled,,permitDowngrade)
     $$$ThrowOnError(sc)
     write "Done."
 
-    do ..ConstructInvertedDependencyGraph(.depdendencyGraph, .invertedDependencyGraph)
+    do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
     if isVerbose {
         write !, "Created inverted dependency graph from dependency graph"
     }
