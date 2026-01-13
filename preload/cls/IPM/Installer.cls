@@ -438,7 +438,7 @@ ClassMethod CleanupOldMappings() As %Status
         }
         set $namespace = namespace
         // check if IPM is installed in this namespace
-        if '$$$comClassDefined("%IPM.Utils.Module") {
+        if '$$$comClassDefined("%IPM.Main") {
             continue
         }
 
