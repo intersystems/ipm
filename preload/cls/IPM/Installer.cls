@@ -23,6 +23,7 @@ XData PM [ XMLNamespace = INSTALLER ]
     <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
     <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" />
   </Configuration>
+  <Invoke Class="IPM.Installer" Method="CleanupOldMappings"/>
   <Import File="${SRCDIR}" Recurse="1"/>
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
@@ -416,8 +417,7 @@ ClassMethod CreateTempDir() As %String
     return ##class(%File).NormalizeDirectory(tDir)
 }
 
-/// This method is called directly in LoadNewModule() instead of with an <Invoke> in the module.xml
-/// because the old mappings break load/install before any <Invokes> can be run.
+/// When installing a new version of IPM, make sure any old mappings are cleaned up
 ClassMethod CleanupOldMappings() As %Status
 {
     set sc = $$$OK
@@ -465,6 +465,11 @@ ClassMethod CleanupOldMappings() As %Status
         set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
         if $$$ISERR(status) {
             set sc = $$$ADDSC(sc, status)
+        }
+        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument",namespace)
+        if $$$ISERR(status) {
+            // this mapping deletion will fail if there are still sub-mappings present
+            // so we can ignore errors here
         }
     }
 
