@@ -1,8 +1,24 @@
 # Contributing to IPM
 
-To implement new features, enhance existing capabilities, or fix known bugs, you can set up a local environment using one of the following methods:
+## Process - Contributions, Review, and Prioritization
 
-## Develop IPM inside Docker containers
+IPM's primary maintainers are a highly invested cross-departmental team within InterSystems. We welcome community contributions, but at times may have limited bandwidth for thorough reviews alongside our own IPM- and non-IPM-related work.
+
+In general:
+* Regressions - InterSystems will review and merge PRs urgently (target: <1 week)
+* Other bug fixes - InterSystems will review and merge without a milestone associated with the issue (target: within 1 month)
+* Features are more complicated. We need to ensure alignment with the overall IPM roadmap and existing design.
+    * To avoid wasting contributors' time, InterSystems signoff on the spec is required before PR review and strongly advised before implementation work begins.
+    * If a feature issue is assigned to an InterSystems employee, that means that work may be in progress. Contributors should verify with the assignee before beginning work.
+    * For community-requested features, it is appropriate to report a GitHub issue and then create a Discussion to hone the spec. The final spec will go into the issue. While pending spec, the issue will be given the "needs spec" label and should not be actioned.
+    * Features we would like to see or implement in a certain timeframe will have an associated milestone.
+    * Features where we would particularly welcome community contribution will have the "help wanted" label.
+
+Pull request reviews will cover code style and quality, architectural consistency, and correctness to spec.
+
+## Technical Guide - Developing IPM in Docker Containers
+
+To implement new features, enhance existing capabilities, or fix known bugs, you can set up a local environment using one of the following methods:
 
 ### Commands
 To develop IPM inside Docker containers, we recommend running the following command directly:
