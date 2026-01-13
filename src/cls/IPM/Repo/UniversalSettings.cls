@@ -103,7 +103,7 @@ ClassMethod UpdateOne(
         quit
     }
     if key="ModuleRoot" {
-        $$$ThrowOnError(..CheckDirPermission(value))
+        do ..CheckDirPermission(value)
     }
     set sc = ..SetValue($parameter(..%ClassName(1),key), value)
     if $$$ISOK(sc) {
@@ -191,19 +191,17 @@ ClassMethod GetMouleRoot() As %String
     return ..GetValue(..#ModuleRoot)
 }
 
-ClassMethod CheckDirPermission(directory As %String = "") As %Status
+ClassMethod CheckDirPermission(directory As %String = "")
 {
-    set status = $$$OK
     if directory="" {
-        return $$$ERROR($$$DirectoryNameRequired)
+        $$$ThrowOnError($$$ERROR($$$DirectoryNameRequired))
     }
     set directory = ##class(%File).NormalizeDirectory(directory)
     if '##class(%File).DirectoryExists(directory) {
-        set status = $$$ERROR($$$DirectoryNotFound)
+        $$$ThrowOnError($$$ERROR($$$DirectoryNotFound))
     } elseif '##class(%File).Writeable(directory) {
-         set status = $$$ERROR($$$GeneralError,"No write permission on directory "_directory)
+         $$$ThrowOnError($$$ERROR($$$GeneralError,"No write permission on directory "_directory))
     }
-    return status
 }
 
 }

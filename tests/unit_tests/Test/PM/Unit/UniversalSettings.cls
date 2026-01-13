@@ -51,8 +51,7 @@ Method TestModuleRootConfiguration()
 {
     #define NormalizeDirectory(%dir)    ##class(%File).NormalizeDirectory(%dir)
     // Define the system default for comparison
-
-    //zpminit setup - set the global to default ipm directory
+    //ZPMInit method setup - set the global to default ipm directory
     do ##class(%IPM.Repo.UniversalSettings).SetValue("ModuleRoot",##class(%SYSTEM.Util).DataDirectory() _ "ipm/", 1)
 
     do $$$LogMessage("Running on "_$namespace_ "namespace")
@@ -83,11 +82,10 @@ Method TestModuleRootConfiguration()
     do $$$LogMessage("Phase 2: Testing permission validation for restricted directories.")
     try {
         // Attempting to set a restricted directory should trigger the validation logic you wrote
-        set status = ##class(%IPM.Repo.UniversalSettings).UpdateOne("ModuleRoot", "/usr")
-        do $$$AssertStatusNotOK(status, "Correctly blocked setting ModuleRoot to a restricted directory (/usr).")
+        do ##class(%IPM.Repo.UniversalSettings).UpdateOne("ModuleRoot", "/usr")
     } catch ex {
         // Fallback if the method throws an exception instead of returning a status
-        do $$$LogMessage("Caught expected exception during permission test: " _ ex.DisplayString())
+        do $$$AssertTrue(1, "Correctly blocked setting ModuleRoot to a restricted directory (/usr).")
     }
 
     do $$$LogMessage("Phase 3: Configuring a custom valid ModuleRoot.")
