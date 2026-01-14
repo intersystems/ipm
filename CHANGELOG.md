@@ -25,9 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 to load using multicompile instead of trying to do own multi-threading of item load which causes
 lock contention by bypassing IRIS compiler.
 - #481: Improve BuildDependencyGraph performance by doing the following:
- - Eliminate recursion and use iteration.
- - Remove depth first search and do pure breadth first search.
- - Have better caching of results for module searches by collapsing search expressions (reducing expressions that are intersections).
+    - Eliminate recursion and use iteration.
+    - Remove depth first search and do pure breadth first search.
+    - Have better caching of results for module searches by collapsing search expressions (reducing expressions that are intersections).
 
 ### Removed
 - #938: Removed secret flag NewVersion handling in %Publish()
@@ -49,6 +49,9 @@ lock contention by bypassing IRIS compiler.
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
 - #885: `-synchronous` flag since loading dependencies synchronously is now the default behavior.
+
+### Security
+- urllib3 wheel has been updated to 2.6.3
 
 ## [0.10.4] - 2025-10-21
 
