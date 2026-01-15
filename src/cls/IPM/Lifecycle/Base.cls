@@ -1200,15 +1200,19 @@ Method %Export(
             if (tModuleName = "") {
                 quit
             }
-            kill tSingleModuleArray
-            merge tSingleModuleArray = tResourceArray(tModuleName)
-            do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
-
             set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
             if exportPythonDependencies {
                 set pyDepMod = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
                 do ..ExportPythonDependencies(pyDepMod, .pParams)
+                // Recalculate resource array to pick up any python dependencies added during export
+                set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph)
+                if $$$ISERR(tSC) {
+                    quit
+                }
             }
+            kill tSingleModuleArray
+            merge tSingleModuleArray = tResourceArray(tModuleName)
+            do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
         }
 
         // Export the deployed project to the target directory, if it's non-empty
@@ -1249,6 +1253,15 @@ Method ExportPythonDependencies(
 	module As %IPM.Storage.Module,
 	ByRef pParams)
 {
+    set orderedResourceList = module.GetOrderedResourceList()
+    set key = ""
+    set resourceNameList = ""
+    for {
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+        set resourceNameList = resourceNameList_$listbuild($zconvert(resource.Name, "l"))
+    }
+
     set root = ##class(%File).NormalizeDirectory("", module.Root)
     $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
     set wheelsDir = ##class(%File).NormalizeDirectory("wheels", module.Root)
@@ -1266,7 +1279,10 @@ Method ExportPythonDependencies(
         if (type '= "F") || (file = "") {
             continue
         }
-        do ##class(%IPM.StudioDocument.Module).AddPythonWheels(module.Name, file)
+        if '$listfind(resourceNameList, $zconvert(file, "l")) {
+            write !!, "do ##class(%IPM.StudioDocument.Module).AddPythonWheels("_module.Name_", "_file_")", !!
+            do ##class(%IPM.StudioDocument.Module).AddPythonWheels(module.Name, file)
+        }
     }
     $$$ThrowOnError(sc)
 }
@@ -1849,6 +1865,7 @@ Method ExportSingleModule(
 	pVerbose As %Boolean = 0)
 {
     merge tParams = pParams
+    set exportPythonDependencies = $get(tParams("ExportPythonDependencies"), 0)
 
     set tFullResourceName = ""
     for {
@@ -1886,6 +1903,8 @@ Method ExportSingleModule(
 
         #dim tProcessor As %IPM.ResourceProcessor.Abstract
         if $data(pResourceArray(tFullResourceName,"Processor"),tProcessor) && $isobject(tProcessor) {
+            // If this is a python resource but -export-python-deps was not specified, skip this resource
+            if 'exportPythonDependencies && (tProcessor.%ClassName(1) = "%IPM.ResourceProcessor.PythonWheel") continue
             kill tItemParams
             merge tItemParams = pResourceArray(tFullResourceName)
             set tItemHandled = 0
