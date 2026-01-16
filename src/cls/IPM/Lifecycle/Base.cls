@@ -1280,7 +1280,6 @@ Method ExportPythonDependencies(
             continue
         }
         if '$listfind(resourceNameList, $zconvert(file, "l")) {
-            write !!, "do ##class(%IPM.StudioDocument.Module).AddPythonWheels("_module.Name_", "_file_")", !!
             do ##class(%IPM.StudioDocument.Module).AddPythonWheels(module.Name, file)
         }
     }
