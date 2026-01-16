@@ -1,7 +1,7 @@
 Class Test.PM.Integration.BuildDependencyGraph Extends Test.PM.Integration.Base
 {
 
-Method OnBeforeAllTests() As %Status
+Method OnBeforeOneTest() As %Status
 {
     set sc = ##class(%IPM.Main).Shell("repo -n build-dependency-graph -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/build-dependency-graph-loop/")
     do $$$AssertStatusOK(sc, "Created build-dependency-graph repo successfully.")
@@ -55,7 +55,7 @@ Method TestBuildDependencyGraphCount()
     do $$$AssertTrue($get(^CacheTemp.BuildDependencyGraph($job), 0) < 4)
 }
 
-Method OnAfterAllTests() As %Status
+Method OnAfterOneTest() As %Status
 {
     set methodDef = ##class(%Dictionary.MethodDefinition).%OpenId("%IPM.Storage.Module||BuildDependencyGraph")
 

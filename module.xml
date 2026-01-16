@@ -3,7 +3,7 @@
   <Document name="ZPM.ZPM">
     <Module>
       <Name>ZPM</Name>
-      <Version>0.10.5-SNAPSHOT</Version>
+      <Version>0.10.6-SNAPSHOT</Version>
       <ExternalName>IPM</ExternalName>
       <Description>InterSystems Package Manager (IPM) provides development tools and
         infrastructure for defining, building, distributing, and installing modules and
@@ -45,7 +45,7 @@
       <PythonWheel Name="referencing-0.36.2-py3-none-any.whl" ExtraPipFlags="--no-deps" />
       <PythonWheel Name="requests-2.32.4-py3-none-any.whl" ExtraPipFlags="--no-deps" />
       <PythonWheel Name="typing_extensions-4.12.2-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-      <PythonWheel Name="urllib3-2.6.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="urllib3-2.6.3-py3-none-any.whl" ExtraPipFlags="--no-deps" />
 
       <!-- Pure python implementation of rpds-py for offline installation or behind a
             firewall.
