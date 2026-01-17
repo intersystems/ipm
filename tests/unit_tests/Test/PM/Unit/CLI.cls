@@ -219,10 +219,12 @@ Method CompareModifiers(
 	}
 }
 
-Method RunCommand(pCommand As %String)
+/// This method returns the %Status for checking the success or failure of executed commands.
+Method RunCommand(pCommand As %String) As %Status
 {
-	do ##class(%IPM.Main).Shell(pCommand)
+	set status = ##class(%IPM.Main).Shell(pCommand)
 	do $$$LogMessage("Run command: "_pCommand)
+    return status
 }
 
 Method AssertNoException(pCommand As %String)
@@ -377,6 +379,20 @@ Method TestByPassIPMDepsModifier()
     do $$$LogMessage("Deleting the created directory...")
     set status = ##class(%File).RemoveDirectoryTree(moduleDir)
     do $$$AssertStatusOK(status, "Directory deleted successfully")
+}
+
+Method TestUninstallWithoutModuleName()
+{
+    do $$$LogMessage("Run Uninstall command without module name")
+    set status = ..RunCommand("uninstall")
+    do $$$AssertStatusNotOK(status, $system.Status.GetErrorText(status))
+    set status = ..RunCommand("install objectscript-math")
+    do $$$AssertStatusOK(status, "objectscript-math module installed successfully.")
+    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
+    do $$$AssertTrue(exists, "objectscript-math Module exists in storage after installation.")
+    do ..RunCommand("uninstall objectscript-math")
+    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
+    do $$$AssertNotTrue(exists, "Module removed successfully.")
 }
 
 }
