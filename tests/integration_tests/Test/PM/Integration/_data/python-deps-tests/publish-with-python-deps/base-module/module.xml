@@ -7,7 +7,15 @@
       <Resource Name="Base.PKG" />
       <Dependencies>
         <ModuleReference>
-          <Name>publish-with-python-deps-dep</Name>
+          <Name>publish-with-python-just-reqs</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>publish-with-python-just-wheels</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+        <ModuleReference>
+          <Name>publish-with-python-wheels-and-reqs</Name>
           <Version>^1.0.0</Version>
         </ModuleReference>
       </Dependencies>

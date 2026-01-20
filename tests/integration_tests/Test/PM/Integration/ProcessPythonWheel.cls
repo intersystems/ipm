@@ -204,15 +204,47 @@ Method TestPackageWithPythonDeps() As %Status
 /// Test publishing with the -export-python-deps flag
 Method TestPublishWithPythonDeps() As %Status
 {
-    // First test the case where the module itself has python dependencies
-    do ..PublishTestHandler("publish-with-python-deps-dep")
 
-    // Next test the case where the base module has no ptyhon dependencies but dependency module does
-    do ..PublishTestHandler("publish-with-python-deps-base")
+    // 1. Test the case of python dependencies defined via requirements.txt
+    set moduleNameReq = "publish-with-python-just-reqs"
+    set wheelsReq = ["docx2md-1.0.5-py3-none-any.whl",
+                     "lxml-6.0.2-cp312-cp312-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+                     "pillow-12.1.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+                     set wheels = {}
+    do wheels.%Set(moduleNameReq, wheelsReq)
+    do ..PublishTestHandler(moduleNameReq, wheels)
+
+    // 2. Test the case of python dependencies defined via wheel resources in module.xml
+    set moduleNameWhl = "publish-with-python-just-wheels"
+    set wheelsWhl = ["numpy-2.4.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+    set wheels = {}
+    do wheels.%Set(moduleNameWhl, wheelsWhl)
+    do ..PublishTestHandler(moduleNameWhl, wheels)
+
+    // 3. Test the case of python dependencies both defined in module.xml and requirements.txt
+    set moduleNameWhlReq = "publish-with-python-wheels-and-reqs"
+    set wheelsWhlReq = ["colorama-0.4.6-py2.py3-none-any.whl",
+                        "six-1.17.0-py2.py3-none-any.whl"]
+    set wheels = {}
+    do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
+    do ..PublishTestHandler(moduleNameWhlReq, wheels)
+
+
+
+    // 4. Test the three cases above but as dependencies of a base module being installed
+    set moduleNameDeps = "publish-with-python-deps-base"
+    // There are no wheels defined for this base module but each of the dependencies do have wheels to check
+    set wheels = {}
+    do wheels.%Set(moduleNameReq, wheelsReq)
+    do wheels.%Set(moduleNameWhl, wheelsWhl)
+    do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
+    do ..PublishTestHandler(moduleNameDeps, wheels)
 }
 
 /// Handler method for publish test suite
-Method PublishTestHandler(moduleName As %String)
+Method PublishTestHandler(
+	moduleName As %String,
+	wheels As %DynamicObject)
 {
     // Create a filesystem repository
     set dir = ..GetModuleDir("python-deps-tests", ..#PublishWithPythonDepsLocation)
@@ -239,6 +271,9 @@ Method PublishTestHandler(moduleName As %String)
     set sc = ##class(%IPM.Main).Shell("install -v remote/"_moduleName)
     do $$$AssertStatusOK(sc, "Successfully installed published module "_moduleName_" from remote repository")
 
+    // Confirm wheels were included in packaging/publishing
+    do ..AssertWheelResourcesExistForModule(wheels)
+
     // Uninstall the module used for this test
     set sc = ##class(%IPM.Main).Shell("uninstall "_moduleName)
     do $$$AssertStatusOK(sc, "Uninstalled module "_moduleName_" successfully")
@@ -248,6 +283,31 @@ Method PublishTestHandler(moduleName As %String)
     do $$$AssertStatusOK(sc, "Removed local filesystem repo")
     set sc = ##class(%IPM.Main).Shell("repo -delete -n remote")
     do $$$AssertStatusOK(sc, "Removed remote repo")
+}
+
+/// Given an object of <module name>-<wheel list> pairs,
+/// compiles a list of resources for the module and iterates over the wheel list to check if that wheel is a resource of the module
+/// 
+/// Ex: wheels= { "module1": ["wheel-1.whl","wheel-2.whl"], "module2":["wheel-3.whl","wheel-4.whl"] }
+Method AssertWheelResourcesExistForModule(wheels As %DynamicObject)
+{
+    set wheelsIter = wheels.%GetIterator()
+    while wheelsIter.%GetNext(.moduleName, .moduleWheels) {
+        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        set resourceList = ""
+        set key = ""
+        for {
+            set resource = module.Resources.GetNext(.key)
+            quit:key=""
+            set resourceList = resourceList_$listbuild($zconvert(resource.Name, "l"))
+        }
+
+        set moduleWheelsIter = moduleWheels.%GetIterator()
+        while moduleWheelsIter.%GetNext(, .wheel) {
+            set wheelIsResource = ($listfind(resourceList, wheel) > 0)
+            do $$$AssertTrue(wheelIsResource, "Wheel resource "_wheel_" is a part of the installed module "_moduleName)
+        }
+    }
 }
 
 }
