@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="module-b.ZPM">
+    <Module>
+      <Name>module-b</Name>
+      <Version>1.0.0+snapshot</Version>
+      <Dependencies>
+        <ModuleReference>
+          <Name>module-c</Name>
+          <Version>1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

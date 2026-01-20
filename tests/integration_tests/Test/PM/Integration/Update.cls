@@ -35,6 +35,12 @@ Parameter ModuleThreeVersion As STRING = "3.5.0";
 
 Parameter UpdateTestRepo As STRING = "update-test-modules";
 
+Parameter DefaultName = "default-name";
+
+Parameter ExternalName = "external-name";
+
+Parameter Folder = "publish-external-name";
+
 Method OnBeforeAllTests() As %Status
 {
   // Clean up repo used for tests
@@ -569,6 +575,91 @@ ClassMethod CleanUpDirectory(dir As %String)
     $$$ThrowOnError($$$ERROR($$$GeneralError,$$$FormatText("Unable to remove directory tree for dir = '%1", dir)))
   }
   return
+}
+
+/// Test that update works with external name as well as default name
+Method TestInterchangeableNameUpdate()
+{
+    set moduleDir = ..GetModuleDir(..#Folder)
+    // Test 1: Publish with default name, update with external name
+    $$$ThrowOnError(##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000"))
+    $$$ThrowOnError(##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.2")))
+
+    // Publish module
+    $$$ThrowOnError(##class(%IPM.Main).Shell("publish " _ ..#DefaultName _ " -verbose -r zot"))
+
+    // Uninstall module
+    set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled module")
+
+    // Load version 0.0.1
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.1"))
+    do $$$AssertStatusOK(sc, "Loaded module succesfully!")
+
+    // Update to version 0.0.2 using external name
+    set sc = ##class(%IPM.Main).Shell("update " _ ..#ExternalName _ " 0.0.2")
+    do $$$AssertStatusOK(sc, "Updated module succesfully!")
+
+    //Cleanup
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
+    do $$$AssertStatusOK(sc, "Unpublished default name from repo")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#DefaultName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install after unpublish")
+
+    // Test 2: Publish with external name, update with default name
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.2"))
+    do $$$AssertStatusOK(sc, "Loaded module succesfully!")
+
+    // Publish module
+    $$$ThrowOnError(##class(%IPM.Main).Shell("publish " _ ..#DefaultName _ " -verbose -r zot -use-ext"))
+
+    // Uninstall module
+    set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled module")
+
+    // Load version 0.0.1
+    set sc = ##class(%IPM.Main).Shell($$$FormatText("load %1", moduleDir _ "/0.0.1"))
+    do $$$AssertStatusOK(sc, "Loaded module succesfully!")
+
+    // Update to version 0.0.2 using default name
+    set sc = ##class(%IPM.Main).Shell("update " _ ..#DefaultName _ " 0.0.2")
+    do $$$AssertStatusOK(sc, "Updated module succesfully!")
+
+    //Cleanup
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
+    do $$$AssertStatusOK(sc, "Unpublished default name from repo")
+    set sc = ##class(%IPM.Main).Shell("install " _ ..#ExternalName)
+    do $$$AssertStatusNotOK(sc, "Correctly failed to install after unpublish")
+
+
+    // Cleanup by uninstalling module and removing zot repo
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
+    do $$$AssertStatusOK(sc, "Unpublished default name from repo")
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
+    do $$$AssertStatusOK(sc, "Unpublished external name from repo")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n zot -delete"))
+}
+
+/// Tests that dev mode is not propagated to dependencies during update
+Method TestDevModePropagation()
+{
+    set moduleDir = ..GetModuleDir("simplest-module") _ "/1.0.0"
+    set sc = ##class(%IPM.Main).Shell("load -v -dev " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Successfully load from folder")
+
+    set moduleDirTwo = ..GetModuleDir("simplest-module") _ "/3.0.0"
+    set sc = ##class(%IPM.Main).Shell("update simplest-module -v -dev -path " _ moduleDirTwo)
+    do $$$AssertStatusOK(sc, "Successfully updated from folder")
+
+    // Check that the main module has dev mode enabled
+    set module = ##class(%IPM.Storage.Module).NameOpen("simplest-module", sc)
+    do $$$AssertStatusOK(sc, "Opened module succesfully")
+    do $$$AssertEquals(module.DeveloperMode, 1)
+
+    set dep = ##class(%IPM.Storage.Module).NameOpen("simplest-module-dep", sc)
+    do $$$AssertStatusOK(sc, "Opened dependency succesfully")
+    do $$$AssertEquals(dep.DeveloperMode, 0)
 }
 
 }
