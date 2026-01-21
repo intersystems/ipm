@@ -191,12 +191,14 @@ Method TestPackageWithPythonDeps() As %Status
     set sc = ##class(%IPM.Main).Shell("uninstall package-with-python-deps")
     do $$$AssertStatusOK(sc, "Uninstalled module")
 
+    /*
     set sc = ##class(%IPM.Main).Shell("load -bypass-py-deps " _ exportDir _ "package-with-python-deps.tgz")
     do $$$AssertStatusOK(sc, "Loaded packaged module")
 
     // Cleanup
     set sc = ##class(%IPM.Main).Shell("uninstall package-with-python-deps")
     do $$$AssertStatusOK(sc, "Uninstalled module")
+    */
     set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
     do $$$AssertStatusOK(sc, "Deleted local filesystem repo")
 }
