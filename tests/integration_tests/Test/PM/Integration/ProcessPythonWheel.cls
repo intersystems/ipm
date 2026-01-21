@@ -17,6 +17,16 @@ Parameter ExportPackageWithPythonDepsLocation = "export-package-with-python-deps
 
 Parameter PublishWithPythonDepsLocation = "publish-with-python-deps";
 
+Method OnAfterOneTest() As %Status
+{
+    // Make test environment clean by uninstalling all modules at the end of each test
+    set sc = ##class(%IPM.Main).Shell("uninstall -all")
+    do $$$AssertStatusOK(sc, "Successfully uninstalled all modules after test")
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc, "Successfully deleted all repositories after test")
+    return sc
+}
+
 /// The PythonWheel resource processor expects to install wheels from the dist directory, as opposed to source code
 ClassMethod GenerateWheel()
 {
