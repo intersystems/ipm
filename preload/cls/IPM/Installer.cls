@@ -23,6 +23,7 @@ XData PM [ XMLNamespace = INSTALLER ]
     <ClassMapping Package="%IPM" From="${CURNSRoutineDB}" />
     <RoutineMapping Routines="%IPM.*" Type="ALL" From="${CURNSRoutineDB}" />
   </Configuration>
+  <Invoke Class="IPM.Installer" Method="CleanupOldMappings"/>
   <Import File="${SRCDIR}" Recurse="1"/>
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
@@ -414,6 +415,65 @@ ClassMethod CreateTempDir() As %String
         throw ##class(%Exception.General).%New("Failed to create temporary directory. Error code: " _ -tDir)
     }
     return ##class(%File).NormalizeDirectory(tDir)
+}
+
+/// When installing a new version of IPM, make sure any old mappings are cleaned up
+ClassMethod CleanupOldMappings() As %Status
+{
+    set sc = $$$OK
+    // Get list of all namespaces
+    new $namespace
+    set $namespace = "%SYS"
+    set status = ##class(%SYS.Namespace).ListAll(.nsList)
+    if $$$ISERR(status) {
+        return status
+    }
+
+    // Iterate through each namespace and remove old mappings
+    set namespace = ""
+    for {
+        set namespace = $order(nsList(namespace))
+        if namespace = "" {
+            quit
+        }
+        set $namespace = namespace
+        // check if IPM is installed in this namespace
+        if '$$$comClassDefined("%IPM.Main") {
+            continue
+        }
+
+        // Cleanup old mappings from oddStudioDocument
+        set key = ""
+        for {
+            set key = $order(^oddStudioDocument(key))
+            quit:key=""
+            if (key["%ZPM.PackageManager") || (key["%ZHSLIB.PackageManager") {
+                kill ^oddStudioDocument(key)
+            }
+        }
+
+        // These mappings were suggested as a temporary workaround for IRIS 2023.x,
+        // but whose underlying issues have been resolved in 2024.1 and later.
+        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(BEGIN):(""%ZP"")","IRISLIB")
+        if $$$ISERR(status) {
+            set sc = $$$ADDSC(sc, status)
+        }
+        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""%ZP""):(""A"")","IRISSYS")
+        if $$$ISERR(status) {
+            set sc = $$$ADDSC(sc, status)
+        }
+        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
+        if $$$ISERR(status) {
+            set sc = $$$ADDSC(sc, status)
+        }
+        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument",namespace)
+        if $$$ISERR(status) {
+            // this mapping deletion will fail if there are still sub-mappings present
+            // so we can ignore errors here
+        }
+    }
+
+    return sc
 }
 
 }
