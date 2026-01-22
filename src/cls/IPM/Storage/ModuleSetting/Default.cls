@@ -57,36 +57,51 @@ ClassMethod EvaluateAttribute(
     return attribute
 }
 
+/// Processes configuration values to resolve variable references.
+/// Searches for placeholders using the ${var} syntax and replaces them with
+/// the value of the corresponding 'Default' or 'Resource' name.
 ClassMethod ResolvePlaceholders(ByRef customParams)
 {
+    // found tracks if any changes were made in the current pass.
     set found = 1
+    // maxLevels is a safety guard to prevents infinite loops caused by circular references.
     set maxLevels = 20
-
+    do ##class(%IPM.Utils.Module).GetSystemExpressions(.systemPrams)
     while (found && (maxLevels > 0)) {
         set found = 0
         set maxLevels = maxLevels - 1
+        if 'maxLevels {
+            $$$ThrowOnError($$$ERROR($$$GeneralError,"Circular reference or too many levels in placeholders"))
+        }
         set param = ""
-
         for {
             set param = $order(customParams(param), 1, data)
             quit:param=""
             continue:data'["${"
-
-            set varExpr = "${" _ $piece($piece(data, "${", 2), "}") _ "}"
-            set resolved = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(varExpr)
-
-            if resolved = varExpr {
-                set internalVar = $piece($piece(data, "${", 2), "}")
-                set resolved = $get(customParams(internalVar), varExpr)
+            set lookup = ""
+			// user defined placeholder
+            for {
+                set lookup = $order(customParams(lookup), 1, val)
+                quit:lookup=""
+                set search = "${" _ lookup _ "}"
+                if data[search {
+                    set data = $replace(data, search, val)
+                    set customParams(param) = data
+                    set found = 1
+                }
             }
-
-            if resolved '= varExpr {
-                set prefix = $piece(data, "${", 1)
-                set suffix = $piece(data, "}", 2, *)
-                set customParams(param) = prefix _ resolved _ suffix
-                set found = 1
+			set lookup = ""
+			// system placeholder
+            for {
+                set lookup = $order(systemPrams(lookup), 1, val)
+                quit:lookup=""
+                set search = "${" _ lookup _ "}"
+                if data[search {
+                    set data = $replace(data, search, val)
+                    set customParams(param) = data
+                    set found = 1
+                }
             }
-
         }
     }
 }

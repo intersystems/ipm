@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
+- #1013: Implement recursive placeholder resolution in Default parameters
 
 ## [0.10.5] - 2026-01-15
 
@@ -23,7 +24,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
 - #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 - #1018: Require module name for uninstall when not using the -all flag
-- #1013: Implement recursive placeholder resolution in Default parameters
 
 ### Changed
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies

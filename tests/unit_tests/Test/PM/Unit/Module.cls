@@ -76,6 +76,16 @@ Method TestResolveAllVariables()
     set customParams("mTestVersion") = "${dataDefaultTest2}/xtest/${version}"
     set customParams("mTestPlaceHolder") = "${dataDefaultTest2}/xtest/${version}${mgrdir}${mTestVersion}${datapath1}"
 
+    //  Frankenstein Variable Assembly
+    // These variables test the "Multi-Pass" capability of the resolver.
+    // It must first resolve 'start', 'middle', and 'end' to build a new
+    // valid placeholder string ("${namespace}"), and then resolve that
+    // string against the System Dictionary in a subsequent pass.
+    set customParams("start") = "${"
+    set customParams("middle") = "namespace"
+    set customParams("end") = "}"
+    set customParams("frankenstein") = "${start}${middle}${end}"
+
     merge customParamsIn = customParams
     // output
     set customParamsOut("count")=7
@@ -90,15 +100,17 @@ Method TestResolveAllVariables()
     set customParamsOut("mTestPlaceHolder")="/usr/irissys/csp/xdata/xtest/1.0.0/usr/irissys/mgr//usr/irissys/csp/xdata/xtest/1.0.0/usr/irissys/mgr/user/mtsdata/"
     set customParamsOut("mTestVersion")="/usr/irissys/csp/xdata/xtest/1.0.0"
     set customParamsOut("version")="1.0.0"
-
+    set customParamsOut("start") = "${"
+    set customParamsOut("middle") = "namespace"
+    set customParamsOut("end") = "}"
+    set customParamsOut("frankenstein") = "USER"
     do ##class(%IPM.Storage.ModuleSetting.Default).ResolvePlaceholders(.customParams)
 
     do $$$LogMessage("Validate all placholder variables")
-
-    set variables = $listbuild("count","dataDefaultTest2","dataDefaultTest3","datadefaultcspdir","datadefaultmgrdir","datapath","datapath1","dataversion","ipmdir","mTestPlaceHolder","mTestVersion","version")
-
-    set ptr=0
-    while $listnext(variables, ptr, variable){
+    set variable=""
+    for {
+        set variable = $order(customParams(variable))
+        quit:variable=""
         do $$$AssertEquals(customParams(variable), customParamsOut(variable), variable_" is resolved correctly and the placeholder "_customParamsIn(variable)_" value is "_customParamsOut(variable))
     }
 }
