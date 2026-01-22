@@ -58,49 +58,52 @@ ClassMethod EvaluateAttribute(
 }
 
 /// Processes configuration values to resolve variable references.
-/// Searches for placeholders using the ${var} syntax and replaces them with
+/// Searches for placeholders using the ${var} or {$var} syntax and replaces them with
 /// the value of the corresponding 'Default' or 'Resource' name.
 ClassMethod ResolvePlaceholders(ByRef customParams)
 {
-    // found tracks if any changes were made in the current pass.
     set found = 1
     // maxLevels is a safety guard to prevents infinite loops caused by circular references.
     set maxLevels = 20
     do ##class(%IPM.Utils.Module).GetSystemExpressions(.systemPrams)
+
     while (found && (maxLevels > 0)) {
         set found = 0
-        set maxLevels = maxLevels - 1
-        if 'maxLevels {
+        //Decrement levels and check for circular references
+		if '$increment(maxLevels, -1) {
             $$$ThrowOnError($$$ERROR($$$GeneralError,"Circular reference or too many levels in placeholders"))
-        }
+		}
         set param = ""
         for {
             set param = $order(customParams(param), 1, data)
             quit:param=""
-            continue:data'["${"
-            set lookup = ""
-			// user defined placeholder
-            for {
-                set lookup = $order(customParams(lookup), 1, val)
-                quit:lookup=""
-                set search = "${" _ lookup _ "}"
-                if data[search {
-                    set data = $replace(data, search, val)
-                    set customParams(param) = data
-                    set found = 1
+            //Skip if no placeholders remain
+            continue:data'["{"
+
+            set initialData = data
+            for delimiter = "${", "{$" {
+                continue:data'[delimiter
+                set pCount = $length(data, delimiter)
+                for i=2:1:pCount {
+                    kill seen
+                    set chunk = $piece(data, delimiter, i)
+                    set key = $piece(chunk, "}", 1)
+                    continue:key=""
+                    continue:$data(seen(key))
+                    set seen(key) = ""
+
+                    set search = delimiter _ key _ "}"
+                    if $data(customParams(key), val) {
+                        set data = $replace(data, search, val)
+                    } elseif $data(systemPrams($$$lcase(key)), val) {
+                        // system variables handled as Case-Insensitive
+                        set data = $replace(data, search, val)
+                    }
                 }
             }
-			set lookup = ""
-			// system placeholder
-            for {
-                set lookup = $order(systemPrams(lookup), 1, val)
-                quit:lookup=""
-                set search = "${" _ lookup _ "}"
-                if data[search {
-                    set data = $replace(data, search, val)
-                    set customParams(param) = data
-                    set found = 1
-                }
+            if data '= initialData {
+                set customParams(param) = data
+                set found = 1
             }
         }
     }
