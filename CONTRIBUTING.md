@@ -16,6 +16,29 @@ In general:
 
 Pull request reviews will cover code style and quality, architectural consistency, and correctness to spec.
 
+## Style Guide
+As a general principle, try to copy the style of the existing code. If you are working in VS Code, use the formatting in `.vscode/settings.json`.
+
+### Syntax and Structure
+* Use full, unabbreviated command names: `set`, `quit`, `write`, instead of `s`, `q`, `w`.
+* Write one command per line—avoid combining operations with semicolons or unnecessary chaining.
+* Use blank lines generously to separate logical sections within methods.
+* Place opening braces on the same line as control structures (`if`, `for`, `while`, `try`, `catch`).
+* Avoid postconditionals except in simple, idiomatic cases
+    * Acceptable: early loop exits (`quit:key=""`) or conditional output (`write:verbose !,"message"`)
+### Variable Naming
+* For variable naming, use descripive names that convey purpose
+* Avoid `p-` and `t-` prefixes
+### Error Handling
+* Use try-catch blocks for error handling
+* Throw errors with `$$$ThrowOnError()` for methods that return a status or `$$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("<Descriptive message> %1",<details from a variable>)))` to construct a custom error status
+* Check status with `$$$ISERR()` or `$$$ISOK()`
+* All return statuses should be handled either by throwing errors or special handling if not fatal
+### Comments
+* Use `//` for inline comments
+* Use `///` for method and class-level documentation
+
+
 ## Technical Guide - Developing IPM in Docker Containers
 
 To implement new features, enhance existing capabilities, or fix known bugs, you can set up a local environment using one of the following methods:
