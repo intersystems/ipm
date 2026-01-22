@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="update-force-deps-a.ZPM">
+    <Module>
+      <Name>update-force-deps-a</Name>
+      <Version>1.1.0</Version>
+      <Packaging>module</Packaging>
+      <Dependencies>
+        <ModuleReference>
+          <Name>update-force-deps-base</Name>
+          <Version>1.1.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>
