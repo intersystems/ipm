@@ -43,6 +43,7 @@ Method TestNestedPlaceholderVar()
 
     do $$$LogMessage("List all modules")
     set status = ##class(%IPM.Main).Shell("list")
+    do $$$AssertStatusOK(status,"List all modules")
 
     set status = ##class(%IPM.Main).Shell("uninstall "_..#ModuleName)
     do $$$AssertStatusOK(status,"uninstalled module "_..#ModuleName_" successfully.")
