@@ -2349,26 +2349,6 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
     return result
 }
 
-ClassMethod GetSystemExpressions(ByRef SystemParams) As %String [ Internal ]
-{
-    do ..GetDatabaseInfoForNamespace($namespace, .properties)
-    set SystemParams("namespace") = $namespace
-    set SystemParams("namespacelower") = $zconvert($namespace,"L")
-    set SystemParams("namespaceroutinedb") = $get(properties("Routines"))
-    set SystemParams("namespaceglobalsdb") = $get(properties("Globals"))
-    set SystemParams("installdir") = $system.Util.InstallDirectory()
-    set SystemParams("datadir") = $system.Util.DataDirectory()
-    set SystemParams("mgrdir") = ##class(%Library.File).ManagerDirectory()
-    set SystemParams("cspdir") = ##class(%Library.File).NormalizeDirectory($system.Util.InstallDirectory()_"csp")
-    set SystemParams("bindir") = $system.Util.BinaryDirectory()
-    set SystemParams("libdir") = ##class(%Library.File).NormalizeDirectory($system.Util.InstallDirectory()_"lib")
-    do ##class(%Studio.General).GetWebServerPort(,,,.urlRoot)
-    set SystemParams("webroot") = urlRoot
-    set dbRole = ..GetDatabaseRole()
-    set SystemParams("dbrole") = dbRole
-    set SystemParams("globalsbbrole") = dbRole
-}
-
 ClassMethod %EvaluateMacro(pString As %String) As %String [ Internal ]
 {
     if pString '[ "$$$" {

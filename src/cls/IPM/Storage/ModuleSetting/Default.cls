@@ -65,14 +65,14 @@ ClassMethod ResolvePlaceholders(ByRef customParams)
     set found = 1
     // maxLevels is a safety guard to prevents infinite loops caused by circular references.
     set maxLevels = 20
-    do ##class(%IPM.Utils.Module).GetSystemExpressions(.systemPrams)
 
     while (found && (maxLevels > 0)) {
         set found = 0
         //Decrement levels and check for circular references
-		if '$increment(maxLevels, -1) {
+		if (maxLevels <= 0) {
             $$$ThrowOnError($$$ERROR($$$GeneralError,"Circular reference or too many levels in placeholders"))
 		}
+        set maxLevels = maxLevels - 1
         set param = ""
         for {
             set param = $order(customParams(param), 1, data)
@@ -83,9 +83,9 @@ ClassMethod ResolvePlaceholders(ByRef customParams)
             set initialData = data
             for delimiter = "${", "{$" {
                 continue:data'[delimiter
+                kill seen
                 set pCount = $length(data, delimiter)
                 for i=2:1:pCount {
-                    kill seen
                     set chunk = $piece(data, delimiter, i)
                     set key = $piece(chunk, "}", 1)
                     continue:key=""
@@ -95,9 +95,12 @@ ClassMethod ResolvePlaceholders(ByRef customParams)
                     set search = delimiter _ key _ "}"
                     if $data(customParams(key), val) {
                         set data = $replace(data, search, val)
-                    } elseif $data(systemPrams($$$lcase(key)), val) {
-                        // system variables handled as Case-Insensitive
-                        set data = $replace(data, search, val)
+                    }
+                    else {
+                        set resolved = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(search)
+                        if (resolved '= search) {
+                            set data = $replace(data, search, resolved)
+                        }
                     }
                 }
             }
