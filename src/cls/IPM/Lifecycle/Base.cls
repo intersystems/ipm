@@ -1194,20 +1194,17 @@ Method %Export(
         set tParams($$$DeployedProjectIndex) = tDeployedProject
 
         set tModuleName = ""
+        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
         for {
             set tModuleName = $order(tResourceArray(tModuleName))
             if (tModuleName = "") {
                 quit
             }
-            set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
             if exportPythonDependencies {
                 set pyDepMod = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
                 do ..ExportPythonDependencies(pyDepMod, .pParams)
                 // Recalculate resource array to pick up any python dependencies added during export
-                set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph)
-                if $$$ISERR(tSC) {
-                    quit
-                }
+                $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph))
             }
             kill tSingleModuleArray
             merge tSingleModuleArray = tResourceArray(tModuleName)
