@@ -537,7 +537,8 @@ ClassMethod DeleteWebApplications(pNamespace As %String) As %Status
 ClassMethod MapPackageEquivalently(
 	pPackageName As %String,
 	pSourceNamespace As %String,
-	pMappedToNamespace As %String) As %Status
+	pMappedToNamespace As %String,
+	pSkipActivation As %Boolean = 0) As %Status
 {
     set tSC = $$$OK
     try {
@@ -557,7 +558,7 @@ ClassMethod MapPackageEquivalently(
         }
         $$$ThrowOnError(tSC)
         set $namespace = oldNamespace
-        set tSC = ##class(%IPM.Utils.Module).AddPackageMapping(pMappedToNamespace, pPackageName, $listget(tDBList))
+        set tSC = ##class(%IPM.Utils.Module).AddPackageMapping(pMappedToNamespace, pPackageName, $listget(tDBList), pSkipActivation)
         $$$ThrowOnError(tSC)
     } catch e {
         set tSC = e.AsStatus()
@@ -570,7 +571,8 @@ ClassMethod MapRoutineEquivalently(
 	pRoutineName As %String,
 	pSourceNamespace As %String,
 	pType As %String = "ALL",
-	pMappedToNamespace As %String) As %Status
+	pMappedToNamespace As %String,
+	pSkipActivation As %Boolean = 0) As %Status
 {
     set tSC = $$$OK
     try {
@@ -590,7 +592,7 @@ ClassMethod MapRoutineEquivalently(
         }
         $$$ThrowOnError(tSC)
         set $namespace = oldNamespace
-        set tSC = ##class(%IPM.Utils.Module).AddRoutineMapping(pMappedToNamespace, pRoutineName, pType, $listget(tDBList))
+        set tSC = ##class(%IPM.Utils.Module).AddRoutineMapping(pMappedToNamespace, pRoutineName, pType, $listget(tDBList), pSkipActivation)
         $$$ThrowOnError(tSC)
     } catch e {
         set tSC = e.AsStatus()
@@ -602,7 +604,8 @@ ClassMethod MapRoutineEquivalently(
 ClassMethod MapGlobalEquivalently(
 	pGlobalName As %String,
 	pSourceNamespace As %String,
-	pMappedToNamespace As %String) As %Status
+	pMappedToNamespace As %String,
+	pSkipActivation As %Boolean = 0) As %Status
 {
     set tSC = $$$OK
     try {
@@ -622,7 +625,7 @@ ClassMethod MapGlobalEquivalently(
         }
         $$$ThrowOnError(tSC)
         set $namespace = oldNamespace
-        set tSC = ##class(%IPM.Utils.Module).AddGlobalMapping(pMappedToNamespace, pGlobalName, $listget(tDBList))
+        set tSC = ##class(%IPM.Utils.Module).AddGlobalMapping(pMappedToNamespace, pGlobalName, $listget(tDBList), pSkipActivation)
         $$$ThrowOnError(tSC)
     } catch e {
         set tSC = e.AsStatus()
