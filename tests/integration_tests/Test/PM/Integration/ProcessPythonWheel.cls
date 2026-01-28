@@ -230,48 +230,8 @@ Method TestPackageWithPythonDeps() As %Status
     do $$$AssertStatusOK(sc, "Deleted local filesystem repo")
 }
 
-/// Test publishing with the -export-python-deps flag
-Method TestPublishWithPythonDeps() As %Status
-{
-
-    // 1. Test the case of python dependencies defined via requirements.txt
-    set moduleNameReq = "publish-with-python-just-reqs"
-    set wheelsReq = ["docx2md-1.0.5-py3-none-any.whl",
-                     "lxml-6.0.2-cp312-cp312-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
-                     "pillow-12.1.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
-                     set wheels = {}
-    do wheels.%Set(moduleNameReq, wheelsReq)
-    do ..PublishTestHandler(moduleNameReq, wheels)
-
-    // 2. Test the case of python dependencies defined via wheel resources in module.xml
-    set moduleNameWhl = "publish-with-python-just-wheels"
-    set wheelsWhl = ["numpy-2.4.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
-    set wheels = {}
-    do wheels.%Set(moduleNameWhl, wheelsWhl)
-    do ..PublishTestHandler(moduleNameWhl, wheels)
-
-    // 3. Test the case of python dependencies both defined in module.xml and requirements.txt
-    set moduleNameWhlReq = "publish-with-python-wheels-and-reqs"
-    set wheelsWhlReq = ["colorama-0.4.6-py2.py3-none-any.whl",
-                        "six-1.17.0-py2.py3-none-any.whl"]
-    set wheels = {}
-    do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
-    do ..PublishTestHandler(moduleNameWhlReq, wheels)
-
-
-
-    // 4. Test the three cases above but as dependencies of a base module being installed
-    set moduleNameDeps = "publish-with-python-deps-base"
-    // There are no wheels defined for this base module but each of the dependencies do have wheels to check
-    set wheels = {}
-    do wheels.%Set(moduleNameReq, wheelsReq)
-    do wheels.%Set(moduleNameWhl, wheelsWhl)
-    do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
-    do ..PublishTestHandler(moduleNameDeps, wheels)
-}
-
 /// Omitting -export-python-deps flag should package without the python
-Method TestWithoutPythonDeps() As %Status
+Method TestPackageWithoutPythonDeps() As %Status
 {
     set dir = ..GetModuleDir("python-deps-tests", ..#PackageWithPythonDepsLocation)
 
@@ -311,6 +271,46 @@ Method TestWithoutPythonDeps() As %Status
 
     set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
     do $$$AssertStatusOK(sc, "Deleted local filesystem repo")
+}
+
+/// Test publishing with the -export-python-deps flag
+Method TestPublishWithPythonDeps() As %Status
+{
+
+    // 1. Test the case of python dependencies defined via requirements.txt
+    set moduleNameReq = "publish-with-python-just-reqs"
+    set wheelsReq = ["docx2md-1.0.5-py3-none-any.whl",
+                     "lxml-6.0.2-cp312-cp312-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+                     "pillow-12.1.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+                     set wheels = {}
+    do wheels.%Set(moduleNameReq, wheelsReq)
+    do ..PublishTestHandler(moduleNameReq, wheels)
+
+    // 2. Test the case of python dependencies defined via wheel resources in module.xml
+    set moduleNameWhl = "publish-with-python-just-wheels"
+    set wheelsWhl = ["numpy-2.4.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+    set wheels = {}
+    do wheels.%Set(moduleNameWhl, wheelsWhl)
+    do ..PublishTestHandler(moduleNameWhl, wheels)
+
+    // 3. Test the case of python dependencies both defined in module.xml and requirements.txt
+    set moduleNameWhlReq = "publish-with-python-wheels-and-reqs"
+    set wheelsWhlReq = ["colorama-0.4.6-py2.py3-none-any.whl",
+                        "six-1.17.0-py2.py3-none-any.whl"]
+    set wheels = {}
+    do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
+    do ..PublishTestHandler(moduleNameWhlReq, wheels)
+
+
+
+    // 4. Test the three cases above but as dependencies of a base module being installed
+    set moduleNameDeps = "publish-with-python-deps-base"
+    // There are no wheels defined for this base module but each of the dependencies do have wheels to check
+    set wheels = {}
+    do wheels.%Set(moduleNameReq, wheelsReq)
+    do wheels.%Set(moduleNameWhl, wheelsWhl)
+    do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
+    do ..PublishTestHandler(moduleNameDeps, wheels)
 }
 
 /// Handler method for publish test suite

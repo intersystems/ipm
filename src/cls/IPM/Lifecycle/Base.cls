@@ -1201,10 +1201,10 @@ Method %Export(
                 quit
             }
             if exportPythonDependencies {
-                set pyDepMod = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
-                do ..ExportPythonDependencies(pyDepMod, .pParams)
+                set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
+                do ..ExportPythonDependencies(tModule, .pParams)
                 // Recalculate resource array to pick up any python dependencies added during export
-                $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph))
+                $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tExportDependencies,..PhaseList,.pDependencyGraph))
             }
             kill tSingleModuleArray
             merge tSingleModuleArray = tResourceArray(tModuleName)
@@ -1262,6 +1262,8 @@ Method ExportPythonDependencies(
     $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
     set wheelsDir = ##class(%File).NormalizeDirectory("wheels", module.Root)
     if '##class(%File).DirectoryExists(wheelsDir) {
+        // ExportPythonDependencies called on base module + dependencies so don't want to error if one of
+        // the modules doesn't have a wheels directory since that might actually be the case for the module
         write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
         quit
     }
@@ -1270,13 +1272,13 @@ Method ExportPythonDependencies(
     set rset = stmt.%Execute(wheelsDir, "*.whl")
     $$$ThrowSQLIfError(rset.%SQLCODE,rset.%Message)
     while rset.%Next(.sc) {
-        set file = rset.%Get("ItemName")
+        set wheelFileName = rset.%Get("ItemName")
         set type = rset.%Get("Type")
-        if (type '= "F") || (file = "") {
+        if (type '= "F") || (wheelFileName = "") {
             continue
         }
-        if '$listfind(resourceNameList, $zconvert(file, "l")) {
-            do ##class(%IPM.StudioDocument.Module).AddPythonWheels(module.Name, file)
+        if '$listfind(resourceNameList, $zconvert(wheelFileName, "l")) {
+            do ##class(%IPM.StudioDocument.Module).AddPythonWheels(module.Name, wheelFileName)
         }
     }
     $$$ThrowOnError(sc)
