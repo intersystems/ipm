@@ -1894,6 +1894,8 @@ ClassMethod EndCaptureOutput(
     } else {
         #; Otherwise switch redirection off
         do $zutil(82,12,0)
+        #; Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
+        use $io::("")
     }
 
     try {
