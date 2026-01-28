@@ -3922,7 +3922,6 @@ ClassMethod DisplayModules(
     if '$data(pList) {
         quit
     }
-    merge ^mtempdc($zhorolog,"pList") = pList
     set pWithNamespace = pWithNamespace || $data(pList("ns"))
     if pWithNamespace {
         set nsWidth = $get(pList("width")) + 2
