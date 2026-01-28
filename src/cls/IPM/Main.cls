@@ -909,14 +909,56 @@ ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
     set mirrorStatus = $system.Mirror.GetStatus()
     set mirrorStatus = "Mirror Status: " _ mirrorStatus
 
+    $$$ThrowOnError(..GetIPMVersionInfo(.ipmVersion, .mappedFromNamespace))
+    if mappedFromNamespace'="" {
+        set ipmVersion = ipmVersion_" (mapped from namespace '"_mappedFromNamespace_"')"
+    }
+
     set list = $listbuild(
-        "Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule($$$IPMModuleName)),
+        "Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ipmVersion),
         "Enter q/quit to exit the shell. Enter ?/help to view available commands",
         registryInfo,
         systemMode,
         mirrorStatus
     )
     quit list
+}
+
+/// Get IPM version for current/specified namespace, including mapping information
+/// Returns version and source namespace (if mapped)
+ClassMethod GetIPMVersionInfo(
+	Output version As %String,
+	Output mappedFromNamespace As %String,
+	namespace As %String = "") As %Status
+{
+    new $namespace
+    set namespace = $select(namespace'="": namespace, 1: $namespace)
+
+    try {
+        // Check if locally installed
+        if ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .id) {
+            set module = ##class(%IPM.Storage.Module).%OpenId(id)
+            set version = module.VersionString
+            set mappedFromNamespace = ""
+            return $$$OK
+        }
+
+        // Check if mapped from another namespace
+        do ..GetMapInfo(.isMappedFrom, .isMappedTo)
+        if $data(isMappedFrom(namespace), sourceNamespace) {
+            set $namespace = sourceNamespace
+            if ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .srcId) {
+                set srcModule = ##class(%IPM.Storage.Module).%OpenId(srcId)
+                set version = srcModule.VersionString
+                set mappedFromNamespace = sourceNamespace
+                return $$$OK
+            }
+        }
+
+        return $$$ERROR($$$GeneralError, "IPM not installed or mapped in namespace " _ namespace)
+    } catch ex {
+        return ex.AsStatus()
+    }
 }
 
 /// For use in unit tests that need to test if a command threw any exceptions.
@@ -1404,7 +1446,7 @@ ClassMethod GetDefaultCommandRegistry()
 /// Get Version Module
 ClassMethod GetVersionModule(
 	name,
-	namespace = {$namespace})
+	namespace = {$namespace}) As %String
 {
     new $namespace
     set $namespace=namespace
@@ -3879,6 +3921,7 @@ ClassMethod DisplayModules(
     if '$data(pList) {
         quit
     }
+    merge ^mtempdc($zhorolog,"pList") = pList
     set pWithNamespace = pWithNamespace || $data(pList("ns"))
     if pWithNamespace {
         set nsWidth = $get(pList("width")) + 2
@@ -3996,54 +4039,55 @@ ClassMethod GetUpstreamPackageVersions(Output list)
 /// Provides information on all installed top level modules (i.e. modules that are not depended on)
 ClassMethod Information(ByRef pCommandInfo)
 {
-  set verbose = $$$HasModifier(pCommandInfo,"verbose")
-  // Figure out which installed modules are not dependencies by
-  // 1) getting list of all installed modules
-  // 2) getting list of all dependencies
-  // and 3) cross checking the two lists
-  do ..GetListModules(,,.modList)
-  set depRes = ##class(%SQL.Statement).%ExecDirect(,
-    "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
-    "from %IPM_Storage.ModuleItem_Dependencies")
-  $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
-  while depRes.%Next(.sc) {
-    $$$ThrowOnError(sc)
-    set visited($zconvert(depRes.%Get("DepName"),"l")) = 1
-  }
-  $$$ThrowOnError(sc)
-
-  set topLevelList("width") = 0
-  for i = 1:1:modList {
-    set entry = modList(i)
-    set name = $listget(entry, 1)
-    // only list non-dependencies
-    if '$data(visited(name)) {
-      // compile information
-      set externalName = $list(entry, 3)
-      if (externalName '= "") && (externalName '= name) {
-        if verbose {
-          set $list(entry, 1) = externalName_" (" _ name _ ")"
-        } else {
-          set $list(entry, 1) = externalName
-        }
-      }
-      if topLevelList("width") < $length($listget(entry)) {
-        set topLevelList("width") = $length($listget(entry))
-      }
-      set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
-      set $list(entry, 2) = version.ToStringWithoutBuild()
-      set topLevelList($increment(topLevelList)) = entry
+    set verbose = $$$HasModifier(pCommandInfo,"verbose")
+    // Figure out which installed modules are not dependencies by
+    // 1) getting list of all installed modules
+    // 2) getting list of all dependencies
+    // and 3) cross checking the two lists
+    do ..GetListModules(,,.modList)
+    set depRes = ##class(%SQL.Statement).%ExecDirect(,
+        "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
+        "from %IPM_Storage.ModuleItem_Dependencies")
+    $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+    while depRes.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set visited($zconvert(depRes.%Get("DepName"),"l")) = 1
     }
-  }
+    $$$ThrowOnError(sc)
 
-  set messages = ..BuildIntroMessages(.outOfBoxMessage)
-  set messages = messages _ $listbuild(outOfBoxMessage)
-  set ptr = 0
-  while $listnext(messages, ptr, line) {
-    write !, line
-  }
-  write !!, "Currently installed top-level modules are listed below:", !
-  do ..DisplayModules(.topLevelList)
+    set topLevelList = 0
+    set topLevelList("width") = 0
+    for i = 1:1:modList {
+        set entry = modList(i)
+        set name = $listget(entry, 1)
+        // only list non-dependencies
+        if '$data(visited(name)) {
+        // compile information
+        set externalName = $list(entry, 3)
+        if (externalName '= "") && (externalName '= name) {
+            if verbose {
+            set $list(entry, 1) = externalName_" (" _ name _ ")"
+            } else {
+            set $list(entry, 1) = externalName
+            }
+        }
+        if topLevelList("width") < $length($listget(entry)) {
+            set topLevelList("width") = $length($listget(entry))
+        }
+        set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
+        set $list(entry, 2) = version.ToStringWithoutBuild()
+        set topLevelList($increment(topLevelList)) = entry
+        }
+    }
+
+    set messages = ..BuildIntroMessages(.outOfBoxMessage)
+    set messages = messages _ $listbuild(outOfBoxMessage)
+    set ptr = 0
+    while $listnext(messages, ptr, line) {
+        write !, line
+    }
+    write !!, "Currently installed top-level modules are listed below:", !
+    do ..DisplayModules(.topLevelList)
 }
 
 ClassMethod Update(ByRef pCommandInfo)
