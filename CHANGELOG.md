@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1002: When listing configured repositories, only show the TokenAuthMethod when a token is defined.
 - #1024: Modules with PythonWheels have wheels packaged correctly under -export-python-deps
 - #1061: Fix issue when installing from OCI/ORAS registries
+- #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
+- #1052: In a namespace with mapped IPM, the `info` command works again and the intro message displays the IPM version and where its mapped from
 
 ## [0.10.5] - 2026-01-15
 
