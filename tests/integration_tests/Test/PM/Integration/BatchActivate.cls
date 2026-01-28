@@ -118,6 +118,7 @@ Method TestBatchActivationSkipsWhenNoChanges()
     set sc = ##class(%IPM.Main).Shell("unmap -ns " _ ns _ " -q")
     do $$$AssertStatusOK(sc, "First unmap executed successfully")
 
+    set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     // Try to unmap again from the same namespace
     // Since there are no more IPM mappings, this should skip
