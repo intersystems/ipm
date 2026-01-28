@@ -909,8 +909,9 @@ ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
     set mirrorStatus = $system.Mirror.GetStatus()
     set mirrorStatus = "Mirror Status: " _ mirrorStatus
 
-    $$$ThrowOnError(..GetIPMVersionInfo(.ipmVersion, .mappedFromNamespace))
-    if mappedFromNamespace'="" {
+    if $$$ISERR(..GetIPMVersionInfo(.ipmVersion, .mappedFromNamespace)) {
+        set ipmVersion = "Not installed"
+    } elseif mappedFromNamespace'="" {
         set ipmVersion = ipmVersion_" (mapped from namespace '"_mappedFromNamespace_"')"
     }
 
