@@ -8,8 +8,8 @@ Include (%IPM.Common, %IPM.Formatting)
 Class %IPM.General.AbstractHistory Extends %Persistent [ Abstract, NoExtent ]
 {
 
-/// Action of this history record. Can be load, install, uninstall or update
-Property Action As %String(VALUELIST = ",load,install,uninstall,update") [ Required ];
+/// Action of this history record. Can be load, install, ci, uninstall or update
+Property Action As %String(VALUELIST = ",load,install,ci,uninstall,update") [ Required ];
 
 /// Name of the package being logged. This is not necessarily required, e.g. when loading a nonexistent directory.
 Property Package As %IPM.DataType.ModuleName;
@@ -64,6 +64,11 @@ ClassMethod Init(
 ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.AbstractHistory
 {
     quit ..Init("install", Package)
+}
+
+ClassMethod CleanInstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.AbstractHistory
+{
+    quit ..Init("ci", Package)
 }
 
 ClassMethod LoadInit(Package As %IPM.DataType.ModuleName = "") As %IPM.General.AbstractHistory

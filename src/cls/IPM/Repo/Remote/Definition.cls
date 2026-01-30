@@ -132,6 +132,20 @@ Method GetPublishingManager(ByRef status)
     return ##class(%IPM.Repo.Remote.PublishManager).%Get(.status)
 }
 
+ClassMethod LockFileValuesToModifiers(
+	lockFileValues As %DynamicObject,
+	Output modifiers)
+{
+    set modifiers("remote") = ""
+    set modifiers("name") = lockFileValues.%Get("name")
+    set modifiers("url") = lockFileValues.%Get("url")
+    set modifiers("read-only") = lockFileValues.%Get("readOnly")
+    // TODO: Implement calling system variables to get username/password/token values
+    set modifiers("username") = ""
+    set modifiers("password") = ""
+    set modifiers("token") = ""
+}
+
 Method LockFileTypeGet()
 {
     return ..#MONIKERALIAS
@@ -141,7 +155,6 @@ XData LockFileMapping
 {
 <Mapping xmlns="http://www.intersystems.com/jsonmapping">
   <Property Name="LockFileType" FieldName="type" />
-  <Property Name="OverriddenSortOrder" FieldName="overriddenSortOrder" />
   <Property Name="ReadOnly" FieldName="readOnly" />
   <Property Name="URL" FieldName="url" />
 </Mapping>

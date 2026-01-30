@@ -790,6 +790,25 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
 </command>
 
+<command name="ci">
+<summary>Installs a module from a lock file</summary>
+<description>
+    Installs a module from its lock file. Will first install all listed repositories followed by dependency modules and then the base module.
+</description>
+
+<!-- Examples -->
+<example description="Reads from the module-lock.json defined for mymodule and installs the repositories, module, and dependencies">
+    ci mymodule 3.0.0
+</example>
+
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module on which to perform update actions" />
+<parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
+
+<!-- Modifiers -->
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 </commands>
 }
 
@@ -1030,8 +1049,10 @@ ClassMethod ShellInternal(
                 do ..ModuleVersion(.tCommandInfo)
             } elseif (tCommandInfo = "information") {
                 do ..Information(.tCommandInfo)
-			} elseif (tCommandInfo = "history") {
-				do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "history") {
+                do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "ci") {
+                do ..CleanInstall(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -2395,12 +2416,11 @@ ClassMethod Install(
                         $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
                     }
                 }
-				$$$ThrowOnError(log.SetSource(tResult.ServerName))
-				$$$ThrowOnError(log.SetVersion(tResult.Version))
+                $$$ThrowOnError(log.SetSource(tResult.ServerName))
+                $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
-            set tPrefix = ""
             if (tModuleName '= "") {
                 if (tVersion '= "") {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
@@ -2414,10 +2434,131 @@ ClassMethod Install(
             }
         }
     } catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        throw ex
+    }
+    $$$ThrowOnError(log.Finalize($$$OK, devMode))
+}
+
+ClassMethod CleanInstall(ByRef commandInfo) [ Internal ]
+{
+    set moduleName = $get(commandInfo("parameters","module"))
+    set version = $get(commandInfo("parameters","version"))
+    set verbose = $get(commandInfo("data","Verbose"))
+    set log = ##class(%IPM.General.HistoryTemp).CleanInstallInit(moduleName)
+
+    // TODO: Add "path"? (see Update() for more info of calling install v load)
+
+    if verbose {
+        write !, "Going to run a clean install on "_moduleName
+    }
+
+    // Indicating to commandInfo that this is a clean install command, not an install or load command. commandInfo will be passed to either Install() or Load() to continue performing the update.
+    set commandInfo("data","cmd") = "ci"
+    set commandInfo("data","CleanInstall") = 1
+    set log = ##class(%IPM.General.HistoryTemp).UpdateInit(moduleName)
+
+    // Forward execution to install
+    do ..Install(.commandInfo, log)
+
+
+
+    /*
+    zwrite commandInfo
+    return
+    set registry = ""
+    set moduleName = $get(commandInfo("parameters","module"))
+    if (moduleName["/") {
+        set $listbuild(registry, moduleName) = $listfromstring(moduleName, "/")
+    }
+
+    if pLog = "" {
+        set log = ##class(%IPM.General.HistoryTemp).CleanInstallInit(moduleName)
+    } else {
+        set log = pLog
+    }
+
+    try {
+        if (moduleName = "") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "No module name specified."))
+        }
+
+        if moduleName = $$$IPMModuleName {
+            $$$ThrowOnError(..CheckModuleNamespace())
+        }
+        // check if any registries are configured and enabled
+        new SQLCODE, count
+        &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
+        $$$ThrowSQLIfError(SQLCODE,%message)
+        if (SQLCODE = 0) && (count = 0) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
+        }
+
+        set version = $get(commandInfo("parameters","version"))
+
+        set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+        set searchCriteria.Registry = registry
+        set searchCriteria.Name = $$$lcase(moduleName)
+        set searchCriteria.VersionExpression = version
+        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(searchCriteria,.results))
+
+        if (results.Count() > 0) {
+            set result = ""
+            #dim result As %IPM.Storage.QualifiedModuleInfo
+            // Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
+            if ('$$$HasModifier(commandInfo,"prompt") || (results.Count() = 1)) { // && (tKeywords = "") {
+                set result = results.GetAt(1)
+            } elseif (results.Count() > 0) {
+                for i=1:1:results.Count() {
+                    set tResultInfo = results.GetAt(i)
+                    set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
+                }
+
+                set tValue = ""
+                set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
+                if (tResponse '= $$$SuccessResponse) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+                }
+                if (tValue '= "") {
+                    set result = results.GetAt(tValue)
+                }
+            }
+
+            if (result '= "") {
+                do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.params)
+                merge params = commandInfo("data")
+                set params("cmd") = "ci"
+                set params("CleanInstall") = 1
+                set params("Verbose") = 1  // TODO: Replace this with actual new parameter instead of shoe-horning this in for logging at other parts of the loading
+                if result.Deployed {
+                    set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
+                    set result.PlatformVersion = platformVersion
+                    if ('result.PlatformVersions.Find(platformVersion)) {
+                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '"_moduleName_"' "_result.VersionString_" not supported on this platform "_platformVersion_"."))
+                    }
+                }
+                $$$ThrowOnError(log.SetSource(result.ServerName))
+                $$$ThrowOnError(log.SetVersion(result.Version))
+                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(result, .params, , log))
+            }
+        } else {
+            set tPrefix = ""
+            if (moduleName '= "") {
+                if (version '= "") {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, moduleName_" "_version_" not found in any repository."))
+                } else {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "'"_moduleName_"' not found in any repository."))
+                }
+            } else {
+                write !,"No modules found. Are there any repositories configured in the current namespace?"
+            }
+        }
+    } catch ex {
+		$$$ThrowOnError(log.Finalize(ex.AsStatus()))
 		throw ex
 	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+	$$$ThrowOnError(log.Finalize($$$OK))
+    */
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]

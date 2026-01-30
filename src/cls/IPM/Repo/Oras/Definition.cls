@@ -140,11 +140,24 @@ Method GetPublishingManager(ByRef status)
     return ##class(%IPM.Repo.Oras.PublishManager).%Get(.status)
 }
 
+ClassMethod LockFileValuesToModifiers(
+	lockFileValues As %DynamicObject,
+	Output modifiers)
+{
+    set modifiers("oras") = ""
+    set modifiers("name") = lockFileValues.%Get("name")
+    set modifiers("read-only") = lockFileValues.%Get("readOnly")
+    set modifiers("url") = lockFileValues.%Get("url")
+    // TODO: Implement calling system variables to get username/password/token values
+    set modifiers("username") = ""
+    set modifiers("password") = ""
+    set modifiers("token") = ""
+}
+
 XData LockFileMapping
 {
 <Mapping xmlns="http://www.intersystems.com/jsonmapping">
   <Property Name="LockFileType" FieldName="type" />
-  <Property Name="OverriddenSortOrder" FieldName="overriddenSortOrder" />
   <Property Name="ReadOnly" FieldName="readOnly" />
   <Property Name="URL" FieldName="url" />
   <Property Name="Namespace" FieldName="orasNamespace" />
