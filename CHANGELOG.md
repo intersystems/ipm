@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.6] - Unreleased
 
+### Added
+- #1059: Add automatic orphaned module cleanup to update command
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
 - #1002: When listing configured repositories, only show the TokenAuthMethod when a token is defined.
