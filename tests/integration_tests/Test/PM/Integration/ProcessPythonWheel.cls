@@ -15,6 +15,20 @@ Parameter PackageWithPythonDepsLocation = "package-with-python-deps";
 
 Parameter ExportPackageWithPythonDepsLocation = "export-package-with-python-deps";
 
+Parameter PublishWithPythonDepsLocation = "publish-with-python-deps";
+
+Parameter ExportedPackagesDir = "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/python-deps-tests/export-package-with-python-deps/";
+
+Method OnAfterOneTest() As %Status
+{
+    // Make test environment clean by uninstalling all modules at the end of each test
+    set sc = ##class(%IPM.Main).Shell("uninstall -all")
+    do $$$AssertStatusOK(sc, "Successfully uninstalled all modules after test")
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc, "Successfully deleted all repositories after test")
+    return sc
+}
+
 /// The PythonWheel resource processor expects to install wheels from the dist directory, as opposed to source code
 ClassMethod GenerateWheel()
 {
@@ -178,25 +192,235 @@ Method TestPackageWithPythonDeps() As %Status
     set sc = ##class(%IPM.Main).Shell("install -v localrepo/package-with-python-deps")
     do $$$AssertStatusOK(sc, "Installed module from local filesystem repo")
 
-    set exportDir = ..GetModuleDir("python-deps-tests", ..#ExportPackageWithPythonDepsLocation)
-
-    set exportTarball = ..GetModuleDir("python-deps-tests", ..#ExportPackageWithPythonDepsLocation, "package-with-python-deps")
+    set exportPath = ..GetRandomExportPath()
+    set exportTarball = exportPath_".tgz"
 
     // Run package with the python-deps export flag
-    set sc = ##class(%IPM.Main).Shell("package package-with-python-deps -v -export-python-deps -path "_ exportTarball)
+    set sc = ##class(%IPM.Main).Shell("package package-with-python-deps -v -export-python-deps -path "_ exportPath)
     do $$$AssertStatusOK(sc, "Packaged module with -export-python-deps")
 
     set sc = ##class(%IPM.Main).Shell("uninstall package-with-python-deps")
     do $$$AssertStatusOK(sc, "Uninstalled module")
 
-    set sc = ##class(%IPM.Main).Shell("load -bypass-py-deps " _ exportDir _ "package-with-python-deps.tgz")
+
+    set wheels = { "wheels": ["ansible_core-2.19.4-py3-none-any.whl",
+                  "ansible_core-2.19.5-py3-none-any.whl",
+                  "ansible-12.2.0-py3-none-any.whl",
+                  "cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+                  "cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl",
+                  "jinja2-3.1.6-py3-none-any.whl",
+                  "lune-1.6.4-py3-none-any.whl",
+                  "markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+                  "packaging-25.0-py3-none-any.whl",
+                  "packaging-26.0-py3-none-any.whl",
+                  "pycparser-2.23-py3-none-any.whl",
+                  "pycparser-3.0-py3-none-any.whl",
+                  "pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+                  "resolvelib-1.2.1-py3-none-any.whl"] }
+    do ..AssertWheelFilesExistInPackagedModule(exportTarball, wheels)
+
+    set sc = ##class(%IPM.Main).Shell("load -bypass-py-deps "_exportTarball)
     do $$$AssertStatusOK(sc, "Loaded packaged module")
 
     // Cleanup
     set sc = ##class(%IPM.Main).Shell("uninstall package-with-python-deps")
     do $$$AssertStatusOK(sc, "Uninstalled module")
+
     set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
     do $$$AssertStatusOK(sc, "Deleted local filesystem repo")
+}
+
+/// Omitting -export-python-deps flag should package without the python
+Method TestPackageWithoutPythonDeps() As %Status
+{
+    set dir = ..GetModuleDir("python-deps-tests", ..#PackageWithPythonDepsLocation)
+
+    // Use a local filesystem repo to install the test module into the namespace
+    set sc = ##class(%IPM.Main).Shell("repo -fs -name localrepo -path " _ dir)
+    do $$$AssertStatusOK(sc, "Configured local filesystem repo")
+
+    set sc = ##class(%IPM.Main).Shell("install -v localrepo/package-with-python-deps")
+    do $$$AssertStatusOK(sc, "Installed module from local filesystem repo")
+
+    set exportPath = ..GetRandomExportPath()
+    set exportTarball = exportPath_".tgz"
+
+    // Run package without the -export-python-deps flag
+    set sc = ##class(%IPM.Main).Shell("package package-with-python-deps -v -path "_ exportPath)
+    do $$$AssertStatusOK(sc, "Packaged module without -export-python-deps")
+
+    set sc = ##class(%IPM.Main).Shell("uninstall package-with-python-deps")
+    do $$$AssertStatusOK(sc, "Uninstalled module")
+
+
+    set wheels = { "wheels": ["ansible_core-2.19.4-py3-none-any.whl",
+                  "ansible_core-2.19.5-py3-none-any.whl",
+                  "ansible-12.2.0-py3-none-any.whl",
+                  "cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+                  "cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl",
+                  "jinja2-3.1.6-py3-none-any.whl",
+                  "lune-1.6.4-py3-none-any.whl",
+                  "markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+                  "packaging-25.0-py3-none-any.whl",
+                  "packaging-26.0-py3-none-any.whl",
+                  "pycparser-2.23-py3-none-any.whl",
+                  "pycparser-3.0-py3-none-any.whl",
+                  "pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+                  "resolvelib-1.2.1-py3-none-any.whl"] }
+    do ..AssertWheelFilesExistInPackagedModule(exportTarball, wheels, 0)
+
+    set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
+    do $$$AssertStatusOK(sc, "Deleted local filesystem repo")
+}
+
+/// Test publishing with the -export-python-deps flag
+Method TestPublishWithPythonDeps() As %Status
+{
+
+    // 1. Test the case of python dependencies defined via requirements.txt
+    set moduleNameReq = "publish-with-python-just-reqs"
+    set wheelsReq = ["docx2md-1.0.5-py3-none-any.whl",
+                     "lxml-6.0.2-cp312-cp312-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
+                     "pillow-12.1.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+                     set wheels = {}
+    do wheels.%Set(moduleNameReq, wheelsReq)
+    do ..PublishTestHandler(moduleNameReq, wheels)
+
+    // 2. Test the case of python dependencies defined via wheel resources in module.xml
+    set moduleNameWhl = "publish-with-python-just-wheels"
+    set wheelsWhl = ["numpy-2.4.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+    set wheels = {}
+    do wheels.%Set(moduleNameWhl, wheelsWhl)
+    do ..PublishTestHandler(moduleNameWhl, wheels)
+
+    // 3. Test the case of python dependencies both defined in module.xml and requirements.txt
+    set moduleNameWhlReq = "publish-with-python-wheels-and-reqs"
+    set wheelsWhlReq = ["colorama-0.4.6-py2.py3-none-any.whl",
+                        "six-1.17.0-py2.py3-none-any.whl"]
+    set wheels = {}
+    do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
+    do ..PublishTestHandler(moduleNameWhlReq, wheels)
+
+
+
+    // 4. Test the three cases above but as dependencies of a base module being installed
+    set moduleNameDeps = "publish-with-python-deps-base"
+    // There are no wheels defined for this base module but each of the dependencies do have wheels to check
+    set wheels = {}
+    do wheels.%Set(moduleNameReq, wheelsReq)
+    do wheels.%Set(moduleNameWhl, wheelsWhl)
+    do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
+    do ..PublishTestHandler(moduleNameDeps, wheels)
+}
+
+/// Handler method for publish test suite
+Method PublishTestHandler(
+	moduleName As %String,
+	wheels As %DynamicObject)
+{
+    // Create a filesystem repository
+    set dir = ..GetModuleDir("python-deps-tests", ..#PublishWithPythonDepsLocation)
+    set sc = ##class(%IPM.Main).Shell("repo -fs -name localrepo -path "_dir)
+    do $$$AssertStatusOK(sc, "Configured local filesystem repo")
+
+    // Install module from local filesystem repo
+    set sc = ##class(%IPM.Main).Shell("install -v localrepo/"_moduleName)
+    do $$$AssertStatusOK(sc, "Installed module from local filesystem repo")
+
+    // Create a remote repository for publishing
+    set sc = ##class(%IPM.Main).Shell("repo -r -name remote -url http://registry:52773/registry -username admin -password SYS")
+    do $$$AssertStatusOK(sc, "Configured remote repo")
+
+    // Publish module to remote repository
+    set sc = ##class(%IPM.Main).Shell("publish -v "_moduleName_" -r remote -export-python-deps -export-deps 1")
+    do $$$AssertStatusOK(sc, "Published module "_moduleName_" to remote repository")
+
+    // Uninstall module that came from filesystem repository
+    set sc = ##class(%IPM.Main).Shell("uninstall "_moduleName)
+    do $$$AssertStatusOK(sc, "Uninstalled module successfully")
+
+    // Install published module from remote repository
+    set sc = ##class(%IPM.Main).Shell("install -v remote/"_moduleName)
+    do $$$AssertStatusOK(sc, "Successfully installed published module "_moduleName_" from remote repository")
+
+    // Confirm wheels were included in packaging/publishing
+    do ..AssertWheelResourcesExistForModule(wheels)
+
+    // Uninstall the module used for this test
+    set sc = ##class(%IPM.Main).Shell("uninstall "_moduleName)
+    do $$$AssertStatusOK(sc, "Uninstalled module "_moduleName_" successfully")
+
+    // Remove the repositories used for this test
+    set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
+    do $$$AssertStatusOK(sc, "Removed local filesystem repo")
+    set sc = ##class(%IPM.Main).Shell("repo -delete -n remote")
+    do $$$AssertStatusOK(sc, "Removed remote repo")
+}
+
+/// Used in package and publish tests to get a known, random directory path for where module gets packaged to
+Method GetRandomExportPath()
+{
+    set randomDir = $translate($system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
+    return ..#ExportedPackagesDir_randomDir_"/package"
+}
+
+/// Checks to see if the physical files exist in a packaged module
+/// 
+/// Arguments:
+///     - exportTarball: path to the packaged tarball
+///     - wheels: Object of <relative path>-<wheel name> pairs array of file names to check for in the unpackaged module
+///               Ex: { "/": ["wheel-1.whl","wheel-2.whl"], "wheels":["wheel-3.whl","wheel-4.whl"] }
+///     - doesExist: set to 0 if we want to check that files explicitly do not exist (in the case -export-python-deps was not provided)
+Method AssertWheelFilesExistInPackagedModule(
+	exportTarball As %String,
+	wheels As %DynamicObject,
+	doesExist As %Boolean = 1)
+{
+    set exportDir = ##class(%File).GetDirectory(exportTarball)
+    set sc = ##class(%IPM.General.Archive).Extract(exportTarball, exportDir)
+    do $$$AssertStatusOK(sc, "Extracted packaged tarball contents to scan for wheel files")
+
+
+    set wheelsIter = wheels.%GetIterator()
+    while wheelsIter.%GetNext(.relativePath, .wheelArr) {
+        set directory = ##class(%File).NormalizeDirectory(relativePath, exportDir)
+        set wheelArrIter = wheelArr.%GetIterator()
+        while wheelArrIter.%GetNext(, .wheelName) {
+            set fileName = ##class(%File).NormalizeFilename(wheelName, directory)
+            set exists = ##class(%File).Exists(fileName)
+            if (doesExist) {
+                do $$$AssertTrue(exists, wheelName_" exists in packaged contents")
+            }
+            else {
+                do $$$AssertNotTrue(exists, wheelName_" not included in packaged contents")
+            }
+        }
+    }
+}
+
+/// Given an object of <module name>-<wheel list> pairs,
+/// compiles a list of resources for the module and iterates over the wheel list to check if that wheel is a resource of the module
+/// 
+/// Ex: wheels = { "module1": ["wheel-1.whl","wheel-2.whl"], "module2":["wheel-3.whl","wheel-4.whl"] }
+Method AssertWheelResourcesExistForModule(wheels As %DynamicObject)
+{
+    set wheelsIter = wheels.%GetIterator()
+    while wheelsIter.%GetNext(.moduleName, .moduleWheels) {
+        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+        set resourceList = ""
+        set key = ""
+        for {
+            set resource = module.Resources.GetNext(.key)
+            quit:key=""
+            set resourceList = resourceList_$listbuild($zconvert(resource.Name, "l"))
+        }
+
+        set moduleWheelsIter = moduleWheels.%GetIterator()
+        while moduleWheelsIter.%GetNext(, .wheel) {
+            set wheelIsResource = ($listfind(resourceList, wheel) > 0)
+            do $$$AssertTrue(wheelIsResource, "Wheel resource "_wheel_" is a part of the installed module "_moduleName)
+        }
+    }
 }
 
 }
