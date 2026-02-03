@@ -219,6 +219,7 @@ Method CompareModifiers(
 	}
 }
 
+/// This method returns the %Status for checking the success or failure of executed commands.
 Method RunCommand(pCommand As %String) As %Status
 {
 	set status = ##class(%IPM.Main).Shell(pCommand)
@@ -226,6 +227,7 @@ Method RunCommand(pCommand As %String) As %Status
     return status
 }
 
+/// This method returns the %Status for checking the success or failure of executed commands.
 Method AssertNoException(pCommand As %String)
 {
 	do ##class(%IPM.Main).ShellInternal(pCommand,.tException)
@@ -312,6 +314,20 @@ Method TestListPython() As %Status
         write !,"Actual:",! zwrite parsedCommandInfo
     }
     quit sc
+}
+
+Method TestUninstallWithoutModuleName()
+{
+    do $$$LogMessage("Run Uninstall command without module name")
+    set status = ..RunCommand("uninstall")
+    do $$$AssertStatusNotOK(status, $system.Status.GetErrorText(status))
+    set status = ..RunCommand("install objectscript-math")
+    do $$$AssertStatusOK(status, "objectscript-math module installed successfully.")
+    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
+    do $$$AssertTrue(exists, "objectscript-math Module exists in storage after installation.")
+    do ..RunCommand("uninstall objectscript-math")
+    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
+    do $$$AssertNotTrue(exists, "Module removed successfully.")
 }
 
 Method TestUninstallWithCleanModifier()
