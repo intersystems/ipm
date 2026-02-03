@@ -92,11 +92,15 @@ ClassMethod ResolvePlaceholders(ByRef customParams)
                     continue:$data(seen(key))
                     set seen(key) = ""
 
+                    // Evaluate the placeholders.
+                    // Perform a module-level lookup: check if local custom parameters are defined first;
+                    // if not found, attempt to resolve as a system expression.
                     set search = delimiter _ key _ "}"
                     if $data(customParams(key), val) {
                         set data = $replace(data, search, val)
-                    }
-                    else {
+                    } else {
+                        // If not found locally, attempt to resolve as an IPM system expression.
+                        // This returns the resolved value or the original string if no match is found.
                         set resolved = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(search)
                         if (resolved '= search) {
                             set data = $replace(data, search, resolved)

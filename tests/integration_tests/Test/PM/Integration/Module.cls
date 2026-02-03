@@ -25,19 +25,8 @@ Method TestNestedPlaceholderVar()
     set status = ##class(%IPM.Main).Shell("load "_moduleDir)
     do $$$AssertStatusOK(status,"Loaded "_..#CommonPathPrefix_" module successfully from "_moduleDir)
 
-    do $$$LogMessage("Validate the place holder variable resolved values in ^IRIS.Temp.IPMVarTest global")
-    set data = $get(^IRIS.Temp.IPMVarTest("frankenstein"))
-    if data'="" {
-        do $$$AssertTrue(1,"frankenstein place holder value is resolved to "_data)
-    }
-    do $$$LogMessage("Verifying other parameter values")
-    do $$$LogMessage(" ^IRIS.Temp.IPMVarTest set on Namespace: "_$namespace)
-    set sub=""
-    for {
-        set sub = $order(^IRIS.Temp.IPMVarTest(sub),1,data)
-        quit:sub=""
-        do $$$LogMessage("^IRIS.Temp.IPMVarTest("_sub_") and value : "_data)
-    }
+    do ..ValidateResolvedVarsValues()
+
     set module = ##class(%IPM.Storage.Module).NameOpen(..#ModuleName)
     do $$$AssertTrue($isobject(module), "Module "_..#ModuleName_" exists in IPM and version is "_ module.Version.ToString())
 
@@ -59,21 +48,57 @@ Method TestNestedPlaceholderVar()
     kill ^IRIS.Temp.IPMVarTest
 }
 
-/// Create class definition at runtime to capute the resovled reference value through <invoke> in manifest
-ClassMethod CreateClassdef() As %Status
+Method ValidateResolvedVarsValues()
 {
+    // testdatas
+    set customParamsOut("frankenstein") = $namespace
+	set customParamsOut("ipmtest")="TESTING MY STRING"
+	set customParamsOut("literalString1")=12121212
+    set customParamsOut("dataDefaultTest2")="/usr/irissys/csp//xdata"
+    set customParamsOut("dataDefaultTest3")="/usr/irissys/csp//xdata/xtest"
+    set customParamsOut("datadefaultcspdir")=##class(%IPM.Utils.Module).%EvaluateSystemExpression("${cspdir}")
+    set customParamsOut("datadefaultmgrdir")=##class(%IPM.Utils.Module).%EvaluateSystemExpression("${mgrdir}")
+    set customParamsOut("datapath1")="/usr/irissys/mgr/user/mtsdata/"
+    set customParamsOut("dataversion")="1.0.0"
+    set customParamsOut("ipmdir")="/usr/irissys/ipm/demo-module1/1.0.0/"
+    set customParamsOut("ipmtest")="TESTING MY STRING"
+    set customParamsOut("mTestVersion")="/usr/irissys/csp//xdata/xtest/1.0.0"
+
+    do $$$LogMessage("Verifying parameter values")
+    do $$$LogMessage(" ^IRIS.Temp.IPMVarTest set on Namespace: "_$namespace)
+    set param=""
+    for {
+        set param = $order(customParamsOut(param),1,parmaData)
+        quit:param=""
+        set tempVal = $get(^IRIS.Temp.IPMVarTest(param))
+        do $$$AssertEquals(tempVal, parmaData, "customParamsOut("""_param_""") value ' "_parmaData_"' is same as the value of ^IRIS.Temp.IPMVarTest("""_param_""") '"_tempVal_"'")
+    }
+}
+
+/// Dynamically creates a class definition at runtime to capture resolved reference values via the <invoke> tag within the manifest.
+Method CreateClassdef() As %Status
+{
+    set className = ..#ClsDefName
+    if ##class(%Dictionary.ClassDefinition).%ExistsId(className) {
+        do $$$LogMessage("Class "_className_ "aready exist. Do deleting the class.")
+        set status =  $system.OBJ.Delete(className)
+        do $$$AssertStatusOK(status, "Deleted the class successfully.")
+    }
     set cls = ##class(%Dictionary.ClassDefinition).%New()
-    set cls.Name = ..#ClsDefName
+    set cls.Name = className
+
     // create sample method
     set method = ##class(%Dictionary.MethodDefinition).%New()
     set method.Name = "CaptureResolvedPlaceHolders"
     set method.ClassMethod = 1
-    set method.FormalSpec = "frankenstein,args..."
-    do method.Implementation.WriteLine($char(9)_"set ^IRIS.Temp.IPMVarTest(""frankenstein"")= frankenstein")
-    do method.Implementation.WriteLine($char(9)_"merge ^IRIS.Temp.IPMVarTest = args")
+    set method.FormalSpec = "args..."
+    do method.Implementation.WriteLine($char(9)_"set fields = $LFS(""frankenstein,dataversion,literalString1,datadefaultcspdir,dataDefaultTest2,dataDefaultTest3,mTestVersion,ipmtest,datapath1,ipmdir,datadefaultmgrdir"")")
+    do method.Implementation.WriteLine($char(9)_"for i=1:1:$listLength(fields) {")
+    do method.Implementation.WriteLine($char(9)_"  set ^IRIS.Temp.IPMVarTest($listget(fields,i))=$get(args(i))")
+    do method.Implementation.WriteLine($char(9)_"}")
     do cls.Methods.Insert(method)
     set sc = cls.%Save()
-    do $system.OBJ.Compile(..#ClsDefName)
+    do $system.OBJ.Compile(className)
     return sc
 }
 
@@ -82,7 +107,7 @@ Method CreateModuleXml(Output pModuleDir) As %Status
     #define NormalizeDirectory(%path)   ##class(%File).NormalizeDirectory(%path)
     #define UTRoot                      ^UnitTestRoot
 
-    set sc = 1
+    set sc = $$$OK
     set testRoot = $$$NormalizeDirectory($get($$$UTRoot))
     set pModuleDir = $$$NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/")
 
@@ -111,10 +136,10 @@ XData TestModuleXML [ MimeType = application/xml ]
 			<Description>testing the name resolved</Description>
 			<Packaging>module</Packaging>
 			<Default Name="count" Value="7"/>
-			<Default Name="dataversion" Value="${version}/" />
-			<Default Name="datadefaultmgrdir" Value="${mgrdir}/" />
+			<Default Name="dataversion" Value="${version}" />
+			<Default Name="datadefaultmgrdir" Value="${mgrdir}" />
 			<Default Name="mTestPlaceHolder" Value="${dataDefaultTest2}/xtest/${version}/${mgrdir}/${mTestVersion}/${datapath1}" />
-			<Default Name="datadefaultcspdir" Value="${cspdir}/" />
+			<Default Name="datadefaultcspdir" Value="${cspdir}" />
 			<Default Name="dataDefaultTest2" Value="${datadefaultcspdir}/xdata" />
 			<Default Name="dataDefaultTest3" Value="${dataDefaultTest2}/xtest" />
 			<Default Name="mTestVersion" Value="${dataDefaultTest2}/xtest/${version}" />
@@ -122,6 +147,7 @@ XData TestModuleXML [ MimeType = application/xml ]
 			<Default Name="ipmdir" Value="/usr/irissys/mgr/user/mts"/>
 			<Default Name="datapath" Value="${libdir}data/" />
 			<Default Name="datapath1" Value="${ipmdir}data/" />
+            <Default Name="version" Value="1.0.0" />
 
             <Default Name="start" Value="${" />
             <Default Name="middle" Value="namespace" />
@@ -131,16 +157,15 @@ XData TestModuleXML [ MimeType = application/xml ]
 			<SourcesRoot>src</SourcesRoot>
             <Invoke Class="Test.TrackPlaceHolders" Method="CaptureResolvedPlaceHolders">
                 <Arg>${frankenstein}</Arg>
-                <Arg>${dataversion} </Arg>
-				<Arg>"12121212" </Arg>
-				<Arg>"12121212ASHOK"</Arg>
+                <Arg>${dataversion}</Arg>
+				<Arg>12121212</Arg>
                 <Arg>${datadefaultcspdir}</Arg>
                 <Arg>${dataDefaultTest2}</Arg>
-                <Arg>${dataDefaultTest3} </Arg>
+                <Arg>${dataDefaultTest3}</Arg>
                 <Arg>${mTestVersion}</Arg>
                 <Arg>${ipmtest}</Arg>
                 <Arg>${datapath1}</Arg>
-                <Arg>${ipmdir} </Arg>
+                <Arg>${ipmdir}</Arg>
                 <Arg>${datadefaultmgrdir}</Arg>
             </Invoke>
 			<AfterInstallMessage>Module installed successfully!</AfterInstallMessage>
