@@ -1328,6 +1328,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 
     do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)
 
+    #dim tTemplate As %IPM.Storage.ModuleTemplate
     set tTemplate = ##class(%IPM.Storage.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
     return:'$isobject(tTemplate)
 
@@ -1359,6 +1360,44 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
             write !,"    "_$listget(apps,i)
         }
         do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
+
+#if $$$CacheVersionMajor>=2025
+        //cors
+        write !,"Cross-Origin Settings:"
+        do ##class(%Library.Prompt).GetYesNo("Configure Access-Control-Allow-Credentials:",.enableCors)
+        if enableCors {
+            do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Headers:",.allowedHeaders,,32767,"comma seperated values e.g: Access-Control-Allow-Origin,Access-Control-Allow-Headers")
+            while (1) {
+                do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Origins:",.allowedOrigins,,32767,"comma seperated values e.g: http://www.example.com")
+                if allowedOrigins="" quit
+                set sc = tTemplate.ValidateCorsOrigin(allowedOrigins)
+                if $$$ISERR(sc) {
+                    do ..DisplayError(sc)
+                    set allowedOrigins = ""
+                    continue
+                }
+                quit
+            }
+            set corsConfig("enableCors") = enableCors
+            set corsConfig("allowedHeaders") = allowedHeaders
+            set corsConfig("allowedOrigins") = allowedOrigins
+            do tTemplate.SetCORSProps(tWebAppList,.corsConfig)
+        }
+#endif
+
+#if $$$CacheVersionMajor>=2024
+        //jwt
+        write !,"JWT Authentication"
+        do ##class(%Library.Prompt).GetYesNo("Configure JWT Authentication: ",.enableJWT)
+        if enableJWT {
+            do ##class(%Library.Prompt).GetNumber(" Enter JWT Access Token Timeout:",.JWTAccessTokenTO,1)
+            do ##class(%Library.Prompt).GetNumber(" Enter JWT Refresh Token Timeout:",.JWTRefreshTokenTO,1)
+            set jwtconfig("enableJWT") = enableJWT
+            set jwtconfig("JWTAccessTokenTO") = JWTAccessTokenTO
+            set jwtconfig("JWTRefreshTokenTO") = JWTRefreshTokenTO
+            do tTemplate.SetJWTProps(tWebAppList,.jwtconfig)
+        }
+#endif
 
         do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps)
         for i=1:1:$listlength(tCSPapps) {

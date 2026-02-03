@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.6] - Unreleased
 
+## Added
+- #973: Enables CORS and JWT configuration for WebApplications in module xml
+
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
 - #1002: When listing configured repositories, only show the TokenAuthMethod when a token is defined.
@@ -24,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
 - #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 - #1018: Require module name for uninstall when not using the -all flag
-
+- #973: Enables CORS and JWT configuration for WebApplications in module xml
 ### Changed
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
 - #885: Always synchronously load dependencies and let each module do multi-threading as needed
