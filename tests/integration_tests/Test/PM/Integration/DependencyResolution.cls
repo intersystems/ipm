@@ -4,22 +4,22 @@ Class Test.PM.Integration.DependencyResolution Extends Test.PM.Integration.Base
 Method TestEverything()
 {
 	#dim tModule As %IPM.Storage.Module
-	New $Namespace
-	Set tOrigNS = $Namespace
-	Try {
-		If '$$$AssertStatusOK(..Setup()) || ..SkipTest {
-			Quit
+	new $namespace
+	set tOrigNS = $namespace
+	try {
+		if '$$$AssertStatusOK(..Setup()) || ..SkipTest {
+			quit
     }
-    
-    Do ..PublishModules()
-  
+
+    do ..PublishModules()
+
 		#; // Get annotations for local module XDATA blocks; put into array by module (XDATA) name.
 		#; If '$$$AssertStatusOK(##class(%IPM.PackageManager.Developer.Annotation.Utils).ExtractAnnotations($classname(),.tAnnotationList)) {
 		#; 	Quit
     #; }
-    
-		Kill tAssertArray
-		
+
+		kill tAssertArray
+
 		#; For i=1:1:tAnnotationList.Count() {
 		#; 	#dim tAnnotation As %IPM.PackageManager.Developer.Annotation
 		#; 	Set tAnnotation = tAnnotationList.GetAt(i)
@@ -27,123 +27,123 @@ Method TestEverything()
 		#; 		Set tAssertArray(tAnnotation.MemberName,$i(tAssertArray(tAnnotation.MemberName))) = $ListBuild(tAnnotation.Tag,$$$lcase(tAnnotation.Value))
 		#; 	}
     #; }
-    
+
 		// In client namespace:
-		Write !,!,!
-		Set $Namespace = ..#CLIENTNS
-		
+		write !,!,!
+		set $namespace = ..#CLIENTNS
+
 		// Create a module referring to the module in the remote repository
-		Set tKey = ""
-		For {
-			Set tKey = $Order(tAssertArray(tKey),1,tAssertCount)
-			Quit:tKey=""
-			
+		set tKey = ""
+		for {
+			set tKey = $order(tAssertArray(tKey),1,tAssertCount)
+			quit:tKey=""
+
 			// Have modules fail independently.
-			Try {
+			try {
 				// If we're loading a module with dependencies, clear out things that might have conflicting dependencies first.
-				Do ..UtilUninstallAll()
-				
-				Continue:'$$$AssertStatusOK(..ReadXDataToModule(tOrigNS,tKey,.tModule),"Loaded module in "_tKey_" XData block.")
-				
-				Continue:'$$$AssertStatusOK(tModule.Lifecycle.Clean(),"Removed existing dependency versions for module.")
-				
-				For i=1:1:tAssertCount {
-					Set $ListBuild(tAssertType,tAssertValue) = tAssertArray(tKey,i)
-					If (tAssertType '= "AssertInstalledBefore") {
-						Continue
+				do ..UtilUninstallAll()
+
+				continue:'$$$AssertStatusOK(..ReadXDataToModule(tOrigNS,tKey,.tModule),"Loaded module in "_tKey_" XData block.")
+
+				continue:'$$$AssertStatusOK(tModule.Lifecycle.Clean(),"Removed existing dependency versions for module.")
+
+				for i=1:1:tAssertCount {
+					set $listbuild(tAssertType,tAssertValue) = tAssertArray(tKey,i)
+					if (tAssertType '= "AssertInstalledBefore") {
+						continue
 					}
-          
-					Set tQualRef = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
-					Set tQualRef.ServerName = ..#REGISTRYNAME
-					Set tQualRef.Name = $Piece(tAssertValue," ",1)
-					Set tQualRef.VersionString = $Piece(tAssertValue," ",2)
-					Set tSC = ##class(%IPM.Utils.Module).LoadQualifiedReference(tQualRef)
-					Do $$$AssertStatusOK(tSC,"Installed "_tAssertValue)
+
+					set tQualRef = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
+					set tQualRef.ServerName = ..#REGISTRYNAME
+					set tQualRef.Name = $piece(tAssertValue," ",1)
+					set tQualRef.VersionString = $piece(tAssertValue," ",2)
+					set tSC = ##class(%IPM.Utils.Module).LoadQualifiedReference(tQualRef)
+					do $$$AssertStatusOK(tSC,"Installed "_tAssertValue)
 				}
-				
-				Kill tDependencyGraph
-				Set tGraphStatus = tModule.BuildDependencyGraph(.tDependencyGraph)
-				
-				For i=1:1:tAssertCount {
-					Set $ListBuild(tAssertType,tAssertValue) = tAssertArray(tKey,i)
-					If (tAssertType = "AssertUnresolvable") {
-						If '$$$AssertStatusNotOK(tGraphStatus,"Could not build dependency graph.") {
-							Set tDepKey = ""
-							For {
-								Set tDepKey = $Order(tDependencyGraph(tDepKey),1,tData)
-								Quit:tDepKey=""
-								Do $$$LogMessage("Resolved as depending on "_tDepKey_" "_$ListGet(tData,3))
+
+				kill tDependencyGraph
+				set tGraphStatus = tModule.BuildDependencyGraph(.tDependencyGraph)
+
+				for i=1:1:tAssertCount {
+					set $listbuild(tAssertType,tAssertValue) = tAssertArray(tKey,i)
+					if (tAssertType = "AssertUnresolvable") {
+						if '$$$AssertStatusNotOK(tGraphStatus,"Could not build dependency graph.") {
+							set tDepKey = ""
+							for {
+								set tDepKey = $order(tDependencyGraph(tDepKey),1,tData)
+								quit:tDepKey=""
+								do $$$LogMessage("Resolved as depending on "_tDepKey_" "_$listget(tData,3))
 							}
 						}
-						Continue
-					} ElseIf (i = 1) {
-						Do $$$AssertStatusOK(tGraphStatus,"Could build dependency graph.")
+						continue
+					} elseif (i = 1) {
+						do $$$AssertStatusOK(tGraphStatus,"Could build dependency graph.")
 					}
-					
-					If (tAssertType = "AssertDependsOn") {
-						Set tModuleName = $Piece(tAssertValue," ")
-						Set tVersion = $Piece(tAssertValue," ",2)
-						If '$$$AssertEquals($ListGet(tDependencyGraph(tModuleName),3),tVersion,"Depends on "_tModuleName_" "_tVersion) {
-              Do $$$LogMessage("Actually depended on "_tModuleName_" "_$ListGet(tDependencyGraph(tModuleName),3))
+
+					if (tAssertType = "AssertDependsOn") {
+						set tModuleName = $piece(tAssertValue," ")
+						set tVersion = $piece(tAssertValue," ",2)
+						if '$$$AssertEquals($listget(tDependencyGraph(tModuleName),3),tVersion,"Depends on "_tModuleName_" "_tVersion) {
+                            do $$$LogMessage("Actually depended on "_tModuleName_" "_$listget(tDependencyGraph(tModuleName),3))
 						}
-					} ElseIf (tAssertType = "AssertCompileOK") {
-						Do $$$AssertStatusOK(tModule.%Compile("-d"),"Module compiled successfully.")
-					} ElseIf (tAssertType = "AssertCompileNotOK") {
-						Set tSC = tModule.%Compile("-d")
-						Do $$$AssertStatusNotOK(tSC,"Module compiled with error: "_$System.Status.GetErrorText(tSC))
+					} elseif (tAssertType = "AssertCompileOK") {
+						do $$$AssertStatusOK(tModule.%Compile("-d"),"Module compiled successfully.")
+					} elseif (tAssertType = "AssertCompileNotOK") {
+						set tSC = tModule.%Compile("-d")
+						do $$$AssertStatusNotOK(tSC,"Module compiled with error: "_$system.Status.GetErrorText(tSC))
 					}
 				}
-				
-				For i=1:1:tAssertCount {
-					Set $ListBuild(tAssertType,tAssertValue) = tAssertArray(tKey,i)
-					If (tAssertType '= "AssertInstalledAfter") && (tAssertType '= "AssertInstallFailedAfter") {
-						Continue
+
+				for i=1:1:tAssertCount {
+					set $listbuild(tAssertType,tAssertValue) = tAssertArray(tKey,i)
+					if (tAssertType '= "AssertInstalledAfter") && (tAssertType '= "AssertInstallFailedAfter") {
+						continue
 					}
-					
-					Set tQualRef = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
-					Set tQualRef.ServerName = ..#REGISTRYNAME
-					Set tQualRef.Name = $Piece(tAssertValue," ",1)
-					Set tQualRef.VersionString = $Piece(tAssertValue," ",2)
-					Set tSC = ##class(%IPM.Utils.Module).LoadQualifiedReference(tQualRef)
-					If (tAssertType = "AssertInstalledAfter") {
-						Do $$$AssertStatusOK(tSC,"Installed "_tAssertValue)
-					} Else {
-						Do $$$AssertStatusNotOK(tSC,"Refused (correctly) to install "_tAssertValue)
+
+					set tQualRef = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
+					set tQualRef.ServerName = ..#REGISTRYNAME
+					set tQualRef.Name = $piece(tAssertValue," ",1)
+					set tQualRef.VersionString = $piece(tAssertValue," ",2)
+					set tSC = ##class(%IPM.Utils.Module).LoadQualifiedReference(tQualRef)
+					if (tAssertType = "AssertInstalledAfter") {
+						do $$$AssertStatusOK(tSC,"Installed "_tAssertValue)
+					} else {
+						do $$$AssertStatusNotOK(tSC,"Refused (correctly) to install "_tAssertValue)
           }
 				}
-			} Catch e {
-				Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+			} catch e {
+				do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
       }
 		}
-	} Catch e {
-		Do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+	} catch e {
+		do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
 	}
-	
+
 	// Cleanup
-	Set $Namespace = tOrigNS
-	Do $$$AssertStatusOK(..TearDown())
+	set $namespace = tOrigNS
+	do $$$AssertStatusOK(..TearDown())
 }
 
 Method PublishModules()
 {
-  Set tOrigNS = $Namespace
+  set tOrigNS = $namespace
   // Publish modules
-  For i=1:1:11,100:1:103 {
+  for i=1:1:11,100:1:104 {
     // If we're loading a module with dependencies, clear out things that might have conflicting dependencies first.
-    Do ..UtilUninstallAll()
-    
-    Quit:'$$$AssertStatusOK(..ReadXDataToModule(tOrigNS,"ServerModule"_i,.tModule),"Loaded module from XData block ServerModule"_i)
-    
+    do ..UtilUninstallAll()
+
+    quit:'$$$AssertStatusOK(..ReadXDataToModule(tOrigNS,"ServerModule"_i,.tModule),"Loaded module from XData block ServerModule"_i)
+
     // Publish module
-    Do $$$AssertStatusOK(tModule.Lifecycle.Publish(),"Published "_tModule.Name_" "_tModule.VersionString)
+    do $$$AssertStatusOK(tModule.Lifecycle.Publish(),"Published "_tModule.Name_" "_tModule.VersionString)
   }
 }
 
 Method UtilUninstallAll()
 {
-	For tModName = "Demo","HS.REST","HS.MDM","HS.JSON" {
-		If ##class(%IPM.Storage.Module).NameExists($$$lcase(tModName)) {
-			Do $$$AssertStatusOK(##class(%IPM.Storage.Module).Uninstall(tModName))
+	for tModName = "Demo","HS.REST","HS.MDM","HS.JSON" {
+		if ##class(%IPM.Storage.Module).NameExists($$$lcase(tModName)) {
+			do $$$AssertStatusOK(##class(%IPM.Storage.Module).Uninstall(tModName))
 		}
 	}
 }
@@ -307,6 +307,21 @@ XData ServerModule103 [ XMLNamespace = "http://www.intersystems.com/PackageManag
 </Module>
 }
 
+XData ServerModule104 [ XMLNamespace = "http://www.intersystems.com/PackageManager" ]
+{
+<?xml version="1.0"?>
+<Module>
+  <Name>HS.REST</Name>
+  <Version>1.0.4</Version>
+  <Dependencies>
+  <ModuleReference>
+  <Name>HS.JSON</Name>
+  <Version>*</Version>
+  </ModuleReference>
+  </Dependencies>
+</Module>
+}
+
 /// @AssertDependsOn("HS.MDM 1.0.1")
 /// @AssertDependsOn("HS.JSON 1.1.4")
 /// @AssertCompileOK
@@ -446,7 +461,7 @@ XData LocalModule7 [ XMLNamespace = "http://www.intersystems.com/PackageManager"
   <Name>HS.MDM</Name>
   <Version>1.*</Version>
   </ModuleReference>
-  
+
   <!-- The below ModuleReference is required in order for the HS.REST/HS.MDM combination above to be resolved. Ideally it would not be, but with the same result. -->
   <ModuleReference>
   <Name>HS.JSON</Name>

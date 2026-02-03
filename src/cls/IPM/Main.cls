@@ -179,10 +179,10 @@ This command is an alias for `module-action module-name makedeployed`
 Delete package from repository
 </description>
 <example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName all</example>
-<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName 1.0.0</example>
+<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository named MyRepo">unpublish MyRepo/MyModuleName 1.0.0</example>
 <parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
 <parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
-
+<modifier name="force" aliases="f" value="false" description="Will delete module from the repository without prompting user for confirmation. Still requires authorization from the repository" />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
@@ -983,8 +983,7 @@ ClassMethod ShellInternal(
             } elseif (tCommandInfo = "load") {
                 do ..Load(.tCommandInfo)
             } elseif (tCommandInfo = "exec") {
-                write !
-                xecute tCommandInfo("parameters","expression")
+                do ..ExecuteCOS(.tCommandInfo)
             } elseif (tCommandInfo = "install") {
                 do ..Install(.tCommandInfo)
             } elseif (tCommandInfo = "reinstall") {
@@ -2193,6 +2192,8 @@ ClassMethod ShowModulesForRepository(
             set list(list, "AllVersions") = tRes.AllVersions
         }
     }
+    // Throw an error if there are no results and tSC is set
+    $$$ThrowOnError(tSC)
     set list("width") = width
     write !
     do ..DisplayModules(.list)
@@ -2253,6 +2254,13 @@ ClassMethod Load(
 		throw Ex
 	}
 	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+}
+
+ClassMethod ExecuteCOS(ByRef commandInfo)
+{
+    new $namespace
+    write !
+    xecute commandInfo("parameters","expression")
 }
 
 ClassMethod LoadInternal(
@@ -2487,7 +2495,10 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
         return
     } else {
-        set tModuleName = pCommandInfo("parameters","module")
+        set tModuleName = $get(pCommandInfo("parameters","module"))
+        if (tModuleName = "") {
+            $$$ThrowOnError($$$ERROR($$$GeneralError, "A module name must be specified for uninstall unless the -all flag is used."))
+        }
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
         }
@@ -2545,25 +2556,29 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 
         if (isEnabled) {
             set tResult = 0
-            if ($$$lcase(tVersion)="all") {
-                write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
-                set tHelp = "Enter ""Yes"" if you want to delete all package versions."
-                set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
-            } else {
-                write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
-                set tHelp = "Enter ""Yes"" if you want to delete selected package version."
-                set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+            set force = $data(pCommandInfo("modifiers","force"))
+            if 'force {
+                if ($$$lcase(tVersion)="all") {
+                    write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action!")
+                    set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                    set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+                } else {
+                    write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action!")
+                    set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+                    set tMsg = "Are you sure you want to delete the package """_tModuleName_" version "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+                }
+
+                set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+
+                if (tResponse '= $$$SuccessResponse) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+                }
             }
 
-            set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
-
-            if (tResponse '= $$$SuccessResponse) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-            }
-
-            if (tResult) {
+            if (tResult || force) {
                 $$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
-                write !!,"Package deleted"
+                set msg = "Package deleted" _ $case(force, 1:" forcefully without user confirmation", :"")
+                write !!, msg
             }
         } else {
             write !,"The package could not be deleted (the registry denied the request)",!
