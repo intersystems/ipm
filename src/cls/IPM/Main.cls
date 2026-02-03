@@ -2146,6 +2146,22 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
         set tType = "%IPM.Repo.Remote.Definition"
         $$$ThrowOnError($classmethod(tType,"Configure",1,.tModifiers,.tData))
         do ..Shell("repo -list")
+    } elseif $$$HasModifier(pCommandInfo,"rebuild-cache") {
+        // Validate repository exists and is filesystem type
+        set repoName = $$$GetModifier(pCommandInfo,"name")
+        set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(repoName,,.sc)
+        $$$ThrowOnError(sc)
+
+        if 'serverDef.%IsA("%IPM.Repo.Filesystem.Definition") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"Cache rebuild only supported for filesystem repositories"))
+        }
+
+        // Rebuild cache
+        write !,"Rebuilding cache for repository: ",repoName
+        set sc = serverDef.BuildCache(1, 1)  // purge=1, verbose=1
+        $$$ThrowOnError(sc)
+
+        write !,"Cache rebuilt successfully"
     } else {
         set tName = $$$GetModifier(pCommandInfo,"name")
         set tType = $listget(serverClassList)
@@ -2247,6 +2263,13 @@ ClassMethod ShowModulesForRepository(
     set list("width") = width
     write !
     do ..DisplayModules(.list)
+
+    // If filesystem repo, show last cache rebuild time and command to rebuild it since there's no auto full cache rebuild mechanism (other than reconfiguring the repo entirely)
+    set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pRepoName,,.tSC)
+    $$$ThrowOnError(tSC)
+    if server.%IsA("%IPM.Repo.Filesystem.Definition") {
+        write !,"Last full cache rebuild for '", pRepoName, "' was on ", server.CacheLastRebuilt, " (UTC). Run 'repo -n "_pRepoName_" -rebuild-cache' to rebuild the cache.",!
+    }
 }
 
 Query SourceControlClasses() As %SQLQuery(ROWSPEC = "ID:%String,Name:%String") [ SqlProc ]
