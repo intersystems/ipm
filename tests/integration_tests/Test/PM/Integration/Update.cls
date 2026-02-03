@@ -641,4 +641,25 @@ Method TestInterchangeableNameUpdate()
     $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n zot -delete"))
 }
 
+/// Tests that dev mode is not propagated to dependencies during update
+Method TestDevModePropagation()
+{
+    set moduleDir = ..GetModuleDir("simplest-module") _ "/1.0.0"
+    set sc = ##class(%IPM.Main).Shell("load -v -dev " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Successfully load from folder")
+
+    set moduleDirTwo = ..GetModuleDir("simplest-module") _ "/3.0.0"
+    set sc = ##class(%IPM.Main).Shell("update simplest-module -v -dev -path " _ moduleDirTwo)
+    do $$$AssertStatusOK(sc, "Successfully updated from folder")
+
+    // Check that the main module has dev mode enabled
+    set module = ##class(%IPM.Storage.Module).NameOpen("simplest-module", sc)
+    do $$$AssertStatusOK(sc, "Opened module succesfully")
+    do $$$AssertEquals(module.DeveloperMode, 1)
+
+    set dep = ##class(%IPM.Storage.Module).NameOpen("simplest-module-dep", sc)
+    do $$$AssertStatusOK(sc, "Opened dependency succesfully")
+    do $$$AssertEquals(dep.DeveloperMode, 0)
+}
+
 }
