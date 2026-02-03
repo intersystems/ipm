@@ -17,6 +17,9 @@ Property Root As %String(MAXLEN = 260) [ Required ];
 /// How many levels of depth to search for module.xml files; 0 indicates unlimited.
 Property Depth As %Integer [ InitialExpression = 0, Required ];
 
+/// Timestamp of last cache rebuild for this repository
+Property CacheLastRebuilt As %TimeStamp;
+
 /// Prompt to use for Root in interactive configuration of this repository type
 Parameter RootPromptString = {$$$Text("Root File Path:","ZPM")};
 
@@ -29,6 +32,7 @@ XData Commands
 <modifier name="filesystem" aliases="f,fs" description="Create/update a filesystem repository" />
 <modifier name="depth" aliases="d" value="true" description="For filesystem repositories, specifies the depth (number of folders underneath the root) to search for files named module.xml" />
 <modifier name="path" aliases="p" value="true" description="For filesystem repositories, specifies the path to the root directory" />
+<modifier name="rebuild-cache" aliases="rebuild" description="Rebuilds the cache for the specified filesystem repository." />
 
 <example description="Create a repository pointing to the filesystem with name LocalFiles, accepting snapshots, looking for files named module.xml up to 2 directories deep in C:\MyWorkspace\RootModuleDir\">
 repo -name LocalFiles -snapshots 1 -fs -depth 2 -path C:\MyWorkspace\RootModuleDir\
@@ -114,6 +118,25 @@ Trigger RootChanged [ Event = UPDATE, Foreach = row/object ]
     }
 }
 
+/// When Depth property changes, cache needs full rebuild
+/// (different depth means different set of files included)
+Trigger DepthChanged [ Event = UPDATE, Foreach = row/object ]
+{
+    new oldDepth, newDepth
+    if ({Depth*C}) {
+        set oldDepth = {Depth*O}
+        set newDepth = {Depth}
+
+        // Depth changed - rebuild cache
+        set oref = ..%Open({ID})
+        if $isobject(oref) {
+            do oref.BuildCache(1, 0)  // Full rebuild, non-verbose
+        }
+    }
+}
+
+/// Build the cache of modules found in the filesystem repository.
+/// pPurge - if 1, deletes existing cache entries before rebuilding
 Method BuildCache(
 	pPurge As %Boolean = 1,
 	pVerbose As %Integer = 0,
@@ -173,6 +196,10 @@ Method BuildCache(
             write:pVerbose !,tName," ",tVersionString," @ ",##class(%File).NormalizeDirectory(..Root_tSubDirectory)
         }
         $$$ThrowOnError(tAggSC)
+
+        // set cache rebuild timestamp using UTC
+        set ..CacheLastRebuilt = $zdatetime($ztimestamp,3)
+        $$$ThrowOnError(..%Save())
         tcommit
     } catch e {
         set tSC = e.AsStatus()
@@ -181,6 +208,61 @@ Method BuildCache(
     quit tSC
 }
 
+/// Parse a module.xml file and return parsed metadata
+Method ParseModuleFile(
+	filePath As %String,
+	root As %String,
+	Output name As %String,
+	Output versionString As %String,
+	Output stream As %Stream.GlobalCharacter)
+{
+    set name = ""
+    set versionString = ""
+
+    // Validate file is a valid Studio document export
+    $$$ThrowOnError($system.OBJ.Load(filePath, "-d", , .loadedList, 1))
+
+    if ($length(loadedList, ",") > 1) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "File contains multiple documents"))
+    }
+
+    set ext = $zconvert($piece($get(loadedList), ".", *), "U")
+    if (ext '= "ZPM") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "File is not a ZPM module"))
+    }
+
+    // Parse module info
+    kill stream, name, versionString
+    $$$ThrowOnError(..GetModuleStreamFromFile(filePath, .stream, .name, .versionString))
+}
+
+/// Refresh a cache entry by re-parsing its module.xml file
+/// Updates the cache entry in-place with new manifest and mtime
+Method RefreshCacheEntry(
+	cacheObj As %IPM.Repo.Filesystem.Cache,
+	filePath As %String,
+	newMTime As %TimeStamp)
+{
+    // Parse the module file
+    kill stream, name, versionString
+    do ..ParseModuleFile(filePath, cacheObj.Root, .name, .versionString, .stream)
+
+    // Update the cache entry
+    set cacheObj.Name = name
+    set cacheObj.VersionString = versionString
+    set cacheObj.FileMTime = newMTime
+    do cacheObj.Manifest.Clear()
+    do cacheObj.Manifest.CopyFrom(stream)
+    set cacheObj.LastModified = $zdatetime($ztimestamp, 3)
+
+    set saveSC = cacheObj.%Save()
+    if $$$ISERR(saveSC) {
+        set status = cacheObj.HandleSaveError(saveSC)
+        $$$ThrowOnError(status)
+    }
+}
+
+/// Adds a module to the cache.
 Method AddCacheItem(
 	pModuleFileName As %String,
 	pSubDirectory As %String,
@@ -191,33 +273,18 @@ Method AddCacheItem(
     set pName = ""
     set pVersionString = ""
     try {
-        // Get list of what's in module.xml
-        set tSC = $system.OBJ.Load(pModuleFileName,"-d",,.tLoadedList,1)
-        if $$$ISERR(tSC) {
-            // Wasn't a valid file. We'll just continue.
-            set tSC = $$$OK
-            quit
+        // Parse the module file
+        kill tStream, tName, tVersionString
+        try {
+            do ..ParseModuleFile(pModuleFileName, ..Root, .pName, .pVersionString, .tStream)
+        } catch ex {
+            // Wasn't a valid file or failed to parse. Log as warning and continue
+            set tSC = ex.AsStatus()
+            do ##class(%IPM.General.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$system.Status.GetErrorText(tSC),1)
+            return $$$OK
         }
 
-        if ($length(tLoadedList,",") > 1) {
-            // Contained multiple documents - tricky! We'll just continue.
-            quit
-        }
-
-        set tExt = $zconvert($piece($get(tLoadedList),".",*),"U")
-        if (tExt '= "ZPM") {
-            quit
-        }
-
-        kill tStream,tName,tVersionString
-        set tParseSC = ..GetModuleStreamFromFile(pModuleFileName,.tStream,.pName,.pVersionString)
-        if $$$ISERR(tParseSC) {
-            // Log as a warning, but keep going.
-            do ##class(%IPM.General.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$system.Status.GetErrorText(tParseSC),1)
-            quit
-        }
-
-        // Create cache item.
+        // Create cache item
         if ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
             set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
             $$$ThrowOnError(tSC)
@@ -228,6 +295,7 @@ Method AddCacheItem(
         }
         set tCacheItem.Name = pName
         set tCacheItem.VersionString = pVersionString
+        set tCacheItem.FileMTime = $zdatetime(##class(%Library.File).GetFileDateModified(pModuleFileName), 3)
         do tCacheItem.Manifest.CopyFrom(tStream)
         set tCacheItem.LastModified = $zdatetime($ztimestamp,3)
         set tSaveSC = tCacheItem.%Save()
@@ -377,6 +445,9 @@ Storage Default
 </Value>
 <Value name="2">
 <Value>Depth</Value>
+</Value>
+<Value name="3">
+<Value>CacheLastRebuilt</Value>
 </Value>
 </Data>
 <DefaultData>FilesystemRepoDefinitionDefaultData</DefaultData>
