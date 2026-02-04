@@ -1205,7 +1205,13 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule, .params)
+        if $get(params("BypassDeps")) {
+            if tVerbose {
+                write !, $$$FormattedLine($$$Yellow,"Skipping installation of IPM dependencies because -bypass-deps is set.")
+            }
+        } else {
+            do ..LoadDependencies(tModule, .params)
+        }
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
