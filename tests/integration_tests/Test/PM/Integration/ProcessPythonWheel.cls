@@ -203,20 +203,8 @@ Method TestPackageWithPythonDeps() As %Status
     do $$$AssertStatusOK(sc, "Uninstalled module")
 
 
-    set wheels = { "wheels": ["ansible_core-2.19.4-py3-none-any.whl",
-                  "ansible_core-2.19.5-py3-none-any.whl",
-                  "ansible-12.2.0-py3-none-any.whl",
-                  "cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
-                  "cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl",
-                  "jinja2-3.1.6-py3-none-any.whl",
-                  "lune-1.6.4-py3-none-any.whl",
-                  "markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
-                  "packaging-25.0-py3-none-any.whl",
-                  "packaging-26.0-py3-none-any.whl",
-                  "pycparser-2.23-py3-none-any.whl",
-                  "pycparser-3.0-py3-none-any.whl",
-                  "pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
-                  "resolvelib-1.2.1-py3-none-any.whl"] }
+    set wheels = { "wheels": ["ansible", "cffi", "cryptography", "jinja2", "lune", "markupsafe",
+                              "packaging", "pycparser", "pyyaml", "resolvelib"] }
     do ..AssertWheelFilesExistInPackagedModule(exportTarball, wheels)
 
     set sc = ##class(%IPM.Main).Shell("load -bypass-py-deps "_exportTarball)
@@ -230,7 +218,7 @@ Method TestPackageWithPythonDeps() As %Status
     do $$$AssertStatusOK(sc, "Deleted local filesystem repo")
 }
 
-/// Omitting -export-python-deps flag should package without the python
+/// Omitting -export-python-deps flag should package without the python wheels resource(s)
 Method TestPackageWithoutPythonDeps() As %Status
 {
     set dir = ..GetModuleDir("python-deps-tests", ..#PackageWithPythonDepsLocation)
@@ -253,20 +241,8 @@ Method TestPackageWithoutPythonDeps() As %Status
     do $$$AssertStatusOK(sc, "Uninstalled module")
 
 
-    set wheels = { "wheels": ["ansible_core-2.19.4-py3-none-any.whl",
-                  "ansible_core-2.19.5-py3-none-any.whl",
-                  "ansible-12.2.0-py3-none-any.whl",
-                  "cffi-2.0.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
-                  "cryptography-46.0.3-cp311-abi3-manylinux_2_34_x86_64.whl",
-                  "jinja2-3.1.6-py3-none-any.whl",
-                  "lune-1.6.4-py3-none-any.whl",
-                  "markupsafe-3.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
-                  "packaging-25.0-py3-none-any.whl",
-                  "packaging-26.0-py3-none-any.whl",
-                  "pycparser-2.23-py3-none-any.whl",
-                  "pycparser-3.0-py3-none-any.whl",
-                  "pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
-                  "resolvelib-1.2.1-py3-none-any.whl"] }
+    set wheels = { "wheels": ["ansible", "cffi", "cryptography", "jinja2", "lune", "markupsafe",
+                              "packaging", "pycparser", "pyyaml", "resolvelib"] }
     do ..AssertWheelFilesExistInPackagedModule(exportTarball, wheels, 0)
 
     set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
@@ -279,24 +255,21 @@ Method TestPublishWithPythonDeps() As %Status
 
     // 1. Test the case of python dependencies defined via requirements.txt
     set moduleNameReq = "publish-with-python-just-reqs"
-    set wheelsReq = ["docx2md-1.0.5-py3-none-any.whl",
-                     "lxml-6.0.2-cp312-cp312-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl",
-                     "pillow-12.1.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+    set wheelsReq = ["docx2md", "lxml", "pillow"]
                      set wheels = {}
     do wheels.%Set(moduleNameReq, wheelsReq)
     do ..PublishTestHandler(moduleNameReq, wheels)
 
     // 2. Test the case of python dependencies defined via wheel resources in module.xml
     set moduleNameWhl = "publish-with-python-just-wheels"
-    set wheelsWhl = ["numpy-2.4.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"]
+    set wheelsWhl = ["numpy"]
     set wheels = {}
     do wheels.%Set(moduleNameWhl, wheelsWhl)
     do ..PublishTestHandler(moduleNameWhl, wheels)
 
     // 3. Test the case of python dependencies both defined in module.xml and requirements.txt
     set moduleNameWhlReq = "publish-with-python-wheels-and-reqs"
-    set wheelsWhlReq = ["colorama-0.4.6-py2.py3-none-any.whl",
-                        "six-1.17.0-py2.py3-none-any.whl"]
+    set wheelsWhlReq = ["colorama", "six"]
     set wheels = {}
     do wheels.%Set(moduleNameWhlReq, wheelsWhlReq)
     do ..PublishTestHandler(moduleNameWhlReq, wheels)
@@ -365,11 +338,14 @@ Method GetRandomExportPath()
 }
 
 /// Checks to see if the physical files exist in a packaged module
+/// Instead of using full file name, checks for a substring. This is because the specific version of dependencies
+/// installed along with requirements.txt can change and we don't want the check to fail if it does so.
+/// This way can just use the package names and not have to worry about extensions on the file names changing causing failures.
 /// 
 /// Arguments:
 ///     - exportTarball: path to the packaged tarball
-///     - wheels: Object of <relative path>-<wheel name> pairs array of file names to check for in the unpackaged module
-///               Ex: { "/": ["wheel-1.whl","wheel-2.whl"], "wheels":["wheel-3.whl","wheel-4.whl"] }
+///     - wheels: Object of <relative path>-<wheel string> pairs array of file names to check for in the unpackaged module
+///               Ex: { "/": ["ansible","pycparser"], "wheels":["jinja2", "lune"] }
 ///     - doesExist: set to 0 if we want to check that files explicitly do not exist (in the case -export-python-deps was not provided)
 Method AssertWheelFilesExistInPackagedModule(
 	exportTarball As %String,
@@ -384,10 +360,23 @@ Method AssertWheelFilesExistInPackagedModule(
     set wheelsIter = wheels.%GetIterator()
     while wheelsIter.%GetNext(.relativePath, .wheelArr) {
         set directory = ##class(%File).NormalizeDirectory(relativePath, exportDir)
+        // Compile a list of file names under the current directory
+        set files = ""
+        set file = $zsearch(directory_"*")
+        while file '= "" {
+            set files = files_$listbuild(##class(%File).GetFilename(file))
+            set file = $zsearch("")
+        }
+
         set wheelArrIter = wheelArr.%GetIterator()
         while wheelArrIter.%GetNext(, .wheelName) {
-            set fileName = ##class(%File).NormalizeFilename(wheelName, directory)
-            set exists = ##class(%File).Exists(fileName)
+            set exists = 0
+            for i = 1:1:$listlength(files) {
+                if $find($listget(files, i), wheelName) {
+                    set exists = 1
+                    quit
+                }
+            }
             if (doesExist) {
                 do $$$AssertTrue(exists, wheelName_" exists in packaged contents")
             }
@@ -401,7 +390,11 @@ Method AssertWheelFilesExistInPackagedModule(
 /// Given an object of <module name>-<wheel list> pairs,
 /// compiles a list of resources for the module and iterates over the wheel list to check if that wheel is a resource of the module
 /// 
-/// Ex: wheels = { "module1": ["wheel-1.whl","wheel-2.whl"], "module2":["wheel-3.whl","wheel-4.whl"] }
+/// Instead of using resource, checks for a substring. This is because the specific version of dependencies
+/// installed along with requirements.txt can change and we don't want the check to fail if it does so.
+/// This way can just use the package names and not have to worry about extensions changing causing failures.
+/// 
+/// Ex: wheels = { "module1": ["ansible","pycparser"], "module2":["jinja2", "lune"] }
 Method AssertWheelResourcesExistForModule(wheels As %DynamicObject)
 {
     set wheelsIter = wheels.%GetIterator()
@@ -417,7 +410,13 @@ Method AssertWheelResourcesExistForModule(wheels As %DynamicObject)
 
         set moduleWheelsIter = moduleWheels.%GetIterator()
         while moduleWheelsIter.%GetNext(, .wheel) {
-            set wheelIsResource = ($listfind(resourceList, wheel) > 0)
+            for i = 1:1:$listlength(resourceList) {
+                set wheelIsResource = 0
+                if $find($listget(resourceList, i), wheel) {
+                    set wheelIsResource = 1
+                    quit
+                }
+            }
             do $$$AssertTrue(wheelIsResource, "Wheel resource "_wheel_" is a part of the installed module "_moduleName)
         }
     }

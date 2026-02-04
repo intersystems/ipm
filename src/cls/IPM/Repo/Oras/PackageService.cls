@@ -252,16 +252,17 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
             // collect all versions for this package in tList
             do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
         }
-    } else {
-        // Endpoint failed, but if the name is specified, still try to find it
+    }
+    // Endpoint failed, but if the name is specified, still try to find it
+    if tList.Count()=0 {
         set name = pSearchCriteria.Name
         if (name '= "") {
             if ..Namespace '= "" {
                 set name = ..AppendURIs(..Namespace, name)
             }
             do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
-        } else {
-            // otherwise error out
+        } elseif response.StatusCode '= 200 {
+            // If no name is specified and the /v2/_catalog endpoint failed, error out
             set msg = "Error: Call to /v2/_catalog endpoint failed. This registry may not support it."
             set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.ReasonPhrase
             $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
