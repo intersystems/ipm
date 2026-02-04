@@ -12,12 +12,17 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
         set $namespace = "%SYS"
         set tLowerName = $zconvert(pNSName,"L")
 
+        set nsExists = ##class(Config.Namespaces).Exists(pNSName)
+        set dbExists = ##class(Config.Databases).Exists(pNSName)
+
         //Create directories
         set tPath = ##class(%File).ManagerDirectory() _ pNSName
-        set tCreated = ##class(%File).CreateDirectory(tPath,.tResult)
-        if 'tCreated {
-            set tSC = $$$ERROR($$$GeneralError,"Error creating directory '"_tPath_"': "_tResult)
-            quit
+        if '##class(%File).DirectoryExists(tPath) {
+            set tCreated = ##class(%File).CreateDirectory(tPath,.tResult)
+            if 'tCreated {
+                set tSC = $$$ERROR($$$GeneralError,"Error creating directory '"_tPath_"': "_tResult)
+                quit
+            }
         }
 
         set tWebPath = ##class(%File).NormalizeDirectory(##class(%File).ParentDirectoryName(##class(%File).ManagerDirectory()) _ "csp") _ pNSName
@@ -30,36 +35,40 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
         }
 
         // Create database
-        set tSC = ##class(SYS.Database).CreateDatabase(tPath)
-        if $$$ISERR(tSC) {
-            quit
-        }
+        if 'dbExists {
+            set tSC = ##class(SYS.Database).CreateDatabase(tPath)
+            if $$$ISERR(tSC) {
+                quit
+            }
 
-        // Mount database
-        set tDBProps("Directory") = tPath
-        set tDBProps("MountRequired") = 1
-        set tSC = ##class(Config.Databases).Create(pNSName,.tDBProps)
-        if $$$ISERR(tSC) {
-            quit
-        }
-        set Properties("MountRequired") = 1
-        set tSC = ##class(Config.Databases).Modify(pNSName,.tDBProps)
-        if $$$ISERR(tSC) {
-            quit
+            // Mount database
+            set tDBProps("Directory") = tPath
+            set tDBProps("MountRequired") = 1
+            set tSC = ##class(Config.Databases).Create(pNSName,.tDBProps)
+            if $$$ISERR(tSC) {
+                quit
+            }
+            set Properties("MountRequired") = 1
+            set tSC = ##class(Config.Databases).Modify(pNSName,.tDBProps)
+            if $$$ISERR(tSC) {
+                quit
+            }
         }
 
         // Create namespace
-        set tNSProps("Globals") = pNSName
-        set tNSProps("Routines") = pNSName
+        if 'nsExists {
+            set tNSProps("Globals") = pNSName
+            set tNSProps("Routines") = pNSName
 
-        set tNSProps("Library") = "IRISLIB"
-        set tNSProps("SysGlobals") = "IRISSYS"
-        set tNSProps("SysRoutines") = "IRISSYS"
-        set tNSProps("TempGlobals") = "IRISTEMP"
+            set tNSProps("Library") = "IRISLIB"
+            set tNSProps("SysGlobals") = "IRISSYS"
+            set tNSProps("SysRoutines") = "IRISSYS"
+            set tNSProps("TempGlobals") = "IRISTEMP"
 
-        set tSC = ##class(Config.Namespaces).Create(pNSName,.tNSProps)
-        if $$$ISERR(tSC) {
-            quit
+            set tSC = ##class(Config.Namespaces).Create(pNSName,.tNSProps)
+            if $$$ISERR(tSC) {
+                quit
+            }
         }
 
         // Ensemble-enable namespace

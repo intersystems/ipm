@@ -1426,15 +1426,18 @@ ClassMethod AddPackageMapping(
 ClassMethod RemovePackageMapping(
 	pNamespace As %String,
 	pMapping As %String,
-	pSkipActivation As %Boolean = 0) As %Status
+	pSkipActivation As %Boolean = 0,
+	ByRef changed As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set changed = 0
     try {
         set tPrevNS = $namespace
         new $namespace
         set $namespace = "%SYS"
         if ##class(Config.MapPackages).Exists(pNamespace,pMapping) {
             $$$ThrowOnError(##class(Config.MapPackages).Delete(pNamespace,pMapping,,$$$CPFSave))
+            set changed = 1
             if 'pSkipActivation {
                 new $namespace
                 set $namespace = tPrevNS
@@ -1442,9 +1445,9 @@ ClassMethod RemovePackageMapping(
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod AddRoutineMapping(
@@ -1485,9 +1488,11 @@ ClassMethod RemoveRoutineMapping(
 	pNamespace As %String,
 	pMapping As %String,
 	pType As %String = "ALL",
-	pSkipActivation As %Boolean = 0) As %Status
+	pSkipActivation As %Boolean = 0,
+	ByRef changed As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set changed = 0
     try {
         set tPrevNS = $namespace
         new $namespace
@@ -1495,6 +1500,7 @@ ClassMethod RemoveRoutineMapping(
         set pMapping = pMapping_$select(pType="ALL":"",1:"_"_pType)
         if ##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
             $$$ThrowOnError(##class(Config.MapRoutines).Delete(pNamespace,pMapping,,$$$CPFSave))
+            set changed = 1
             if 'pSkipActivation {
                 new $namespace
                 set $namespace = tPrevNS
@@ -1502,9 +1508,9 @@ ClassMethod RemoveRoutineMapping(
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod AddGlobalMapping(
@@ -1655,6 +1661,55 @@ ClassMethod ActivateMappings(pNamespace = {$namespace}) As %Status [ Internal ]
         set tSC = ex.AsStatus()
     }
     quit tSC
+}
+
+/// Activate configuration changes for multiple namespaces in a single operation.
+/// namespaces(ns)=1 for each namespace to activate.
+ClassMethod PerformBatchActivation(
+	ByRef namespaces,
+	useTransactions As %Boolean = 1,
+	verbose As %Boolean = 0) As %Status [ Internal ]
+{
+    set sc = $$$OK
+    set initTLevel = $tlevel
+    try {
+        set interruptManager = ##class(%IPM.Utils.InterruptManager).%New()
+        do interruptManager.DisableInterrupts()
+
+        if useTransactions {
+            tstart
+        }
+
+        new $namespace
+        set $namespace = "%SYS"
+        $$$ThrowOnError(##class(Config.CPF).Write())
+        $$$ThrowOnError(##class(Config.Map).MoveToActive())
+
+        set ns = ""
+        for {
+            set ns = $order(namespaces(ns))
+            quit:(ns = "")
+            if '##class(Config.Namespaces).Exists(ns) {
+                if verbose {
+                    write !, "Namespace "_ns_" does not exist; skipping activation."
+                }
+                continue
+            }
+            $$$ThrowOnError(##class(Config.Namespaces).Load(ns))
+        }
+
+        if useTransactions {
+            tcommit
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+
+    while ($tlevel > initTLevel) {
+        trollback 1
+    }
+
+    quit sc
 }
 
 /// Copy a package from one namespace to another. This works whether or not the contents of
@@ -1839,6 +1894,8 @@ ClassMethod EndCaptureOutput(
     } else {
         #; Otherwise switch redirection off
         do $zutil(82,12,0)
+        #; Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
+        use $io::("")
     }
 
     try {
