@@ -127,8 +127,7 @@ Method Test04Module2Dependencies1Transient()
 /// Edge cases below:
 /// All repository types
 /// Uses Module G
-/// TODO: Update lock-mod-oras: Created lock file with mods-other-repos filesystem repo instead of oras + remote repo
-Method Test05ModuleDependenciesAllRepositoryTypes()
+Method Test05AllRepositoryTypes()
 {
     set sc = $$$OK
     try {
@@ -165,41 +164,8 @@ Method Test05ModuleDependenciesAllRepositoryTypes()
         do $$$AssertStatusOK(sc,"Removed lock-file-other-repos repo successfully.")
 
         // Now that modules and repositories are set up, do the actual test
-        set moduleName = "lock-mod-oras"
-        do ..AssertInstallCreatesLockFileAsExpected(moduleName)
-
-        // Go back to the initial state by uninstalling the module, dependencies, and repositories used for this test
-        do ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
-        do $$$AssertStatusOK(sc, "Uninstalled "_moduleName_" and dependencies at the end of the test")
-
-
-        // Now test installing from a lock file from a module in a remote repository
-        set moduleName = "lock-mod-remote"
-
-        // TODO: Replace this with zpm "ci" once implemented
-        set sc = ##class(%IPM.Main).Shell("install "_remoteRepo_"/"_moduleName)
-        do $$$AssertStatusOK(sc, "Installed "_moduleName_" via the laock file successfully")
-
-        // Confirm that module and dependency classes were loaded correctly
-        do $classmethod("LockModRemote.Class1", "MethodA")
-
-
-        // Now test installing from a lock file from a module in an oras repository
-        set moduleName = "lock-mod-oras"
-
-        // TODO: Replace this with zpm "ci" once implemented
-        set sc = ##class(%IPM.Main).Shell("install "_orasRepo_"/"_moduleName)
-        do $$$AssertStatusOK(sc, "Installed "_moduleName_" via the laock file successfully")
-
-        // Confirm that module and dependency classes were loaded correctly
-        do $classmethod("LockModORAS.Class1", "MethodA")
-
-
-
-
-
-
-
+        do ..ExecuteGenericLockFileTest(remoteMod, "LockModRemote.Class1")
+        do ..ExecuteGenericLockFileTest(orasMod, "LockModORAS.Class1")
 
         do ##class(%IPM.Main).Shell("repo -delete -name "_remoteRepo)
         do $$$AssertStatusOK(sc, "Removed "_remoteRepo_" at the end of the test")
@@ -236,11 +202,11 @@ Method Test06ModuleMultipleVersions()
         do $$$AssertStatusOK(sc, "Uninstalled "_moduleName)
 
         // Install module from lock file
-        // TODO: Replace this with zpm "ci" once implemented
-        set sc = ##class(%IPM.Main).Shell("install "_moduleName)
+        set sc = ##class(%IPM.Main).Shell("ci "_moduleName)
+        do $$$AssertStatusOK(sc, "Able to install "_moduleName_" v"_latestVersion_" from the lock file")
 
         // Confirm classes and dependencies get installed as well
-        do $classmethod("LockModH.Class1", "MethodA")
+        do $classmethod("LockModH.Class1", "MethodB")
 
         // Uninstall module before testing with other version
         set sc = ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
@@ -267,8 +233,8 @@ Method Test06ModuleMultipleVersions()
         do $$$AssertStatusOK(sc, "Uninstalled "_moduleName)
 
         // Install module from lock file
-        // TODO: Replace this with zpm "ci" once implemented
-        set sc = ##class(%IPM.Main).Shell("install "_moduleName)
+        set sc = ##class(%IPM.Main).Shell("ci "_moduleName_" "_olderVersion)
+        do $$$AssertStatusOK(sc, "Able to install "_moduleName_" v"_olderVersion_" from the lock file")
 
         // Confirm classes and dependencies get installed as well
         do $classmethod("LockModH.Class1", "MethodA")
@@ -278,10 +244,10 @@ Method Test06ModuleMultipleVersions()
 }
 
 /// Module with no pre-existing lock file
-///     - [TODO, with "ci" command] zpm "ci" should fail due to not being able to locate the lock file
 ///     - Test creation of a lock file, for a module that did not already have one.
 ///         - Differs from other tests which overwrite pre-existing lock files
 ///         - Both cases SHOULD be functionally equivalent
+///     - zpm "ci" should fail due to not being able to locate the lock file
 /// Uses Module I
 Method Test07ModuleNoLockFile()
 {
@@ -302,22 +268,28 @@ Method Test07ModuleNoLockFile()
         set sc = ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
         do $$$AssertStatusOK(sc, "Uninstalled "_moduleName)
 
-        // TODO: This should fail due to no lock file
-        //Install module from lock file
-        //do ..AssertInstallFromLockFileAsExpected(moduleName)
+        // This should fail due to no lock file
+        set sc = ##class(%IPM.Main).Shell("ci "_moduleName)
+        do $$$AssertStatusNotOK(sc, "zpm ""ci"" fails on module "_moduleName_"due to not having a lock file")
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test07ModuleNoLockFile.")
     }
 }
 
+/// TODO: This succeeds, compiling modules doesn't see dependency issues and by the time
+///       we call LockModJ.Class1::MethodA() all dependencies are loaded so no issues there.
+///           - Is that okay?
+///               - I'm inclined to say yes. Dependencies out of order isn't too realistic a use case
+///                 anyways so maybe delete this case altogether?
 /// Try install on a lock file that lists dependencies out of order
 /// Uses Module J
 Method Test08ModuleDependenciesOutOfOrder()
 {
     set moduleName = ..#ModuleJ
 
-    // TODO: Replace this with zpm "ci" once implemented
-    //set sc = ##class(%IPM.Main).Shell("install "_moduleName)
+    zpm "install -lock "_moduleName
+
+    //set sc = ##class(%IPM.Main).Shell("ci "_moduleName)
     //do $$$AssertStatusNotOK(sc, "Installing from lock file with dependencies listed out of order fails")
 }
 
@@ -349,7 +321,9 @@ Method Test10ComplexNestedDependencies()
 /// 3. Uninstall the module (and dependencies)
 /// 4. Install from lock file via zpm "ci"
 /// 5. Call method in installed module (which in turn calls dependency methods) to confirm "ci" loads all modules correctly
-Method ExecuteGenericLockFileTest(moduleName As %String)
+Method ExecuteGenericLockFileTest(
+	moduleName As %String,
+	className As %String = "")
 {
     // Install and create lock file for module
     do ..AssertInstallCreatesLockFileAsExpected(moduleName)
@@ -359,7 +333,7 @@ Method ExecuteGenericLockFileTest(moduleName As %String)
     do $$$AssertStatusOK(sc, "Uninstalled "_moduleName)
 
     // Install module from lock file
-    do ..AssertInstallFromLockFileAsExpected(moduleName)
+    do ..AssertInstallFromLockFileAsExpected(moduleName, className)
 }
 
 /// Base cases of creating a lock file upon install of a module
@@ -390,8 +364,6 @@ ClassMethod AreLockFilesEqual(
     try {
         set actualLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(actualLockFilePath)
         set expectedLockFileContents = ##class(%DynamicAbstractObject).%FromJSONFile(expectedLockFilePath)
-        zwrite actualLockFileContents
-        zwrite expectedLockFileContents
         return actualLockFileContents.%ToJSON() = expectedLockFileContents.%ToJSON()
     } catch (ex) {
         // Should error if we fail to open either the actual or expected file
@@ -400,16 +372,20 @@ ClassMethod AreLockFilesEqual(
 }
 
 /// Base case of installing a module from a lock file and confirming everything gets loaded as expected
-Method AssertInstallFromLockFileAsExpected(moduleName As %String)
+Method AssertInstallFromLockFileAsExpected(
+	moduleName As %String,
+	className As %String = "")
 {
-    // TODO: Replace this with zpm "ci" once implemented
-    set sc = ##class(%IPM.Main).Shell("install "_moduleName)
+    set sc = ##class(%IPM.Main).Shell("ci "_moduleName)
+    do $$$AssertStatusOK(sc, "Installed "_moduleName_" via the lock file successfully")
 
     set sc = $$$OK
     try {
-        // Letter of the module is in the 10th place: "lock-mod-x-..."
-        set packageLetter = $zconvert($extract(moduleName, 10), "u")
-        set className = "LockMod"_packageLetter_".Class1"
+        if (className = "") {
+            // Letter of the module is in the 10th place: "lock-mod-x-..."
+            set packageLetter = $zconvert($extract(moduleName, 10), "u")
+            set className = "LockMod"_packageLetter_".Class1"
+        }
         do $classmethod(className, "MethodA")
     } catch (ex) {
         set sc = ex.AsStatus()

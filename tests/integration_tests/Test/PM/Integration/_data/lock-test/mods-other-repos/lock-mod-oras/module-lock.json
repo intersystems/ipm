@@ -1,7 +1,7 @@
 {
     "name": "lock-mod-oras",
     "version": "1.0.0",
-    "repository": "lock-file-other-repos",
+    "repository": "lock-file-oras",
     "lockFileVersion": "1",
     "repositories": {
         "lock-file-base": {
@@ -10,11 +10,15 @@
             "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/",
             "depth": 0
         },
-        "lock-file-other-repos": {
-            "type": "filesystem",
+        "lock-file-oras": {
+            "type": "oras",
             "readOnly": false,
-            "root": "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-other-repos/",
-            "depth": 0
+            "url": "http://oras:5000"
+        },
+        "lock-file-remote": {
+            "type": "remote",
+            "readOnly": false,
+            "url": "http://registry:52773/registry"
         }
     },
     "dependencies": {
@@ -43,7 +47,7 @@
         },
         "lock-mod-remote": {
             "version": "1.0.0",
-            "repository": "lock-file-other-repos",
+            "repository": "lock-file-remote",
             "dependencies": {
                 "lock-mod-e-1-dep-0-transient": "^1.0.0"
             }
