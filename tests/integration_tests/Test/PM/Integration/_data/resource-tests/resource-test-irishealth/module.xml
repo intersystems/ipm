@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-<Document name="ResourceTest.ZPM"><Module>
-  <Name>ResourceTest</Name>
+<Document name="ResourceTestIRISHealth.ZPM"><Module>
+  <Name>ResourceTestIRISHealth</Name>
   <Version>0.0.1+snapshot</Version>
   <Packaging>module</Packaging>
   <Resources>
@@ -28,14 +28,19 @@
     </Resource>
     <Resource Name="ResourceTest.SomeClass.CLS"/>
     <Resource Name="ResourceTest.MyClass.CLS"/>
+    <Resource Name="ResourceTest.TestIncludeLoads.CLS"/>
     <Resource Name="ResourceTest.TestDTL.dtl"/>
     <Resource Name="ResourceTest.TestBPL.bpl"/>
+    <Resource Name="/inc/ResourceTest">
+    </Resource>
     <Resource Name="ResourceTest.INC">
     </Resource>
     <Resource Name="ResourceTest.APackage.AnotherIncludeFile.INC" />
     <Resource Name="ResourceTest.MAC">
     </Resource>
     <Resource Name="ResourceTest.GBL">
+    </Resource>
+    <Resource Name=>
     </Resource>
   </Resources>
   <LifecycleClass>Module</LifecycleClass>
