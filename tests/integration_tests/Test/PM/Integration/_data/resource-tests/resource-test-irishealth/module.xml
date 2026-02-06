@@ -31,7 +31,7 @@
     <Resource Name="ResourceTest.TestIncludeLoads.CLS"/>
     <Resource Name="ResourceTest.TestDTL.dtl"/>
     <Resource Name="ResourceTest.TestBPL.bpl"/>
-    <Resource Name="/inc/ResourceTest">
+    <Resource Name="/inc/ResourceTest" ProcessorClass="Default.Include">
     </Resource>
     <Resource Name="ResourceTest.INC">
     </Resource>
@@ -39,8 +39,6 @@
     <Resource Name="ResourceTest.MAC">
     </Resource>
     <Resource Name="ResourceTest.GBL">
-    </Resource>
-    <Resource Name=>
     </Resource>
   </Resources>
   <LifecycleClass>Module</LifecycleClass>
