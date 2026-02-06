@@ -103,7 +103,7 @@ git checkout -b <new-branch-name>
 
 iris session <YOUR-INSTANCE-NAME>
 ```
-Then, inside the container, run:
+Then, inside the instance terminal, run:
 ```objectscript
 do $System.OBJ.Load("</path/to/ipm/repo>/preload/cls/IPM/Installer.cls", "ck")
 do ##class(IPM.Installer).setup("</path/to/ipm/repo>/", 3)
