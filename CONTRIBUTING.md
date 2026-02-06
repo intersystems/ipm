@@ -44,7 +44,7 @@ As a general principle, try to copy the style of the existing code. If you are w
 
 ## Technical Guide
 
-### Developing IPM in Docker Containers
+### Developing IPM in Docker Containers (*RECOMMENDED*)
 
 To implement new features, enhance existing capabilities, or fix known bugs, we strongly recommend setting up a local dev environment with Docker containers.
 
@@ -63,7 +63,7 @@ This will spin up 3 (or 4, if you're working on v0.10.x) containers, which are:
 - `ipm-sandbox-1`, a container with a vanilla IRIS instance, where the management portal (52773) is published to the host OS at 52776. On the Docker network, this container has the hostname `sandbox`.
 - `ipm-oras-1`, a container WITHOUT any IRIS instance. This container is based on [zot](https://github.com/project-zot/zot) and provides an OCI image registry, with port 5000 published to the host OS at 5001. On the Docker network, this container has the hostname `oras`.
 
-#### Important notes
+#### Important Notes
 - In both `ipm-iris-1` and `ipm-sandbox-1`, the IPM repo itself is mounted at `/home/irisowner/zpm/`.
 - Sometimes `ipm-registry-1` doesn't install zpm-registry properly; you may need to perform the following steps to manually make it work:
   - Run `docker exec -it ipm-registry-1 /bin/bash` to access the container.
@@ -93,7 +93,7 @@ docker system prune -a
 ```
 
 
-### Developing IPM in an existing IRIS instance
+### Developing IPM in an Existing IRIS Instance
 If you already have an IRIS instance running and you want to test IPM in this instance, run the following command:
 ```bash
 git clone https://github.com/intersystems/ipm
@@ -103,14 +103,14 @@ git checkout -b <new-branch-name>
 
 iris session <YOUR-INSTANCE-NAME>
 ```
-Then, inside the instance terminal, run:
+Create a new namespace. Then, inside the instance terminal, switch to that namespace and run:
 ```objectscript
 do $System.OBJ.Load("</path/to/ipm/repo>/preload/cls/IPM/Installer.cls", "ck")
 do ##class(IPM.Installer).setup("</path/to/ipm/repo>/", 3)
 ```
 
 #### Caveats
-- This approach is NOT recommended for any instance with HSLIB as the existing versions of IPM and its extensions may interfere
+- This approach is NOT recommended in a library namespace that ships with any ISC product (%SYS, HSLIB, etc.). You can develop on those instances but in a fresh namespace.
 - If your current instance doesn't run on 52774 with an empty prefix, you need to manually edit VS Code settings (either via GUI or `.vscode/settings.json`) in order to automate VS Code compilation on your instance.
 - When you switch to another Git branch, previous changes may carry over. For example, if you created and compiled a new class `%IPM.MyClass.cls` on branch A and switched to branch B, that class may still be visible in your instance. Consider manually deleting the IPM package using `$System.OBJ.DeletePackage("%IPM")` before switching branches if needed.
 
