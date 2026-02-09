@@ -140,6 +140,7 @@ This command is an alias for `module-action module-name publish`
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="If specified, exports Python dependencies. If omitted, defaults to false." />
 </command>
 
 <command name="update" dataPrefix="D">
