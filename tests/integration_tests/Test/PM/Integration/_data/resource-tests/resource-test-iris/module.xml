@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-<Document name="ResourceTest.ZPM"><Module>
-  <Name>ResourceTest</Name>
+<Document name="ResourceTestIRIS.ZPM"><Module>
+  <Name>ResourceTestIRIS</Name>
   <Version>0.0.1+snapshot</Version>
   <Packaging>module</Packaging>
   <Resources>
@@ -11,25 +11,17 @@
     <Resource Name="Covid19-Countries_bubble_atelier.pivot.dfi"/>
     <Resource Name="Covid19-Countries_bubble_vscode.pivot.dfi"/>
     <Resource Name="HTTP.Statuses.LOC"/>
-    <Resource Name="Test_HIPAA_5010.X12">
-      <Attribute Name="Directory">misc</Attribute>
-    </Resource>
-    <Resource Name="2_1_vscode.HL7"/>
-    <Resource Name="Test_HIPAA_5010_vscode.X12"/>
-    <Resource Name="hl7_2.5.LUT">
-      <Attribute Name="Directory">misc</Attribute>
-    </Resource>
-    <Resource Name="TestLookupTable_wide_system.lut"/>
-    <Resource Name="TestLookupTable_short_atelier.lut"/>
-    <Resource Name="TestLookupTable_short_vscode.lut"/>
     <Resource Name="ResourceTest.APackage.PKG">
       <Attribute Name="CompileAfter">ResourceTest.MAC</Attribute>
       <Attribute Name="Flags">ck /multi=0</Attribute>
     </Resource>
     <Resource Name="ResourceTest.SomeClass.CLS"/>
     <Resource Name="ResourceTest.MyClass.CLS"/>
+    <Resource Name="ResourceTest.TestIncludeLoads.CLS"/>
     <Resource Name="ResourceTest.TestDTL.dtl"/>
     <Resource Name="ResourceTest.TestBPL.bpl"/>
+    <Resource Name="/inc/ResourceTest" ProcessorClass="Default.Include">
+    </Resource>
     <Resource Name="ResourceTest.INC">
     </Resource>
     <Resource Name="ResourceTest.APackage.AnotherIncludeFile.INC" />
