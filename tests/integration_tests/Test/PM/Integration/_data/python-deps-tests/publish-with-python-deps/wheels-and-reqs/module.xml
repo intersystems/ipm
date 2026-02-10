@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="publish-with-python-wheels-and-reqs.ZPM">
+    <Module>
+      <Name>publish-with-python-wheels-and-reqs</Name>
+      <Version>1.6.2</Version>
+      <Packaging>module</Packaging>
+      <PythonWheel Name="colorama-0.4.6-py2.py3-none-any.whl" Directory="." />
+    </Module>
+  </Document>
+</Export>
