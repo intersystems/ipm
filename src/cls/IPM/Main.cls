@@ -470,6 +470,13 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
     uninstall HS.JSON
 </example>
 
+<example description="Uninstalls HS.JSON from the current namespace with python dependencies.">
+    uninstall HS.JSON -with-py
+</example>
+
+<example description="Uninstalls HS.JSON from the current namespace with the dependent modules with python dependencies.">
+    uninstall HS.JSON -r -with-py
+</example>
 <!-- Parameters -->
 <parameter name="module" description="Name of module to uninstall" />
 
@@ -481,6 +488,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
+<modifier name="with-py" dataAlias="with-py" dataValue="1" description="Remove the associated Python libraries if no longer needed by other modules." />
 
 </command>
 
@@ -972,6 +980,7 @@ ClassMethod ShellInternal(
 			set $$$ZPMCommandToLog = tCommand
 
             if (tCommandInfo = "quit") {
+                do ..OnBeforeShellExit()
                 return
             } elseif (tCommandInfo = "help") {
                 do ..%Help(.tCommandInfo)
@@ -4073,6 +4082,15 @@ ClassMethod GetPythonInstalledLibs(Output list)
 		}
 		set list("width") = width
 	}
+}
+
+/// Clean up any temporary data or PPG before exiting the shell
+ClassMethod OnBeforeShellExit() [ Internal ]
+{
+    try{
+        kill ^||%IPM.PipCaller
+    }catch ex{
+    }
 }
 
 ClassMethod GetPythonLibrariesList(PythonPath As %String) As %String [ Language = python ]

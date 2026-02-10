@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+	<Document name="demo-module3.ZPM">
+		<Module>
+			<Name>demo-module3</Name>
+			<Version>1.0.1</Version>
+			<Description>description</Description>
+			<Keywords>keywords</Keywords>
+			<Author>
+				<Person>your name</Person>
+				<Organization>your organization</Organization>
+				<CopyrightDate>2020</CopyrightDate>
+				<License>MIT</License>
+				<Notes>notes</Notes>
+			</Author>
+			<Packaging>module</Packaging>
+			<Default Name="count" Value="7"/>
+			<SystemRequirements Version=">=2020.1" Interoperability="enabled"/>
+			<SourcesRoot>src</SourcesRoot>
+		</Module>
+	</Document>
+</Export>

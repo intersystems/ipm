@@ -491,11 +491,35 @@ Method %Clean(ByRef pParams) As %Status
             if $$$ISERR(tSC) {
                 quit
             }
+            // validates the python libaraies need to be uninstalled as part of the clean process
+            if $get(pParams("with-py")) {
+                do ..UninstallPythonDeps(.pParams)
+            }
         }
     } catch e {
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+Method UninstallPythonDeps(pParams)
+{
+    if '##class(%IPM.Utils.Python).IsPythonEnabled() {
+        quit $$$OK
+    }
+    if '..Module.PythonDependencies.Count() {
+        quit $$$OK
+    }
+    do ..Log("Evaluating Python dependencies for removal...")
+    set key = ""
+    set ^||%IPM.PipCaller = ##class(%IPM.Utils.Python).ResolvePipCaller(.pParams)
+    for {
+        set pyRefOref = ..Module.PythonDependencies.GetNext(.key)
+        quit:key=""
+        set sc = ##class(%IPM.Storage.PythonReference).RemovePythonReference(key, .pParams)
+        $$$ThrowOnError(sc)
+    }
+    //kill ^||%IPM.PipCaller
 }
 
 Method %ExportData(ByRef pParams) As %Status
@@ -746,16 +770,10 @@ Method InstallOrDownloadPythonRequirements(
     }
     set tSC = $$$OK
     try {
-        set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
-        if '$system.CLS.IsMthd("%SYS.Python", "Import") {
-            throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
-        }
         set processType = ""
-        set tSysModule = ##class(%SYS.Python).Import("sys")
-        set tPyMajor = tSysModule."version_info".major
-        set tPyMinor = tSysModule."version_info".minor
-        set tPyMicro = tSysModule."version_info".micro
-        set tPyVersion = tPyMajor_"."_tPyMinor_"."_tPyMicro
+        set stdout = ""
+        set target = ##class(%IPM.Utils.Python).PythonManagerDir()
+        $$$ThrowOnError(##class(%IPM.Utils.Python).GetPythonVersion(.tPyVersion))
         if download {
             set processType = "Download Python wheels"
             do ..Log(processType _ " START")
@@ -783,6 +801,8 @@ Method InstallOrDownloadPythonRequirements(
             }
             set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
             $$$ThrowOnError(tSC)
+            set tSC = ..SavePythonDependencies(pythonRequirements)
+            $$$ThrowOnError(tSC)
         }
         do ..Log(processType _ " SUCCESS")
     } catch ex {
@@ -790,6 +810,41 @@ Method InstallOrDownloadPythonRequirements(
         do ..Log(processType _ " FAILURE")
     }
     quit tSC
+}
+
+Method SavePythonDependencies(pythonFileLocation As %String = "") As %Status
+{
+    quit:pythonFileLocation="" $$$OK
+    do ..Log("Saving python dependencies from "_pythonFileLocation)
+    set file = ##class(%File).%New(pythonFileLocation)
+    set sc = file.Open("R")
+    if $$$ISERR(sc) {
+        return sc
+    }
+    while 'file.AtEnd {
+        set lib = file.ReadLine()
+        set lib = $zstrip(lib, "<>W")
+        if lib="" continue
+        if (lib [ ".whl") || (lib [ ".wheel") {
+            set whlFile = $piece($translate(lib, "\", "/"), "/", *)
+            set libraryName = $piece(whlFile, "-")
+        } else {
+            set libraryName = $piece(lib,"==")
+        }
+        // check does this Module already have this EXACT library and version?
+        set pyRefObj =..Module.PythonDependencies.GetAt($$$lcase(libraryName))
+        if $isobject(pyRefObj) {
+            // already have this exact library and version, skip to next
+            if pyRefObj.IsVersionMatch(lib) {
+                continue
+            }
+        }
+        set pytonlibObj = ##class(%IPM.Storage.PythonReference).SavePythonDependencies(lib)
+        set sc = ..Module.PythonDependencies.SetAt(pytonlibObj, pytonlibObj.LibraryName)
+    }
+    // Save the python dependencies to the module object before reload.
+    set sc = ..Module.%Save()
+    return sc
 }
 
 ClassMethod ResolvePipCaller(ByRef pParams) As %List
