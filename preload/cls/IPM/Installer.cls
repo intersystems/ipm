@@ -113,6 +113,7 @@ ClassMethod ZPMInit(
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("UseStandalonePip", "", 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("SemVerPostRelease", 0, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("DefaultLogEntryLimit",20, 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ModuleRoot",##class(%SYSTEM.Util).DataDirectory() _ "ipm/", 0))
     quit $$$OK
 }
 
