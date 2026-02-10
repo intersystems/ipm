@@ -107,13 +107,13 @@ Method ListModulesFromTagString(
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
     set pointer = 0
     while $listnext(allVersionsList,pointer,moduleVersion) {
-        #; filter by version
+        // filter by version
         set tVersion = ##class(%IPM.General.SemanticVersion).FromString($$$Tag2Semver(moduleVersion))
         if 'tVersion.Satisfies(semverExpr) {
             continue
         }
 
-        #; Special case: if we provided an explicit build number, require it.
+        // Special case: if we provided an explicit build number, require it.
         if ##class(%IPM.General.SemanticVersion).IsValid(searchCriteria.VersionExpression,.specificVersion) && (specificVersion.Build '= "") && (specificVersion.Build '= tVersion.Build) {
             continue
         }
@@ -126,10 +126,52 @@ Method ListModulesFromTagString(
             set tag = tag _ $$$OrasTagPlatformSeparator _ platformVersion
         }
 
-        #; get metadata from annotations
+        // get metadata from annotations
         set metadata = ..GetPackageMetadata(..Location, name, tag, "", client)
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
         $$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
+
+        // Filter by module name if requested - check both Name and ExternalName
+        if (searchCriteria.Name '= "") {
+            // Extract the package name without namespace prefix for comparison
+            // Package name from ORAS may be "namespace/modulename" or just "modulename"
+            set packageNameWithoutNamespace = $piece(name, "/", *)
+
+            // First check if package name already matches
+            set packageNameMatches = ($$$lcase(packageNameWithoutNamespace) = $$$lcase(searchCriteria.Name))
+
+            // If packageNameMatches is true, proceed without additional checks
+            // Otherwise fetch module.xml to check namespaced Name and ExternalName
+            if 'packageNameMatches {
+                // Note: pass empty namespace since 'name' already includes the full path
+                set moduleXMLText = ..GetModuleXML(..Location, name _ ":" _ tag, "", ..Username, ..Password, ..Token, ..TokenAuthMethod)
+
+                if (moduleXMLText '= "") {
+                    // Parse module.xml
+                    try {
+                        set moduleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromString(moduleXMLText, .found)
+                    } catch ex {
+                        // if a single module.xml fails to parse, move onto the next one instead of failing completely
+                        continue
+                    }
+                    if 'found {
+                        continue
+                    }
+
+                    // Check if search name matches either Name or ExternalName (case-insensitive)
+                    set matchesName = ($$$lcase(moduleObj.Name) = $$$lcase(searchCriteria.Name))
+                    set matchesExternalName = ((moduleObj.ExternalName '= "") && ($$$lcase(moduleObj.ExternalName) = $$$lcase(searchCriteria.Name)))
+
+                    // Only include if at least one matches
+                    if 'matchesName && 'matchesExternalName {
+                        continue
+                    }
+                } else {
+                    // No module.xml available - skip this module
+                    continue
+                }
+            }
+        }
 
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
         // `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
@@ -162,48 +204,32 @@ Method ListModulesFromTagString(
     }
 }
 
+/// Lists the modules available in this repository that satisfy the search criteria
+/// Note: for ORAS repositories only, the internal name and external name can be used interchangeably
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")
 {
-    #; Get ORAS client
+    // Get ORAS client
     set client = ..GetClient(..Location, ..Username, ..Password, ..Token, ..TokenAuthMethod)
 
-    #; Parse search criteria
-    set name = $$$lcase(pSearchCriteria.Name)
+    // Parse search criteria
     set tVersionExpression = pSearchCriteria.VersionExpression
     set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(pSearchCriteria.VersionExpression, .tVersionExpression)
     $$$ThrowOnError(tSC)
 
-    #; If namespace is defined, add it to the package URI being searched for
-    if (name'="") && (..Namespace'="") {
-        set name = ..AppendURIs(..Namespace, name)
-    }
-
-    #; Get all modules
+    // Collect list of modules
     set tList = ##class(%Library.ListOfObjects).%New()
 
-    #; get all versions
-    // When no namespace is specified, we can only call "v2/_catalog" to get all the packages. In case of error, fail descriptively
-    if (..Namespace = "") {
-        set request = ..GetHttpRequest()
-        #; Make GET request
-        // response is a JSON structure like {"repositories":["package1", "package2", ...]}
-        set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
-        $$$ThrowOnError(tSC)
-        set response=request.HttpResponse
-        if (response.StatusCode'=200) {
-            // TODO improve error processing
-            set msg = "Error: ORAS namespace is not set and the call to /v2/_catalog endpoint failed"
-            set msg = msg _ $char(10,13) _ "Either set an ORAS namespace or ensure the ORAS server supports the /v2/_catalog endpoint"
-            set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.Data.Read()
-            $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-        }
-
-        #; Handle results
-        set json = ""
-        while 'response.Data.AtEnd {
-            set json = json _ response.Data.Read()
-        }
-        set data = ##class(%DynamicAbstractObject).%FromJSON(json)
+    // Use /v2/_catalog to enumerate all packages, then filter appropriately
+    // Note: not every registry supports this endpoint, but without it, searching becomes much harder without using registry-specific endpoints
+    set request = ..GetHttpRequest()
+    // Make GET request
+    // response is a JSON structure like {"repositories":["package1", "package2", ...]}
+    set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
+    $$$ThrowOnError(tSC)
+    set response=request.HttpResponse
+    if (response.StatusCode=200) {
+        // Handle results
+        set data = ##class(%DynamicAbstractObject).%FromJSON(response.Data)
         set iter = data.repositories.%GetIterator()
         // Iterate through each package
         // key is the index
@@ -213,22 +239,39 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
             if (package="") {
                 continue
             }
-            #; filter by module name if requested
-            if (name'="") && (package'=name) {
-                continue
+
+            // If namespace is configured, only consider packages in that namespace
+            if (..Namespace '= "") {
+                set namespacePrefix = ..Namespace _ "/"
+                // Skip packages not in this namespace
+                if ($extract(package, 1, $length(namespacePrefix)) '= namespacePrefix) {
+                    continue
+                }
             }
-            #; collect all versions for this package in tList
+
+            // collect all versions for this package in tList
             do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, package, .tList)
         }
-    } else {
-        // TODO: Make this work properly for the case where name is empty (searching in a repo with a namespace)
-        do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
+    }
+    // Endpoint failed, but if the name is specified, still try to find it
+    if tList.Count()=0 {
+        set name = pSearchCriteria.Name
+        if (name '= "") {
+            if ..Namespace '= "" {
+                set name = ..AppendURIs(..Namespace, name)
+            }
+            do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
+        } elseif response.StatusCode '= 200 {
+            // If no name is specified and the /v2/_catalog endpoint failed, error out
+            set msg = "Error: Call to /v2/_catalog endpoint failed. This registry may not support it."
+            set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.ReasonPhrase
+            $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+        }
     }
     return tList
 }
 
-// ** ORAS FUNCTIONS **
-
+/// ** ORAS FUNCTIONS **
 /// Returns an authenticated ORAS client
 ClassMethod GetClient(
 	registry As %String,
@@ -391,8 +434,8 @@ ClassMethod GetModuleXML(
         annotations = manifest.get('annotations', {})
         module_xml = annotations.get('com.intersystems.ipm.module.v1+xml')
         if module_xml:
-            # remove all whitespace
-            return "".join(module_xml.split())
+            # remove extraneous whitespace
+            return module_xml.strip()
     except Exception as ex:
         print("Exception: %s" % str(ex))
 

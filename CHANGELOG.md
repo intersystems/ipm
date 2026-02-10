@@ -5,16 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.5] - Unreleased
+## [0.10.6] - Unreleased
 
 ### Added
-- #938 Added flag -export-python-deps to package command
+- #1024: Added flag -export-python-deps to publish command
+- #1025: implement python dependency lifecycle and reference counting
+
+### Fixed
+- #996: Ensure COS commands execute in exec under a dedicated, isolated context
+- #1002: When listing configured repositories, only show the TokenAuthMethod when a token is defined.
+- #1024: Modules with PythonWheels have wheels packaged correctly under -export-python-deps
+- #1061: Fix issue when installing from OCI/ORAS registries
+- #1065: Fixed regression introduced in IPM 0.10.3 which removed support for resources with directories as names (e.g. /inc)
+
+## [0.10.5] - 2026-01-15
+
+### Added
+- #938: Added flag -export-python-deps to package command
 - #462: The `repo` command for repository configuration now supports secret input terminal mode for passwords with the `-password-stdin` flag
 - #935: Adding a generic JFrog Artifactory tarball resource processor for bundling artifact with a package and deploying it to a final location on install.
 - #950: Added support for listing installed Python packages using `list -python`, `list -py` and `list-installed -python`
 - #822: The CPF resource processor now supports system expressions and macros in CPF merge files
-- #578 Added functionality to record and display IPM history of install, uninstall, load, and update
+- #578: Added functionality to record and display IPM history of install, uninstall, load, and update
 - #961: Adding creation of a lock file for a module by using the `-create-lockfile` flag on install.
+- #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
+- #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
+- #1018: Require module name for uninstall when not using the -all flag
 
 ### Changed
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
@@ -22,12 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 to load using multicompile instead of trying to do own multi-threading of item load which causes
 lock contention by bypassing IRIS compiler.
 - #481: Improve BuildDependencyGraph performance by doing the following:
- - Eliminate recursion and use iteration.
- - Remove depth first search and do pure breadth first search.
- - Have better caching of results for module searches by collapsing search expressions (reducing expressions that are intersections).
+    - Eliminate recursion and use iteration.
+    - Remove depth first search and do pure breadth first search.
+    - Have better caching of results for module searches by collapsing search expressions (reducing expressions that are intersections).
 
 ### Removed
-- #938 Removed secret flag NewVersion handling in %Publish()
+- #938: Removed secret flag NewVersion handling in %Publish()
 
 ### Fixed
 - #943: The `load` command when used with a GitHub repository URL accepts a `branch` argument again
@@ -37,10 +53,18 @@ lock contention by bypassing IRIS compiler.
 - #965: FileCopy on a directory with a Name without the leading slash now works
 - #937: Publishing a module with a `<WebApplication>` containing a `Path` no longer errors out
 - #957: Improved error messages for OS command execution. Now, when a command fails, the error message includes the full command and its return code. Also fixed argument separation for the Windows `attrib` command and removed misleading error handling for missing commands.
+- #789: Fix error when listing modules for an ORAS repo with a specified namespace.
+- #999, #1000: Installing IPM cleans up stale mappings used in old versions of IPM
+- #1007: The `${ipmDir}` expression now works in the `<Arg>` of an `<Invoke>`
+- #1015: Fix dependency resolution bugs where `*` as the version requirement and intersecting ranges wouldn't work properly.
+- #1036: The `update` command no longer propagates developer mode to dependencies
 
 ### Deprecated
 - #828: The `CheckStatus` flag for `<Invoke>` action has been deprecated. Default behavior is now to always check the status of the method if and only if the method signature returns %Library.Status
 - #885: `-synchronous` flag since loading dependencies synchronously is now the default behavior.
+
+### Security
+- urllib3 wheel has been updated to 2.6.3
 
 ## [0.10.4] - 2025-10-21
 
@@ -65,6 +89,8 @@ lock contention by bypassing IRIS compiler.
 - #924: Make "module" parameter not required for "uninstall" command so -all modifier works
 - #928: `zpm "info"` now recognizes existence of configured ORAS registries
 - #930: Fix issue where `load` didn't work on GitHub URLs
+- #1011: Hidden flags IgnoreInstalled and UpdateSnapshots cause redundant calling of BuildDependencyGraph()
+- #1014: After FileCopy respects scope change #864, compileable resources with specified Scope cause Compile phase to fail on install
 
 ### Changed
 - #639: All modules installed in developer mode can now be edited, even if they do not contain "snapshot" in the version string
