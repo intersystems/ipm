@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.10.6] - Unreleased
+### Added
+- #1027: Add -bypass-deps flag to skip install the IPM dependencies
 
 ### Added
 - #1024: Added flag -export-python-deps to publish command
@@ -30,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
 - #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 - #1018: Require module name for uninstall when not using the -all flag
+
 
 ### Changed
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
