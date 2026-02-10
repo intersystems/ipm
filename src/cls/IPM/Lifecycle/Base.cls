@@ -492,6 +492,26 @@ Method %Clean(ByRef pParams) As %Status
                 quit
             }
         }
+        // Remove the source directory while uninstalling the module.
+        if $data(pParams("Clean","clean")) ||(##class(%IPM.Repo.UniversalSettings).GetCleanOnUninstall()) {
+            set verbose = $get(pParams("Clean","Verbose"))
+            set moduleRootDir = ..Module.Root
+            set moduleName = ..Module.DisplayName
+            write !,"["_$namespace_"|"_moduleName_"]",$char(9),"Cleanup: Removing source directory"
+            if ##class(%File).DirectoryExists(moduleRootDir) {
+                if verbose {
+                    write !,"["_$namespace_"|"_moduleName_"]",$char(9),"Found source directory: "_moduleRootDir
+                }
+                set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(moduleRootDir)
+                if verbose {
+                    write !,"["_$namespace_"|"_moduleName_"]",$char(9),"Source directory successfully deleted"
+                }
+                if $$$ISERR(tSC) {
+                     write !,"["_$namespace_"|"_moduleName_"]",$char(9),"Source directory delete issue: "_$system.Status.GetErrorText(tSC)
+                     $$$ThrowOnError(tSC)
+                }
+            }
+        }
     } catch e {
         set tSC = e.AsStatus()
     }

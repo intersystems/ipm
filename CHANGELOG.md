@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1024: Added flag -export-python-deps to publish command
+- #1034: Add -clean flag to remove source directory while uninstalling
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
