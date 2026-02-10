@@ -315,6 +315,29 @@ Method TestListPython() As %Status
     quit sc
 }
 
+Method TestAutoPurgeOldHistory() As %Status
+{
+    set status = ..RunCommand("config set HistoryRetain 30")
+    do $$$AssertStatusOK(status, "Config set executed successfully")
+
+    set status = ..RunCommand("config get HistoryRetain")
+    do $$$AssertStatusOK(status, "Config get executed successfully")
+
+    do $$$LogMessage("Update HistoryRetain from 30 days to 1 day")
+    set status = ..RunCommand("config set HistoryRetain 1")
+    do $$$AssertStatusOK(status, "HistoryRetain is changed from 30 days to 1 day successfully")
+
+    do $$$LogMessage("Purging old history entries older than 1 day")
+    set status = ##class(%IPM.General.History).AutoPurgeOldHistory()
+    do $$$AssertStatusOK(status, "AutoPurgeOldHistory executed successfully")
+
+    set afterPurge = ##class(%IPM.General.History).GetHistoryLastPurge()
+    do $$$LogMessage("After purge timestamp: "_afterPurge)
+    do $$$LogMessage("reset set the HistoryRetain to default value by deleting the config")
+    set status = ..RunCommand("config delete HistoryRetain")
+    do $$$AssertStatusOK(status, "Config delete executed successfully")
+}
+
 Method TestUninstallWithoutModuleName()
 {
     do $$$LogMessage("Run Uninstall command without module name")
