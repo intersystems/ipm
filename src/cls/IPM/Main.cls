@@ -1079,7 +1079,11 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
     set name = $translate($get(pCommandInfo("parameters","name"),"*"),$char(34))
     if (name'["*") {
         try {
-            set $namespace = name
+            if '..IsIPMEnabled(name) {
+                write $$$FormattedLine($$$Red,"IPM is not enabled in the "_name_" namespace.")
+            } else {
+                set $namespace = name
+            }
         } catch ex {
             $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to switch to namespace: " _ name))
         }
@@ -1102,9 +1106,17 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
         do ##class(%Library.Prompt).GetString(prompt, .value)
         quit:value=""
         try {
-            set $namespace = $select($data(list(value), ns): $listget(ns), 1: value)
+            set selectedNamespace = $select($data(list(value), ns): $listget(ns), 1: value)
+            if '..IsIPMEnabled(selectedNamespace) {
+                write $$$FormattedLine($$$Red," IPM is not enabled for the selected "_selectedNamespace_" namespace.")
+                hang 0.5
+                // Clear the current line and move the cursor up to remove the error message
+                write $$$ClearLineAndMoveUp
+                continue
+            }
+            set $namespace = selectedNamespace
         } catch e {
-            write $char(13),*27,"[K",*27,"[A"
+            write $$$ClearLineAndMoveUp
             continue
         }
         quit
@@ -3864,7 +3876,8 @@ ClassMethod DisplayModules(
             if pNumbered {
                 write $justify(i, numbersWidth - 2), ". "
             }
-            write $$$FormattedLinePadRight($$$Magenta, tNS _ "> ", nsWidth)
+            set ipmStatus=$select('..IsIPMEnabled(tNS):"(IPM not enabled)",1:"")
+            write $$$FormattedLinePadRight($$$Magenta, tNS _ "> "_ipmStatus, nsWidth)
             set tPrefix = $justify("", numbersWidth) _ tNS
             kill tModulesList
             merge tModulesList = pList(i, "modules")
@@ -3941,6 +3954,13 @@ ClassMethod DisplayModules(
             }
         }
     }
+}
+
+ClassMethod IsIPMEnabled(pNamespace As %String = {$namespace}) As %Boolean
+{
+    new $namespace
+    set $namespace = pNamespace
+    return $system.CLS.IsMthd("%IPM.Main", "Shell")
 }
 
 ClassMethod GetUpstreamPackageVersions(Output list)
