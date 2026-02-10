@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="publish-with-python-just-reqs.ZPM">
+    <Module>
+      <Name>publish-with-python-just-reqs</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+    </Module>
+  </Document>
+</Export>
