@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.6] - Unreleased
 
 ### Added
+- #1024: Added flag -export-python-deps to publish command
 - #1013: Implement recursive placeholder resolution in Default parameters
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
 - #1002: When listing configured repositories, only show the TokenAuthMethod when a token is defined.
+- #1024: Modules with PythonWheels have wheels packaged correctly under -export-python-deps
+- #1061: Fix issue when installing from OCI/ORAS registries
+- #1065: Fixed regression introduced in IPM 0.10.3 which removed support for resources with directories as names (e.g. /inc)
 
 ## [0.10.5] - 2026-01-15
 
