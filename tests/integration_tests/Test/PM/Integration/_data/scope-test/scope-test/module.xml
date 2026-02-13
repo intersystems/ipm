@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?><Export generator="IRIS" version="26">
+<Document name="scope-test.ZPM">
+    <Module>
+        <Name>scope-test</Name>
+        <Version>1.0.0</Version>
+        <Packaging>module</Packaging>
+        <Description>
+            This module tests the loading of scoped dependencies. This parent module has a dependency, scope-test-dep, which contains a scoped class, Test.Scope.ScopedClass. The parent module
+            also contains a unit test that references Test.Scope.ScopedClass. If the scoped dependency is loaded correctly, then the unit test will be able to find Test.Scope.ScopedClass and pass.
+            If not, then the unit test will fail due to Test.Scope.ScopedClass not being found.
+        </Description>
+        <Dependencies>
+            <ModuleReference Scope="test">
+                <Name>scope-test-dep</Name>
+                <Version>1.0.0</Version>
+            </ModuleReference>
+        </Dependencies>
+	    <UnitTest Name="/tests" Package="Test.Scope" Phase="test" />
+    </Module>
+</Document></Export>
