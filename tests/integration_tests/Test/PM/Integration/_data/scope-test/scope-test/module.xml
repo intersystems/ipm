@@ -14,8 +14,12 @@
                 <Name>scope-test-dep</Name>
                 <Version>1.0.0</Version>
             </ModuleReference>
+            <ModuleReference Scope="verify">
+                <Name>scope-test-dep-verify</Name>
+                <Version>1.0.0</Version>
+            </ModuleReference>
         </Dependencies>
-	    <UnitTest Name="/tests" Package="Test.Scope" Phase="test" />
-	    <!-- <UnitTest Name="/tests" Package="Test.Scope" Phase="verify" /> -->
+	    <UnitTest Name="/unit_tests" Package="Test.Scope" Phase="test" />
+	    <UnitTest Name="/integration_tests" Package="Verify.Scope" Phase="verify" />
     </Module>
 </Document></Export>

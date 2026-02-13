@@ -1386,6 +1386,10 @@ Method %Verify(ByRef pParams) As %Status
             }
         }
 
+        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
+        set tSC = ..Module.LoadDependencies(..PhaseList, .pParams)
+        $$$ThrowOnError(tSC)
+
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
