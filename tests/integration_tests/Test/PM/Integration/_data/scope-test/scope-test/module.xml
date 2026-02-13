@@ -16,5 +16,6 @@
             </ModuleReference>
         </Dependencies>
 	    <UnitTest Name="/tests" Package="Test.Scope" Phase="test" />
+	    <!-- <UnitTest Name="/tests" Package="Test.Scope" Phase="verify" /> -->
     </Module>
 </Document></Export>

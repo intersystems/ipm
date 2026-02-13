@@ -159,12 +159,12 @@ Method HandleAllUpdateSteps(
 }
 
 /// For a given version, seed or execute update steps listed in the module's update package version class
-///
+/// 
 /// If seeding: For only steps that don't have a TimeStampEnd value or have an errored status, set it's TimeStampEnd to the current time
-///
+/// 
 /// If executing: Only start running steps at the first one found not to have a TimeStampEnd value or if an errored step is found
 ///               After finding this step, run it and all subsequent steps, regardless of if they have been run or not.
-///
+/// 
 /// newStepToApply - Gets marked as true to tell us to run all remaining steps in the list, whether or not they have been run/seeded before
 ///                  Can carry this over to subsequent calls by passing the newStepToApply variable to those HandleUpdateStepsFromList() calls
 Method HandleUpdateStepsFromList(
@@ -818,6 +818,91 @@ ClassMethod HasScope(
     quit $listfind(tPhases, scopeItem) > 0
 }
 
+Method LoadDependencies(
+	pPhaseList As %List,
+	ByRef pParams) As %Status
+{
+    set tSC = $$$OK
+    try {
+        set tVerbose = $get(pParams("Verbose"))
+
+        if '$data(pParams("qstruct")) {
+            set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
+        } else {
+            merge qstruct = pParams("qstruct")
+        }
+
+        // Resolve and validate dependencies
+        set tReloadSnapshots = +$get(pParams("UpdateSnapshots"))
+        set tPermitDowngrade = +$get(pParams("PermitDowngrade"))
+        set tSC = ..BuildDependencyGraph(.tDependencyGraph,,tReloadSnapshots,.qstruct,pPhaseList,,,,,,tPermitDowngrade)
+        if $$$ISERR(tSC) {
+            quit
+        }
+
+        if $data(tDependencyGraph) {
+            set tOptimizeInstalled = 'tReloadSnapshots
+            write:tVerbose !,"Dependencies:"
+            set tModuleLoop = ""
+            for {
+                set tModuleLoop = $order(tDependencyGraph(tModuleLoop),1,tValue)
+                quit:tModuleLoop=""
+
+                // Check if module is already installed (but don't skip if it's not)
+                set tExists = ##class(%IPM.Storage.Module).NameExists(tModuleLoop)
+
+                if tExists {
+                    // Optimize for exact version matches that are already installed.
+                    set tMod = ##class(%IPM.Storage.Module).NameOpen(tModuleLoop,,.tSC)
+                    $$$ThrowOnError(tSC)
+                    if (tMod.VersionString = $listget(tValue,3)) {
+                        set $list(tValue,2) = ""
+                        set $list(tDependencyGraph(tModuleLoop),2) = ""
+                    }
+
+                    set tServer = $case($listget(tValue,2),"":" (installed)",:" @ "_$listget(tValue,2))
+                    write:tVerbose !,tModuleLoop," ",$listget(tValue,3),tServer
+
+                    // If phases are specified and dependency is already installed with correct version,
+                    // reload scoped resources for those phases
+                    set tAlreadyInstalled = (tMod.VersionString = $listget(tValue,3))
+                    if (pPhaseList '= "") && tAlreadyInstalled && (tMod.Root '= "") {
+                        write:tVerbose !,"Reloading scoped resources for ",tModuleLoop," from ",tMod.Root," with phases: ",pPhaseList
+                        // Create or reuse lifecycle with PhaseList set to include test/verify phases
+                        kill tParams
+                        merge tParams("qstruct") = qstruct
+                        merge tParams = pParams
+                        if '$isobject(tMod.Lifecycle) {
+                            set tMod.Lifecycle = ##class(%IPM.Lifecycle.Base).%New(tMod)
+                        }
+                        set tMod.Lifecycle.PhaseList = pPhaseList
+                        // Set root directory for the dependency so %Reload can find its files
+                        set tParams("RootDirectory") = tMod.Root
+                        // Execute Reload to load scoped resources
+                        set tSC = tMod.Lifecycle.%Reload(.tParams)
+                        $$$ThrowOnError(tSC)
+                    }
+                } else {
+                    // Module not installed - leave server name so Utils.LoadDependencies will install it
+                    set tServer = $case($listget(tValue,2),"":" (not found)",:" @ "_$listget(tValue,2))
+                    write:tVerbose !,tModuleLoop," ",$listget(tValue,3),tServer
+                }
+            }
+
+            // Install/update any dependencies that need it (have server names)
+            // Use LoadDependenciesFromGraph() which accepts our pre-built phase-aware dependency graph
+            kill tParams
+            merge tParams("qstruct") = qstruct
+            merge tParams = pParams
+            set tSC = ##class(%IPM.Utils.Module).LoadDependenciesFromGraph(.tDependencyGraph, .tParams)
+            $$$ThrowOnError(tSC)
+        }
+    } catch e {
+        set tSC = e.AsStatus()
+    }
+    quit tSC
+}
+
 /// Builds a dependency graph using a fully iterative breadth-first algorithm
 /// with no recursive calls (which result in massive slowdowns in ObjectScript).
 /// <p>
@@ -1400,7 +1485,7 @@ Method OverrideLifecycleClassSet(pValue As %Dictionary.Classname) As %Status
 
 /// This callback method is invoked by the <METHOD>%New</METHOD> method to
 /// provide notification that a new instance of an object is being created.
-///
+/// 
 /// <P>If this method returns an error then the object will not be created.
 /// <p>It is passed the arguments provided in the %New call.
 /// When customizing this method, override the arguments with whatever variables and types you expect to receive from %New().
@@ -1416,7 +1501,7 @@ Method %OnNew() As %Status [ Private, ServerOnly = 1 ]
 
 /// This callback method is invoked by the <METHOD>%Open</METHOD> method to
 /// provide notification that the object specified by <VAR>oid</VAR> is being opened.
-///
+/// 
 /// <P>If this method returns an error then the object will not be opened.
 Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 {
@@ -1446,7 +1531,7 @@ Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 
 /// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to
 /// provide notification that the current object is being validated.
-///
+/// 
 /// <P>If this method returns an error then <METHOD>%ValidateObject</METHOD> will fail.
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {
@@ -1535,7 +1620,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 /// either because %Save() was invoked on this object or on an object that references this object.
 /// %OnAddToSaveSet can modify the current object. It can also add other objects to the current
 /// SaveSet by invoking %AddToSaveSet or remove objects by calling %RemoveFromSaveSet.
-///
+/// 
 /// <P>If this method returns an error status then %Save() will fail and the transaction
 /// will be rolled back.
 Method %OnAddToSaveSet(
@@ -1570,7 +1655,7 @@ Method %OnAddToSaveSet(
 }
 
 /// Get an instance of an XML enabled class.<br><br>
-///
+/// 
 /// You may override this method to do custom processing (such as initializing
 /// the object instance) before returning an instance of this class.
 /// However, this method should not be called directly from user code.<br>
@@ -1801,9 +1886,9 @@ Method %Evaluate(
 /// This callback method is invoked by the <METHOD>%Save</METHOD> method to
 /// provide notification that the object is being saved. It is called before
 /// any data is written to disk.
-///
+/// 
 /// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
-///
+/// 
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
