@@ -1110,8 +1110,7 @@ Method %Test(ByRef pParams) As %Status
     set tSC = $$$OK
     try {
         // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList, .pParams)
-        $$$ThrowOnError(tSC)
+        do ##class(%IPM.Utils.Module).LoadDependencies(..Module, ..PhaseList, .pParams)
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1387,8 +1386,7 @@ Method %Verify(ByRef pParams) As %Status
         }
 
         // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList, .pParams)
-        $$$ThrowOnError(tSC)
+        do ##class(%IPM.Utils.Module).LoadDependencies(..Module, ..PhaseList, .pParams)
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""

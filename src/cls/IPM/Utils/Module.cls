@@ -1205,7 +1205,7 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule, .params)
+        do ..LoadDependencies(tModule,, .params)
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1241,9 +1241,10 @@ ClassMethod LoadNewModule(
 }
 
 /// Load dependencies of a module in a synchronous manner, one at a time, in the correct order.
-/// This method builds a dependency graph without phases and installs missing dependencies.
+/// This method builds a dependency graph (optionally with phases) and installs missing dependencies.
 ClassMethod LoadDependencies(
 	pModule As %IPM.Storage.Module,
+	phaseList As %List = "",
 	ByRef pParams)
 {
     set isVerbose = $get(pParams("Verbose"),0)
@@ -1252,69 +1253,43 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,"",,,,ignoreInstalled,,permitDowngrade)
+    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade)
     $$$ThrowOnError(sc)
     write "Done."
 
-    // Delegate to LoadDependenciesFromGraph to install modules
-    set sc = ..LoadDependenciesFromGraph(.dependencyGraph, .pParams, pModule)
-    $$$ThrowOnError(sc)
-}
-
-/// Load dependencies of a module in a synchronous manner, one at a time, in the correct order.
-/// Load dependencies from a pre-built dependency graph. <br />
-/// This method accepts a dependency graph (typically built with BuildDependencyGraph()) and installs
-/// any modules that have server names (are not already installed with the correct version). <br />
-/// @Argument	pDependencyGraph	Dependency graph array with structure: <br />
-///                                 pDependencyGraph(moduleName) = $lb(depth, serverName, version, displayName) <br />
-///                                 If serverName is empty, the module is already installed with the correct version. <br />
-/// @Argument	pParams				Parameters for module loading <br />
-/// @Argument	pModule				Optional: Module object for lock file creation <br />
-/// @Return		%Status				Status of the operation
-ClassMethod LoadDependenciesFromGraph(
-	ByRef pDependencyGraph,
-	ByRef pParams,
-	pModule As %IPM.Storage.Module = "") As %Status
-{
-    set sc = $$$OK
-    try {
-        set isVerbose = $get(pParams("Verbose"),0)
-
-        do ..ConstructInvertedDependencyGraph(.pDependencyGraph, .invertedDependencyGraph)
-        if isVerbose {
-            write !, "Created inverted dependency graph from dependency graph"
-        }
-
-        #dim flatDepList As %Library.ListOfObjects
-        set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
-        if isVerbose {
-            write !, "Constructed flat dependency list from inverted dependency graph"
-            write !, "Starting installation of dependencies..."
-            write !
-        }
-        for i = 1:1:flatDepList.Count() {
-            #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
-            set moduleReference = flatDepList.GetAt(i)
-            if (moduleReference.ServerName = "") {
-                // Ignore modules already installed that do not need to be installed again
-                continue
-            }
-            set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams)
-            $$$ThrowOnError(sc)
-        }
-
-        // Create lock file if specified for this module
-        if $isobject(pModule) && $get(pParams("CreateLockFile"), 0) && (pModule.Name = $get(pParams("LockFileModule"))) {
-            try {
-                do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
-            } catch (ex) {
-                write !, $$$FormatText("Error creating lock file for %1 - %2", pModule.Name, ex.DisplayString()), !
-            }
-        }
-    } catch e {
-        set sc = e.AsStatus()
+    // Install dependencies from the graph
+    do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
+    if isVerbose {
+        write !, "Created inverted dependency graph from dependency graph"
     }
-    quit sc
+
+    #dim flatDepList As %Library.ListOfObjects
+    set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
+    if isVerbose {
+        write !, "Constructed flat dependency list from inverted dependency graph"
+        write !, "Starting installation of dependencies..."
+        write !
+    }
+
+    for i = 1:1:flatDepList.Count() {
+        #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
+        set moduleReference = flatDepList.GetAt(i)
+        if (moduleReference.ServerName = "") {
+            // Ignore modules already installed that do not need to be installed again
+            continue
+        }
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams)
+        $$$ThrowOnError(sc)
+    }
+
+    // Create lock file if specified for this module
+    if $isobject(pModule) && $get(pParams("CreateLockFile"), 0) && (pModule.Name = $get(pParams("LockFileModule"))) {
+        try {
+            do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
+        } catch (ex) {
+            write !, $$$FormatText("Error creating lock file for %1 - %2", pModule.Name, ex.DisplayString()), !
+        }
+    }
 }
 
 /// Construct an inverted dependency graph from the dependency graph of a module. <br />

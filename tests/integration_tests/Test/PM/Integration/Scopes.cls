@@ -84,10 +84,6 @@ Method TestScopedDependencyLoadingTest()
         set sc = ##class(%IPM.Main).Shell("repo -fs -name scopetest -path " _ repoDir)
         do $$$AssertStatusOK(sc, "Set up filesystem repository")
 
-        // Uninstall any existing modules first
-        set sc = ##class(%IPM.Main).Shell("uninstall scope-test-dep")
-        set sc = ##class(%IPM.Main).Shell("uninstall scope-test")
-
         // Install parent module from filesystem repo (should NOT install scoped dependency yet)
         set sc = ##class(%IPM.Main).Shell("install scopetest/scope-test -verbose")
         do $$$AssertStatusOK(sc, "Installed scope-test from filesystem repo")
@@ -124,10 +120,6 @@ Method TestScopedDependencyLoadingVerify()
         set repoDir = ..GetModuleDir("scope-test/scope-test")
         set sc = ##class(%IPM.Main).Shell("repo -fs -name scopetest -path " _ repoDir)
         do $$$AssertStatusOK(sc, "Set up filesystem repository")
-
-        // Uninstall any existing modules first
-        set sc = ##class(%IPM.Main).Shell("uninstall scope-test-dep-verify")
-        set sc = ##class(%IPM.Main).Shell("uninstall scope-test")
 
         // Install parent module from filesystem repo (should NOT install scoped dependency yet)
         set sc = ##class(%IPM.Main).Shell("install scopetest/scope-test -verbose")
