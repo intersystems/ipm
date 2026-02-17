@@ -819,88 +819,89 @@ ClassMethod HasScope(
 }
 
 Method LoadDependencies(
-	pPhaseList As %List,
-	ByRef pParams) As %Status
+	phaseList As %List,
+	ByRef params) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
-        set tVerbose = $get(pParams("Verbose"))
+        set verbose = $get(params("Verbose"))
 
-        if '$data(pParams("qstruct")) {
-            set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
+        if '$data(params("qstruct")) {
+            set qstruct = "ck"_$select(verbose:"d",1:"-d")
         } else {
-            merge qstruct = pParams("qstruct")
+            merge qstruct = params("qstruct")
         }
 
         // Resolve and validate dependencies
-        set tReloadSnapshots = +$get(pParams("UpdateSnapshots"))
-        set tPermitDowngrade = +$get(pParams("PermitDowngrade"))
-        set tSC = ..BuildDependencyGraph(.tDependencyGraph,,tReloadSnapshots,.qstruct,pPhaseList,,,,,,tPermitDowngrade)
-        if $$$ISERR(tSC) {
+        set reloadSnapshots = +$get(params("UpdateSnapshots"))
+        set permitDowngrade = +$get(params("PermitDowngrade"))
+        set sc = ..BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,.qstruct,phaseList,,,,,,permitDowngrade)
+        if $$$ISERR(sc) {
             quit
         }
 
-        if $data(tDependencyGraph) {
-            set tOptimizeInstalled = 'tReloadSnapshots
-            write:tVerbose !,"Dependencies:"
-            set tModuleLoop = ""
+        if $data(dependencyGraph) {
+            set optimizeInstalled = 'reloadSnapshots
+            write:verbose !,"Dependencies:"
+            set moduleLoop = ""
             for {
-                set tModuleLoop = $order(tDependencyGraph(tModuleLoop),1,tValue)
-                quit:tModuleLoop=""
+                set moduleLoop = $order(dependencyGraph(moduleLoop),1,value)
+                quit:moduleLoop=""
 
                 // Check if module is already installed (but don't skip if it's not)
-                set tExists = ##class(%IPM.Storage.Module).NameExists(tModuleLoop)
+                set exists = ##class(%IPM.Storage.Module).NameExists(moduleLoop)
 
-                if tExists {
-                    // Optimize for exact version matches that are already installed.
-                    set tMod = ##class(%IPM.Storage.Module).NameOpen(tModuleLoop,,.tSC)
-                    $$$ThrowOnError(tSC)
-                    if (tMod.VersionString = $listget(tValue,3)) {
-                        set $list(tValue,2) = ""
-                        set $list(tDependencyGraph(tModuleLoop),2) = ""
+                if exists {
+                    set mod = ##class(%IPM.Storage.Module).NameOpen(moduleLoop,,.sc)
+                    $$$ThrowOnError(sc)
+
+                    if optimizeInstalled && (mod.VersionString = $listget(value,3)) {
+                        // Optimize for exact version matches that are already installed.
+                        set $list(value,2) = ""
+                        set $list(dependencyGraph(moduleLoop),2) = ""
                     }
 
-                    set tServer = $case($listget(tValue,2),"":" (installed)",:" @ "_$listget(tValue,2))
-                    write:tVerbose !,tModuleLoop," ",$listget(tValue,3),tServer
+                    set server = $case($listget(value,2),"":" (installed)",:" @ "_$listget(value,2))
+                    write:verbose !,moduleLoop," ",$listget(value,3),server
 
                     // If phases are specified and dependency is already installed with correct version,
                     // reload scoped resources for those phases
-                    set tAlreadyInstalled = (tMod.VersionString = $listget(tValue,3))
-                    if (pPhaseList '= "") && tAlreadyInstalled && (tMod.Root '= "") {
-                        write:tVerbose !,"Reloading scoped resources for ",tModuleLoop," from ",tMod.Root," with phases: ",pPhaseList
+                    set alreadyInstalled = (mod.VersionString = $listget(value,3))
+                    if (phaseList '= "") && alreadyInstalled && (mod.Root '= "") {
+                        write:verbose !,"Reloading scoped resources for ",moduleLoop," from ",mod.Root," with phases: ",phaseList
                         // Create or reuse lifecycle with PhaseList set to include test/verify phases
-                        kill tParams
-                        merge tParams("qstruct") = qstruct
-                        merge tParams = pParams
-                        if '$isobject(tMod.Lifecycle) {
-                            set tMod.Lifecycle = ##class(%IPM.Lifecycle.Base).%New(tMod)
+                        kill reloadParams
+                        merge reloadParams("qstruct") = qstruct
+                        merge reloadParams = params
+                        if '$isobject(mod.Lifecycle) {
+                            set mod.Lifecycle = ##class(%IPM.Lifecycle.Base).%New(mod)
                         }
-                        set tMod.Lifecycle.PhaseList = pPhaseList
+                        set mod.Lifecycle.PhaseList = phaseList
                         // Set root directory for the dependency so %Reload can find its files
-                        set tParams("RootDirectory") = tMod.Root
+                        set reloadParams("RootDirectory") = mod.Root
                         // Execute Reload to load scoped resources
-                        set tSC = tMod.Lifecycle.%Reload(.tParams)
-                        $$$ThrowOnError(tSC)
+                        set sc = mod.Lifecycle.%Reload(.reloadParams)
+                        $$$ThrowOnError(sc)
                     }
                 } else {
                     // Module not installed - leave server name so Utils.LoadDependencies will install it
-                    set tServer = $case($listget(tValue,2),"":" (not found)",:" @ "_$listget(tValue,2))
-                    write:tVerbose !,tModuleLoop," ",$listget(tValue,3),tServer
+                    set server = $case($listget(value,2),"":" (not found)",:" @ "_$listget(value,2))
+                    write:verbose !,moduleLoop," ",$listget(value,3),server
                 }
             }
 
             // Install/update any dependencies that need it (have server names)
             // Use LoadDependenciesFromGraph() which accepts our pre-built phase-aware dependency graph
-            kill tParams
-            merge tParams("qstruct") = qstruct
-            merge tParams = pParams
-            set tSC = ##class(%IPM.Utils.Module).LoadDependenciesFromGraph(.tDependencyGraph, .tParams)
-            $$$ThrowOnError(tSC)
+            kill installParams
+            merge installParams("qstruct") = qstruct
+            merge installParams = params
+            set sc = ##class(%IPM.Utils.Module).LoadDependenciesFromGraph(.dependencyGraph, .installParams)
+            $$$ThrowOnError(sc)
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 /// Builds a dependency graph using a fully iterative breadth-first algorithm
