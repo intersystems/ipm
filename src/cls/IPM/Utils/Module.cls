@@ -1283,7 +1283,7 @@ ClassMethod LoadDependencies(
     }
 
     // Create lock file if specified for this module
-    if $isobject(pModule) && $get(pParams("CreateLockFile"), 0) && (pModule.Name = $get(pParams("LockFileModule"))) {
+    if $get(pParams("CreateLockFile"), 0) && (pModule.Name = $get(pParams("LockFileModule"))) {
         try {
             do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
         } catch (ex) {
