@@ -2158,10 +2158,11 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 
         // Rebuild cache
         write !,"Rebuilding cache for repository: ",repoName
+        set start = $zhorolog
         set sc = serverDef.BuildCache(1, 1)  // purge=1, verbose=1
         $$$ThrowOnError(sc)
 
-        write !,"Cache rebuilt successfully"
+        write !,"Cache rebuilt successfully in ", $zhorolog-start, " seconds."
     } else {
         set tName = $$$GetModifier(pCommandInfo,"name")
         set tType = $listget(serverClassList)
@@ -2268,7 +2269,7 @@ ClassMethod ShowModulesForRepository(
     set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pRepoName,,.tSC)
     $$$ThrowOnError(tSC)
     if server.%IsA("%IPM.Repo.Filesystem.Definition") {
-        write !,"Last full cache rebuild for '", pRepoName, "' was on ", server.CacheLastRebuilt, " (UTC). Run 'repo -n "_pRepoName_" -rebuild-cache' to rebuild the cache.",!
+        write !,"Last full cache rebuild for '", pRepoName, "' was on ", server.CacheLastRebuilt, " (UTC). Run 'repo -n "_pRepoName_" -rebuild-cache' to refresh the cache.",!
     }
 }
 
