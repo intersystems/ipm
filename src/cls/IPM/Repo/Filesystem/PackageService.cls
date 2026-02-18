@@ -27,6 +27,20 @@ Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream
     // Use validated open to ensure cache is fresh
     set module = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..Root, pModuleReference.Name, pModuleReference.VersionString, , .status)
     $$$ThrowOnError(status)
+
+    // Lazy-load manifest if not already loaded
+    if 'module.ManifestLoaded {
+        set defObj = ##class(%IPM.Repo.Filesystem.Definition).RootIndexOpen(module.Root, , .status)
+        $$$ThrowOnError(status)
+
+        // Reconstruct file path
+        set dirPath = ##class(%File).NormalizeFilename(module.SubDirectory, module.Root)
+        set filePath = ##class(%File).NormalizeFilename("module.xml", dirPath)
+
+        set status = defObj.LoadManifestForCacheEntry(module, filePath)
+        $$$ThrowOnError(status)
+    }
+
     quit module.Manifest
 }
 

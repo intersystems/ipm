@@ -231,9 +231,9 @@ Method ParseModuleFile(
         $$$ThrowStatus($$$ERROR($$$GeneralError, "File is not a ZPM module"))
     }
 
-    // Parse module info
+    // Parse module info (skip full manifest)
     kill stream, name, versionString
-    $$$ThrowOnError(..GetModuleStreamFromFile(filePath, .stream, .name, .versionString))
+    $$$ThrowOnError(..GetModuleStreamFromFile(filePath, .stream, .name, .versionString, 1))
 }
 
 /// Refresh a cache entry by re-parsing its module.xml file
@@ -243,7 +243,7 @@ Method RefreshCacheEntry(
 	filePath As %String,
 	newMTime As %TimeStamp)
 {
-    // Parse the module file
+    // Parse the module file (metadata only)
     kill stream, name, versionString
     do ..ParseModuleFile(filePath, cacheObj.Root, .name, .versionString, .stream)
 
@@ -251,8 +251,7 @@ Method RefreshCacheEntry(
     set cacheObj.Name = name
     set cacheObj.VersionString = versionString
     set cacheObj.FileMTime = newMTime
-    do cacheObj.Manifest.Clear()
-    do cacheObj.Manifest.CopyFrom(stream)
+    set cacheObj.ManifestLoaded = 0  // Mark manifest as not loaded (lazy load on next access)
     set cacheObj.LastModified = $zdatetime($ztimestamp, 3)
 
     set saveSC = cacheObj.%Save()
@@ -273,7 +272,7 @@ Method AddCacheItem(
     set pName = ""
     set pVersionString = ""
     try {
-        // Parse the module file
+        // Parse the module file (metadata only)
         kill tStream, tName, tVersionString
         try {
             do ..ParseModuleFile(pModuleFileName, ..Root, .pName, .pVersionString, .tStream)
@@ -296,7 +295,7 @@ Method AddCacheItem(
         set tCacheItem.Name = pName
         set tCacheItem.VersionString = pVersionString
         set tCacheItem.FileMTime = $zdatetime(##class(%Library.File).GetFileDateModified(pModuleFileName), 3)
-        do tCacheItem.Manifest.CopyFrom(tStream)
+        set tCacheItem.ManifestLoaded = 0  // Manifest will be loaded on load/install command
         set tCacheItem.LastModified = $zdatetime($ztimestamp,3)
         set tSaveSC = tCacheItem.%Save()
         if $$$ISERR(tSaveSC) {
@@ -308,11 +307,36 @@ Method AddCacheItem(
     quit tSC
 }
 
+/// Load the full manifest for a cache entry on-demand
+/// Used for lazy loading optimization - only extracts manifest when needed
+Method LoadManifestForCacheEntry(
+	cacheObj As %IPM.Repo.Filesystem.Cache,
+	filePath As %String) As %Status
+{
+    set sc = $$$OK
+    try {
+        // Extract full manifest using GetModuleStreamFromFile (not metadata-only)
+        kill stream, name, version
+        $$$ThrowOnError(..GetModuleStreamFromFile(filePath, .stream, .name, .version, 0))
+
+        // Update cache entry with manifest
+        do cacheObj.Manifest.Clear()
+        do cacheObj.Manifest.CopyFrom(stream)
+        set cacheObj.ManifestLoaded = 1
+        set cacheObj.LastModified = $zdatetime($ztimestamp, 3)
+        $$$ThrowOnError(cacheObj.%Save())
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
 Method GetModuleStreamFromFile(
 	pFilename As %String,
 	Output pStream As %Stream.GlobalCharacter,
 	Output pName As %String,
-	Output pVersion As %String) As %Status
+	Output pVersion As %String,
+	pMetadataOnly As %Boolean = 0) As %Status
 {
     set tSC = $$$OK
     set pName = ""
@@ -323,18 +347,28 @@ Method GetModuleStreamFromFile(
         set tSC = tSourceStream.LinkToFile(pFilename)
         $$$ThrowOnError(tSC)
 
-        set pStream = ##class(%Stream.GlobalCharacter).%New()
+        // Copy to in-memory stream for reuse (avoid file I/O on rewind)
+        set tMemoryStream = ##class(%Stream.GlobalCharacter).%New()
+        set tSC = tMemoryStream.CopyFrom(tSourceStream)
+        $$$ThrowOnError(tSC)
+        do tMemoryStream.Rewind()
+
         set tMetaStream = ##class(%Stream.GlobalCharacter).%New()
 
-        // Extract <Module> section of document
-        set tCompiledTransform = ##class(%IPM.Repo.XSLTProvider).GetCompiledTransformForXData($classname(),"ModuleDocumentTransform")
-        set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tSourceStream,tCompiledTransform,.pStream)
-        $$$ThrowOnError(tSC)
+        // Extract <Module> section of document (skip if metadata-only)
+        if 'pMetadataOnly {
+            set pStream = ##class(%Stream.GlobalCharacter).%New()
+            set tCompiledTransform = ##class(%IPM.Repo.XSLTProvider).GetCompiledTransformForXData($classname(),"ModuleDocumentTransform")
+            set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tMemoryStream,tCompiledTransform,.pStream)
+            $$$ThrowOnError(tSC)
+
+            // Rewind in-memory stream for next transform
+            do tMemoryStream.Rewind()
+        }
 
         // Extract Name and Version
-        do tSourceStream.Rewind()
         set tCompiledTransform = ##class(%IPM.Repo.XSLTProvider).GetCompiledTransformForXData($classname(),"MetadataExtractionTransform")
-        set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tSourceStream,tCompiledTransform,.tMetaStream)
+        set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tMemoryStream,tCompiledTransform,.tMetaStream)
         $$$ThrowOnError(tSC)
 
         set tMetaStream.LineTerminator = $select($$$isWINDOWS:$char(13,10),$$$isUNIX:$char(10))
