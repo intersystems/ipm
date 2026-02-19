@@ -21,6 +21,9 @@ Property FileMTime As %TimeStamp;
 /// Indicates if full manifest has been populated (deferred loading optimization)
 Property ManifestLoaded As %Boolean [ InitialExpression = 0 ];
 
+/// Indicates if file has been validated as a valid ZPM document
+Property ValidationPassed As %Boolean [ InitialExpression = 0 ];
+
 /// Full module manifest
 Property Manifest As %Stream.GlobalCharacter;
 
@@ -243,6 +246,9 @@ Storage Default
 </Value>
 <Value name="18">
 <Value>ManifestLoaded</Value>
+</Value>
+<Value name="19">
+<Value>ValidationPassed</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.Filesystem.CacheD</DataLocation>
