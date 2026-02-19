@@ -127,6 +127,12 @@ Trigger DepthChanged [ Event = UPDATE, Foreach = row/object ]
         set oldDepth = {Depth*O}
         set newDepth = {Depth}
 
+        // Skip if we're already in the middle of BuildCache (e.g., auto-detecting depth)
+        // This prevents infinite recursion when BuildCache sets the depth
+        if $get(^||IPMBuildingCache) {
+            quit
+        }
+
         // Depth changed - rebuild cache
         set oref = ..%Open({ID})
         if $isobject(oref) {
@@ -138,12 +144,16 @@ Trigger DepthChanged [ Event = UPDATE, Foreach = row/object ]
 /// Build the cache of modules found in the filesystem repository.
 /// pPurge - if 1, deletes existing cache entries before rebuilding
 Method BuildCache(
-	pPurge As %Boolean = 1,
+	pPurge As %Boolean = 0,
 	pVerbose As %Integer = 0,
 	pAutoDetectDepth As %Boolean = 0) As %Status
 {
     set tSC = $$$OK
     set tInitTLevel = $tlevel
+
+    // Set flag to prevent DepthChanged trigger from recursively calling BuildCache
+    set ^||IPMBuildingCache = 1
+
     try {
         set tLogManager = ##class(%IPM.General.LogManager).%Get(.tSC)
         $$$ThrowOnError(tSC)
@@ -153,6 +163,10 @@ Method BuildCache(
         $$$ThrowOnError(tSC)
 
         tstart
+
+        // Track visited cache entries (for cleanup of stale entries)
+        kill tVisitedIds
+
         if (pPurge) && (..%Id() '= "") {
             set tLockManager = ##class(%IPM.Utils.LockManager).%New()
             $$$ThrowOnError(tLockManager.LockClassId($classname(),..%Id()))
@@ -171,7 +185,12 @@ Method BuildCache(
         }
 
         // Scan root directory recursively, up to ..Depth levels down, for module.xml files.
-        set tSC = ..ScanDirectory(..Root,.tFilenameList,,..Depth,$select(pVerbose>1:1,1:0),.tMaxDepth)
+        // Try Python scanner first (much faster), fall back to SQL-based scanner if unavailable
+        set tSC = ..ScanDirectoryPython(..Root,.tFilenameList,..Depth,$select(pVerbose>1:1,1:0),.tMaxDepth)
+        if $$$ISERR(tSC) {
+            write:pVerbose !,"Python scanner not available, using SQL-based scanner. ", $system.Status.GetErrorText(tSC)
+            set tSC = ..ScanDirectory(..Root,.tFilenameList,,..Depth,$select(pVerbose>1:1,1:0),.tMaxDepth)
+        }
         if $$$ISERR(tSC) {
             quit
         }
@@ -192,10 +211,22 @@ Method BuildCache(
             quit:(tKey="")
 
             set tSubDirectory = tFilenameList(tKey,"sub")
-            set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,.tName,.tVersionString))
+            set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,.tName,.tVersionString,.tCacheId))
+
+            // Track this cache entry as visited (still exists on filesystem)
+            if tCacheId '= "" {
+                set tVisitedIds(tCacheId) = 1
+            }
+
             write:pVerbose !,tName," ",tVersionString," @ ",##class(%File).NormalizeDirectory(..Root_tSubDirectory)
         }
         $$$ThrowOnError(tAggSC)
+
+        // Cleanup stale entries (files deleted from filesystem)
+        if 'pPurge {
+            set tSC = ..CleanupStaleEntries(.tVisitedIds, pVerbose)
+            $$$ThrowOnError(tSC)
+        }
 
         // set cache rebuild timestamp using UTC
         set ..CacheLastRebuilt = $zdatetime($ztimestamp,3)
@@ -205,6 +236,10 @@ Method BuildCache(
         set tSC = e.AsStatus()
     }
     while ($tlevel > tInitTLevel) { trollback 1 }
+
+    // Done building cache so clear the flag
+    set ^||IPMBuildingCache = 0
+
     quit tSC
 }
 
@@ -214,24 +249,28 @@ Method ParseModuleFile(
 	root As %String,
 	Output name As %String,
 	Output versionString As %String,
-	Output stream As %Stream.GlobalCharacter)
+	Output stream As %Stream.GlobalCharacter,
+	skipValidation As %Boolean = 0)
 {
     set name = ""
     set versionString = ""
 
-    // Validate file is a valid Studio document export
-    $$$ThrowOnError($system.OBJ.Load(filePath, "-d", , .loadedList, 1))
+    // Only validate if not skipping (file already validated and unchanged)
+    if 'skipValidation {
+        // Validate file is a valid Studio document export
+        $$$ThrowOnError($system.OBJ.Load(filePath, "-d", , .loadedList, 1))
 
-    if ($length(loadedList, ",") > 1) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "File contains multiple documents"))
+        if ($length(loadedList, ",") > 1) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "File contains multiple documents"))
+        }
+
+        set ext = $zconvert($piece($get(loadedList), ".", *), "U")
+        if (ext '= "ZPM") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "File is not a ZPM module"))
+        }
     }
 
-    set ext = $zconvert($piece($get(loadedList), ".", *), "U")
-    if (ext '= "ZPM") {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "File is not a ZPM module"))
-    }
-
-    // Parse module info (skip full manifest)
+    // Parse module info (skip full manifest if metadata-only)
     kill stream, name, versionString
     $$$ThrowOnError(..GetModuleStreamFromFile(filePath, .stream, .name, .versionString, 1))
 }
@@ -243,21 +282,22 @@ Method RefreshCacheEntry(
 	filePath As %String,
 	newMTime As %TimeStamp)
 {
-    // Parse the module file (metadata only)
+    // Parse the module file (metadata only, re-validate since file changed)
     kill stream, name, versionString
-    do ..ParseModuleFile(filePath, cacheObj.Root, .name, .versionString, .stream)
+    do ..ParseModuleFile(filePath, cacheObj.Root, .name, .versionString, .stream, 0)
 
     // Update the cache entry
     set cacheObj.Name = name
     set cacheObj.VersionString = versionString
     set cacheObj.FileMTime = newMTime
     set cacheObj.ManifestLoaded = 0  // Mark manifest as not loaded (lazy load on next access)
+    set cacheObj.ValidationPassed = 1  // Mark validation passed
     set cacheObj.LastModified = $zdatetime($ztimestamp, 3)
 
-    set saveSC = cacheObj.%Save()
-    if $$$ISERR(saveSC) {
-        set status = cacheObj.HandleSaveError(saveSC)
-        $$$ThrowOnError(status)
+    set sc = cacheObj.%Save()
+    if $$$ISERR(sc) {
+        set sc = cacheObj.HandleSaveError(sc)
+        $$$ThrowOnError(sc)
     }
 }
 
@@ -266,16 +306,34 @@ Method AddCacheItem(
 	pModuleFileName As %String,
 	pSubDirectory As %String,
 	Output pName As %String,
-	Output pVersionString As %String) As %Status
+	Output pVersionString As %String,
+	Output pCacheId As %String = "") As %Status
 {
     set tSC = $$$OK
     set pName = ""
     set pVersionString = ""
+    set pCacheId = ""
     try {
-        // Parse the module file (metadata only)
+        // Check if cache entry exists and validation already passed
+        set tCurrentMTime = $zdatetime(##class(%Library.File).GetFileDateModified(pModuleFileName), 3)
+        set skipValidation = 0
+
+        if ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
+            set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
+            $$$ThrowOnError(tSC)
+
+            // Check if we can skip validation (file unchanged and previously validated)
+            set skipValidation = (tCacheItem.FileMTime = tCurrentMTime) && tCacheItem.ValidationPassed
+        } else {
+            set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).%New()
+            set tCacheItem.Root = ..Root
+            set tCacheItem.SubDirectory = pSubDirectory
+        }
+
+        // Parse the module file (metadata only, with conditional validation)
         kill tStream, tName, tVersionString
         try {
-            do ..ParseModuleFile(pModuleFileName, ..Root, .pName, .pVersionString, .tStream)
+            do ..ParseModuleFile(pModuleFileName, ..Root, .pName, .pVersionString, .tStream, skipValidation)
         } catch ex {
             // Wasn't a valid file or failed to parse. Log as warning and continue
             set tSC = ex.AsStatus()
@@ -283,28 +341,68 @@ Method AddCacheItem(
             return $$$OK
         }
 
-        // Create cache item
-        if ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
-            set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
-            $$$ThrowOnError(tSC)
-        } else {
-            set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).%New()
-            set tCacheItem.Root = ..Root
-            set tCacheItem.SubDirectory = pSubDirectory
-        }
+        // Update cache item
         set tCacheItem.Name = pName
         set tCacheItem.VersionString = pVersionString
-        set tCacheItem.FileMTime = $zdatetime(##class(%Library.File).GetFileDateModified(pModuleFileName), 3)
-        set tCacheItem.ManifestLoaded = 0  // Manifest will be loaded on load/install command
+        set tCacheItem.FileMTime = tCurrentMTime
+        set tCacheItem.ManifestLoaded = 0  // Manifest will be loaded on-demand
+        set tCacheItem.ValidationPassed = 1  // Mark validation passed
         set tCacheItem.LastModified = $zdatetime($ztimestamp,3)
         set tSaveSC = tCacheItem.%Save()
         if $$$ISERR(tSaveSC) {
             set tSC = tCacheItem.HandleSaveError(tSaveSC)
         }
+
+        // Return cache ID for tracking
+        set pCacheId = tCacheItem.%Id()
     } catch e {
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Delete cache entries for files that no longer exist on filesystem
+Method CleanupStaleEntries(
+	ByRef visitedIds,
+	verbose As %Integer = 0) As %Status
+{
+    set sc = $$$OK
+    try {
+        // Query all cache entries for this root
+        set stmt = ##class(%SQL.Statement).%New()
+        set sc = stmt.%Prepare("SELECT ID, Name, VersionString, SubDirectory FROM %IPM_Repo_Filesystem.Cache WHERE Root = ?")
+        $$$ThrowOnError(sc)
+
+        set result = stmt.%Execute(..Root)
+        set deletedCount = 0
+
+        while result.%Next() {
+            set cacheId = result.%Get("ID")
+
+            // If not visited during scan, delete it (file was removed)
+            if '$data(visitedIds(cacheId)) {
+                set name = result.%Get("Name")
+                set version = result.%Get("VersionString")
+                set subDir = result.%Get("SubDirectory")
+
+                write:verbose !,"Removing stale cache entry: ",name," ",version," (file deleted from ",..Root,subDir,")"
+
+                set delSC = ##class(%IPM.Repo.Filesystem.Cache).%DeleteId(cacheId)
+                if $$$ISERR(delSC) {
+                    set sc = $$$ADDSC(sc, delSC)
+                } else {
+                    set deletedCount = deletedCount + 1
+                }
+            }
+        }
+
+        if (deletedCount > 0) && verbose {
+            write !,"Cleaned up ",deletedCount," stale cache entries"
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 /// Load the full manifest for a cache entry on-demand
@@ -409,6 +507,100 @@ XData MetadataExtractionTransform
   <xsl:value-of select="Version" />
  </xsl:template>
 </xsl:stylesheet>
+}
+
+/// Fast directory scanning using embedded Python - returns dynamic object with results
+/// Uses Python's os.walk() which is C-based and highly optimized
+ClassMethod ScanDirectoryPythonImpl(
+	root As %String,
+	depth As %Integer = 0,
+	verbose As %Boolean = 0) As %DynamicObject [ Language = python ]
+{
+import os
+import iris
+
+# Track results and max depth
+results = []
+max_depth = 0
+
+try:
+    for dirpath, dirnames, filenames in os.walk(root):
+        if 'module.xml' in filenames:
+            full_path = os.path.join(dirpath, 'module.xml')
+
+            # Calculate relative directory from root
+            if dirpath == root or dirpath == root.rstrip(os.sep):
+                rel_dir = ''
+            else:
+                rel_dir = os.path.relpath(dirpath, root)
+                # Convert backslashes to forward slashes for consistency
+                rel_dir = rel_dir.replace('\\', '/')
+
+            # Track max depth
+            if rel_dir:
+                current_depth = rel_dir.count('/') + 1
+                if current_depth > max_depth:
+                    max_depth = current_depth
+
+            # Store result as dict
+            results.append({'fullPath': full_path, 'relDir': rel_dir})
+
+            if verbose:
+                print(f"Found file: {full_path}")
+
+        # Depth limiting
+        if depth > 0:
+            current_depth = dirpath[len(root):].lstrip(os.sep).count(os.sep)
+            if current_depth >= depth:
+                dirnames.clear()  # Don't descend further
+
+    # Return plain dict
+    return {
+        'results': results,
+        'maxDepth': max_depth
+    }
+
+except Exception as e:
+    error_msg = f"Error scanning directory with Python: {str(e)}"
+    print(error_msg)
+    raise
+}
+
+/// Wrapper method that calls Python scanner and converts results to ObjectScript array
+ClassMethod ScanDirectoryPython(
+	root As %String,
+	ByRef filenameList,
+	depth As %Integer = 0,
+	verbose As %Boolean = 0,
+	Output maxDepth As %Integer = 0) As %Status
+{
+    set sc = $$$OK
+    try {
+        // Normalize root path
+        set root = ##class(%File).NormalizeDirectory(root)
+
+        // Call Python implementation
+        set result = ..ScanDirectoryPythonImpl(root, depth, verbose)
+
+        // Extract results and max depth from Python dict
+        set resultsList = result."__getitem__"("results")
+        set maxDepth = result."__getitem__"("maxDepth")
+
+        // Convert Python list to ObjectScript array
+        set filenameList = 0
+        set listLen = resultsList."__len__"()
+        for idx = 0:1:(listLen-1) {
+            set item = resultsList."__getitem__"(idx)
+            set fullPath = item."__getitem__"("fullPath")
+            set relDir = item."__getitem__"("relDir")
+
+            set filenameList($increment(filenameList)) = fullPath
+            set filenameList(filenameList, "sub") = relDir
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 ClassMethod ScanDirectory(

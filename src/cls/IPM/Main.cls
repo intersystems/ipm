@@ -2071,7 +2071,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
         // Rebuild cache
         write !,"Rebuilding cache for repository: ",repoName
         set start = $zhorolog
-        set sc = serverDef.BuildCache(1, 1)  // purge=1, verbose=1
+        set sc = serverDef.BuildCache(0, 1)  // purge=0, verbose=1
         $$$ThrowOnError(sc)
 
         write !,"Cache rebuilt successfully in ", $zhorolog-start, " seconds."
