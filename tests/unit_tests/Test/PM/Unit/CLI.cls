@@ -329,4 +329,16 @@ Method TestUninstallWithoutModuleName()
     do $$$AssertNotTrue(exists, "Module removed successfully.")
 }
 
+Method TestListSortingFlags()
+{
+    do $$$LogMessage("Testing list-installed sorting flags")
+    set status = ..RunCommand("list")
+    set status = ..RunCommand("list -s n")
+    do $$$AssertStatusOK(status, "Sort by name command executed successfully")
+    set status = ..RunCommand("list -s v-d")
+    do $$$AssertStatusOK(status, "Sort by version descending executed successfully")
+    set status = ..RunCommand("list -s d-d")
+    do $$$AssertStatusOK(status, "Sort by date descending executed successfully")
+}
+
 }
