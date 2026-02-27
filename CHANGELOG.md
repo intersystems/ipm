@@ -66,6 +66,7 @@ modules are.
 
 ### Added
 - #1024: Added flag -export-python-deps to publish command
+- #1081: implement locate command for resource-to-module mapping
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
