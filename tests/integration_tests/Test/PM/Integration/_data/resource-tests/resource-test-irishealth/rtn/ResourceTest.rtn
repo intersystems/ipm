@@ -1,0 +1,13 @@
+^MAC^Save for Source Control^^~Format=Cache.S~^UTF8
+%RO
+ResourceTest^MAC^^^0
+#include ResourceTest
+	Quit
+.
+MyFunction() PUBLIC
+{
+	Quit $$$answer
+}
+
+
+

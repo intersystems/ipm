@@ -1,4 +1,0 @@
-Class ResourceTest.SomeClass
-{
-
-}
