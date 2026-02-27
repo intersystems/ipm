@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1024: Added flag -export-python-deps to publish command
+- #962: Adding zpm "ci" command to install from a lock file
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
