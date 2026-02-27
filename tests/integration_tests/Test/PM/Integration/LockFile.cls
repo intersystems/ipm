@@ -25,7 +25,7 @@ Parameter ModuleE As String = "lock-mod-e-1-dep-0-transient";
 /// Module with 1 dep w/ 1 transient & 1 dep w/o transient (E & B)
 Parameter ModuleF As String = "lock-mod-f-2-deps-1-transient";
 
-/// Module with dependencies for all repository types (Module remote, Module oras, Module http, Module filesystem, & Module perforce)
+/// Module with dependencies for all repository types (Module remote, Module oras, Module http, Module filesystem)
 Parameter ModuleG As String = "lock-mod-g-all-repo-types";
 
 /// Module with multiple versions
@@ -35,10 +35,6 @@ Parameter ModuleH As String = "lock-mod-h-multiple-versions";
 
 /// Base equivalent to Module F, just deleted the lock file
 Parameter ModuleI As String = "lock-mod-i-no-prior-lock-file";
-
-/// Base equivalent to Module D, but different lock file
-/// Lock file as A->C->B instead of A->B->C (C is dependent on B)
-Parameter ModuleJ As String = "lock-mod-j-deps-misordered";
 
 /// 2 dependencies: C & E, both with same transient dependency: A
 Parameter ModuleK As String = "lock-mod-k-common-transient";
@@ -125,7 +121,7 @@ Method Test04Module2Dependencies1Transient()
 }
 
 /// Edge cases below:
-/// All repository types
+/// Test with all repository types: Filesystem, ORAS, & Remote
 /// Uses Module G
 Method Test05AllRepositoryTypes()
 {
@@ -163,9 +159,16 @@ Method Test05AllRepositoryTypes()
         set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-other-repos")
         do $$$AssertStatusOK(sc,"Removed lock-file-other-repos repo successfully.")
 
-        // Now that modules and repositories are set up, do the actual test
-        do ..ExecuteGenericLockFileTest(remoteMod, "LockModRemote.Class1")
-        do ..ExecuteGenericLockFileTest(orasMod, "LockModORAS.Class1")
+        // Now that modules have been published to their respective repositories, run the test
+        do ..AssertInstallCreatesLockFileAsExpected(..#ModuleG)
+
+        // Remove all repositories except lock-file-edge (where Module G comes from) to confirm all types get created correctly when installing from lock file
+        do ##class(%IPM.Main).Shell("repo -delete -name lock-file-base")
+        do ##class(%IPM.Main).Shell("repo -delete -name "_remoteRepo)
+        do ##class(%IPM.Main).Shell("repo -delete -name "_orasRepo)
+
+        // Install from Module G's lock file
+        do ..AssertInstallFromLockFileAsExpected(..#ModuleG)
 
         do ##class(%IPM.Main).Shell("repo -delete -name "_remoteRepo)
         do $$$AssertStatusOK(sc, "Removed "_remoteRepo_" at the end of the test")
@@ -276,26 +279,9 @@ Method Test07ModuleNoLockFile()
     }
 }
 
-/// TODO: This succeeds, compiling modules doesn't see dependency issues and by the time
-///       we call LockModJ.Class1::MethodA() all dependencies are loaded so no issues there.
-///           - Is that okay?
-///               - I'm inclined to say yes. Dependencies out of order isn't too realistic a use case
-///                 anyways so maybe delete this case altogether?
-/// Try install on a lock file that lists dependencies out of order
-/// Uses Module J
-Method Test08ModuleDependenciesOutOfOrder()
-{
-    set moduleName = ..#ModuleJ
-
-    zpm "install -lock "_moduleName
-
-    //set sc = ##class(%IPM.Main).Shell("ci "_moduleName)
-    //do $$$AssertStatusNotOK(sc, "Installing from lock file with dependencies listed out of order fails")
-}
-
 /// 2 dependencies for a module have the same transient to add to the lock file
 /// Uses Module K
-Method Test09Module2DependenciesSameTransient()
+Method Test08Module2DependenciesSameTransient()
 {
     try {
         do ..ExecuteGenericLockFileTest(..#ModuleK)
@@ -306,7 +292,7 @@ Method Test09Module2DependenciesSameTransient()
 
 /// Tests writing and installing from a lock file for a module with a more complex nested dependencies setup
 /// Uses Module L
-Method Test10ComplexNestedDependencies()
+Method Test09ComplexNestedDependencies()
 {
     try {
         do ..ExecuteGenericLockFileTest(..#ModuleL)

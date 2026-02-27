@@ -148,10 +148,20 @@ ClassMethod LockFileValuesToModifiers(
     set modifiers("name") = lockFileValues.%Get("name")
     set modifiers("read-only") = lockFileValues.%Get("readOnly")
     set modifiers("url") = lockFileValues.%Get("url")
-    // TODO: Implement calling system variables to get username/password/token values
-    set modifiers("username") = ""
-    set modifiers("password") = ""
-    set modifiers("token") = ""
+    set modifiers("namespace") = lockFileValues.%Get("orasNamespace")
+
+    // The following variables are set as system level variables for us to get
+    // Naming convention for those follow the name of the repository, first converting any '-' to '_',
+    // then removing everything except for alphabetic characters, numbers, and '_' to use as variable prefix
+    // lastly, adds a suffix based on the modifier
+    // Examples: <repo name>        - <prefix>
+    //           "registry"         - "registry"
+    //           "ORAS!Repo(5)?"    - "ORASRepo5"
+    //           "My-Repository-2"  - "My_Repository_2"
+    set prefix = $zstrip($replace(modifiers("name"), "-", "_"), "*E'N'A")
+    set modifiers("username") = $system.Util.GetEnviron(prefix_"_username")
+    set modifiers("password") = $system.Util.GetEnviron(prefix_"_password")
+    set modifiers("token") = $system.Util.GetEnviron(prefix_"_token")
 }
 
 XData LockFileMapping

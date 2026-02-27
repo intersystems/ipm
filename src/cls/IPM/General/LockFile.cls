@@ -148,9 +148,12 @@ ClassMethod InstallFromLockFile(
     }
 
     // Install modules (even if they already exist)
-    set depIter = dependencies.%GetIterator()
-    while depIter.%GetNext(.depName, .depVals) {
-        //break
+    do ..GetOrderedDependenciesList(dependencies, .orderedDependenciesList)
+    set depName = ""
+    for i=1:1:$listlength(orderedDependenciesList) {
+        set depName = $list(orderedDependenciesList, i)
+        set depVals = dependencies.%Get(depName)
+
         set version = depVals.version
         set repository = depVals.repository
 
@@ -161,6 +164,39 @@ ClassMethod InstallFromLockFile(
         set commandInfo("parameters", "version") = version
         set commandInfo("data", "LockFileInstallStarted") = 1
         do ##class(%IPM.Main).CleanInstall(.commandInfo)
+    }
+}
+
+/// The dependencies list in a lock file is listed alphabetically.
+/// This method compiles the dependencies and creates an ordered list such that no module is listed
+/// before one of its dependencies. Can then trace the list this outputs and install in order
+ClassMethod GetOrderedDependenciesList(
+	dependencies As %DynamicObject,
+	ByRef orderedDependenciesList As %List = "") [ Internal ]
+{
+    set depIter = dependencies.%GetIterator()
+    while depIter.%GetNext(.depName, .depVals) {
+        do ..AddToOrderedDependenciesList(depName, dependencies, .orderedDependenciesList)
+    }
+}
+
+/// For a dependency, recursively adds all dependencies to the ordered list, followed by this dependency
+ClassMethod AddToOrderedDependenciesList(
+	dependencyName As %String,
+	dependencies As %DynamicObject,
+	ByRef orderedDependenciesList As %List) [ Internal, Private ]
+{
+    set depVals = dependencies.%Get(dependencyName)
+    set transientDeps = depVals.%Get("dependencies", {})
+    set transientIter = transientDeps.%GetIterator()
+    while transientIter.%GetNext(.transDepName) {
+        // If dependency hasn't been installed yet, then recursively run this method on it
+        if '$listfind(orderedDependenciesList, transDepName) {
+            do ..AddToOrderedDependenciesList(transDepName, dependencies, .orderedDependenciesList)
+        }
+    }
+    if '$listfind(orderedDependenciesList, dependencyName) {
+        set orderedDependenciesList = orderedDependenciesList _ $listbuild(dependencyName)
     }
 }
 
