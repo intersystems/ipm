@@ -329,4 +329,23 @@ Method TestUninstallWithoutModuleName()
     do $$$AssertNotTrue(exists, "Module removed successfully.")
 }
 
+Method TestLocateCommand()
+{
+    do $$$LogMessage("Testing 'loc' alias with .inc resource")
+    set status = ..RunCommand("loc %IPM.Common.inc")
+    do $$$AssertStatusOK(status, "Alias 'loc' executed successfully")
+
+    do $$$LogMessage("Testing 'locate' command with .cls resource")
+    set status = ..RunCommand("locate %IPM.Main.cls")
+    do $$$AssertStatusOK(status, "Command 'locate' executed successfully")
+
+    do $$$LogMessage("Testing locate with non-existing resource")
+    set status = ..RunCommand("locate Test.Sample.inc")
+    do $$$AssertStatusOK(status, "Gracefully handled non-existing resource")
+
+    do $$$LogMessage("Testing locate without required argument")
+    set status = ..RunCommand("locate")
+    do $$$AssertStatusNotOK(status, "Handled missing argument")
+}
+
 }

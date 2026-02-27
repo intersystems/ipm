@@ -791,6 +791,13 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
 </command>
 
+<command name="locate" aliases="loc">
+    <description>Find the module that owns a specific resource.</description>
+    <parameter name="resource" description="resource: The full name of the resource (e.g., My.Class.cls, Utils.inc)." />
+    <example description="Finds the module containing the specified class.">locate %IPM.Main.cls</example>
+    <example description="Finds the module containing the specified include file.">loc %IPM.Common.inc</example>
+</command>
+
 </commands>
 }
 
@@ -1033,6 +1040,8 @@ ClassMethod ShellInternal(
                 do ..Information(.tCommandInfo)
 			} elseif (tCommandInfo = "history") {
 				do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "locate") {
+				do ..Locate(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -4049,6 +4058,23 @@ ClassMethod Update(ByRef pCommandInfo)
         // Call ..Install() in order to install the newer version of the module.
         do ..Install(.pCommandInfo, log)
     }
+}
+
+ClassMethod Locate(ByRef CommandInfo)
+{
+    set resource = $get(CommandInfo("parameters","resource"))
+    if resource="" {
+        $$$ThrowOnError($$$ERROR($$$GeneralError,"Resource name is required."))
+    }
+    set moduleName = ##class(%IPM.ExtensionBase.Utils).GetHomeModuleName(resource)
+    if (moduleName="") {
+        write $$$FormattedLine($$$Red, "Resource '"_ resource_"' is not currently mapped to an installed module.")
+        quit
+    }
+    set showFields = ""
+    write !
+    do ..GetListModules(,moduleName, .list)
+    do ..DisplayModules(.list,,,, .tModifiers)
 }
 
 ClassMethod GetPythonInstalledLibs(Output list)
