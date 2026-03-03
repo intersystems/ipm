@@ -1041,7 +1041,7 @@ ClassMethod ShellInternal(
 			} elseif (tCommandInfo = "history") {
 				do ..History(.tCommandInfo)
             } elseif (tCommandInfo = "locate-resource") {
-				do ..Locate(.tCommandInfo)
+				do ..LocateResource(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -4060,7 +4060,7 @@ ClassMethod Update(ByRef pCommandInfo)
     }
 }
 
-ClassMethod Locate(ByRef CommandInfo)
+ClassMethod LocateResource(ByRef CommandInfo)
 {
     set resource = $get(CommandInfo("parameters","resource"))
     set moduleName = ##class(%IPM.ExtensionBase.Utils).GetHomeModuleName(resource)
