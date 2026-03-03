@@ -791,11 +791,11 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
 </command>
 
-<command name="locate" aliases="loc">
+<command name="locate-resource">
     <description>Find the module that owns a specific resource.</description>
-    <parameter name="resource" description="resource: The full name of the resource (e.g., My.Class.cls, Utils.inc)." />
-    <example description="Finds the module containing the specified class.">locate %IPM.Main.cls</example>
-    <example description="Finds the module containing the specified include file.">loc %IPM.Common.inc</example>
+    <parameter name="resource" required="true" description="resource: The full name of the resource (e.g., My.Class.cls, Utils.inc)." />
+    <example description="Finds the module containing the specified class.">locate-resource %IPM.Main.cls</example>
+    <example description="Finds the module containing the specified include file.">locate-resource %IPM.Common.inc</example>
 </command>
 
 </commands>
@@ -1040,7 +1040,7 @@ ClassMethod ShellInternal(
                 do ..Information(.tCommandInfo)
 			} elseif (tCommandInfo = "history") {
 				do ..History(.tCommandInfo)
-            } elseif (tCommandInfo = "locate") {
+            } elseif (tCommandInfo = "locate-resource") {
 				do ..Locate(.tCommandInfo)
             }
         } catch pException {
@@ -4063,12 +4063,9 @@ ClassMethod Update(ByRef pCommandInfo)
 ClassMethod Locate(ByRef CommandInfo)
 {
     set resource = $get(CommandInfo("parameters","resource"))
-    if resource="" {
-        $$$ThrowOnError($$$ERROR($$$GeneralError,"Resource name is required."))
-    }
     set moduleName = ##class(%IPM.ExtensionBase.Utils).GetHomeModuleName(resource)
     if (moduleName="") {
-        write $$$FormattedLine($$$Red, "Resource '"_ resource_"' is not currently mapped to an installed module.")
+        write $$$FormattedLine($$$Red, "Resource '"_ resource_"' is not currently part of an installed module.")
         quit
     }
     set showFields = ""
