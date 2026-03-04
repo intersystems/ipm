@@ -240,8 +240,8 @@ jobs:
             zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
             zpm "install dsw":1
             zpm "list":1
-            set mod = ##class(%IPM.Storage.Module).NameOpen("zpm") set mod.Root="/home/irisowner/zpm/" set mod.DeveloperMode=1 d mod.%Save() kill mod
-            zpm "test zpm -v -only":1
+            zpm "repo -o -name zot -url http://oras:5000":1
+            zpm "publish -r zot dsw":1
             halt
           EOF
           docker logs $CONTAINER
