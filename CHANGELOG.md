@@ -7,12 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.7] - Unreleased
 
+### Added
+- #536: Improve filesystem repository cache building through performance improvements, better staleness checking based on mtime, and new `-rebuild-cache` flag for `repo` command to manually rebuild the entire cache
 
 ## [0.10.6] - 2026-02-24
 
 ### Added
 - #1024: Added flag -export-python-deps to publish command
-- #536: When installing from a file system repos, if the cached version of the module is stale (the modification time of the `module.xml` is different than when it was cached), pull again from disk. Also add `-rebuild-cache` flag for the `repo` command has been to rebuild the file system repo's entire cache.
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
