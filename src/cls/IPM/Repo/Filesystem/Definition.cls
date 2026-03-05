@@ -85,8 +85,8 @@ ClassMethod OnConfigure(
             set pInstance.Depth = tDepth
         }
 
-        // This also saves it.
-        $$$ThrowOnError(pInstance.BuildCache(1,1,1))
+        // Build cache without auto-detect - user specifies depth explicitly or it defaults to 0 (unlimited)
+        $$$ThrowOnError(pInstance.BuildCache(1,1,0))
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -525,7 +525,23 @@ max_depth = 0
 
 try:
     for dirpath, dirnames, filenames in os.walk(root):
+        # Calculate current depth before processing
+        # Must compute each iteration because os.walk() provides absolute paths, not incremental navigation
+        # We derive depth by: removing root prefix, stripping separators, then counting remaining separators + 1
+        if dirpath == root or dirpath == root.rstrip(os.sep):
+            current_depth = 0
+        else:
+            current_depth = dirpath[len(root):].lstrip(os.sep).count(os.sep) + 1
+
+        # Depth limiting - stop descending if we've reached the limit
+        if depth > 0 and current_depth >= depth:
+            dirnames.clear()  # Don't descend further
+
         if 'module.xml' in filenames:
+            # Skip if this directory exceeds the depth limit
+            if depth > 0 and current_depth > depth:
+                continue
+
             full_path = os.path.join(dirpath, 'module.xml')
 
             # Calculate relative directory from root
@@ -538,21 +554,15 @@ try:
 
             # Track max depth
             if rel_dir:
-                current_depth = rel_dir.count('/') + 1
-                if current_depth > max_depth:
-                    max_depth = current_depth
+                file_depth = rel_dir.count('/') + 1
+                if file_depth > max_depth:
+                    max_depth = file_depth
 
             # Store result as dict
             results.append({'fullPath': full_path, 'relDir': rel_dir})
 
             if verbose:
                 print(f"Found file: {full_path}")
-
-        # Depth limiting
-        if depth > 0:
-            current_depth = dirpath[len(root):].lstrip(os.sep).count(os.sep)
-            if current_depth >= depth:
-                dirnames.clear()  # Don't descend further
 
     # Return plain dict
     return {
