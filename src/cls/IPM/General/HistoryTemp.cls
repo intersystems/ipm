@@ -28,29 +28,32 @@ ClassMethod Init(
 /// Persist this more permanently by saving to the PersistedTwin
 Method %OnClose() As %Status [ Private, ServerOnly = 1 ]
 {
-    if ..PersistedTwin '= "" {
-        // copy all values to the Persisted Twin
-        set ..PersistedTwin.TimeStart = ..TimeStart
-        set ..PersistedTwin.TimeEnd = ..TimeEnd
-        set ..PersistedTwin.Action = ..Action
-        set ..PersistedTwin.Package = ..Package
-        set ..PersistedTwin.CommandString = ..CommandString
-        set ..PersistedTwin.UserName = ..UserName
-        set ..PersistedTwin.Version = ..Version
-        set ..PersistedTwin.SourceName = ..SourceName
-        set ..PersistedTwin.SourceMoniker = ..SourceMoniker
-        set ..PersistedTwin.SourceDetails = ..SourceDetails
-        set ..PersistedTwin.Success = ..Success
-        set ..PersistedTwin.Committed = ..Committed
-        set ..PersistedTwin.Phases = ..Phases
-        // Mark as finalized and record should be locked
-        set ..PersistedTwin.Finalized = 1
-    }
-    // Ensure the persisted twin is saved
-    set sc = ..%Save()
+    set sc = $$$OK
+    if $$$comClassDefined("%IPM.General.History") {
+        if (..PersistedTwin '= "") {
+            // copy all values to the Persisted Twin
+            set ..PersistedTwin.TimeStart = ..TimeStart
+            set ..PersistedTwin.TimeEnd = ..TimeEnd
+            set ..PersistedTwin.Action = ..Action
+            set ..PersistedTwin.Package = ..Package
+            set ..PersistedTwin.CommandString = ..CommandString
+            set ..PersistedTwin.UserName = ..UserName
+            set ..PersistedTwin.Version = ..Version
+            set ..PersistedTwin.SourceName = ..SourceName
+            set ..PersistedTwin.SourceMoniker = ..SourceMoniker
+            set ..PersistedTwin.SourceDetails = ..SourceDetails
+            set ..PersistedTwin.Success = ..Success
+            set ..PersistedTwin.Committed = ..Committed
+            set ..PersistedTwin.Phases = ..Phases
+            // Mark as finalized and record should be locked
+            set ..PersistedTwin.Finalized = 1
+        }
+        // Ensure the persisted twin is saved
+        set sc = ..%Save()
 
-    // Delete this temp entry as it's no longer needed
-    set sc = $$$ADDSC(sc, ..%DeleteId(..%Id()))
+        // Delete this temp entry as it's no longer needed
+        set sc = $$$ADDSC(sc, ..%DeleteId(..%Id()))
+    }
     quit sc
 }
 

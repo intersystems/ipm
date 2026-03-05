@@ -625,6 +625,14 @@ ClassMethod ExecutePhases(
                     new $$$DeployedProjectInstalled
                     $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
                     $$$ThrowOnError($method(tLifecycle,"%"_tOnePhase,.pParams))
+
+                    // Self-uninstall: After Clean deletes IPM's own classes, skip all post-phase callbacks
+                    // All the callback code has been deleted, so attempting to call it would fail
+                    if (tOnePhase = "Clean") && (tModule.Name = $$$IPMModuleName) {
+                        // Skip all post-phase processing - classes have been deleted
+                        continue
+                    }
+
                     $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
                 }
 

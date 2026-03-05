@@ -1090,6 +1090,14 @@ ClassMethod ShellInternal(
             }
             do ..DisplayError(pException.AsStatus())
         }
+
+        // Check if IPM has uninstalled itself - exit gracefully if so
+        if $get($$$IPMSelfUninstallFlag, 0) {
+            write !,!,$$$FormattedLine($$$Yellow, "IPM has been uninstalled from this namespace. Exiting shell...")
+            write !
+            return
+        }
+
         set tCommand = ""
         if tOneCommand {
             quit
@@ -2551,6 +2559,8 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         }
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
+            // Set flag to indicate self-uninstall - will be checked by Interactive() loop
+            set $$$IPMSelfUninstallFlag = 1
         }
         set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
         $$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(tModuleName,tForce,tRecurse,.tParams))

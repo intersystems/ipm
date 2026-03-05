@@ -487,9 +487,12 @@ Method %Clean(ByRef pParams) As %Status
         }
 
         if (tLevel > 0) && '$get(pParams("Clean","Nested"),0) {
-            set tSC = ##class(%IPM.StudioDocument.Module).Delete(..Module.Name_".ZPM")
-            if $$$ISERR(tSC) {
-                quit
+            // Check if StudioDocument.Module class still exists before trying to delete
+            if $$$comClassDefined("%IPM.StudioDocument.Module") {
+                set tSC = ##class(%IPM.StudioDocument.Module).Delete(..Module.Name_".ZPM")
+                if $$$ISERR(tSC) {
+                    quit
+                }
             }
         }
     } catch e {

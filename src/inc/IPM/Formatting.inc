@@ -1,7 +1,8 @@
 ROUTINE %IPM.Formatting [Type=INC]
 #; Contains utility macros for formatting lines printed to Terminal
 
-#define ColorScheme $Case(##class(%IPM.Repo.UniversalSettings).GetValue("ColorScheme"),"none":0,:1)
+#define ColorScheme $Select(##class(%Dictionary.CompiledClass).%ExistsId("%IPM.Repo.UniversalSettings"):##class(%IPM.Repo.UniversalSettings).GetValue("ColorScheme")'="none",1:0)
+
 /// Returns a line with given formatting, clearing the formatting at the end of the line
 #define FormattedLine(%formatCode, %line) $Select($$$ColorScheme:$$$ControlSequence(%formatCode)_%line_$$$ControlSequence($$$ResetAll),1:%line)
 #define pad(%width, %text) $Justify("", %width - $Length(%text))
