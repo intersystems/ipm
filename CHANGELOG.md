@@ -5,11 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.10.7] - Unreleased
+
+### Added
+- #1079: add semantic sorting and shortcuts to list-installed
+
 ## [0.10.6] - Unreleased
 
 ### Added
 - #1024: Added flag -export-python-deps to publish command
-- #1079: add semantic sorting and shortcuts to list-installed
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context

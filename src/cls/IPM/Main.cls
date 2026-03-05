@@ -531,7 +531,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
     list -s [name|date|version]
 </example>
 
-<example description="Shows installed modules in decending">
+<example description="Shows installed modules in descending order">
     list -s name-desc
 </example>
 <example description="Shows installed modules in decending based on the installation date">
@@ -2743,13 +2743,13 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
         set newlist =""
         if sortMode'="" {
             for i=1:1:list {
-                 set entry = list(i)
+                set entry = list(i)
                 set name = $listget(entry,1)
                 set entry = entry_$listbuild(i)
                 if sortMode["name"{
                     set newlist($$$lcase(name))=entry
                 }
-                if sortMode["date"{
+                if sortMode["date" {
                     set date = $listget(entry,6)
                     set newlist(date)=entry
                 }
