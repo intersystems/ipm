@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.7] - Unreleased
 
 ### Added
-- #536: Improve filesystem repository cache building through performance improvements, better staleness checking based on mtime, and new `-rebuild-cache` flag for `repo` command to manually rebuild the entire cache
+- #536: Improve filesystem repository cache through performance improvements, smart auto-cache rebuilding on install, and new `-rebuild-cache` flag for `repo` command to manually rebuild the entire cache
 
 ## [0.10.6] - 2026-02-24
 

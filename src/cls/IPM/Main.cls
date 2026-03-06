@@ -2068,10 +2068,10 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
             $$$ThrowStatus($$$ERROR($$$GeneralError,"Cache rebuild only supported for filesystem repositories"))
         }
 
-        // Rebuild cache
+        // Rebuild cache with purge
         write !,"Rebuilding cache for repository: ",repoName
         set start = $zhorolog
-        set sc = serverDef.BuildCache(0, 1)  // purge=0, verbose=1
+        set sc = serverDef.BuildCache(1, 1)  // purge=1, verbose=1
         $$$ThrowOnError(sc)
 
         write !,"Cache rebuilt successfully in ", $zhorolog-start, " seconds."
@@ -2367,6 +2367,31 @@ ClassMethod Install(
         $$$ThrowSQLIfError(SQLCODE,%message)
         if (SQLCODE = 0) && (count = 0) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
+        }
+
+        // Rebuild cache for filesystem repositories before searching
+        // This ensures newly added modules are discovered
+        write !,"Rebuilding cache(s) for filesystem repo(s)..."
+        if (tRegistry '= "") {
+            // Specific repository requested - only rebuild that one if it's filesystem
+            set tRepoDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
+            if $$$ISOK(tSC) && $isobject(tRepoDef) && tRepoDef.%IsA("%IPM.Repo.Filesystem.Definition") {
+                do tRepoDef.BuildCache(0, 0)  // purge=0, verbose=0
+            }
+        } else {
+            // No specific repo - rebuild all enabled filesystem repos
+            &sql(DECLARE fsRepoCursor CURSOR FOR
+                 SELECT ID INTO :tRepoId FROM %IPM_Repo_Filesystem.Definition WHERE Enabled = 1)
+            &sql(OPEN fsRepoCursor)
+            &sql(FETCH fsRepoCursor)
+            while (SQLCODE = 0) {
+                set tFsRepo = ##class(%IPM.Repo.Filesystem.Definition).%OpenId(tRepoId,,.tSC)
+                if $$$ISOK(tSC) && $isobject(tFsRepo) {
+                    do tFsRepo.BuildCache(0, 0)  // purge=0, verbose=0
+                }
+                &sql(FETCH fsRepoCursor)
+            }
+            &sql(CLOSE fsRepoCursor)
         }
 
         set tVersion = $get(pCommandInfo("parameters","version"))

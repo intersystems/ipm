@@ -248,26 +248,21 @@ Method ParseModuleFile(
 	filePath As %String,
 	root As %String,
 	Output name As %String,
-	Output versionString As %String,
-	Output stream As %Stream.GlobalCharacter,
-	skipValidation As %Boolean = 0)
+	Output versionString As %String)
 {
     set name = ""
     set versionString = ""
 
-    // Only validate if not skipping (file already validated and unchanged)
-    if 'skipValidation {
-        // Validate file is a valid Studio document export
-        $$$ThrowOnError($system.OBJ.Load(filePath, "-d", , .loadedList, 1))
+    // Validate file is a valid Studio document export
+    $$$ThrowOnError($system.OBJ.Load(filePath, "-d", , .loadedList, 1))
 
-        if ($length(loadedList, ",") > 1) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "File contains multiple documents"))
-        }
+    if ($length(loadedList, ",") > 1) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "File contains multiple documents"))
+    }
 
-        set ext = $zconvert($piece($get(loadedList), ".", *), "U")
-        if (ext '= "ZPM") {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "File is not a ZPM module"))
-        }
+    set ext = $zconvert($piece($get(loadedList), ".", *), "U")
+    if (ext '= "ZPM") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "File is not a ZPM module"))
     }
 
     // Parse module info (skip full manifest if metadata-only)
@@ -284,7 +279,7 @@ Method RefreshCacheEntry(
 {
     // Parse the module file (metadata only, re-validate since file changed)
     kill stream, name, versionString
-    do ..ParseModuleFile(filePath, cacheObj.Root, .name, .versionString, .stream, 0)
+    do ..ParseModuleFile(filePath, cacheObj.Root, .name, .versionString)
 
     // Update the cache entry
     set cacheObj.Name = name
@@ -314,26 +309,32 @@ Method AddCacheItem(
     set pVersionString = ""
     set pCacheId = ""
     try {
-        // Check if cache entry exists and validation already passed
+        // Check if cache entry exists
         set tCurrentMTime = $zdatetime(##class(%Library.File).GetFileDateModified(pModuleFileName), 3)
-        set skipValidation = 0
 
         if ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
             set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
             $$$ThrowOnError(tSC)
 
-            // Check if we can skip validation (file unchanged and previously validated)
-            set skipValidation = (tCacheItem.FileMTime = tCurrentMTime) && tCacheItem.ValidationPassed
+            // Check if we can skip parsing entirely (file unchanged and previously validated)
+            if (tCacheItem.FileMTime = tCurrentMTime) && tCacheItem.ValidationPassed {
+                // File unchanged - reuse cached values without parsing or updating
+                set pName = tCacheItem.Name
+                set pVersionString = tCacheItem.VersionString
+                set pCacheId = tCacheItem.%Id()
+                return $$$OK
+            }
         } else {
+            // New cache entry - need to create, parse and validate
             set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).%New()
             set tCacheItem.Root = ..Root
             set tCacheItem.SubDirectory = pSubDirectory
         }
 
-        // Parse the module file (metadata only, with conditional validation)
+        // Parse the module file (metadata only, validate since file is new or changed)
         kill tStream, tName, tVersionString
         try {
-            do ..ParseModuleFile(pModuleFileName, ..Root, .pName, .pVersionString, .tStream, skipValidation)
+            do ..ParseModuleFile(pModuleFileName, ..Root, .pName, .pVersionString)
         } catch ex {
             // Wasn't a valid file or failed to parse. Log as warning and continue
             set tSC = ex.AsStatus()

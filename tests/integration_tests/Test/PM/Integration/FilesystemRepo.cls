@@ -126,6 +126,9 @@ Method Test03RebuildCache()
     do $$$AssertStatusOK(sc,"Opened repo definition")
     set initialTimestamp = repoDef.CacheLastRebuilt
 
+    // Wait a second to ensure timestamp difference
+    hang 1
+
     // Rebuild cache using command
     set sc = ##class(%IPM.Main).Shell("repo -n "_..#REPONAME_" -rebuild-cache")
     do $$$AssertStatusOK(sc,"Cache rebuild command executed successfully")
@@ -182,7 +185,7 @@ Method Test04CacheFreshnessDetection()
     do $$$AssertStatusOK(sc,"Successfully installed module after cache refresh")
 }
 
-/// Test adding a new version to the filesystem
+/// Test adding a new version to the filesystem and auto-discovery on install
 Method Test05AddNewVersion()
 {
     // Create new directory for module-b 3.0.0
@@ -204,18 +207,21 @@ Method Test05AddNewVersion()
     set sc = file.%Save()
     do $$$AssertStatusOK(sc,"Saved new module.xml file")
 
-    // Rebuild cache to pick up new version
-    set sc = ##class(%IPM.Main).Shell("repo -n "_..#REPONAME_" -rebuild-cache")
-    do $$$AssertStatusOK(sc,"Rebuilt cache")
+    // NOTE: No manual cache rebuild here - install should auto-discover the new version
+    // This tests the auto-rebuild feature (cache rebuilt before dependency resolution)
 
-    // Verify new version is in cache
+    // Verify new version is NOT yet in cache
     set cacheB3 = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-b","3.0.0",,.sc)
-    do $$$AssertStatusOK(sc,"Cache entry for module-b 3.0.0 exists")
-    do $$$AssertTrue($isobject(cacheB3),"module-b 3.0.0 found in cache")
+    do $$$AssertTrue('$isobject(cacheB3),"module-b 3.0.0 not yet in cache before install")
 
-    // Test installing the new version
+    // Install should auto-rebuild cache and find the new version
     set sc = ##class(%IPM.Main).Shell("install module-b 3.0.0")
-    do $$$AssertStatusOK(sc,"Successfully installed module-b 3.0.0")
+    do $$$AssertStatusOK(sc,"Successfully installed module-b 3.0.0 with auto-rebuild")
+
+    // Verify new version is NOW in cache (after install auto-rebuilt)
+    set cacheB3After = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-b","3.0.0",,.sc)
+    do $$$AssertStatusOK(sc,"Cache entry for module-b 3.0.0 exists after install")
+    do $$$AssertTrue($isobject(cacheB3After),"module-b 3.0.0 found in cache after auto-rebuild")
 }
 
 /// Test deleting a version and verifying stale entry cleanup
