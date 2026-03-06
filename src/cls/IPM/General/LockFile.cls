@@ -69,12 +69,12 @@ ClassMethod CreateLockFileForModule(
         $$$ThrowOnError(lockFile.Dependencies.SetAt(dependencyVal, mod.Name))
 
         // Add the dependency's repository to the lock file
-        do AddRepositoryToLockFile(.lockFile, mod.Repository, verbose)
+        do ..AddRepositoryToLockFile(.lockFile, mod.Repository, verbose)
     }
     // Add repository for base module if not already added by a dependency
     // Skip undefined repositories as that means the module was installed via the zpm "load" command
     if (module.Repository '= "") {
-        do AddRepositoryToLockFile(.lockFile, module.Repository, verbose)
+        do ..AddRepositoryToLockFile(.lockFile, module.Repository, verbose)
     }
 
     $$$ThrowOnError(lockFile.%JSONExportToStream(.lockFileJSON, "LockFileMapping"))
@@ -113,6 +113,90 @@ ClassMethod GetRepo(repoName As %String) As %IPM.Repo.Definition [ Internal ]
         return repo
     } else {
         $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Tried getting repo ""%1"" but none found with that name", repoName)))
+    }
+}
+
+ClassMethod InstallFromLockFile(
+	directory As %String,
+	ByRef params)
+{
+    set verbose = $get(params("Verbose"), 0)
+
+    set lockFilePath = ##class(%File).NormalizeFilename("module-lock.json", directory)
+    set lockFileJSON = ##class(%DynamicObject).%FromJSONFile(lockFilePath)
+
+    set repositories = lockFileJSON.%Get("repositories", {})
+    set dependencies = lockFileJSON.%Get("dependencies", {})
+
+    // Install repositories (if they don't already exist)
+    set repoIter = repositories.%GetIterator()
+    while repoIter.%GetNext(.repoName, .repoVals) {
+        if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
+            if (verbose) {
+                write !, "Repo: "_repoName_" already exists, skipping creating new one from lock file"
+            }
+            continue
+        }
+        elseif (verbose) {
+            write !, "Creating repo: "_repoName_" from lock file"
+        }
+        do ##class(%IPM.Repo.Definition).CollectServerTypes(.types)
+        set repoClass = types(repoVals.type)
+        set repoVals.name = repoName
+        do $classmethod(repoClass, "LockFileValuesToModifiers", repoVals, .modifiers)
+        $$$ThrowOnError($classmethod(repoClass,"Configure",0,.modifiers,.tData,repoClass))
+    }
+
+    // Install modules (even if they already exist)
+    do ..GetOrderedDependenciesList(dependencies, .orderedDependenciesList)
+    set depName = ""
+    for i=1:1:$listlength(orderedDependenciesList) {
+        set depName = $list(orderedDependenciesList, i)
+        set depVals = dependencies.%Get(depName)
+
+        set version = depVals.version
+        set repository = depVals.repository
+
+        // Call CleanInstall() on dependency modules but set flag "LockFileInstallStarted" so we don't try installing from the dependency module's lock file
+        set commandInfo = "ci"
+        set commandInfo("data", "Verbose") = verbose
+        set commandInfo("parameters","module") = repository_"/"_depName
+        set commandInfo("parameters", "version") = version
+        set commandInfo("data", "LockFileInstallStarted") = 1
+        do ##class(%IPM.Main).CleanInstall(.commandInfo)
+    }
+}
+
+/// The dependencies list in a lock file is listed alphabetically.
+/// This method compiles the dependencies and creates an ordered list such that no module is listed
+/// before one of its dependencies. Can then trace the list this outputs and install in order
+ClassMethod GetOrderedDependenciesList(
+	dependencies As %DynamicObject,
+	ByRef orderedDependenciesList As %List = "") [ Internal ]
+{
+    set depIter = dependencies.%GetIterator()
+    while depIter.%GetNext(.depName, .depVals) {
+        do ..AddToOrderedDependenciesList(depName, dependencies, .orderedDependenciesList)
+    }
+}
+
+/// For a dependency, recursively adds all dependencies to the ordered list, followed by this dependency
+ClassMethod AddToOrderedDependenciesList(
+	dependencyName As %String,
+	dependencies As %DynamicObject,
+	ByRef orderedDependenciesList As %List) [ Internal, Private ]
+{
+    set depVals = dependencies.%Get(dependencyName)
+    set transientDeps = depVals.%Get("dependencies", {})
+    set transientIter = transientDeps.%GetIterator()
+    while transientIter.%GetNext(.transDepName) {
+        // If dependency hasn't been installed yet, then recursively run this method on it
+        if '$listfind(orderedDependenciesList, transDepName) {
+            do ..AddToOrderedDependenciesList(transDepName, dependencies, .orderedDependenciesList)
+        }
+    }
+    if '$listfind(orderedDependenciesList, dependencyName) {
+        set orderedDependenciesList = orderedDependenciesList _ $listbuild(dependencyName)
     }
 }
 

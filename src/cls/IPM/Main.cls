@@ -791,6 +791,25 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
 </command>
 
+<command name="ci">
+<summary>Installs a module from a lock file</summary>
+<description>
+    Installs a module from its lock file. Will first install all listed repositories followed by dependency modules and then the base module.
+</description>
+
+<!-- Examples -->
+<example description="Reads from the module-lock.json defined for mymodule and installs the repositories, module, and dependencies">
+    ci mymodule 3.0.0
+</example>
+
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of module on which to perform update actions" />
+<parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
+
+<!-- Modifiers -->
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 </commands>
 }
 
@@ -1031,8 +1050,10 @@ ClassMethod ShellInternal(
                 do ..ModuleVersion(.tCommandInfo)
             } elseif (tCommandInfo = "information") {
                 do ..Information(.tCommandInfo)
-			} elseif (tCommandInfo = "history") {
-				do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "history") {
+                do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "ci") {
+                do ..CleanInstall(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -2396,12 +2417,11 @@ ClassMethod Install(
                         $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
                     }
                 }
-				$$$ThrowOnError(log.SetSource(tResult.ServerName))
-				$$$ThrowOnError(log.SetVersion(tResult.Version))
+                $$$ThrowOnError(log.SetSource(tResult.ServerName))
+                $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
-            set tPrefix = ""
             if (tModuleName '= "") {
                 if (tVersion '= "") {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
@@ -2415,10 +2435,32 @@ ClassMethod Install(
             }
         }
     } catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
-		throw ex
-	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+        $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        throw ex
+    }
+    $$$ThrowOnError(log.Finalize($$$OK, devMode))
+}
+
+ClassMethod CleanInstall(ByRef commandInfo) [ Internal ]
+{
+    set moduleName = $get(commandInfo("parameters","module"))
+    set version = $get(commandInfo("parameters","version"))
+    set verbose = $get(commandInfo("data","Verbose"))
+    set log = ##class(%IPM.General.HistoryTemp).CleanInstallInit(moduleName)
+
+    // TODO: Add "path"? (see Update() for more info of calling install v load)
+
+    if verbose {
+        write !, "Going to run a clean install on "_moduleName
+    }
+
+    // Indicating to commandInfo that this is a clean install command, not an install or load command. commandInfo will be passed to either Install() or Load() to continue performing the update.
+    set commandInfo("data","cmd") = "ci"
+    set commandInfo("data","CleanInstall") = 1
+    set log = ##class(%IPM.General.HistoryTemp).UpdateInit(moduleName)
+
+    // Forward execution to install
+    do ..Install(.commandInfo, log)
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
