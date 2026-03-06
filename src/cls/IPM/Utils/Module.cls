@@ -1129,11 +1129,21 @@ ClassMethod LoadNewModule(
                 $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
         }
-
+        set cmd = $get(params("cmd"))
+        set orphanCleanup = (cmd = "update") && ('$get(pParams("KeepOrphans")))
+        // Retrieve dependencies from the previous version and compare with the current version to find modules that are no longer required
+        if (orphanCleanup) {
+            set tModule = ##class(%IPM.Storage.Module).NameOpen(commandLineModuleName,,.tSC)
+            do ..GetExistingDependencies(tModule, .oldDependencies)
+        }
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
 
+        // Compare dependencies from the previous version with the latest version and collect orphaned dependencies as an array
+        if (orphanCleanup) {
+            do ..GetOrphanedDependencies(tModule,.oldDependencies, .orphanedDeps)
+        }
         set tFirstLoaded = $order(tLoadedList(""))
         if (tFirstLoaded = "") {
             $$$ThrowStatus($$$ERROR($$$GeneralError,"No module definition found."))
@@ -1228,6 +1238,10 @@ ClassMethod LoadNewModule(
             tcommit
         }
         $$$ThrowOnError(tSC)
+        // Uninstall orphaned dependencies
+         if (orphanCleanup) {
+            do ..UninstallOrphanedDependencies(.orphanedDeps, .pParams)
+        }
         do tModule.WriteAfterInstallMessage()
     } catch e {
         set tSC = e.AsStatus()
@@ -1238,6 +1252,51 @@ ClassMethod LoadNewModule(
         }
     }
     quit tSC
+}
+
+/// Uninstall orphaned dependencies identified during update.
+/// Recursively removes modules not required by the main module or other local packages.
+ClassMethod UninstallOrphanedDependencies(
+	ByRef orphanedDeps,
+	ByRef Params)
+{
+    if '$data(orphanedDeps) {
+        quit
+    }
+    set dependencyModule=""
+    write !,"Uninstalling orphaned dependencies"
+    for {
+        set dependencyModule = $order(orphanedDeps(dependencyModule)) quit:dependencyModule=""
+        continue:'##class(%IPM.Storage.Module).NameExists(dependencyModule)
+        // Remove this module and its dependencies recursively, skipping any still in use
+        $$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(dependencyModule,,1,.Params))
+    }
+}
+
+/// Retrieves the dependency graph for the currently installed version of the module.
+ClassMethod GetExistingDependencies(
+	Module As %IPM.Storage.Module,
+	Output DependencyGraph)
+{
+    $$$ThrowOnError(Module.BuildDependencyGraph(.DependencyGraph,,,,"",,,,,,))
+}
+
+/// Compares the previous dependency graph with the current one to identify orphans.
+ClassMethod GetOrphanedDependencies(
+	Module As %IPM.Storage.Module,
+	ByRef ExistDependencies,
+	Output OrphanedModules)
+{
+    kill OrphanedModules
+    merge existDeps = ExistDependencies
+    set sc = Module.BuildDependencyGraph(.dependencyGraph,,,,"",,,,,,)
+    $$$ThrowOnError(sc)
+    set module=""
+    for {
+        set module = $order(dependencyGraph(module)) quit:module=""
+        kill existDeps(module)
+    }
+    merge OrphanedModules = existDeps
 }
 
 /// Load dependencies of a module in a synchronous manner, one at a time, in the correct order.
