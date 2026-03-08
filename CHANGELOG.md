@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.6] - 2026-02-24
 
+## [0.10.6] - 2026-02-24
+
 ### Added
 - #1024: Added flag -export-python-deps to publish command
 
