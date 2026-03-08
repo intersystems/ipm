@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?><Export generator="IRIS" version="26">
+<Document name="scope-test-dep.ZPM">
+    <Module>
+        <Name>scope-test-dep</Name>
+        <Version>1.0.0</Version>
+        <Packaging>module</Packaging>
+        <Resource Name="Test.Scope.ScopedClass.CLS"/>
+    </Module>
+</Document></Export>
