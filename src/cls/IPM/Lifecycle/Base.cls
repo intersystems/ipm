@@ -1109,6 +1109,9 @@ Method %Test(ByRef pParams) As %Status
 {
     set tSC = $$$OK
     try {
+        // Load dependencies scoped to the "Test" phase that are not yet installed.
+        do ##class(%IPM.Utils.Module).LoadDependencies(..Module, ..PhaseList, .pParams)
+
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
         for {
@@ -1381,6 +1384,9 @@ Method %Verify(ByRef pParams) As %Status
                 }
             }
         }
+
+        // Load dependencies scoped to the "Verify" phase that are not yet installed.
+        do ##class(%IPM.Utils.Module).LoadDependencies(..Module, ..PhaseList, .pParams)
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
