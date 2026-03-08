@@ -60,15 +60,15 @@ jobs:
         VERSION=`grep -oPm1 "(?<=<Version>)[^<]+" module.xml | cut -d- -f1`
         [ -n '${{ inputs.version }}' ] && VERSION=${{ inputs.version }}
         sed -i -E "s/<Version>(.*)<\/Version>/<Version>${VERSION/v/}<\/Version>/" module.xml
-       
+
         docker run -d --rm -v `pwd`:/home/irisowner/${NAME}/ ${BASE} ${DOCKER_FLAGS}
         CONTAINER=`docker ps -lq`
-        sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+        sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
         /bin/echo -e '' \
           "zpm \"repo -r -name registry ${REGISTRY_FLAGS}\":1\n" \
           "zpm \"load /home/irisowner/${NAME}/ -v\":1\n" \
           "zpm \"test ${NAME} -v\":1" \
-          "zpm \"publish ${NAME} -v\":1" \
+          "zpm \"publish ${NAME} -v -export-python-deps\":1" \
           'halt\n' \
         | docker exec -i $CONTAINER iris session iris -U ${NAMESPACE}
         docker stop $CONTAINER
