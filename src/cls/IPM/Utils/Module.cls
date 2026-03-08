@@ -1216,7 +1216,7 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule, .params)
+        do ..LoadDependencies(tModule,, .params)
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1252,8 +1252,10 @@ ClassMethod LoadNewModule(
 }
 
 /// Load dependencies of a module in a synchronous manner, one at a time, in the correct order.
+/// This method builds a dependency graph (optionally with phases) and installs missing dependencies.
 ClassMethod LoadDependencies(
 	pModule As %IPM.Storage.Module,
+	phaseList As %List = "",
 	ByRef pParams)
 {
     set isVerbose = $get(pParams("Verbose"),0)
@@ -1262,10 +1264,11 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,"",,,,ignoreInstalled,,permitDowngrade)
+    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade)
     $$$ThrowOnError(sc)
     write "Done."
 
+    // Install dependencies from the graph
     do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
     if isVerbose {
         write !, "Created inverted dependency graph from dependency graph"
@@ -1278,6 +1281,7 @@ ClassMethod LoadDependencies(
         write !, "Starting installation of dependencies..."
         write !
     }
+
     for i = 1:1:flatDepList.Count() {
         #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
         set moduleReference = flatDepList.GetAt(i)
@@ -1285,14 +1289,14 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString,$get(tDeployed), $get(tPlatformVersion), .pParams)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams)
         $$$ThrowOnError(sc)
     }
 
     // Create lock file if specified for this module
     if $get(pParams("CreateLockFile"), 0) && (pModule.Name = $get(pParams("LockFileModule"))) {
         try {
-            do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .tParams)
+            do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
         } catch (ex) {
             write !, $$$FormatText("Error creating lock file for %1 - %2", pModule.Name, ex.DisplayString()), !
         }
