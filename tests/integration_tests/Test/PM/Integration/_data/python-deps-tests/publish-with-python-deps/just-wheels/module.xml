@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="publish-with-python-just-wheels.ZPM">
+    <Module>
+      <Name>publish-with-python-just-wheels</Name>
+      <Version>1.6.2</Version>
+      <Packaging>module</Packaging>
+      <PythonWheel Name="numpy-2.4.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl" Directory="wheels" />
+    </Module>
+  </Document>
+</Export>

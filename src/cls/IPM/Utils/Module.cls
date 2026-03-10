@@ -1205,7 +1205,7 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule, .params)
+        do ..LoadDependencies(tModule,, .params)
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1241,8 +1241,10 @@ ClassMethod LoadNewModule(
 }
 
 /// Load dependencies of a module in a synchronous manner, one at a time, in the correct order.
+/// This method builds a dependency graph (optionally with phases) and installs missing dependencies.
 ClassMethod LoadDependencies(
 	pModule As %IPM.Storage.Module,
+	phaseList As %List = "",
 	ByRef pParams)
 {
     set isVerbose = $get(pParams("Verbose"),0)
@@ -1251,10 +1253,11 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,"",,,,ignoreInstalled,,permitDowngrade)
+    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade)
     $$$ThrowOnError(sc)
     write "Done."
 
+    // Install dependencies from the graph
     do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
     if isVerbose {
         write !, "Created inverted dependency graph from dependency graph"
@@ -1267,6 +1270,7 @@ ClassMethod LoadDependencies(
         write !, "Starting installation of dependencies..."
         write !
     }
+
     for i = 1:1:flatDepList.Count() {
         #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
         set moduleReference = flatDepList.GetAt(i)
@@ -1274,14 +1278,14 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString,$get(tDeployed), $get(tPlatformVersion), .pParams)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams)
         $$$ThrowOnError(sc)
     }
 
     // Create lock file if specified for this module
     if $get(pParams("CreateLockFile"), 0) && (pModule.Name = $get(pParams("LockFileModule"))) {
         try {
-            do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .tParams)
+            do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
         } catch (ex) {
             write !, $$$FormatText("Error creating lock file for %1 - %2", pModule.Name, ex.DisplayString()), !
         }
@@ -1426,15 +1430,18 @@ ClassMethod AddPackageMapping(
 ClassMethod RemovePackageMapping(
 	pNamespace As %String,
 	pMapping As %String,
-	pSkipActivation As %Boolean = 0) As %Status
+	pSkipActivation As %Boolean = 0,
+	ByRef changed As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set changed = 0
     try {
         set tPrevNS = $namespace
         new $namespace
         set $namespace = "%SYS"
         if ##class(Config.MapPackages).Exists(pNamespace,pMapping) {
             $$$ThrowOnError(##class(Config.MapPackages).Delete(pNamespace,pMapping,,$$$CPFSave))
+            set changed = 1
             if 'pSkipActivation {
                 new $namespace
                 set $namespace = tPrevNS
@@ -1442,9 +1449,9 @@ ClassMethod RemovePackageMapping(
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod AddRoutineMapping(
@@ -1485,9 +1492,11 @@ ClassMethod RemoveRoutineMapping(
 	pNamespace As %String,
 	pMapping As %String,
 	pType As %String = "ALL",
-	pSkipActivation As %Boolean = 0) As %Status
+	pSkipActivation As %Boolean = 0,
+	ByRef changed As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set changed = 0
     try {
         set tPrevNS = $namespace
         new $namespace
@@ -1495,6 +1504,7 @@ ClassMethod RemoveRoutineMapping(
         set pMapping = pMapping_$select(pType="ALL":"",1:"_"_pType)
         if ##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
             $$$ThrowOnError(##class(Config.MapRoutines).Delete(pNamespace,pMapping,,$$$CPFSave))
+            set changed = 1
             if 'pSkipActivation {
                 new $namespace
                 set $namespace = tPrevNS
@@ -1502,9 +1512,9 @@ ClassMethod RemoveRoutineMapping(
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod AddGlobalMapping(
@@ -1655,6 +1665,55 @@ ClassMethod ActivateMappings(pNamespace = {$namespace}) As %Status [ Internal ]
         set tSC = ex.AsStatus()
     }
     quit tSC
+}
+
+/// Activate configuration changes for multiple namespaces in a single operation.
+/// namespaces(ns)=1 for each namespace to activate.
+ClassMethod PerformBatchActivation(
+	ByRef namespaces,
+	useTransactions As %Boolean = 1,
+	verbose As %Boolean = 0) As %Status [ Internal ]
+{
+    set sc = $$$OK
+    set initTLevel = $tlevel
+    try {
+        set interruptManager = ##class(%IPM.Utils.InterruptManager).%New()
+        do interruptManager.DisableInterrupts()
+
+        if useTransactions {
+            tstart
+        }
+
+        new $namespace
+        set $namespace = "%SYS"
+        $$$ThrowOnError(##class(Config.CPF).Write())
+        $$$ThrowOnError(##class(Config.Map).MoveToActive())
+
+        set ns = ""
+        for {
+            set ns = $order(namespaces(ns))
+            quit:(ns = "")
+            if '##class(Config.Namespaces).Exists(ns) {
+                if verbose {
+                    write !, "Namespace "_ns_" does not exist; skipping activation."
+                }
+                continue
+            }
+            $$$ThrowOnError(##class(Config.Namespaces).Load(ns))
+        }
+
+        if useTransactions {
+            tcommit
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+
+    while ($tlevel > initTLevel) {
+        trollback 1
+    }
+
+    quit sc
 }
 
 /// Copy a package from one namespace to another. This works whether or not the contents of
@@ -1839,6 +1898,8 @@ ClassMethod EndCaptureOutput(
     } else {
         #; Otherwise switch redirection off
         do $zutil(82,12,0)
+        #; Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
+        use $io::("")
     }
 
     try {

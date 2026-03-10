@@ -279,7 +279,8 @@ Method GetOrderedResourceList() As %ListOfObjects
     for {
         set tResource = ..Resources.GetNext(.tKey)
         quit:tKey=""
-        if $isobject(tResource.Processor) && tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document") {
+        // Ignore any Document resources that start with a '/' (e.g. /inc) as they refer to a directory and can be processed in any order
+        if (($isobject(tResource.Processor)) && (tResource.Processor.%Extends("%IPM.ResourceProcessor.Default.Document")) && ($extract(tResource.Name) '= "/")) {
             // Strip extension from resource name as that caused improper sorting (i.e. MyPackage.MyClass.CLS gets sorted before MyPackage.PKG)
             set tResourceName = $piece(tResource.Name,".",1,*-1)
             if ($get(documentResourceList(tResourceName)) = "") {
