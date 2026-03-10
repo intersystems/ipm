@@ -169,7 +169,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
-<modifier name="keep-orphans" aliases="ko" dataAlias="KeepOrphans" dataValue="1" description="Retains dependencies that are no longer required by the updated module. By default, these orphaned modules are automatically uninstalled." />
+<modifier name="keep-orphans" aliases="ro" dataAlias="KeepOrphans" dataValue="1" description="Retains dependencies that are no longer required by the updated module. By default, these orphaned modules are automatically uninstalled." />
 </command>
 
 <command name="makedeployed">
