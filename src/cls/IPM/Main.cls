@@ -794,6 +794,13 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
     <example description="Display the current history retention setting.">config get HistoryRetain</example>
 </command>
 
+<command name="locate-resource">
+    <description>Find the module that owns a specific resource.</description>
+    <parameter name="resource" required="true" description="resource: The full name of the resource (e.g., My.Class.cls, Utils.inc)." />
+    <example description="Finds the module containing the specified class.">locate-resource %IPM.Main.cls</example>
+    <example description="Finds the module containing the specified include file.">locate-resource %IPM.Common.inc</example>
+</command>
+
 </commands>
 }
 
@@ -1082,6 +1089,8 @@ ClassMethod ShellInternal(
                 do ..Information(.tCommandInfo)
 			} elseif (tCommandInfo = "history") {
 				do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "locate-resource") {
+				do ..LocateResource(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -4169,6 +4178,20 @@ ClassMethod Update(ByRef pCommandInfo)
         // Call ..Install() in order to install the newer version of the module.
         do ..Install(.pCommandInfo, log)
     }
+}
+
+ClassMethod LocateResource(ByRef CommandInfo)
+{
+    set resource = $get(CommandInfo("parameters","resource"))
+    set moduleName = ##class(%IPM.ExtensionBase.Utils).GetHomeModuleName(resource)
+    if (moduleName="") {
+        write $$$FormattedLine($$$Red, "Resource '"_ resource_"' is not currently part of an installed module.")
+        quit
+    }
+    set showFields = ""
+    write !
+    do ..GetListModules(,moduleName, .list)
+    do ..DisplayModules(.list,,,, .tModifiers)
 }
 
 ClassMethod GetPythonInstalledLibs(Output list)
