@@ -41,10 +41,14 @@ Parameter UseStandalonePip = "UseStandalonePip";
 /// Default value is 0, where 1.0.0-anystring is considered a pre-release of 1.0.0, hence 1.0.0-anystring < 1.0.0
 Parameter SemVerPostRelease = "SemVerPostRelease";
 
+/// Configuration setting name used to determine the number of days
+/// to retain IPM history records before they are eligible for cleanup.
+Parameter HistoryRetain = "history_retain";
+
 /// Determines if the source folder should be physically deleted when a module is uninstalled.
 Parameter CleanOnUninstall = "CleanOnUninstall";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,CleanOnUninstall";
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,CleanOnUninstall";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -182,11 +186,6 @@ ClassMethod SetAnalyticsAvailable(
 	overwrite As %Boolean = 1) As %Boolean
 {
     return ..SetValue(..#analytics, +val, overwrite)
-}
-
-ClassMethod GetCleanOnUninstall() As %String [ CodeMode = expression ]
-{
-..GetValue(..#CleanOnUninstall)
 }
 
 }

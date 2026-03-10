@@ -790,6 +790,9 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
 	<example description="Delete all histories in the namespace">history delete -confirm</example>
 	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
+    <example description="Enable history auto-purge. Example: config set HistoryRetain 30.">config set HistoryRetain "days" </example>
+    <example description="Disable history auto-purge">config set HistoryRetain 0</example>
+    <example description="Display the current history retention setting.">config get HistoryRetain</example>
 </command>
 
 </commands>
@@ -809,7 +812,10 @@ ClassMethod Shell(
 	pTerminateOnError As %Boolean = 0,
 	pHaltOnComplete As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set tSC = ##class(%IPM.General.History).AutoPurgeOldHistory()
+    if $$$ISERR(tSC) {
+        return tSC
+    }
     do ..ShellInternal(pCommand,.tException)
     if $isobject(tException) {
         if pTerminateOnError {
@@ -910,14 +916,57 @@ ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
     set mirrorStatus = $system.Mirror.GetStatus()
     set mirrorStatus = "Mirror Status: " _ mirrorStatus
 
+    if $$$ISERR(..GetIPMVersionInfo(.ipmVersion, .mappedFromNamespace)) {
+        set ipmVersion = "Not installed"
+    } elseif mappedFromNamespace'="" {
+        set ipmVersion = ipmVersion_" (mapped from namespace '"_mappedFromNamespace_"')"
+    }
+
     set list = $listbuild(
-        "Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule($$$IPMModuleName)),
+        "Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ipmVersion),
         "Enter q/quit to exit the shell. Enter ?/help to view available commands",
         registryInfo,
         systemMode,
         mirrorStatus
     )
     quit list
+}
+
+/// Get IPM version for current/specified namespace, including mapping information
+/// Returns version and source namespace (if mapped)
+ClassMethod GetIPMVersionInfo(
+	Output version As %String,
+	Output mappedFromNamespace As %String,
+	namespace As %String = "") As %Status
+{
+    new $namespace
+    set namespace = $select(namespace'="": namespace, 1: $namespace)
+
+    try {
+        // Check if locally installed
+        if ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .id) {
+            set module = ##class(%IPM.Storage.Module).%OpenId(id)
+            set version = module.VersionString
+            set mappedFromNamespace = ""
+            return $$$OK
+        }
+
+        // Check if mapped from another namespace
+        do ..GetMapInfo(.isMappedFrom, .isMappedTo)
+        if $data(isMappedFrom(namespace), sourceNamespace) {
+            set $namespace = sourceNamespace
+            if ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .srcId) {
+                set srcModule = ##class(%IPM.Storage.Module).%OpenId(srcId)
+                set version = srcModule.VersionString
+                set mappedFromNamespace = sourceNamespace
+                return $$$OK
+            }
+        }
+
+        return $$$ERROR($$$GeneralError, "IPM not installed or mapped in namespace " _ namespace)
+    } catch ex {
+        return ex.AsStatus()
+    }
 }
 
 /// For use in unit tests that need to test if a command threw any exceptions.
@@ -1405,7 +1454,7 @@ ClassMethod GetDefaultCommandRegistry()
 /// Get Version Module
 ClassMethod GetVersionModule(
 	name,
-	namespace = {$namespace})
+	namespace = {$namespace}) As %String
 {
     new $namespace
     set $namespace=namespace
@@ -3241,6 +3290,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
     set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
     set mapRepos = $$$HasModifier(pCommandInfo,"repos")
     set remoteName = $$$GetModifier(pCommandInfo,"remote")
+    set useTransactions = '($get(pCommandInfo("data","NoTransaction"),0) || $get(pCommandInfo("data","NoJournal"),0))
     set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
     set targetVersion = "" 		// var to store the final version of IPM to be installed
     kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
@@ -3281,6 +3331,9 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
             set namespaces = $listfromstring(namespaces)
         }
 
+        // Track namespaces that receive new mappings for batch activation
+        kill nsToActivate
+
         // First try to map IPM itself
         set pointer = 0
         while $listnext(namespaces,pointer,namespace) {
@@ -3300,11 +3353,12 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
             if 'quiet {
                 write !,"Mapping %IPM package in "_initNamespace_" equivalently to "_namespace
             }
-            $$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace))
+            $$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace,1))
+            set nsToActivate(namespace) = 1
             if 'quiet {
                 write !,"Mapping %IPM.* routines in "_initNamespace_" equivalently to "_namespace
             }
-            $$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
+            $$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace,1))
         }
 
         // Then try to map repositories if -repos is specified
@@ -3336,13 +3390,19 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
                 if 'quiet {
                     write !,"Mapping IPM repository in "_initNamespace_" equivalently to "_namespace
                 }
+                set nsToActivate(namespace) = 1
                 for suffix = "D", "S", "I" {
-                    $$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace))
+                    $$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace, 1))
                 }
             }
         }
 
+        // Batch activate all modified namespaces once at the end
         set $namespace = initNamespace
+        if 'preview && $data(nsToActivate) {
+            $$$ThrowOnError(##class(%IPM.Utils.Module).PerformBatchActivation(.nsToActivate, useTransactions, 'quiet))
+        }
+
         if preview {
             write !,"Preview mode; no configuration changes were made."
         } elseif 'quiet {
@@ -3576,6 +3636,7 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
     set namespaces = $$$ucase(namespaces)
     set verbose = '$$$HasModifier(pCommandInfo,"quiet")
     set reposOnly = $$$HasModifier(pCommandInfo,"repos-only")
+    set useTransactions = '($get(pCommandInfo("data","NoTransaction"),0) || $get(pCommandInfo("data","NoJournal"),0))
     // Sanity check
     if (globally && (namespaces '= "")) {
         $$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global unmap flag at the same time."))
@@ -3606,6 +3667,7 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
     // Gather namespaces where %IPM is mapped into
     do ..GetMapInfo(.tIsMappedFrom)
 
+    kill nsToActivate
     set ptr = 0
     while $listnext(namespaces, ptr, ns) {
         set src = $get(tIsMappedFrom(ns))
@@ -3620,16 +3682,34 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
             write !,"Unmapping repository settings from "_ns_" (mapped from "_src_")"
         }
         for suffix = "D", "S", "I" {
-            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveGlobalMapping(ns, "IPM.Repo.Definition"_suffix))
+            set changed = 0
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveGlobalMapping(ns, "IPM.Repo.Definition"_suffix, 1, .changed))
+            if changed {
+                set nsToActivate(ns) = 1
+            }
         }
 
         if 'reposOnly {
             if verbose {
                 write !,"Unmapping IPM package and routines from "_ns_" (mapped from "_src_")"
             }
-            $$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
-            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+            set pkgChanged = 0
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM", 1, .pkgChanged))
+            if pkgChanged {
+                set nsToActivate(ns) = 1
+            }
+
+            set rtnChanged = 0
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*", 1, .rtnChanged))
+            if rtnChanged {
+                set nsToActivate(ns) = 1
+            }
         }
+    }
+
+    // Batch activate all modified namespaces once at the end
+    if $data(nsToActivate) {
+        $$$ThrowOnError(##class(%IPM.Utils.Module).PerformBatchActivation(.nsToActivate, useTransactions, verbose))
     }
 }
 
@@ -3972,54 +4052,55 @@ ClassMethod GetUpstreamPackageVersions(Output list)
 /// Provides information on all installed top level modules (i.e. modules that are not depended on)
 ClassMethod Information(ByRef pCommandInfo)
 {
-  set verbose = $$$HasModifier(pCommandInfo,"verbose")
-  // Figure out which installed modules are not dependencies by
-  // 1) getting list of all installed modules
-  // 2) getting list of all dependencies
-  // and 3) cross checking the two lists
-  do ..GetListModules(,,.modList)
-  set depRes = ##class(%SQL.Statement).%ExecDirect(,
-    "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
-    "from %IPM_Storage.ModuleItem_Dependencies")
-  $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
-  while depRes.%Next(.sc) {
-    $$$ThrowOnError(sc)
-    set visited($zconvert(depRes.%Get("DepName"),"l")) = 1
-  }
-  $$$ThrowOnError(sc)
-
-  set topLevelList("width") = 0
-  for i = 1:1:modList {
-    set entry = modList(i)
-    set name = $listget(entry, 1)
-    // only list non-dependencies
-    if '$data(visited(name)) {
-      // compile information
-      set externalName = $list(entry, 3)
-      if (externalName '= "") && (externalName '= name) {
-        if verbose {
-          set $list(entry, 1) = externalName_" (" _ name _ ")"
-        } else {
-          set $list(entry, 1) = externalName
-        }
-      }
-      if topLevelList("width") < $length($listget(entry)) {
-        set topLevelList("width") = $length($listget(entry))
-      }
-      set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
-      set $list(entry, 2) = version.ToStringWithoutBuild()
-      set topLevelList($increment(topLevelList)) = entry
+    set verbose = $$$HasModifier(pCommandInfo,"verbose")
+    // Figure out which installed modules are not dependencies by
+    // 1) getting list of all installed modules
+    // 2) getting list of all dependencies
+    // and 3) cross checking the two lists
+    do ..GetListModules(,,.modList)
+    set depRes = ##class(%SQL.Statement).%ExecDirect(,
+        "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
+        "from %IPM_Storage.ModuleItem_Dependencies")
+    $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+    while depRes.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set visited($zconvert(depRes.%Get("DepName"),"l")) = 1
     }
-  }
+    $$$ThrowOnError(sc)
 
-  set messages = ..BuildIntroMessages(.outOfBoxMessage)
-  set messages = messages _ $listbuild(outOfBoxMessage)
-  set ptr = 0
-  while $listnext(messages, ptr, line) {
-    write !, line
-  }
-  write !!, "Currently installed top-level modules are listed below:", !
-  do ..DisplayModules(.topLevelList)
+    set topLevelList = 0
+    set topLevelList("width") = 0
+    for i = 1:1:modList {
+        set entry = modList(i)
+        set name = $listget(entry, 1)
+        // only list non-dependencies
+        if '$data(visited(name)) {
+        // compile information
+        set externalName = $list(entry, 3)
+        if (externalName '= "") && (externalName '= name) {
+            if verbose {
+            set $list(entry, 1) = externalName_" (" _ name _ ")"
+            } else {
+            set $list(entry, 1) = externalName
+            }
+        }
+        if topLevelList("width") < $length($listget(entry)) {
+            set topLevelList("width") = $length($listget(entry))
+        }
+        set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
+        set $list(entry, 2) = version.ToStringWithoutBuild()
+        set topLevelList($increment(topLevelList)) = entry
+        }
+    }
+
+    set messages = ..BuildIntroMessages(.outOfBoxMessage)
+    set messages = messages _ $listbuild(outOfBoxMessage)
+    set ptr = 0
+    while $listnext(messages, ptr, line) {
+        write !, line
+    }
+    write !!, "Currently installed top-level modules are listed below:", !
+    do ..DisplayModules(.topLevelList)
 }
 
 ClassMethod Update(ByRef pCommandInfo)
