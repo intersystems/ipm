@@ -527,6 +527,17 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
     list -python
 </example>
 
+<example description="Shortforms: n, d, v. Add '-d' for descending (e.g., d-d).">
+    list -s [name|date|version]
+</example>
+
+<example description="Shows installed modules in descending order">
+    list -s name-desc
+</example>
+<example description="Shows installed modules in decending based on the installation date">
+    list -s d-d
+</example>
+
 <!-- Parameters -->
 <parameter name="searchString" description="Search string, * can be used." />
 
@@ -538,6 +549,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 <modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of IPM modules." />
+<modifier name="sort" aliases="s" value="true" description="Sort the list. Options: name, name-desc, date, date-desc, version, version-desc" />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -2809,6 +2821,41 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
             }
         }
         merge tModifiers = pCommandInfo("modifiers")
+        set sortMode = $$$lcase($get(pCommandInfo("modifiers", "sort")))
+        set type = $extract(sortMode, 1) // "d", "n", or "v"
+        set isDesc = (sortMode [ "-d")
+        set sortMode = $case(type, "n":"name", "d":"date", "v":"version", :"name")
+        if isDesc {
+            set sortMode = sortMode_"-desc"
+        }
+        set newlist =""
+        if sortMode'="" {
+            for i=1:1:list {
+                set entry = list(i)
+                set name = $listget(entry,1)
+                set entry = entry_$listbuild(i)
+                if sortMode["name"{
+                    set newlist($$$lcase(name))=entry
+                }
+                if sortMode["date" {
+                    set date = $listget(entry,6)
+                    set newlist(date)=entry
+                }
+                if sortMode["version" {
+                    set newlist($listfromstring($listget(entry,2),"."))=entry
+                }
+                kill list(i)
+            }
+            set direction = $select(sortMode [ "desc": -1, 1: 1)
+            set mod = ""
+            if $data(newlist)>1 {
+                // create new list based on the sorting
+                for {
+                    set mod = $order(newlist(mod),direction,data) quit:mod=""
+                    set list($increment(mlist))=data
+                }
+            }
+        }
         do ..DisplayModules(.list,,,, .tModifiers)
     }
 }
