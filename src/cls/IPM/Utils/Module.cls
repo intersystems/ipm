@@ -1288,15 +1288,16 @@ ClassMethod GetOrphanedDependencies(
 	Output OrphanedModules)
 {
     kill OrphanedModules
-    merge existDeps = ExistDependencies
-    set sc = Module.BuildDependencyGraph(.dependencyGraph,,,,"",,,,,,)
-    $$$ThrowOnError(sc)
-    set module=""
+    $$$ThrowOnError(Module.BuildDependencyGraph(.dependencyGraph,,,,"",,,,,,))
+    set moduleName = ""
     for {
-        set module = $order(dependencyGraph(module)) quit:module=""
-        kill existDeps(module)
+        set moduleName = $order(dependencyGraph(moduleName))
+        quit:moduleName=""
+
+        // Remove active dependencies from the existing list.
+        kill ExistDependencies(moduleName)
     }
-    merge OrphanedModules = existDeps
+    merge OrphanedModules = ExistDependencies
 }
 
 /// Load dependencies of a module in a synchronous manner, one at a time, in the correct order.
