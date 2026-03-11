@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.6] - Unreleased
+## [0.10.7] - Unreleased
+
+### Added
+- #992: Implement automatic history purge logic
+- #973: Enables CORS and JWT configuration for WebApplications in module.xml
+- #1027: Add -bypass-deps flag to skip install the IPM dependencies
+
+### Fixed
+- #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
+- #1052: In a namespace with mapped IPM, the `info` command works again and the intro message displays the IPM version and where its mapped from
+
+## [0.10.6] - 2026-02-24
+
 ### Added
 - #1027: Add -bypass-deps flag to skip install the IPM dependencies
 
@@ -18,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1024: Modules with PythonWheels have wheels packaged correctly under -export-python-deps
 - #1061: Fix issue when installing from OCI/ORAS registries
 - #1065: Fixed regression introduced in IPM 0.10.3 which removed support for resources with directories as names (e.g. /inc)
+- #1072: Fixed regression where scoped dependencies weren't being loaded in the test or verify phase.
 
 ## [0.10.5] - 2026-01-15
 

@@ -61,16 +61,87 @@ Method TestScopedResourceInstall()
         do $$$AssertStatusOK(status, "Module ScopeClass successfully installed.")
 
         // Normal install: Scoped class should not exist
-        do $$$AssertNotTrue($classmethod("%Dictionary.ClassDefinition", "%ExistsId", "HS.ScopedClass"), "Scoped class should NOT exist after normal install")
+        do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("HS.ScopedClass"), "Scoped class should NOT exist after normal install")
 
         set moduleDir = ..GetModuleDir("scope-test/scope-package")
         set status = ##class(%IPM.Main).Shell("load -verbose "_moduleDir)
         do $$$AssertStatusOK(status, "Module ScopePackage successfully installed.")
 
         // Normal install: Class within a scoped package should not exist
-        do $$$AssertNotTrue($classmethod("%Dictionary.ClassDefinition", "%ExistsId", "HS.Class"), "Class within scoped package should NOT exist after normal install")
+        do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("HS.Class"), "Class within scoped package should NOT exist after normal install")
     } catch ex {
         do $$$AssertStatusOK(ex.AsStatus(), "Unexpected failure in TestScopedResourceInstall")
+    }
+}
+
+/// Validates that test-scoped dependencies are loaded when running tests
+Method TestScopedDependencyLoadingTest()
+{
+    set sc = $$$OK
+    try {
+        // Setup filesystem repository
+        set repoDir = ..GetModuleDir("scope-test/scope-test")
+        set sc = ##class(%IPM.Main).Shell("repo -fs -name scopetest -path " _ repoDir)
+        do $$$AssertStatusOK(sc, "Set up filesystem repository")
+
+        // Install parent module from filesystem repo (should NOT install scoped dependency yet)
+        set sc = ##class(%IPM.Main).Shell("install scopetest/scope-test -verbose")
+        do $$$AssertStatusOK(sc, "Installed scope-test from filesystem repo")
+
+        // Verify scoped dependency class does not exist yet
+        do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("Test.Scope.ScopedClass"), "Test.Scope.ScopedClass should NOT exist before running tests")
+
+        // Run tests (should load scoped dependency)
+        set sc = ##class(%IPM.Main).Shell("scope-test test -only -verbose")
+        do $$$AssertStatusOK(sc, "Running tests should load test-scoped dependency and pass")
+
+        // Verify scoped dependency was installed and class exists
+        do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("Test.Scope.ScopedClass"), "Test.Scope.ScopedClass should exist after running tests")
+
+        // Cleanup: uninstall modules
+        set sc = ##class(%IPM.Main).Shell("uninstall scope-test-dep")
+        set sc = ##class(%IPM.Main).Shell("uninstall scope-test")
+
+        // Cleanup: delete repository
+        set sc = ##class(%IPM.Main).Shell("repo -delete -name scopetest")
+        do $$$AssertStatusOK(sc, "Deleted filesystem repo")
+
+    } catch ex {
+        do $$$AssertStatusOK(ex.AsStatus(), "Unexpected failure in TestScopedDependencyLoadingTest")
+    }
+}
+
+/// Validates that verify-scoped dependencies are loaded when running verify
+Method TestScopedDependencyLoadingVerify()
+{
+    set sc = $$$OK
+    try {
+        // Setup filesystem repository
+        set repoDir = ..GetModuleDir("scope-test/scope-test")
+        set sc = ##class(%IPM.Main).Shell("repo -fs -name scopetest -path " _ repoDir)
+        do $$$AssertStatusOK(sc, "Set up filesystem repository")
+
+        // Install parent module from filesystem repo (should NOT install scoped dependency yet)
+        set sc = ##class(%IPM.Main).Shell("install scopetest/scope-test -verbose")
+        do $$$AssertStatusOK(sc, "Installed scope-test from filesystem repo")
+
+        // Verify scoped dependency class does not exist yet
+        do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("Test.Scope.VerifyScopedClass"), "Test.Scope.VerifyScopedClass should NOT exist before running verify")
+
+        // Run verify (should load scoped dependency)
+        set sc = ##class(%IPM.Main).Shell("scope-test verify -only -verbose")
+        do $$$AssertStatusOK(sc, "Running verify should load verify-scoped dependency and pass")
+
+        // Cleanup: uninstall modules
+        set sc = ##class(%IPM.Main).Shell("uninstall scope-test-dep-verify")
+        set sc = ##class(%IPM.Main).Shell("uninstall scope-test")
+
+        // Cleanup: delete repository
+        set sc = ##class(%IPM.Main).Shell("repo -delete -name scopetest")
+        do $$$AssertStatusOK(sc, "Deleted filesystem repo")
+
+    } catch ex {
+        do $$$AssertStatusOK(ex.AsStatus(), "Unexpected failure in TestScopedDependencyLoadingVerify")
     }
 }
 
