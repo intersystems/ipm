@@ -271,6 +271,9 @@ ClassMethod LoadModuleFromDirectory(
 {
     set tSC = $$$OK
     try {
+        if $get(pParams("CleanInstall"), 0) && '$get(pParams("LockFileInstallStarted"), 0) {
+            do ##class(%IPM.General.LockFile).InstallFromLockFile(pDirectory, .pParams)
+        }
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         write:tVerbose !,"Loading from ",pDirectory,!
@@ -948,7 +951,6 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-/// 
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1205,7 +1207,12 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule,, .params)
+
+        // If installing from a lock file, don't need to load dependencies since dependencies will be installed in order anyways
+        if ('$get(params("CleanInstall"), 0)) {
+            do ..LoadDependencies(tModule, .params)
+        }
+
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
