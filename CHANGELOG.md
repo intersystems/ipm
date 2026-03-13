@@ -5,11 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [0.10.7] - Unreleased
 
 ### Added
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
+- #1031: Add support for user-configurable ModuleRoot for IPM module installation
 
 ### Fixed
 - #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
