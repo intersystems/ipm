@@ -1,11 +1,19 @@
 {
     "objectscript.conn": {
         "active": true,
-        "port": 52774,
-        "host": "localhost",
+        "docker-compose": {
+            "service": "iris"
+        },
         "username": "_system",
         "password": "SYS",
         "ns": "USER"
+    },
+    // Non-default export settings needed so Testing Manager extension can find sources when doing coverage runs
+    "objectscript.export": {
+        "addCategory": true,
+        "map": {
+            "%(.*)": "$1"
+        }
     },
     // Force formatting rules
     "intersystems.testingManager.client.relativeTestRoot": "tests/unit_tests",

@@ -434,9 +434,9 @@ XData AppendWheelUnderModuleTransform [ XMLNamespace = "http://www.intersystems.
     <xsl:variable name="ns" select="namespace-uri(..)"/>
     <xsl:copy><xsl:apply-templates select="@*|node()"/></xsl:copy>
     <xsl:element name="PythonWheel" namespace="{$ns}">
-      <xsl:element name="Name" namespace="{$ns}">
+      <xsl:attribute name="Name" namespace="{$ns}">
         <xsl:value-of select="$wheelName"/>
-      </xsl:element>
+      </xsl:attribute>
     </xsl:element>
 
   </xsl:template>

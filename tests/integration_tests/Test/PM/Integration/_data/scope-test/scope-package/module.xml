@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?><Export generator="IRIS" version="26">
+<Document name="HealthShare.ScopePackage.ZPM">
+    <Module>
+      <Name>HealthShare.ScopePackage</Name>
+      <ExternalName>ScopePackage</ExternalName>
+      <Version>1.0.0</Version>
+      <Description>Test module for scope package</Description>
+      <Packaging>module</Packaging>
+      <Resource Name="HS.PKG" Scope="verify"/>
+    </Module>
+</Document></Export>

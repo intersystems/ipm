@@ -20,212 +20,17 @@ ClassMethod CreateAndGetSSLConfig(ByRef pProperties) As %String
     return name
 }
 
-/// Format of <var>pDependencyGraph</var>:
-/// pDependencyGraph("module name") = $ListBuild(<depth>,<server name>,<version>)
-/// pDependencyGraph("module name","<dependent module> <dependent module version>") = <irrelevant>
-ClassMethod LoadDependencies(
-	ByRef pDependencyGraph,
-	ByRef pParams,
-	pWorkQueue As %SYSTEM.WorkMgr)
-{
-    // Suspend the error count to avoid spurious messages about errors being detected in load/compile.
-    $$$SuspendErrorCount
-    set tSC = $$$OK
-    set tLocked = 0
-    set tRestoreParams = 0
-    try {
-        set initWorkQueueManager = '$data(pParams("Multicompile","CacheTempIndex"),tCacheTempIndex) || '$isobject($get(pWorkQueue))
-        if initWorkQueueManager {
-            if '$isobject($get(pWorkQueue)) {
-                // There may be one at a higher stack level.
-                // Deal with dependencies here, and ensure that previous CacheTempIndex can be restored at the end.
-                merge tParamBackup = pParams
-                set tRestoreParams = 1
-            }
-
-            if ($get(pParams("Threads")) = 1) || ($tlevel > 0) {
-                set tNumWorkers = -1 // Disable multithreading.
-            } else {
-                set tNumWorkers = $get(pParams("Threads"),1) // Enable multicompile
-            }
-
-            set pWorkQueue = ##class(%SYSTEM.WorkMgr).Initialize("/multicompile="_tNumWorkers,.tSC)
-            $$$ThrowOnError(tSC)
-
-            set tModuleName = ""
-            for {
-                set tModuleName = $order(pDependencyGraph(tModuleName),1,tData)
-                quit:tModuleName=""
-
-                // List modules to avoid duplicate loads.
-                set pParams("Multicompile","ModuleContext",tModuleName) = $listbuild("Activate")
-
-                // Invert dependency graph, subscripts (<module>,<depends on>)
-                set tInvertedDependencyGraph(tModuleName) = $list(tData,2,*)
-
-                set tDependentKey = ""
-                for {
-                    set tDependentKey = $order(pDependencyGraph(tModuleName,tDependentKey))
-                    quit:tDependentKey=""
-
-                    set tInvertedDependencyGraph($piece(tDependentKey," "),tModuleName) = ""
-                }
-            }
-
-            set tCacheTempIndex = $increment($$$ZPMTempLoadGraphRoot)
-            set pParams("Multicompile","CacheTempIndex") = tCacheTempIndex
-            kill $$$ZPMTempLoadGraph(tCacheTempIndex)
-            merge $$$ZPMTempLoadGraph(tCacheTempIndex) = tInvertedDependencyGraph
-        } else {
-            lock +$$$ZPMTempLoadGraph(tCacheTempIndex):$$$LockTimeout
-            if $test {
-                set tLocked = 1
-            } else {
-                $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to obtain lock on dependency graph."))
-            }
-            merge tInvertedDependencyGraph = $$$ZPMTempLoadGraph(tCacheTempIndex)
-        }
-
-        // Queue load of modules without uninstalled dependencies.
-        set tModuleName = ""
-        for {
-            set tModuleName = $order(tInvertedDependencyGraph(tModuleName),1,tData)
-            quit:tModuleName=""
-
-            // Check if ALL subnode modules have no server name in the top level node of those modules
-            // in the inverted dependency graph (which means they are already installed)
-            // ONLY want to check on the initial version of the graph because nodes are killed as modules are installed
-            if initWorkQueueManager {
-                set tHasUninstalledDependency = 0
-                set tSubnode = ""
-                while 1 {
-                    set tSubnode = $order(tInvertedDependencyGraph(tModuleName, tSubnode))
-                    if (tSubnode = "") {
-                        quit
-                    }
-                    // Check if subnode exists. If it doesn't, then its already been installed because subnodes are killed
-                    set tSubnodeServerName = $listget($get(tInvertedDependencyGraph(tSubnode)), 1)
-                    if (tSubnodeServerName '= "") {
-                        set tHasUninstalledDependency = 1
-                        quit
-                    }
-                }
-            } else {
-                set tHasUninstalledDependency = ($data(tInvertedDependencyGraph(tModuleName)) >= 10)
-            }
-            // If no uninstalled dependencies remain...
-            if 'tHasUninstalledDependency {
-                set $listbuild(tServerName, tVersion, tDeployed, tPlatformVersion) = tData
-                zkill $$$ZPMTempLoadGraph(tCacheTempIndex,tModuleName)
-
-                // Missing server name indicates that it's already present locally; nothing to do in that case.
-                if (tServerName '= "") {
-                    if ($tlevel = 0) && ($get(pParams("Multicompile","Verbose"),$get(pParams("Verbose"),0))) {
-                        write !,"Queuing module load: ",tModuleName," ",tVersion," @ ",tServerName
-                    }
-                    set tSC = pWorkQueue.QueueCallback(
-                        "##class("_$classname()_").LoadModuleReference",
-                        "##class("_$classname()_").LoadCompleted",
-                        tServerName, tModuleName, tVersion, $get(tDeployed), $get(tPlatformVersion), .pParams, .pDependencyGraph)
-                    $$$ThrowOnError(tSC)
-                } else {
-                    // Remove this module from dependencies.
-                    set tDependentKey = ""
-                    for {
-                        set tDependentKey = $order($$$ZPMTempLoadGraph(tCacheTempIndex,tDependentKey))
-                        quit:tDependentKey=""
-
-                        kill $$$ZPMTempLoadGraph(tCacheTempIndex,tDependentKey,tModuleName)
-                    }
-                }
-            }
-        }
-        if (tLocked) {
-            lock -$$$ZPMTempLoadGraph(tCacheTempIndex)
-            set tLocked = 0
-        } else {
-            // Only call WaitForComplete once (!!!)
-            // Recursive calls will do repeat execution of previously-queued jobs.
-            set tSC = pWorkQueue.WaitForComplete()
-            $$$ThrowOnError(tSC)
-        }
-
-        merge $$$ZPMHandledModules($namespace) = pParams("Multicompile","ModuleContext")
-    } catch e {
-        if (e.Name["ZSOAP") {
-            set tSC = $get(%objlasterror,e.AsStatus())
-        } else {
-            set tSC = e.AsStatus()
-        }
-    }
-    if tRestoreParams {
-        kill pParams
-        merge pParams = tParamBackup
-    }
-    if (tLocked) {
-        lock -$$$ZPMTempLoadGraph(tCacheTempIndex)
-    }
-    quit tSC
-}
-
-/// Intended to be invoked only as a work queue callback (so %status and %workqueue will be defined)
-/// Signature must match <method>LoadModuleReference</method> per work queue manager conventions.
-ClassMethod LoadCompleted(
-	pServerName As %String,
-	pModuleName As %String,
-	pVersion As %String,
-	pDeployed As %String,
-	pPlatformVersion As %String,
-	ByRef pParams,
-	ByRef pDependencyGraph) As %Status
-{
-    // Suspend the error count to avoid spurious messages about errors being detected in load/compile.
-    $$$SuspendErrorCount
-    set tSC = $$$OK
-    set tLocked = 0
-    try {
-        $$$ThrowOnError(%status)
-        if $$$ISOK(tSC) && $data(pParams("Multicompile","CacheTempIndex"),tCacheTempIndex) {
-            // Remove loaded dependency from dependencies subscript.
-            lock +$$$ZPMTempLoadGraph(tCacheTempIndex):$$$LockTimeout
-            if $test {
-                set tLocked = 1
-            } else {
-                $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to obtain lock on dependency graph."))
-            }
-            set tDependentKey = ""
-            for {
-                set tDependentKey = $order($$$ZPMTempLoadGraph(tCacheTempIndex,tDependentKey))
-                quit:tDependentKey=""
-
-                kill $$$ZPMTempLoadGraph(tCacheTempIndex,tDependentKey,pModuleName)
-            }
-            lock -$$$ZPMTempLoadGraph(tCacheTempIndex)
-            set tLocked = 0
-
-            // Schedule load of any other modules that may need to be scheduled.
-            set tSC = ..LoadDependencies(.pDependencyGraph,.pParams,%workqueue)
-        }
-    } catch e {
-        set tSC = e.AsStatus()
-    }
-    if (tLocked) {
-        lock -$$$ZPMTempLoadGraph(tCacheTempIndex)
-    }
-    quit tSC
-}
-
 ClassMethod LoadQualifiedReference(
 	pReference As %IPM.Storage.QualifiedModuleInfo,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pSynchronous As %Boolean = 0) As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pSynchronous)
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog)
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -240,19 +45,31 @@ ClassMethod LoadModuleReference(
 	pPlatformVersion As %String,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pSynchronous As %Boolean = 0) As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
+    // if install of module is already being logged, don't duplicate
+    set prelogged = $case(pLog, "": 0, :1)
+
     // Keep a reference of the singleton in this process (which can be a new process!), so subsequent .%Get() calls return the same instance
     set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
 
-    // Suspend the error count to avoid spurious messages about errors being detected in load/compile.
-    $$$SuspendErrorCount
     #dim tExpression As %IPM.General.SemanticVersionExpression
     set tSC = $$$OK
     try {
         // Backward-compatibility: if params isn't an array, use it as qstruct
         if $data(pParams) = 1 {
             set qstruct = pParams
+        }
+        if pLog = "" {
+            if $get(pParams("cmd")) = "install" {
+                set log = ##class(%IPM.General.HistoryTemp).InstallInit(pModuleName)
+            } else {
+                set log = ##class(%IPM.General.HistoryTemp).LoadInit(pModuleName)
+            }
+            $$$ThrowOnError(log.SetSource(pServerName))
+            $$$ThrowOnError(log.SetVersion(pVersion))
+        } else {
+            set log = pLog
         }
 
         set tVerbose = $get(pParams("Verbose"))
@@ -263,23 +80,11 @@ ClassMethod LoadModuleReference(
             merge qstruct = pParams("qstruct")
         }
 
-        // Use % variables that intentionally leak in worker processes, to avoid duplicate work when they go out of scope.
-        #dim %installcontext As %IPM.General.InstallContext
-        #dim %manager As %IPM.Repo.Manager
-        if '$$$IsISCWorker {
-            new %installcontext
-            new %manager
-        }
-        set %installcontext = ##class(%IPM.General.InstallContext).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-        do %installcontext.SetGraph(.pDependencyGraph)
-        merge tIndex = pParams("Multicompile","CacheTempIndex")
-        do %installcontext.SetCacheTempIndex(.tIndex)
-
-        set %manager = $select($isobject($get(%manager)):%manager,1:##class(%IPM.Repo.Manager).%Get(.tSC))
+        #dim manager As %IPM.Repo.Manager
+        set manager = ##class(%IPM.Repo.Manager).%Get(.tSC)
         $$$ThrowOnError(tSC)
 
-        set tClient = %manager.CheckServiceCache(pServerName,.tAvailable)
+        set tClient = manager.CheckServiceCache(pServerName,.tAvailable)
         if 'tAvailable {
             set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pServerName))
             quit
@@ -309,7 +114,7 @@ ClassMethod LoadModuleReference(
 
         // Ensure requested versions match those required by other modules in the namespace, excluding versions currently being installed
         // (the requirements of such modules are already known to be satisfied)
-        set tSC = ..GetRequiredVersionExpression(pModuleName,%installcontext.GetPendingModuleList(),.tExpression,.tSourceList)
+        set tSC = ..GetRequiredVersionExpression(pModuleName,,.tExpression,.tSourceList)
         if $$$ISERR(tSC) {
             quit
         }
@@ -330,7 +135,7 @@ ClassMethod LoadModuleReference(
             }
             set dotModules = ##class(%File).NormalizeDirectory(".modules", tDirectory)
             set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-            set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName,pSynchronous)
+            set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName,log)
             set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         } else {
             set tAsArchive = -1
@@ -364,7 +169,7 @@ ClassMethod LoadModuleReference(
             do tTmpStream.CopyFromAndSave(tPayload)
 
             if (tAsArchive) {
-                set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName,pSynchronous)
+                set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName,log)
             } else {
                 // Old format (TODO: officially deprecate): try loading a .xml file
 
@@ -398,6 +203,14 @@ ClassMethod LoadModuleReference(
             set tSC = e.AsStatus()
         }
     }
+    if $isobject($get(log)) && (prelogged=0) {
+		if $data(tDeveloperMode) # 2 {
+			set devMode = $get(tDeveloperMode, 0)
+		} else {
+			set devMode = $get(pParams("DeveloperMode"), 0)
+		}
+		set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+	}
     quit tSC
 }
 
@@ -407,7 +220,7 @@ ClassMethod LoadModuleFromArchive(
 	pArchiveStream As %Stream.Object,
 	ByRef pParams,
 	pRepository As %String = "",
-	pSynchronous As %Boolean = 0) As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -438,7 +251,7 @@ ClassMethod LoadModuleFromArchive(
 
         set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
         set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-        set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository,pSynchronous)
+        set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository, pLog)
         set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         if $$$ISERR(tSC) {
             quit
@@ -454,25 +267,31 @@ ClassMethod LoadModuleFromDirectory(
 	ByRef pParams,
 	pOverrideDeveloperMode As %Boolean = 0,
 	pRepository As %String = "",
-	pSynchronous As %Boolean = 0) As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         write:tVerbose !,"Loading from ",pDirectory,!
+
+        // Propagate all params to dependencies except those that should only apply to the top level module
+        // pParams("Install") indicates this is a top-level module
         merge tParams = pParams
-        if $get(pParams("Install")) || $get(pParams("Update")) {
-            if $get(pParams("Update"),0) {
-                set tParams("cmd") = "update"
-            } else {
-                zkill tParams("Install")
-            }
-        } else {
-            // Propagate all params except developer mode to dependencies
-            set tParams("DeveloperMode") = $get(pOverrideDeveloperMode,0)
+        if '$get(pParams("Install")) {
+            set tParams("DeveloperMode") = pOverrideDeveloperMode
+            // Do not pass these down so BuildDependencyGraph() does not get called more than necessary
+            kill tParams("UpdateSnapshots")
+            kill tParams("IgnoreInstalled")
         }
-        set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pSynchronous)
+
+        if $get(pParams("Update")) {
+            set tParams("cmd") = "update"
+        } elseif $get(pParams("Install")) {
+            zkill tParams("Install")
+        }
+
+        set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pLog)
         if $$$ISERR(tSC) {
             quit
         }
@@ -513,6 +332,19 @@ ClassMethod GetModuleObjectFromStream(
     set pFound = (reader.Next(.moduleObj, .sc) > 0)
     $$$ThrowOnError(sc)
     return $get(moduleObj)
+}
+
+/// Given a string, tries to correlate it to an instance of <class>%IPM.Storage.Module</class>.
+/// Throws errors.
+ClassMethod GetModuleObjectFromString(
+	moduleXML As %String,
+	Output found As %Boolean) As %IPM.Storage.Module
+{
+    // Create stream from XML text
+    set stream = ##class(%Stream.GlobalCharacter).%New()
+    do stream.Write(moduleXML)
+
+    return ..GetModuleObjectFromStream(stream, .found)
 }
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
@@ -1231,8 +1063,11 @@ ClassMethod LoadNewModule(
 	pDirectory As %String,
 	ByRef pParams,
 	pRepository As %String = "",
-	pSynchronous As %Boolean = 0) As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
+	if $data(pLog) # 2 = 0 {
+		set pLog = ""
+	}
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
@@ -1247,15 +1082,6 @@ ClassMethod LoadNewModule(
             set qstruct = "ck"_$select(tVerbose:"d",1:"-d")
         }
         set commandLineModuleName = $get(params("ModuleName"))
-
-        // Check for valid license key prior to top-level module load
-        // This may throw an exception.
-        if '$data($$$ZPMHandledModules($namespace)) {
-            set tLicenseIsValid = ..CheckLicenseKey()
-            if 'tLicenseIsValid {
-                write !,"WARNING: Continuing module load without a valid license."
-            }
-        }
 
         // Create a singleton instance for logging of warnings/error messages
         set tLogManager = ##class(%IPM.General.LogManager).%Get(.tSC)
@@ -1323,13 +1149,9 @@ ClassMethod LoadNewModule(
         set tDisplayName = $piece(tFirstLoaded, ".", 1, *-1)
         set tModuleName = $$$lcase(tDisplayName)
 
-        #dim tInstallContext As %IPM.General.InstallContext
-        set tInstallContext = ##class(%IPM.General.InstallContext).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
-        if foundNewModuleObj && 'tInstallContext.ModuleIsDependency(tModuleName) {
+        if foundNewModuleObj {
             // Check that on an update command with -path flag, the module in the path matches the base module specified for update.
-            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) {
+            if (commandLineModuleName '= "") && (newModuleObj.Name '= commandLineModuleName) && (newModuleObj.ExternalName '= commandLineModuleName){
               set msg = $$$FormatText("The specified path does not contain a module matching the specified module to update. Module in path = %1. Specified module = %2.",newModuleObj.Name,commandLineModuleName)
               $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
@@ -1350,6 +1172,10 @@ ClassMethod LoadNewModule(
 
         set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
+		if $isobject(pLog) {
+			$$$ThrowOnError(pLog.SetName(tModuleName))
+			$$$ThrowOnError(pLog.SetVersion(tModule.VersionString))
+		}
         set tModule.Repository = pRepository
 
         if $data(params("DeveloperMode"),tDeveloperMode) {
@@ -1372,32 +1198,14 @@ ClassMethod LoadNewModule(
             tstart
         }
 
-        if '$data($$$ZPMHandledModules($namespace)) {
-            // The purpose of this NEW command is to make sure that the % variable $$$ZPMHandledModules refers to doesn't leak outside this scope.
-            // This only happens for the first module to be loaded in a set of dependencies (using zpm "load ..." or zpm "install ...")
-            // $$$ZPMHandledModules is also used in the ExecutePhases method of %IPM.Storage.Module to
-            // cover cases where new dependencies are added and a module is compiled without reloading, and in the BuildDependencyGraph
-            // method to treat installed snapshot versions as installed rather than forcing reload if they have been reloaded
-            // as part of the same root module operation.
-            new $$$ZPMHandledModules
-            set $$$ZPMHandledModules($namespace) = "" //Initialize.
-        }
-        merge $$$ZPMHandledModules($namespace) = params("Multicompile","ModuleContext")
-
         $$$ThrowOnError(##class(%IPM.Storage.Module).CheckSystemRequirements(tModuleName))
 
-        if 'tInstallContext.ModuleIsDependency(tModuleName) {
-            if 'pSynchronous {
-                // Regular async multi-threaded loading of dependencies
-                set tSC = tModule.LoadDependencies("",.params)
-                $$$ThrowOnError(tSC)
-            } else {
-                // Temporary custom loading of dependencies in a synchronous
-                // manner to prevent lock timeouts until lifecycle rework
-                // is complete (HSIEO-4450)
-                do ..SyncLoadDependencies(tModule, .params)
-            }
+        kill params("ModuleName") // Ensure module name is not passed down to dependency loads
+        // If lock file is to be created, add the module name to params so lock file is just created for base module and not any of the dependency modules loaded
+        if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
+            set params("LockFileModule") = tModule.Name
         }
+        do ..LoadDependencies(tModule,, .params)
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1415,7 +1223,7 @@ ClassMethod LoadNewModule(
         }
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
-        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params)
+        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
             tcommit
         }
@@ -1424,36 +1232,33 @@ ClassMethod LoadNewModule(
     } catch e {
         set tSC = e.AsStatus()
     }
-    while ($tlevel > tInitTLevel) {
-        trollback 1
+    if $tlevel > tInitTLevel {
+        while ($tlevel > tInitTLevel) {
+            trollback 1
+        }
     }
     quit tSC
 }
 
-/// Temporary workaround to synchronously load dependencies. Can be removed once
-/// HSIEO-4450 is complete.
-ClassMethod SyncLoadDependencies(
+/// Load dependencies of a module in a synchronous manner, one at a time, in the correct order.
+/// This method builds a dependency graph (optionally with phases) and installs missing dependencies.
+ClassMethod LoadDependencies(
 	pModule As %IPM.Storage.Module,
+	phaseList As %List = "",
 	ByRef pParams)
 {
     set isVerbose = $get(pParams("Verbose"),0)
-
-    /*
-     * Call to BuildDependencyGraph copied from %IPM.Storage.Module:LoadDependencies
-     */
 
     set reloadSnapshots = +$get(pParams("UpdateSnapshots"))
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-    set sc = pModule.BuildDependencyGraph(.depdendencyGraph,,reloadSnapshots,,"",,,,ignoreInstalled,,permitDowngrade)
+    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade)
     $$$ThrowOnError(sc)
     write "Done."
 
-    /* This setting is copied from %IPM.Main:Install */
-    set pParams("Install") = 1
-
-    do ..ConstructInvertedDependencyGraph(.depdendencyGraph, .invertedDependencyGraph)
+    // Install dependencies from the graph
+    do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
     if isVerbose {
         write !, "Created inverted dependency graph from dependency graph"
     }
@@ -1465,6 +1270,7 @@ ClassMethod SyncLoadDependencies(
         write !, "Starting installation of dependencies..."
         write !
     }
+
     for i = 1:1:flatDepList.Count() {
         #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
         set moduleReference = flatDepList.GetAt(i)
@@ -1472,8 +1278,17 @@ ClassMethod SyncLoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString,$get(tDeployed), $get(tPlatformVersion), .pParams)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams)
         $$$ThrowOnError(sc)
+    }
+
+    // Create lock file if specified for this module
+    if $get(pParams("CreateLockFile"), 0) && (pModule.Name = $get(pParams("LockFileModule"))) {
+        try {
+            do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
+        } catch (ex) {
+            write !, $$$FormatText("Error creating lock file for %1 - %2", pModule.Name, ex.DisplayString()), !
+        }
     }
 }
 
@@ -1553,7 +1368,7 @@ ClassMethod CheckLicenseKey() As %Boolean
     // Limit the number of attempts in case this somehow ends up running in a non-interactive process.
     #define MaxTries 5
     set tValidLicense = ($system.License.GetKeyStatus() '= "Invalid")
-    while ('tValidLicense) && $$$InProgrammerMode && ('$$$IsISCWorker) && ($increment(tTries) <= $$$MaxTries) {
+    while ('tValidLicense) && $$$InProgrammerMode && ($increment(tTries) <= $$$MaxTries) {
         write !!,"Your system has no (valid) license key present"
         write !,"Copy a valid license key into "_$system.Util.ManagerDirectory()
         write !,"and then enter 'y' to activate it. Enter 'n' to continue without a license key, "
@@ -1615,15 +1430,18 @@ ClassMethod AddPackageMapping(
 ClassMethod RemovePackageMapping(
 	pNamespace As %String,
 	pMapping As %String,
-	pSkipActivation As %Boolean = 0) As %Status
+	pSkipActivation As %Boolean = 0,
+	ByRef changed As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set changed = 0
     try {
         set tPrevNS = $namespace
         new $namespace
         set $namespace = "%SYS"
         if ##class(Config.MapPackages).Exists(pNamespace,pMapping) {
             $$$ThrowOnError(##class(Config.MapPackages).Delete(pNamespace,pMapping,,$$$CPFSave))
+            set changed = 1
             if 'pSkipActivation {
                 new $namespace
                 set $namespace = tPrevNS
@@ -1631,9 +1449,9 @@ ClassMethod RemovePackageMapping(
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod AddRoutineMapping(
@@ -1674,9 +1492,11 @@ ClassMethod RemoveRoutineMapping(
 	pNamespace As %String,
 	pMapping As %String,
 	pType As %String = "ALL",
-	pSkipActivation As %Boolean = 0) As %Status
+	pSkipActivation As %Boolean = 0,
+	ByRef changed As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set changed = 0
     try {
         set tPrevNS = $namespace
         new $namespace
@@ -1684,6 +1504,7 @@ ClassMethod RemoveRoutineMapping(
         set pMapping = pMapping_$select(pType="ALL":"",1:"_"_pType)
         if ##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
             $$$ThrowOnError(##class(Config.MapRoutines).Delete(pNamespace,pMapping,,$$$CPFSave))
+            set changed = 1
             if 'pSkipActivation {
                 new $namespace
                 set $namespace = tPrevNS
@@ -1691,9 +1512,9 @@ ClassMethod RemoveRoutineMapping(
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod AddGlobalMapping(
@@ -1844,6 +1665,55 @@ ClassMethod ActivateMappings(pNamespace = {$namespace}) As %Status [ Internal ]
         set tSC = ex.AsStatus()
     }
     quit tSC
+}
+
+/// Activate configuration changes for multiple namespaces in a single operation.
+/// namespaces(ns)=1 for each namespace to activate.
+ClassMethod PerformBatchActivation(
+	ByRef namespaces,
+	useTransactions As %Boolean = 1,
+	verbose As %Boolean = 0) As %Status [ Internal ]
+{
+    set sc = $$$OK
+    set initTLevel = $tlevel
+    try {
+        set interruptManager = ##class(%IPM.Utils.InterruptManager).%New()
+        do interruptManager.DisableInterrupts()
+
+        if useTransactions {
+            tstart
+        }
+
+        new $namespace
+        set $namespace = "%SYS"
+        $$$ThrowOnError(##class(Config.CPF).Write())
+        $$$ThrowOnError(##class(Config.Map).MoveToActive())
+
+        set ns = ""
+        for {
+            set ns = $order(namespaces(ns))
+            quit:(ns = "")
+            if '##class(Config.Namespaces).Exists(ns) {
+                if verbose {
+                    write !, "Namespace "_ns_" does not exist; skipping activation."
+                }
+                continue
+            }
+            $$$ThrowOnError(##class(Config.Namespaces).Load(ns))
+        }
+
+        if useTransactions {
+            tcommit
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+
+    while ($tlevel > initTLevel) {
+        trollback 1
+    }
+
+    quit sc
 }
 
 /// Copy a package from one namespace to another. This works whether or not the contents of
@@ -2028,6 +1898,8 @@ ClassMethod EndCaptureOutput(
     } else {
         #; Otherwise switch redirection off
         do $zutil(82,12,0)
+        #; Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
+        use $io::("")
     }
 
     try {
@@ -2380,14 +2252,10 @@ ClassMethod RunCommand(
         $$$ThrowOnError(..ReadFileToStream(stderr, .pErrOutput, $get(stderrTmp)))
 
         if (pRetCode'=0) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Running command returned error."))
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Running os command '"_$listtostring(pCmd, " ")_"' failed with return code: "_pRetCode))
         }
     } catch (ex) {
-        if (ex.Code = 34) {
-            set tSC = $$$ERROR($$$GeneralError, "Command " _ $get(cmd) _ " not found.")
-        } else {
-            set tSC = ex.AsStatus()
-        }
+        set tSC = ex.AsStatus()
     }
     if $get(currentDirectory)'="" {
         do ##class(%SYSTEM.Process).CurrentDirectory(currentDirectory)

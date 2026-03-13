@@ -1,6 +1,6 @@
 Include (%occErrors, %syGluedef, %IPM.Common)
 
-Class %IPM.Lifecycle.Base Extends %RegisteredObject [ Abstract ]
+Class %IPM.Lifecycle.Base Extends %RegisteredObject [ Abstract, DependsOn = %IPM.DataType.PhaseName ]
 {
 
 Property Module As %IPM.Storage.Module [ Private ];
@@ -9,7 +9,7 @@ Property PhaseList As %List;
 
 /// $ListBuild list of phases in this lifecycle. <br />
 /// For each phase name, an instance method named "%<phase name>" must be defined in the class with a return type of %Status.
-Parameter PHASES = {$listbuild("Clean","Initialize", "Reload","*","Validate","ExportData","Compile","Activate","Document","MakeDeployed","Test","Package","Verify", "Publish", "Configure","Unconfigure","ApplyUpdateSteps")};
+Parameter PHASES = {$listfromstring($extract(##class(%IPM.DataType.PhaseName).#VALUELIST,2,*))};
 
 Property Payload As %Stream.Object [ Private ];
 
@@ -433,11 +433,24 @@ Method %Clean(ByRef pParams) As %Status
                 }
                 zkill pParams("Clean","Skip",tModName)
                 if ##class(%IPM.Storage.Module).NameExists(tModName) {
+                    // Log uninstalls of dependents
+                    set log = ##class(%IPM.General.HistoryTemp).UninstallInit(tModName)
+                    do log.InitPhase("Clean")
                     set tModObj = ##class(%IPM.Storage.Module).NameOpen(tModName,,.tModSC)
                     if $$$ISERR(tModSC) {
                         write !,"WARNING: "_$system.Status.GetErrorText(tModSC)
+                        do log.FinalizePhase("Clean", tModSC)
+                        set status = log.Finalize(tModSC)
+                        if '$$$ISOK(status) {
+                            set tSC = $system.Status.AppendStatus(tSC, status)
+                        }
                         continue
                     }
+                    set tSC = log.SetVersion(tModObj.Version)
+                    if $$$ISERR(tSC) {
+                        quit
+                    }
+
                     kill tParams
                     merge tParams = pParams
                     zkill:'tRecurse tParams("Clean","Force")
@@ -445,15 +458,27 @@ Method %Clean(ByRef pParams) As %Status
                     set tParams("Clean","Nested") = 1
                     set tSC = tModObj.Lifecycle.Clean(.tParams)
                     if $$$ISERR(tSC) {
+                        do log.FinalizePhase("Clean", tSC)
+                        set status = log.Finalize(tSC)
+                        if $$$ISERR(status) {
+                            set tSC = $system.Status.AppendStatus(tSC, status)
+                        }
                         quit
                     }
                     if '$data(tParams("Clean","Skip",tModName)) {
                         set tSC = ##class(%IPM.Storage.Module).NameDelete(tModName)
                         if $$$ISERR(tSC) {
+                            do log.FinalizePhase("Clean", tSC)
+                            set status = log.Finalize(tSC)
+                            if $$$ISERR(status) {
+                                set tSC = $system.Status.AppendStatus(tSC, status)
+                            }
                             quit
                         }
                         write:tVerbose !,"Deleted ",tModName
                     }
+                    do log.FinalizePhase("Clean", $$$OK)
+                    set tSC = log.Finalize($$$OK)
                 }
             }
             if $$$ISERR(tSC) {
@@ -726,7 +751,6 @@ Method InstallOrDownloadPythonRequirements(
             throw ##class(%Exception.General).%New("Embedded Python is not available in this instance.")
         }
         set processType = ""
-        set stdout = ""
         set tSysModule = ##class(%SYS.Python).Import("sys")
         set tPyMajor = tSysModule."version_info".major
         set tPyMinor = tSysModule."version_info".minor
@@ -918,10 +942,6 @@ Method %Compile(ByRef pParams) As %Status
             $$$ThrowOnError(##class(%Studio.SourceControl.Interface).SourceControlCreate())
         }
 
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
-
         // Compile items within the module that are compilable using OnPhase
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -946,7 +966,7 @@ Method %Compile(ByRef pParams) As %Status
             set tResource = orderedResourceList.GetNext(.tKey)
             quit:tKey=""
 
-            if '$data(tHandledMap(tResource.Name)) && $isobject(tResource.Processor) {
+            if '$data(tHandledMap(tResource.Name)) && $isobject(tResource.Processor) && tResource.IsInScope("Compile") {
                 if tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject {
                     if tVerbose {
                         write !, tResource.Name_" was loaded as deployed code, so compilation isn't needed."
@@ -1036,13 +1056,6 @@ Method %Compile(ByRef pParams) As %Status
                 }
 
                 set tNoCompileLock = '$get(pParams("NoLock"))
-                if $$$IsISCWorker && 'tNoCompileLock {
-                    // Customized locking - takes out shared locks on dependencies to avoid conflicts between parallel module loads.
-                    set tSC = ##class(%IPM.Utils.LockManager).LockClassesRecursive(.tLockManager,.tCompileArray,.tLockedClasses)
-                    $$$ThrowOnError(tSC)
-                    set tNoCompileLock = 1
-                }
-
                 // Actually do the compile
                 if $data(tCompileArray)>1 {
                     set tCompiledSomething = 1
@@ -1096,9 +1109,8 @@ Method %Test(ByRef pParams) As %Status
 {
     set tSC = $$$OK
     try {
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
+        // Load dependencies scoped to the "Test" phase that are not yet installed.
+        do ##class(%IPM.Utils.Module).LoadDependencies(..Module, ..PhaseList, .pParams)
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1147,7 +1159,7 @@ Method %Export(
         }
 
         set tExportDependencies = $get(pParams("ExportDependencies"), ..#EXPORTDEPENDENCIES)
-        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,1,.pDependencyGraph)
+        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph)
         if $$$ISERR(tSC) {
             quit
         }
@@ -1173,10 +1185,6 @@ Method %Export(
                 }
             }
         }
-        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
-        if exportPythonDependencies {
-            do ..ExportPythonDependencies(.pParams)
-        }
 
         // Deployed items should be exported as a studio project to a designated directory
         set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
@@ -1189,10 +1197,17 @@ Method %Export(
         set tParams($$$DeployedProjectIndex) = tDeployedProject
 
         set tModuleName = ""
+        set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
         for {
             set tModuleName = $order(tResourceArray(tModuleName))
             if (tModuleName = "") {
                 quit
+            }
+            if exportPythonDependencies {
+                set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
+                do ..ExportPythonDependencies(tModule, .pParams)
+                // Recalculate resource array to pick up any python dependencies added during export
+                $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tExportDependencies,..PhaseList,.pDependencyGraph))
             }
             kill tSingleModuleArray
             merge tSingleModuleArray = tResourceArray(tModuleName)
@@ -1233,25 +1248,41 @@ Method %Export(
 }
 
 /// Downloads Python wheels for Python dependencies into the /root/wheels directory of the module. Also updates module.xml with the Python Wheel resources.
-Method ExportPythonDependencies(ByRef pParams)
+Method ExportPythonDependencies(
+	module As %IPM.Storage.Module,
+	ByRef pParams)
 {
-    set root = ##class(%File).NormalizeDirectory("", ..Module.Root)
+    set orderedResourceList = module.GetOrderedResourceList()
+    set key = ""
+    set resourceNameList = ""
+    for {
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+        set resourceNameList = resourceNameList_$listbuild($zconvert(resource.Name, "l"))
+    }
+
+    set root = ##class(%File).NormalizeDirectory("", module.Root)
     $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
-    set wheelsDir = ##class(%File).NormalizeDirectory("wheels", ..Module.Root)
+    set wheelsDir = ##class(%File).NormalizeDirectory("wheels", module.Root)
     if '##class(%File).DirectoryExists(wheelsDir) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheels directory: "_wheelsDir_" not found."))
+        // ExportPythonDependencies called on base module + dependencies so don't want to error if one of
+        // the modules doesn't have a wheels directory since that might actually be the case for the module
+        write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        quit
     }
     set stmt = ##class(%SQL.Statement).%New()
     $$$ThrowOnError(stmt.%PrepareClassQuery("%File", "FileSet"))
     set rset = stmt.%Execute(wheelsDir, "*.whl")
     $$$ThrowSQLIfError(rset.%SQLCODE,rset.%Message)
     while rset.%Next(.sc) {
-        set file = rset.%Get("ItemName")
+        set wheelFileName = rset.%Get("ItemName")
         set type = rset.%Get("Type")
-        if (type '= "F") || (file = "") {
+        if (type '= "F") || (wheelFileName = "") {
             continue
         }
-    do ##class(%IPM.StudioDocument.Module).AddPythonWheels(..Module.Name, file)
+        if '$listfind(resourceNameList, $zconvert(wheelFileName, "l")) {
+            do ##class(%IPM.StudioDocument.Module).AddPythonWheels(module.Name, wheelFileName)
+        }
     }
     $$$ThrowOnError(sc)
 }
@@ -1354,9 +1385,8 @@ Method %Verify(ByRef pParams) As %Status
             }
         }
 
-        // Load dependencies correctly for the requested phases. (This will be a no-op in most cases.)
-        set tSC = ..Module.LoadDependencies(..PhaseList,.pParams)
-        $$$ThrowOnError(tSC)
+        // Load dependencies scoped to the "Verify" phase that are not yet installed.
+        do ##class(%IPM.Utils.Module).LoadDependencies(..Module, ..PhaseList, .pParams)
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""
@@ -1638,7 +1668,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
 
         // Default implementation: see which resources are expicitly flagged with Deploy = true.
         // Build an array of those, then mark them as deployed.
-        $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,1,.pDependencyGraph))
+        $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tLockedDependencies,..PhaseList,.pDependencyGraph))
 
         set tModuleKey = ""
         for {
@@ -1779,7 +1809,11 @@ Method GetResourceRelativePath(
 	pResource As %String,
 	pExtension As %String) As %String
 {
-    if ($get(pExtension) = "") {
+    // directories do not have an extension, so pResource will be empty
+    if ($get(pResource) = "") {
+        set tName = pExtension
+        set tExtension = ""
+    } elseif ($get(pExtension) = "") {
         set tName = $piece(pResource,".",1,*-1)
         set tExtension = $piece(pResource,".",*)
     } else {
@@ -1819,6 +1853,7 @@ Method GetResourceRelativePath(
         "BPL":$translate(tName,".%","/")_".cls",
         "GBL":$translate(tName,"%,("")","___")_".xml",
         "DFI":$translate(tName,"-","/")_".dfi",
+        "":tName,
         : tName _ "." _$$$lcase(tExtension)
     )
 
@@ -1833,6 +1868,7 @@ Method ExportSingleModule(
 	pVerbose As %Boolean = 0)
 {
     merge tParams = pParams
+    set exportPythonDependencies = $get(tParams("ExportPythonDependencies"), 0)
 
     set tFullResourceName = ""
     for {
@@ -1870,6 +1906,8 @@ Method ExportSingleModule(
 
         #dim tProcessor As %IPM.ResourceProcessor.Abstract
         if $data(pResourceArray(tFullResourceName,"Processor"),tProcessor) && $isobject(tProcessor) {
+            // If this is a python resource but -export-python-deps was not specified, skip this resource
+            if 'exportPythonDependencies && (tProcessor.%ClassName(1) = "%IPM.ResourceProcessor.PythonWheel") continue
             kill tItemParams
             merge tItemParams = pResourceArray(tFullResourceName)
             set tItemHandled = 0

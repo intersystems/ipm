@@ -55,9 +55,11 @@ Method TestParser()
 	set tResults(tCommands)="list-installed"
 	set tResults(tCommands,"modifiers","tree")=""
 
-	set tCommands($increment(tCommands)) = "install SomeModule"
+	set tCommands($increment(tCommands)) = "install SomeModule -synchronous"
 	set tResults(tCommands)="install"
 	set tResults(tCommands,"parameters","module")="SomeModule"
+	set tResults(tCommands,"modifiers","synchronous")=""
+	set tResults(tCommands,"modifiers","synchronous","deprecated")=1
 
 	set tCommands($increment(tCommands)) = "install SomeModule 0.0.1-prerelease.42+snapshot"
 	set tResults(tCommands)="install"
@@ -217,10 +219,12 @@ Method CompareModifiers(
 	}
 }
 
-Method RunCommand(pCommand As %String)
+/// This method returns the %Status for checking the success or failure of executed commands.
+Method RunCommand(pCommand As %String) As %Status
 {
-	do ##class(%IPM.Main).Shell(pCommand)
+	set status = ##class(%IPM.Main).Shell(pCommand)
 	do $$$LogMessage("Run command: "_pCommand)
+    return status
 }
 
 Method AssertNoException(pCommand As %String)
@@ -283,6 +287,69 @@ Method CompareArrays(
         set tRef2 = $query(@tRef2)
     }
     quit tEqual
+}
+
+/// Test that the 'list -python' command correctly retrieves and formats Python packages.
+Method TestListPython() As %Status
+{
+    set sc = $$$OK
+    set commandsList = $listbuild("list -python", "list -py", "list-installed -python", "list-installed -py")
+    set ptr=0
+    while $listnext(commandsList,ptr,command) {
+        do ..RunCommand(command)
+    }
+    ;
+    set i = $increment(commands)
+    set commands(i) = "list-installed -python"
+	set results(commands)="list-installed"
+	set results(commands,"modifiers","python")=""
+	// Verify output matches
+    kill parsedCommandInfo,expectedCommandInfo
+    do $$$AssertStatusOK(##class(%IPM.Main).%ParseCommandInput(commands(i),.parsedCommandInfo))
+    merge expectedCommandInfo = results(i)
+    if $$$AssertTrue(..CompareArrays(.parsedCommandInfo,.expectedCommandInfo,.tMessage),"Parsed correctly: "_commands(i)) {
+        do $$$LogMessage(tMessage)
+        write !,"Expected:",! zwrite expectedCommandInfo
+        write !,"Actual:",! zwrite parsedCommandInfo
+    }
+    quit sc
+}
+
+Method TestAutoPurgeOldHistory() As %Status
+{
+    set status = ..RunCommand("config set HistoryRetain 30")
+    do $$$AssertStatusOK(status, "Config set executed successfully")
+
+    set status = ..RunCommand("config get HistoryRetain")
+    do $$$AssertStatusOK(status, "Config get executed successfully")
+
+    do $$$LogMessage("Update HistoryRetain from 30 days to 1 day")
+    set status = ..RunCommand("config set HistoryRetain 1")
+    do $$$AssertStatusOK(status, "HistoryRetain is changed from 30 days to 1 day successfully")
+
+    do $$$LogMessage("Purging old history entries older than 1 day")
+    set status = ##class(%IPM.General.History).AutoPurgeOldHistory()
+    do $$$AssertStatusOK(status, "AutoPurgeOldHistory executed successfully")
+
+    set afterPurge = ##class(%IPM.General.History).GetHistoryLastPurge()
+    do $$$LogMessage("After purge timestamp: "_afterPurge)
+    do $$$LogMessage("reset set the HistoryRetain to default value by deleting the config")
+    set status = ..RunCommand("config delete HistoryRetain")
+    do $$$AssertStatusOK(status, "Config delete executed successfully")
+}
+
+Method TestUninstallWithoutModuleName()
+{
+    do $$$LogMessage("Run Uninstall command without module name")
+    set status = ..RunCommand("uninstall")
+    do $$$AssertStatusNotOK(status, $system.Status.GetErrorText(status))
+    set status = ..RunCommand("install objectscript-math")
+    do $$$AssertStatusOK(status, "objectscript-math module installed successfully.")
+    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
+    do $$$AssertTrue(exists, "objectscript-math Module exists in storage after installation.")
+    do ..RunCommand("uninstall objectscript-math")
+    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
+    do $$$AssertNotTrue(exists, "Module removed successfully.")
 }
 
 }

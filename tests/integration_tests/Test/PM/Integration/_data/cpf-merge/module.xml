@@ -16,6 +16,9 @@
       <!-- Also can make it happen only for a custom phase -->
       <CPF Name="package-mapping.cpf" CustomPhase="MyPhase" />
 
+      <!-- Test system expressions in CPF files -->
+      <CPF Name="system-expressions.cpf" CustomPhase="TestSystemExpressions" />
+
       <!-- Both the CPF merge above and the Invoke should run during MyPhase -->
       <Resource Name="CPFMerge.Main.CLS" />
       <Invoke Class="CPFMerge.Main" Method="SayHello" CustomPhase="MyPhase" />

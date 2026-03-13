@@ -1,2 +1,2 @@
 lune==1.6.4
-ansible==12.1.0
+ansible==12.2.0

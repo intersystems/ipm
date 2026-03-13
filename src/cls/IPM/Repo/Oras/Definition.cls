@@ -140,6 +140,17 @@ Method GetPublishingManager(ByRef status)
     return ##class(%IPM.Repo.Oras.PublishManager).%Get(.status)
 }
 
+XData LockFileMapping
+{
+<Mapping xmlns="http://www.intersystems.com/jsonmapping">
+  <Property Name="LockFileType" FieldName="type" />
+  <Property Name="OverriddenSortOrder" FieldName="overriddenSortOrder" />
+  <Property Name="ReadOnly" FieldName="readOnly" />
+  <Property Name="URL" FieldName="url" />
+  <Property Name="Namespace" FieldName="orasNamespace" />
+</Mapping>
+}
+
 Storage Default
 {
 <Data name="OrasRepoDefinitionDefaultData">

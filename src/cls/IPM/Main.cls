@@ -139,8 +139,9 @@ This command is an alias for `module-action module-name verify`
 This command is an alias for `module-action module-name publish`
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform publish actions" />
-<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name for the module to publish to (if deployment is enabled)" />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="If specified, exports Python dependencies. If omitted, defaults to false." />
 </command>
 
 <command name="update" dataPrefix="D">
@@ -164,6 +165,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format." />
 <modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
+<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
 </command>
 
 <command name="makedeployed">
@@ -176,13 +178,13 @@ This command is an alias for `module-action module-name makedeployed`
 
 <command name="unpublish">
 <description>
-Delete package from registry
+Delete package from repository
 </description>
-<example description="Delete all versions of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName all</example>
-<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the registry">unpublish MyModuleName 1.0.0</example>
+<example description="Delete all versions of the package &quot;MyModuleName&quot; from the repository">unpublish MyModuleName all</example>
+<example description="Delete version &quot;1.0.0&quot; of the package &quot;MyModuleName&quot; from the repository named MyRepo">unpublish MyRepo/MyModuleName 1.0.0</example>
 <parameter name="module" required="true" description="Name of module on which to perform unpublish actions" />
 <parameter name="version" required="true" description="Version of module on which to perform unpublish actions. Use &quot;all&quot; to delete all versions of the package" />
-
+<modifier name="force" aliases="f" value="false" description="Will delete module from the repository without prompting user for confirmation. Still requires authorization from the repository" />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
@@ -289,8 +291,9 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
-<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
+<modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
+<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -366,7 +369,6 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
                     "latest": ""
                 },
                 "custom_modifiers": {
-                    "NoMapping": 1,
                     "Deploy.Parameter": "TESTDEPLOY"
                 }
             }
@@ -388,6 +390,9 @@ run C:\Temp\MyCommands.json, where contents of the file are as follows:
 <!-- Examples -->
 <example description="Installs the most recent 1.x version of HS.JSON available in any configured repository in the current namespace.">
     install HS.JSON 1.x
+</example>
+<example description="Installs the most recent version of HS.JSON from the `registry` repository.">
+    install registry/HS.JSON
 </example>
 <example description="Installs HS.JSON without installing python dependencies">
     install -bypass-py-deps HS.JSON
@@ -413,8 +418,9 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="keywords" aliases="k" value="true" description="Searches for modules matching some set of keywords." />
 <modifier name="bypass-py-deps" dataAlias="BypassPyDeps" dataValue="1" description="Skip installing python dependencies" />
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
-<modifier name="synchronous" value="false" description="Load the module in a single process, rather than using the default multi-process loading." />
+<modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
+<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
 
 </command>
 
@@ -518,6 +524,9 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <example description="Shows all installed modules in tree format.">
     list-installed -tree
 </example>
+<example description="Shows all installed Python packages.">
+    list -python
+</example>
 
 <!-- Parameters -->
 <parameter name="searchString" description="Search string, * can be used." />
@@ -529,7 +538,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showtime" aliases="st" description="If specified, show the time of last update for each module" />
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
-
+<modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of IPM modules." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -649,8 +658,8 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 </command>
 
 <command name="search" aliases="find">
-<description>Shows all modules in current registry or namespaces</description>
-<example description="Shows all modules in current registry">search -r</example>
+<description>Shows all modules matching the search string in all configured registries</description>
+<example description="Shows all versions of all modules starting with `zpm`">search -versions zpm*</example>
 <modifier name="show-repo" aliases="r" dataAlias="Repo" dataValue="1" description="Shows github repository only for each module." />
 <modifier name="description" aliases="d" dataAlias="Description" dataValue="1" description="Shows description for each module." />
 <modifier name="versions" dataAlias="AllVersions" dataValue="1" description="Shows all versions for each module." />
@@ -759,6 +768,33 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
     </example>
 </command>
 
+<command name="history" aliases="log" dataPrefix="D">
+	<summary>Manage history of package installation/uninstallation.</summary>
+	<description>Manage history of package installation/uninstallation. Commands logged are install, load, uninstall, and update. By default, all entries will be affected. To specify filters, use the -Dcol=val syntax. See examples for more.</description>
+	<modifier name="globally" aliases="g" description="If specified, will affect all namespaces instead of the current one. Defaults to false."/>
+	<modifier name="sort" aliases="asc" value="true" description="List the history logs in a specific order. Allowed values are asc and desc. Default behaviour is to list logs in descending order of %ID."/>
+	<modifier name="limit" value="true" description="If specified, will only list the specified number of logs. If set to 0, all logs will be displayed. If omitted, will use the value returned by `zpm &quot;config get DefaultLogEntryLimit&quot;`."/>
+    <modifier name="showPhases" aliases="p,phases" description="Show lifecycle phase information in details view." />
+	<modifier name="confirm" value="false" description="If present, will delete all records in the current namespace. Ignored if -globally is passed too."/>
+    <modifier name="verbose" aliases="v" dataAlias="verbose" dataValue="1" description="Produces verbose output from the command." />
+	<parameter name="action" required="false" description="One of history actions: find (default), details, delete, schema" />
+	<parameter name="argument" required="false" description="Argument for `details` command" />
+	<example description="Show history of all packages in the current namespace in descending order">history find </example>
+	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
+	<example description="Show history of all packages in the current namespace where the command has been committed `to disk`. Note that committed != successful, as all actions in dev mode will be committed regardless of success.">history find -DCommitted=1</example>
+	<example description="Show history of all packages in the current namespace where the command has errored">history find -DSucess="0*"</example>
+	<example description="Show history of all packages in the current namespace where start time is later than 2000-01-01 00:00:00">history find -DTimeStart=">2000-01-01 00:00:00"</example>
+	<example description="Show 5 history records in the current namespace in ascending order">history find -sort asc -limit 5</example>
+	<example description="Show column names that the table can be filtered by">history schema</example>
+	<example description="Show only installation history of package &quot;zpip&quot; in the current namespace ">history find -Daction=install -Dpackage=zpip</example>
+	<example description="Show only installation history of package &quot;zpip&quot; in all namespaces ">history find -globally -Daction=install -Dpackage=zpip</example>
+	<example description="Delete all histories in the namespace">history delete -confirm</example>
+	<example description="Show details of history item with ID 3 and information for each undergone lifecyle phase">history details 3 -phases</example>
+    <example description="Enable history auto-purge. Example: config set HistoryRetain 30.">config set HistoryRetain "days" </example>
+    <example description="Disable history auto-purge">config set HistoryRetain 0</example>
+    <example description="Display the current history retention setting.">config get HistoryRetain</example>
+</command>
+
 </commands>
 }
 
@@ -776,7 +812,10 @@ ClassMethod Shell(
 	pTerminateOnError As %Boolean = 0,
 	pHaltOnComplete As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set tSC = ##class(%IPM.General.History).AutoPurgeOldHistory()
+    if $$$ISERR(tSC) {
+        return tSC
+    }
     do ..ShellInternal(pCommand,.tException)
     if $isobject(tException) {
         if pTerminateOnError {
@@ -877,14 +916,57 @@ ClassMethod BuildIntroMessages(Output outOfBoxMessage As %String) As %List
     set mirrorStatus = $system.Mirror.GetStatus()
     set mirrorStatus = "Mirror Status: " _ mirrorStatus
 
+    if $$$ISERR(..GetIPMVersionInfo(.ipmVersion, .mappedFromNamespace)) {
+        set ipmVersion = "Not installed"
+    } elseif mappedFromNamespace'="" {
+        set ipmVersion = ipmVersion_" (mapped from namespace '"_mappedFromNamespace_"')"
+    }
+
     set list = $listbuild(
-        "Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ..GetVersionModule($$$IPMModuleName)),
+        "Welcome to the Package Manager Shell (ZPM). Version: "_$$$FormattedLine($$$Green, ipmVersion),
         "Enter q/quit to exit the shell. Enter ?/help to view available commands",
         registryInfo,
         systemMode,
         mirrorStatus
     )
     quit list
+}
+
+/// Get IPM version for current/specified namespace, including mapping information
+/// Returns version and source namespace (if mapped)
+ClassMethod GetIPMVersionInfo(
+	Output version As %String,
+	Output mappedFromNamespace As %String,
+	namespace As %String = "") As %Status
+{
+    new $namespace
+    set namespace = $select(namespace'="": namespace, 1: $namespace)
+
+    try {
+        // Check if locally installed
+        if ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .id) {
+            set module = ##class(%IPM.Storage.Module).%OpenId(id)
+            set version = module.VersionString
+            set mappedFromNamespace = ""
+            return $$$OK
+        }
+
+        // Check if mapped from another namespace
+        do ..GetMapInfo(.isMappedFrom, .isMappedTo)
+        if $data(isMappedFrom(namespace), sourceNamespace) {
+            set $namespace = sourceNamespace
+            if ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .srcId) {
+                set srcModule = ##class(%IPM.Storage.Module).%OpenId(srcId)
+                set version = srcModule.VersionString
+                set mappedFromNamespace = sourceNamespace
+                return $$$OK
+            }
+        }
+
+        return $$$ERROR($$$GeneralError, "IPM not installed or mapped in namespace " _ namespace)
+    } catch ex {
+        return ex.AsStatus()
+    }
 }
 
 /// For use in unit tests that need to test if a command threw any exceptions.
@@ -927,10 +1009,17 @@ ClassMethod ShellInternal(
             // Parse command
             $$$ThrowOnError(..%ParseCommandInput(tCommand,.tParsedCommandInfo))
 
+            // Warn for deprecated parameters/modifiers
+            do ..WarnOnDeprecatedModifiersOrParameters(.tParsedCommandInfo)
+
             // Merge defaults first so they can be overwritten by commands
             do ..GetNamespaceDefaultModifiers(.tDefaultArray)
             merge tCommandInfo("data") = tDefaultArray
             merge tCommandInfo = tParsedCommandInfo
+
+			// Stashed for use in %IPM.General.History:Init
+			new $$$ZPMCommandToLog
+			set $$$ZPMCommandToLog = tCommand
 
             if (tCommandInfo = "quit") {
                 return
@@ -945,8 +1034,7 @@ ClassMethod ShellInternal(
             } elseif (tCommandInfo = "load") {
                 do ..Load(.tCommandInfo)
             } elseif (tCommandInfo = "exec") {
-                write !
-                xecute tCommandInfo("parameters","expression")
+                do ..ExecuteCOS(.tCommandInfo)
             } elseif (tCommandInfo = "install") {
                 do ..Install(.tCommandInfo)
             } elseif (tCommandInfo = "reinstall") {
@@ -993,6 +1081,8 @@ ClassMethod ShellInternal(
                 do ..ModuleVersion(.tCommandInfo)
             } elseif (tCommandInfo = "information") {
                 do ..Information(.tCommandInfo)
+			} elseif (tCommandInfo = "history") {
+				do ..History(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -1006,6 +1096,22 @@ ClassMethod ShellInternal(
             quit
         }
         write !
+    }
+}
+
+/// Warn for deprecated parameters/modifiers
+ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal, Private ]
+{
+    for key = "modifiers", "parameters" {
+        set name = ""
+        for {
+            set name = $order(pCommandInfo(key,name))
+            quit:name=""
+            if ($get(pCommandInfo(key,name,"deprecated"),0)) {
+                set singularKey = $zconvert($extract(key,1),"U") _ $extract(key,2,*-1)
+                write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: %1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name)),!
+            }
+        }
     }
 }
 
@@ -1273,6 +1379,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 
     do ##class(%Library.Prompt).GetString("Enter module keywords:", .tKeywords)
 
+    #dim tTemplate As %IPM.Storage.ModuleTemplate
     set tTemplate = ##class(%IPM.Storage.ModuleTemplate).NewTemplate(tPath, tName, tVersion, tDescription, tKeywords)
     return:'$isobject(tTemplate)
 
@@ -1304,6 +1411,44 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
             write !,"    "_$listget(apps,i)
         }
         do ##class(%Library.Prompt).GetString("    Enter a comma separated list of web applications or * for all:", .tWebAppList)
+
+#if $$$CacheVersionMajor>=2025
+        //cors
+        write !,"Cross-Origin Settings:"
+        do ##class(%Library.Prompt).GetYesNo("Configure Access-Control-Allow-Credentials:",.enableCors)
+        if enableCors {
+            do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Headers:",.allowedHeaders,,32767,"comma seperated values e.g: Access-Control-Allow-Origin,Access-Control-Allow-Headers")
+            while (1) {
+                do ##class(%Library.Prompt).GetString(" Enter a comma separated list of Allowed Origins:",.allowedOrigins,,32767,"comma seperated values e.g: http://www.example.com")
+                if allowedOrigins="" quit
+                set sc = tTemplate.ValidateCorsOrigin(allowedOrigins)
+                if $$$ISERR(sc) {
+                    do ..DisplayError(sc)
+                    set allowedOrigins = ""
+                    continue
+                }
+                quit
+            }
+            set corsConfig("enableCors") = enableCors
+            set corsConfig("allowedHeaders") = allowedHeaders
+            set corsConfig("allowedOrigins") = allowedOrigins
+            do tTemplate.SetCORSProps(tWebAppList,.corsConfig)
+        }
+#endif
+
+#if $$$CacheVersionMajor>=2024
+        //jwt
+        write !,"JWT Authentication"
+        do ##class(%Library.Prompt).GetYesNo("Configure JWT Authentication: ",.enableJWT)
+        if enableJWT {
+            do ##class(%Library.Prompt).GetNumber(" Enter JWT Access Token Timeout:",.JWTAccessTokenTO,1)
+            do ##class(%Library.Prompt).GetNumber(" Enter JWT Refresh Token Timeout:",.JWTRefreshTokenTO,1)
+            set jwtconfig("enableJWT") = enableJWT
+            set jwtconfig("JWTAccessTokenTO") = JWTAccessTokenTO
+            set jwtconfig("JWTRefreshTokenTO") = JWTRefreshTokenTO
+            do tTemplate.SetJWTProps(tWebAppList,.jwtconfig)
+        }
+#endif
 
         do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps)
         for i=1:1:$listlength(tCSPapps) {
@@ -1348,7 +1493,7 @@ ClassMethod GetDefaultCommandRegistry()
 /// Get Version Module
 ClassMethod GetVersionModule(
 	name,
-	namespace = {$namespace})
+	namespace = {$namespace}) As %String
 {
     new $namespace
     set $namespace=namespace
@@ -2098,6 +2243,8 @@ ClassMethod ShowModulesForRepository(
             set list(list, "AllVersions") = tRes.AllVersions
         }
     }
+    // Throw an error if there are no results and tSC is set
+    $$$ThrowOnError(tSC)
     set list("width") = width
     write !
     do ..DisplayModules(.list)
@@ -2141,7 +2288,35 @@ ClassMethod LoadFromRepo(
     quit tDirectoryName
 }
 
-ClassMethod Load(ByRef pCommandInfo) [ Internal ]
+ClassMethod Load(
+	ByRef pCommandInfo,
+	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
+{
+	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
+    if pLog = "" {
+	    set log = ##class(%IPM.General.HistoryTemp).LoadInit("")
+    } else {
+        set log = pLog
+    }
+	try {
+		do ..LoadInternal(.pCommandInfo, log)
+	} catch Ex {
+		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
+		throw Ex
+	}
+	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+}
+
+ClassMethod ExecuteCOS(ByRef commandInfo)
+{
+    new $namespace
+    write !
+    xecute commandInfo("parameters","expression")
+}
+
+ClassMethod LoadInternal(
+	ByRef pCommandInfo,
+	pLog As %IPM.General.AbstractHistory) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
     set isAbsolutePath = ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) = tDirectoryName)
@@ -2152,7 +2327,6 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
         // if the path is to a directory (not a file) and it is not a URL, it must be absolute
         $$$ThrowStatus($$$ERROR($$$GeneralError,"The specified path must be absolute."))
     }
-    set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
     set tForce = $$$HasModifier(pCommandInfo,"force")
     merge tParams = pCommandInfo("data")
     // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
@@ -2202,7 +2376,7 @@ ClassMethod Load(ByRef pCommandInfo) [ Internal ]
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , tSynchronous)
+    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , pLog)
     set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
     $$$ThrowOnError(tSC)
 }
@@ -2227,96 +2401,113 @@ ClassMethod CheckModuleNamespace() As %Status
     quit $$$OK
 }
 
-ClassMethod Install(ByRef pCommandInfo) [ Internal ]
+ClassMethod Install(
+	ByRef pCommandInfo,
+	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
 {
+    set devMode = $get(pCommandInfo("data","DeveloperMode"), 0)
     set tRegistry = ""
     set tModuleName = $get(pCommandInfo("parameters","module"))
     if (tModuleName["/") {
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
     }
-    if (tModuleName = "") {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "No module name specified."))
+
+    if pLog = "" {
+        set log = ##class(%IPM.General.HistoryTemp).InstallInit(tModuleName)
+    } else {
+        set log = pLog
     }
 
-    if tModuleName = $$$IPMModuleName {
-        $$$ThrowOnError(..CheckModuleNamespace())
-    }
-    // check if any registries are configured and enabled
-    new SQLCODE, count
-    &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
-    $$$ThrowSQLIfError(SQLCODE,%message)
-    if (SQLCODE = 0) && (count = 0) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
-    }
-
-    set tVersion = $get(pCommandInfo("parameters","version"))
-    set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
-    set tSynchronous = $$$HasModifier(pCommandInfo,"synchronous")
-    set tForce = $$$HasModifier(pCommandInfo,"force")
-
-    set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-    set tSearchCriteria.Registry = tRegistry
-    set tSearchCriteria.Name = $$$lcase(tModuleName)
-    set tSearchCriteria.VersionExpression = tVersion
-    set tSearchCriteria.Keywords = tKeywords
-    $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
-
-    if (tResults.Count() > 0) {
-        set tResult = ""
-        #dim tResult As %IPM.Storage.QualifiedModuleInfo
-        // Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
-        if ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
-            set tResult = tResults.GetAt(1)
-        } elseif (tResults.Count() > 0) {
-            for i=1:1:tResults.Count() {
-                set tResultInfo = tResults.GetAt(i)
-                set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
-            }
-
-            set tValue = ""
-            set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
-            if (tResponse '= $$$SuccessResponse) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-            }
-            if (tValue '= "") {
-                set tResult = tResults.GetAt(tValue)
-            }
+	try {
+        if (tModuleName = "") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "No module name specified."))
         }
 
-        if (tResult '= "") {
-            do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
-            merge tParams = pCommandInfo("data")
-            set tParams("DeveloperMode") = $get(tParams("DeveloperMode"), 0)
-            set tParams("Force") = tForce
-            // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
-            // In the case of a install command, tParams still needs to be populated here.
-            if '$get(tParams("Update"),0) {
-                set tParams("cmd") = "install"
-                set tParams("Install") = 1
-            }
-            if tResult.Deployed {
-                set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
-                set tResult.PlatformVersion = platformVersion
-                if ('tResult.PlatformVersions.Find(platformVersion)) {
-                    $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
+        if tModuleName = $$$IPMModuleName {
+            $$$ThrowOnError(..CheckModuleNamespace())
+        }
+        // check if any registries are configured and enabled
+        new SQLCODE, count
+        &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
+        $$$ThrowSQLIfError(SQLCODE,%message)
+        if (SQLCODE = 0) && (count = 0) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
+        }
+
+        set tVersion = $get(pCommandInfo("parameters","version"))
+        set tKeywords = $$$GetModifier(pCommandInfo,"keywords")
+        set tForce = $$$HasModifier(pCommandInfo,"force")
+
+        set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+        set tSearchCriteria.Registry = tRegistry
+        set tSearchCriteria.Name = $$$lcase(tModuleName)
+        set tSearchCriteria.VersionExpression = tVersion
+        set tSearchCriteria.Keywords = tKeywords
+        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+
+        if (tResults.Count() > 0) {
+            set tResult = ""
+            #dim tResult As %IPM.Storage.QualifiedModuleInfo
+            // Results are ordered by semantic version, descending. (So the "latest" version will always be first.)
+            if ('$$$HasModifier(pCommandInfo,"prompt") || (tResults.Count() = 1)) && (tKeywords = "") {
+                set tResult = tResults.GetAt(1)
+            } elseif (tResults.Count() > 0) {
+                for i=1:1:tResults.Count() {
+                    set tResultInfo = tResults.GetAt(i)
+                    set tOptArray(i) = tResultInfo.DisplayName_" "_tResultInfo.VersionString_" @ "_tResultInfo.ServerName
+                }
+
+                set tValue = ""
+                set tResponse = ##class(%Library.Prompt).GetMenu("Which version?",.tValue,.tOptArray,,$$$InitialDisplayMask+$$$EnableQuitCharMask)
+                if (tResponse '= $$$SuccessResponse) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+                }
+                if (tValue '= "") {
+                    set tResult = tResults.GetAt(tValue)
                 }
             }
-            $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , tSynchronous))
-        }
-    } else {
-        set tPrefix = ""
-        if (tModuleName '= "") {
-            if (tVersion '= "") {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
-            } else {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "'"_tModuleName_"' not found in any repository."))
+
+            if (tResult '= "") {
+                do ##class(%IPM.Lifecycle.Base).GetDefaultParameters(.tParams)
+                merge tParams = pCommandInfo("data")
+                set tParams("DeveloperMode") = devMode
+                set tParams("Force") = tForce
+                // In the case of an update command, pCommandInfo has already been populated in ..Update(). The relevant information was then moved to tParams via the merge command above.
+                // In the case of a install command, tParams still needs to be populated here.
+                if '$get(tParams("Update"),0) {
+                    set tParams("cmd") = "install"
+                    set tParams("Install") = 1
+                }
+                if tResult.Deployed {
+                    set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
+                    set tResult.PlatformVersion = platformVersion
+                    if ('tResult.PlatformVersions.Find(platformVersion)) {
+                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
+                    }
+                }
+				$$$ThrowOnError(log.SetSource(tResult.ServerName))
+				$$$ThrowOnError(log.SetVersion(tResult.Version))
+                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
-        } elseif (tKeywords '= "") {
-            $$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
         } else {
-            write !,"No modules found. Are there any repositories configured in the current namespace?"
+            set tPrefix = ""
+            if (tModuleName '= "") {
+                if (tVersion '= "") {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
+                } else {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, "'"_tModuleName_"' not found in any repository."))
+                }
+            } elseif (tKeywords '= "") {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
+            } else {
+                write !,"No modules found. Are there any repositories configured in the current namespace?"
+            }
         }
-    }
+    } catch ex {
+		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+		throw ex
+	}
+	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
@@ -2355,7 +2546,10 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
         return
     } else {
-        set tModuleName = pCommandInfo("parameters","module")
+        set tModuleName = $get(pCommandInfo("parameters","module"))
+        if (tModuleName = "") {
+            $$$ThrowOnError($$$ERROR($$$GeneralError, "A module name must be specified for uninstall unless the -all flag is used."))
+        }
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
         }
@@ -2413,25 +2607,29 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
 
         if (isEnabled) {
             set tResult = 0
-            if ($$$lcase(tVersion)="all") {
-                write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action")
-                set tHelp = "Enter ""Yes"" if you want to delete all package versions."
-                set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
-            } else {
-                write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action")
-                set tHelp = "Enter ""Yes"" if you want to delete selected package version."
-                set tMsg = "Are you sure you want to delete the package """_tModuleName_" "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+            set force = $data(pCommandInfo("modifiers","force"))
+            if 'force {
+                if ($$$lcase(tVersion)="all") {
+                    write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action!")
+                    set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                    set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+                } else {
+                    write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action!")
+                    set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+                    set tMsg = "Are you sure you want to delete the package """_tModuleName_" version "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+                }
+
+                set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+
+                if (tResponse '= $$$SuccessResponse) {
+                    $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
+                }
             }
 
-            set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
-
-            if (tResponse '= $$$SuccessResponse) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-            }
-
-            if (tResult) {
+            if (tResult || force) {
                 $$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
-                write !!,"Package deleted"
+                set msg = "Package deleted" _ $case(force, 1:" forcefully without user confirmation", :"")
+                write !!, msg
             }
         } else {
             write !,"The package could not be deleted (the registry denied the request)",!
@@ -2553,6 +2751,13 @@ ClassMethod ActiveNamespacesClose(qHandle As %Binary) As %Status [ PlaceAfter = 
 ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 {
     set tSearchString = $get(pCommandInfo("parameters","searchString"),"")
+    if $data(pCommandInfo("modifiers","python")) {
+		set list = ""
+		do ..GetPythonInstalledLibs(.list)
+		merge tModifiers = pCommandInfo("modifiers")
+		do ..DisplayModules(.list,,,, .tModifiers)
+		quit
+	}
     if (''$data(pCommandInfo("modifiers","tree"))) {
         // Show tree of dependencies as well.
         // Modules that are dependencies for no other are shown at the top level.
@@ -3118,6 +3323,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
     set allowUpgrade = $$$HasModifier(pCommandInfo,"allow-upgrade")
     set mapRepos = $$$HasModifier(pCommandInfo,"repos")
     set remoteName = $$$GetModifier(pCommandInfo,"remote")
+    set useTransactions = '($get(pCommandInfo("data","NoTransaction"),0) || $get(pCommandInfo("data","NoJournal"),0))
     set useLocal = 1			// var to store the final decision of whether to use local manifest or get from server
     set targetVersion = "" 		// var to store the final version of IPM to be installed
     kill targetNamespaces 		// multi-dim array to store the final namespaces that need to install IPM
@@ -3158,6 +3364,9 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
             set namespaces = $listfromstring(namespaces)
         }
 
+        // Track namespaces that receive new mappings for batch activation
+        kill nsToActivate
+
         // First try to map IPM itself
         set pointer = 0
         while $listnext(namespaces,pointer,namespace) {
@@ -3177,11 +3386,12 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
             if 'quiet {
                 write !,"Mapping %IPM package in "_initNamespace_" equivalently to "_namespace
             }
-            $$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace))
+            $$$ThrowOnError(##class(%IPM.Utils.Build).MapPackageEquivalently("%IPM",initNamespace,namespace,1))
+            set nsToActivate(namespace) = 1
             if 'quiet {
                 write !,"Mapping %IPM.* routines in "_initNamespace_" equivalently to "_namespace
             }
-            $$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace))
+            $$$ThrowOnError(##class(%IPM.Utils.Build).MapRoutineEquivalently("%IPM.*",initNamespace,,namespace,1))
         }
 
         // Then try to map repositories if -repos is specified
@@ -3213,13 +3423,19 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
                 if 'quiet {
                     write !,"Mapping IPM repository in "_initNamespace_" equivalently to "_namespace
                 }
+                set nsToActivate(namespace) = 1
                 for suffix = "D", "S", "I" {
-                    $$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace))
+                    $$$ThrowOnError(##class(%IPM.Utils.Build).MapGlobalEquivalently("IPM.Repo.Definition"_suffix, initNamespace, namespace, 1))
                 }
             }
         }
 
+        // Batch activate all modified namespaces once at the end
         set $namespace = initNamespace
+        if 'preview && $data(nsToActivate) {
+            $$$ThrowOnError(##class(%IPM.Utils.Module).PerformBatchActivation(.nsToActivate, useTransactions, 'quiet))
+        }
+
         if preview {
             write !,"Preview mode; no configuration changes were made."
         } elseif 'quiet {
@@ -3453,6 +3669,7 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
     set namespaces = $$$ucase(namespaces)
     set verbose = '$$$HasModifier(pCommandInfo,"quiet")
     set reposOnly = $$$HasModifier(pCommandInfo,"repos-only")
+    set useTransactions = '($get(pCommandInfo("data","NoTransaction"),0) || $get(pCommandInfo("data","NoJournal"),0))
     // Sanity check
     if (globally && (namespaces '= "")) {
         $$$ThrowOnError($$$ERROR($$$GeneralError,"Cannot specify namespaces and global unmap flag at the same time."))
@@ -3483,6 +3700,7 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
     // Gather namespaces where %IPM is mapped into
     do ..GetMapInfo(.tIsMappedFrom)
 
+    kill nsToActivate
     set ptr = 0
     while $listnext(namespaces, ptr, ns) {
         set src = $get(tIsMappedFrom(ns))
@@ -3497,16 +3715,34 @@ ClassMethod UnmapIPM(ByRef pCommandInfo)
             write !,"Unmapping repository settings from "_ns_" (mapped from "_src_")"
         }
         for suffix = "D", "S", "I" {
-            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveGlobalMapping(ns, "IPM.Repo.Definition"_suffix))
+            set changed = 0
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveGlobalMapping(ns, "IPM.Repo.Definition"_suffix, 1, .changed))
+            if changed {
+                set nsToActivate(ns) = 1
+            }
         }
 
         if 'reposOnly {
             if verbose {
                 write !,"Unmapping IPM package and routines from "_ns_" (mapped from "_src_")"
             }
-            $$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM"))
-            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*"))
+            set pkgChanged = 0
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RemovePackageMapping(ns, "%IPM", 1, .pkgChanged))
+            if pkgChanged {
+                set nsToActivate(ns) = 1
+            }
+
+            set rtnChanged = 0
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveRoutineMapping(ns, "%IPM.*", 1, .rtnChanged))
+            if rtnChanged {
+                set nsToActivate(ns) = 1
+            }
         }
+    }
+
+    // Batch activate all modified namespaces once at the end
+    if $data(nsToActivate) {
+        $$$ThrowOnError(##class(%IPM.Utils.Module).PerformBatchActivation(.nsToActivate, useTransactions, verbose))
     }
 }
 
@@ -3624,6 +3860,58 @@ ClassMethod GetMapInfo(
 ClassMethod IPMInstalled(ByRef ipmModuleId) As %Boolean [ CodeMode = expression ]
 {
 $$$comClassDefined("%IPM.Storage.Module") && ##class(%IPM.Storage.Module).NameExists($$$IPMModuleName, .ipmModuleId)
+}
+
+ClassMethod History(ByRef pCommandInfo)
+{
+    set verbose = $get(pCommandInfo("data","verbose"))
+	set action = $get(pCommandInfo("parameters", "action"))
+	set globally = $$$HasModifier(pCommandInfo, "globally")
+	set ascend = ($$$GetModifier(pCommandInfo, "sort") = "asc")
+	set confirm = $$$HasModifier(pCommandInfo, "confirm")
+	set limit = $$$GetModifier(pCommandInfo, "limit")
+	set limit = $select(limit="": ##class(%IPM.Repo.UniversalSettings).GetValue("DefaultLogEntryLimit"), limit=0: "", 1: +limit)
+	merge filter = pCommandInfo("data", "zpm")
+
+	if (action = "find") || (action = "") {
+        if globally {
+            set array = ##class(%IPM.General.History).GetHistoryGlobally(.filter, ascend, limit)
+            do ##class(%IPM.General.History).DisplayArray(array)
+        } else {
+            set rs = ##class(%IPM.General.History).GetHistory(.filter, ascend, limit)
+            do ##class(%IPM.General.History).DisplayQueryResult(rs, $namespace)
+        }
+	} elseif action = "details" {
+		set id = $get(pCommandInfo("parameters", "argument"))
+	    set showPhases = $$$HasModifier(pCommandInfo, "showPhases")
+		do ##class(%IPM.General.History).DisplayOneRecord(id, showPhases)
+	} elseif action = "schema" {
+		$$$ThrowOnError($system.SQL.Schema.GetAllColumns("%IPM_General.History", , .columns))
+		write "Columns available for filtering are: "
+		set idx = ""
+		for {
+			set idx = $order(columns(idx), 1, col)
+			if idx = "" {
+				quit
+			}
+			if $extract(col, 1, 3) = "x__" {
+				continue
+			}
+			write !, "- ", col
+		}
+	} elseif action = "delete" {
+		if ($data(filter) \ 2 = 0) && ('globally) && ('confirm) {
+			$$$ThrowStatus($$$ERROR($$$GeneralError,"No filter specified. Should specify at least one column to filter on or pass -confirm to delete all records in the current namespace."))
+		}
+        if globally {
+		    set count = ##class(%IPM.General.History).DeleteHistoryGlobally(.filter, verbose)
+        } else {
+		    set count = ##class(%IPM.General.History).DeleteHistory(.filter)
+        }
+		write !, "Deleted ", count, " record(s)."
+	} else {
+		$$$ThrowStatus($$$ERROR($$$GeneralError,"Invalid action specified. Use `help history` to see available actions."))
+	}
 }
 
 /// Runs package manager commands in a way that is friendly to the OS-level shell.
@@ -3797,54 +4085,55 @@ ClassMethod GetUpstreamPackageVersions(Output list)
 /// Provides information on all installed top level modules (i.e. modules that are not depended on)
 ClassMethod Information(ByRef pCommandInfo)
 {
-  set verbose = $$$HasModifier(pCommandInfo,"verbose")
-  // Figure out which installed modules are not dependencies by
-  // 1) getting list of all installed modules
-  // 2) getting list of all dependencies
-  // and 3) cross checking the two lists
-  do ..GetListModules(,,.modList)
-  set depRes = ##class(%SQL.Statement).%ExecDirect(,
-    "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
-    "from %IPM_Storage.ModuleItem_Dependencies")
-  $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
-  while depRes.%Next(.sc) {
-    $$$ThrowOnError(sc)
-    set visited($zconvert(depRes.%Get("DepName"),"l")) = 1
-  }
-  $$$ThrowOnError(sc)
-
-  set topLevelList("width") = 0
-  for i = 1:1:modList {
-    set entry = modList(i)
-    set name = $listget(entry, 1)
-    // only list non-dependencies
-    if '$data(visited(name)) {
-      // compile information
-      set externalName = $list(entry, 3)
-      if (externalName '= "") && (externalName '= name) {
-        if verbose {
-          set $list(entry, 1) = externalName_" (" _ name _ ")"
-        } else {
-          set $list(entry, 1) = externalName
-        }
-      }
-      if topLevelList("width") < $length($listget(entry)) {
-        set topLevelList("width") = $length($listget(entry))
-      }
-      set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
-      set $list(entry, 2) = version.ToStringWithoutBuild()
-      set topLevelList($increment(topLevelList)) = entry
+    set verbose = $$$HasModifier(pCommandInfo,"verbose")
+    // Figure out which installed modules are not dependencies by
+    // 1) getting list of all installed modules
+    // 2) getting list of all dependencies
+    // and 3) cross checking the two lists
+    do ..GetListModules(,,.modList)
+    set depRes = ##class(%SQL.Statement).%ExecDirect(,
+        "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
+        "from %IPM_Storage.ModuleItem_Dependencies")
+    $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+    while depRes.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set visited($zconvert(depRes.%Get("DepName"),"l")) = 1
     }
-  }
+    $$$ThrowOnError(sc)
 
-  set messages = ..BuildIntroMessages(.outOfBoxMessage)
-  set messages = messages _ $listbuild(outOfBoxMessage)
-  set ptr = 0
-  while $listnext(messages, ptr, line) {
-    write !, line
-  }
-  write !!, "Currently installed top-level modules are listed below:", !
-  do ..DisplayModules(.topLevelList)
+    set topLevelList = 0
+    set topLevelList("width") = 0
+    for i = 1:1:modList {
+        set entry = modList(i)
+        set name = $listget(entry, 1)
+        // only list non-dependencies
+        if '$data(visited(name)) {
+        // compile information
+        set externalName = $list(entry, 3)
+        if (externalName '= "") && (externalName '= name) {
+            if verbose {
+            set $list(entry, 1) = externalName_" (" _ name _ ")"
+            } else {
+            set $list(entry, 1) = externalName
+            }
+        }
+        if topLevelList("width") < $length($listget(entry)) {
+            set topLevelList("width") = $length($listget(entry))
+        }
+        set version = ##class(%IPM.General.SemanticVersion).FromString($list(entry, 2))
+        set $list(entry, 2) = version.ToStringWithoutBuild()
+        set topLevelList($increment(topLevelList)) = entry
+        }
+    }
+
+    set messages = ..BuildIntroMessages(.outOfBoxMessage)
+    set messages = messages _ $listbuild(outOfBoxMessage)
+    set ptr = 0
+    while $listnext(messages, ptr, line) {
+        write !, line
+    }
+    write !!, "Currently installed top-level modules are listed below:", !
+    do ..DisplayModules(.topLevelList)
 }
 
 ClassMethod Update(ByRef pCommandInfo)
@@ -3872,14 +4161,82 @@ ClassMethod Update(ByRef pCommandInfo)
     set pCommandInfo("data","cmd") = "update"
     set pCommandInfo("data","Update") = 1
     set pCommandInfo("data","ModuleName") = moduleName
+    set log = ##class(%IPM.General.HistoryTemp).UpdateInit(moduleName)
     if path '= "" {
         // A path to a tarball is specified. Call ..Load() in order to load the newer version of the module.
         set pCommandInfo("parameters","path") = path
-        do ..Load(.pCommandInfo)
+        do ..Load(.pCommandInfo, log)
     } else {
         // Call ..Install() in order to install the newer version of the module.
-        do ..Install(.pCommandInfo)
+        do ..Install(.pCommandInfo, log)
     }
+}
+
+ClassMethod GetPythonInstalledLibs(Output list)
+{
+	set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
+	if '$system.CLS.IsMthd("%SYS.Python", "Import") {
+        $$$ThrowOnError($$$ERROR($$$PythonGeneralError,"Embedded Python is not available in this instance."))
+	}
+	set pyLibList = {}.%FromJSON(..GetPythonLibrariesList(target))
+    // Styling: Omit headers and separators to maintain consistency with native IPM list command output.
+	if $isobject(pyLibList) {
+		if pyLibList.%IsDefined("error") {
+            $$$ThrowOnError($$$ERROR($$$PythonGeneralError,pyLibList.error))
+		}
+		set iter = pyLibList.%GetIterator()
+		set width=0
+		while iter.%GetNext(.key,.val) {
+			set list($increment(list))=$listbuild(key,val)
+			if width < $length(key) {
+        		set width = $length(key)
+     		 }
+		}
+		set list("width") = width
+	}
+}
+
+ClassMethod GetPythonLibrariesList(PythonPath As %String) As %String [ Language = python ]
+{
+import sys
+import json
+from pathlib import Path
+
+try:
+    # Convert to Path object
+    target = Path(PythonPath)
+
+    # Validate directory exists
+    if not target.exists():
+        return json.dumps({"error": f"Path not found: {PythonPath}"})
+
+    # use site-packages if present
+    site_packages = target / "site-packages"
+    if site_packages.exists():
+        target = site_packages
+
+    # add to sys.path
+    sys.path.insert(0, str(target))
+
+    packages = {}
+
+    # scan *.dist-info directories
+    for dist in target.glob("*.dist-info"):
+        parts = dist.name.split("-")
+        if len(parts) >= 2:
+            name = parts[0]
+            version = parts[1].split(".dist")[0]
+            packages[name] = version
+
+    # If no packages found
+    if not packages:
+        return json.dumps({"warning": "No Python packages found", "path": str(target)})
+
+    return json.dumps(packages)
+
+except Exception as e:
+    # Return error as JSON string
+    return json.dumps({"error": str(e)})
 }
 
 }

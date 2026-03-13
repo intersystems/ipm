@@ -185,7 +185,7 @@ Method AddWebApps(
 {
     set tAppList = ""
     set pApps = $zstrip(pApps,"<>W")
-    if ( pApps = "*" ) {
+    if (pApps = "*") {
         do ..GetCSPApplications(.tAppList)
     } else {
         set tAppList = $listfromstring(pApps,",")
@@ -194,33 +194,42 @@ Method AddWebApps(
 
     new $namespace
     set $namespace = "%SYS"
+    set (matchRoles,dispatchClass,autheEnabled,path)=""
     for i=1:1:$listlength(tAppList) {
-        set app = ##class(Security.Applications).Get($listget(tAppList,i),.props)
-        set tAppName = props("Name")
+        set app = ##class(Security.Applications).Get($listget(tAppList,i), .props)
+        if $$$ISOK(app) {
+            set tAppName = props("Name")
+            set matchRoles = props("MatchRoles")
+            set autheEnabled = props("AutheEnabled")
+            set dispatchClass = props("DispatchClass")
+            set path = props("Path")
+        } else {
+            set tAppName = $listget(tAppList,i)
+            set autheEnabled = $$$AuthePassword
+        }
         set ..TemplateResources(tAppName) = tAppName
         set ..TemplateResources(tAppName, "Url") = tAppName
-        if props("MatchRoles")["%DB_"_curns {
-            set props("MatchRoles") = $replace(props("MatchRoles"),"%DB_"_curns,"{$dbrole}")
+        if matchRoles["%DB_"_curns {
+            set props("MatchRoles") = $replace(matchRoles,"%DB_"_curns,"{$dbrole}")
         }
-        if (props("DispatchClass")'="") {
-            set ..TemplateResources(tAppName,"DispatchClass") = props("DispatchClass")
+        if (dispatchClass'="") {
+            set ..TemplateResources(tAppName,"DispatchClass") = dispatchClass
         } else {
             set tCSPDir = ##class(%File).NormalizeDirectory(##class(%File).ParentDirectoryName(##class(%File).ManagerDirectory())_"/csp")
-            set ..TemplateResources(tAppName,"Directory") = $replace(props("Path"),tCSPDir,"${cspdir}")
+            set ..TemplateResources(tAppName,"Directory") = $replace(path,tCSPDir,"${cspdir}")
             set cspapps = cspapps_$listbuild(tAppName)
-
         }
-        if ( props("AutheEnabled") = 32 ) {
+        if ( autheEnabled = $$$AuthePassword ) {
             set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 0
             set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
-        } elseif ( props("AutheEnabled") = 64 ) {
-            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 0
-            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
-        } elseif ( props("AutheEnabled") = 96 ) {
+        } elseif ( autheEnabled = $$$AutheUnauthenticated ) {
+            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 1
+            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 0
+        } elseif ( autheEnabled = 96 ) {
             set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 1
             set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
         } else {
-            set ..TemplateResources(tAppName,"AuthenticationMethods") = props("AutheEnabled")
+            set ..TemplateResources(tAppName,"AuthenticationMethods") = autheEnabled
         }
 
         // Map subscript of application properties to %Installer.CSPApplication properties
@@ -273,6 +282,24 @@ Method SetSourcePathForCSPApp(
 	pPath) As %Status
 {
     set ..TemplateResources(pCSPApp,"Path") = pPath
+}
+
+Method DefineReminWebAppProps(ByRef props)
+{
+    //add cors origin details
+    set props("CorsAllowlist") = ""
+    set props("CorsCredentialsAllowed") = 0
+    // add cors headers
+    set props("CorsHeadersList") = ""
+    set props("DeepSeeEnabled") = 0
+    set props("JWTAuthEnabled") = 0
+    set props("JWTRefreshTokenTimeout") = 900
+    set props("JWTAccessTokenTimeout") = 60
+    set props("WSGIAppLocation") = ""
+    set props("WSGIAppName") = ""
+    set props("WSGICallable") = ""
+    set props("WSGIDebug") = ""
+    set props("WSGIType") = ""
 }
 
 ClassMethod GetGlobalsList(Output globals As %List) As %Status
@@ -341,6 +368,58 @@ Method SetAuthorProps(
     set tAuthor.Notes = pNotes
     set ..Author = tAuthor
     return $$$OK
+}
+
+Method SetCORSProps(
+	apps As %String = "",
+	ByRef cors)
+{
+    set appList = ""
+    set apps = $zstrip(apps,"<>W")
+    if (apps = "*") {
+        $$$ThrowOnError(..GetCSPApplications(.appList))
+    } else {
+        set appList = $listfromstring(apps,",")
+    }
+    set ptr = 0
+    while $listnext(appList, ptr, webpApp) {
+        set ..TemplateResources(webpApp,"CorsCredentialsAllowed") = cors("enableCors")
+        set ..TemplateResources(webpApp,"CorsHeadersList") = cors("allowedHeaders")
+        set ..TemplateResources(webpApp,"CorsAllowlist") = cors("allowedOrigins")
+    }
+}
+
+Method SetJWTProps(
+	apps As %String = "",
+	ByRef jwt)
+{
+    set appList = ""
+    set apps = $zstrip(apps,"<>W")
+    if (apps = "*") {
+        $$$ThrowOnError(..GetCSPApplications(.appList))
+    } else {
+        set appList = $listfromstring(apps,",")
+    }
+    set ptr = 0
+    while $listnext(appList, ptr, webpApp) {
+        set ..TemplateResources(webpApp,"JWTAccessTokenTimeout") = jwt("JWTAccessTokenTO")
+        set ..TemplateResources(webpApp,"JWTAuthEnabled") = jwt("allowedHeaders")
+        set ..TemplateResources(webpApp,"JWTRefreshTokenTimeout") = jwt("JWTRefreshTokenTO")
+    }
+}
+
+Method ValidateCorsOrigin(pAllowedOrigins As %String = "") As %Status
+{
+    new $namespace
+    set $namespace = "%SYS"
+    set originsList = $listfromstring(pAllowedOrigins,",")
+    set ptr = 0
+    set sc = $$$OK
+    while $listnext(originsList, ptr, origin){
+        set sc = ##class(Security.Applications).ValidateCorsOrigin(origin)
+        if $$$ISERR(sc) quit
+    }
+    return sc
 }
 
 ClassMethod NewTemplate(
@@ -516,6 +595,11 @@ Method SetTemplateProps() As %Status
     set ..TemplateResources("rest","UnauthenticatedEnabled") = 0
     set ..TemplateResources("rest","Recurse") = 1
 
+    //CORS
+    set ..TemplateResources("rest","CorsAllowlist") = "http://www.example.com"
+    set ..TemplateResources("rest","CorsCredentialsAllowed") = 1
+    set ..TemplateResources("rest","CorsHeadersList") = "Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers, Access-Control-Allow-Credentials, Access-Control-Max-Age, Access-Control-Expose-Headers, Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+
     // WEB APP
     set ..TemplateResources("web") = "/web"
     set ..TemplateResources("web","Url") = "/web"
@@ -591,9 +675,9 @@ XData XSLT
     </Export>
   </xsl:template>
   <xsl:template match="Resource[@Url]">
-    <CSPApplication>
+    <WebApplication>
         <xsl:apply-templates select="@*[local-name() != 'Name']" />
-    </CSPApplication>
+    </WebApplication>
   </xsl:template>
   <xsl:template match="node()">
     <xsl:copy>

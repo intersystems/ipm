@@ -1,22 +1,12 @@
-Class %IPM.General.SemanticVersion Extends (%SerialObject, %XML.Adaptor) [ StorageStrategy = "" ]
+Class %IPM.General.SemanticVersion Extends (%SerialObject, %IPM.General.SemanticVersion.Properties) [ StorageStrategy = "" ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemanticVersion";
 
 Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 
-Property Major As %Integer(MINVAL = 0) [ Required ];
-
-Property Minor As %Integer(MINVAL = 0) [ Required ];
-
-Property Patch As %Integer(MINVAL = 0) [ Required ];
-
-Property Prerelease As %IPM.DataType.RegExString(MAXLEN = 100, REGEX = "([0-9A-Za-z-])+(\.([0-9A-Za-z-])+)*");
-
 /// This is an alias for Prerelease. It is used for code readability when SemVerPostRelease is enabled.
 Property Postrelease As %IPM.DataType.RegExString(MAXLEN = 100, REGEX = "([0-9A-Za-z-])+(\.([0-9A-Za-z-])+)*") [ Calculated, SqlComputeCode = { set {*} = {Prerelease} }, SqlComputed, Transient ];
-
-Property Build As %IPM.DataType.RegExString(MAXLEN = 100, REGEX = "([0-9A-Za-z-])+(\.([0-9A-Za-z-])+)*");
 
 Method PostreleaseGet() As %IPM.DataType.RegExString
 {

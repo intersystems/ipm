@@ -90,8 +90,6 @@ Method Display()
     }
     if (..Token '= "") {
         write !,$char(9),"Token: ",..Padding(0),$case(..Token,"":"<unset>",:"<set>")
-    }
-    if (..Token '= "") || (..Password '= "") || (..Username '= "") {
         write !,$char(9),"Token Auth Method: ",..Padding(2),..TokenAuthMethod
     }
 }
