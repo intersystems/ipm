@@ -15,6 +15,15 @@ Property SubDirectory As %String(MAXLEN = 260);
 
 Property LastModified As %TimeStamp [ Required ];
 
+/// Filesystem modification time of the module.xml file
+Property FileMTime As %TimeStamp;
+
+/// Indicates if full manifest has been populated (deferred loading optimization).
+/// When 0: Only metadata (Name, Version) is cached; Manifest stream is empty.
+/// When 1: Full <Module> XML has been loaded into Manifest property.
+/// Use LoadManifestForCacheEntry() to populate on-demand when needed.
+Property ManifestLoaded As %Boolean [ InitialExpression = 0 ];
+
 /// Full module manifest
 Property Manifest As %Stream.GlobalCharacter;
 
@@ -113,6 +122,74 @@ Method HandleSaveError(pSC As %Status) As %Status
     quit tSC
 }
 
+/// Open a cache entry and validate it against the filesystem
+/// If the cached entry is stale (FileMTime differs from actual file mtime),
+/// re-parse the module.xml and update the cache entry
+/// Returns the cache object (possibly refreshed) or throws error if not found
+ClassMethod RootNameVersionOpenValidated(
+	root As %String,
+	name As %String,
+	versionString As %String,
+	concurrency As %Integer = -1,
+	Output status As %Status) As %IPM.Repo.Filesystem.Cache
+{
+    set status = $$$OK
+    set cacheObj = ""
+
+    try {
+        // Open the cache entry
+        set cacheObj = ..RootNameVersionOpen(root, name, versionString, concurrency, .status)
+        $$$ThrowOnError(status)
+
+        set defObj = ##class(%IPM.Repo.Filesystem.Definition).RootIndexOpen(root, , .status)
+        $$$ThrowOnError(status)
+
+        // Check for schema migration (old cache entries without FileMTime)
+        set dirPath = ##class(%File).NormalizeFilename(cacheObj.SubDirectory, cacheObj.Root)
+        set filePath = ##class(%File).NormalizeFilename("module.xml", dirPath)
+        if (cacheObj.FileMTime = "") {
+            // Old cache entry - refresh it to populate FileMTime
+            if ##class(%File).Exists(filePath) {
+                set horologTime = ##class(%Library.File).GetFileDateModified(filePath)
+                set currentMTime = $zdatetime(horologTime, 3)
+                do defObj.RefreshCacheEntry(cacheObj, filePath, currentMTime)
+                $$$ThrowOnError(status)
+            } else {
+                // File doesn't exist - invalidate cache
+                set status = $$$ERROR($$$GeneralError, "module.xml not found in " _ dirPath)
+                do cacheObj.%DeleteId(cacheObj.%Id())
+                set cacheObj = ""
+                quit
+            }
+        }
+
+        // Stat the file to get current mtime
+        if '##class(%File).Exists(filePath) {
+            // File deleted from filesystem - invalidate cache
+            set status = $$$ERROR($$$GeneralError, "module.xml not found in " _ dirPath)
+            do cacheObj.%DeleteId(cacheObj.%Id())
+            set cacheObj = ""
+            quit
+        }
+
+        set horologTime = ##class(%Library.File).GetFileDateModified(filePath)
+        set currentMTime = $zdatetime(horologTime, 3)  // ODBC format
+
+        // Compare cached mtime with current mtime
+        if (cacheObj.FileMTime '= currentMTime) {
+            do defObj.RefreshCacheEntry(cacheObj, filePath, currentMTime)
+            if $$$ISERR(status) {
+                quit
+            }
+        }
+    } catch ex {
+        set status = ex.AsStatus()
+        set cacheObj = ""
+    }
+
+    quit cacheObj
+}
+
 Storage Default
 {
 <Data name="CacheDefaultData">
@@ -163,6 +240,12 @@ Storage Default
 </Value>
 <Value name="16">
 <Value>DisplayName</Value>
+</Value>
+<Value name="17">
+<Value>FileMTime</Value>
+</Value>
+<Value name="18">
+<Value>ManifestLoaded</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.Filesystem.CacheD</DataLocation>
