@@ -147,12 +147,17 @@ This command is an alias for `module-action module-name publish`
 <summary>Updates a module to a newer version.</summary>
 <description>
 	Updates a module to a newer version. By default, updates to the latest available version. Also runs all of the update steps from the current version to the newer version.
+    Additionally, uninstalls any modules that are no longer required as dependencies by default
     This command is an alias for module-action module-name applyupdatesteps.
 </description>
 
 <!-- Examples -->
 <example description="Updates the HS.JSON module from the current version to version 3.0.0.">
 	update HS.JSON 3.0.0
+</example>
+
+<example description="Updates the HS.JSON module from the current version to version 3.0.0 and keep the orphaned modules">
+	update HS.JSON 3.0.0 -keep-orphans
 </example>
 
 <!-- Parameters -->
@@ -165,6 +170,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
+<modifier name="keep-orphans" dataAlias="KeepOrphans" dataValue="1" description="Retains dependencies that are no longer required by the updated module. By default, these orphaned modules are automatically uninstalled." />
 </command>
 
 <command name="makedeployed">
