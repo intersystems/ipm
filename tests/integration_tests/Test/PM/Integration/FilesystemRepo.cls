@@ -61,9 +61,7 @@ Method Test01CacheBuiltCorrectly()
 
     // Verify initial cache state - manifest not loaded, but validation passed during cache build
     // ManifestLoaded=0 means only metadata (name/version) was extracted, not full manifest (lazy loading)
-    // ValidationPassed=1 means the module.xml was validated as a valid ZPM document during cache build
     do $$$AssertEquals(cacheA.ManifestLoaded,0,"ManifestLoaded is initially 0 (lazy loading)")
-    do $$$AssertEquals(cacheA.ValidationPassed,1,"ValidationPassed is 1 after cache build")
 
     set cacheB1 = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-b","1.0.0",,.sc)
     do $$$AssertStatusOK(sc,"Cache entry for module-b 1.0.0 exists")

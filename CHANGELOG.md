@@ -18,7 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1102: %IPM.Storage.QualifiedModuleInfo:%New() will now copy over version properties when passed in a resolvedReference
 - #1112: Packaging a module with a globals resource now respects SourcesRoot, placing the exported file at the correct path in the tarball
 
-
 ## [0.10.6] - 2026-02-24
 
 ### Added
