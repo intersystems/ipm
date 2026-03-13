@@ -262,6 +262,18 @@ Method OnExportItem(
             set tSC = $$Export^%apiRTN(pItemName,pFullExportPath,"Save for Source Control","WNSK\UTF8\",tExportFlags)
             set pItemHandled = 1
         }
+
+        // Edge case of .HL7 being handled as .xml but needing the file name of the document itself
+        do ##class(%RoutineMgr).UserType(pItemName, .docclass, .doctype)
+        if 'pItemHandled && (docclass = "EnsLib.HL7.SchemaDocument") && (doctype = "xml") {
+            set hl7ItemName = ""
+            do ..ResourceReference.Children.GetNext(.hl7ItemName)
+            if (hl7ItemName '= "") {
+                $$$ThrowOnError($system.OBJ.Export(hl7ItemName,pFullExportPath,tExportFlags))
+                set pItemHandled = 1
+            }
+        }
+
         write:tVerbose !,"Exporting '",pItemName,"' to '",pFullExportPath,"'"
     } catch e {
         set tSC = e.AsStatus()
