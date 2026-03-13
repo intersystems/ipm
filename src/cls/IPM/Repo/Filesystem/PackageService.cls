@@ -28,7 +28,8 @@ Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream
     set module = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..Root, pModuleReference.Name, pModuleReference.VersionString, , .status)
     $$$ThrowOnError(status)
 
-    // Lazy-load manifest if not already loaded
+    // Lazy load manifest if not already populated (ManifestLoaded=0)
+    // This defers expensive XML parsing until manifest is actually needed
     if 'module.ManifestLoaded {
         set defObj = ##class(%IPM.Repo.Filesystem.Definition).RootIndexOpen(module.Root, , .status)
         $$$ThrowOnError(status)
