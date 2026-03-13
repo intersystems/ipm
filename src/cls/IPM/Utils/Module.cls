@@ -1257,16 +1257,16 @@ ClassMethod LoadNewModule(
 /// Uninstall orphaned dependencies identified during update.
 /// Recursively removes modules not required by the main module or other local packages.
 ClassMethod UninstallOrphanedDependencies(
-	ByRef orphanedDeps,
+	ByRef OrphanedDeps,
 	ByRef Params)
 {
-    if '$data(orphanedDeps) {
+    if '$data(OrphanedDeps) {
         quit
     }
     set dependencyModule=""
     write !,"Uninstalling orphaned dependencies"
     for {
-        set dependencyModule = $order(orphanedDeps(dependencyModule)) quit:dependencyModule=""
+        set dependencyModule = $order(OrphanedDeps(dependencyModule)) quit:dependencyModule=""
         continue:'##class(%IPM.Storage.Module).NameExists(dependencyModule)
         // Remove this module and its dependencies recursively, skipping any still in use
         $$$ThrowOnError(##class(%IPM.Storage.Module).Uninstall(dependencyModule,,1,.Params))

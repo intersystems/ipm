@@ -34,11 +34,11 @@ Method TestRemoveOrphanedModsOnUpdate() As %Status
 
     set status = ..CreateModuleFile(v1ModuleDir, "DemoModuleV1")
     do $$$AssertStatusOK(status, mainModule_" version 1.0.0 Module.xml created")
-    do ..CreateDependecnyModules(v1ModuleDir)
+    do ..CreateDependencyModules(v1ModuleDir)
 
     do $$$LogMessage("Loading '" _ mainModule _ "' version 1.0.0")
     set status = ..RunCommand("load "_v1ModuleDir)
-    do $$$AssertStatusOK(status, mainModule_" version 1.0.0 laoded successfully")
+    do $$$AssertStatusOK(status, mainModule_" version 1.0.0 loaded successfully")
 
     set moduleObj = ##class(%IPM.Storage.Module).NameOpen(mainModule)
 
@@ -46,7 +46,7 @@ Method TestRemoveOrphanedModsOnUpdate() As %Status
         set depsCount = moduleObj.Dependencies.Count()
         for i=1:1:depsCount {
             set depsName = moduleObj.Dependencies.GetAt(i)
-            do $$$LogMessage("Module "_depsName.Name _ " (dependency of " _mainModule _ ") installed successfully")
+            do $$$LogMessage("Module '"_depsName.Name_ "' (dependency of " _mainModule _ ") installed successfully")
         }
         if depsCount = 3 {
             do $$$LogMessage("All 3 dependencies for '"_mainModule_"' have been loaded successfully")
@@ -56,7 +56,7 @@ Method TestRemoveOrphanedModsOnUpdate() As %Status
     do $$$LogMessage("Updating '" _ mainModule _ "' to version 2.0.0.")
     set status = ..CreateModuleFile(v2ModuleDir, "DemoModuleV2")
     do $$$AssertStatusOK(status, mainModule_" version 2.0.0 Module.xml created")
-    do ..CreateDependecnyModules(v1ModuleDir)
+    do ..CreateDependencyModules(v1ModuleDir)
 
     do $$$LogMessage("Updating '"_mainModule_"' to version 2.0.0. Orphaned dependencies should be automatically uninstalled (default behavior).")
     set status = ..RunCommand("update "_mainModule_" -p "_v2ModuleDir)
@@ -67,7 +67,7 @@ Method TestRemoveOrphanedModsOnUpdate() As %Status
     set depsCount = moduleObj.Dependencies.Count()
         for i=1:1:depsCount{
             set depsName = moduleObj.Dependencies.GetAt(i)
-            do $$$LogMessage("Dependency module "_depsName.Name_" is exist")
+            do $$$LogMessage("Dependency module '"_depsName.Name_"' exists")
         }
         if depsCount = 2 {
             do $$$LogMessage("Only 2 Dependency modules are exist after update the "_mainModule)
@@ -82,7 +82,7 @@ Method TestRemoveOrphanedModsOnUpdate() As %Status
 
     set status = ..CreateModuleFile(v3ModuleDir, "DemoModuleV3")
     do $$$AssertStatusOK(status, mainModule_" version 3.0.0 Module.xml created")
-    do ..CreateDependecnyModules(v1ModuleDir)
+    do ..CreateDependencyModules(v1ModuleDir)
 
     set status = ..RunCommand("update "_mainModule_" -p "_v3ModuleDir_" -keep-orphans")
     do $$$AssertStatusOK(status, "Successfully updated '"_mainModule_"' to 3.0.0; dependencies were retained as specified by the -keep-orphans flag.")
@@ -93,7 +93,7 @@ Method TestRemoveOrphanedModsOnUpdate() As %Status
 
     for i=1:1:depsCount {
         set depsName = moduleObj.Dependencies.GetAt(i)
-        do $$$LogMessage("Dependency module "_depsName.Name_" exist after update "_mainModule_" to version 3.0.0")
+        do $$$LogMessage("Dependency module '"_depsName.Name_"' exist after update "_mainModule_" to version 3.0.0")
     }
     set isExist = ##class(%IPM.Storage.Module).NameExists("test-dependency-2")
     do $$$AssertTrue(isExist,"The orphaned 'test-dependency-2' module was successfully retained as expected.")
@@ -135,7 +135,7 @@ Method CreateModuleFile(
     return status
 }
 
-Method CreateDependecnyModules(Directory As %String = "")
+Method CreateDependencyModules(Directory As %String = "")
 {
     if ##class(%File).DirectoryExists(Directory) {
         set dependencyModuleList = $listbuild("DepModule1", "DepModule2", "DepModule3" )

@@ -147,6 +147,7 @@ This command is an alias for `module-action module-name publish`
 <summary>Updates a module to a newer version.</summary>
 <description>
 	Updates a module to a newer version. By default, updates to the latest available version. Also runs all of the update steps from the current version to the newer version.
+    Additionally, uninstalls any modules that are no longer required as dependencies by default
     This command is an alias for module-action module-name applyupdatesteps.
 </description>
 
