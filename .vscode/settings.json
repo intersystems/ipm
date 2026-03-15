@@ -1,6 +1,6 @@
 {
     "objectscript.conn": {
-        "active": false,
+        "active": true,
         "docker-compose": {
             "service": "iris"
         },
