@@ -34,7 +34,7 @@ Method OnAfterOneTest() As %Status
 
 /// SearchRepositoriesForModule should return a list where each entry
 /// is a modile reference with AllVersions set
-Method SearchRepositoriesForModule()
+Method TestSearchRepositoriesForModule()
 {
     // Set searchCriteria
     set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
