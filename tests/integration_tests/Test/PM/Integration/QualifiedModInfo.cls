@@ -24,14 +24,6 @@ Method OnAfterAllTests() As %Status
     quit sc
 }
 
-Method OnAfterOneTest() As %Status
-{
-    // Uninstall all modules after each test for clean state
-    set sc = ##class(%IPM.Main).Shell("uninstall -all")
-    do $$$AssertStatusOK(sc,"Uninstalled all modules after test.")
-    quit sc
-}
-
 /// SearchRepositoriesForModule should return a list where each entry
 /// is a modile reference with AllVersions set
 Method TestSearchRepositoriesForModule()
