@@ -13,11 +13,13 @@ Method TestResultFileGeneration()
     #define NormalizeFilename(%file)  ##class(%File).NormalizeFilename(%file)
 
     do $$$LogMessage("This file generation picks the last or current unit test id and generate the reports")
+
     set fileDir = ##class(%File).NormalizeDirectory($get(^UnitTestRoot)_"/test-reports/")
     if '##class(%File).DirectoryExists(fileDir){
         set status = ##class(%File).CreateDirectoryChain(fileDir)
         do $$$AssertStatusOK(status,"Directory created: "_fileDir)
     }
+
     do $$$LogMessage("Start generating the reports")
     set fileName = $$$NormalizeFilename(fileDir_"/test.yaml")
     set status = ##class(%IPM.Test.YamlOutput).ToFile(fileName)
@@ -32,16 +34,13 @@ Method TestResultFileGeneration()
     do $$$AssertStatusOK(status,"Toon file generated successfully in "_fileDir)
 
     do ..ShowGeneratedFilesAndCleaup(fileDir)
-
-    //set status = ##class(%File).RemoveDirectory(fileDir)
-    //do $$$AssertStatusOK(status,"Deleted the directory "_fileDir)
 }
 
-Method ShowGeneratedFilesAndCleaup(fileDir As %String)
+Method ShowGeneratedFilesAndCleaup(FileDir As %String)
 {
     do $$$LogMessage("Display the generated unit test report files")
-    set fileSet = ##class(%File).FileSetFunc(fileDir)
-    while fileSet.%Next(){
+    set fileSet = ##class(%File).FileSetFunc(FileDir)
+    while fileSet.%Next() {
         set file = fileSet.Name
         set fileNames(file) = fileSet.ItemName
         do $$$LogMessage("Generated file "_file)
