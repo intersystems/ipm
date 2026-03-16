@@ -2269,7 +2269,7 @@ ClassMethod ShowModulesForRepository(
     set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pRepoName,,.tSC)
     $$$ThrowOnError(tSC)
     if server.%IsA("%IPM.Repo.Filesystem.Definition") {
-        write !,"Last full cache rebuild for '", pRepoName, "' was on ", server.CacheLastRebuilt, " (UTC). Run 'repo -n "_pRepoName_" -rebuild-cache' to refresh the cache.",!
+        write !,"Last full cache rebuild for '", pRepoName, "' was on ", server.CacheLastRebuilt, " (UTC). If needed, run 'repo -n "_pRepoName_" -rebuild-cache' to refresh the cache.",!
     }
 }
 

@@ -139,10 +139,14 @@ ClassMethod RootNameVersionOpenValidated(
     try {
         // Open the cache entry
         set cacheObj = ..RootNameVersionOpen(root, name, versionString, concurrency, .status)
-        $$$ThrowOnError(status)
+        if $$$ISERR(status) {
+            quit
+        }
 
         set defObj = ##class(%IPM.Repo.Filesystem.Definition).RootIndexOpen(root, , .status)
-        $$$ThrowOnError(status)
+        if $$$ISERR(status) {
+            quit
+        }
 
         // Check for schema migration (old cache entries without FileMTime)
         set dirPath = ##class(%File).NormalizeFilename(cacheObj.SubDirectory, cacheObj.Root)
@@ -153,7 +157,6 @@ ClassMethod RootNameVersionOpenValidated(
                 set horologTime = ##class(%Library.File).GetFileDateModified(filePath)
                 set currentMTime = $zdatetime(horologTime, 3)
                 do defObj.RefreshCacheEntry(cacheObj, filePath, currentMTime)
-                $$$ThrowOnError(status)
             } else {
                 // File doesn't exist - invalidate cache
                 set status = $$$ERROR($$$GeneralError, "module.xml not found in " _ dirPath)
@@ -178,9 +181,6 @@ ClassMethod RootNameVersionOpenValidated(
         // Compare cached mtime with current mtime
         if (cacheObj.FileMTime '= currentMTime) {
             do defObj.RefreshCacheEntry(cacheObj, filePath, currentMTime)
-            if $$$ISERR(status) {
-                quit
-            }
         }
     } catch ex {
         set status = ex.AsStatus()
