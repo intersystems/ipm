@@ -213,22 +213,30 @@ Method OnPhase(
             write !
             if $data(pParams("outputformat"),outputFormat)||('tVerbose) {
                 write !,"Test result summary",!
-                // TODO: Move this default format to ^IPM.Config.Test("outputFormat") rather than keeping it hardcoded.
-                set:$get(outputFormat)="" outputFormat="Toon"
+                set defaultOutputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+                if defaultOutputFormat'="" {
+                    set outputFormat = defaultOutputFormat
+                }
+                else {
+                    if $get(outputFormat)="" {
+                        set outputFormat="Toon"
+                    }
+                }
+
                 set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
                 if '$$$defClassDefined(outputClass) {
                     $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputType_" output format does not exist."))
                 }
                 set defaultTestStatus = "failed"
-                set tSC = $classmethod(outputClass,"OutputToDevice",,defaultTestStatus)
-                $$$ThrowOnError(tSC)
+                set sc = $classmethod(outputClass,"OutputToDevice",,defaultTestStatus)
+                $$$ThrowOnError(sc)
                 write !
             }
             // By default, detect and report unit test failures as an error from this phase
             if $get(pParams("UnitTest","FailuresAreFatal"),1) {
                 do ##class(%IPM.Test.Manager).OutputFailures()
-                set tSC = ##class(%IPM.Test.Manager).GetLastStatus()
-                $$$ThrowOnError(tSC)
+                set sc = ##class(%IPM.Test.Manager).GetLastStatus()
+                $$$ThrowOnError(sc)
             }
             write !
         }

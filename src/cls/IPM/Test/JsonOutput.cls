@@ -2,47 +2,51 @@ Class %IPM.Test.JsonOutput Extends %IPM.Test.Abstract
 {
 
 ClassMethod ToFile(
-	pFileName As %String,
-	pTestStatus As %String = "",
-	pTestIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+	FileName As %String,
+	TestStatus As %String = "",
+	TestIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
         set fileStream = ##class(%Stream.FileCharacter).%New()
-        set fileStream.TranslateTable="UTF8"
-        do fileStream.LinkToFile(pFileName)
-        set responseJson = ..JSON(pTestIndex, pTestStatus)
-        do fileStream.Write(responseJson.%ToJSON())
+        set fileStream.TranslateTable = "UTF8"
+        $$$ThrowOnError(fileStream.LinkToFile(FileName))
+        set responseJson = ..JSON(TestIndex, TestStatus)
+        if $isobject(responseJson) {
+            do fileStream.Write(responseJson.%ToJSON())
+        }
         $$$ThrowOnError(fileStream.%Save())
-    } catch e {
-        set tSC = e.AsStatus()
+    } catch ex {
+        set sc = ex.AsStatus()
     }
-    return tSC
+    return sc
 }
 
 ClassMethod OutputToDevice(
-	pTestIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+	TestIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
 	pCaseStatus As %String = "") As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
-        set responseJson= ..JSON(pTestIndex, pCaseStatus)
+        set responseJson = ..JSON(TestIndex, pCaseStatus)
         write !
-        do responseJson.%ToJSON()
-    } catch e {
-        set tSC = e.AsStatus()
+        if $isobject(responseJson) {
+            do responseJson.%ToJSON()
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
     }
-    return tSC
+    return sc
 }
 
 ClassMethod JSON(
-	pTestIndex,
-	pTestStatus) As %DynamicObject
+	TestIndex As %Integer,
+	TestStatus As %String) As %DynamicObject
 {
-    if pTestStatus'=""{
-        set tResult = ..FilteredTestResultsFunc(pTestIndex,pTestStatus)
+    if TestStatus'="" {
+        set tResult = ..FilteredTestResultsFunc(TestIndex, TestStatus)
     } else {
-         set tResult = ..GetAllTestResultsFunc(pTestIndex)
+         set tResult = ..GetAllTestResultsFunc(TestIndex)
     }
     set unitTest = {}
     set unitTest.results = []
@@ -50,12 +54,12 @@ ClassMethod JSON(
 
     while tResult.%Next() {
         if previousID = "" {
-            set unitTest.id = pTestIndex
+            set unitTest.id = TestIndex
             set unitTest.namespace = tResult.namespace
             set unitTest.duration = tResult.duration
             set unitTest.testDateTime = tResult.testDateTime
         }
-        set previousID = pTestIndex
+        set previousID = TestIndex
         if tResult.suiteName '= currentSuite {
             set currentSuite = tResult.suiteName
             set suiteObj = {

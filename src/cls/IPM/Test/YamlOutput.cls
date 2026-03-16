@@ -2,60 +2,60 @@ Class %IPM.Test.YamlOutput Extends %IPM.Test.Abstract
 {
 
 ClassMethod ToFile(
-	pFileName As %String,
-	pTestStatus As %String = "",
-	pTestIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+	FileName As %String,
+	TestStatus As %String = "",
+	TestIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
         set fileStream = ##class(%Stream.FileCharacter).%New()
-        set fileStream.TranslateTable="UTF8"
-        do fileStream.LinkToFile(pFileName)
-        do fileStream.CopyFrom(..YAML(pTestIndex, pTestStatus))
+        set fileStream.TranslateTable = "UTF8"
+        $$$ThrowOnError(fileStream.LinkToFile(FileName))
+        do fileStream.CopyFrom(..YAML(TestIndex, TestStatus))
         $$$ThrowOnError(fileStream.%Save())
-    } catch e {
-        set tSC = e.AsStatus()
+    } catch ex {
+        set sc = ex.AsStatus()
     }
-    return tSC
+    return sc
 }
 
 ClassMethod OutputToDevice(
-	pTestIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-	pTestStatus As %String = "") As %Status
+	TestIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+	TestStatus As %String = "") As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
-        set yamlStream = ..YAML(pTestIndex, pTestStatus)
+        set yamlStream = ..YAML(TestIndex, TestStatus)
         write !
         while 'yamlStream.AtEnd {
             write yamlStream.Read()
         }
-    } catch e {
-        set tSC = e.AsStatus()
+    } catch ex {
+        set sc = ex.AsStatus()
     }
-    return tSC
+    return sc
 }
 
 ClassMethod YAML(
-	pTestIndex = {$order(^UnitTest.Result(""),-1)},
-	pTestStatus As %String = "") As %Stream.TmpCharacter
+	TestIndex = {$order(^UnitTest.Result(""),-1)},
+	TestStatus As %String = "") As %Stream.TmpCharacter
 {
-	if pTestStatus'=""{
-        set tResult= ..FilteredTestResultsFunc(pTestIndex, pTestStatus)
+	if TestStatus'="" {
+        set tResult = ..FilteredTestResultsFunc(TestIndex, TestStatus)
     } else {
-        set tResult= ..GetAllTestResultsFunc(pTestIndex)
+        set tResult = ..GetAllTestResultsFunc(TestIndex)
     }
     set yamlStream = ##class(%Stream.TmpCharacter).%New()
     set (yaml,currentID,currentSuite,currentTestcase) = ""
     while tResult.%Next() {
         if currentID = "" {
-            set currentID = pTestIndex
+            set currentID = TestIndex
             do yamlStream.WriteLine("unitTest:")
-            do yamlStream.WriteLine("  id: "_pTestIndex)
+            do yamlStream.WriteLine("  id: "_TestIndex)
             do yamlStream.WriteLine("  namespace: """_tResult.namespace_"""")
             do yamlStream.WriteLine("  duration: "_tResult.duration)
             do yamlStream.WriteLine("  testDateTime: """_tResult.testDateTime_"""")
-            do yamlStream.WriteLine( "")
+            do yamlStream.WriteLine()
             do yamlStream.WriteLine("  results:")
         }
         if tResult.suiteName '= currentSuite {
@@ -70,11 +70,11 @@ ClassMethod YAML(
             do yamlStream.WriteLine("          methods:")
         }
         do yamlStream.WriteLine("            - methodName: """_tResult.methodName_"""")
-        //do yamlStream.WriteLine("              testMethod: """_tResult.testMethod_"""")
+        do yamlStream.WriteLine("              testMethod: """_tResult.testMethod_"""")
         do yamlStream.WriteLine("              assertAction: """_tResult.assertAction_"""")
         do yamlStream.WriteLine("              assertCounter: "_tResult.assertCounter)
-        //do yamlStream.WriteLine("              assertDescription: |")
-        //do yamlStream.WriteLine("                "_$replace(tResult.assertDescription, $c(10), $c(10)_"                "))
+        do yamlStream.WriteLine("              assertDescription: |")
+        do yamlStream.WriteLine("                "_$replace(tResult.assertDescription, $char(10), $char(10)_"                "))
         do yamlStream.WriteLine("              assertLocation: """_tResult.assertLocation_"""")
     }
     return yamlStream
