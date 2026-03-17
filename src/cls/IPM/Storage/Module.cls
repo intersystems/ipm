@@ -625,10 +625,10 @@ ClassMethod ExecutePhases(
                     new $$$DeployedProjectInstalled
                     $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
 
-                    // Self-uninstall: Finalize history BEFORE Clean deletes IPM's own classes
-                    set tIsSelfUninstall = (tOnePhase = "Clean") && (tModule.Name = $$$IPMModuleName)
-                    if tIsSelfUninstall && $isobject(pLog) {
-                        // Log the Clean phase completion and finalize NOW, before classes are deleted
+                    // Self-uninstall: Finalize history before Clean phase deletes IPM's own classes
+                    set isSelfUninstall = (tOnePhase = "Clean") && (tModule.Name = $$$IPMModuleName)
+                    if isSelfUninstall && $isobject(pLog) {
+                        // Log the Clean phase completion and finalize now
                         do pLog.FinalizePhase(tOnePhase, $$$OK)
                         set tSC = pLog.Finalize($$$OK, 0)
                         $$$ThrowOnError(tSC)
@@ -643,7 +643,7 @@ ClassMethod ExecutePhases(
                     $$$ThrowOnError($method(tLifecycle,"%"_tOnePhase,.pParams))
 
                     // Self-uninstall: After Clean deletes IPM's own classes, skip all post-phase callbacks
-                    if tIsSelfUninstall {
+                    if isSelfUninstall {
                         // Print success message before skipping
                         write !,"["_$namespace_"|"_tModule.DisplayName_"]",$char(9),tOnePhase," SUCCESS"
                         if tTiming {
@@ -659,12 +659,12 @@ ClassMethod ExecutePhases(
                 #; Call Invoke Methods After Phase
                 set tKey = ""
                 for {
-                set tInvoke = tModule.Invokes.GetNext(.tKey)
-                if (tKey = "") || '$isobject(tInvoke) {
-                    quit // '$IsObject can happen reasonably after namespace changes
-                }
-                set tSC = tInvoke.OnAfterPhase(tOnePhase,.pParams)
-                quit:$$$ISERR(tSC)
+                    set tInvoke = tModule.Invokes.GetNext(.tKey)
+                    if (tKey = "") || '$isobject(tInvoke) {
+                        quit // '$IsObject can happen reasonably after namespace changes
+                    }
+                    set tSC = tInvoke.OnAfterPhase(tOnePhase,.pParams)
+                    quit:$$$ISERR(tSC)
                 }
                 quit:$$$ISERR(tSC)
 

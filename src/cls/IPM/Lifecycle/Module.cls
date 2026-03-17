@@ -28,12 +28,9 @@ Method %Clean(ByRef pParams) As %Status
         if (..Module.Name = $$$IPMModuleName) {
             set verbose = $get(pParams("Verbose"))
 
-            // Check if user wants full cleanup
-            set fullCleanup = $get(pParams("Clean","FullCleanup"), 0)
-
-            if fullCleanup {
-                // Full cleanup: delete ALL module records and operational globals
-                write !,"Performing full cleanup of IPM operational globals..."
+            // Check if user wants full cleanup (delete ALL module records and operational globals)
+            if $get(pParams("Clean","FullCleanup"), 0) {
+                write:verbose !,"Performing cleanup of IPM globals..."
 
                 kill ^IPM.Storage.ModuleD          // Delete ALL module records (including orphans)
                 kill ^IPM.Storage.ModuleI
@@ -57,32 +54,32 @@ Method %Clean(ByRef pParams) As %Status
                 // Note: Preserve ^IPM.General.HistoryD for audit trail
                 // Note: Preserve ^IPM.settings in %SYS for user preferences
 
-                write:verbose !,"Full cleanup complete: All module records deleted."
+                write:verbose !,"Cleanup complete."
             } else {
-                // Check if modules were orphaned (user used -force)
+                // Check if modules were orphaned
                 // IPM is always at index 1, so start checking at index 2
-                set tOrphanedModules = ""
-                set tIndex = 1
+                set orphanedModules = ""
+                set index = 1
                 for {
-                    set tIndex = $order(^IPM.Storage.ModuleD(tIndex))
-                    quit:tIndex=""
-                    set tOrphanedModules = tOrphanedModules _ $listbuild(tIndex)
+                    set index = $order(^IPM.Storage.ModuleD(index))
+                    quit:index=""
+                    set orphanedModules = orphanedModules _ $listbuild(index)
                 }
 
-                if $listlength(tOrphanedModules) > 0 {
+                if $listlength(orphanedModules) > 0 {
                     // Modules were orphaned - warn user but still clean up
-                    write !,"Warning: ",$listlength(tOrphanedModules)," module(s) orphaned:"
+                    write !,"Warning: ",$listlength(orphanedModules)," module(s) orphaned:"
 
                     // List orphaned modules with versions
-                    set tPtr = 0
-                    while $listnext(tOrphanedModules, tPtr, tIndex) {
+                    set ptr = 0
+                    while $listnext(orphanedModules, ptr, index) {
                         try {
-                            set tModData = ^IPM.Storage.ModuleD(tIndex)
-                            set tModName = $listget(tModData, 2)
-                            set tVersion = $listget(tModData, 4)
-                            write !,"  - ",tModName," (",tVersion,")"
+                            set modData = ^IPM.Storage.ModuleD(index)
+                            set modName = $listget(modData, 2)
+                            set version = $listget(modData, 4)
+                            write !,"  - ",modName," (",version,")"
                         } catch {
-                            write !,"  - (unknown module at index ",tIndex,")"
+                            write !,"  - (unknown module at index ",index,")"
                         }
                     }
                     write !,"Reinstalling IPM will automatically re-adopt these modules."

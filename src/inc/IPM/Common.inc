@@ -90,10 +90,6 @@ ROUTINE %IPM.Common [Type=INC]
 #;            %IPMDeployedProjectInstalled("/path/to/second/Deployed.xml") = ""
 #Define DeployedProjectInstalled %IPMDeployedProjectInstalled
 
-#; Variable to indicate IPM has uninstalled itself
-#; Set during zpm uninstall, checked by Interactive() shell loop
-#define IPMSelfUninstallFlag %IPMSelfUninstallFlag
-
 #Define DeployedProjectIndex "%Export","DeployedProject"
 
 #; Locking for module update framework
