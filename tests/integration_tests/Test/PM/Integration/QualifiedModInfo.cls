@@ -26,7 +26,7 @@ Method OnAfterAllTests() As %Status
 
 /// SearchRepositoriesForModule should return a module reference
 /// will AllVersions set to all three versions of the module when no version specified in search criteria
-Method SearchModuleNoVersionSpecified()
+Method TestSearchModuleNoVersionSpecified()
 {
     // Set searchCriteria
     set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
@@ -51,7 +51,7 @@ Method SearchModuleNoVersionSpecified()
 
 /// SearchRepositoriesForModule should return a module reference
 /// will AllVersions set to all versions of the module that match the version expression in search criteria
-Method SearchModuleVersionSpecified()
+Method TestSearchModuleVersionSpecified()
 {
     // Set searchCriteria
     set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
