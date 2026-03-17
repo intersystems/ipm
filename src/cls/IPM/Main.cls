@@ -3259,10 +3259,11 @@ ZPM(pArgs...)
     // TODO: Needs to support enabling IPM from here, also need to decide what level of customization to provide
     set quitOnError = $get(pArgs(2))
     set haltOnComplete = $get(pArgs(3))
-    write !, "IPM is not enabled in this namespace."
+    set currentNs = $namespace
     set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Nsp FROM %SYS.Namespace_List()")
     if rs.%SQLCODE '= 0 {
-        write !, "Error getting namespace name. SQLCODE =", rs.%SQLCODE
+        write !, "Error getting namespace list. SQLCODE =", rs.%SQLCODE
+        write !, "IPM is not enabled in namespace ", currentNs, "."
     } else {
         new $namespace
         set found = 0
@@ -3270,17 +3271,17 @@ ZPM(pArgs...)
             set $namespace = $zstrip(rs.%Get("Nsp"), "<>WC")
             // Some I4H containers come with %IPM.Main but the "version" command doesn't work ?!
             if $system.CLS.IsMthd("%IPM.Main", "Shell") && ($namespace '= "HSLIB") && ($namespace '= "HSSYS") {
-                write !, "Change namespace to one of the following to run the ""zpm"" command"
+                write !, "IPM is not enabled in namespace ", currentNs, ". Switch to one of the following namespaces to use IPM:"
                 do ##class(%IPM.Main).Shell("version")
-                write !, "If you want to map IPM globally, switch to one of the namespaces above and run: zpm ""enable -map -globally""."
-                write !, "If you want to reset repository and map IPM globally along with repository settings, switch to one of the namespaces above and run: zpm ""enable -community""."
+                write !, "To map IPM globally, switch to one of the namespaces above and run: zpm ""enable -map -globally""."
+                write !, "To reset repository and map IPM globally with repository settings, run: zpm ""enable -community""."
                 set found = 1
                 quit
             }
         }
         // Shouldn't happen since %ZLANGC00.mac and %ZLANGF00.mac are present
         if 'found {
-            write !, "No namespace found with IPM enabled."
+            write !, "IPM is not installed. No namespace found with IPM enabled."
         }
     }
 

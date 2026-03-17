@@ -624,11 +624,31 @@ ClassMethod ExecutePhases(
                     // Lifecycle before / (phase) / after
                     new $$$DeployedProjectInstalled
                     $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
+
+                    // Self-uninstall: Finalize history BEFORE Clean deletes IPM's own classes
+                    set tIsSelfUninstall = (tOnePhase = "Clean") && (tModule.Name = $$$IPMModuleName)
+                    if tIsSelfUninstall && $isobject(pLog) {
+                        // Log the Clean phase completion and finalize NOW, before classes are deleted
+                        do pLog.FinalizePhase(tOnePhase, $$$OK)
+                        set tSC = pLog.Finalize($$$OK, 0)
+                        $$$ThrowOnError(tSC)
+                        // Explicitly persist to twin while History classes still exist
+                        $$$ThrowOnError(pLog.PersistToTwin())
+                        // Delete the temp record immediately to prevent %OnClose() from trying to reload it later
+                        $$$ThrowOnError(pLog.%DeleteId(pLog.%Id()))
+                        // Clear the log object reference so it's not used again
+                        set pLog = ""
+                    }
+
                     $$$ThrowOnError($method(tLifecycle,"%"_tOnePhase,.pParams))
 
                     // Self-uninstall: After Clean deletes IPM's own classes, skip all post-phase callbacks
-                    // All the callback code has been deleted, so attempting to call it would fail
-                    if (tOnePhase = "Clean") && (tModule.Name = $$$IPMModuleName) {
+                    if tIsSelfUninstall {
+                        // Print success message before skipping
+                        write !,"["_$namespace_"|"_tModule.DisplayName_"]",$char(9),tOnePhase," SUCCESS"
+                        if tTiming {
+                            write " ("_($zhorolog-tStart)_" s)"
+                        }
                         // Skip all post-phase processing - classes have been deleted
                         continue
                     }
@@ -725,7 +745,14 @@ ClassMethod Uninstall(
         set tSC = e.AsStatus()
     }
 	set devMode = $get(pParams("DeveloperMode", 0))
-	set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+	// Only finalize if log wasn't already finalized and deleted (e.g., during self-uninstall)
+	if $isobject(log) {
+		try {
+			set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+		} catch {
+			// Skip if log was already deleted during self-uninstall
+		}
+	}
     quit tSC
 }
 

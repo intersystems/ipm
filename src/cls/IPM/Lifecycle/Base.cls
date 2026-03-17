@@ -262,6 +262,7 @@ Method CheckBeforeClean(
         set tVerbose = $get(pParams("Verbose"))
         set tLevel = $get(pParams("Clean","Level"),0)
         set tRecurse = $get(pParams("Clean","Recurse"),1)
+        set tForce = $get(pParams("Clean","Force"),0)
 
         if (..Module.GlobalScope && '$get(pParams("Clean","GlobalScope"))) {
             do ..Log("Clean SKIPPED - module has global scope.")
@@ -269,7 +270,7 @@ Method CheckBeforeClean(
             quit
         }
 
-        if '$get(pParams("Clean","Force")) {
+        if 'tForce {
             // Check to see if anything depends on this module and return an error status if it does.
             set tSC = ##class(%IPM.Utils.Module).GetDependentsList(.tList,,..Module.Name)
             if $$$ISERR(tSC) {
@@ -288,6 +289,26 @@ Method CheckBeforeClean(
                 do ..Log("Clean SKIPPED - required by " _ $listlength(tModList) _ " other module" _ $case($listlength(tModList),1:"",:"s") _ ". (" _ $listtostring(tModList,"; ") _ ")")
                 set pSkip = 1
                 quit
+            }
+            // Special check for IPM self-uninstall: block if other modules are installed
+            if (..Module.Name = $$$IPMModuleName) {
+                // Check if other modules are installed
+                set tStmt = ##class(%SQL.Statement).%New()
+                set tSC = tStmt.%Prepare("SELECT COUNT(*) As ModCount FROM %IPM_Storage.ModuleItem WHERE Name != ?")
+                $$$ThrowOnError(tSC)
+                set tRS = tStmt.%Execute($$$IPMModuleName)
+                if tRS.%Next() {
+                    set tCount = tRS.ModCount
+                    if (tCount > 0) {
+                        write !,"Cannot uninstall IPM: ",tCount," module(s) still installed."
+                        write !,"Run 'uninstall -all' first, or use 'uninstall zpm -force' to bypass this check."
+                        write !,"Warning: Using -force will orphan installed modules."
+                        set pSkip = 1
+                        // Unmark the self-uninstall flag since uninstall won't proceed
+                        set $$$IPMSelfUninstallFlag = 0
+                        quit
+                    }
+                }
             }
         }
     } catch e {
