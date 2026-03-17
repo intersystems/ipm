@@ -26,70 +26,67 @@ Method %Clean(ByRef pParams) As %Status
 
         // Special handling for IPM self-uninstall: clean up operational globals
         if (..Module.Name = $$$IPMModuleName) {
-            set tVerbose = $get(pParams("Verbose"))
+            set verbose = $get(pParams("Verbose"))
 
-            // Check if modules were orphaned (user used -force)
-            // IPM is always at index 1, so start checking at index 2
-            set tOrphanedModules = ""
-            set tIndex = 1
-            for {
-                set tIndex = $order(^IPM.Storage.ModuleD(tIndex))
-                quit:tIndex=""
-                set tOrphanedModules = tOrphanedModules _ $listbuild(tIndex)
-            }
+            // Check if user wants full cleanup
+            set fullCleanup = $get(pParams("Clean","FullCleanup"), 0)
 
-            if $listlength(tOrphanedModules) > 0 {
-                // Modules were orphaned - warn user but still clean up
-                write !,"Warning: ",$listlength(tOrphanedModules)," module(s) orphaned:"
+            if fullCleanup {
+                // Full cleanup: delete ALL module records and operational globals
+                write !,"Performing full cleanup of IPM operational globals..."
 
-                // List orphaned modules with versions
-                set tPtr = 0
-                while $listnext(tOrphanedModules, tPtr, tIndex) {
-                    try {
-                        set tModData = ^IPM.Storage.ModuleD(tIndex)
-                        set tModName = $listget(tModData, 2)
-                        set tVersion = $listget(tModData, 4)
-                        write !,"  - ",tModName," (",tVersion,")"
-                    } catch {
-                        write !,"  - (unknown module at index ",tIndex,")"
-                    }
+                kill ^IPM.Storage.ModuleD          // Delete ALL module records (including orphans)
+                kill ^IPM.Storage.ModuleI
+                kill ^IPM.Storage.InvokeReferenceC
+                kill ^IPM.Storage.ResourceReferenceC
+                kill ^IPM.Storage.ResourceReferenceI
+                kill ^IPM.Storage.SystemRequirementsD
+                kill ^IPM.Repo.DefinitionD
+                kill ^IPM.Repo.DefinitionI
+                kill ^IPM.Repo.Filesystem.CacheD
+                kill ^IPM.General.SettingsD
+                kill ^IPM.UpdateStep.AnyMemberD
+                kill ^IPM.UpdateStep.PrimaryOnlyD
+                kill ^IPM.StudioDoc.ModuleStreamD
+                kill ^IPM.StudioDoc.ModuleStreamI
+                kill ^IPM.StudioDoc.ModuleStreamS
+                kill ^IPM.StudioDoc.LocalMsgStreamD
+                kill ^IRIS.Temp.HistoryTempD
+                kill ^IRIS.Temp.IPM.LoadedResourceD
+
+                // Note: Preserve ^IPM.General.HistoryD for audit trail
+                // Note: Preserve ^IPM.settings in %SYS for user preferences
+
+                write:verbose !,"Full cleanup complete: All module records deleted."
+            } else {
+                // Check if modules were orphaned (user used -force)
+                // IPM is always at index 1, so start checking at index 2
+                set tOrphanedModules = ""
+                set tIndex = 1
+                for {
+                    set tIndex = $order(^IPM.Storage.ModuleD(tIndex))
+                    quit:tIndex=""
+                    set tOrphanedModules = tOrphanedModules _ $listbuild(tIndex)
                 }
 
-                write !,"Module classes remain but are no longer managed by IPM."
-                write !,"Recovery options:"
-                write !,"  1. Delete orphaned classes: Do $system.OBJ.DeletePackage([package])"
-                write !,"  2. Reinstall IPM, then reinstall modules from registry"
-            }
+                if $listlength(tOrphanedModules) > 0 {
+                    // Modules were orphaned - warn user but still clean up
+                    write !,"Warning: ",$listlength(tOrphanedModules)," module(s) orphaned:"
 
-            // Always clean up operational globals (whether orphaned or not)
-            if tVerbose {
-                write !,"Cleaning up IPM operational globals..."
-            }
-
-            kill ^IPM.Storage.ModuleD          // Delete ALL module records (including orphans)
-            kill ^IPM.Storage.ModuleI
-            kill ^IPM.Storage.InvokeReferenceC
-            kill ^IPM.Storage.ResourceReferenceC
-            kill ^IPM.Storage.ResourceReferenceI
-            kill ^IPM.Storage.SystemRequirementsD
-            kill ^IPM.Repo.DefinitionD
-            kill ^IPM.Repo.DefinitionI
-            kill ^IPM.Repo.Filesystem.CacheD
-            kill ^IPM.General.SettingsD
-            kill ^IPM.UpdateStep.AnyMemberD
-            kill ^IPM.UpdateStep.PrimaryOnlyD
-            kill ^IPM.StudioDoc.ModuleStreamD
-            kill ^IPM.StudioDoc.ModuleStreamI
-            kill ^IPM.StudioDoc.ModuleStreamS
-            kill ^IPM.StudioDoc.LocalMsgStreamD
-            kill ^IRIS.Temp.HistoryTempD
-            kill ^IRIS.Temp.IPM.LoadedResourceD
-
-            // Note: Preserve ^IPM.General.HistoryD for audit trail
-            // Note: Preserve ^IPM.settings in %SYS for user preferences
-
-            if tVerbose {
-                write !,"IPM operational globals cleaned up (history and settings preserved)."
+                    // List orphaned modules with versions
+                    set tPtr = 0
+                    while $listnext(tOrphanedModules, tPtr, tIndex) {
+                        try {
+                            set tModData = ^IPM.Storage.ModuleD(tIndex)
+                            set tModName = $listget(tModData, 2)
+                            set tVersion = $listget(tModData, 4)
+                            write !,"  - ",tModName," (",tVersion,")"
+                        } catch {
+                            write !,"  - (unknown module at index ",tIndex,")"
+                        }
+                    }
+                    write !,"Reinstalling IPM will automatically re-adopt these modules."
+                }
             }
         }
     } catch e {

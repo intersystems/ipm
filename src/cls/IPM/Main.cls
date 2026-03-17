@@ -2559,6 +2559,38 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         }
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
+
+            // Check if other modules are installed
+            set tHasModules = 0
+            set rs = ##class(%SQL.Statement).%ExecDirect(,
+                "SELECT Name, VersionString FROM %IPM_Storage.ModuleItem WHERE Name != ?",
+                $$$IPMModuleName)
+            if rs.%Next() {
+                set tHasModules = 1
+
+                // Show list of installed modules
+                write !,"The following modules are currently installed:"
+                write !,"  - ",rs.Name," (",rs.VersionString,")"
+                while rs.%Next() {
+                    write !,"  - ",rs.Name," (",rs.VersionString,")"
+                }
+                write !
+
+                if 'tForce {
+                    // Dialog: Ask about full cleanup (downgrade scenario)
+                    write !,"Do you want to fully remove all modules and IPM metadata (except history)?"
+                    write !,"This is required for downgrading IPM. [y/N]: "
+                    read fullCleanupResponse
+                    set tParams("Clean","FullCleanup") = $case($zconvert(fullCleanupResponse,"L"),"y":1,"yes":1,:0)
+                }
+            }
+
+            if tParams("Clean","FullCleanup") {
+                // User chose full cleanup - uninstall all modules
+                write !,"Performing full cleanup: uninstalling all modules..."
+                $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
+            }
+
             // Set flag to indicate self-uninstall - will be checked by Interactive() loop
             set $$$IPMSelfUninstallFlag = 1
         }

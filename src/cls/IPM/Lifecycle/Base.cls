@@ -290,26 +290,6 @@ Method CheckBeforeClean(
                 set pSkip = 1
                 quit
             }
-            // Special check for IPM self-uninstall: block if other modules are installed
-            if (..Module.Name = $$$IPMModuleName) {
-                // Check if other modules are installed
-                set tStmt = ##class(%SQL.Statement).%New()
-                set tSC = tStmt.%Prepare("SELECT COUNT(*) As ModCount FROM %IPM_Storage.ModuleItem WHERE Name != ?")
-                $$$ThrowOnError(tSC)
-                set tRS = tStmt.%Execute($$$IPMModuleName)
-                if tRS.%Next() {
-                    set tCount = tRS.ModCount
-                    if (tCount > 0) {
-                        write !,"Cannot uninstall IPM: ",tCount," module(s) still installed."
-                        write !,"Run 'uninstall -all' first, or use 'uninstall zpm -force' to bypass this check."
-                        write !,"Warning: Using -force will orphan installed modules."
-                        set pSkip = 1
-                        // Unmark the self-uninstall flag since uninstall won't proceed
-                        set $$$IPMSelfUninstallFlag = 0
-                        quit
-                    }
-                }
-            }
         }
     } catch e {
         set tSC = e.AsStatus()
