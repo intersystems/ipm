@@ -262,6 +262,7 @@ Method CheckBeforeClean(
         set tVerbose = $get(pParams("Verbose"))
         set tLevel = $get(pParams("Clean","Level"),0)
         set tRecurse = $get(pParams("Clean","Recurse"),1)
+        set tForce = $get(pParams("Clean","Force"),0)
 
         if (..Module.GlobalScope && '$get(pParams("Clean","GlobalScope"))) {
             do ..Log("Clean SKIPPED - module has global scope.")
@@ -269,7 +270,7 @@ Method CheckBeforeClean(
             quit
         }
 
-        if '$get(pParams("Clean","Force")) {
+        if 'tForce {
             // Check to see if anything depends on this module and return an error status if it does.
             set tSC = ##class(%IPM.Utils.Module).GetDependentsList(.tList,,..Module.Name)
             if $$$ISERR(tSC) {
@@ -487,9 +488,12 @@ Method %Clean(ByRef pParams) As %Status
         }
 
         if (tLevel > 0) && '$get(pParams("Clean","Nested"),0) {
-            set tSC = ##class(%IPM.StudioDocument.Module).Delete(..Module.Name_".ZPM")
-            if $$$ISERR(tSC) {
-                quit
+            // Check if StudioDocument.Module class still exists before trying to delete
+            if $$$comClassDefined("%IPM.StudioDocument.Module") {
+                set tSC = ##class(%IPM.StudioDocument.Module).Delete(..Module.Name_".ZPM")
+                if $$$ISERR(tSC) {
+                    quit
+                }
             }
         }
     } catch e {

@@ -624,19 +624,47 @@ ClassMethod ExecutePhases(
                     // Lifecycle before / (phase) / after
                     new $$$DeployedProjectInstalled
                     $$$ThrowOnError(tLifecycle.OnBeforePhase(tOnePhase,.pParams))
+
+                    // Self-uninstall: Finalize history before Clean phase deletes IPM's own classes
+                    set isSelfUninstall = (tOnePhase = "Clean") && (tModule.Name = $$$IPMModuleName)
+                    if isSelfUninstall && $isobject(pLog) {
+                        // Log the Clean phase completion and finalize now
+                        do pLog.FinalizePhase(tOnePhase, $$$OK)
+                        set tSC = pLog.Finalize($$$OK, 0)
+                        $$$ThrowOnError(tSC)
+                        // Explicitly persist to twin while History classes still exist
+                        $$$ThrowOnError(pLog.PersistToTwin())
+                        // Delete the temp record immediately to prevent %OnClose() from trying to reload it later
+                        $$$ThrowOnError(pLog.%DeleteId(pLog.%Id()))
+                        // Clear the log object reference so it's not used again
+                        set pLog = ""
+                    }
+
                     $$$ThrowOnError($method(tLifecycle,"%"_tOnePhase,.pParams))
+
+                    // Self-uninstall: After Clean deletes IPM's own classes, skip all post-phase callbacks
+                    if isSelfUninstall {
+                        // Print success message before skipping
+                        write !,"["_$namespace_"|"_tModule.DisplayName_"]",$char(9),tOnePhase," SUCCESS"
+                        if tTiming {
+                            write " ("_($zhorolog-tStart)_" s)"
+                        }
+                        // Skip all post-phase processing - classes have been deleted
+                        continue
+                    }
+
                     $$$ThrowOnError(tLifecycle.OnAfterPhase(tOnePhase,.pParams))
                 }
 
                 #; Call Invoke Methods After Phase
                 set tKey = ""
                 for {
-                set tInvoke = tModule.Invokes.GetNext(.tKey)
-                if (tKey = "") || '$isobject(tInvoke) {
-                    quit // '$IsObject can happen reasonably after namespace changes
-                }
-                set tSC = tInvoke.OnAfterPhase(tOnePhase,.pParams)
-                quit:$$$ISERR(tSC)
+                    set tInvoke = tModule.Invokes.GetNext(.tKey)
+                    if (tKey = "") || '$isobject(tInvoke) {
+                        quit // '$IsObject can happen reasonably after namespace changes
+                    }
+                    set tSC = tInvoke.OnAfterPhase(tOnePhase,.pParams)
+                    quit:$$$ISERR(tSC)
                 }
                 quit:$$$ISERR(tSC)
 
@@ -717,7 +745,14 @@ ClassMethod Uninstall(
         set tSC = e.AsStatus()
     }
 	set devMode = $get(pParams("DeveloperMode", 0))
-	set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+	// Only finalize if log wasn't already finalized and deleted (e.g., during self-uninstall)
+	if $isobject(log) {
+		try {
+			set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+		} catch {
+			// Skip if log was already deleted during self-uninstall
+		}
+	}
     quit tSC
 }
 
