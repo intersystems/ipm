@@ -357,11 +357,21 @@ ClassMethod ScanDirectory(
     quit tSC
 }
 
+ClassMethod LockFileValuesToModifiers(
+	lockFileValues As %DynamicObject,
+	Output modifiers)
+{
+    set modifiers("filesystem") = ""
+    set modifiers("name") = lockFileValues.%Get("name")
+    set modifiers("path") = lockFileValues.%Get("root")
+    set modifiers("depth") = lockFileValues.%Get("depth")
+    set modifiers("read-only") = lockFileValues.%Get("readOnly")
+}
+
 XData LockFileMapping
 {
 <Mapping xmlns="http://www.intersystems.com/jsonmapping">
   <Property Name="LockFileType" FieldName="type" />
-  <Property Name="OverriddenSortOrder" FieldName="overriddenSortOrder" />
   <Property Name="ReadOnly" FieldName="readOnly" />
   <Property Name="Root" FieldName="root" />
   <Property Name="Depth" FieldName="depth" />

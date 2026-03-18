@@ -1,14 +1,14 @@
 Class LockModH.Class1
 {
 
-ClassMethod MethodA()
+/// Method renamed from MethodA in v2 to MethodB in v3
+ClassMethod MethodB()
 {
-    write !, "This is LockModH v3 ##class(LockModH.Class1).MethodA()"
+    write !, "This is LockModH v3 ##class(LockModH.Class1).MethodB()"
 
-    write !, "Now calling dependency classes (LockModA, LockModB, LockModE)"
-    do ##class(LockModA.Class1).MethodA()
-    do ##class(LockModB.Class1).MethodA()
+    write !, "Now calling dependency classes (LockModE, LockModB)"
     do ##class(LockModE.Class1).MethodA()
+    do ##class(LockModB.Class1).MethodA()
 }
 
 }
