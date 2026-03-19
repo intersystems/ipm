@@ -41,11 +41,9 @@ Parameter UseStandalonePip = "UseStandalonePip";
 /// Default value is 0, where 1.0.0-anystring is considered a pre-release of 1.0.0, hence 1.0.0-anystring < 1.0.0
 Parameter SemVerPostRelease = "SemVerPostRelease";
 
-/// Configuration setting name used to determine the number of days
-/// to retain IPM history records before they are eligible for cleanup.
-Parameter HistoryRetain = "history_retain";
+Parameter ModuleRoot = "ModuleRoot";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain";
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,ModuleRoot";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -103,6 +101,9 @@ ClassMethod UpdateOne(
     if ('$listfind(SettingsList,key)) {
         write "Config key = """_key_""" not found",!
         quit
+    }
+    if key="ModuleRoot" {
+        do ..CheckDirPermission(value)
     }
     set sc = ..SetValue($parameter(..%ClassName(1),key), value)
     if $$$ISOK(sc) {
@@ -185,9 +186,22 @@ ClassMethod SetAnalyticsAvailable(
     return ..SetValue(..#analytics, +val, overwrite)
 }
 
-ClassMethod GetHistoryRetain() As %Integer
+ClassMethod GetMouleRoot() As %String
 {
-    return ..GetValue(..#HistoryRetain)
+    return ..GetValue(..#ModuleRoot)
+}
+
+ClassMethod CheckDirPermission(directory As %String = "")
+{
+    if directory="" {
+        $$$ThrowOnError($$$ERROR($$$DirectoryNameRequired))
+    }
+    set directory = ##class(%File).NormalizeDirectory(directory)
+    if '##class(%File).DirectoryExists(directory) {
+        $$$ThrowOnError($$$ERROR($$$DirectoryNotFound))
+    } elseif '##class(%File).Writeable(directory) {
+         $$$ThrowOnError($$$ERROR($$$GeneralError,"No write permission on directory "_directory))
+    }
 }
 
 }
