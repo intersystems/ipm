@@ -352,4 +352,43 @@ Method TestUninstallWithoutModuleName()
     do $$$AssertNotTrue(exists, "Module removed successfully.")
 }
 
+/// Validates that the '-outdated' modifier correctly identifies and displays modules with newer registry versions
+Method TestListOutdatedModules()
+{
+    set moduleName = "irisjwt"
+    if $isobject(##class(%IPM.Storage.Module).NameOpen(moduleName)) {
+        do $$$LogMessage(moduleName_" already exist. So uninstalling the module")
+        do ..RunCommand("uninstall "_moduleName)
+    }
+
+    set status = ..RunCommand("install "_moduleName_" 1.0.0")
+    do $$$AssertStatusOK(status, moduleName_" installed at version 1.0.0")
+    do ##class(%IPM.Main).GetOutdatedModulesList(.list)
+
+    set found = 0
+    for i=1:1:list {
+        set moduleInfo = list(i)
+        set currentModuleName = $listget(moduleInfo, 1)
+        set versionString = $listget(moduleInfo, 2)
+
+        // Scrub ANSI color codes
+        set matcher = ##class(%Regex.Matcher).%New("\x1b\[[0-9;]*m", versionString)
+        set cleanString = matcher.ReplaceAll("")
+
+        set cleanString = $zstrip(cleanString, "<>W")
+        set currentVersion = $piece(cleanString, "  ", 1)
+        set serverVersion = $piece(cleanString, "  ", 2)
+        if (moduleName = currentModuleName) {
+            set found = 1
+        }
+        if currentVersion'=serverVersion {
+            do $$$AssertNotEquals(currentVersion, serverVersion, "Version mismatch detected for "_moduleName)
+            do $$$LogMessage(currentVersion_"  "_serverVersion)
+            do $$$LogMessage("Currently installed "_currentModuleName_" (local:"_currentVersion_") has a newer version available (server:"_serverVersion_")")
+        }
+    }
+    do $$$AssertTrue(found, "The module "_moduleName_" was found in the outdated list")
+    do ..RunCommand("list -o")
+}
+
 }

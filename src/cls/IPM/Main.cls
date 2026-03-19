@@ -526,6 +526,9 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <example description="Shows all installed Python packages.">
     list -python
 </example>
+<example description="Lists all installed modules with available updates in the registry.">
+    list -outdated
+</example>
 
 <!-- Parameters -->
 <parameter name="searchString" description="Search string, * can be used." />
@@ -538,6 +541,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 <modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of IPM modules." />
+<modifier name="outdated" aliases="o" description="If specified, only lists installed modules that have available updates in the registry. Modules installed as dependencies are skipped." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -2757,6 +2761,12 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 		do ..DisplayModules(.list,,,, .tModifiers)
 		quit
 	}
+    if $data(pCommandInfo("modifiers","outdated")) {
+        merge tModifiers = pCommandInfo("modifiers")
+        do ..GetOutdatedModulesList(.list)
+        do ..DisplayModules(.list,,,, .tModifiers)
+        quit
+    }
     if (''$data(pCommandInfo("modifiers","tree"))) {
         // Show tree of dependencies as well.
         // Modules that are dependencies for no other are shown at the top level.
@@ -2821,8 +2831,7 @@ ClassMethod GetListModule(
 {
     new $namespace
     set $namespace=ns
-    set tRes = ##class(%SQL.Statement).%ExecDirect(,
-        "select * from %IPM_Storage.ModuleItem")
+    set tRes = ##class(%SQL.Statement).%ExecDirect(, "select * from %IPM_Storage.ModuleItem")
     $$$ThrowSQLIfError(tRes.%SQLCODE,tRes.%Message)
     set in=""
     while tRes.%Next(.tSC) {
@@ -4169,6 +4178,47 @@ ClassMethod Update(ByRef pCommandInfo)
         // Call ..Install() in order to install the newer version of the module.
         do ..Install(.pCommandInfo, log)
     }
+}
+
+ClassMethod GetOutdatedModulesList(Output list)
+{
+    // Get the dependencies list to prevent displaying an outdated list
+    set depRes = ##class(%SQL.Statement).%ExecDirect(,
+            "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
+            "from %IPM_Storage.ModuleItem_Dependencies")
+    $$$ThrowSQLIfError(depRes.%SQLCODE, depRes.%Message)
+    while depRes.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set visitedMap($zconvert(depRes.%Get("DepName"),"l")) = 1
+    }
+    $$$ThrowOnError(sc)
+
+    do ..GetListModules($namespace, , .installedModules)
+    do ..GetUpstreamPackageVersions(.serverModuleVersions)
+
+    set width = 0
+    for i=1:1:installedModules {
+        set moduleInfo = installedModules(i)
+        set moduleName = $listget(moduleInfo)
+
+        // Skip processing if the module is a dependency module
+        if moduleName="zpm"||($data(visitedMap(moduleName))) {
+            continue
+        }
+
+        set currentVersion =  $listget(moduleInfo,2)
+        if $data(serverModuleVersions(moduleName)) {
+            set reg = $order(serverModuleVersions(moduleName,""),1,versionString)
+            if currentVersion'=versionString {
+                set currentwidth = $length(moduleName)
+                set list($increment(list)) = $listbuild(moduleName,$$$FormattedLine($$$Red, currentVersion)_"  "_$$$FormattedLine($$$Green,versionString))
+                if width<currentwidth {
+                    set width = currentwidth
+                }
+            }
+        }
+    }
+    set list("width") = width
 }
 
 ClassMethod GetPythonInstalledLibs(Output list)
