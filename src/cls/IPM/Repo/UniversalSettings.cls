@@ -45,7 +45,10 @@ Parameter SemVerPostRelease = "SemVerPostRelease";
 /// to retain IPM history records before they are eligible for cleanup.
 Parameter HistoryRetain = "history_retain";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain";
+/// Specifies the serialization format (JSON, TOON, YAML) for unit and integration test results in the shell.
+Parameter TestReportFormat = "TestReportFormat";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -188,6 +191,18 @@ ClassMethod SetAnalyticsAvailable(
 ClassMethod GetHistoryRetain() As %Integer
 {
     return ..GetValue(..#HistoryRetain)
+}
+
+ClassMethod SetTestReportFormat(
+	val As %String,
+	overwrite As %Boolean = 1) As %Boolean
+{
+    return ..SetValue(..#TestReportFormat, val, overwrite)
+}
+
+ClassMethod GetTestReportFormat() As %String
+{
+     return ..GetValue(..#TestReportFormat)
 }
 
 }
