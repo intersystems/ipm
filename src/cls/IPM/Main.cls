@@ -2822,37 +2822,40 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
         }
         merge tModifiers = pCommandInfo("modifiers")
         set sortMode = $$$lcase($get(pCommandInfo("modifiers", "sort")))
-        set type = $extract(sortMode, 1) // "d", "n", or "v"
-        set isDesc = (sortMode [ "-d")
-        set sortMode = $case(type, "n":"name", "d":"date", "v":"version", :"name")
-        if isDesc {
-            set sortMode = sortMode_"-desc"
-        }
-        set newlist =""
+
         if sortMode'="" {
+            set newlist =""
+            set type = $extract(sortMode, 1) // "d", "n", or "v"
+            set isDesc = (sortMode [ "-d")
+            set sortMode = $case(type, "n":"name", "d":"date", "v":"version", :"name")
+            if isDesc {
+                set sortMode = sortMode_"-desc"
+            }
             for i=1:1:list {
                 set entry = list(i)
                 set name = $listget(entry,1)
                 set entry = entry_$listbuild(i)
                 if sortMode["name"{
-                    set newlist($$$lcase(name))=entry
-                }
-                if sortMode["date" {
+                    set newlist($$$lcase(name),i)=entry
+                } elseif sortMode["date" {
                     set date = $listget(entry,6)
-                    set newlist(date)=entry
-                }
-                if sortMode["version" {
-                    set newlist($listfromstring($listget(entry,2),"."))=entry
+                    set newlist(date,name) = entry
+                } elseif sortMode["version" {
+                    set newlist($listfromstring($listget(entry,2),"."),name) = entry
                 }
                 kill list(i)
             }
             set direction = $select(sortMode [ "desc": -1, 1: 1)
-            set mod = ""
+            set sub = ""
             if $data(newlist)>1 {
                 // create new list based on the sorting
                 for {
-                    set mod = $order(newlist(mod),direction,data) quit:mod=""
-                    set list($increment(mlist))=data
+                    set sub = $order(newlist(sub),direction) quit:sub=""
+                    set mod=""
+                    for {
+                        set mod = $order(newlist(sub,mod),direction,data) quit:mod=""
+                        set list($increment(mlist))=data
+                    }
                 }
             }
         }
