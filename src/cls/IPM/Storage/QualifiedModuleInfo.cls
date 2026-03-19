@@ -20,8 +20,6 @@ Method %OnNew(
         set ..Version = pResolvedReference.Version
         set ..Deployed = pResolvedReference.Deployed
         set ..PlatformVersions = pResolvedReference.PlatformVersions
-        set ..VersionString = pResolvedReference.VersionString
-        set ..AllVersions = pResolvedReference.AllVersions
     }
     quit $$$OK
 }
