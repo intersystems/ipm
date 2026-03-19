@@ -541,7 +541,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 <modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of IPM modules." />
-<modifier name="outdated" aliases="o" description="If specified, only lists installed modules that have available updates in the registry. Modules installed only as dependencies are skipped." />
+<modifier name="outdated" aliases="o" description="If specified, only lists installed modules that have available updates in the registry. Modules installed as dependencies are skipped." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -4180,10 +4180,9 @@ ClassMethod Update(ByRef pCommandInfo)
     }
 }
 
-ClassMethod GetOutdatedModulesList(Output List)
+ClassMethod GetOutdatedModulesList(Output list)
 {
     // Get the dependencies list to prevent displaying an outdated list
-    set List=""
     set depRes = ##class(%SQL.Statement).%ExecDirect(,
             "select ModuleItem->Name ModName,Dependencies_Name DepName,Dependencies_VersionString DepVer "_
             "from %IPM_Storage.ModuleItem_Dependencies")
@@ -4212,14 +4211,14 @@ ClassMethod GetOutdatedModulesList(Output List)
             set reg = $order(serverModuleVersions(moduleName,""),1,versionString)
             if currentVersion'=versionString {
                 set currentwidth = $length(moduleName)
-                set List($increment(List)) = $listbuild(moduleName,$$$FormattedLine($$$Red, currentVersion)_"  "_$$$FormattedLine($$$Green,versionString))
+                set list($increment(list)) = $listbuild(moduleName,$$$FormattedLine($$$Red, currentVersion)_"  "_$$$FormattedLine($$$Green,versionString))
                 if width<currentwidth {
                     set width = currentwidth
                 }
             }
         }
     }
-    set List("width") = width
+    set list("width") = width
 }
 
 ClassMethod GetPythonInstalledLibs(Output list)
