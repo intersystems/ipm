@@ -10,6 +10,7 @@ ROUTINE %IPM.Formatting [Type=INC]
 
 /// Creates the control sequence for the formatting based on the code
 #define ControlSequence(%code) $Char(27)_"["_%code_"m"
+#define ClearLineAndMoveUp $char(13),*27,"[K",*27,"[A"
 
 #; Codes to add to convert format types
 #define Reset 20
