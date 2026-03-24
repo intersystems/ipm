@@ -18,6 +18,12 @@ Method SaveResult(duration)
 {
     do ##super(.duration)
     set ^||%UnitTest.Manager.LastResult = i%LogIndex
+
+    // Accumulate ALL test LogIndexes in an array
+    // Uses $increment to append so nested calls add to the array
+    set tCount = $increment(^||%UnitTest.Manager.AllResultsCount)
+    set ^||%UnitTest.Manager.AllResults(tCount) = i%LogIndex
+
     quit
 }
 
@@ -91,6 +97,65 @@ ClassMethod GetLastStatus(Output pFailureCount As %Integer) As %Status
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Check all test LogIndexes accumulated in AllResults and return aggregated status
+/// Returns error if any test had failures
+/// startIndex: Only check results from this index onwards (for nested phases, e.g. calling `zpm verify` inside `zpm verify`)
+ClassMethod GetAllTestsStatus(
+	Output failureCount As %Integer,
+	startIndex As %Integer = 0) As %Status
+{
+    set sc = $$$OK
+    set failureCount = 0
+    try {
+        set testCount = $get(^||%UnitTest.Manager.AllResultsCount, 0)
+
+        // If no tests were tracked, fall back to GetLastStatus
+        if (testCount = 0) {
+            return ##class(%IPM.Test.Manager).GetLastStatus(.failureCount)
+        }
+
+        // Check tracked test LogIndexes from startIndex onwards
+        // This ensures nested phases only see their own results, not parent's
+        for i=(startIndex+1):1:testCount {
+            set logIndex = $get(^||%UnitTest.Manager.AllResults(i))
+            if (logIndex '= "") {
+                // Query for assertion failures in this test run (matches GetLastStatus pattern)
+                set res = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
+                    "from %UnitTest_Result.TestAssert where Status = 0 "_
+                    "and TestMethod->TestCase->TestSuite->TestInstance->InstanceIndex = ?",logIndex)
+                if (res.%SQLCODE < 0) {
+                    throw ##class(%Exception.SQL).CreateFromSQLCODE(res.%SQLCODE,res.%Message)
+                }
+                do res.%Next(.sc)
+                $$$ThrowOnError(sc)
+                set failures = res.%GetData(1)
+                set failureCount = failureCount + failures
+
+                // Also check for test suite failures (e.g., loading errors)
+                if (failures = 0) {
+                    set res = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
+                        "from %UnitTest_Result.TestSuite where Status = 0 "_
+                        "and TestInstance->InstanceIndex = ?",logIndex)
+                    if (res.%SQLCODE < 0) {
+                        throw ##class(%Exception.SQL).CreateFromSQLCODE(res.%SQLCODE,res.%Message)
+                    }
+                    do res.%Next(.sc)
+                    $$$ThrowOnError(sc)
+                    set failures = res.%GetData(1)
+                    set failureCount = failureCount + failures
+                }
+            }
+        }
+
+        if (failureCount > 0) {
+            set sc = $$$ERROR($$$GeneralError, failureCount_" assertion(s) failed.")
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 ClassMethod OutputFailures()

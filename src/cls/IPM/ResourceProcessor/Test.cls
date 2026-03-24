@@ -97,6 +97,16 @@ Method OnPhase(
 {
     set tSC = $$$OK
     try {
+        // Initialize test result accumulator for this phase if not already initialized (i.e., we're at top level, not nested)
+        // This way nested Shell calls append to parent's AllResults instead of wiping it
+        if '$data(^||%UnitTest.Manager.AllResultsCount) {
+            kill ^||%UnitTest.Manager.AllResults
+            set ^||%UnitTest.Manager.AllResultsCount = 0
+        }
+
+        // Track where this phase's results start (for nested phases)
+        set phaseStartIndex = $get(^||%UnitTest.Manager.AllResultsCount, 0)
+
         if ..TestsShouldRun(pPhase,.pParams) {
             // In test/verify phase, run unit tests.
             set tVerbose = $get(pParams("Verbose"), 0)
@@ -204,7 +214,7 @@ Method OnPhase(
             // By default, detect and report unit test failures as an error from this phase
             if $get(pParams("UnitTest","FailuresAreFatal"),1) {
                 do ##class(%IPM.Test.Manager).OutputFailures()
-                set tSC = ##class(%IPM.Test.Manager).GetLastStatus()
+                set tSC = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
                 $$$ThrowOnError(tSC)
             }
             write !
