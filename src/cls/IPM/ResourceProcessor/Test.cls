@@ -213,7 +213,7 @@ Method OnPhase(
 
             // By default, detect and report unit test failures as an error from this phase
             if $get(pParams("UnitTest","FailuresAreFatal"),1) {
-                do ##class(%IPM.Test.Manager).OutputFailures()
+                do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
                 set tSC = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
                 $$$ThrowOnError(tSC)
             }
