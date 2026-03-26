@@ -774,6 +774,11 @@ Method InstallOrDownloadPythonRequirements(
             set processType = "requirements.txt"
             do ..Log(processType _ " START")
             write:tVerbose !
+
+            // Clean up existing package installations before pip install
+            // This is necessary because pip with --python-version doesn't check/uninstall existing packages
+            do ..CleanupPythonInstallation(pythonRequirements, target, tVerbose)
+
             set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
             if tVerbose {
                 write !, "Running "
@@ -914,6 +919,69 @@ ClassMethod DetectPipCaller(
     }
 
     throw ##class(%Exception.General).%New("Could not find a suitable pip caller. Consider setting UseStandalonePip and PipCaller")
+}
+
+/// Cleans up the existing Python package installation in the specified target directory based on the given requirements.txt file
+ClassMethod CleanupPythonInstallation(
+	filename As %String,
+	targetDirectory As %String,
+	verbose As %Boolean)
+{
+    set file = ##class(%Stream.FileCharacter).%New()
+    set file.Filename = filename
+    while 'file.AtEnd {
+        set line = $zstrip(file.ReadLine(), "<>W")
+        // Skip comments and empty lines
+        continue:line=""
+        continue:$extract(line,1)="#"
+
+        // Extract package name (before any version operator)
+        set packageName = line
+        for operator = "==", ">=", "<=", "!=", "~=", ">", "<" {
+            set packageName = $piece(packageName, operator, 1)
+        }
+        set packageName = $zstrip(packageName, "<>W")
+
+        if packageName '= "" {
+            // Remove package directory: <target>/<package>/
+            set packageDir = ##class(%File).NormalizeDirectory(packageName, targetDirectory)
+            if ##class(%File).DirectoryExists(packageDir) {
+                set removed = ##class(%File).RemoveDirectoryTree(packageDir)
+                if verbose && removed {
+                    write !, "Removed old package directory: ", packageDir
+                }
+            }
+
+            // Remove dist-info directories: <target>/<package>-*.dist-info/
+            set pattern = targetDirectory _ packageName _ "-*.dist-info"
+            set distInfo = $zsearch(pattern)
+            while distInfo '= "" {
+                if ##class(%File).DirectoryExists(distInfo) {
+                    set removed = ##class(%File).RemoveDirectoryTree(distInfo)
+                    if verbose && removed {
+                        write !, "Removed old dist-info: ", distInfo
+                    }
+                }
+                set distInfo = $zsearch("")
+            }
+
+            // Also handle underscore variant: <package>_<name>-*.dist-info/
+            set packageUnderscore = $replace(packageName, "-", "_")
+            if packageUnderscore '= packageName {
+                set pattern = targetDirectory _ packageUnderscore _ "-*.dist-info"
+                set distInfo = $zsearch(pattern)
+                while distInfo '= "" {
+                    if ##class(%File).DirectoryExists(distInfo) {
+                        set removed = ##class(%File).RemoveDirectoryTree(distInfo)
+                        if verbose && removed {
+                            write !, "Removed old dist-info: ", distInfo
+                        }
+                    }
+                    set distInfo = $zsearch("")
+                }
+            }
+        }
+    }
 }
 
 Method %Validate(ByRef pParams) As %Status
