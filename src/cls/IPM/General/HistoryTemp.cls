@@ -51,6 +51,7 @@ Method PersistToTwin() As %Status
             set ..PersistedTwin.Phases = ..Phases
             // Mark as finalized and record should be locked
             set ..PersistedTwin.Finalized = 1
+            // Ensure the persisted twin is saved (automatically included by saving this temp object)
             set sc = ..%Save()
         }
     }

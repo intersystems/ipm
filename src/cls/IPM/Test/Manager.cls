@@ -100,6 +100,12 @@ ClassMethod GetAllTestsStatus(
         if (failureCount > 0) {
             set sc = $$$ERROR($$$GeneralError, failureCount_" assertion(s) failed.")
         }
+
+        // Only clean up AllResults at top level (startIndex=0), not in nested phases
+        if (startIndex = 0) {
+            kill ^||%UnitTest.Manager.AllResults
+            kill ^||%UnitTest.Manager.AllResultsCount
+        }
     } catch e {
         set sc = e.AsStatus()
     }
@@ -123,11 +129,6 @@ ClassMethod OutputFailures(startIndex As %Integer = 0)
             }
         }
 
-        // Only clean up AllResults at top level (startIndex=0), not in nested phases
-        if (startIndex = 0) {
-            kill ^||%UnitTest.Manager.AllResults
-            kill ^||%UnitTest.Manager.AllResultsCount
-        }
     } catch e {
         set sc = e.AsStatus()
     }
