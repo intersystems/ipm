@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="all-resources-module.ZPM">
+    <Module>
+      <Name>all-resources-module</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="AllResources.Main.CLS" />
+      <Resource Name="AllResources.Generated.CLS" Generated="true" />
+      <Resource Name="AllResources.INC" />
+      <CPF Name="config.cpf" />
+      <FileCopy Name="test-data.txt" Target="${mgrdir}../all-resources-data.txt" />
+      <PythonWheel Name="mockpackage-1.0.0-py3-none-any.whl" />
+      <WebApplication
+        Name="/allresources"
+        NameSpace="${namespace}"
+        Path="csp/allresources"
+        Recurse="1"
+        ServeFiles="1"
+        AuthenticationMethods="32"
+        IsNameSpaceDefault="true"
+        MatchRoles=":%DB_${namespace}"
+      />
+    </Module>
+  </Document>
+</Export>
