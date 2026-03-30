@@ -126,6 +126,37 @@ This command is an alias for `module-action module-name package`
 <modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="If specified, exports Python dependencies. If omitted, defaults to false." />
 </command>
 
+<command name="package-source" dataPrefix="D">
+<description>
+Creates a .tgz archive of module source files. Equivalent to the existing `package` command.
+</description>
+<parameter name="module" required="true" description="Name of module to package" />
+<modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="Controls whether dependencies are exported." />
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Exports Python dependencies." />
+</command>
+
+<command name="package-database" dataPrefix="D">
+<description>
+Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), and dependencies.xml.
+</description>
+<parameter name="module" required="true" description="Name of module to package as database" />
+<modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
+<modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
+<modifier name="include-test-resources" dataAlias="IncludeTestResources" dataValue="1" description="Include test resources (Scope=test or Scope=verify) in the package. Excluded by default." />
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Exports Python dependencies into wheels/ subdirectory. Defaults to true for database packages." />
+<modifier name="db-name" dataAlias="DatabaseName" value="true" description="Name for the new temporary database. Auto-generated if omitted." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="package-studio-project" dataPrefix="D">
+<description>
+Creates a Studio project package. Deprecated: will be removed in IPM 1.0.0. Equivalent to using `package` on a module with Packaging=studio-project.
+</description>
+<parameter name="module" required="true" description="Name of module to package as Studio project" />
+<modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the package." />
+</command>
+
 <command name="verify" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name verify`
@@ -1062,6 +1093,20 @@ ClassMethod ShellInternal(
                 do ..Unpublish(.tCommandInfo)
             }  elseif (tCommandInfo = "update") {
                 do ..Update(.tCommandInfo)
+            } elseif (tCommandInfo = "package-source") {
+                // Identical to "package": route to the Package phase using current lifecycle
+                set tCommandInfo = "package"
+                do ..RunOnePhase(.tCommandInfo)
+            } elseif (tCommandInfo = "package-database") {
+                // Force the Database lifecycle class and route to the Package phase
+                set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.Database"
+                set tCommandInfo = "package"
+                do ..RunOnePhase(.tCommandInfo)
+            } elseif (tCommandInfo = "package-studio-project") {
+                // Force the StudioProject lifecycle class and route to the Package phase
+                set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.StudioProject"
+                set tCommandInfo = "package"
+                do ..RunOnePhase(.tCommandInfo)
             } elseif ($listfind(..#STANDARDPHASES,tCommandInfo)) {
                 do ..RunOnePhase(.tCommandInfo)
             } elseif (tCommandInfo = "generate") {

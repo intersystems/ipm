@@ -1465,8 +1465,19 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
             if (..Packaging = "") {
                 set ..Packaging = tPackaging
             } elseif (..Packaging '= tPackaging) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
-                quit
+                // The lifecycle class is still the default but Packaging has been changed.
+                // Try to derive the correct class from the Packaging value.
+                set tDerived = $$$DefaultLifecyclePackageDot _ $case(..Packaging,
+                    "application":    "Application",
+                    "database":       "Database",
+                    "studio-project": "StudioProject",
+                    :                 "")
+                if (tDerived '= $$$DefaultLifecyclePackageDot) && $$$comClassDefined(tDerived) {
+                    set ..LifecycleClass = tDerived
+                } else {
+                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
+                    quit
+                }
             }
         } elseif (..LifecycleClass = "") && (..Packaging '= "") {
               set ..LifecycleClass = $case(..Packaging,"application": "Application", : "Module")
