@@ -58,7 +58,7 @@ Method TestSimplePackageAndInstall()
     do $$$AssertStatusOK(sc, "Loaded simple module successfully")
 
     // Package as database package
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
     do $$$AssertStatusOK(sc, "Packaged module as database package")
 
     // Verify package file exists
@@ -134,7 +134,7 @@ Method TestSimplePackageAndInstall()
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir2)
     do $$$AssertStatusOK(sc, "Loaded dependency module")
 
-    set sc = ##class(%IPM.Main).Shell("package dep-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database dep-module")
     do $$$AssertStatusOK(sc, "Packaged dep-module as database")
 
     set packageFile2 = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "dep-module-1.0.0-database.tgz"
@@ -171,7 +171,7 @@ Method TestPackageAndInstallWithDependencies()
     set sc = ##class(%IPM.Main).Shell("load -v " _ depModuleDir)
     do $$$AssertStatusOK(sc, "Loaded dependency module")
 
-    set sc = ##class(%IPM.Main).Shell("package dep-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database dep-module")
     do $$$AssertStatusOK(sc, "Packaged dependency module")
 
     // Now load and package the module with dependencies
@@ -179,7 +179,7 @@ Method TestPackageAndInstallWithDependencies()
     set sc = ##class(%IPM.Main).Shell("load -v " _ mainModuleDir)
     do $$$AssertStatusOK(sc, "Loaded module with dependencies")
 
-    set sc = ##class(%IPM.Main).Shell("package main-with-deps -database")
+    set sc = ##class(%IPM.Main).Shell("package-database main-with-deps")
     do $$$AssertStatusOK(sc, "Packaged module with dependencies")
 
     // Verify dependencies.xml is created correctly
@@ -226,7 +226,7 @@ Method TestPackageAndInstallAllResourceTypes()
     do $$$AssertStatusOK(sc, "Loaded module with all resources")
 
     // Package as database
-    set sc = ##class(%IPM.Main).Shell("package all-resources-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module")
     do $$$AssertStatusOK(sc, "Packaged module with all resources")
 
     set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "all-resources-module-1.0.0-database.tgz"
@@ -282,7 +282,7 @@ Method TestPackageAndInstallWithTestResources()
     do $$$AssertStatusOK(sc, "Loaded module with test resources")
 
     // Package WITH test resources
-    set sc = ##class(%IPM.Main).Shell("package module-with-tests -database -include-test-resources")
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -include-test-resources")
     do $$$AssertStatusOK(sc, "Packaged with test resources")
 
     // Install and verify test resources are present
@@ -300,7 +300,7 @@ Method TestPackageAndInstallWithTestResources()
 
     // Package WITHOUT test resources (default)
     set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("package module-with-tests -database")
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests")
     do $$$AssertStatusOK(sc, "Packaged without test resources")
 
     set packageFileNoTests = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "module-with-tests-1.0.0-database.tgz"
@@ -334,7 +334,7 @@ Method TestPackageWithUseCurrentDbFlag()
     do $$$AssertStatusOK(sc, "Loaded simple module")
 
     // Package with -use-current-db flag
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module -database -use-current-db")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -use-current-db")
     do $$$AssertStatusOK(sc, "Packaged with -use-current-db flag")
 
     // Verify package was created
@@ -358,7 +358,7 @@ Method TestPackagingAndInstallValidation()
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module")
 
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
     do $$$AssertStatusOK(sc, "Packaged module")
 
     set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
@@ -412,7 +412,7 @@ Method TestBackupAndRollback()
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module")
 
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
     do $$$AssertStatusOK(sc, "Packaged module")
 
     set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
@@ -461,7 +461,7 @@ Method TestUpgradeDatabaseToDatabase()
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module v1.0.0")
 
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
     do $$$AssertStatusOK(sc, "Packaged v1.0.0")
 
     set packageV1 = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
@@ -523,7 +523,7 @@ Method TestUpgradeSourceToDatabase()
 
     // Now package as database and upgrade
     set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
     do $$$AssertStatusOK(sc, "Packaged as database")
 
     set dbPackage = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
@@ -551,7 +551,7 @@ Method TestUninstallDatabasePackage()
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module")
 
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
     do $$$AssertStatusOK(sc, "Packaged module")
 
     set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
@@ -602,7 +602,7 @@ Method TestMixedPackaging()
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded database module")
 
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
     do $$$AssertStatusOK(sc, "Packaged as database")
 
     set dbPackageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
@@ -650,7 +650,7 @@ Method TestMixedPackaging()
     set sc = ##class(%IPM.Main).Shell("load -v " _ allResDir)
     do $$$AssertStatusOK(sc, "Loaded second module")
 
-    set sc = ##class(%IPM.Main).Shell("package all-resources-module -database")
+    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module")
     do $$$AssertStatusOK(sc, "Packaged second module as database")
 
     set dbPackage2 = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "all-resources-module-1.0.0-database.tgz"
