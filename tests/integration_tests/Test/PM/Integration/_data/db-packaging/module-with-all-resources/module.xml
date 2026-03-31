@@ -11,7 +11,7 @@
       <Resource Name="AllResources.INC" />
       <CPF Name="config.cpf" />
       <FileCopy Name="test-data.txt" Target="${mgrdir}../all-resources-data.txt" />
-      <PythonWheel Name="mockpackage-1.0.0-py3-none-any.whl" />
+      <PythonWheel Name="lune-1.6.2-py3-none-any.whl" />
       <WebApplication
         Name="/allresources"
         NameSpace="${namespace}"
