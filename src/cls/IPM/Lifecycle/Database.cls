@@ -1,3 +1,5 @@
+Include %syPrompt
+
 /// Database packaging lifecycle. Packages a module as an IRIS.DAT file inside a .tgz.
 /// The .tgz contains IRIS.DAT, an enriched module.xml with SHA-256 checksum,
 /// and a dependencies.xml compiling all dependency manifests.
@@ -18,6 +20,7 @@ Method %Package(ByRef params) As %Status
     set stagingDir = ""
     set dbRemapped = 0
     set ns = $namespace
+    new $namespace
 
     try {
         set verbose = $get(params("Verbose"))
@@ -34,9 +37,9 @@ Method %Package(ByRef params) As %Status
         if useCurrentDB {
             // -use-current-db: use the existing routines DB directly, no remapping
             // Note: globals mapping is unchanged throughout — IPM metadata stays in globals DB
-            new $namespace
             set $namespace = "%SYS"
             $$$ThrowOnError(##class(Config.Namespaces).Get(ns, .nsProps))
+            set $namespace = ns
             set curDBName = $get(nsProps("Routines"))
             set tempDBPath = ##class(%Library.File).NormalizeDirectory(
                 ##class(%Library.File).ManagerDirectory() _ curDBName)
@@ -243,35 +246,67 @@ Method LoadResourcesIntoDatabase(
     $$$ThrowOnError(..%Compile(.loadParams))
 }
 
-/// During database packaging without -include-test-resources,
-/// skip test-scoped resources so they don't get compiled into the DB.
+/// Returns 1 if the current context is a database package install.
+/// Both conditions required: module declares database packaging (not just a lifecycle override
+/// for source packaging) AND IRIS.DAT is present in the module root (extracted package dir).
+Method IsInstallContext() As %Boolean [ Private ]
+{
+    set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", ..Module.Root)
+    quit (..Module.Packaging = "database") && ##class(%Library.File).Exists(irisDAT)
+}
+
+/// Handles three contexts:
+/// - Install (Packaging=database and IRIS.DAT in root): skip source loading entirely.
+/// - Database packaging inside %Package (params("DatabasePackaging")=1):
+///   load resources into temp DB, filtering test scope unless requested.
+/// - All other contexts (packaging phase chain on source): delegate to ##super.
 Method %Reload(ByRef params) As %Status
 {
-    set sc = $$$OK
-    try {
-        set orderedResourceList = ..Module.GetOrderedResourceList()
-        set tKey = ""
-        for {
-            #dim tResource As %IPM.Storage.ResourceReference
-            set tResource = orderedResourceList.GetNext(.tKey)
-            quit:tKey=""
+    // Install context: IRIS.DAT already in place — no source to reload.
+    if ..IsInstallContext() {
+        quit $$$OK
+    }
 
-            // Skip test-scoped resources unless -include-test-resources was specified
-            if '$get(params("IncludeTestResources")) {
-                set scope = $zconvert(tResource.Scope, "L")
-                if (scope = "test") || (scope = "verify") {
-                    continue
+    // Inside %Package.LoadResourcesIntoDatabase: load resources, filtering test scope.
+    if $get(params("DatabasePackaging")) {
+        set sc = $$$OK
+        try {
+            set orderedResourceList = ..Module.GetOrderedResourceList()
+            set tKey = ""
+            for {
+                #dim tResource As %IPM.Storage.ResourceReference
+                set tResource = orderedResourceList.GetNext(.tKey)
+                quit:tKey=""
+
+                if '$get(params("IncludeTestResources")) {
+                    set scope = $zconvert(tResource.Scope, "L")
+                    if (scope = "test") || (scope = "verify") {
+                        continue
+                    }
+                }
+
+                if $isobject(tResource.Processor) && tResource.IsInScope("Reload") {
+                    $$$ThrowOnError(tResource.Processor.OnPhase("Reload", .params))
                 }
             }
-
-            if $isobject(tResource.Processor) && tResource.IsInScope("Reload") {
-                $$$ThrowOnError(tResource.Processor.OnPhase("Reload", .params))
-            }
+        } catch ex {
+            set sc = ex.AsStatus()
         }
-    } catch ex {
-        set sc = ex.AsStatus()
+        quit sc
     }
-    quit sc
+
+    // Packaging phase chain on source module: delegate to Base.
+    quit ##super(.params)
+}
+
+/// During a database package install, there is no source to compile.
+/// In all other contexts, delegate to ##super.
+Method %Compile(ByRef pParams) As %Status
+{
+    if ..IsInstallContext() {
+        quit $$$OK
+    }
+    quit ##super(.pParams)
 }
 
 /// Computes the SHA-256 hash of a file and returns it as a lowercase hex string (64 chars).
@@ -495,6 +530,249 @@ Method AssemblePackage(
     write:verbose !, "Database package generated:", !, $char(9), packageFile
 
     quit packageFile
+}
+
+/// Pre-install validation for a database swap.
+/// Throws on any failure. Does not modify any state.
+Method ValidateBeforeSwap(
+	packageDir As %String,
+	ns As %String) [ Private ]
+{
+    set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
+    if '##class(%Library.File).Exists(irisDAT) {
+        set msg = "Database package is missing IRIS.DAT in: " _ packageDir
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    }
+    if ##class(%Library.File).GetFileSize(irisDAT) <= 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "IRIS.DAT in database package is zero-sized."))
+    }
+
+    set moduleXML = ##class(%Library.File).NormalizeFilename("module.xml", packageDir)
+    if '##class(%Library.File).Exists(moduleXML) {
+        set msg = "Database package is missing module.xml in: " _ packageDir
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    }
+
+    set xmlStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(xmlStream.LinkToFile(moduleXML))
+    $$$ThrowOnError(##class(%XML.XPATH.Document).CreateFromStream(xmlStream, .xpathDoc))
+
+    $$$ThrowOnError(xpathDoc.EvaluateExpression("/Export/Document/Module/Packaging", "text()", .packagingResults))
+    set packagingValue = $select(packagingResults.Count() > 0: packagingResults.GetAt(1).Value, 1: "")
+    if packagingValue '= "database" {
+        set msg = "module.xml does not declare <Packaging>database</Packaging>. Got: " _ packagingValue
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    }
+
+    set depsXML = ##class(%Library.File).NormalizeFilename("dependencies.xml", packageDir)
+    if '##class(%Library.File).Exists(depsXML) {
+        set msg = "Database package is missing dependencies.xml in: " _ packageDir
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    }
+
+    $$$ThrowOnError(xpathDoc.EvaluateExpression("/Export/Document/Module/Checksum", "text()", .checksumResults))
+    if checksumResults.Count() = 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "module.xml is missing <Checksum> element."))
+    }
+    set expectedChecksum = checksumResults.GetAt(1).Value
+    set actualChecksum = ..ComputeSHA256Hex(irisDAT)
+    if $zconvert(actualChecksum, "L") '= $zconvert(expectedChecksum, "L") {
+        set msg = "IRIS.DAT SHA-256 mismatch. Expected: " _ expectedChecksum _ " Actual: " _ actualChecksum
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    }
+
+    // Validate IPM is not in the target namespace's routines DB
+    do ..ValidateIPMNotInRoutinesDB()
+}
+
+/// Dismounts the current routines DB, renames IRIS.DAT to a timestamped backup,
+/// moves the packaged IRIS.DAT into place, and remounts.
+/// Sets dbDir and backupPath for use in rollback on failure.
+Method PerformDatabaseSwap(
+	packageDir As %String,
+	ns As %String,
+	Output dbDir As %String,
+	Output backupPath As %String) [ Private ]
+{
+    set dbDir = ""
+    set backupPath = ""
+
+    new $namespace
+    set $namespace = "%SYS"
+
+    $$$ThrowOnError(##class(Config.Namespaces).Get(ns, .nsProps))
+    set routinesDBName = $get(nsProps("Routines"))
+    set dbDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
+
+    $$$ThrowOnError(##class(SYS.Database).DismountDatabase(dbDir))
+
+    // Rename current IRIS.DAT to timestamped backup: IRIS_<dbname>_YYYYMMDDHHmmss.DAT
+    set h = $horolog
+    set timestamp = $translate($zdate(h, 8), "-", "") _ $translate($ztime($piece(h, ",", 2), 2), ":", "")
+    set backupPath = dbDir _ "IRIS_" _ routinesDBName _ "_" _ timestamp _ ".DAT"
+    if '##class(%Library.File).Rename(dbDir _ "IRIS.DAT", backupPath) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to rename IRIS.DAT to backup: " _ backupPath))
+    }
+
+    // Move (rename) packaged IRIS.DAT into the database directory
+    set srcDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
+    if '##class(%Library.File).Rename(srcDAT, dbDir _ "IRIS.DAT") {
+        set tMsg = "Failed to move IRIS.DAT from " _ srcDAT _ " to " _ dbDir
+        $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
+    }
+
+    $$$ThrowOnError(##class(SYS.Database).MountDatabase(dbDir))
+}
+
+/// Best-effort rollback after a failed swap. Never throws — called from a catch block.
+/// Dismounts new DB, removes new IRIS.DAT if present, restores backup, remounts.
+Method RollbackDatabaseSwap(
+	dbDir As %String,
+	backupPath As %String) [ Private ]
+{
+    if dbDir = "" {
+        quit
+    }
+
+    new $namespace
+    set $namespace = "%SYS"
+
+    set sc = ##class(SYS.Database).DismountDatabase(dbDir)
+    if $$$ISERR(sc) {
+        write !, "Rollback warning — could not dismount database at ", dbDir
+    }
+
+    set newDAT = dbDir _ "IRIS.DAT"
+    if ##class(%Library.File).Exists(newDAT) {
+        if '##class(%Library.File).Delete(newDAT) {
+            write !, "Rollback warning — could not delete new IRIS.DAT at ", newDAT
+        }
+    }
+
+    if (backupPath '= "") && ##class(%Library.File).Exists(backupPath) {
+        if '##class(%Library.File).Rename(backupPath, dbDir _ "IRIS.DAT") {
+            write !, "Rollback warning — could not restore backup from ", backupPath
+            write !, "  Manual intervention required to restore IRIS.DAT."
+        }
+    }
+
+    set mountSC = ##class(SYS.Database).MountDatabase(dbDir)
+    if $$$ISERR(mountSC) && '$system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
+        write !, "Rollback warning — could not remount database at ", dbDir
+        write !, "  Namespace routines may be unavailable — manual remount required."
+    }
+}
+
+/// Shows the namespace and current DB path, then prompts for y/N confirmation.
+/// Throws if the user declines or cancels.
+Method PromptForSwapConfirmation(ns As %String) [ Private ]
+{
+    new $namespace
+    set $namespace = "%SYS"
+    $$$ThrowOnError(##class(Config.Namespaces).Get(ns, .nsProps))
+    set routinesDBName = $get(nsProps("Routines"))
+    set dbDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
+    set $namespace = ns
+
+    write !, "WARNING: This will replace the routines database for namespace ", ns
+    write !, "  Current database: ", dbDir _ "IRIS.DAT"
+    write !, "  The current IRIS.DAT will be renamed to a timestamped backup before the swap."
+    write !
+
+    set confirmed = 0
+    set response = ##class(%Library.Prompt).GetYesNo("Proceed with database swap? [y/N] ", .confirmed)
+    if (response '= $$$SuccessResponse) || 'confirmed {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Database swap cancelled by user."))
+    }
+}
+
+/// Reads dependencies.xml and registers each dependency's module metadata
+/// into the current namespace's IPM storage.
+/// The dependency code is already in the swapped-in routines DB;
+/// this only registers the IPM metadata so zpm list and dependency tracking work.
+Method RegisterDependencyMetadata(packageDir As %String) [ Private ]
+{
+    set depsXML = ##class(%Library.File).NormalizeFilename("dependencies.xml", packageDir)
+    if '##class(%Library.File).Exists(depsXML) {
+        quit
+    }
+
+    set depsStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(depsStream.LinkToFile(depsXML))
+
+    set fullContent = ""
+    while 'depsStream.AtEnd {
+        set fullContent = fullContent _ depsStream.Read(32000)
+    }
+
+    // Extract each <Export>...</Export> block (one per dependency) and load it
+    set searchPos = 1
+    for {
+        set blockStart = $find(fullContent, "<Export", searchPos) - $length("<Export")
+        quit:blockStart<=0
+
+        set blockEnd = $find(fullContent, "</Export>", blockStart)
+        quit:blockEnd<=0
+
+        set fragment = $extract(fullContent, blockStart, blockEnd - 1)
+
+        set tempFile = ##class(%Library.File).TempFilename("xml")
+        set out = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(out.LinkToFile(tempFile))
+        $$$ThrowOnError(out.Write("<?xml version=""1.0"" encoding=""UTF-8""?>" _ $char(10)))
+        $$$ThrowOnError(out.Write(fragment))
+        $$$ThrowOnError(out.%Save())
+
+        set loadSC = $system.OBJ.Load(tempFile, "-d")
+        do ##class(%Library.File).Delete(tempFile)
+        $$$ThrowOnError(loadSC)
+
+        set searchPos = blockEnd
+    }
+}
+
+/// For a database package install: validate, optionally prompt, swap the routines database,
+/// and register dependency metadata in IPM storage.
+/// For all other contexts: delegate to ##super.
+Method %Activate(ByRef params) As %Status
+{
+    if '..IsInstallContext() {
+        quit ##super(.params)
+    }
+
+    set sc = $$$OK
+    set dbDir = ""
+    set backupPath = ""
+    try {
+        if $get(params("DeveloperMode")) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Database packages cannot be installed in developer mode."))
+        }
+
+        set ns = $namespace
+        set packageDir = ..Module.Root
+
+        do ..ValidateBeforeSwap(packageDir, ns)
+
+        if '$get(params("SwapDB")) {
+            do ..PromptForSwapConfirmation(ns)
+        }
+
+        do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
+        do ..RegisterDependencyMetadata(packageDir)
+
+        write !, "Database swap complete for namespace ", ns
+        write !, "  Backup: ", backupPath
+
+    } catch ex {
+        set sc = ex.AsStatus()
+        if dbDir '= "" {
+            write !, "ERROR — attempting rollback..."
+            do ..RollbackDatabaseSwap(dbDir, backupPath)
+        }
+    }
+    quit sc
 }
 
 }
