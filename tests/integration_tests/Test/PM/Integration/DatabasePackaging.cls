@@ -6,19 +6,28 @@ Property CreatedNamespaces As %List;
 
 Property OriginalNamespace As %String;
 
-Method OnBeforeEachTest() As %Status
+Property PackageOutputDir As %String;
+
+Property CreatedGlobalsDatabases As %List;
+
+Method OnBeforeOneTest() As %Status
 {
     set ..CreatedNamespaces = ""
+    set ..CreatedGlobalsDatabases = ""
     set ..OriginalNamespace = $namespace
+    // Use ManagerDirectory + job PID for a reliable absolute temp path
+    set ..PackageOutputDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "pkg-test-output-" _ $job)
+    write !, "DEBUG OnBefore: ManagerDir=[", ##class(%File).ManagerDirectory(), "] PackageOutputDir=[", ..PackageOutputDir, "]"
+    do ##class(%File).CreateDirectory(..PackageOutputDir)
     return $$$OK
 }
 
-Method OnAfterEachTest() As %Status
+Method OnAfterOneTest() As %Status
 {
     set sc = $$$OK
     set $namespace = ..OriginalNamespace
 
-    // Clean up all created namespaces
+    // Clean up all created namespaces (and their main routines databases)
     for i=1:1:$listlength(..CreatedNamespaces) {
         set ns = $listget(..CreatedNamespaces, i)
         if (ns '= "") {
@@ -27,15 +36,95 @@ Method OnAfterEachTest() As %Status
         }
     }
 
+    // Clean up the separate globals databases
+    for i=1:1:$listlength(..CreatedGlobalsDatabases) {
+        set dbName = $listget(..CreatedGlobalsDatabases, i)
+        if dbName '= "" {
+            set cleanupSC = $$$OK
+            try {
+                new $namespace
+                set $namespace = "%SYS"
+                set dbPath = ##class(%Library.File).NormalizeDirectory(
+                    ##class(%Library.File).ManagerDirectory() _ dbName)
+                // Best-effort dismount — may already be dismounted
+                do ##class(SYS.Database).DismountDatabase(dbPath)
+                $$$ThrowOnError(##class(Config.Databases).Delete(dbName))
+                $$$ThrowOnError(##class(SYS.Database).DeleteDatabase(dbPath))
+                set $namespace = ..OriginalNamespace
+                if ##class(%Library.File).DirectoryExists(dbPath) {
+                    do ##class(%IPM.Utils.File).RemoveDirectoryTree(dbPath)
+                }
+            } catch ex {
+                set cleanupSC = ex.AsStatus()
+            }
+            set sc = $$$ADDSC(sc, cleanupSC)
+        }
+    }
+
     return sc
 }
 
-/// Helper method to create and track a namespace
+/// Creates a test namespace with a separate globals database.
+/// The routines database (pNamespace) can be safely dismounted during
+/// package-database or database swap without losing IPM metadata globals.
 Method CreateTestNamespace(pNamespace As %String) As %Status
 {
+    // Create the standard namespace (initially Globals=pNamespace, Routines=pNamespace)
     set sc = ##class(%IPM.Test.Utils).CreateNamespace(pNamespace)
-    if $$$ISOK(sc) {
-        set ..CreatedNamespaces = ..CreatedNamespaces _ $listbuild(pNamespace)
+    if $$$ISERR(sc) {
+        return sc
+    }
+    set ..CreatedNamespaces = ..CreatedNamespaces _ $listbuild(pNamespace)
+
+    // Create a dedicated globals database so dismounting the routines DB
+    // during packaging or swap doesn't lose IPM metadata (^IPM.Storage.*)
+    set globalsDBName = pNamespace _ "G"
+    set sc = $$$OK
+    try {
+        new $namespace
+        set $namespace = "%SYS"
+
+        set globalsPath = ##class(%Library.File).NormalizeDirectory(
+            ##class(%Library.File).ManagerDirectory() _ globalsDBName)
+
+        // Clean up any leftover state from a previous test run
+        // Check both directory existence and DB registration independently
+        if ##class(%Library.File).DirectoryExists(globalsPath) {
+            do ##class(SYS.Database).DismountDatabase(globalsPath)
+            do ##class(SYS.Database).DeleteDatabase(globalsPath)
+            if ##class(%Library.File).DirectoryExists(globalsPath) {
+                set $namespace = ..OriginalNamespace
+                do ##class(%IPM.Utils.File).RemoveDirectoryTree(globalsPath)
+                set $namespace = "%SYS"
+            }
+        }
+        if ##class(Config.Databases).Exists(globalsDBName) {
+            do ##class(Config.Databases).Delete(globalsDBName)
+        }
+
+        if '##class(%Library.File).CreateDirectory(globalsPath, .result) {
+            set tMsg = "Failed to create globals DB directory: " _ result
+            $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
+        }
+
+        $$$ThrowOnError(##class(SYS.Database).CreateDatabase(globalsPath))
+
+        set dbProps("Directory") = globalsPath
+        set dbProps("MountRequired") = 1
+        $$$ThrowOnError(##class(Config.Databases).Create(globalsDBName, .dbProps))
+
+        set mountSC = ##class(SYS.Database).MountDatabase(globalsPath)
+        if $$$ISERR(mountSC) && '$system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
+            $$$ThrowOnError(mountSC)
+        }
+
+        $$$ThrowOnError(##class(Config.Namespaces).Get(pNamespace, .nsProps))
+        set nsProps("Globals") = globalsDBName
+        $$$ThrowOnError(##class(Config.Namespaces).Modify(pNamespace, .nsProps))
+
+        set ..CreatedGlobalsDatabases = ..CreatedGlobalsDatabases _ $listbuild(globalsDBName)
+    } catch ex {
+        set sc = ex.AsStatus()
     }
     return sc
 }
@@ -49,25 +138,29 @@ Method TestSimplePackageAndInstall()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
+    set moduleDir2 = ..GetModuleDir("db-packaging", "dependency-module")
+
     // Switch to test namespace and load simple module
     new $namespace
     set $namespace = testNS
 
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded simple module successfully")
 
     // Package as database package
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module as database package")
 
     // Verify package file exists
-    set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
+    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
     do $$$AssertTrue(##class(%File).Exists(packageFile), "Database package .tgz file exists")
 
     // Extract and verify contents
-    set extractDir = ##class(%File).NormalizeDirectory(##class(%File).TempFilename())
+    set extractDir = ##class(%File).NormalizeDirectory(..PackageOutputDir _ "extract")
     do ##class(%File).CreateDirectory(extractDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir, .extractOutput)
+    do $$$AssertStatusOK(sc, "Extracted package contents for verification")
 
     // Verify IRIS.DAT exists in extracted package
     set irisDataFile = ##class(%File).NormalizeDirectory(extractDir) _ "IRIS.DAT"
@@ -98,8 +191,13 @@ Method TestSimplePackageAndInstall()
 
     set $namespace = installNS
 
+    // Debug: verify path before load
+    write !, "DEBUG packageFile=[", packageFile, "]"
+    write !, "DEBUG packageFile exists=[", ##class(%File).Exists(packageFile), "]"
+    write !, "DEBUG namespace=[", $namespace, "]"
+
     // Install database package with -swap-db flag
-    set sc = ##class(%IPM.Main).Shell("install " _ packageFile _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed database package successfully")
 
     // Verify classes are accessible
@@ -130,14 +228,13 @@ Method TestSimplePackageAndInstall()
 
     // Test load command with another module
     set $namespace = testNS
-    set moduleDir2 = ..GetModuleDir("db-packaging", "dependency-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir2)
     do $$$AssertStatusOK(sc, "Loaded dependency module")
 
-    set sc = ##class(%IPM.Main).Shell("package-database dep-module")
+    set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged dep-module as database")
 
-    set packageFile2 = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "dep-module-1.0.0-database.tgz"
+    set packageFile2 = ..PackageOutputDir _ "dep-module-1.0.0-database.tgz"
 
     // Create another namespace for load test
     set loadNS = "TESTDBLOAD1"
@@ -163,27 +260,28 @@ Method TestPackageAndInstallWithDependencies()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
+    set mainModuleDir = ..GetModuleDir("db-packaging", "module-with-deps")
+
     new $namespace
     set $namespace = testNS
 
     // First load and package the dependency module
-    set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ depModuleDir)
     do $$$AssertStatusOK(sc, "Loaded dependency module")
 
-    set sc = ##class(%IPM.Main).Shell("package-database dep-module")
+    set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged dependency module")
 
     // Now load and package the module with dependencies
-    set mainModuleDir = ..GetModuleDir("db-packaging", "module-with-deps")
     set sc = ##class(%IPM.Main).Shell("load -v " _ mainModuleDir)
     do $$$AssertStatusOK(sc, "Loaded module with dependencies")
 
-    set sc = ##class(%IPM.Main).Shell("package-database main-with-deps")
+    set sc = ##class(%IPM.Main).Shell("package-database main-with-deps -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module with dependencies")
 
     // Verify dependencies.xml is created correctly
-    set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "main-with-deps-1.0.0-database.tgz"
+    set packageFile = ..PackageOutputDir _ "main-with-deps-1.0.0-database.tgz"
     do $$$AssertTrue(##class(%File).Exists(packageFile), "Package file exists")
 
     // Create installation namespace
@@ -194,7 +292,7 @@ Method TestPackageAndInstallWithDependencies()
     set $namespace = installNS
 
     // Install the module with dependencies
-    set sc = ##class(%IPM.Main).Shell("install " _ packageFile _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed module with dependencies")
 
     // Verify main module classes exist
@@ -203,9 +301,9 @@ Method TestPackageAndInstallWithDependencies()
     // Verify dependencies are tracked
     set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("list -dependencies")
+    set sc = ##class(%IPM.Main).Shell("list")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-    do $$$AssertStatusOK(sc, "List dependencies command executed")
+    do $$$AssertStatusOK(sc, "List command executed")
     do $$$AssertTrue(..FindStringInMultiDimArray("dep-module", .output), "Dependency appears in list")
 }
 
@@ -217,19 +315,18 @@ Method TestPackageAndInstallAllResourceTypes()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
+
     new $namespace
     set $namespace = testNS
-
-    // Load module with all resource types
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module with all resources")
 
     // Package as database
-    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module")
+    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module with all resources")
 
-    set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "all-resources-module-1.0.0-database.tgz"
+    set packageFile = ..PackageOutputDir _ "all-resources-module-1.0.0-database.tgz"
 
     // Create installation namespace
     set installNS = "TESTDBRESINS"
@@ -239,7 +336,7 @@ Method TestPackageAndInstallAllResourceTypes()
     set $namespace = installNS
 
     // Install the package
-    set sc = ##class(%IPM.Main).Shell("install " _ packageFile _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed module with all resources")
 
     // Verify classes exist
@@ -273,44 +370,43 @@ Method TestPackageAndInstallWithTestResources()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "module-with-tests")
+
     new $namespace
     set $namespace = testNS
-
-    // Load module with test resources
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-tests")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module with test resources")
 
     // Package WITH test resources
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -include-test-resources")
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -include-test-resources -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged with test resources")
 
     // Install and verify test resources are present
-    set packageFileWithTests = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "module-with-tests-1.0.0-database.tgz"
+    set packageFileWithTests = ..PackageOutputDir _ "module-with-tests-1.0.0-database.tgz"
 
     set installNS1 = "TESTDBTESTINS1"
     set sc = ..CreateTestNamespace(installNS1)
     do $$$AssertStatusOK(sc, "Created installation namespace 1")
 
     set $namespace = installNS1
-    set sc = ##class(%IPM.Main).Shell("install " _ packageFileWithTests _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFileWithTests _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed with test resources")
 
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Test"), "Test class exists when included")
 
     // Package WITHOUT test resources (default)
     set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests")
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged without test resources")
 
-    set packageFileNoTests = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "module-with-tests-1.0.0-database.tgz"
+    set packageFileNoTests = ..PackageOutputDir _ "module-with-tests-1.0.0-database.tgz"
 
     set installNS2 = "TESTDBTESTINS2"
     set sc = ..CreateTestNamespace(installNS2)
     do $$$AssertStatusOK(sc, "Created installation namespace 2")
 
     set $namespace = installNS2
-    set sc = ##class(%IPM.Main).Shell("install " _ packageFileNoTests _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFileNoTests _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed without test resources")
 
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Test"), "Test class excluded by default")
@@ -325,20 +421,19 @@ Method TestPackageWithUseCurrentDbFlag()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
+
     new $namespace
     set $namespace = testNS
-
-    // Load simple module
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded simple module")
 
     // Package with -use-current-db flag
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -use-current-db")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -use-current-db -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged with -use-current-db flag")
 
     // Verify package was created
-    set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
+    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
     do $$$AssertTrue(##class(%File).Exists(packageFile), "Package created with -use-current-db")
 }
 
@@ -350,18 +445,17 @@ Method TestPackagingAndInstallValidation()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
+
     new $namespace
     set $namespace = testNS
-
-    // Load and package a valid module first
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module")
 
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module")
 
-    set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
+    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
 
     // Test: Checksum validation - tamper with IRIS.DAT
     // Extract package, modify IRIS.DAT, repack, attempt install
@@ -375,7 +469,7 @@ Method TestPackagingAndInstallValidation()
     // Test install with tampered package (simulated)
     // This test validates that checksum verification works
     // Actual implementation would fail if IRIS.DAT is tampered
-    set sc = ##class(%IPM.Main).Shell("install " _ packageFile _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
     // For now, this should work with valid package
     do $$$AssertStatusOK(sc, "Valid package installs successfully")
 
@@ -404,45 +498,44 @@ Method TestBackupAndRollback()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
+
     new $namespace
     set $namespace = testNS
-
-    // Load and package module
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module")
 
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module")
 
-    set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
+    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
 
-    // Create installation namespace
     set installNS = "TESTDBBKUPINS"
     set sc = ..CreateTestNamespace(installNS)
     do $$$AssertStatusOK(sc, "Created installation namespace")
-
+    new $namespace
     set $namespace = installNS
-
-    // Install database package
-    set sc = ##class(%IPM.Main).Shell("install " _ packageFile _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed database package")
 
-    // Verify backup was created
-    // Backup should be named IRIS_<db-name>_<timestamp>.DAT
-    // Implementation should verify backup file exists
-
-    // Get database directory for this namespace
+    // Verify backup file was created in the routines DB directory
     new $namespace
     set $namespace = "%SYS"
-    set nsProperties = ##class(Config.Namespaces).Get(installNS)
-    set dbDir = nsProperties.Routines
+    $$$ThrowOnError(##class(Config.Namespaces).Get(installNS, .nsProperties))
+    set routinesDBName = $get(nsProperties("Routines"))
+    set dbDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
+    set $namespace = installNS
 
-    // Verify database exists
-    do $$$AssertTrue(dbDir '= "", "Database directory found")
-
-    // Test rollback scenario
-    // In actual implementation, would test corrupted install with rollback
+    set backupCount = 0
+    set rs = ##class(%ResultSet).%New("%File:FileSet")
+    $$$ThrowOnError(rs.Execute(dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", , 1))
+    set nextSC = $$$OK
+    while rs.%Next(.nextSC) {
+        set backupCount = backupCount + 1
+    }
+    $$$ThrowOnError(nextSC)
+    do $$$AssertTrue(backupCount > 0, "Backup IRIS.DAT file created after swap")
 }
 
 /// Test upgrading from database package to newer database package
@@ -453,18 +546,17 @@ Method TestUpgradeDatabaseToDatabase()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
+
     new $namespace
     set $namespace = testNS
-
-    // Package v1.0.0
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module v1.0.0")
 
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged v1.0.0")
 
-    set packageV1 = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
+    set packageV1 = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
 
     // Create installation namespace
     set installNS = "TESTDBUPGINS"
@@ -474,7 +566,7 @@ Method TestUpgradeDatabaseToDatabase()
     set $namespace = installNS
 
     // Install v1.0.0
-    set sc = ##class(%IPM.Main).Shell("install " _ packageV1 _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageV1 _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed v1.0.0")
 
     // Verify v1.0.0 is installed
@@ -494,18 +586,17 @@ Method TestUpgradeSourceToDatabase()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
+
     new $namespace
     set $namespace = testNS
-
-    // Load and package as source first
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module")
 
-    set sc = ##class(%IPM.Main).Shell("package simple-db-module")
+    set sc = ##class(%IPM.Main).Shell("package simple-db-module -path " _ ..PackageOutputDir _ "simple-db-module-1.0.0/")
     do $$$AssertStatusOK(sc, "Packaged as source")
 
-    set sourcePackage = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0.tgz"
+    set sourcePackage = ..PackageOutputDir _ "simple-db-module-1.0.0.tgz"
 
     // Create installation namespace
     set installNS = "TESTDBUPGSRCINS"
@@ -515,7 +606,7 @@ Method TestUpgradeSourceToDatabase()
     set $namespace = installNS
 
     // Install source package
-    set sc = ##class(%IPM.Main).Shell("install " _ sourcePackage)
+    set sc = ##class(%IPM.Main).Shell("load " _ sourcePackage)
     do $$$AssertStatusOK(sc, "Installed source package")
 
     // Verify source installed
@@ -523,10 +614,10 @@ Method TestUpgradeSourceToDatabase()
 
     // Now package as database and upgrade
     set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged as database")
 
-    set dbPackage = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
+    set dbPackage = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
 
     set $namespace = installNS
 
@@ -543,18 +634,17 @@ Method TestUninstallDatabasePackage()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
+
     new $namespace
     set $namespace = testNS
-
-    // Load and package module
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module")
 
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module")
 
-    set packageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
+    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
 
     // Create installation namespace
     set installNS = "TESTDBUNINSNS"
@@ -564,7 +654,7 @@ Method TestUninstallDatabasePackage()
     set $namespace = installNS
 
     // Install database package
-    set sc = ##class(%IPM.Main).Shell("install " _ packageFile _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed database package")
 
     // Verify installation
@@ -594,18 +684,19 @@ Method TestMixedPackaging()
     set sc = ..CreateTestNamespace(testNS)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
+    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
+    set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
+    set allResDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
+
     new $namespace
     set $namespace = testNS
-
-    // Package database package
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded database module")
 
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module")
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged as database")
 
-    set dbPackageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "simple-db-module-1.0.0-database.tgz"
+    set dbPackageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
 
     // Create installation namespace
     set installNS = "TESTDBMIXEDINS"
@@ -615,24 +706,23 @@ Method TestMixedPackaging()
     set $namespace = installNS
 
     // Install database package
-    set sc = ##class(%IPM.Main).Shell("install " _ dbPackageFile _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ dbPackageFile _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed database package")
 
     // Test: Install source package in same namespace should work
     set $namespace = testNS
-    set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
     set sc = ##class(%IPM.Main).Shell("load -v " _ depModuleDir)
     do $$$AssertStatusOK(sc, "Loaded dependency module as source")
 
-    set sc = ##class(%IPM.Main).Shell("package dep-module")
+    set sc = ##class(%IPM.Main).Shell("package dep-module -path " _ ..PackageOutputDir _ "dep-module-1.0.0/")
     do $$$AssertStatusOK(sc, "Packaged as source")
 
-    set sourcePackageFile = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "dep-module-1.0.0.tgz"
+    set sourcePackageFile = ..PackageOutputDir _ "dep-module-1.0.0.tgz"
 
     set $namespace = installNS
 
     // Install source package in namespace with database package
-    set sc = ##class(%IPM.Main).Shell("install " _ sourcePackageFile)
+    set sc = ##class(%IPM.Main).Shell("load " _ sourcePackageFile)
     do $$$AssertStatusOK(sc, "Installed source package alongside database package")
 
     // Verify both packages exist
@@ -646,19 +736,18 @@ Method TestMixedPackaging()
 
     // Test: Cannot install second database package in same namespace
     set $namespace = testNS
-    set allResDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
     set sc = ##class(%IPM.Main).Shell("load -v " _ allResDir)
     do $$$AssertStatusOK(sc, "Loaded second module")
 
-    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module")
+    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged second module as database")
 
-    set dbPackage2 = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.Module).GetWorkingDirectory()) _ "all-resources-module-1.0.0-database.tgz"
+    set dbPackage2 = ..PackageOutputDir _ "all-resources-module-1.0.0-database.tgz"
 
     set $namespace = installNS
 
     // Attempt to install second database package should fail
-    set sc = ##class(%IPM.Main).Shell("install " _ dbPackage2 _ " -swap-db")
+    set sc = ##class(%IPM.Main).Shell("load " _ dbPackage2 _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Cannot install second database package in same namespace")
 }
 
