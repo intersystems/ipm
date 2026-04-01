@@ -19,6 +19,7 @@ Method %Package(ByRef params) As %Status
     set oldDBName = ""
     set stagingDir = ""
     set dbRemapped = 0
+    set generatedExports = ""
     set ns = $namespace
     new $namespace
 
@@ -49,6 +50,11 @@ Method %Package(ByRef params) As %Status
             do ..CreateTempDatabase(.dbName, .tempDBPath)
             set tempDBName = dbName
 
+            // Export Generated resources from source namespace BEFORE remapping.
+            // Once the old DB is dismounted, compiled Generated classes are inaccessible.
+            write:verbose !, "Exporting generated resources from source namespace..."
+            do ..ExportGeneratedResources(ns, includeTests, .params, .generatedExports)
+
             // Remap namespace routines to the temp DB
             // Note: globals mapping is unchanged — ^IPM.* globals remain in the real globals DB
             // and will NOT enter the temp IRIS.DAT. No cleanup step is needed.
@@ -59,6 +65,19 @@ Method %Package(ByRef params) As %Status
             // Load and compile module resources into the temp DB
             write:verbose !, "Loading resources into temp database..."
             do ..LoadResourcesIntoDatabase(ns, includeTests, .params)
+
+            // Import generated resources into the temp namespace
+            if $listlength(generatedExports) > 0 {
+                write:verbose !, "Importing generated resources into temp database..."
+                new $namespace
+                set $namespace = ns
+                set ptr = 0
+                while $listnext(generatedExports, ptr, tempFile) {
+                    $$$ThrowOnError($system.OBJ.Load(tempFile, "-d"))
+                    do ##class(%Library.File).Delete(tempFile)
+                }
+                set generatedExports = ""
+            }
 
             // Restore namespace mapping before packaging
             write:verbose !, "Restoring namespace routines..."
@@ -98,6 +117,14 @@ Method %Package(ByRef params) As %Status
         if $$$ISERR(restoreSC) {
             write !, "ERROR: Failed to restore namespace routines DB — manual intervention required."
             write !, $system.Status.GetErrorText(restoreSC)
+        }
+    }
+
+    // Clean up any generated resource export temp files not yet imported (error path)
+    set ptr = 0
+    while $listnext(generatedExports, ptr, tempFile) {
+        if ##class(%Library.File).Exists(tempFile) {
+            do ##class(%Library.File).Delete(tempFile)
         }
     }
 
@@ -244,6 +271,55 @@ Method LoadResourcesIntoDatabase(
 
     $$$ThrowOnError(..%Reload(.loadParams))
     $$$ThrowOnError(..%Compile(.loadParams))
+}
+
+/// Before remapping the namespace routines DB, exports each Generated resource
+/// from the current (source) namespace to a temp XML file.
+/// Returns generatedExports as a $list of temp file paths to be imported later.
+/// Must be called BEFORE RemapRoutinesDB — once the old DB is dismounted, the
+/// compiled generated classes are no longer accessible.
+/// 
+/// This export/import is the primary mechanism for Generated resources that have
+/// no in-lifecycle generator: classes produced by external tools or processes that
+/// are pre-compiled in the source DB but not recreated during %Reload/%Compile.
+/// 
+/// For resources that ARE regenerated during packaging (BPL/DTL compilation
+/// auto-generates their .1.cls subclass; <Invoke After Compile> explicitly creates
+/// a class via %Dictionary API), the import is redundant but harmless — the class
+/// already exists in the temp DB by import time.
+Method ExportGeneratedResources(
+	ns As %String,
+	includeTestResources As %Boolean,
+	ByRef params,
+	Output generatedExports As %List) [ Private ]
+{
+    set generatedExports = ""
+    set orderedList = ..Module.GetOrderedResourceList()
+    set tKey = ""
+    for {
+        #dim tResource As %IPM.Storage.ResourceReference
+        set tResource = orderedList.GetNext(.tKey)
+        quit:tKey=""
+
+        if 'includeTestResources {
+            set scope = $zconvert(tResource.Scope, "L")
+            if (scope = "test") || (scope = "verify") {
+                continue
+            }
+        }
+
+        if 'tResource.Generated {
+            continue
+        }
+
+        set tempFile = ##class(%Library.File).TempFilename("xml")
+        set exportSC = $system.OBJ.Export(tResource.Name, tempFile, "-d")
+        if $$$ISOK(exportSC) && (##class(%Library.File).GetFileSize(tempFile) > 0) {
+            set generatedExports = generatedExports _ $listbuild(tempFile)
+        } elseif ##class(%Library.File).Exists(tempFile) {
+            do ##class(%Library.File).Delete(tempFile)
+        }
+    }
 }
 
 /// Returns 1 if the current context is a database package install.

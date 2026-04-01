@@ -7,7 +7,9 @@
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
       <Resource Name="AllResources.Main.CLS" />
-      <Resource Name="AllResources.Generated.CLS" Generated="true" />
+      <Resource Name="AllResources.Generator.CLS" />
+      <Invoke Class="AllResources.Generator" Method="Generate" Phase="Compile" When="After" />
+      <Resource Name="AllResources.Generated.CLS" Generated="1" Compile="0" />
       <Resource Name="AllResources.INC" />
       <CPF Name="config.cpf" />
       <FileCopy Name="test-data.txt" Target="${mgrdir}../all-resources-data.txt" />
@@ -19,8 +21,8 @@
         Recurse="1"
         ServeFiles="1"
         AuthenticationMethods="32"
-        IsNameSpaceDefault="true"
-        MatchRoles=":%DB_${namespace}"
+        IsNameSpaceDefault="1"
+        MatchRoles=":${dbrole}"
       />
     </Module>
   </Document>
