@@ -1205,7 +1205,12 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule,, .params)
+        // For database packages, all dependencies are compiled into IRIS.DAT — skip LoadDependencies.
+        // Fetching deps from a registry would fail (code isn't installed yet before the DB swap).
+        // %Activate registers dependency metadata from dependencies.xml after the swap.
+        if tModule.Packaging '= "database" {
+            do ..LoadDependencies(tModule,, .params)
+        }
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)

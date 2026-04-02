@@ -144,7 +144,8 @@ Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, modu
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
 <modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
 <modifier name="include-test-resources" dataAlias="IncludeTestResources" dataValue="1" description="Include test resources (Scope=test or Scope=verify) in the package. Excluded by default." />
-<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Exports Python dependencies into wheels/ subdirectory. Defaults to true for database packages." />
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Include Python wheels (from &lt;PythonWheel&gt; resources) in the database package. On by default." />
+<modifier name="no-export-python-deps" dataAlias="ExportPythonDependencies" dataValue="0" description="Exclude Python wheels from the database package." />
 <modifier name="db-name" dataAlias="DatabaseName" value="true" description="Name for the new temporary database. Auto-generated if omitted." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
