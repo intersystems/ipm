@@ -51,30 +51,16 @@ Method OnPhase(
             }
 
             if '..ResourceReference.Generated {
-                set tSubDirectory = $select(..ResourceReference.Preload:"preload/",1:"")
-                set tResourceDirectory = tRoot _ "/" _ tSubDirectory
-
-                set tSourceRoot = ..ResourceReference.Module.SourcesRoot
-                if tSourceRoot'="","\/"'[$extract(tSourceRoot, *) {
-                    set tSourceRoot = tSourceRoot _ "/"
-                }
-
-                set tDirectory = ..Directory
-                if tDirectory'="","\/"'[$extract(tDirectory, *) {
-                    set tDirectory = tDirectory _ "/"
-                } else {
-                    set tDirectory = "gbl/"
-                }
-
-                set tResourceDirectory = ##class(%File).NormalizeDirectory(tResourceDirectory_tSourceRoot_tDirectory)
+                set relativePath = ..OnItemRelativePath(..ResourceReference.Name)
+                set resourcePath = ##class(%File).NormalizeFilename(tRoot _ "/" _ relativePath)
+                set resourceDirectory = ##class(%File).GetDirectory(resourcePath)
 
                 if tDeveloperMode {
-                    set ^Sources("GBL",tName) = tSourcesPrefix_tResourceDirectory
+                    set ^Sources("GBL", tName) = tSourcesPrefix _ resourceDirectory
                 }
 
                 if '..ResourceReference.Preload {
-                    set tResourcePath = tResourceDirectory_$translate(tName,"%,("")","___")_".xml"
-                    set tSC = $system.OBJ.Load(tResourcePath,$select(tVerbose:"/display",1:"/nodisplay")_"/nocompile")
+                    set tSC = $system.OBJ.Load(resourcePath, $select(tVerbose:"/display", 1:"/nodisplay") _ "/nocompile")
                     if $$$ISERR(tSC) {
                         quit
                     }
@@ -91,6 +77,35 @@ Method OnPhase(
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Sets the relative path for the globals resource so the packaging phase
+/// exports the file to the correct location, respecting SourcesRoot.
+Method OnResolveChildren(ByRef resourceArray) As %Status
+{
+    set resourceArray(..ResourceReference.Name, "RelativePath") = ..OnItemRelativePath(..ResourceReference.Name)
+    quit $$$OK
+}
+
+/// Returns the path of <var>itemName</var> relative to the module root,
+/// including SourcesRoot and the configured Directory.
+Method OnItemRelativePath(itemName As %String) As %String
+{
+    set sourceRoot = ..ResourceReference.Module.SourcesRoot
+    // Append trailing slash only if sourceRoot is non-empty and doesn't already end with / or \
+    if sourceRoot '= "", "\/" '[ $extract(sourceRoot, *) {
+        set sourceRoot = sourceRoot _ "/"
+    }
+
+    set directory = ..Directory
+    if directory = "" {
+        set directory = "gbl/"
+    } elseif "\/" '[ $extract(directory, *) {
+        set directory = directory _ "/"
+    }
+
+    set name = $piece(itemName, ".", 1, * - 1)
+    quit $select(..ResourceReference.Preload:"preload/", 1:"") _ sourceRoot _ directory _ $translate(name, "%,("")", "___") _ ".xml"
 }
 
 }
