@@ -22,7 +22,7 @@
         ServeFiles="1"
         AuthenticationMethods="32"
         IsNameSpaceDefault="1"
-        MatchRoles=":${dbrole}"
+        MatchRoles=":${globalsDbRole}"
       />
     </Module>
   </Document>
