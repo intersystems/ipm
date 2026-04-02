@@ -73,7 +73,7 @@ Method %Package(ByRef params) As %Status
                 set $namespace = ns
                 set ptr = 0
                 while $listnext(generatedExports, ptr, tempFile) {
-                    $$$ThrowOnError($system.OBJ.Load(tempFile, "-d"))
+                    $$$ThrowOnError($system.OBJ.Load(tempFile, "ck"))
                     do ##class(%Library.File).Delete(tempFile)
                 }
                 set generatedExports = ""
@@ -89,7 +89,7 @@ Method %Package(ByRef params) As %Status
         write:verbose !, "Computing SHA-256 checksum..."
         set irisDAT = tempDBPath _ "IRIS.DAT"
         set checksumHex = ..ComputeSHA256Hex(irisDAT)
-        write:verbose !, "  Checksum: ", checksumHex
+        write !, "  Checksum: ", checksumHex
 
         // Assemble staging dir and create .tgz
         set stagingDir = ##class(%Library.File).NormalizeDirectory(
@@ -276,14 +276,14 @@ Method LoadResourcesIntoDatabase(
 /// Before remapping the namespace routines DB, exports each Generated resource
 /// from the current (source) namespace to a temp XML file.
 /// Returns generatedExports as a $list of temp file paths to be imported later.
-/// Must be called BEFORE RemapRoutinesDB — once the old DB is dismounted, the
+/// Must be called before RemapRoutinesDB — once the old DB is dismounted, the
 /// compiled generated classes are no longer accessible.
 /// 
 /// This export/import is the primary mechanism for Generated resources that have
 /// no in-lifecycle generator: classes produced by external tools or processes that
 /// are pre-compiled in the source DB but not recreated during %Reload/%Compile.
 /// 
-/// For resources that ARE regenerated during packaging (BPL/DTL compilation
+/// For resources that are regenerated during packaging (BPL/DTL compilation
 /// auto-generates their .1.cls subclass; <Invoke After Compile> explicitly creates
 /// a class via %Dictionary API), the import is redundant but harmless — the class
 /// already exists in the temp DB by import time.
@@ -339,7 +339,11 @@ Method IsInstallContext() As %Boolean [ Private ]
 Method %Reload(ByRef params) As %Status
 {
     // Install context: IRIS.DAT already in place — no source to reload.
+    // Also skip <Invoke> elements in all subsequent phases: they ran during packaging.
+    // The new IRIS.DAT isn't mounted until %Activate, so any invoke referencing packaged
+    // classes would fail with <CLASS DOES NOT EXIST>.
     if ..IsInstallContext() {
+        set params("SkipInvokes") = 1
         quit $$$OK
     }
 
@@ -348,21 +352,35 @@ Method %Reload(ByRef params) As %Status
         set sc = $$$OK
         try {
             set orderedResourceList = ..Module.GetOrderedResourceList()
-            set tKey = ""
+            set key = ""
             for {
-                #dim tResource As %IPM.Storage.ResourceReference
-                set tResource = orderedResourceList.GetNext(.tKey)
-                quit:tKey=""
+                #dim resource As %IPM.Storage.ResourceReference
+                set resource = orderedResourceList.GetNext(.key)
+                quit:key=""
 
+                // Type A: regular resources with Scope="test" or Scope="verify" — skip unless requested
                 if '$get(params("IncludeTestResources")) {
-                    set scope = $zconvert(tResource.Scope, "L")
+                    set scope = $zconvert(resource.Scope, "L")
                     if (scope = "test") || (scope = "verify") {
                         continue
                     }
                 }
 
-                if $isobject(tResource.Processor) && tResource.IsInScope("Reload") {
-                    $$$ThrowOnError(tResource.Processor.OnPhase("Reload", .params))
+                // Type B: <UnitTest> parent resources have Scope="" and a Test processor.
+                // OnPhase("Reload") is a no-op for this processor; loading is done via LoadTestDirectory.
+                if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.Test") && ($extract(resource.Name, *) = "/") {
+                    if $get(params("IncludeTestResources")) {
+                        set testDir = ##class(%Library.File).NormalizeDirectory(resource.Module.Root _ resource.Name)
+                        set format = resource.Processor.Format
+                        set loadSC = ##class(%IPM.Test.Manager).LoadTestDirectory(testDir, $get(params("Verbose")), , format)
+                        $$$ThrowOnError(loadSC)
+                    }
+                    continue
+                }
+
+                if $isobject(resource.Processor) {
+                    set reloadPhase = $select(resource.Scope '= "": resource.Scope, 1: "Reload")
+                    $$$ThrowOnError(resource.Processor.OnPhase(reloadPhase, .params))
                 }
             }
         } catch ex {
@@ -550,7 +568,7 @@ Method WriteDependenciesXML(targetDir As %String)
         $$$ThrowOnError(sc)
 
         set depStream = ##class(%Stream.TmpCharacter).%New()
-        $$$ThrowOnError(depModule.XMLExportToStream(.depStream, , "literal,indent"))
+        $$$ThrowOnError($system.OBJ.ExportToStream(depModule.Name _ ".ZPM", .depStream, "-d"))
         $$$ThrowOnError(depStream.Rewind())
 
         // Strip the <?xml...?> header before appending
@@ -563,6 +581,81 @@ Method WriteDependenciesXML(targetDir As %String)
 
     do outStream.WriteLine("</Dependencies>")
     $$$ThrowOnError(outStream.%Save())
+}
+
+/// Copies non-compiled resource source files (FileCopy, PythonWheel, CPF) from
+/// the module source tree into stagingDir so their processors can find them during install.
+/// Called from AssemblePackage after IRIS.DAT is already in stagingDir.
+/// WebApplication is configuration-only and is not handled here.
+Method CopyNonCompiledResources(
+	stagingDir As %String,
+	includeTestResources As %Boolean)
+{
+    set orderedResourceList = ..Module.GetOrderedResourceList()
+    set key = ""
+    for {
+        #dim resource As %IPM.Storage.ResourceReference
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+
+        // Skip test-scoped resources unless requested
+        if 'includeTestResources {
+            set scope = $zconvert(resource.Scope, "L")
+            if (scope = "test") || (scope = "verify") {
+                continue
+            }
+        }
+
+        if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.FileCopy") {
+            set name = resource.Processor.Name
+            set sourcePath = ##class(%Library.File).NormalizeFilename(name, ..Module.Root)
+            if '##class(%Library.File).Exists(sourcePath) {
+                continue
+            }
+            set destPath = ##class(%Library.File).NormalizeFilename(name, stagingDir)
+            set destDir = ##class(%Library.File).GetDirectory(destPath)
+            if '##class(%Library.File).CreateDirectoryChain(destDir) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create dir for FileCopy: " _ destDir))
+            }
+            if '##class(%Library.File).CopyFile(sourcePath, destPath, 1) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy FileCopy source: " _ sourcePath))
+            }
+
+        } elseif $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") {
+            set wheelDir = resource.Processor.Directory
+            set wheelName = resource.Processor.Name
+            set sourceDir = ##class(%Library.File).NormalizeDirectory(..Module.Root _ wheelDir)
+            set sourcePath = ##class(%Library.File).NormalizeFilename(wheelName, sourceDir)
+            if '##class(%Library.File).Exists(sourcePath) {
+                continue
+            }
+            set destDir = ##class(%Library.File).NormalizeDirectory(stagingDir _ wheelDir)
+            if '##class(%Library.File).CreateDirectoryChain(destDir) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create wheels dir: " _ destDir))
+            }
+            if '##class(%Library.File).CopyFile(sourcePath, destDir _ wheelName, 1) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy wheel: " _ sourcePath))
+            }
+
+        } elseif $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") {
+            set cpfName = resource.Processor.Name
+            set cpfSubdir = resource.Processor.Directory
+            set sourceDir = ##class(%Library.File).NormalizeDirectory(..Module.Root _ ..Module.SourcesRoot _ "/" _ cpfSubdir)
+            set sourcePath = ##class(%Library.File).NormalizeFilename(cpfName, sourceDir)
+            if '##class(%Library.File).Exists(sourcePath) {
+                continue
+            }
+            set destDir = ##class(%Library.File).NormalizeDirectory(stagingDir _ ..Module.SourcesRoot _ "/" _ cpfSubdir)
+            if '##class(%Library.File).CreateDirectoryChain(destDir) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create CPF staging dir: " _ destDir))
+            }
+            if '##class(%Library.File).CopyFile(sourcePath, destDir _ cpfName, 1) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy CPF file: " _ sourcePath))
+            }
+        }
+        // Compiled resources (Class, Routine, Include, etc.) are handled via IRIS.DAT — no file staging needed.
+        // WebApplication is configuration-only — no file staging needed.
+    }
 }
 
 /// Copies IRIS.DAT into stagingDir, writes module.xml and dependencies.xml,
@@ -580,6 +673,10 @@ Method AssemblePackage(
     if '##class(%Library.File).CopyFile(irisDAT, stagingDir _ "IRIS.DAT", 1, .result) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy IRIS.DAT: " _ result))
     }
+
+    // Stage non-compiled resource files so processors can find them during install
+    set includeTestResources = $get(params("IncludeTestResources"), 0)
+    do ..CopyNonCompiledResources(stagingDir, includeTestResources)
 
     do ..WritePackageModuleXML(stagingDir, checksumHex)
     do ..WriteDependenciesXML(stagingDir)
@@ -603,7 +700,7 @@ Method AssemblePackage(
     for i=1:1:$get(archiveOutput) {
         write:verbose !, archiveOutput(i)
     }
-    write:verbose !, "Database package generated:", !, $char(9), packageFile
+    write !, "Database package generated:", !, $char(9), packageFile
 
     quit packageFile
 }
@@ -655,6 +752,14 @@ Method ValidateBeforeSwap(
     if $zconvert(actualChecksum, "L") '= $zconvert(expectedChecksum, "L") {
         set msg = "IRIS.DAT SHA-256 mismatch. Expected: " _ expectedChecksum _ " Actual: " _ actualChecksum
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+    }
+
+    // Only one database package per namespace is allowed
+    set conflictStmt = ##class(%SQL.Statement).%New()
+    $$$ThrowOnError(conflictStmt.%Prepare("SELECT Name FROM %IPM_Storage.ModuleItem WHERE Packaging = 'database' AND Name != ?"))
+    set conflictRS = conflictStmt.%Execute(..Module.Name)
+    if conflictRS.%Next() {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "A database package ('" _ conflictRS.%Get("Name") _ "') is already installed in this namespace. Only one database package per namespace is allowed."))
     }
 
     // Validate IPM is not in the target namespace's routines DB
@@ -768,7 +873,7 @@ Method PromptForSwapConfirmation(ns As %String) [ Private ]
 /// into the current namespace's IPM storage.
 /// The dependency code is already in the swapped-in routines DB;
 /// this only registers the IPM metadata so zpm list and dependency tracking work.
-Method RegisterDependencyMetadata(packageDir As %String) [ Private ]
+ClassMethod RegisterDependencyMetadata(packageDir As %String)
 {
     set depsXML = ##class(%Library.File).NormalizeFilename("dependencies.xml", packageDir)
     if '##class(%Library.File).Exists(depsXML) {
@@ -801,7 +906,7 @@ Method RegisterDependencyMetadata(packageDir As %String) [ Private ]
         $$$ThrowOnError(out.Write(fragment))
         $$$ThrowOnError(out.%Save())
 
-        set loadSC = $system.OBJ.Load(tempFile, "-d")
+        set loadSC = $system.OBJ.Load(tempFile, "ck")
         do ##class(%Library.File).Delete(tempFile)
         $$$ThrowOnError(loadSC)
 
@@ -836,7 +941,7 @@ Method %Activate(ByRef params) As %Status
         }
 
         do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
-        do ..RegisterDependencyMetadata(packageDir)
+        do ##class(%IPM.Lifecycle.Database).RegisterDependencyMetadata(packageDir)
 
         write !, "Database swap complete for namespace ", ns
         write !, "  Backup: ", backupPath

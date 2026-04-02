@@ -386,7 +386,8 @@ Method TestPackageAndInstallWithTestResources()
     set sc = ##class(%IPM.Main).Shell("load " _ packageFileWithTests _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed with test resources")
 
-    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Test"), "Test class exists when included")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Test"), "Test class (Type B UnitTest) exists when included")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.TestHelper"), "TestHelper class (Type A Scope=test) exists when included")
 
     // Package WITHOUT test resources (default)
     set $namespace = testNS
@@ -404,6 +405,7 @@ Method TestPackageAndInstallWithTestResources()
     do $$$AssertStatusOK(sc, "Installed without test resources")
 
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Test"), "Test class excluded by default")
+    do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.TestHelper"), "TestHelper class excluded by default")
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Main"), "Main class exists")
 }
 
@@ -467,21 +469,75 @@ Method TestPackagingAndInstallValidation()
     // For now, this should work with valid package
     do $$$AssertStatusOK(sc, "Valid package installs successfully")
 
-    // Test: Attempt to install database package without -swap-db flag
+    // Test: Tampered IRIS.DAT fails checksum validation
+    set tamperDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "tamper-extract")
+    do ##class(%Library.File).CreateDirectory(tamperDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, tamperDir)
+    do $$$AssertStatusOK(sc, "Extracted package for tampering test")
+
+    set tamperedIRISDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", tamperDir)
+    do ##class(%Library.File).Delete(tamperedIRISDAT)
+    open tamperedIRISDAT:"WNS":5
+    use tamperedIRISDAT
+    write "NOT_A_REAL_IRIS_DATABASE_FILE"
+    close tamperedIRISDAT
+    use $principal
+
+    set tamperedPackage = ..PackageOutputDir _ "simple-db-module-tampered.tgz"
+    set sc = ##class(%IPM.General.Archive).Create(tamperDir, tamperedPackage)
+    do $$$AssertStatusOK(sc, "Repacked tampered archive")
+
     set installNS2 = "TESTDBVALIDINS2"
     set sc = ..CreateTestNamespace(installNS2)
-    do $$$AssertStatusOK(sc, "Created second installation namespace")
-
+    do $$$AssertStatusOK(sc, "Created namespace for tampered install test")
     set $namespace = installNS2
 
-    // Without -swap-db, should require confirmation or error
-    // Implementation should handle this appropriately
+    set sc = ##class(%IPM.Main).Shell("load " _ tamperedPackage _ " -swap-db")
+    do $$$AssertStatusNotOK(sc, "Tampered IRIS.DAT rejected by checksum validation")
 
-    // Test: Zero-sized IRIS.DAT validation
-    // Would be created and tested in actual implementation
+    // Test: Zero-sized IRIS.DAT fails validation
+    set zeroDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "zero-extract")
+    do ##class(%Library.File).CreateDirectory(zeroDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, zeroDir)
+    do $$$AssertStatusOK(sc, "Extracted package for zero-size IRIS.DAT test")
 
-    // Test: Missing dependencies.xml validation
-    // Would be tested with corrupted package
+    set zeroIRISDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", zeroDir)
+    do ##class(%Library.File).Delete(zeroIRISDAT)
+    open zeroIRISDAT:"WNS":5
+    close zeroIRISDAT
+
+    set zeroPackage = ..PackageOutputDir _ "simple-db-module-zero.tgz"
+    set sc = ##class(%IPM.General.Archive).Create(zeroDir, zeroPackage)
+    do $$$AssertStatusOK(sc, "Repacked archive with zero-sized IRIS.DAT")
+
+    set installNS3 = "TESTDBVALIDINS3"
+    set sc = ..CreateTestNamespace(installNS3)
+    do $$$AssertStatusOK(sc, "Created namespace for zero-size test")
+    set $namespace = installNS3
+
+    set sc = ##class(%IPM.Main).Shell("load " _ zeroPackage _ " -swap-db")
+    do $$$AssertStatusNotOK(sc, "Zero-sized IRIS.DAT rejected by validation")
+
+    // Test: Missing dependencies.xml fails validation
+    set missingDepsDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "missing-deps-extract")
+    do ##class(%Library.File).CreateDirectory(missingDepsDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, missingDepsDir)
+    do $$$AssertStatusOK(sc, "Extracted package for missing dependencies.xml test")
+
+    set missingDepsXML = ##class(%Library.File).NormalizeFilename("dependencies.xml", missingDepsDir)
+    do ##class(%Library.File).Delete(missingDepsXML)
+
+    set missingDepsPackage = ..PackageOutputDir _ "simple-db-module-missing-deps.tgz"
+    set sc = ##class(%IPM.General.Archive).Create(missingDepsDir, missingDepsPackage)
+    do $$$AssertStatusOK(sc, "Repacked archive without dependencies.xml")
+
+    set installNS4 = "TESTDBVALIDINS4"
+    set sc = ..CreateTestNamespace(installNS4)
+    do $$$AssertStatusOK(sc, "Created namespace for missing-deps test")
+    set $namespace = installNS4
+
+    set sc = ##class(%IPM.Main).Shell("load " _ missingDepsPackage _ " -swap-db")
+    do $$$AssertStatusNotOK(sc, "Missing dependencies.xml rejected by validation")
 }
 
 /// Test backup and rollback during installation
@@ -568,8 +624,25 @@ Method TestUpgradeDatabaseToDatabase()
 
     // Now upgrade to v2.0.0 (simulated - would need v2 module in real test)
     // For this RED test, we'll upgrade from same package to test mechanism
-    set sc = ##class(%IPM.Main).Shell("update simple-db-module " _ packageV1 _ " -swap-db")
-    // Implementation should handle upgrade with backup and database swap
+    set sc = ##class(%IPM.Main).Shell("update simple-db-module -path " _ packageV1 _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Upgraded database package")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Module still installed after upgrade")
+
+    // Verify a second DB swap actually occurred (backup count must be > 1)
+    new $namespace
+    set $namespace = "%SYS"
+    $$$ThrowOnError(##class(Config.Namespaces).Get(installNS, .nsProps))
+    set routinesDBName = $get(nsProps("Routines"))
+    set dbDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
+    set $namespace = installNS
+    set backupCount = 0
+    set rs = ##class(%ResultSet).%New("%File:FileSet")
+    $$$ThrowOnError(rs.Execute(dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", , 1))
+    set nextSC = $$$OK
+    while rs.%Next(.nextSC) { set backupCount = backupCount + 1 }
+    $$$ThrowOnError(nextSC)
+    do $$$AssertTrue(backupCount > 1, "Second backup created during upgrade (DB was swapped again)")
 }
 
 /// Test upgrading from source package to database package
@@ -616,8 +689,29 @@ Method TestUpgradeSourceToDatabase()
     set $namespace = installNS
 
     // Upgrade from source to database package
-    set sc = ##class(%IPM.Main).Shell("update simple-db-module " _ dbPackage _ " -swap-db")
-    // Implementation should handle metadata migration between packaging types
+    set sc = ##class(%IPM.Main).Shell("update simple-db-module -path " _ dbPackage _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Upgraded from source to database package")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Module still installed after upgrade")
+
+    // Verify module metadata was migrated: packaging type must now be 'database'
+    set module = ##class(%IPM.Storage.Module).NameOpen("simple-db-module")
+    do $$$AssertEquals(module.Packaging, "database", "Module packaging changed to 'database' after source-to-database upgrade")
+
+    // Verify a DB swap occurred (at least one backup was created)
+    new $namespace
+    set $namespace = "%SYS"
+    $$$ThrowOnError(##class(Config.Namespaces).Get(installNS, .nsProps))
+    set routinesDBName = $get(nsProps("Routines"))
+    set dbDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
+    set $namespace = installNS
+    set backupCount = 0
+    set rs = ##class(%ResultSet).%New("%File:FileSet")
+    $$$ThrowOnError(rs.Execute(dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", , 1))
+    set nextSC = $$$OK
+    while rs.%Next(.nextSC) { set backupCount = backupCount + 1 }
+    $$$ThrowOnError(nextSC)
+    do $$$AssertTrue(backupCount > 0, "DB swap occurred during source-to-database upgrade")
 }
 
 /// Test uninstalling database package
@@ -666,8 +760,24 @@ Method TestUninstallDatabasePackage()
 
     do $$$AssertNotTrue(..FindStringInMultiDimArray("simple-db-module", .output), "Module no longer in list")
 
-    // Verify namespace returns to original state
-    // Backup should still exist for user to manage
+    // Verify backup file is preserved after uninstall (user manages cleanup)
+    new $namespace
+    set $namespace = "%SYS"
+    $$$ThrowOnError(##class(Config.Namespaces).Get(installNS, .nsProps))
+    set routinesDBName = $get(nsProps("Routines"))
+    set dbDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
+    set $namespace = installNS
+    set backupCount = 0
+    set rs = ##class(%ResultSet).%New("%File:FileSet")
+    $$$ThrowOnError(rs.Execute(dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", , 1))
+    set nextSC = $$$OK
+    while rs.%Next(.nextSC) { set backupCount = backupCount + 1 }
+    $$$ThrowOnError(nextSC)
+    do $$$AssertTrue(backupCount > 0, "Backup file preserved after uninstall")
+
+    // Verify compiled classes are removed from the routines DB (spec: uninstall deletes compiled resources)
+    do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Classes removed from namespace after uninstall")
 }
 
 /// Test mixed packaging scenarios
@@ -743,6 +853,175 @@ Method TestMixedPackaging()
     // Attempt to install second database package should fail
     set sc = ##class(%IPM.Main).Shell("load " _ dbPackage2 _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Cannot install second database package in same namespace")
+}
+
+/// Test that -no-export-python-deps excludes wheels from the package, and that Python wheels
+/// are installed during database package install (PythonWheel uses Initialize phase, which
+/// has no Database.cls override).
+/// Expected: wheel-present assertion PASSES, no-wheel assertion FAILS (not yet implemented),
+/// Python install assertion PASSES.
+Method TestPackageWithExportPyDepsFlag()
+{
+    set testNS = "TESTDBPYWHL"
+    set sc = ..CreateTestNamespace(testNS)
+    do $$$AssertStatusOK(sc, "Created test namespace")
+
+    set moduleDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
+
+    new $namespace
+    set $namespace = testNS
+    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Loaded module with Python wheel resource")
+
+    // Package with default settings (export-python-deps ON by default)
+    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged with default settings")
+
+    set defaultPkg = ..PackageOutputDir _ "all-resources-module-1.0.0-database.tgz"
+    set extractDir1 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-default-whl")
+    do ##class(%Library.File).CreateDirectory(extractDir1)
+    set sc = ##class(%IPM.General.Archive).Extract(defaultPkg, extractDir1)
+    do $$$AssertStatusOK(sc, "Extracted default package")
+
+    set wheelInDefault = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir1)
+    do $$$AssertTrue(##class(%Library.File).Exists(wheelInDefault), "Wheel included in package by default (export-python-deps ON)")
+
+    // Package with -no-export-python-deps into a separate subdirectory
+    set noExportDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "noexport")
+    do ##class(%Library.File).CreateDirectory(noExportDir)
+    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -no-export-python-deps -path " _ noExportDir)
+    do $$$AssertStatusOK(sc, "Packaged with -no-export-python-deps")
+
+    set noExportPkg = noExportDir _ "all-resources-module-1.0.0-database.tgz"
+    set extractDir2 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-nowheel")
+    do ##class(%Library.File).CreateDirectory(extractDir2)
+    set sc = ##class(%IPM.General.Archive).Extract(noExportPkg, extractDir2)
+    do $$$AssertStatusOK(sc, "Extracted no-wheel package")
+
+    set wheelInNoExport = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir2)
+    // FAILS until CopyNonCompiledResources respects the ExportPythonDependencies flag
+    do $$$AssertNotTrue(##class(%Library.File).Exists(wheelInNoExport), "Wheel excluded when -no-export-python-deps is set")
+
+    // Verify Python wheel is installed during database package install.
+    // PythonWheel.OnPhase("Initialize") fires since %Initialize has no Database.cls override.
+    set installNS = "TESTDBPYWHLINS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created install namespace")
+    set $namespace = installNS
+
+    do ..PurgePythonPackage("lune")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ defaultPkg _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Installed database package with Python wheel")
+
+    try {
+        set lunePackage = ##class(%SYS.Python).Import("lune")
+        do $$$AssertSuccess("lune importable after database install")
+        set wheelVer = ..GetPythonVersion("lune")
+        do $$$AssertEquals(wheelVer, "1.6.2", "lune version is 1.6.2 as packaged")
+    } catch ex {
+        do $$$AssertFailure("Failed to import lune after database install: " _ ex.AsStatus())
+    }
+}
+
+/// Test that FileCopy resources are applied during database package install.
+/// Currently FAILS: Database.%Activate override does not call ##super for the install context,
+/// so FileCopy.OnBeforePhase("Activate") never fires.
+/// Note: WebApplication creation works (via %Configure, which has no Database.cls override).
+Method TestNonCompiledResourcesAppliedDuringInstall()
+{
+    set testNS = "TESTDBNONCMP"
+    set sc = ..CreateTestNamespace(testNS)
+    do $$$AssertStatusOK(sc, "Created test namespace")
+
+    set moduleDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
+
+    new $namespace
+    set $namespace = testNS
+    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Loaded module (FileCopy runs during Activate)")
+
+    // Package as database
+    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged module as database")
+
+    set packageFile = ..PackageOutputDir _ "all-resources-module-1.0.0-database.tgz"
+
+    // Compute FileCopy target: ${mgrdir}../all-resources-data.txt
+    // ParentDirectoryName handles the .. reliably across platforms
+    set mgrDir = ##class(%Library.File).ManagerDirectory()
+    set parentDir = ##class(%Library.File).ParentDirectoryName(mgrDir)
+    set fileCopyTarget = ##class(%Library.File).NormalizeFilename("all-resources-data.txt", parentDir)
+
+    // Confirm FileCopy created the file during load, then delete it
+    do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget), "FileCopy target exists after load (pre-condition)")
+    set deleteOK = ##class(%Library.File).Delete(fileCopyTarget)
+    do $$$AssertTrue(deleteOK, "FileCopy target successfully deleted before install (setup check)")
+    do $$$AssertNotTrue(##class(%Library.File).Exists(fileCopyTarget), "FileCopy target absent before install (setup verified)")
+
+    // Create install namespace
+    set installNS = "TESTDBNONCMPINS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created install namespace")
+    set $namespace = installNS
+
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Installed database package")
+
+    // FAILS: FileCopy.OnBeforePhase("Activate") is not invoked because
+    // Database.%Activate skips ##super for the install context.
+    do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget), "FileCopy target created during database install")
+}
+
+/// Get the installed version of a Python package.
+ClassMethod GetPythonVersion(name As %String) As %String
+{
+    try {
+        set importlib = ##class(%SYS.Python).Import("importlib")
+        set metadata = importlib."import_module"("importlib.metadata")
+        set ver = metadata."version"(name)
+        return ver
+    } catch ex {
+        set packageResources = ##class(%SYS.Python).Import("pkg_resources")
+        set dist = packageResources."get_distribution"(name)
+        return dist."version"
+    }
+}
+
+/// Remove a file or directory if it exists.
+ClassMethod DeletePath(path As %String)
+{
+    if ##class(%Library.File).DirectoryExists(path) {
+        set removeSuccess = ##class(%Library.File).RemoveDirectoryTree(path)
+        if 'removeSuccess {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to remove directory: " _ path))
+        }
+    } elseif ##class(%Library.File).Exists(path) {
+        set removeSuccess = ##class(%Library.File).Delete(path)
+        if 'removeSuccess {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to remove file: " _ path))
+        }
+    }
+}
+
+/// Remove all files under folder matching a glob pattern.
+ClassMethod DeletePattern(
+	folder As %String,
+	pattern As %String)
+{
+    set file = $zsearch(folder _ pattern)
+    while file '= "" {
+        do ..DeletePath(file)
+        set file = $zsearch("")
+    }
+}
+
+/// Remove all installed copies of a Python package from the shared pip target directory.
+ClassMethod PurgePythonPackage(name As %String)
+{
+    set target = ##class(%Library.File).NormalizeDirectory("python", ##class(%Library.File).ManagerDirectory())
+    do ..DeletePath(target _ name)
+    do ..DeletePattern(target, name _ "-*" _ ".dist-info")
 }
 
 }

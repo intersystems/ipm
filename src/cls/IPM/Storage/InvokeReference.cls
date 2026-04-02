@@ -56,6 +56,7 @@ Method OnBeforePhase(
 	pPhase As %String,
 	ByRef pParams) As %Status
 {
+    if $get(pParams("SkipInvokes")) { quit $$$OK }
     set tPhase = $select(..CustomPhase'="":..CustomPhase,1:..Phase)
     if (pPhase '= tPhase) || ("Before" '= ..When) {
         quit $$$OK
@@ -67,6 +68,7 @@ Method OnAfterPhase(
 	pPhase As %String,
 	ByRef pParams) As %Status
 {
+    if $get(pParams("SkipInvokes")) { quit $$$OK }
     set tPhase = $select(..CustomPhase'="":..CustomPhase,1:..Phase)
     if (pPhase '= tPhase) || ("After" '= ..When) {
         quit $$$OK
