@@ -5,7 +5,7 @@ Class %IPM.ResourceProcessor.Default.Global Extends %IPM.ResourceProcessor.Abstr
 Parameter DESCRIPTION As STRING = "Standard resource processor for global exports.";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Global,Preserve";
+Parameter ATTRIBUTES As STRING = "Global,Preserve,Directory,FilenameTranslateIdentifier,FilenameTranslateAssociator";
 
 /// Optional name of global within the file
 Property Global As %IPM.DataType.GlobalReference;
@@ -16,6 +16,12 @@ Property Preserve As %Boolean [ InitialExpression = 0 ];
 /// Directory relative to module root containing the exported resource.
 /// Defaults to the resource's extension (lower-case) if unspecified.
 Property Directory As %String(MAXLEN = "") [ InitialExpression = "gbl/" ];
+
+/// Characters in the resource name to translate when building the filename.
+Property FilenameTranslateIdentifier As %String [ InitialExpression = "%,("")" ];
+
+/// Replacement characters corresponding to FilenameTranslateIdentifier.
+Property FilenameTranslateAssociator As %String [ InitialExpression = "___" ];
 
 Method OnPhase(
 	pPhase As %String,
@@ -93,7 +99,7 @@ Method OnItemRelativePath(itemName As %String) As %String
 {
     set sourceRoot = ..ResourceReference.Module.SourcesRoot
     // Append trailing slash only if sourceRoot is non-empty and doesn't already end with / or \
-    if sourceRoot '= "", "\/" '[ $extract(sourceRoot, *) {
+    if (sourceRoot '= "") && ("\/" '[ $extract(sourceRoot, *)) {
         set sourceRoot = sourceRoot _ "/"
     }
 
@@ -105,7 +111,7 @@ Method OnItemRelativePath(itemName As %String) As %String
     }
 
     set name = $piece(itemName, ".", 1, * - 1)
-    quit $select(..ResourceReference.Preload:"preload/", 1:"") _ sourceRoot _ directory _ $translate(name, "%,("")", "___") _ ".xml"
+    quit $select(..ResourceReference.Preload:"preload/", 1:"") _ sourceRoot _ directory _ $translate(name, ..FilenameTranslateIdentifier, ..FilenameTranslateAssociator) _ ".xml"
 }
 
 }
