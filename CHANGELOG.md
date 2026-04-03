@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
 - #1052: In a namespace with mapped IPM, the `info` command works again and the intro message displays the IPM version and where its mapped from
 - #1102: %IPM.Storage.QualifiedModuleInfo:%New() will now copy over version properties when passed in a resolvedReference
+- #1112: Packaging a module with a globals resource now respects SourcesRoot, placing the exported file at the correct path in the tarball
 
 ## [0.10.6] - 2026-02-24
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Global>
+<Node><Sub>^My.Settings</Sub>
+    <Node><Sub>Mode</Sub>
+        <Data>Example</Data>
+    </Node>
+    <Node><Sub>Parameter</Sub>
+        <Data>42</Data>
+    </Node>
+</Node>
+</Global>
+</Export>
