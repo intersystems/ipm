@@ -1780,6 +1780,7 @@ Method %Evaluate(
     set customParams("verbose") = +$get(pParams("Verbose"))
     set customParams("ipmDir") = ##class(%Library.File).NormalizeDirectory($system.Util.DataDirectory() _ "ipm/" _ ..Name _ "/" _ ..VersionString)
     set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
+    do ##class(%IPM.Storage.ModuleSetting.Default).ResolvePlaceholders(.customParams)
     set tAttrValue = ##class(%IPM.Storage.ModuleSetting.Default).EvaluateAttribute(tAttrValue,.customParams)
     set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
 
