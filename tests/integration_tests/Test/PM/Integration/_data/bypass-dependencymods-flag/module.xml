@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+	<Document name="demo-module1.ZPM">
+		<Module>
+			<Name>demo-module1</Name>
+			<Version>1.0.0</Version>
+			<Description>description</Description>
+			<Dependencies>
+				<ModuleReference>
+					<Name>test-dependency-1</Name>
+					<Version>0.0.1</Version>
+				</ModuleReference>
+				<ModuleReference>
+					<Name>test-dependency-2</Name>
+					<Version>1.0.0</Version>
+				</ModuleReference>
+			</Dependencies>
+			<Packaging>module</Packaging>
+			<SourcesRoot>src</SourcesRoot>
+		</Module>
+	</Document>
+</Export>
