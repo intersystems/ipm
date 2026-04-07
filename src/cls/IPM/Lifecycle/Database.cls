@@ -589,7 +589,8 @@ Method WriteDependenciesXML(targetDir As %String)
 /// WebApplication is configuration-only and is not handled here.
 Method CopyNonCompiledResources(
 	stagingDir As %String,
-	includeTestResources As %Boolean)
+	includeTestResources As %Boolean,
+	exportPythonDeps As %Boolean = 1)
 {
     set orderedResourceList = ..Module.GetOrderedResourceList()
     set key = ""
@@ -620,8 +621,7 @@ Method CopyNonCompiledResources(
             if '##class(%Library.File).CopyFile(sourcePath, destPath, 1) {
                 $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy FileCopy source: " _ sourcePath))
             }
-
-        } elseif $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") {
+        } elseif exportPythonDeps && $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") {
             set wheelDir = resource.Processor.Directory
             set wheelName = resource.Processor.Name
             set sourceDir = ##class(%Library.File).NormalizeDirectory(..Module.Root _ wheelDir)
@@ -636,7 +636,6 @@ Method CopyNonCompiledResources(
             if '##class(%Library.File).CopyFile(sourcePath, destDir _ wheelName, 1) {
                 $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy wheel: " _ sourcePath))
             }
-
         } elseif $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") {
             set cpfName = resource.Processor.Name
             set cpfSubdir = resource.Processor.Directory
@@ -676,7 +675,8 @@ Method AssemblePackage(
 
     // Stage non-compiled resource files so processors can find them during install
     set includeTestResources = $get(params("IncludeTestResources"), 0)
-    do ..CopyNonCompiledResources(stagingDir, includeTestResources)
+    set exportPythonDeps = $get(params("ExportPythonDependencies"), 1)
+    do ..CopyNonCompiledResources(stagingDir, includeTestResources, exportPythonDeps)
 
     do ..WritePackageModuleXML(stagingDir, checksumHex)
     do ..WriteDependenciesXML(stagingDir)
