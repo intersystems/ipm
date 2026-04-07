@@ -15,8 +15,10 @@ Method OnBeforeOneTest() As %Status
     set ..CreatedNamespaces = ""
     set ..CreatedGlobalsDatabases = ""
     set ..OriginalNamespace = $namespace
-    // Use ManagerDirectory + job PID for a reliable absolute temp path
-    set ..PackageOutputDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "pkg-test-output-" _ $job)
+    set ..PackageOutputDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "pkg-test-output")
+    if ##class(%Library.File).DirectoryExists(..PackageOutputDir) {
+        do ##class(%IPM.Utils.File).RemoveDirectoryTree(..PackageOutputDir)
+    }
     do ##class(%File).CreateDirectory(..PackageOutputDir)
     return $$$OK
 }
@@ -477,11 +479,10 @@ Method TestPackagingAndInstallValidation()
 
     set tamperedIRISDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", tamperDir)
     do ##class(%Library.File).Delete(tamperedIRISDAT)
-    open tamperedIRISDAT:"WNS":5
-    use tamperedIRISDAT
-    write "NOT_A_REAL_IRIS_DATABASE_FILE"
-    close tamperedIRISDAT
-    use $principal
+    set tamperedStream = ##class(%Stream.FileBinary).%New()
+    $$$ThrowOnError(tamperedStream.LinkToFile(tamperedIRISDAT))
+    do tamperedStream.Write("NOT_A_REAL_IRIS_DATABASE_FILE")
+    $$$ThrowOnError(tamperedStream.%Save())
 
     set tamperedPackage = ..PackageOutputDir _ "simple-db-module-tampered.tgz"
     set sc = ##class(%IPM.General.Archive).Create(tamperDir, tamperedPackage)
@@ -503,8 +504,9 @@ Method TestPackagingAndInstallValidation()
 
     set zeroIRISDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", zeroDir)
     do ##class(%Library.File).Delete(zeroIRISDAT)
-    open zeroIRISDAT:"WNS":5
-    close zeroIRISDAT
+    set zeroStream = ##class(%Stream.FileBinary).%New()
+    $$$ThrowOnError(zeroStream.LinkToFile(zeroIRISDAT))
+    $$$ThrowOnError(zeroStream.%Save())
 
     set zeroPackage = ..PackageOutputDir _ "simple-db-module-zero.tgz"
     set sc = ##class(%IPM.General.Archive).Create(zeroDir, zeroPackage)
