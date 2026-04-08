@@ -814,8 +814,6 @@ Method TestMixedPackaging()
 /// Test that -no-export-python-deps excludes wheels from the package, and that Python wheels
 /// are installed during database package install (PythonWheel uses Initialize phase, which
 /// has no Database.cls override).
-/// Expected: wheel-present assertion PASSES, no-wheel assertion FAILS (not yet implemented),
-/// Python install assertion PASSES.
 Method TestPackageWithExportPyDepsFlag()
 {
     set testNS = "TESTDBPYWHL"
@@ -880,10 +878,100 @@ Method TestPackageWithExportPyDepsFlag()
     }
 }
 
+/// Test that requirements.txt dependencies are resolved into wheels during database packaging
+/// when -export-python-deps is enabled (the default). Modules with only a requirements.txt
+/// (no explicit <PythonWheel> entries) should get their Python deps packaged as wheels.
+Method TestPackageWithRequirementsTxt()
+{
+    set testNS = "TESTDBREQTXT"
+    set sc = ..CreateTestNamespace(testNS)
+    do $$$AssertStatusOK(sc, "Created test namespace")
+
+    set moduleDir = ..GetModuleDir("db-packaging", "module-with-requirements")
+
+    new $namespace
+    set $namespace = testNS
+    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Loaded module with requirements.txt")
+
+    // Package as database (export-python-deps is on by default)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-requirements -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged module with requirements.txt")
+
+    // Extract and verify wheels were included
+    set packageFile = ..PackageOutputDir _ "module-with-requirements-1.0.0-database.tgz"
+    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-reqtxt")
+    do ##class(%Library.File).CreateDirectory(extractDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
+    do $$$AssertStatusOK(sc, "Extracted package")
+
+    set wheelPath = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir)
+    do $$$AssertTrue(##class(%Library.File).Exists(wheelPath), "Wheel from requirements.txt included in database package")
+
+    // Verify wheel is not included when -no-export-python-deps is set
+    set noExportDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "noexport-reqtxt")
+    do ##class(%Library.File).CreateDirectory(noExportDir)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-requirements -no-export-python-deps -path " _ noExportDir)
+    do $$$AssertStatusOK(sc, "Packaged with -no-export-python-deps")
+
+    set noExportPkg = noExportDir _ "module-with-requirements-1.0.0-database.tgz"
+    set extractDir2 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-noreqtxt")
+    do ##class(%Library.File).CreateDirectory(extractDir2)
+    set sc = ##class(%IPM.General.Archive).Extract(noExportPkg, extractDir2)
+    do $$$AssertStatusOK(sc, "Extracted no-export package")
+
+    set wheelPath2 = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir2)
+    do $$$AssertNotTrue(##class(%Library.File).Exists(wheelPath2), "Wheel excluded when -no-export-python-deps is set")
+}
+
+/// Test that a module with both requirements.txt and explicit <PythonWheel> resources
+/// gets both sets of wheels packaged correctly. The two sources should not conflict —
+/// ExportPythonDependencies resolves requirements.txt into wheels and adds <PythonWheel>
+/// entries, then CopyNonCompiledResources stages all PythonWheel resources.
+Method TestPackageWithMixedPythonDeps()
+{
+    set testNS = "TESTDBMIXPY"
+    set sc = ..CreateTestNamespace(testNS)
+    do $$$AssertStatusOK(sc, "Created test namespace")
+
+    set moduleDir = ..GetModuleDir("db-packaging", "module-with-mixed-python")
+
+    new $namespace
+    set $namespace = testNS
+    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Loaded module with mixed Python deps")
+
+    // Package as database (export-python-deps on by default)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged module with mixed Python deps")
+
+    // Extract and verify both wheels are present
+    set packageFile = ..PackageOutputDir _ "module-with-mixed-python-1.0.0-database.tgz"
+    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-mixpy")
+    do ##class(%Library.File).CreateDirectory(extractDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
+    do $$$AssertStatusOK(sc, "Extracted package")
+
+    // Explicit <PythonWheel> resource
+    set luneWheel = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir)
+    do $$$AssertTrue(##class(%Library.File).Exists(luneWheel), "Explicit PythonWheel (lune) included in package")
+
+    // Wheel resolved from requirements.txt — pycparser filename includes version and platform tags
+    set wheelsDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).NormalizeFilename("wheels", extractDir))
+    set pycparserFound = 0
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)", wheelsDir, "pycparser*.whl", "", 0)
+    while rs.%Next() {
+        set pycparserFound = 1
+    }
+    do $$$AssertTrue(pycparserFound, "requirements.txt wheel (pycparser) included in package")
+}
+
 /// Test that FileCopy resources are applied during database package install.
-/// Currently FAILS: Database.%Activate override does not call ##super for the install context,
-/// so FileCopy.OnBeforePhase("Activate") never fires.
-/// Note: WebApplication creation works (via %Configure, which has no Database.cls override).
+/// FileCopy.OnBeforePhase("Activate") fires because resource processor hooks run at
+/// Module level (in Module.RunPhase), not inside the lifecycle method.
+/// WebApplication creation also works (via %Configure, which has no Database.cls override).
 Method TestNonCompiledResourcesAppliedDuringInstall()
 {
     set testNS = "TESTDBNONCMP"
@@ -924,8 +1012,8 @@ Method TestNonCompiledResourcesAppliedDuringInstall()
     set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed database package")
 
-    // FAILS: FileCopy.OnBeforePhase("Activate") is not invoked because
-    // Database.%Activate skips ##super for the install context.
+    // FileCopy.OnBeforePhase("Activate") is invoked by Module.RunPhase independently
+    // of the lifecycle method — resource processor hooks are siblings, not children.
     do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget), "FileCopy target created during database install")
 }
 
@@ -978,14 +1066,13 @@ Method CountBackupFiles(ns As %String) As %Integer
     set routinesDBName = ##class(%IPM.Lifecycle.Database).GetRoutinesDBName(ns)
     set dbDir = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(routinesDBName)
     set rs = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)",
+        "SELECT COUNT(*) AS fileCount FROM %Library.File_FileSet(?, ?, ?, ?)",
         dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", "", 1)
     if rs.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing backup files: " _ rs.%Message))
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error counting backup files: " _ rs.%Message))
     }
-    set fileCount = 0
-    while rs.%Next() { set fileCount = fileCount + 1 }
-    quit fileCount
+    do rs.%Next()
+    quit rs.%Get("fileCount")
 }
 
 /// Removes all installed files of a Python package from the shared pip target directory.
