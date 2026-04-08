@@ -101,6 +101,14 @@ Method %Package(ByRef params) As %Status
         set checksumHex = ..ComputeSHA256Hex(irisDAT)
         write !, "  Checksum: ", checksumHex
 
+        // Resolve requirements.txt into wheels and add <PythonWheel> resources to module.xml,
+        // matching what Base.ExportPythonDependencies does for source packaging.
+        // This ensures modules with a requirements.txt get their Python dependencies
+        // included in the database package.
+        if $get(params("ExportPythonDependencies"), 1) {
+            do ..ExportPythonDependencies(..Module, .params)
+        }
+
         // Assemble staging dir and create .tgz
         set stagingDir = ##class(%Library.File).NormalizeDirectory(
             ##class(%Library.File).TempFilename()) _ "stage/"
@@ -372,6 +380,12 @@ Method %Reload(ByRef params) As %Status
     }
 
     // Inside %Package.LoadResourcesIntoDatabase: load resources, filtering test scope.
+    // Cannot delegate to ##super here: Base.%Reload quits early without DeveloperMode
+    // and RootDirectory in params, which are never set during packaging.
+    // This means this branch does not inherit Base.%Reload behavior (e.g., package/routine
+    // mappings from module.xml). Python requirements are handled separately in %Package
+    // via ExportPythonDependencies. If Base.%Reload gains new resource-loading logic,
+    // this branch must be updated to match.
     if $get(params("DatabasePackaging")) {
         set sc = $$$OK
         try {
@@ -647,20 +661,24 @@ Method CopyNonCompiledResources(
             }
         }
 
-        if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.FileCopy") {
+        if '$isobject(resource.Processor) {
+            continue
+        }
+
+        if resource.Processor.%IsA("%IPM.ResourceProcessor.FileCopy") {
             set name = resource.Processor.Name
             set sourcePath = ##class(%Library.File).NormalizeFilename(name, ..Module.Root)
             set destPath = ##class(%Library.File).NormalizeFilename(name, stagingDir)
             do ..StageFile(sourcePath, destPath)
 
-        } elseif exportPythonDeps && $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") {
+        } elseif exportPythonDeps && resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") {
             set wheelDir = resource.Processor.Directory
             set wheelName = resource.Processor.Name
             set sourcePath = ##class(%Library.File).NormalizeFilename(wheelName, ##class(%Library.File).NormalizeDirectory(..Module.Root _ wheelDir))
             set destPath = ##class(%Library.File).NormalizeDirectory(stagingDir _ wheelDir) _ wheelName
             do ..StageFile(sourcePath, destPath)
 
-        } elseif $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") {
+        } elseif resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") {
             set cpfName = resource.Processor.Name
             set cpfSubdir = resource.Processor.Directory
             set sourcePath = ##class(%Library.File).NormalizeFilename(cpfName, ##class(%Library.File).NormalizeDirectory(..Module.Root _ ..Module.SourcesRoot _ "/" _ cpfSubdir))
@@ -787,9 +805,12 @@ Method ValidateBeforeSwap(
     }
 
     // Only one database package per namespace is allowed
-    set conflictStmt = ##class(%SQL.Statement).%New()
-    $$$ThrowOnError(conflictStmt.%Prepare("SELECT Name FROM %IPM_Storage.ModuleItem WHERE Packaging = 'database' AND Name != ?"))
-    set conflictRS = conflictStmt.%Execute(..Module.Name)
+    set conflictRS = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT Name FROM %IPM_Storage.ModuleItem WHERE Packaging = 'database' AND Name != ?",
+        ..Module.Name)
+    if conflictRS.%SQLCODE < 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error checking for conflicting database packages: " _ conflictRS.%Message))
+    }
     if conflictRS.%Next() {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "A database package ('" _ conflictRS.%Get("Name") _ "') is already installed in this namespace. Only one database package per namespace is allowed."))
     }
