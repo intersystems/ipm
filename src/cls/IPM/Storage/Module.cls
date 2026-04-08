@@ -552,6 +552,9 @@ ClassMethod ExecutePhases(
                 set tOnePhase = tNormalizedPhaseName
             }
             set tStart = $zhorolog
+            // "*" is a module-object refresh checkpoint, not a real phase.
+            // Reopens the module and lifecycle from storage to pick up changes
+            // made by earlier phases (e.g., module.xml edits during Reload).
             if tOnePhase="*" {
                 kill tModule,tLifecycle
                 set tModule = ..NameOpen(pModuleName,,.tSC)
