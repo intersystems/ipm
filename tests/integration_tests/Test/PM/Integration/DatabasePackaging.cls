@@ -922,6 +922,9 @@ Method TestPackageWithRequirementsTxt()
 
     set wheelPath2 = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir2)
     do $$$AssertNotTrue(##class(%Library.File).Exists(wheelPath2), "Wheel excluded when -no-export-python-deps is set")
+
+    // Cleanup: wheels/ was downloaded by ExportPythonDependencies as part of test
+    do ..DeletePath(moduleDir _ "wheels")
 }
 
 /// Test that a module with both requirements.txt and explicit <PythonWheel> resources
@@ -966,6 +969,9 @@ Method TestPackageWithMixedPythonDeps()
         set pycparserFound = 1
     }
     do $$$AssertTrue(pycparserFound, "requirements.txt wheel (pycparser) included in package")
+
+    // Cleanup: pycparser wheel downloaded by ExportPythonDependencies as part of test
+    do ..DeletePattern(moduleDir _ "wheels/", "pycparser*.whl")
 }
 
 /// Test that FileCopy resources are applied during database package install.
