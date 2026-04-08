@@ -48,6 +48,36 @@ Method %Package(ByRef params) As %Status
         write:verbose !, "Validating IPM mapping..."
         do ..ValidateIPMNotInRoutinesDB()
 
+        // Warn about <Invoke> elements that won't run during database install.
+        // The routines DB isn't mounted until %Activate completes, so invoke targets
+        // don't exist for phases before Activate.After.
+        // Custom phases are excluded — they're on-demand operations triggered after install,
+        // never part of the standard install phase chain.
+        // Build pre-Activate set from the canonical VALUELIST so this stays correct
+        // if the phase ordering ever changes. Skip "*" — it's an internal checkpoint
+        // in ExecutePhases, not a real invokable phase.
+        set preActivatePhases = ","
+        for i=2:1:$length($parameter("%IPM.DataType.PhaseName","VALUELIST"),",") {
+            set phase = $piece($parameter("%IPM.DataType.PhaseName","VALUELIST"),",",i)
+            quit:(phase = "Activate")
+            if phase '= "*" { set preActivatePhases = preActivatePhases _ phase _ "," }
+        }
+        set key = ""
+        for {
+            set invoke = ..Module.Invokes.GetNext(.key)
+            quit:(key = "")
+            if invoke.CustomPhase '= "" {
+                continue
+            }
+            set invokePhase = invoke.Phase
+            set invokeWhen = invoke.When
+            if (preActivatePhases [ (","_invokePhase_",")) || ((invokePhase = "Activate") && (invokeWhen = "Before")) {
+                write !, "WARNING: <Invoke Class="""_invoke.Class_""" Method="""_invoke.Method_""" Phase="""_invokePhase_""" When="""_invokeWhen_"""> will not run during database install."
+                write !, "  The routines DB is not mounted until Activate completes."
+                write !, "  For install-time setup, use Phase=""Activate"" When=""After"" or a later phase (Configure, ApplyUpdateSteps)."
+            }
+        }
+
         if useCurrentDB {
             // -use-current-db: use the existing routines DB directly, no remapping
             // Note: globals mapping is unchanged throughout — IPM metadata stays in globals DB
@@ -970,6 +1000,12 @@ Method %Activate(ByRef params) As %Status
 
         do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
         do ##class(%IPM.Lifecycle.Database).RegisterDependencyMetadata(packageDir)
+
+        // Allow <Invoke> elements to run for Activate.After and subsequent phases.
+        // The DB is now mounted so invoke targets exist. Pre-Activate invokes were
+        // skipped because the class wouldn't exist yet (SkipInvokes was set in %Reload).
+        // On swap failure, this line is not reached — invokes stay suppressed.
+        kill params("SkipInvokes")
 
         write !, "Database swap complete for namespace ", ns
         write !, "  Backup: ", backupPath
