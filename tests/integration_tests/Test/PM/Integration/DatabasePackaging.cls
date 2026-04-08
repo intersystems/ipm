@@ -10,6 +10,8 @@ Property PackageOutputDir As %String;
 
 Property CreatedGlobalsDatabases As %List;
 
+/// Resets test state: clears namespace/DB tracking lists, records original namespace,
+/// and creates a clean package output directory (wiping any leftover from previous runs).
 Method OnBeforeOneTest() As %Status
 {
     set ..CreatedNamespaces = ""
@@ -23,6 +25,8 @@ Method OnBeforeOneTest() As %Status
     return $$$OK
 }
 
+/// Tears down all test namespaces and their dedicated globals databases created during the test.
+/// Always restores $namespace to the original namespace first.
 Method OnAfterOneTest() As %Status
 {
     set sc = $$$OK
@@ -181,9 +185,9 @@ Method TestSimplePackageAndInstall()
     do $$$AssertTrue(xmlContent [ "<Packaging>database</Packaging>", "module.xml contains <Packaging>database</Packaging>")
     do $$$AssertTrue(xmlContent [ "<Checksum Algorithm=""SHA-256"">", "module.xml contains SHA-256 checksum")
 
-    // Verify dependencies.xml exists
-    set depsXMLFile = ##class(%File).NormalizeDirectory(extractDir) _ "dependencies.xml"
-    do $$$AssertTrue(##class(%File).Exists(depsXMLFile), "dependencies.xml exists in package")
+    // Verify deps/ directory exists
+    set depsDir = ##class(%File).NormalizeDirectory(extractDir) _ "deps/"
+    do $$$AssertTrue(##class(%File).DirectoryExists(depsDir), "deps/ directory exists in package")
 
     // Create a new test namespace for installation
     set installNS = "TESTDBINST1"
@@ -479,10 +483,14 @@ Method TestPackagingAndInstallValidation()
 
     set tamperedIRISDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", tamperDir)
     do ##class(%Library.File).Delete(tamperedIRISDAT)
+    set tamperTmp = ##class(%Library.File).TempFilename("dat")
     set tamperedStream = ##class(%Stream.FileBinary).%New()
-    $$$ThrowOnError(tamperedStream.LinkToFile(tamperedIRISDAT))
+    $$$ThrowOnError(tamperedStream.LinkToFile(tamperTmp))
     do tamperedStream.Write("NOT_A_REAL_IRIS_DATABASE_FILE")
     $$$ThrowOnError(tamperedStream.%Save())
+    if '##class(%Library.File).Rename(tamperTmp, tamperedIRISDAT) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot rename tamper file to IRIS.DAT"))
+    }
 
     set tamperedPackage = ..PackageOutputDir _ "simple-db-module-tampered.tgz"
     set sc = ##class(%IPM.General.Archive).Create(tamperDir, tamperedPackage)
@@ -520,18 +528,19 @@ Method TestPackagingAndInstallValidation()
     set sc = ##class(%IPM.Main).Shell("load " _ zeroPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Zero-sized IRIS.DAT rejected by validation")
 
-    // Test: Missing dependencies.xml fails validation
+    // Test: Missing deps/ directory fails validation
     set missingDepsDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "missing-deps-extract")
     do ##class(%Library.File).CreateDirectory(missingDepsDir)
     set sc = ##class(%IPM.General.Archive).Extract(packageFile, missingDepsDir)
-    do $$$AssertStatusOK(sc, "Extracted package for missing dependencies.xml test")
+    do $$$AssertStatusOK(sc, "Extracted package for missing deps/ test")
 
-    set missingDepsXML = ##class(%Library.File).NormalizeFilename("dependencies.xml", missingDepsDir)
-    do ##class(%Library.File).Delete(missingDepsXML)
+    set missingDepsSubDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).NormalizeFilename("deps", missingDepsDir))
+    do ##class(%Library.File).RemoveDirectoryTree(missingDepsSubDir)
 
     set missingDepsPackage = ..PackageOutputDir _ "simple-db-module-missing-deps.tgz"
     set sc = ##class(%IPM.General.Archive).Create(missingDepsDir, missingDepsPackage)
-    do $$$AssertStatusOK(sc, "Repacked archive without dependencies.xml")
+    do $$$AssertStatusOK(sc, "Repacked archive without deps/ directory")
 
     set installNS4 = "TESTDBVALIDINS4"
     set sc = ..CreateTestNamespace(installNS4)
@@ -539,7 +548,7 @@ Method TestPackagingAndInstallValidation()
     set $namespace = installNS4
 
     set sc = ##class(%IPM.Main).Shell("load " _ missingDepsPackage _ " -swap-db")
-    do $$$AssertStatusNotOK(sc, "Missing dependencies.xml rejected by validation")
+    do $$$AssertStatusNotOK(sc, "Missing deps/ directory rejected by validation")
 }
 
 /// Test backup and rollback during installation
@@ -571,23 +580,7 @@ Method TestBackupAndRollback()
     do $$$AssertStatusOK(sc, "Installed database package")
 
     // Verify backup file was created in the routines DB directory
-    new $namespace
-    set $namespace = "%SYS"
-    $$$ThrowOnError(##class(Config.Namespaces).Get(installNS, .nsProperties))
-    set routinesDBName = $get(nsProperties("Routines"))
-    set dbDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
-    set $namespace = installNS
-
-    set backupCount = 0
-    set rs = ##class(%ResultSet).%New("%File:FileSet")
-    $$$ThrowOnError(rs.Execute(dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", , 1))
-    set nextSC = $$$OK
-    while rs.%Next(.nextSC) {
-        set backupCount = backupCount + 1
-    }
-    $$$ThrowOnError(nextSC)
-    do $$$AssertTrue(backupCount > 0, "Backup IRIS.DAT file created after swap")
+    do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup IRIS.DAT file created after swap")
 }
 
 /// Test upgrading from database package to newer database package
@@ -631,20 +624,7 @@ Method TestUpgradeDatabaseToDatabase()
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Module still installed after upgrade")
 
     // Verify a second DB swap actually occurred (backup count must be > 1)
-    new $namespace
-    set $namespace = "%SYS"
-    $$$ThrowOnError(##class(Config.Namespaces).Get(installNS, .nsProps))
-    set routinesDBName = $get(nsProps("Routines"))
-    set dbDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
-    set $namespace = installNS
-    set backupCount = 0
-    set rs = ##class(%ResultSet).%New("%File:FileSet")
-    $$$ThrowOnError(rs.Execute(dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", , 1))
-    set nextSC = $$$OK
-    while rs.%Next(.nextSC) { set backupCount = backupCount + 1 }
-    $$$ThrowOnError(nextSC)
-    do $$$AssertTrue(backupCount > 1, "Second backup created during upgrade (DB was swapped again)")
+    do $$$AssertTrue(..CountBackupFiles(installNS) > 1, "Second backup created during upgrade (DB was swapped again)")
 }
 
 /// Test upgrading from source package to database package
@@ -700,20 +680,7 @@ Method TestUpgradeSourceToDatabase()
     do $$$AssertEquals(module.Packaging, "database", "Module packaging changed to 'database' after source-to-database upgrade")
 
     // Verify a DB swap occurred (at least one backup was created)
-    new $namespace
-    set $namespace = "%SYS"
-    $$$ThrowOnError(##class(Config.Namespaces).Get(installNS, .nsProps))
-    set routinesDBName = $get(nsProps("Routines"))
-    set dbDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
-    set $namespace = installNS
-    set backupCount = 0
-    set rs = ##class(%ResultSet).%New("%File:FileSet")
-    $$$ThrowOnError(rs.Execute(dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", , 1))
-    set nextSC = $$$OK
-    while rs.%Next(.nextSC) { set backupCount = backupCount + 1 }
-    $$$ThrowOnError(nextSC)
-    do $$$AssertTrue(backupCount > 0, "DB swap occurred during source-to-database upgrade")
+    do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "DB swap occurred during source-to-database upgrade")
 }
 
 /// Test uninstalling database package
@@ -763,20 +730,7 @@ Method TestUninstallDatabasePackage()
     do $$$AssertNotTrue(..FindStringInMultiDimArray("simple-db-module", .output), "Module no longer in list")
 
     // Verify backup file is preserved after uninstall (user manages cleanup)
-    new $namespace
-    set $namespace = "%SYS"
-    $$$ThrowOnError(##class(Config.Namespaces).Get(installNS, .nsProps))
-    set routinesDBName = $get(nsProps("Routines"))
-    set dbDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
-    set $namespace = installNS
-    set backupCount = 0
-    set rs = ##class(%ResultSet).%New("%File:FileSet")
-    $$$ThrowOnError(rs.Execute(dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", , 1))
-    set nextSC = $$$OK
-    while rs.%Next(.nextSC) { set backupCount = backupCount + 1 }
-    $$$ThrowOnError(nextSC)
-    do $$$AssertTrue(backupCount > 0, "Backup file preserved after uninstall")
+    do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup file preserved after uninstall")
 
     // Verify compiled classes are removed from the routines DB (spec: uninstall deletes compiled resources)
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Classes removed from namespace after uninstall")
@@ -1018,7 +972,26 @@ ClassMethod DeletePattern(
     }
 }
 
-/// Remove all installed copies of a Python package from the shared pip target directory.
+/// Counts IRIS_<dbname>_*.DAT backup files in the routines DB directory for a namespace.
+Method CountBackupFiles(ns As %String) As %Integer
+{
+    set routinesDBName = ##class(%IPM.Lifecycle.Database).GetRoutinesDBName(ns)
+    set dbDir = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(routinesDBName)
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)",
+        dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", "", 1)
+    if rs.%SQLCODE < 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing backup files: " _ rs.%Message))
+    }
+    set fileCount = 0
+    while rs.%Next() { set fileCount = fileCount + 1 }
+    quit fileCount
+}
+
+/// Removes all installed files of a Python package from the shared pip target directory.
+/// Deletes both the package directory and its .dist-info metadata directory.
+/// Uses direct file deletion rather than pip uninstall to avoid pip dependency resolution
+/// and ensure a clean slate regardless of pip state.
 ClassMethod PurgePythonPackage(name As %String)
 {
     set target = ##class(%Library.File).NormalizeDirectory("python", ##class(%Library.File).ManagerDirectory())
