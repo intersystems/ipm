@@ -6,11 +6,24 @@ Include %syPrompt
 Class %IPM.Lifecycle.Database Extends %IPM.Lifecycle.Base
 {
 
+/// Binary stream holding the packaged .tgz file for the Publish phase.
 Property Payload As %Stream.TmpBinary [ Private ];
 
 Parameter PACKAGING As STRING [ Final ] = "database";
 
-/// Entry point for database packaging.
+/// Entry point for database packaging. Orchestrates the full pipeline:
+/// 1. Validate IPM is externally mapped (not in routines DB)
+/// 2. Create a temp IRIS.DAT and remap the namespace routines to it
+///    (or use the current DB with -use-current-db)
+/// 3. Export Generated resources before remapping (they become inaccessible after dismount)
+/// 4. Load and compile module resources into the temp DB
+/// 5. Restore the namespace to its original routines DB
+/// 6. Compute SHA-256 checksum of the IRIS.DAT
+/// 7. Assemble staging dir (IRIS.DAT + module.xml + dependencies.xml + non-compiled resources)
+///    and create the .tgz archive
+/// 
+/// On error during remap, a safety net restores the namespace.
+/// Temp files and directories are cleaned up in all paths.
 Method %Package(ByRef params) As %Status
 {
     set sc = $$$OK
@@ -38,12 +51,9 @@ Method %Package(ByRef params) As %Status
         if useCurrentDB {
             // -use-current-db: use the existing routines DB directly, no remapping
             // Note: globals mapping is unchanged throughout — IPM metadata stays in globals DB
-            set $namespace = "%SYS"
-            $$$ThrowOnError(##class(Config.Namespaces).Get(ns, .nsProps))
-            set $namespace = ns
-            set curDBName = $get(nsProps("Routines"))
-            set tempDBPath = ##class(%Library.File).NormalizeDirectory(
-                ##class(%Library.File).ManagerDirectory() _ curDBName)
+            // AssemblePackage copies (not moves) IRIS.DAT for this branch: the source is the live routines DB
+            set curDBName = ..GetRoutinesDBName(ns)
+            set tempDBPath = ..GetDatabaseDirectory(curDBName)
         } else {
             // Default: create a fresh empty temp database
             write:verbose !, "Creating temporary database..."
@@ -94,7 +104,7 @@ Method %Package(ByRef params) As %Status
         // Assemble staging dir and create .tgz
         set stagingDir = ##class(%Library.File).NormalizeDirectory(
             ##class(%Library.File).TempFilename()) _ "stage/"
-        set packageFile = ..AssemblePackage(irisDAT, stagingDir, checksumHex, .params)
+        set packageFile = ..AssemblePackage(irisDAT, stagingDir, checksumHex, .params, 'useCurrentDB)
         set params("PackageFile") = packageFile
 
         // Store in Payload for the Publish phase
@@ -133,7 +143,8 @@ Method %Package(ByRef params) As %Status
         do ##class(%IPM.Utils.File).RemoveDirectoryTree(stagingDir)
     }
 
-    // Clean up temp DB directory (IRIS.DAT already copied into the .tgz by AssemblePackage)
+    // Clean up temp DB directory (IRIS.DAT was moved to staging by AssemblePackage — only the empty dir remains;
+    // for -use-current-db, IRIS.DAT was copied not moved, so it still exists here but tempDBName="" skips this block)
     if (tempDBName '= "") && (tempDBPath '= "") && ##class(%Library.File).DirectoryExists(tempDBPath) {
         new $namespace
         set $namespace = "%SYS"
@@ -161,6 +172,22 @@ ClassMethod IsClassInLocalRoutinesDB(className As %String) As %Boolean
     quit '##class(%Library.RoutineMgr).IsMapped(className _ ".CLS")
 }
 
+/// Returns the normalized filesystem directory path for a database registered in Config.Databases.
+ClassMethod GetDatabaseDirectory(dbName As %String) As %String
+{
+    quit ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).ManagerDirectory() _ dbName)
+}
+
+/// Returns the Config.Databases key for a namespace's routines database.
+ClassMethod GetRoutinesDBName(ns As %String) As %String
+{
+    new $namespace
+    set $namespace = "%SYS"
+    $$$ThrowOnError(##class(Config.Namespaces).Get(ns, .nsProps))
+    quit $get(nsProps("Routines"))
+}
+
 /// Creates a new empty IRIS.DAT in a temporary directory and registers it in Config.Databases.
 /// dbName: caller-supplied name, or auto-generated if empty.
 /// Sets dbPath to the normalized directory path (trailing slash) containing IRIS.DAT.
@@ -176,8 +203,7 @@ ClassMethod CreateTempDatabase(
             $system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)), "+/=", "")
     }
 
-    set dbPath = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).ManagerDirectory() _ dbName)
+    set dbPath = ..GetDatabaseDirectory(dbName)
 
     if '##class(%Library.File).CreateDirectory(dbPath, .result) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to create temp database directory: " _ dbPath _ " - " _ result))
@@ -195,8 +221,9 @@ ClassMethod CreateTempDatabase(
     }
 }
 
-/// Dismounts the current routines DB, remaps the namespace to newDBName, and stores
-/// the original DB name in oldDBName for later restoration.
+/// Remaps the namespace's routines to newDBName, then dismounts the old routines DB.
+/// Remap-before-dismount avoids a window where the namespace has no mounted routines DB.
+/// Stores the original DB name in oldDBName for later restoration.
 ClassMethod RemapRoutinesDB(
 	ns As %String,
 	newDBName As %String,
@@ -208,8 +235,7 @@ ClassMethod RemapRoutinesDB(
     $$$ThrowOnError(##class(Config.Namespaces).Get(ns, .nsProps))
     set oldDBName = $get(nsProps("Routines"))
 
-    set oldPath = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).ManagerDirectory() _ oldDBName)
+    set oldPath = ..GetDatabaseDirectory(oldDBName)
 
     // Remap namespace to new DB first, then dismount old DB
     // This avoids a window where the namespace has no mounted routines DB
@@ -242,9 +268,7 @@ ClassMethod RestoreRoutinesDB(
     $$$ThrowOnError(##class(Config.Namespaces).Modify(ns, .nsProps))
 
     // Remount original DB
-    set mountSC = ##class(SYS.Database).MountDatabase(
-        ##class(%Library.File).NormalizeDirectory(
-            ##class(%Library.File).ManagerDirectory() _ oldDBName))
+    set mountSC = ##class(SYS.Database).MountDatabase(..GetDatabaseDirectory(oldDBName))
     if $$$ISERR(mountSC) && '$system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
         $$$ThrowOnError(mountSC)
     }
@@ -544,17 +568,18 @@ ClassMethod CollectAllDependencies(
     }
 }
 
-/// Writes dependencies.xml to targetDir by compiling all dependency module manifests.
-Method WriteDependenciesXML(targetDir As %String)
+/// Writes dependency module manifests into a deps/ subdirectory of targetDir.
+/// Each dependency is written as a standalone IRIS export file (<depname>.xml),
+/// loadable directly with $system.OBJ.Load — no XML parsing required at install time.
+Method WriteDependencies(targetDir As %String)
 {
     do ..CollectAllDependencies(..Module, .depMap)
 
-    set outPath = ##class(%Library.File).NormalizeFilename("dependencies.xml", targetDir)
-    set outStream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(outStream.LinkToFile(outPath))
-
-    do outStream.WriteLine("<?xml version=""1.0"" encoding=""UTF-8""?>")
-    do outStream.WriteLine("<Dependencies>")
+    set depsDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).NormalizeFilename("deps", targetDir))
+    if '##class(%Library.File).CreateDirectoryChain(depsDir) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create deps directory: " _ depsDir))
+    }
 
     set depName = ""
     for {
@@ -567,20 +592,35 @@ Method WriteDependenciesXML(targetDir As %String)
         set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
         $$$ThrowOnError(sc)
 
-        set depStream = ##class(%Stream.TmpCharacter).%New()
-        $$$ThrowOnError($system.OBJ.ExportToStream(depModule.Name _ ".ZPM", .depStream, "-d"))
-        $$$ThrowOnError(depStream.Rewind())
-
-        // Strip the <?xml...?> header before appending
-        set firstLine = depStream.ReadLine()
-        if firstLine '[ "<?xml" {
-            do outStream.WriteLine(firstLine)
-        }
-        $$$ThrowOnError(outStream.CopyFrom(depStream))
+        set depFile = ##class(%Library.File).NormalizeFilename(depName _ ".xml", depsDir)
+        set fileStream = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(fileStream.LinkToFile(depFile))
+        set exportStream = ##class(%Stream.TmpCharacter).%New()
+        $$$ThrowOnError($system.OBJ.ExportToStream(depModule.Name _ ".ZPM", .exportStream, "-d"))
+        $$$ThrowOnError(exportStream.Rewind())
+        $$$ThrowOnError(fileStream.CopyFrom(exportStream))
+        $$$ThrowOnError(fileStream.%Save())
     }
+}
 
-    do outStream.WriteLine("</Dependencies>")
-    $$$ThrowOnError(outStream.%Save())
+/// Copies a file to a destination path, creating parent directories as needed.
+/// Throws on failure. Skips silently if source does not exist.
+/// Returns 1 if file was copied, 0 if source did not exist.
+ClassMethod StageFile(
+	sourcePath As %String,
+	destPath As %String) As %Boolean
+{
+    if '##class(%Library.File).Exists(sourcePath) {
+        quit 0
+    }
+    set destDir = ##class(%Library.File).GetDirectory(destPath)
+    if '##class(%Library.File).CreateDirectoryChain(destDir) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create directory: " _ destDir))
+    }
+    if '##class(%Library.File).CopyFile(sourcePath, destPath, 1) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy file: " _ sourcePath _ " to " _ destPath))
+    }
+    quit 1
 }
 
 /// Copies non-compiled resource source files (FileCopy, PythonWheel, CPF) from
@@ -610,67 +650,55 @@ Method CopyNonCompiledResources(
         if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.FileCopy") {
             set name = resource.Processor.Name
             set sourcePath = ##class(%Library.File).NormalizeFilename(name, ..Module.Root)
-            if '##class(%Library.File).Exists(sourcePath) {
-                continue
-            }
             set destPath = ##class(%Library.File).NormalizeFilename(name, stagingDir)
-            set destDir = ##class(%Library.File).GetDirectory(destPath)
-            if '##class(%Library.File).CreateDirectoryChain(destDir) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create dir for FileCopy: " _ destDir))
-            }
-            if '##class(%Library.File).CopyFile(sourcePath, destPath, 1) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy FileCopy source: " _ sourcePath))
-            }
+            do ..StageFile(sourcePath, destPath)
+
         } elseif exportPythonDeps && $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") {
             set wheelDir = resource.Processor.Directory
             set wheelName = resource.Processor.Name
-            set sourceDir = ##class(%Library.File).NormalizeDirectory(..Module.Root _ wheelDir)
-            set sourcePath = ##class(%Library.File).NormalizeFilename(wheelName, sourceDir)
-            if '##class(%Library.File).Exists(sourcePath) {
-                continue
-            }
-            set destDir = ##class(%Library.File).NormalizeDirectory(stagingDir _ wheelDir)
-            if '##class(%Library.File).CreateDirectoryChain(destDir) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create wheels dir: " _ destDir))
-            }
-            if '##class(%Library.File).CopyFile(sourcePath, destDir _ wheelName, 1) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy wheel: " _ sourcePath))
-            }
+            set sourcePath = ##class(%Library.File).NormalizeFilename(wheelName, ##class(%Library.File).NormalizeDirectory(..Module.Root _ wheelDir))
+            set destPath = ##class(%Library.File).NormalizeDirectory(stagingDir _ wheelDir) _ wheelName
+            do ..StageFile(sourcePath, destPath)
+
         } elseif $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") {
             set cpfName = resource.Processor.Name
             set cpfSubdir = resource.Processor.Directory
-            set sourceDir = ##class(%Library.File).NormalizeDirectory(..Module.Root _ ..Module.SourcesRoot _ "/" _ cpfSubdir)
-            set sourcePath = ##class(%Library.File).NormalizeFilename(cpfName, sourceDir)
-            if '##class(%Library.File).Exists(sourcePath) {
-                continue
-            }
-            set destDir = ##class(%Library.File).NormalizeDirectory(stagingDir _ ..Module.SourcesRoot _ "/" _ cpfSubdir)
-            if '##class(%Library.File).CreateDirectoryChain(destDir) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create CPF staging dir: " _ destDir))
-            }
-            if '##class(%Library.File).CopyFile(sourcePath, destDir _ cpfName, 1) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy CPF file: " _ sourcePath))
-            }
+            set sourcePath = ##class(%Library.File).NormalizeFilename(cpfName, ##class(%Library.File).NormalizeDirectory(..Module.Root _ ..Module.SourcesRoot _ "/" _ cpfSubdir))
+            set destPath = ##class(%Library.File).NormalizeDirectory(stagingDir _ ..Module.SourcesRoot _ "/" _ cpfSubdir) _ cpfName
+            do ..StageFile(sourcePath, destPath)
+
         }
         // Compiled resources (Class, Routine, Include, etc.) are handled via IRIS.DAT — no file staging needed.
         // WebApplication is configuration-only — no file staging needed.
     }
 }
 
-/// Copies IRIS.DAT into stagingDir, writes module.xml and dependencies.xml,
+/// Moves (or copies) IRIS.DAT into stagingDir, writes module.xml and dependencies.xml,
 /// then calls Archive.Create to build the final .tgz. Returns path to .tgz.
+/// moveFile=1 (default): rename IRIS.DAT into staging — avoids copying multi-GB files.
+/// moveFile=0: copy instead — required for -use-current-db where irisDAT is the live routines DB.
 Method AssemblePackage(
 	irisDAT As %String,
 	stagingDir As %String,
 	checksumHex As %String,
-	ByRef params) As %String
+	ByRef params,
+	moveFile As %Boolean = 1) As %String
 {
     if '##class(%Library.File).CreateDirectoryChain(stagingDir, .result) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create staging dir: " _ result))
     }
 
-    if '##class(%Library.File).CopyFile(irisDAT, stagingDir _ "IRIS.DAT", 1, .result) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy IRIS.DAT: " _ result))
+    if moveFile {
+        // Move IRIS.DAT into staging — avoids copying potentially multi-GB files.
+        // Safe because the temp DB is already dismounted before AssemblePackage runs.
+        if '##class(%Library.File).Rename(irisDAT, stagingDir _ "IRIS.DAT") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot move IRIS.DAT to staging dir"))
+        }
+    } else {
+        // -use-current-db: copy instead — irisDAT is the live routines DB, must not be moved
+        if '##class(%Library.File).CopyFile(irisDAT, stagingDir _ "IRIS.DAT", 1, .result) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy IRIS.DAT: " _ result))
+        }
     }
 
     // Stage non-compiled resource files so processors can find them during install
@@ -679,7 +707,7 @@ Method AssemblePackage(
     do ..CopyNonCompiledResources(stagingDir, includeTestResources, exportPythonDeps)
 
     do ..WritePackageModuleXML(stagingDir, checksumHex)
-    do ..WriteDependenciesXML(stagingDir)
+    do ..WriteDependencies(stagingDir)
 
     set outputDir = $get(params("Path"))
     if outputDir = "" {
@@ -706,6 +734,9 @@ Method AssemblePackage(
 }
 
 /// Pre-install validation for a database swap.
+/// Checks: IRIS.DAT exists and non-zero, module.xml declares database packaging,
+/// dependencies.xml present, SHA-256 checksum matches, no other database package
+/// already installed in this namespace, and IPM is not in the target routines DB.
 /// Throws on any failure. Does not modify any state.
 Method ValidateBeforeSwap(
 	packageDir As %String,
@@ -737,9 +768,10 @@ Method ValidateBeforeSwap(
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
 
-    set depsXML = ##class(%Library.File).NormalizeFilename("dependencies.xml", packageDir)
-    if '##class(%Library.File).Exists(depsXML) {
-        set msg = "Database package is missing dependencies.xml in: " _ packageDir
+    set depsDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).NormalizeFilename("deps", packageDir))
+    if '##class(%Library.File).DirectoryExists(depsDir) {
+        set msg = "Database package is missing deps/ directory in: " _ packageDir
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
 
@@ -781,10 +813,8 @@ Method PerformDatabaseSwap(
     new $namespace
     set $namespace = "%SYS"
 
-    $$$ThrowOnError(##class(Config.Namespaces).Get(ns, .nsProps))
-    set routinesDBName = $get(nsProps("Routines"))
-    set dbDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
+    set routinesDBName = ..GetRoutinesDBName(ns)
+    set dbDir = ..GetDatabaseDirectory(routinesDBName)
 
     $$$ThrowOnError(##class(SYS.Database).DismountDatabase(dbDir))
 
@@ -849,13 +879,8 @@ Method RollbackDatabaseSwap(
 /// Throws if the user declines or cancels.
 Method PromptForSwapConfirmation(ns As %String) [ Private ]
 {
-    new $namespace
-    set $namespace = "%SYS"
-    $$$ThrowOnError(##class(Config.Namespaces).Get(ns, .nsProps))
-    set routinesDBName = $get(nsProps("Routines"))
-    set dbDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).ManagerDirectory() _ routinesDBName)
-    set $namespace = ns
+    set routinesDBName = ..GetRoutinesDBName(ns)
+    set dbDir = ..GetDatabaseDirectory(routinesDBName)
 
     write !, "WARNING: This will replace the routines database for namespace ", ns
     write !, "  Current database: ", dbDir _ "IRIS.DAT"
@@ -869,53 +894,35 @@ Method PromptForSwapConfirmation(ns As %String) [ Private ]
     }
 }
 
-/// Reads dependencies.xml and registers each dependency's module metadata
-/// into the current namespace's IPM storage.
+/// Loads each IRIS export file from the deps/ directory into the current namespace,
+/// registering dependency module metadata in IPM storage.
 /// The dependency code is already in the swapped-in routines DB;
 /// this only registers the IPM metadata so zpm list and dependency tracking work.
 ClassMethod RegisterDependencyMetadata(packageDir As %String)
 {
-    set depsXML = ##class(%Library.File).NormalizeFilename("dependencies.xml", packageDir)
-    if '##class(%Library.File).Exists(depsXML) {
+    set depsDir = ##class(%Library.File).NormalizeDirectory(
+        ##class(%Library.File).NormalizeFilename("deps", packageDir))
+    if '##class(%Library.File).DirectoryExists(depsDir) {
         quit
     }
 
-    set depsStream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(depsStream.LinkToFile(depsXML))
-
-    set fullContent = ""
-    while 'depsStream.AtEnd {
-        set fullContent = fullContent _ depsStream.Read(32000)
+    // Each file in deps/ is a standalone IRIS export XML, one per dependency.
+    // Load them directly — no XML parsing required.
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)",
+        depsDir, "*.xml", "", 0)
+    if rs.%SQLCODE < 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing deps: " _ rs.%Message))
     }
-
-    // Extract each <Export>...</Export> block (one per dependency) and load it
-    set searchPos = 1
-    for {
-        set blockStart = $find(fullContent, "<Export", searchPos) - $length("<Export")
-        quit:blockStart<=0
-
-        set blockEnd = $find(fullContent, "</Export>", blockStart)
-        quit:blockEnd<=0
-
-        set fragment = $extract(fullContent, blockStart, blockEnd - 1)
-
-        set tempFile = ##class(%Library.File).TempFilename("xml")
-        set out = ##class(%Stream.FileCharacter).%New()
-        $$$ThrowOnError(out.LinkToFile(tempFile))
-        $$$ThrowOnError(out.Write("<?xml version=""1.0"" encoding=""UTF-8""?>" _ $char(10)))
-        $$$ThrowOnError(out.Write(fragment))
-        $$$ThrowOnError(out.%Save())
-
-        set loadSC = $system.OBJ.Load(tempFile, "ck")
-        do ##class(%Library.File).Delete(tempFile)
-        $$$ThrowOnError(loadSC)
-
-        set searchPos = blockEnd
+    while rs.%Next() {
+        $$$ThrowOnError($system.OBJ.Load(rs.%Get("Name"), "ck"))
     }
 }
 
-/// For a database package install: validate, optionally prompt, swap the routines database,
-/// and register dependency metadata in IPM storage.
+/// For a database package install: validate package integrity (checksum, packaging type,
+/// conflict check), optionally prompt for user confirmation (skipped with -swap-db),
+/// swap the routines database, and register dependency metadata in IPM storage.
+/// Rejects developer mode. On failure after swap, rolls back to the backup IRIS.DAT.
 /// For all other contexts: delegate to ##super.
 Method %Activate(ByRef params) As %Status
 {
@@ -951,6 +958,7 @@ Method %Activate(ByRef params) As %Status
         if dbDir '= "" {
             write !, "ERROR — attempting rollback..."
             do ..RollbackDatabaseSwap(dbDir, backupPath)
+            write !, "Rollback complete. Namespace restored."
         }
     }
     quit sc
