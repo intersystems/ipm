@@ -1207,7 +1207,7 @@ ClassMethod LoadNewModule(
         }
         // For database packages, all dependencies are compiled into IRIS.DAT — skip LoadDependencies.
         // Fetching deps from a registry would fail (code isn't installed yet before the DB swap).
-        // %Activate registers dependency metadata from dependencies.xml after the swap.
+        // %Activate registers dependency metadata from deps/ directory after the swap.
         if tModule.Packaging '= "database" {
             do ..LoadDependencies(tModule,, .params)
         }

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="module-with-mixed-python.ZPM">
+    <Module>
+      <Name>module-with-mixed-python</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="MixedPyModule.Main.CLS" />
+      <PythonWheel Name="lune-1.6.2-py3-none-any.whl" />
+    </Module>
+  </Document>
+</Export>
