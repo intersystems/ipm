@@ -11,9 +11,8 @@
       <Invoke Class="AllResources.Generator" Method="Generate" Phase="Compile" When="After" />
       <Resource Name="AllResources.Generated.CLS" Generated="1" Compile="0" />
       <Resource Name="AllResources.INC" />
-      <CPF Name="config.cpf" />
-      <FileCopy Name="test-data.txt" Target="${mgrdir}../all-resources-data.txt" />
-      <PythonWheel Name="lune-1.6.2-py3-none-any.whl" />
+<FileCopy Name="test-data.txt" Target="${mgrdir}../all-resources-data.txt" />
+      <PythonWheel Name="colorama-0.4.6-py2.py3-none-any.whl" />
       <WebApplication
         Name="/allresources"
         NameSpace="${namespace}"

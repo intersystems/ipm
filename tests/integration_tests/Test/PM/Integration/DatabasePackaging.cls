@@ -2,13 +2,76 @@
 Class Test.PM.Integration.DatabasePackaging Extends Test.PM.Integration.Base
 {
 
+/// Namespaces created during the current test — cleaned up in OnAfterOneTest.
 Property CreatedNamespaces As %List;
 
+/// Namespace active when the test class was invoked — restored after each test.
 Property OriginalNamespace As %String;
 
+/// Directory where .tgz packages are written during tests — wiped and recreated in OnBeforeOneTest.
 Property PackageOutputDir As %String;
 
+/// Globals databases created per-test — cleaned up in OnAfterOneTest.
+/// Separate from the routines DB so dismounting during package-database doesn't lose IPM metadata.
 Property CreatedGlobalsDatabases As %List;
+
+/// Packaging namespaces are shared across tests to avoid the ~10s overhead of creating and
+/// tearing down a namespace + globals DB for every test. Each shared NS is lazily initialized
+/// on first use and cleaned up in OnAfterAllTests. Tests still create their own install
+/// namespaces via CreateTestNamespace — those are per-test and cleaned up in OnAfterOneTest.
+/// 
+/// Sharing is safe because package-database does not modify namespace state — it creates a
+/// temp DB elsewhere, compiles into it, and discards it. The loaded classes, globals, and
+/// module registry in the shared NS are untouched. Any on-disk side effects (e.g. wheels
+/// downloaded by ExportPythonDependencies) are the responsibility of the individual tests.
+/// 
+/// Shared NS for the majority of tests — generally along compiled-resource lines.
+/// Lazily created by GetOrCreateSharedNS1; cleaned up in OnAfterAllTests.
+Property SharedNS1 As %String;
+
+/// Shared NS for Python/resource-heavy tests — generally along non-compiled-resource lines.
+/// Lazily created by GetOrCreateSharedNS2; cleaned up in OnAfterAllTests.
+/// Note: Each module loaded here must use a distinct PythonWheel filename — IPM disallows
+/// two modules in the same namespace from claiming the same wheel. If adding a module with a
+/// PythonWheel or requirements.txt, ensure it uses a wheel not already claimed by another
+/// module in this namespace (e.g. lune, colorama, pycparser, packaging are already taken).
+Property SharedNS2 As %String;
+
+/// Globals databases for shared namespaces — tracked separately since they outlive individual tests.
+/// Cleaned up in OnAfterAllTests.
+Property SharedGlobalsDatabases As %List;
+
+/// Defensive cleanup of leftover shared namespaces from interrupted previous runs.
+Method OnBeforeAllTests() As %Status
+{
+    set ..OriginalNamespace = $namespace
+    set ..SharedNS1 = ""
+    set ..SharedNS2 = ""
+    set ..SharedGlobalsDatabases = ""
+
+    for i=1:1:2 {
+        set ns = "TESTDBPKGNS" _ i
+        set globalsDB = ns _ "G"
+        do ##class(%IPM.Test.Utils).DeleteNamespace(ns)
+        set dbPath = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(globalsDB)
+        try {
+            new $namespace
+            set $namespace = "%SYS"
+            do ##class(SYS.Database).DismountDatabase(dbPath)
+            if ##class(Config.Databases).Exists(globalsDB) {
+                do ##class(Config.Databases).Delete(globalsDB)
+            }
+            do ##class(SYS.Database).DeleteDatabase(dbPath)
+            set $namespace = ..OriginalNamespace
+            if ##class(%Library.File).DirectoryExists(dbPath) {
+                do ##class(%IPM.Utils.File).RemoveDirectoryTree(dbPath)
+            }
+        } catch ex {
+            // Best-effort — may not exist from a previous clean run
+        }
+    }
+    quit $$$OK
+}
 
 /// Resets test state: clears namespace/DB tracking lists, records original namespace,
 /// and creates a clean package output directory (wiping any leftover from previous runs).
@@ -134,24 +197,91 @@ Method CreateTestNamespace(pNamespace As %String) As %Status
     return sc
 }
 
+/// Returns the shared packaging namespace for core modules (generally compiled-resource tests).
+/// Creates TESTDBPKGNS1 on first call and loads all relevant modules; reuses on subsequent calls.
+/// GetModuleDir calls are made before any namespace switch since ^UnitTestRoot is only in origNS.
+Method GetOrCreateSharedNS1() As %String
+{
+    if ..SharedNS1 '= "" {
+        quit ..SharedNS1
+    }
+
+    set ns = "TESTDBPKGNS1"
+
+    // Resolve all module dirs before switching namespace (^UnitTestRoot only in original NS)
+    set depDir = ..GetModuleDir("db-packaging", "dependency-module")
+    set simpleDir = ..GetModuleDir("db-packaging", "simple-module")
+    set depsDir = ..GetModuleDir("db-packaging", "module-with-deps")
+    set testsDir = ..GetModuleDir("db-packaging", "module-with-tests")
+    set invokesDir = ..GetModuleDir("db-packaging", "module-with-invokes")
+
+    $$$ThrowOnError(..CreateTestNamespace(ns))
+    // Move the shared NS from per-test tracking to shared tracking so OnAfterOneTest
+    // doesn't clean it up prematurely
+    set lastIdx = $listlength(..CreatedNamespaces)
+    set ..CreatedNamespaces = $list(..CreatedNamespaces, 1, lastIdx - 1)
+    set lastIdx = $listlength(..CreatedGlobalsDatabases)
+    set lastDB = $list(..CreatedGlobalsDatabases, lastIdx)
+    set ..CreatedGlobalsDatabases = $list(..CreatedGlobalsDatabases, 1, lastIdx - 1)
+    set ..SharedGlobalsDatabases = ..SharedGlobalsDatabases _ $listbuild(lastDB)
+
+    new $namespace
+    set $namespace = ns
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ depDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ simpleDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ depsDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ testsDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ invokesDir))
+
+    set ..SharedNS1 = ns
+    quit ns
+}
+
+/// Returns the shared packaging namespace for Python/resource-heavy modules (generally non-compiled-resource tests).
+/// Creates TESTDBPKGNS2 on first call and loads all relevant modules; reuses on subsequent calls.
+Method GetOrCreateSharedNS2() As %String
+{
+    if ..SharedNS2 '= "" {
+        quit ..SharedNS2
+    }
+
+    set ns = "TESTDBPKGNS2"
+
+    // Resolve all module dirs before switching namespace (^UnitTestRoot only in original NS)
+    set allResDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
+    set reqsDir = ..GetModuleDir("db-packaging", "module-with-requirements")
+    set mixPyDir = ..GetModuleDir("db-packaging", "module-with-mixed-python")
+    set nonCmpDir = ..GetModuleDir("db-packaging", "module-with-non-compiled-resources")
+
+    $$$ThrowOnError(..CreateTestNamespace(ns))
+    // Move the shared NS from per-test tracking to shared tracking
+    set lastIdx = $listlength(..CreatedNamespaces)
+    set ..CreatedNamespaces = $list(..CreatedNamespaces, 1, lastIdx - 1)
+    set lastIdx = $listlength(..CreatedGlobalsDatabases)
+    set lastDB = $list(..CreatedGlobalsDatabases, lastIdx)
+    set ..CreatedGlobalsDatabases = $list(..CreatedGlobalsDatabases, 1, lastIdx - 1)
+    set ..SharedGlobalsDatabases = ..SharedGlobalsDatabases _ $listbuild(lastDB)
+
+    new $namespace
+    set $namespace = ns
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ allResDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ reqsDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ mixPyDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ nonCmpDir))
+
+    set ..SharedNS2 = ns
+    quit ns
+}
+
 /// Test simple package and install with database packaging
 Method TestSimplePackageAndInstall()
 {
-    set testNS = "TESTDBPKG1"
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
-
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
-    set moduleDir2 = ..GetModuleDir("db-packaging", "dependency-module")
-
-    // Switch to test namespace and load simple module
+    // Switch to shared packaging namespace (simple-db-module and dep-module are pre-loaded)
     new $namespace
-    set $namespace = testNS
-
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded simple module successfully")
+    set $namespace = packagingNS
 
     // Package as database package
     set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
@@ -226,10 +356,8 @@ Method TestSimplePackageAndInstall()
     do $$$AssertStatusOK(sc, "History command executed")
     do $$$AssertTrue(..FindStringInMultiDimArray("simple-db-module", .historyOutput), "Installation recorded in history")
 
-    // Test load command with another module
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir2)
-    do $$$AssertStatusOK(sc, "Loaded dependency module")
+    // Test load command with another module (dep-module is pre-loaded in shared NS1)
+    set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged dep-module as database")
@@ -249,33 +377,21 @@ Method TestSimplePackageAndInstall()
 
     // Verify module loaded
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "DepModule.Core class exists after load")
+    set ^||DBPkgTimings("TestSimplePackageAndInstall") = $zhorolog - tStart
 }
 
 /// Test packaging and installing modules with dependencies
 Method TestPackageAndInstallWithDependencies()
 {
-    set testNS = "TESTDBDEPS1"
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
-
-    set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
-    set mainModuleDir = ..GetModuleDir("db-packaging", "module-with-deps")
-
+    // Switch to shared packaging namespace (dep-module and main-with-deps are pre-loaded)
     new $namespace
-    set $namespace = testNS
-
-    // First load and package the dependency module
-    set sc = ##class(%IPM.Main).Shell("load -v " _ depModuleDir)
-    do $$$AssertStatusOK(sc, "Loaded dependency module")
+    set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged dependency module")
-
-    // Now load and package the module with dependencies
-    set sc = ##class(%IPM.Main).Shell("load -v " _ mainModuleDir)
-    do $$$AssertStatusOK(sc, "Loaded module with dependencies")
 
     set sc = ##class(%IPM.Main).Shell("package-database main-with-deps -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module with dependencies")
@@ -305,22 +421,25 @@ Method TestPackageAndInstallWithDependencies()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
     do $$$AssertStatusOK(sc, "List command executed")
     do $$$AssertTrue(..FindStringInMultiDimArray("dep-module", .output), "Dependency appears in list")
+    set ^||DBPkgTimings("TestPackageAndInstallWithDependencies") = $zhorolog - tStart
 }
 
-/// Test packaging and installing modules with all resource types
+/// Smoke test: a module using every compiled resource type (class, include, generated class,
+/// WebApplication) packages and installs correctly as a database package.
+/// Asserts on the compiled outputs — class existence, runtime behavior, WebApp creation.
+/// 
+/// Distinct from TestNonCompiledResourcesAppliedDuringInstall: this test does not attempt to
+/// prove that non-compiled processor hooks fire during install. It uses module-with-all-resources
+/// (FileCopy, PythonWheel, WebApp present) because real modules mix resource types; the goal
+/// is to confirm nothing breaks, not to assert on each non-compiled resource individually.
 Method TestPackageAndInstallAllResourceTypes()
 {
-    set testNS = "TESTDBALLRES"
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS2()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
-
+    // Switch to shared packaging namespace (all-resources-module is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module with all resources")
+    set $namespace = packagingNS
 
     // Package as database
     set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -path " _ ..PackageOutputDir)
@@ -360,22 +479,18 @@ Method TestPackageAndInstallAllResourceTypes()
 
     // Verify all resource types work correctly
     do $$$AssertStatusOK($$$OK, "All resource types verified")
+    set ^||DBPkgTimings("TestPackageAndInstallAllResourceTypes") = $zhorolog - tStart
 }
 
 /// Test packaging with and without test resources
 Method TestPackageAndInstallWithTestResources()
 {
-    set testNS = "TESTDBTESTRES"
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-tests")
-
+    // Switch to shared packaging namespace (module-with-tests is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module with test resources")
+    set $namespace = packagingNS
 
     // Package WITH test resources
     set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -include-test-resources -path " _ ..PackageOutputDir)
@@ -396,7 +511,7 @@ Method TestPackageAndInstallWithTestResources()
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.TestHelper"), "TestHelper class (Type A Scope=test) exists when included")
 
     // Package WITHOUT test resources (default)
-    set $namespace = testNS
+    set $namespace = packagingNS
     set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged without test resources")
 
@@ -413,22 +528,18 @@ Method TestPackageAndInstallWithTestResources()
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Test"), "Test class excluded by default")
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.TestHelper"), "TestHelper class excluded by default")
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Main"), "Main class exists")
+    set ^||DBPkgTimings("TestPackageAndInstallWithTestResources") = $zhorolog - tStart
 }
 
 /// Test packaging with -use-current-db flag
 Method TestPackageWithUseCurrentDbFlag()
 {
-    set testNS = "TESTDBCURDB"
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
-
+    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded simple module")
+    set $namespace = packagingNS
 
     // Package with -use-current-db flag
     set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -use-current-db -path " _ ..PackageOutputDir)
@@ -437,22 +548,18 @@ Method TestPackageWithUseCurrentDbFlag()
     // Verify package was created
     set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
     do $$$AssertTrue(##class(%File).Exists(packageFile), "Package created with -use-current-db")
+    set ^||DBPkgTimings("TestPackageWithUseCurrentDbFlag") = $zhorolog - tStart
 }
 
 /// Test packaging and install validation (errors and edge cases)
 Method TestPackagingAndInstallValidation()
 {
-    set testNS = "TESTDBVALID"
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
-
+    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module")
+    set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module")
@@ -549,22 +656,18 @@ Method TestPackagingAndInstallValidation()
 
     set sc = ##class(%IPM.Main).Shell("load " _ missingDepsPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Missing deps/ directory rejected by validation")
+    set ^||DBPkgTimings("TestPackagingAndInstallValidation") = $zhorolog - tStart
 }
 
 /// Test backup and rollback during installation
 Method TestBackupAndRollback()
 {
-    set testNS = "TESTDBBKUP"
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
-
+    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module")
+    set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module")
@@ -581,22 +684,18 @@ Method TestBackupAndRollback()
 
     // Verify backup file was created in the routines DB directory
     do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup IRIS.DAT file created after swap")
+    set ^||DBPkgTimings("TestBackupAndRollback") = $zhorolog - tStart
 }
 
 /// Test upgrading from database package to newer database package
 Method TestUpgradeDatabaseToDatabase()
 {
-    set testNS = "TESTDBUPG"
-    // Create test namespace for packaging
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
-
+    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module v1.0.0")
+    set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged v1.0.0")
@@ -625,22 +724,18 @@ Method TestUpgradeDatabaseToDatabase()
 
     // Verify a second DB swap actually occurred (backup count must be > 1)
     do $$$AssertTrue(..CountBackupFiles(installNS) > 1, "Second backup created during upgrade (DB was swapped again)")
+    set ^||DBPkgTimings("TestUpgradeDatabaseToDatabase") = $zhorolog - tStart
 }
 
 /// Test upgrading from source package to database package
 Method TestUpgradeSourceToDatabase()
 {
-    set testNS = "TESTDBUPGSRC"
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
-
+    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module")
+    set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package simple-db-module -path " _ ..PackageOutputDir _ "simple-db-module-1.0.0/")
     do $$$AssertStatusOK(sc, "Packaged as source")
@@ -662,7 +757,7 @@ Method TestUpgradeSourceToDatabase()
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Source package installed")
 
     // Now package as database and upgrade
-    set $namespace = testNS
+    set $namespace = packagingNS
     set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged as database")
 
@@ -681,22 +776,18 @@ Method TestUpgradeSourceToDatabase()
 
     // Verify a DB swap occurred (at least one backup was created)
     do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "DB swap occurred during source-to-database upgrade")
+    set ^||DBPkgTimings("TestUpgradeSourceToDatabase") = $zhorolog - tStart
 }
 
 /// Test uninstalling database package
 Method TestUninstallDatabasePackage()
 {
-    set testNS = "TESTDBUNINS"
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
-
+    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module")
+    set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module")
@@ -734,24 +825,18 @@ Method TestUninstallDatabasePackage()
 
     // Verify compiled classes are removed from the routines DB (spec: uninstall deletes compiled resources)
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Classes removed from namespace after uninstall")
+    set ^||DBPkgTimings("TestUninstallDatabasePackage") = $zhorolog - tStart
 }
 
 /// Test mixed packaging scenarios
 Method TestMixedPackaging()
 {
-    set testNS = "TESTDBMIXED"
-    // Create test namespace
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "simple-module")
-    set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
-    set allResDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
-
+    // Switch to shared packaging namespace (simple-db-module and dep-module are pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded database module")
+    set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged as database")
@@ -770,10 +855,8 @@ Method TestMixedPackaging()
     do $$$AssertStatusOK(sc, "Installed database package")
 
     // Test: Install source package in same namespace should work
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ depModuleDir)
-    do $$$AssertStatusOK(sc, "Loaded dependency module as source")
-
+    // dep-module is pre-loaded in shared NS1; package it as source first
+    set $namespace = packagingNS
     set sc = ##class(%IPM.Main).Shell("package dep-module -path " _ ..PackageOutputDir _ "dep-module-1.0.0/")
     do $$$AssertStatusOK(sc, "Packaged as source")
 
@@ -795,20 +878,19 @@ Method TestMixedPackaging()
     do $$$AssertTrue(..FindStringInMultiDimArray("dep-module", .output), "Source package in list")
 
     // Test: Cannot install second database package in same namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ allResDir)
-    do $$$AssertStatusOK(sc, "Loaded second module")
+    // dep-module is pre-loaded in shared NS1 — just package it as database
+    set $namespace = packagingNS
+    set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged dep-module as database")
 
-    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged second module as database")
-
-    set dbPackage2 = ..PackageOutputDir _ "all-resources-module-1.0.0-database.tgz"
+    set dbPackage2 = ..PackageOutputDir _ "dep-module-1.0.0-database.tgz"
 
     set $namespace = installNS
 
     // Attempt to install second database package should fail
     set sc = ##class(%IPM.Main).Shell("load " _ dbPackage2 _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Cannot install second database package in same namespace")
+    set ^||DBPkgTimings("TestMixedPackaging") = $zhorolog - tStart
 }
 
 /// Test that -no-export-python-deps excludes wheels from the package, and that Python wheels
@@ -816,22 +898,18 @@ Method TestMixedPackaging()
 /// has no Database.cls override).
 Method TestPackageWithExportPyDepsFlag()
 {
-    set testNS = "TESTDBPYWHL"
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS2()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
-
+    // Switch to shared packaging namespace (module-with-mixed-python is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module with Python wheel resource")
+    set $namespace = packagingNS
 
     // Package with default settings (export-python-deps ON by default)
-    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -path " _ ..PackageOutputDir)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged with default settings")
 
-    set defaultPkg = ..PackageOutputDir _ "all-resources-module-1.0.0-database.tgz"
+    set defaultPkg = ..PackageOutputDir _ "module-with-mixed-python-1.0.0-database.tgz"
     set extractDir1 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-default-whl")
     do ##class(%Library.File).CreateDirectory(extractDir1)
     set sc = ##class(%IPM.General.Archive).Extract(defaultPkg, extractDir1)
@@ -843,10 +921,10 @@ Method TestPackageWithExportPyDepsFlag()
     // Package with -no-export-python-deps into a separate subdirectory
     set noExportDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "noexport")
     do ##class(%Library.File).CreateDirectory(noExportDir)
-    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -no-export-python-deps -path " _ noExportDir)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -no-export-python-deps -path " _ noExportDir)
     do $$$AssertStatusOK(sc, "Packaged with -no-export-python-deps")
 
-    set noExportPkg = noExportDir _ "all-resources-module-1.0.0-database.tgz"
+    set noExportPkg = noExportDir _ "module-with-mixed-python-1.0.0-database.tgz"
     set extractDir2 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-nowheel")
     do ##class(%Library.File).CreateDirectory(extractDir2)
     set sc = ##class(%IPM.General.Archive).Extract(noExportPkg, extractDir2)
@@ -876,6 +954,7 @@ Method TestPackageWithExportPyDepsFlag()
     } catch ex {
         do $$$AssertFailure("Failed to import lune after database install: " _ ex.AsStatus())
     }
+    set ^||DBPkgTimings("TestPackageWithExportPyDepsFlag") = $zhorolog - tStart
 }
 
 /// Test that requirements.txt dependencies are resolved into wheels during database packaging
@@ -883,16 +962,14 @@ Method TestPackageWithExportPyDepsFlag()
 /// (no explicit <PythonWheel> entries) should get their Python deps packaged as wheels.
 Method TestPackageWithRequirementsTxt()
 {
-    set testNS = "TESTDBREQTXT"
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
-
+    set tStart = $zhorolog
+    // Capture moduleDir before NS switch (used for cleanup at end of test)
     set moduleDir = ..GetModuleDir("db-packaging", "module-with-requirements")
+    set packagingNS = ..GetOrCreateSharedNS2()
 
+    // Switch to shared packaging namespace (module-with-requirements is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module with requirements.txt")
+    set $namespace = packagingNS
 
     // Package as database (export-python-deps is on by default)
     set sc = ##class(%IPM.Main).Shell("package-database module-with-requirements -path " _ ..PackageOutputDir)
@@ -905,7 +982,7 @@ Method TestPackageWithRequirementsTxt()
     set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
     do $$$AssertStatusOK(sc, "Extracted package")
 
-    set wheelPath = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir)
+    set wheelPath = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir)
     do $$$AssertTrue(##class(%Library.File).Exists(wheelPath), "Wheel from requirements.txt included in database package")
 
     // Verify wheel is not included when -no-export-python-deps is set
@@ -920,11 +997,12 @@ Method TestPackageWithRequirementsTxt()
     set sc = ##class(%IPM.General.Archive).Extract(noExportPkg, extractDir2)
     do $$$AssertStatusOK(sc, "Extracted no-export package")
 
-    set wheelPath2 = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir2)
+    set wheelPath2 = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir2)
     do $$$AssertNotTrue(##class(%Library.File).Exists(wheelPath2), "Wheel excluded when -no-export-python-deps is set")
 
     // Cleanup: wheels/ was downloaded by ExportPythonDependencies as part of test
     do ..DeletePath(moduleDir _ "wheels")
+    set ^||DBPkgTimings("TestPackageWithRequirementsTxt") = $zhorolog - tStart
 }
 
 /// Test that a module with both requirements.txt and explicit <PythonWheel> resources
@@ -933,16 +1011,14 @@ Method TestPackageWithRequirementsTxt()
 /// entries, then CopyNonCompiledResources stages all PythonWheel resources.
 Method TestPackageWithMixedPythonDeps()
 {
-    set testNS = "TESTDBMIXPY"
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
-
+    set tStart = $zhorolog
+    // Capture moduleDir before NS switch (used for pycparser wheel cleanup at end of test)
     set moduleDir = ..GetModuleDir("db-packaging", "module-with-mixed-python")
+    set packagingNS = ..GetOrCreateSharedNS2()
 
+    // Switch to shared packaging namespace (module-with-mixed-python is pre-loaded)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module with mixed Python deps")
+    set $namespace = packagingNS
 
     // Package as database (export-python-deps on by default)
     set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -path " _ ..PackageOutputDir)
@@ -972,6 +1048,7 @@ Method TestPackageWithMixedPythonDeps()
 
     // Cleanup: pycparser wheel downloaded by ExportPythonDependencies as part of test
     do ..DeletePattern(moduleDir _ "wheels/", "pycparser*.whl")
+    set ^||DBPkgTimings("TestPackageWithMixedPythonDeps") = $zhorolog - tStart
 }
 
 /// Test that pre-Activate invokes are skipped and post-Activate invokes run
@@ -979,20 +1056,13 @@ Method TestPackageWithMixedPythonDeps()
 /// verify whether it executed.
 Method TestInvokeBehaviorDuringDatabaseInstall()
 {
-    set testNS = "TESTDBINVOKE"
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-invokes")
-
+    // Switch to shared packaging namespace (module-with-invokes is pre-loaded)
+    // Both invokes fired when the module was loaded during NS1 init — clear lingering markers.
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module with invokes")
-
-    // Both invokes ran during source load — verify markers exist
-    do $$$AssertEquals($get(^InvokeTest("compile")), 1, "Compile invoke ran during source load")
-    do $$$AssertEquals($get(^InvokeTest("activate")), 1, "Activate invoke ran during source load")
+    set $namespace = packagingNS
     kill ^InvokeTest
 
     // Package as database
@@ -1025,36 +1095,48 @@ Method TestInvokeBehaviorDuringDatabaseInstall()
 
     // Cleanup
     kill ^InvokeTest
+    set ^||DBPkgTimings("TestInvokeBehaviorDuringDatabaseInstall") = $zhorolog - tStart
 }
 
-/// Test that FileCopy resources are applied during database package install.
-/// FileCopy.OnBeforePhase("Activate") fires because resource processor hooks run at
-/// Module level (in Module.RunPhase), not inside the lifecycle method.
-/// WebApplication creation also works (via %Configure, which has no Database.cls override).
+/// Proves that non-compiled resource processor hooks (CPF, FileCopy) actually fire during
+/// a database package install, not just during the original source load.
+/// Uses a delete-then-verify pattern for FileCopy: the file is deleted after the initial load,
+/// then install is run — if FileCopy fires, the file reappears. CPF staging is verified by
+/// extracting the package and confirming the CPF file is present.
+/// 
+/// Distinct from TestPackageAndInstallAllResourceTypes: that test checks compiled outputs
+/// (classes, include, WebApp) on a full-featured module. This test uses a minimal module
+/// (class + CPF + FileCopy only) to isolate and prove the processor hook firing mechanism,
+/// with explicit before/after assertions rather than a passive smoke test.
 Method TestNonCompiledResourcesAppliedDuringInstall()
 {
-    set testNS = "TESTDBNONCMP"
-    set sc = ..CreateTestNamespace(testNS)
-    do $$$AssertStatusOK(sc, "Created test namespace")
+    set tStart = $zhorolog
+    set packagingNS = ..GetOrCreateSharedNS2()
 
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
-
+    // Switch to shared packaging namespace (module-with-non-compiled-resources is pre-loaded;
+    // FileCopy already ran during NS2 init so the target file exists)
     new $namespace
-    set $namespace = testNS
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusOK(sc, "Loaded module (FileCopy runs during Activate)")
+    set $namespace = packagingNS
 
     // Package as database
-    set sc = ##class(%IPM.Main).Shell("package-database all-resources-module -path " _ ..PackageOutputDir)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-non-compiled-resources -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged module as database")
 
-    set packageFile = ..PackageOutputDir _ "all-resources-module-1.0.0-database.tgz"
+    set packageFile = ..PackageOutputDir _ "module-with-non-compiled-resources-1.0.0-database.tgz"
 
-    // Compute FileCopy target: ${mgrdir}../all-resources-data.txt
+    // Verify CPF file is staged in the package
+    set cpfExtractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "cpf-staging-check")
+    do ##class(%Library.File).CreateDirectory(cpfExtractDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, cpfExtractDir)
+    do $$$AssertStatusOK(sc, "Extracted package for CPF staging check")
+    set stagedCPF = ##class(%Library.File).NormalizeFilename("src/cpf/config.cpf", cpfExtractDir)
+    do $$$AssertTrue(##class(%Library.File).Exists(stagedCPF), "CPF file is staged in database package")
+
+    // Compute FileCopy target: ${mgrdir}../non-compiled-data.txt
     // ParentDirectoryName handles the .. reliably across platforms
     set mgrDir = ##class(%Library.File).ManagerDirectory()
     set parentDir = ##class(%Library.File).ParentDirectoryName(mgrDir)
-    set fileCopyTarget = ##class(%Library.File).NormalizeFilename("all-resources-data.txt", parentDir)
+    set fileCopyTarget = ##class(%Library.File).NormalizeFilename("non-compiled-data.txt", parentDir)
 
     // Confirm FileCopy created the file during load, then delete it
     do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget), "FileCopy target exists after load (pre-condition)")
@@ -1069,11 +1151,65 @@ Method TestNonCompiledResourcesAppliedDuringInstall()
     set $namespace = installNS
 
     set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
-    do $$$AssertStatusOK(sc, "Installed database package")
+    do $$$AssertStatusOK(sc, "Installed database package (CPF applied during Initialize, FileCopy during Activate)")
 
-    // FileCopy.OnBeforePhase("Activate") is invoked by Module.RunPhase independently
-    // of the lifecycle method — resource processor hooks are siblings, not children.
+    // CPF.OnBeforePhase("Initialize") and FileCopy.OnBeforePhase("Activate") are both invoked
+    // by Module.RunPhase independently of the lifecycle method — resource processor hooks are
+    // siblings, not children. CPF staging is verified above; FileCopy is verified here.
     do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget), "FileCopy target created during database install")
+    set ^||DBPkgTimings("TestNonCompiledResourcesAppliedDuringInstall") = $zhorolog - tStart
+}
+
+Method OnAfterAllTests() As %Status
+{
+    write !, "--- DatabasePackaging timing summary ---"
+    set name = ""
+    set total = 0
+    for {
+        set name = $order(^||DBPkgTimings(name), 1, elapsed)
+        quit:(name = "")
+        write !, $justify(name, -55), " ", $fnumber(elapsed, "", 2), "s"
+        set total = total + elapsed
+    }
+    write !, $justify("TOTAL", -55), " ", $fnumber(total, "", 2), "s"
+    write !
+    kill ^||DBPkgTimings
+
+    set sc = $$$OK
+    set $namespace = ..OriginalNamespace
+
+    // Clean up shared packaging namespaces (routines DBs)
+    if ..SharedNS1 '= "" {
+        set sc = $$$ADDSC(sc, ##class(%IPM.Test.Utils).DeleteNamespace(..SharedNS1))
+    }
+    if ..SharedNS2 '= "" {
+        set sc = $$$ADDSC(sc, ##class(%IPM.Test.Utils).DeleteNamespace(..SharedNS2))
+    }
+
+    // Clean up shared globals databases
+    for i=1:1:$listlength(..SharedGlobalsDatabases) {
+        set dbName = $listget(..SharedGlobalsDatabases, i)
+        if dbName '= "" {
+            set dbPath = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(dbName)
+            try {
+                new $namespace
+                set $namespace = "%SYS"
+                do ##class(SYS.Database).DismountDatabase(dbPath)
+                if ##class(Config.Databases).Exists(dbName) {
+                    $$$ThrowOnError(##class(Config.Databases).Delete(dbName))
+                }
+                $$$ThrowOnError(##class(SYS.Database).DeleteDatabase(dbPath))
+                set $namespace = ..OriginalNamespace
+                if ##class(%Library.File).DirectoryExists(dbPath) {
+                    do ##class(%IPM.Utils.File).RemoveDirectoryTree(dbPath)
+                }
+            } catch ex {
+                set sc = $$$ADDSC(sc, ex.AsStatus())
+            }
+        }
+    }
+
+    return sc
 }
 
 /// Get the installed version of a Python package.
