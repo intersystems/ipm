@@ -1102,6 +1102,8 @@ ClassMethod ShellInternal(
                 set tCommandInfo = "package"
                 do ..RunOnePhase(.tCommandInfo)
             } elseif (tCommandInfo = "package-database") {
+                // Fail fast before any work begins — same check as %IPM.Lifecycle.Database:%Package
+                do ##class(%IPM.Lifecycle.Database).ValidateIPMNotInRoutinesDB()
                 // Force the Database lifecycle class and route to the Package phase
                 set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.Database"
                 set tCommandInfo = "package"
