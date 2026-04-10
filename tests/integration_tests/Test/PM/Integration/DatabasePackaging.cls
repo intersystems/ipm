@@ -276,7 +276,6 @@ Method GetOrCreateSharedNS2() As %String
 /// Test simple package and install with database packaging
 Method TestSimplePackageAndInstall()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module and dep-module are pre-loaded)
@@ -377,13 +376,11 @@ Method TestSimplePackageAndInstall()
 
     // Verify module loaded
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "DepModule.Core class exists after load")
-    set ^||DBPkgTimings("TestSimplePackageAndInstall") = $zhorolog - tStart
 }
 
 /// Test packaging and installing modules with dependencies
 Method TestPackageAndInstallWithDependencies()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (dep-module and main-with-deps are pre-loaded)
@@ -421,7 +418,6 @@ Method TestPackageAndInstallWithDependencies()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
     do $$$AssertStatusOK(sc, "List command executed")
     do $$$AssertTrue(..FindStringInMultiDimArray("dep-module", .output), "Dependency appears in list")
-    set ^||DBPkgTimings("TestPackageAndInstallWithDependencies") = $zhorolog - tStart
 }
 
 /// Smoke test: a module using every compiled resource type (class, include, generated class,
@@ -434,7 +430,6 @@ Method TestPackageAndInstallWithDependencies()
 /// is to confirm nothing breaks, not to assert on each non-compiled resource individually.
 Method TestPackageAndInstallAllResourceTypes()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS2()
 
     // Switch to shared packaging namespace (all-resources-module is pre-loaded)
@@ -479,13 +474,11 @@ Method TestPackageAndInstallAllResourceTypes()
 
     // Verify all resource types work correctly
     do $$$AssertStatusOK($$$OK, "All resource types verified")
-    set ^||DBPkgTimings("TestPackageAndInstallAllResourceTypes") = $zhorolog - tStart
 }
 
 /// Test packaging with and without test resources
 Method TestPackageAndInstallWithTestResources()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (module-with-tests is pre-loaded)
@@ -528,13 +521,11 @@ Method TestPackageAndInstallWithTestResources()
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Test"), "Test class excluded by default")
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.TestHelper"), "TestHelper class excluded by default")
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Main"), "Main class exists")
-    set ^||DBPkgTimings("TestPackageAndInstallWithTestResources") = $zhorolog - tStart
 }
 
 /// Test packaging with -use-current-db flag
 Method TestPackageWithUseCurrentDbFlag()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module is pre-loaded)
@@ -548,13 +539,11 @@ Method TestPackageWithUseCurrentDbFlag()
     // Verify package was created
     set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
     do $$$AssertTrue(##class(%File).Exists(packageFile), "Package created with -use-current-db")
-    set ^||DBPkgTimings("TestPackageWithUseCurrentDbFlag") = $zhorolog - tStart
 }
 
 /// Test packaging and install validation (errors and edge cases)
 Method TestPackagingAndInstallValidation()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module is pre-loaded)
@@ -656,13 +645,11 @@ Method TestPackagingAndInstallValidation()
 
     set sc = ##class(%IPM.Main).Shell("load " _ missingDepsPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Missing deps/ directory rejected by validation")
-    set ^||DBPkgTimings("TestPackagingAndInstallValidation") = $zhorolog - tStart
 }
 
 /// Test backup and rollback during installation
 Method TestBackupAndRollback()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module is pre-loaded)
@@ -684,13 +671,11 @@ Method TestBackupAndRollback()
 
     // Verify backup file was created in the routines DB directory
     do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup IRIS.DAT file created after swap")
-    set ^||DBPkgTimings("TestBackupAndRollback") = $zhorolog - tStart
 }
 
 /// Test upgrading from database package to newer database package
 Method TestUpgradeDatabaseToDatabase()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module is pre-loaded)
@@ -724,13 +709,11 @@ Method TestUpgradeDatabaseToDatabase()
 
     // Verify a second DB swap actually occurred (backup count must be > 1)
     do $$$AssertTrue(..CountBackupFiles(installNS) > 1, "Second backup created during upgrade (DB was swapped again)")
-    set ^||DBPkgTimings("TestUpgradeDatabaseToDatabase") = $zhorolog - tStart
 }
 
 /// Test upgrading from source package to database package
 Method TestUpgradeSourceToDatabase()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module is pre-loaded)
@@ -776,13 +759,11 @@ Method TestUpgradeSourceToDatabase()
 
     // Verify a DB swap occurred (at least one backup was created)
     do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "DB swap occurred during source-to-database upgrade")
-    set ^||DBPkgTimings("TestUpgradeSourceToDatabase") = $zhorolog - tStart
 }
 
 /// Test uninstalling database package
 Method TestUninstallDatabasePackage()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module is pre-loaded)
@@ -825,13 +806,11 @@ Method TestUninstallDatabasePackage()
 
     // Verify compiled classes are removed from the routines DB (spec: uninstall deletes compiled resources)
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Classes removed from namespace after uninstall")
-    set ^||DBPkgTimings("TestUninstallDatabasePackage") = $zhorolog - tStart
 }
 
 /// Test mixed packaging scenarios
 Method TestMixedPackaging()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module and dep-module are pre-loaded)
@@ -890,7 +869,6 @@ Method TestMixedPackaging()
     // Attempt to install second database package should fail
     set sc = ##class(%IPM.Main).Shell("load " _ dbPackage2 _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Cannot install second database package in same namespace")
-    set ^||DBPkgTimings("TestMixedPackaging") = $zhorolog - tStart
 }
 
 /// Test that -no-export-python-deps excludes wheels from the package, and that Python wheels
@@ -898,7 +876,6 @@ Method TestMixedPackaging()
 /// has no Database.cls override).
 Method TestPackageWithExportPyDepsFlag()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS2()
 
     // Switch to shared packaging namespace (module-with-mixed-python is pre-loaded)
@@ -954,7 +931,6 @@ Method TestPackageWithExportPyDepsFlag()
     } catch ex {
         do $$$AssertFailure("Failed to import lune after database install: " _ ex.AsStatus())
     }
-    set ^||DBPkgTimings("TestPackageWithExportPyDepsFlag") = $zhorolog - tStart
 }
 
 /// Test that requirements.txt dependencies are resolved into wheels during database packaging
@@ -962,7 +938,6 @@ Method TestPackageWithExportPyDepsFlag()
 /// (no explicit <PythonWheel> entries) should get their Python deps packaged as wheels.
 Method TestPackageWithRequirementsTxt()
 {
-    set tStart = $zhorolog
     // Capture moduleDir before NS switch (used for cleanup at end of test)
     set moduleDir = ..GetModuleDir("db-packaging", "module-with-requirements")
     set packagingNS = ..GetOrCreateSharedNS2()
@@ -1002,7 +977,6 @@ Method TestPackageWithRequirementsTxt()
 
     // Cleanup: wheels/ was downloaded by ExportPythonDependencies as part of test
     do ..DeletePath(moduleDir _ "wheels")
-    set ^||DBPkgTimings("TestPackageWithRequirementsTxt") = $zhorolog - tStart
 }
 
 /// Test that a module with both requirements.txt and explicit <PythonWheel> resources
@@ -1011,7 +985,6 @@ Method TestPackageWithRequirementsTxt()
 /// entries, then CopyNonCompiledResources stages all PythonWheel resources.
 Method TestPackageWithMixedPythonDeps()
 {
-    set tStart = $zhorolog
     // Capture moduleDir before NS switch (used for pycparser wheel cleanup at end of test)
     set moduleDir = ..GetModuleDir("db-packaging", "module-with-mixed-python")
     set packagingNS = ..GetOrCreateSharedNS2()
@@ -1048,7 +1021,6 @@ Method TestPackageWithMixedPythonDeps()
 
     // Cleanup: pycparser wheel downloaded by ExportPythonDependencies as part of test
     do ..DeletePattern(moduleDir _ "wheels/", "pycparser*.whl")
-    set ^||DBPkgTimings("TestPackageWithMixedPythonDeps") = $zhorolog - tStart
 }
 
 /// Test that pre-Activate invokes are skipped and post-Activate invokes run
@@ -1056,7 +1028,6 @@ Method TestPackageWithMixedPythonDeps()
 /// verify whether it executed.
 Method TestInvokeBehaviorDuringDatabaseInstall()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (module-with-invokes is pre-loaded)
@@ -1095,7 +1066,6 @@ Method TestInvokeBehaviorDuringDatabaseInstall()
 
     // Cleanup
     kill ^InvokeTest
-    set ^||DBPkgTimings("TestInvokeBehaviorDuringDatabaseInstall") = $zhorolog - tStart
 }
 
 /// Proves that non-compiled resource processor hooks (CPF, FileCopy) actually fire during
@@ -1110,7 +1080,6 @@ Method TestInvokeBehaviorDuringDatabaseInstall()
 /// with explicit before/after assertions rather than a passive smoke test.
 Method TestNonCompiledResourcesAppliedDuringInstall()
 {
-    set tStart = $zhorolog
     set packagingNS = ..GetOrCreateSharedNS2()
 
     // Switch to shared packaging namespace (module-with-non-compiled-resources is pre-loaded;
@@ -1157,24 +1126,10 @@ Method TestNonCompiledResourcesAppliedDuringInstall()
     // by Module.RunPhase independently of the lifecycle method — resource processor hooks are
     // siblings, not children. CPF staging is verified above; FileCopy is verified here.
     do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget), "FileCopy target created during database install")
-    set ^||DBPkgTimings("TestNonCompiledResourcesAppliedDuringInstall") = $zhorolog - tStart
 }
 
 Method OnAfterAllTests() As %Status
 {
-    write !, "--- DatabasePackaging timing summary ---"
-    set name = ""
-    set total = 0
-    for {
-        set name = $order(^||DBPkgTimings(name), 1, elapsed)
-        quit:(name = "")
-        write !, $justify(name, -55), " ", $fnumber(elapsed, "", 2), "s"
-        set total = total + elapsed
-    }
-    write !, $justify("TOTAL", -55), " ", $fnumber(total, "", 2), "s"
-    write !
-    kill ^||DBPkgTimings
-
     set sc = $$$OK
     set $namespace = ..OriginalNamespace
 

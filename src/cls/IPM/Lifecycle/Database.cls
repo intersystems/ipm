@@ -194,7 +194,7 @@ Method %Package(ByRef params) As %Status
 
 /// Validates that %IPM classes are not stored in the current namespace's local routines database.
 /// IPM must be mapped from another namespace so it survives a database swap.
-Method ValidateIPMNotInRoutinesDB()
+ClassMethod ValidateIPMNotInRoutinesDB()
 {
     if ##class(%Dictionary.ClassDefinition).%ExistsId("%IPM.Main") {
         if ..IsClassInLocalRoutinesDB("%IPM.Main") {
