@@ -1074,7 +1074,7 @@ Method ProcessSingleDependencyIterative(
             }
 
             set sc = ##class(%IPM.Utils.Module).GetRequiredVersionExpression(
-                pDep.Name,otherDepsList,.installedReqExpr,.installedConstraintList
+                pDep.Name,otherDepsList,,.installedReqExpr,.installedConstraintList
             )
             $$$ThrowOnError(sc)
             set searchExpr = searchExpr.And(installedReqExpr)
