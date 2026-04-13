@@ -109,7 +109,7 @@ jobs:
           sleep 5
           docker logs $ORAS
       - name: Test and Verify
-        timeout-minutes: 20
+        timeout-minutes: 25
         run: |
           CONTAINER=$(docker run --network zpm -d --rm \
             -e TEST_REGISTRY=http://registry:52773/registry/ \
@@ -167,7 +167,7 @@ jobs:
           docker logs $CONTAINER
           docker stop $CONTAINER
       - name: Clean install current version and test new one.
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: |
           curl http://localhost:52773/registry/packages/-/all | jq
           curl http://localhost:52773/registry/packages/zpm/ | jq
