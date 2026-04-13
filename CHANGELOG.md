@@ -46,6 +46,7 @@ modules are.
 - #843: Optionally include tests when packaging using either the `-include-tests` flag or `<IncludeTests>1</IncludeTests>` in module.xml
 - #1079: Add semantic sorting and shortcuts to list-installed
 - #1152: Adds information about scoped dependencies in the output array of BuildDependencyGraph()
+- #986: Database packaging: new `package-database` and `publish-database` commands create an IRIS.DAT-based package that installs via swapping of the routines database rather than compilation of source files.
 
 ### Fixed
 - #1175: Fix issue parsing version for packages with both deployed and non-deployed versions
