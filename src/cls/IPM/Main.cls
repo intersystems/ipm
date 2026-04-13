@@ -175,6 +175,20 @@ This command is an alias for `module-action module-name publish`
 <modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="If specified, exports Python dependencies. If omitted, defaults to false." />
 </command>
 
+<command name="publish-database" dataPrefix="D">
+<description>
+Packages the module as an IRIS.DAT database package and publishes it to a registry in one step.
+Equivalent to running `package-database` followed by `publish`, but without needing a separate output path.
+</description>
+<parameter name="module" required="true" description="Name of module to package as database and publish" />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository to publish to (deployment must be enabled)" />
+<modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
+<modifier name="include-test-resources" dataAlias="IncludeTestResources" dataValue="1" description="Include test resources (Scope=test or Scope=verify) in the package. Excluded by default." />
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Include Python wheels in the database package." />
+<modifier name="no-export-python-deps" dataAlias="ExportPythonDependencies" dataValue="0" description="Exclude Python wheels from the database package." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
 <command name="update" dataPrefix="D">
 <summary>Updates a module to a newer version.</summary>
 <description>
@@ -1107,6 +1121,13 @@ ClassMethod ShellInternal(
                 // Force the Database lifecycle class and route to the Package phase
                 set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.Database"
                 set tCommandInfo = "package"
+                do ..RunOnePhase(.tCommandInfo)
+            } elseif (tCommandInfo = "publish-database") {
+                // Fail fast before any work begins — same check as %IPM.Lifecycle.Database:%Package
+                do ##class(%IPM.Lifecycle.Database).ValidateIPMNotInRoutinesDB()
+                // Force the Database lifecycle class and route to the Publish phase
+                set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.Database"
+                set tCommandInfo = "publish"
                 do ..RunOnePhase(.tCommandInfo)
             } elseif (tCommandInfo = "package-studio-project") {
                 // Force the StudioProject lifecycle class and route to the Package phase
