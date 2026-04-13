@@ -19,12 +19,12 @@ Property CreatedGlobalsDatabases As %List;
 /// tearing down a namespace + globals DB for every test. Each shared NS is lazily initialized
 /// on first use and cleaned up in OnAfterAllTests. Tests still create their own install
 /// namespaces via CreateTestNamespace — those are per-test and cleaned up in OnAfterOneTest.
-/// 
+///
 /// Sharing is safe because package-database does not modify namespace state — it creates a
 /// temp DB elsewhere, compiles into it, and discards it. The loaded classes, globals, and
 /// module registry in the shared NS are untouched. Any on-disk side effects (e.g. wheels
 /// downloaded by ExportPythonDependencies) are the responsibility of the individual tests.
-/// 
+///
 /// Shared NS for the majority of tests — generally along compiled-resource lines.
 /// Lazily created by GetOrCreateSharedNS1; cleaned up in OnAfterAllTests.
 Property SharedNS1 As %String;
@@ -423,7 +423,7 @@ Method TestPackageAndInstallWithDependencies()
 /// Smoke test: a module using every compiled resource type (class, include, generated class,
 /// WebApplication) packages and installs correctly as a database package.
 /// Asserts on the compiled outputs — class existence, runtime behavior, WebApp creation.
-/// 
+///
 /// Distinct from TestNonCompiledResourcesAppliedDuringInstall: this test does not attempt to
 /// prove that non-compiled processor hooks fire during install. It uses module-with-all-resources
 /// (FileCopy, PythonWheel, WebApp present) because real modules mix resource types; the goal
@@ -1073,7 +1073,7 @@ Method TestInvokeBehaviorDuringDatabaseInstall()
 /// Uses a delete-then-verify pattern for FileCopy: the file is deleted after the initial load,
 /// then install is run — if FileCopy fires, the file reappears. CPF staging is verified by
 /// extracting the package and confirming the CPF file is present.
-/// 
+///
 /// Distinct from TestPackageAndInstallAllResourceTypes: that test checks compiled outputs
 /// (classes, include, WebApp) on a full-featured module. This test uses a minimal module
 /// (class + CPF + FileCopy only) to isolate and prove the processor hook firing mechanism,
@@ -1126,6 +1126,79 @@ Method TestNonCompiledResourcesAppliedDuringInstall()
     // by Module.RunPhase independently of the lifecycle method — resource processor hooks are
     // siblings, not children. CPF staging is verified above; FileCopy is verified here.
     do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget), "FileCopy target created during database install")
+}
+
+/// Test that update steps are seeded (not run) on a fresh database package install, and that
+/// new steps introduced in a later version run exactly once during a database package upgrade.
+///
+/// Flow:
+/// 1. Load v1 from source in a dedicated packaging NS; package-database v1.
+/// 2. Upgrade to v2 from source in the same NS; package-database v2.
+/// 3. In a fresh install NS: install v1 database package — Step001 must be seeded, not run.
+/// 4. Upgrade to v2 database package — Step001 must still not have run; Step002 must run once.
+///
+/// Uses a dedicated per-test packaging NS (not SharedNS1/2) because it is mutated by the
+/// v1→v2 source upgrade. The packaging NS's update step side effects (Step002 executes there
+/// during the source upgrade) do not affect the install NS — ^DBPkgUpdateSteps is a global and
+/// lives in each namespace's own globals DB.
+Method TestUpdateStepsWithDatabasePackaging()
+{
+    set v1Dir = ..GetModuleDir("db-packaging", "module-with-update-steps-v1")
+    set v2Dir = ..GetModuleDir("db-packaging", "module-with-update-steps-v2")
+
+    // --- Packaging phase: load both versions from source and database-package each ---
+    set packagingNS = "TESTDBUPDPKGNS"
+    set sc = ..CreateTestNamespace(packagingNS)
+    do $$$AssertStatusOK(sc, "Created packaging namespace")
+
+    new $namespace
+    set $namespace = packagingNS
+
+    // Fresh install of v1 from source: Module.cls:%Activate seeds Step001 in packaging NS globals
+    set sc = ##class(%IPM.Main).Shell("load -v " _ v1Dir)
+    do $$$AssertStatusOK(sc, "Loaded v1 from source in packaging NS")
+
+    set sc = ##class(%IPM.Main).Shell("package-database update-steps-module -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged update-steps-module v1 as database")
+    set v1Package = ..PackageOutputDir _ "update-steps-module-1.0.0-database.tgz"
+    do $$$AssertTrue(##class(%Library.File).Exists(v1Package), "v1 database package .tgz exists")
+
+    // Source upgrade to v2: Step001 already seeded so it is skipped; Step002 runs in packaging NS
+    set sc = ##class(%IPM.Main).Shell("update update-steps-module -path " _ v2Dir)
+    do $$$AssertStatusOK(sc, "Upgraded to v2 from source in packaging NS")
+
+    set sc = ##class(%IPM.Main).Shell("package-database update-steps-module -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged update-steps-module v2 as database")
+    set v2Package = ..PackageOutputDir _ "update-steps-module-2.0.0-database.tgz"
+    do $$$AssertTrue(##class(%Library.File).Exists(v2Package), "v2 database package .tgz exists")
+
+    // --- Install phase: fresh namespace, verify seeding and selective step execution ---
+    set installNS = "TESTDBUPDINSTNS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created install namespace")
+
+    set $namespace = installNS
+
+    // Install v1 database package.
+    // Database.cls:%Activate swaps the DB then seeds all update steps — Step001 must be
+    // seeded (not executed) because its work is already baked into the IRIS.DAT.
+    set sc = ##class(%IPM.Main).Shell("load " _ v1Package _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Installed v1 database package")
+
+    do $$$AssertEquals($get(^DBPkgUpdateSteps("step001"), 0), 0, "Step001 not run after v1 database install (seeded only)")
+    do $$$AssertEquals($get(^DBPkgUpdateSteps("step002"), 0), 0, "Step002 absent in v1 — counter is 0")
+
+    // Upgrade to v2 database package.
+    // Database.cls:%Activate swaps the DB (skips seeding — update path);
+    // %ApplyUpdateSteps then runs HandleAllUpdateSteps: Step001 is already seeded so it is
+    // skipped; Step002 is new and must run exactly once.
+    set sc = ##class(%IPM.Main).Shell("update update-steps-module -path " _ v2Package _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Upgraded to v2 database package")
+
+    do $$$AssertEquals($get(^DBPkgUpdateSteps("step001"), 0), 0, "Step001 still not run after v2 upgrade (seeded at v1 install)")
+    do $$$AssertEquals($get(^DBPkgUpdateSteps("step002"), 0), 1, "Step002 ran exactly once during v2 database upgrade")
+
+    kill ^DBPkgUpdateSteps
 }
 
 Method OnAfterAllTests() As %Status
