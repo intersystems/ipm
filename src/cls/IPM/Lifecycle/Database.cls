@@ -1007,6 +1007,13 @@ Method %Activate(ByRef params) As %Status
         // On swap failure, this line is not reached — invokes stay suppressed.
         kill params("SkipInvokes")
 
+        // Seed all update steps as already-run on a fresh install so a subsequent 'update'
+        // only executes steps introduced after this version. Same logic as Module.cls:%Activate.
+        // Skipped when params("Update") is set — we're actually running an update, not a fresh install.
+        if '$get(params("Update")) {
+            $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1, $get(params("Verbose"))))
+        }
+
         write !, "Database swap complete for namespace ", ns
         write !, "  Backup: ", backupPath
 
