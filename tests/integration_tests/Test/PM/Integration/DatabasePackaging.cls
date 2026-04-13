@@ -607,11 +607,7 @@ Method TestPackagingAndInstallValidation()
 
     set $namespace = installNS
 
-    // Test install with tampered package (simulated)
-    // This test validates that checksum verification works
-    // Actual implementation would fail if IRIS.DAT is tampered
     set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
-    // For now, this should work with valid package
     do $$$AssertStatusOK(sc, "Valid package installs successfully")
 
     // Test: Tampered IRIS.DAT fails checksum validation
@@ -714,44 +710,6 @@ Method TestBackupAndRollback()
 
     // Verify backup file was created in the routines DB directory
     do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup IRIS.DAT file created after swap")
-}
-
-/// Test upgrading from database package to newer database package
-Method TestUpgradeDatabaseToDatabase()
-{
-    set packagingNS = ..GetOrCreateSharedNS1()
-
-    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
-    new $namespace
-    set $namespace = packagingNS
-
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged v1.0.0")
-
-    set packageV1 = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
-
-    // Create installation namespace
-    set installNS = "TESTDBUPGINS"
-    set sc = ..CreateTestNamespace(installNS)
-    do $$$AssertStatusOK(sc, "Created installation namespace")
-
-    set $namespace = installNS
-
-    // Install v1.0.0
-    set sc = ##class(%IPM.Main).Shell("load " _ packageV1 _ " -swap-db")
-    do $$$AssertStatusOK(sc, "Installed v1.0.0")
-
-    // Verify v1.0.0 is installed
-    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Module v1.0.0 installed")
-
-    // Now upgrade to v2.0.0 (simulated - would need v2 module in real test)
-    // For this RED test, we'll upgrade from same package to test mechanism
-    set sc = ##class(%IPM.Main).Shell("update simple-db-module -path " _ packageV1 _ " -swap-db")
-    do $$$AssertStatusOK(sc, "Upgraded database package")
-    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Module still installed after upgrade")
-
-    // Verify a second DB swap actually occurred (backup count must be > 1)
-    do $$$AssertTrue(..CountBackupFiles(installNS) > 1, "Second backup created during upgrade (DB was swapped again)")
 }
 
 /// Test upgrading from source package to database package
@@ -951,7 +909,6 @@ Method TestPackageWithExportPyDepsFlag()
     do $$$AssertStatusOK(sc, "Extracted no-wheel package")
 
     set wheelInNoExport = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir2)
-    // FAILS until CopyNonCompiledResources respects the ExportPythonDependencies flag
     do $$$AssertNotTrue(##class(%Library.File).Exists(wheelInNoExport), "Wheel excluded when -no-export-python-deps is set")
 
     // Verify Python wheel is installed during database package install.
@@ -1240,6 +1197,7 @@ Method TestUpdateStepsWithDatabasePackaging()
 
     do $$$AssertEquals($get(^DBPkgUpdateSteps("step001"), 0), 0, "Step001 still not run after v2 upgrade (seeded at v1 install)")
     do $$$AssertEquals($get(^DBPkgUpdateSteps("step002"), 0), 1, "Step002 ran exactly once during v2 database upgrade")
+    do $$$AssertTrue(..CountBackupFiles(installNS) > 1, "Second backup created during v2 upgrade (DB was swapped again)")
 
     kill ^DBPkgUpdateSteps
 }
