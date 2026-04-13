@@ -132,6 +132,47 @@ Method OnAfterOneTest() As %Status
     return sc
 }
 
+/// Tears down shared namespaces (TESTDBPKGNS1, TESTDBPKGNS2) and their globals databases.
+/// Per-test namespaces and DBs are handled by OnAfterOneTest.
+Method OnAfterAllTests() As %Status
+{
+    set sc = $$$OK
+    set $namespace = ..OriginalNamespace
+
+    // Clean up shared packaging namespaces (routines DBs)
+    if ..SharedNS1 '= "" {
+        set sc = $$$ADDSC(sc, ##class(%IPM.Test.Utils).DeleteNamespace(..SharedNS1))
+    }
+    if ..SharedNS2 '= "" {
+        set sc = $$$ADDSC(sc, ##class(%IPM.Test.Utils).DeleteNamespace(..SharedNS2))
+    }
+
+    // Clean up shared globals databases
+    for i=1:1:$listlength(..SharedGlobalsDatabases) {
+        set dbName = $listget(..SharedGlobalsDatabases, i)
+        if dbName '= "" {
+            set dbPath = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(dbName)
+            try {
+                new $namespace
+                set $namespace = "%SYS"
+                do ##class(SYS.Database).DismountDatabase(dbPath)
+                if ##class(Config.Databases).Exists(dbName) {
+                    $$$ThrowOnError(##class(Config.Databases).Delete(dbName))
+                }
+                $$$ThrowOnError(##class(SYS.Database).DeleteDatabase(dbPath))
+                set $namespace = ..OriginalNamespace
+                if ##class(%Library.File).DirectoryExists(dbPath) {
+                    do ##class(%IPM.Utils.File).RemoveDirectoryTree(dbPath)
+                }
+            } catch ex {
+                set sc = $$$ADDSC(sc, ex.AsStatus())
+            }
+        }
+    }
+
+    return sc
+}
+
 /// Creates a test namespace with a separate globals database.
 /// The routines database (pNamespace) can be safely dismounted during
 /// package-database or database swap without losing IPM metadata globals.
@@ -268,6 +309,8 @@ Method GetOrCreateSharedNS2() As %String
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ reqsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ mixPyDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ nonCmpDir))
+    // Configure the local zot ORAS registry once
+    $$$ThrowOnError(##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000"))
 
     set ..SharedNS2 = ns
     quit ns
@@ -1201,43 +1244,63 @@ Method TestUpdateStepsWithDatabasePackaging()
     kill ^DBPkgUpdateSteps
 }
 
-Method OnAfterAllTests() As %Status
+/// Test that publish-database packages a module as a database package and publishes it to
+/// an ORAS registry (zot at http://oras:5000), and that install from that registry performs
+/// a database swap in a fresh namespace. Uses all-resources-module to verify that compiled
+/// classes, Python wheels (colorama), FileCopy output, and WebApplication are all present
+/// after a registry-based install.
+Method TestPublishDatabaseWithORAS()
 {
-    set sc = $$$OK
-    set $namespace = ..OriginalNamespace
+    // all-resources-module is already loaded in SharedNS2; zot is configured there at NS init time
+    set packagingNS = ..GetOrCreateSharedNS2()
 
-    // Clean up shared packaging namespaces (routines DBs)
-    if ..SharedNS1 '= "" {
-        set sc = $$$ADDSC(sc, ##class(%IPM.Test.Utils).DeleteNamespace(..SharedNS1))
-    }
-    if ..SharedNS2 '= "" {
-        set sc = $$$ADDSC(sc, ##class(%IPM.Test.Utils).DeleteNamespace(..SharedNS2))
-    }
+    new $namespace
+    set $namespace = packagingNS
 
-    // Clean up shared globals databases
-    for i=1:1:$listlength(..SharedGlobalsDatabases) {
-        set dbName = $listget(..SharedGlobalsDatabases, i)
-        if dbName '= "" {
-            set dbPath = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(dbName)
-            try {
-                new $namespace
-                set $namespace = "%SYS"
-                do ##class(SYS.Database).DismountDatabase(dbPath)
-                if ##class(Config.Databases).Exists(dbName) {
-                    $$$ThrowOnError(##class(Config.Databases).Delete(dbName))
-                }
-                $$$ThrowOnError(##class(SYS.Database).DeleteDatabase(dbPath))
-                set $namespace = ..OriginalNamespace
-                if ##class(%Library.File).DirectoryExists(dbPath) {
-                    do ##class(%IPM.Utils.File).RemoveDirectoryTree(dbPath)
-                }
-            } catch ex {
-                set sc = $$$ADDSC(sc, ex.AsStatus())
-            }
-        }
-    }
+    // publish-database: packages as database .tgz and uploads to zot in one step
+    set sc = ##class(%IPM.Main).Shell("publish-database all-resources-module -r zot -v")
+    do $$$AssertStatusOK(sc, "Published all-resources-module as database package to zot")
 
-    return sc
+    // Fresh install namespace — separate globals DB so dismount during swap is safe
+    set installNS = "TESTDBORASINSTNS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created ORAS install namespace")
+
+    set $namespace = installNS
+
+    set sc = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
+    do $$$AssertStatusOK(sc, "Configured zot registry in install NS")
+
+    set sc = ##class(%IPM.Main).Shell("install all-resources-module -swap-db")
+    do $$$AssertStatusOK(sc, "Installed all-resources-module from zot registry")
+
+    // Compiled classes from routines DB (DB swap)
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("AllResources.Main"), "AllResources.Main class exists after registry install")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("AllResources.Generated"), "AllResources.Generated class exists after registry install")
+
+    // Include file constant accessible
+    set result = ##class(AllResources.Main).Process()
+    do $$$AssertTrue(result [ "TestValue", "Include file constant accessible after registry install")
+
+    // Generated resource works
+    set genResult = ##class(AllResources.Generated).GetGeneratedValue()
+    do $$$AssertEquals(genResult, "Generated resource value", "Generated resource class works after registry install")
+
+    // Python wheel (colorama) installed via PythonWheel resource processor (Initialize phase)
+    set coloramaVersion = ..GetPythonVersion("colorama")
+    do $$$AssertTrue(coloramaVersion '= "", "colorama wheel installed after registry install")
+
+    // WebApplication created by resource processor hook at install time
+    new $namespace
+    set $namespace = "%SYS"
+    set webAppExists = ##class(Security.Applications).Exists("/allresources")
+    set $namespace = installNS
+    do $$$AssertTrue(webAppExists, "WebApplication /allresources created after registry install")
+
+    // Module record: packaging must be database
+    set mod = ##class(%IPM.Storage.Module).NameOpen("all-resources-module", , .modSC)
+    do $$$AssertStatusOK(modSC, "Module record accessible after registry install")
+    do $$$AssertEquals(mod.Packaging, "database", "Module packaging is database after registry install")
 }
 
 /// Get the installed version of a Python package.
