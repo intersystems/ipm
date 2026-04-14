@@ -349,6 +349,9 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
+/// 
+/// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
+/// This is especially important for update, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
 	moduleName As %String,
 	excludeModules As %List = "",
@@ -382,6 +385,7 @@ ClassMethod GetRequiredVersionExpression(
             set expression = expression.And(versionExpr)
             set sourceList = sourceList_$listbuild($listtostring(result.%Get("ModuleNames"),", ")_": "_version)
         }
+        $$$ThrowOnError(sc)
 
         // Add modules from the dependency graph to the expression and sourceList objects
         if ($data(dependencyGraph)) {
@@ -412,8 +416,6 @@ ClassMethod GetRequiredVersionExpression(
                 }
             }
         }
-
-        $$$ThrowOnError(sc)
     } catch e {
         set expression = $$$NULLOREF
         set sourceList = ""
@@ -1292,7 +1294,7 @@ ClassMethod LoadDependencies(
 
     set reloadSnapshots = +$get(pParams("UpdateSnapshots"))
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
-    set ignoreInstalled = +$get(pParams("zpm", "IgnoreInstalled"))
+    set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
     set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade)
     $$$ThrowOnError(sc)
