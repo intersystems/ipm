@@ -872,47 +872,58 @@ Method TestMixedPackaging()
     do $$$AssertStatusNotOK(sc, "Cannot install second database package in same namespace")
 }
 
-/// Test that -no-export-python-deps excludes wheels from the package, and that Python wheels
-/// are installed during database package install (PythonWheel uses Initialize phase, which
-/// has no Database.cls override).
-Method TestPackageWithExportPyDepsFlag()
+/// Tests all Python dependency packaging behaviour in one pass:
+/// - module-with-mixed-python (explicit PythonWheel + requirements.txt): both wheels present
+///   by default; both absent with -no-export-python-deps; lune installs correctly at runtime
+/// - module-with-requirements (requirements.txt only): wheel present by default; absent with flag
+/// Combining these avoids packaging module-with-mixed-python twice across separate test methods.
+Method TestPythonDependencyPackaging()
 {
-    set packagingNS = ..GetOrCreateSharedNS2()
+    // Capture module dirs before NS switch — GetModuleDir uses ^UnitTestRoot which is only set here
+    set mixedModuleDir = ..GetModuleDir("db-packaging", "module-with-mixed-python")
+    set reqModuleDir = ..GetModuleDir("db-packaging", "module-with-requirements")
 
-    // Switch to shared packaging namespace (module-with-mixed-python is pre-loaded)
+    set packagingNS = ..GetOrCreateSharedNS2()
     new $namespace
     set $namespace = packagingNS
 
-    // Package with default settings (export-python-deps ON by default)
+    // module-with-mixed-python: default (export-python-deps)
+    // Packages both an explicit <PythonWheel> (lune) and a requirements.txt dep (pycparser)
     set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged with default settings")
+    do $$$AssertStatusOK(sc, "Packaged module-with-mixed-python with default settings")
 
     set defaultPkg = ..PackageOutputDir _ "module-with-mixed-python-1.0.0-database.tgz"
-    set extractDir1 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-default-whl")
-    do ##class(%Library.File).CreateDirectory(extractDir1)
-    set sc = ##class(%IPM.General.Archive).Extract(defaultPkg, extractDir1)
-    do $$$AssertStatusOK(sc, "Extracted default package")
+    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-mixpy")
+    do ##class(%Library.File).CreateDirectory(extractDir)
+    set sc = ##class(%IPM.General.Archive).Extract(defaultPkg, extractDir)
+    do $$$AssertStatusOK(sc, "Extracted module-with-mixed-python default package")
 
-    set wheelInDefault = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir1)
-    do $$$AssertTrue(##class(%Library.File).Exists(wheelInDefault), "Wheel included in package by default (export-python-deps ON)")
+    set luneWheel = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir)
+    do $$$AssertTrue(##class(%Library.File).Exists(luneWheel), "Explicit PythonWheel (lune) included in default package")
 
-    // Package with -no-export-python-deps into a separate subdirectory
+    set wheelsDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).NormalizeFilename("wheels", extractDir))
+    set pycparserFound = 0
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)", wheelsDir, "pycparser*.whl", "", 0)
+    while rs.%Next() { set pycparserFound = 1 }
+    do $$$AssertTrue(pycparserFound, "requirements.txt wheel (pycparser) included in default package")
+
+    // module-with-mixed-python: -no-export-python-deps
     set noExportDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "noexport")
     do ##class(%Library.File).CreateDirectory(noExportDir)
     set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -no-export-python-deps -path " _ noExportDir)
-    do $$$AssertStatusOK(sc, "Packaged with -no-export-python-deps")
+    do $$$AssertStatusOK(sc, "Packaged module-with-mixed-python with -no-export-python-deps")
 
     set noExportPkg = noExportDir _ "module-with-mixed-python-1.0.0-database.tgz"
     set extractDir2 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-nowheel")
     do ##class(%Library.File).CreateDirectory(extractDir2)
     set sc = ##class(%IPM.General.Archive).Extract(noExportPkg, extractDir2)
-    do $$$AssertStatusOK(sc, "Extracted no-wheel package")
+    do $$$AssertStatusOK(sc, "Extracted no-export package")
 
     set wheelInNoExport = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir2)
     do $$$AssertNotTrue(##class(%Library.File).Exists(wheelInNoExport), "Wheel excluded when -no-export-python-deps is set")
 
-    // Verify Python wheel is installed during database package install.
-    // PythonWheel.OnPhase("Initialize") fires since %Initialize has no Database.cls override.
+    // Runtime install: PythonWheel.OnPhase("Initialize") fires (no Database.cls override)
     set installNS = "TESTDBPYWHLINS"
     set sc = ..CreateTestNamespace(installNS)
     do $$$AssertStatusOK(sc, "Created install namespace")
@@ -931,96 +942,40 @@ Method TestPackageWithExportPyDepsFlag()
     } catch ex {
         do $$$AssertFailure("Failed to import lune after database install: " _ ex.AsStatus())
     }
-}
 
-/// Test that requirements.txt dependencies are resolved into wheels during database packaging
-/// when -export-python-deps is enabled (the default). Modules with only a requirements.txt
-/// (no explicit <PythonWheel> entries) should get their Python deps packaged as wheels.
-Method TestPackageWithRequirementsTxt()
-{
-    // Capture moduleDir before NS switch (used for cleanup at end of test)
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-requirements")
-    set packagingNS = ..GetOrCreateSharedNS2()
-
-    // Switch to shared packaging namespace (module-with-requirements is pre-loaded)
-    new $namespace
+    // module-with-requirements: default (requirements.txt → wheel)
     set $namespace = packagingNS
 
-    // Package as database (export-python-deps is on by default)
     set sc = ##class(%IPM.Main).Shell("package-database module-with-requirements -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged module with requirements.txt")
+    do $$$AssertStatusOK(sc, "Packaged module-with-requirements with default settings")
 
-    // Extract and verify wheels were included
-    set packageFile = ..PackageOutputDir _ "module-with-requirements-1.0.0-database.tgz"
-    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-reqtxt")
-    do ##class(%Library.File).CreateDirectory(extractDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
-    do $$$AssertStatusOK(sc, "Extracted package")
+    set reqPkg = ..PackageOutputDir _ "module-with-requirements-1.0.0-database.tgz"
+    set extractDir3 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-reqtxt")
+    do ##class(%Library.File).CreateDirectory(extractDir3)
+    set sc = ##class(%IPM.General.Archive).Extract(reqPkg, extractDir3)
+    do $$$AssertStatusOK(sc, "Extracted module-with-requirements default package")
 
-    set wheelPath = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir)
-    do $$$AssertTrue(##class(%Library.File).Exists(wheelPath), "Wheel from requirements.txt included in database package")
+    set wheelPath = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir3)
+    do $$$AssertTrue(##class(%Library.File).Exists(wheelPath), "Wheel from requirements.txt included in package")
 
-    // Verify wheel is not included when -no-export-python-deps is set
-    set noExportDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "noexport-reqtxt")
-    do ##class(%Library.File).CreateDirectory(noExportDir)
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-requirements -no-export-python-deps -path " _ noExportDir)
-    do $$$AssertStatusOK(sc, "Packaged with -no-export-python-deps")
+    // module-with-requirements: -no-export-python-deps
+    set noExportReqDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "noexport-reqtxt")
+    do ##class(%Library.File).CreateDirectory(noExportReqDir)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-requirements -no-export-python-deps -path " _ noExportReqDir)
+    do $$$AssertStatusOK(sc, "Packaged module-with-requirements with -no-export-python-deps")
 
-    set noExportPkg = noExportDir _ "module-with-requirements-1.0.0-database.tgz"
-    set extractDir2 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-noreqtxt")
-    do ##class(%Library.File).CreateDirectory(extractDir2)
-    set sc = ##class(%IPM.General.Archive).Extract(noExportPkg, extractDir2)
-    do $$$AssertStatusOK(sc, "Extracted no-export package")
+    set noExportReqPkg = noExportReqDir _ "module-with-requirements-1.0.0-database.tgz"
+    set extractDir4 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-noreqtxt")
+    do ##class(%Library.File).CreateDirectory(extractDir4)
+    set sc = ##class(%IPM.General.Archive).Extract(noExportReqPkg, extractDir4)
+    do $$$AssertStatusOK(sc, "Extracted no-export requirements package")
 
-    set wheelPath2 = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir2)
-    do $$$AssertNotTrue(##class(%Library.File).Exists(wheelPath2), "Wheel excluded when -no-export-python-deps is set")
+    set wheelPath2 = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir4)
+    do $$$AssertNotTrue(##class(%Library.File).Exists(wheelPath2), "Wheel excluded from requirements package when -no-export-python-deps is set")
 
-    // Cleanup: wheels/ was downloaded by ExportPythonDependencies as part of test
-    do ..DeletePath(moduleDir _ "wheels")
-}
-
-/// Test that a module with both requirements.txt and explicit <PythonWheel> resources
-/// gets both sets of wheels packaged correctly. The two sources should not conflict —
-/// ExportPythonDependencies resolves requirements.txt into wheels and adds <PythonWheel>
-/// entries, then CopyNonCompiledResources stages all PythonWheel resources.
-Method TestPackageWithMixedPythonDeps()
-{
-    // Capture moduleDir before NS switch (used for pycparser wheel cleanup at end of test)
-    set moduleDir = ..GetModuleDir("db-packaging", "module-with-mixed-python")
-    set packagingNS = ..GetOrCreateSharedNS2()
-
-    // Switch to shared packaging namespace (module-with-mixed-python is pre-loaded)
-    new $namespace
-    set $namespace = packagingNS
-
-    // Package as database (export-python-deps on by default)
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged module with mixed Python deps")
-
-    // Extract and verify both wheels are present
-    set packageFile = ..PackageOutputDir _ "module-with-mixed-python-1.0.0-database.tgz"
-    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-mixpy")
-    do ##class(%Library.File).CreateDirectory(extractDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
-    do $$$AssertStatusOK(sc, "Extracted package")
-
-    // Explicit <PythonWheel> resource
-    set luneWheel = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir)
-    do $$$AssertTrue(##class(%Library.File).Exists(luneWheel), "Explicit PythonWheel (lune) included in package")
-
-    // Wheel resolved from requirements.txt — pycparser filename includes version and platform tags
-    set wheelsDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).NormalizeFilename("wheels", extractDir))
-    set pycparserFound = 0
-    set rs = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)", wheelsDir, "pycparser*.whl", "", 0)
-    while rs.%Next() {
-        set pycparserFound = 1
-    }
-    do $$$AssertTrue(pycparserFound, "requirements.txt wheel (pycparser) included in package")
-
-    // Cleanup: pycparser wheel downloaded by ExportPythonDependencies as part of test
-    do ..DeletePattern(moduleDir _ "wheels/", "pycparser*.whl")
+    // Cleanup: wheels downloaded by ExportPythonDependencies during packaging
+    do ..DeletePattern(mixedModuleDir _ "wheels/", "pycparser*.whl")
+    do ..DeletePath(reqModuleDir _ "wheels")
 }
 
 /// Test that pre-Activate invokes are skipped and post-Activate invokes run
