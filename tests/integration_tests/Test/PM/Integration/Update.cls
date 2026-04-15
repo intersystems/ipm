@@ -663,11 +663,11 @@ Method TestDevModePropagation()
 }
 
 /// Test case to make sure that update doesn't fail due to version errors that get resolved as a part of update
-/// i.e. - Module A 1.0.0 requires Module B ^1.0.0
-///      - Module A 2.0.0 requires Module B ^2.0.0
-///      - Pre-Update: Module A 1.0.0, Module B 1.3.0
-///      - Post-Update: Module A 2.0.0, Module B 2.0.1
-///      - Don't want a version error to be thrown in flight when Module A is 2.0.0 and Module B is still 1.3.0
+/// i.e. - Module A 2.0.0 requires Module B ^1.0.0
+///      - Module A 2.1.0 requires Module B ^2.0.0
+///      - Pre-Update: Module A 2.0.0, Module B 1.0.0
+///      - Post-Update: Module A 2.1.0, Module B 2.0.0
+///      - Don't want a version error to be thrown in flight when Module A is 2.1.0 and Module B is still 1.0.0
 Method TestDependencyVersionsUpdated()
 {
     // Define variables for this test

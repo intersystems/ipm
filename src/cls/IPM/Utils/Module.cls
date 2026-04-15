@@ -351,7 +351,7 @@ ClassMethod GetModuleObjectFromString(
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
 /// 
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
-/// This is especially important for update, where we want to check requirements with post-update versions as opposed to what's currently installed.
+/// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
 	moduleName As %String,
 	excludeModules As %List = "",
