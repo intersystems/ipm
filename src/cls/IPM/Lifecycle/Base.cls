@@ -1190,16 +1190,6 @@ Method %Export(
             }
         }
 
-        // Deployed items should be exported as a studio project to a designated directory
-        set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(..Module.Name)
-        set tDeployedProject = ##class(%Studio.Project).%OpenId(tDeployedProjectName)
-        if '$isobject(tDeployedProject) {
-            set tDeployedProject = ##class(%Studio.Project).%New()
-            set tDeployedProject.Name = tDeployedProjectName
-        }
-        do tDeployedProject.Items.Clear()
-        set tParams($$$DeployedProjectIndex) = tDeployedProject
-
         set tModuleName = ""
         set exportPythonDependencies = $get(pParams("ExportPythonDependencies"), 0)
         for {
@@ -1215,14 +1205,26 @@ Method %Export(
             }
             kill tSingleModuleArray
             merge tSingleModuleArray = tResourceArray(tModuleName)
-            do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
-        }
 
-        // Export the deployed project to the target directory, if it's non-empty
-        if tDeployedProject.Items.Count() > 0 {
-            // Intentionally not calling .%Save() on the project; we don't want to persist it.
-            set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(pTargetDirectory)
-            $$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $select(tVerbose:"d",1:"-d")_"/createdirs"))
+            // Deployed items for each module + dependency should be exported as a studio project to a designated directory
+            set tDeployedProjectName = ##class(%IPM.Utils.Module).GetDeployedProjectName(tModuleName)
+            set tDeployedProject = ##class(%Studio.Project).%OpenId(tDeployedProjectName)
+            if '$isobject(tDeployedProject) {
+                set tDeployedProject = ##class(%Studio.Project).%New()
+                set tDeployedProject.Name = tDeployedProjectName
+            }
+            do tDeployedProject.Items.Clear()
+            set tParams($$$DeployedProjectIndex) = tDeployedProject
+
+            do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
+
+            // Export the deployed project for this module to the target directory, if it's non-empty
+            if tDeployedProject.Items.Count() > 0 {
+                // Intentionally not calling .%Save() on the project; we don't want to persist it.
+                set tDeployTargetDirectory = pTargetDirectory _ $get(pDependencyGraph(tModuleName, "Location"))
+                set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(tDeployTargetDirectory)
+                $$$ThrowOnError(tDeployedProject.DeployToFile(tDeployedProjectPath, $select(tVerbose:"d",1:"-d")_"/createdirs"))
+            }
         }
 
         /// Always keep these files
