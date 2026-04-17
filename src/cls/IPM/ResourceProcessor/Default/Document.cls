@@ -280,10 +280,9 @@ Method OnExportDeployedItem(
     try {
         set tVerbose = $get(pParams("Verbose"),0)
         set tDeveloperMode = $get(pParams("DeveloperMode"),0)
-        set isDepAndRecurse = $get(pParams("Recurse"),0) && $find(pFullExportPath, ".modules")
         set executingPhases = $listlength(..ResourceReference.Module.Lifecycle.PhaseList)
-        if (tDeveloperMode || ('..ResourceReference.Deploy) || ('executingPhases && 'isDepAndRecurse)) {
-            // Only export deployed items if we say to, are in a non-developer-mode context,
+        if (tDeveloperMode || ('..ResourceReference.Deploy) || ('executingPhases && '$get(pParams("Recurse"),0))) {
+            // Only export deployed items if they are marked for deploy, we are in a non-developer-mode context,
             // and are currently executing module lifecycle phases or this is a dependency module with the recurse flag set
             // OnExportItem may also be called from a source control extension context, and in this case PhaseList will be empty.
             quit
