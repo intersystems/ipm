@@ -280,14 +280,11 @@ Method OnExportDeployedItem(
     try {
         set tVerbose = $get(pParams("Verbose"),0)
         set tDeveloperMode = $get(pParams("DeveloperMode"),0)
-        if (tDeveloperMode || ('..ResourceReference.Deploy) || ('$listlength(..ResourceReference.Module.Lifecycle.PhaseList))) {
-            // Only export deployed items if we say to, are in a non-developer-mode context, and are currently executing module lifecycle phases.
-            // OnExportItem may also be called from a source control extension context, and in this case PhaseList will be empty.
+        if (tDeveloperMode || ('..ResourceReference.Deploy)) {
+            // Only export deployed items if they are marked for deploy, we are in a non-developer-mode context
             quit
         }
-        set tModuleName = ..ResourceReference.Module.Name
         set fileExt = $$$ucase($piece(pItemName, ".", *))
-        set tName = $piece(pItemName, ".", 1, * - 1)
         quit:'($listfind($listbuild("CLS","MAC","INT"), fileExt))
         if $data(pParams($$$DeployedProjectIndex), deployedProject) {
             if tVerbose {

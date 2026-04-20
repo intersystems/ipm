@@ -25,32 +25,49 @@ ClassMethod Init(
     quit log
 }
 
+/// Explicitly persist current state to the PersistedTwin
+/// Can be called before classes are deleted during self-uninstall
+Method PersistToTwin() As %Status
+{
+    set sc = $$$OK
+    if $$$comClassDefined("%IPM.General.History") {
+        if (..PersistedTwin '= "") {
+            // Reload to get latest state
+            $$$ThrowOnError(..%Reload())
+
+            // copy all values to the Persisted Twin
+            set ..PersistedTwin.TimeStart = ..TimeStart
+            set ..PersistedTwin.TimeEnd = ..TimeEnd
+            set ..PersistedTwin.Action = ..Action
+            set ..PersistedTwin.Package = ..Package
+            set ..PersistedTwin.CommandString = ..CommandString
+            set ..PersistedTwin.UserName = ..UserName
+            set ..PersistedTwin.Version = ..Version
+            set ..PersistedTwin.SourceName = ..SourceName
+            set ..PersistedTwin.SourceMoniker = ..SourceMoniker
+            set ..PersistedTwin.SourceDetails = ..SourceDetails
+            set ..PersistedTwin.Success = ..Success
+            set ..PersistedTwin.Committed = ..Committed
+            set ..PersistedTwin.Phases = ..Phases
+            // Mark as finalized and record should be locked
+            set ..PersistedTwin.Finalized = 1
+            set sc = ..%Save()
+        }
+    }
+    quit sc
+}
+
 /// Persist this more permanently by saving to the PersistedTwin
 Method %OnClose() As %Status [ Private, ServerOnly = 1 ]
 {
-    if ..PersistedTwin '= "" {
-        // copy all values to the Persisted Twin
-        set ..PersistedTwin.TimeStart = ..TimeStart
-        set ..PersistedTwin.TimeEnd = ..TimeEnd
-        set ..PersistedTwin.Action = ..Action
-        set ..PersistedTwin.Package = ..Package
-        set ..PersistedTwin.CommandString = ..CommandString
-        set ..PersistedTwin.UserName = ..UserName
-        set ..PersistedTwin.Version = ..Version
-        set ..PersistedTwin.SourceName = ..SourceName
-        set ..PersistedTwin.SourceMoniker = ..SourceMoniker
-        set ..PersistedTwin.SourceDetails = ..SourceDetails
-        set ..PersistedTwin.Success = ..Success
-        set ..PersistedTwin.Committed = ..Committed
-        set ..PersistedTwin.Phases = ..Phases
-        // Mark as finalized and record should be locked
-        set ..PersistedTwin.Finalized = 1
-    }
-    // Ensure the persisted twin is saved
-    set sc = ..%Save()
+    set sc = $$$OK
+    if $$$comClassDefined("%IPM.General.History") {
+        // Persist to twin if not already done
+        set sc = ..PersistToTwin()
 
-    // Delete this temp entry as it's no longer needed
-    set sc = $$$ADDSC(sc, ..%DeleteId(..%Id()))
+        // Delete this temp entry as it's no longer needed
+        set sc = $$$ADDSC(sc, ..%DeleteId(..%Id()))
+    }
     quit sc
 }
 
