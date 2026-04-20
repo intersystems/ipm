@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# ipm: convenience wrapper to run a ZPM command in an IRIS session
+# Usage examples:
+#   ipm isc.genai test -only
+#   ipm -U PLAZA isc.genai test -only
+
+ARGS=()
+CMD=()
+
+# Allow namespace via env like iriscli
+if [ -n "$IRIS_NAMESPACE" ]; then
+  ARGS+=( -U "$IRIS_NAMESPACE" )
+elif [ -n "$IRISNAMESPACE" ]; then
+  ARGS+=( -U "$IRISNAMESPACE" )
+fi
+
+# Optional leading -U <ns>
+if [ "$1" = "-U" ] && [ -n "$2" ]; then
+  ARGS+=( -U "$2" )
+  shift 2
+fi
+
+# Remaining args compose the ZPM command string
+while [[ $# -gt 0 ]]; do
+  CMD+=( "$1" )
+  shift
+done
+
+if [ ${#CMD[@]} -eq 0 ]; then
+  echo "Usage: ipm [ -U <NAMESPACE> ] <zpm command and args...>" >&2
+  exit 1
+fi
+
+# Join CMD array into a single string
+CMDSTR="${CMD[*]}"
+# Escape quotes for ObjectScript string literal
+CMDSTR_ESC=${CMDSTR//\"/\"\"}
+
+# Build an OS snippet and feed to iris session
+(
+  echo "zpm \"${CMDSTR_ESC}\":1:1"
+  echo "halt"
+) | iris session ${ISC_PACKAGE_INSTANCENAME:-iris} "${ARGS[@]}"

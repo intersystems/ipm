@@ -1,0 +1,34 @@
+#!/bin/bash
+
+ARGS=()
+PARAMS=()
+file=
+
+if [ -n "$IRIS_NAMESPACE" ]; then
+    ARGS+=( -U $IRIS_NAMESPACE )
+elif [ -n "$IRISNAMESPACE" ]; then
+    ARGS+=( -U $IRISNAMESPACE )
+fi
+
+while [[ $# -gt 0 ]]; do
+    if [ -x $1 ]; then
+        file=$1
+    elif [ -z "$file" ]; then
+        ARGS+=("$1")
+    else 
+        PARAMS+=("$1")
+    fi
+    shift
+done
+
+if [ -n "$file" ]; then
+    (
+        for param in ${PARAMS[@]}; do
+            echo "Set params(\$i(params)) = \"${param//\"/\"\"}\""
+        done
+        egrep -v '^(;|#|//)|^$' $file; 
+        echo halt
+    ) | iris session $ISC_PACKAGE_INSTANCENAME "${ARGS[@]}"
+else
+    iris session iris "${ARGS[@]}"
+fi
