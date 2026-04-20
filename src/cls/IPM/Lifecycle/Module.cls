@@ -135,6 +135,9 @@ Method %Package(ByRef pParams) As %Status
 {
     set tSC = $$$OK
     try {
+        if ($get(pParams("ExportDependencies"), 0)) {
+            set pParams("Recurse") = 1
+        }
         set tVerbose = $get(pParams("Verbose"))
         if ..Module.HaveToDeploy() {
             $$$ThrowOnError(..MakeDeployed(.pParams))
