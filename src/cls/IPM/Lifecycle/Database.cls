@@ -21,7 +21,7 @@ Parameter PACKAGING As STRING [ Final ] = "database";
 /// 6. Compute SHA-256 checksum of the IRIS.DAT
 /// 7. Assemble staging dir (IRIS.DAT + module.xml + dependencies.xml + non-compiled resources)
 ///    and create the .tgz archive
-/// 
+///
 /// On error during remap, a safety net restores the namespace.
 /// Temp files and directories are cleaned up in all paths.
 Method %Package(ByRef params) As %Status
@@ -340,11 +340,11 @@ Method LoadResourcesIntoDatabase(
 /// Returns generatedExports as a $list of temp file paths to be imported later.
 /// Must be called before RemapRoutinesDB — once the old DB is dismounted, the
 /// compiled generated classes are no longer accessible.
-/// 
+///
 /// This export/import is the primary mechanism for Generated resources that have
 /// no in-lifecycle generator: classes produced by external tools or processes that
 /// are pre-compiled in the source DB but not recreated during %Reload/%Compile.
-/// 
+///
 /// For resources that are regenerated during packaging (BPL/DTL compilation
 /// auto-generates their .1.cls subclass; <Invoke After Compile> explicitly creates
 /// a class via %Dictionary API), the import is redundant but harmless — the class
@@ -490,9 +490,9 @@ ClassMethod ComputeSHA256Hex(filePath As %String) As %String
     quit hexHash
 }
 
-/// XSLT to inject <Packaging>database</Packaging> and
-/// <Checksum Algorithm="SHA-256">...</Checksum> into a module XML stream.
-/// REPLACECHECKSUM is substituted with the real checksum before XSLT compilation.
+/// XSLT to inject <Packaging>database</Packaging>, <Checksum Algorithm="SHA-256">...</Checksum>,
+/// and <SystemRequirements Version="..."/> into a module XML stream.
+/// REPLACECHECKSUM and REPLACEIRISVERSION are substituted with real values before XSLT compilation.
 XData InjectDatabasePackagingTransform
 {
 <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
@@ -529,12 +529,13 @@ XData InjectDatabasePackagingTransform
   </xsl:template>
 
   <!-- Module: each child on its own line, 6-space indent.
-       Skip any existing Packaging/Checksum (will be re-injected).
-       Inject Packaging + Checksum immediately after Version. -->
+       Skip any existing Packaging/Checksum/SystemRequirements (will be re-injected).
+       Inject Packaging + Checksum immediately after Version.
+       Inject SystemRequirements (with current IRIS version) after Checksum. -->
   <xsl:template match="*[local-name()='Module']">
     <xsl:copy>
       <xsl:apply-templates select="@*"/>
-      <xsl:for-each select="*[local-name()!='Packaging' and local-name()!='Checksum']">
+      <xsl:for-each select="*[local-name()!='Packaging' and local-name()!='Checksum' and local-name()!='SystemRequirements']">
         <xsl:text>&#10;      </xsl:text>
         <xsl:apply-templates select="."/>
         <xsl:if test="local-name()='Version'">
@@ -543,6 +544,14 @@ XData InjectDatabasePackagingTransform
           <xsl:text>&#10;      </xsl:text>
           <xsl:element name="Checksum" namespace="{namespace-uri(..)}">
             <xsl:attribute name="Algorithm">SHA-256</xsl:attribute>REPLACECHECKSUM</xsl:element>
+          <xsl:text>&#10;      </xsl:text>
+          <xsl:element name="SystemRequirements" namespace="{namespace-uri(..)}">
+            <xsl:attribute name="Version">REPLACEIRISVERSION</xsl:attribute>
+            <!-- Carry all non-Version attributes from any existing SystemRequirements element -->
+            <xsl:for-each select="../*[local-name()='SystemRequirements']/@*[local-name()!='Version']">
+              <xsl:copy/>
+            </xsl:for-each>
+          </xsl:element>
         </xsl:if>
       </xsl:for-each>
       <xsl:text>&#10;    </xsl:text>
@@ -551,8 +560,8 @@ XData InjectDatabasePackagingTransform
 </xsl:stylesheet>
 }
 
-/// Compiles InjectDatabasePackagingTransform with the real checksum substituted in.
-ClassMethod CompilePackagingTransform(checksumHex As %String) As %XML.XSLT.CompiledStyleSheet
+/// Compiles InjectDatabasePackagingTransform with the real checksum and IRIS version substituted in.
+ClassMethod CompilePackagingTransform(checksumHex As %String, irisVersion As %String) As %XML.XSLT.CompiledStyleSheet
 {
     set xData = ##class(%Dictionary.CompiledXData).IDKEYOpen(
         $classname(), "InjectDatabasePackagingTransform", , .sc)
@@ -563,6 +572,7 @@ ClassMethod CompilePackagingTransform(checksumHex As %String) As %XML.XSLT.Compi
         set raw = raw _ xData.Data.Read()
     }
     set raw = $replace(raw, "REPLACECHECKSUM", checksumHex)
+    set raw = $replace(raw, "REPLACEIRISVERSION", irisVersion)
 
     set stream = ##class(%Stream.TmpCharacter).%New()
     $$$ThrowOnError(stream.Write(raw))
@@ -573,17 +583,18 @@ ClassMethod CompilePackagingTransform(checksumHex As %String) As %XML.XSLT.Compi
 }
 
 /// Exports the module manifest, applies the database packaging XSLT transform
-/// (injecting Packaging and Checksum elements), and writes to targetDir/module.xml.
+/// (injecting Packaging, Checksum, and SystemRequirements elements), and writes to targetDir/module.xml.
 Method WritePackageModuleXML(
 	targetDir As %String,
-	checksumHex As %String)
+	checksumHex As %String,
+	irisVersion As %String)
 {
     set srcPath = ##class(%Library.File).NormalizeFilename("module.xml", ..Module.Root)
     set baseStream = ##class(%Stream.FileCharacter).%New()
     $$$ThrowOnError(baseStream.LinkToFile(srcPath))
     $$$ThrowOnError(baseStream.Rewind())
 
-    set compiled = ..CompilePackagingTransform(checksumHex)
+    set compiled = ..CompilePackagingTransform(checksumHex, irisVersion)
     $$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(baseStream, compiled, .transformed))
 
     set outPath = ##class(%Library.File).NormalizeFilename("module.xml", targetDir)
@@ -754,7 +765,15 @@ Method AssemblePackage(
     set exportPythonDeps = $get(params("ExportPythonDependencies"), 1)
     do ..CopyNonCompiledResources(stagingDir, includeTestResources, exportPythonDeps)
 
-    do ..WritePackageModuleXML(stagingDir, checksumHex)
+    set irisVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
+    set existingVersion = ""
+    if $isobject(..Module.SystemRequirements) {
+        set existingVersion = ..Module.SystemRequirements.VersionString
+    }
+    if (existingVersion '= "") && (existingVersion '= irisVersion) {
+        write !, "WARNING: Overwriting existing SystemRequirements Version '", existingVersion, "' with '", irisVersion, "'"
+    }
+    do ..WritePackageModuleXML(stagingDir, checksumHex, irisVersion)
     do ..WriteDependencies(stagingDir)
 
     set outputDir = $get(params("Path"))
