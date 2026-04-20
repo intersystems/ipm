@@ -1168,6 +1168,9 @@ Method ProcessSingleDependencyIterative(
         set searchCriteria.Name = pDep.Name
         set searchExprStr = searchExpr.ToResolvedString()
         set searchCriteria.VersionExpression = searchExprStr
+        // Dependencies are always resolved as source packages regardless of top-level -swap-db.
+        // A database-packaged module already includes its dependencies in the tgz.
+        set searchCriteria.Packaging = "source"
         if searchExprStr = "" {
             set searchExprStr = "*"
         }

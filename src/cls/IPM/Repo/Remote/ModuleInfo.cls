@@ -9,6 +9,9 @@ Property Payload As %Stream.GlobalBinary(%JSONFIELDNAME = "package");
 
 Property Manifest As %Stream.GlobalCharacterSearchable(%JSONFIELDNAME = "manifest", SIMILARITYINDEX = "ManifestSearchIndex");
 
+/// Registry packaging type: "source" or "database". Used by PublishService to tag and annotate the manifest.
+Property IPMPackaging As %String(VALUELIST = ",source,database") [ InitialExpression = "source" ];
+
 Property Installer As %Stream.GlobalCharacterSearchable(%JSONFIELDNAME = "installer");
 
 /// NOTE: Must be redeclared in subclasses (?)
