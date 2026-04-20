@@ -94,7 +94,7 @@ docker system prune -a
 
 #### Convenience Scripts: `ipm` and `iriscli`
 
-The repo ships two bash scripts that wrap common IRIS interactions so you don't have to type `iris session iris` boilerplate every time. They are copied into `/home/irisowner/bin/` during the container build and are available by name in any running container.
+The repo ships two bash scripts that wrap common IRIS interactions so you don't have to type `iris session iris` boilerplate every time. When IPM is installed on Unix/Linux, they are automatically copied to `~/.local/bin/` and `~/bin/` (if it exists), making them available on PATH in most environments including the dev containers.
 
 **`ipm`** — runs a single IPM/ZPM command non-interactively and exits:
 ```bash

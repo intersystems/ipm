@@ -52,6 +52,9 @@
     This intentionally and necessarily masks possible installation of the real rpds-py package
     for the sake of working in a container environment with durable %SYS. -->
       <FileCopy Name="modules/python/rpds.py" Target="${mgrdir}python/rpds.py" />
+      <FileCopy Name="ipm" Target="${ipmdir}bin/ipm" />
+      <FileCopy Name="iriscli" Target="${ipmdir}bin/iriscli" />
+      <Invoke Class="IPM.Installer" Method="InstallScripts" Phase="Activate" When="After" />
     </Module>
   </Document>
 </Export>
