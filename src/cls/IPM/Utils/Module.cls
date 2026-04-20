@@ -30,7 +30,7 @@ ClassMethod LoadQualifiedReference(
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog)
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog, tReference.IPMPackaging)
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -45,7 +45,8 @@ ClassMethod LoadModuleReference(
 	pPlatformVersion As %String,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pLog As %IPM.General.AbstractHistory = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "",
+	pIPMPackaging As %String = "") As %Status
 {
     // if install of module is already being logged, don't duplicate
     set prelogged = $case(pLog, "": 0, :1)
@@ -94,6 +95,7 @@ ClassMethod LoadModuleReference(
         set tModRef.VersionString = pVersion
         set tModRef.Deployed = pDeployed
         set tModRef.PlatformVersion = pPlatformVersion
+        set tModRef.IPMPackaging = pIPMPackaging
         if pDeployed {
             $$$ThrowOnError(tModRef.PlatformVersions.Insert(pPlatformVersion))
         }
@@ -948,7 +950,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-/// 
+///
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1283,7 +1285,7 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, , , moduleReference.IPMPackaging)
         $$$ThrowOnError(sc)
     }
 

@@ -2514,7 +2514,24 @@ ClassMethod Install(
         set tSearchCriteria.Name = $$$lcase(tModuleName)
         set tSearchCriteria.VersionExpression = tVersion
         set tSearchCriteria.Keywords = tKeywords
+        if ($get(pCommandInfo("data","SwapDB"))) {
+            set tSearchCriteria.Packaging = "database"
+        } else {
+            set tSearchCriteria.Packaging = "source"
+        }
         $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+
+        // If no source package found, check whether a database-only package exists and give a helpful error
+        if (tResults.Count() = 0) && (tSearchCriteria.Packaging = "source") {
+            set checkCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+            set checkCriteria.Name = tSearchCriteria.Name
+            set checkCriteria.VersionExpression = tSearchCriteria.VersionExpression
+            set checkCriteria.Packaging = "database"
+            $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(checkCriteria,.fallbackResults))
+            if (fallbackResults.Count() > 0) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Module '"_tModuleName_"' is only available as a database package. Re-run with -swap-db to install it."))
+            }
+        }
 
         if (tResults.Count() > 0) {
             set tResult = ""
