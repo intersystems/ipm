@@ -47,10 +47,13 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
         set metadata.IPMDeployed = pModule.Deployed
         set metadata.IPMPlatformVersion = pModule.PlatformVersion
         set metadata.IPMModuleV1XML = moduleXML
-        do metadata.%JSONExportToString(.metaDataString)
-        if (pModule.Deployed) {
+        if (pModule.IPMPackaging = "database") {
+            set metadata.IPMPackaging = "database"
+            set tag = tag _ "_database" _ $$$OrasTagPlatformSeparator _ pModule.PlatformVersion
+        } elseif (pModule.Deployed) {
             set tag = tag _ $$$OrasTagPlatformSeparator _ pModule.PlatformVersion
         }
+        $$$ThrowOnError(metadata.%JSONExportToString(.metaDataString))
 
         #; Push file
         $$$ThrowOnError(..Push(..Location, repo, tag, ..Namespace, tempDirectory, metaDataString, ..Username, ..Password, ..Token, ..TokenAuthMethod))

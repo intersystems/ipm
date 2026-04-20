@@ -35,7 +35,9 @@ Method GetModule(
 	Output AsArchive As %Boolean = 0) As %Stream.Object
 {
     set tag = $$$Semver2Tag(pModuleReference.VersionString)
-    if (pModuleReference.Deployed) {
+    if (pModuleReference.IPMPackaging = "database") {
+        set tag = tag _ "_database" _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
+    } elseif (pModuleReference.Deployed) {
         set tag = tag _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
     }
     set status = ..Pull(..Location, pModuleReference.Name, tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
@@ -75,7 +77,11 @@ ClassMethod AggregatePlatformVersions(
     set ptr = 0
     while $listnext(tagsList, ptr, tag) {
         // aggregate
-        set $listbuild(version, platformVersion) = $listfromstring(tag, $$$OrasTagPlatformSeparator)
+        // Use $piece (not $listbuild/$listfromstring) so platformVersion is always set to ""
+        // for tags with no "__" separator. $listbuild assignment of a shorter list leaves
+        // extra variables at their previous value rather than zeroing them.
+        set version = $piece(tag, $$$OrasTagPlatformSeparator, 1)
+        set platformVersion = $piece(tag, $$$OrasTagPlatformSeparator, 2)
         set value = $get(aggregatedPlatformVersion(version))
         set aggregatedPlatformVersion(version) = value _ $listbuild(platformVersion)
     }
@@ -128,6 +134,10 @@ Method ListModulesFromTagString(
 
         // get metadata from annotations
         set metadata = ..GetPackageMetadata(..Location, name, tag, "", client)
+        if (metadata = "") {
+            // Tag exists in the tag list but manifest is unreachable — skip silently
+            continue
+        }
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
         $$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
@@ -173,15 +183,31 @@ Method ListModulesFromTagString(
             }
         }
 
+        // Determine packaging type from annotation; absent means source for backwards compatibility
+        set modPackaging = $case(artifactMetadata.IPMPackaging, "database":"database", :"source")
+
+        // Apply packaging filter if specified
+        if (searchCriteria.Packaging '= "") && (modPackaging '= searchCriteria.Packaging) {
+            continue
+        }
+
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
         // `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
         set tModRef.Name = name
         // `artifactMetadata.ImageVersion` can be different from `moduleVersion`. E.g., when the module was simply "moved" from elsewhere under a different tag
-        set tModRef.VersionString = tVersion.ToString()
+        // For database packages, VersionString must be the plain semver (e.g. "1.0.0"), not "1.0.0+database".
+        // GetModule constructs the full tag ("1.0.0_database__<platform>") from IPMPackaging + PlatformVersion.
+        // Using tVersion.ToString() for database packages would embed "+database" in VersionString,
+        // causing GetModule to build "1.0.0_database_database__<platform>".
+        set tModRef.VersionString = $select(modPackaging = "database": tVersion.Major _ "." _ tVersion.Minor _ "." _ tVersion.Patch, 1: tVersion.ToString())
         set tModRef.Repository = artifactMetadata.ImageSource
         set tModRef.Description = artifactMetadata.ImageDescription
+        set tModRef.IPMPackaging = modPackaging
         set tModRef.Deployed = artifactMetadata.IPMDeployed
-        if (artifactMetadata.IPMDeployed '= "") {
+        if (modPackaging = "database") {
+            // For database packages, store PlatformVersion so GetModule can build the correct tag.
+            set tModRef.PlatformVersion = platformVersion
+        } elseif (artifactMetadata.IPMDeployed '= "") {
             set pvPtr = 0
             while $listnext(platformVersions, pvPtr, pv) {
                 $$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))

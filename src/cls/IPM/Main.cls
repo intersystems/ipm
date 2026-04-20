@@ -126,6 +126,38 @@ This command is an alias for `module-action module-name package`
 <modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="If specified, exports Python dependencies. If omitted, defaults to false." />
 </command>
 
+<command name="package-source" dataPrefix="D">
+<description>
+Creates a .tgz archive of module source files. Equivalent to the existing `package` command.
+</description>
+<parameter name="module" required="true" description="Name of module to package" />
+<modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="Controls whether dependencies are exported." />
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Exports Python dependencies." />
+</command>
+
+<command name="package-database" dataPrefix="D">
+<description>
+Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), and dependencies.xml.
+</description>
+<parameter name="module" required="true" description="Name of module to package as database" />
+<modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
+<modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
+<modifier name="include-test-resources" dataAlias="IncludeTestResources" dataValue="1" description="Include test resources (Scope=test or Scope=verify) in the package. Excluded by default." />
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Include Python wheels (from &lt;PythonWheel&gt; resources) in the database package. On by default." />
+<modifier name="no-export-python-deps" dataAlias="ExportPythonDependencies" dataValue="0" description="Exclude Python wheels from the database package." />
+<modifier name="db-name" dataAlias="DatabaseName" value="true" description="Name for the new temporary database. Auto-generated if omitted." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+</command>
+
+<command name="package-studio-project" dataPrefix="D">
+<description>
+Creates a Studio project package. Deprecated: will be removed in IPM 1.0.0. Equivalent to using `package` on a module with Packaging=studio-project.
+</description>
+<parameter name="module" required="true" description="Name of module to package as Studio project" />
+<modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the package." />
+</command>
+
 <command name="verify" dataPrefix="D">
 <description>
 This command is an alias for `module-action module-name verify`
@@ -141,6 +173,20 @@ This command is an alias for `module-action module-name publish`
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository for the module to publish to (if deployment is enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
 <modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="If specified, exports Python dependencies. If omitted, defaults to false." />
+</command>
+
+<command name="publish-database" dataPrefix="D">
+<description>
+Packages the module as an IRIS.DAT database package and publishes it to a registry in one step.
+Equivalent to running `package-database` followed by `publish`, but without needing a separate output path.
+</description>
+<parameter name="module" required="true" description="Name of module to package as database and publish" />
+<modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository to publish to (deployment must be enabled)" />
+<modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
+<modifier name="include-test-resources" dataAlias="IncludeTestResources" dataValue="1" description="Include test resources (Scope=test or Scope=verify) in the package. Excluded by default." />
+<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Include Python wheels in the database package." />
+<modifier name="no-export-python-deps" dataAlias="ExportPythonDependencies" dataValue="0" description="Exclude Python wheels from the database package." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 
 <command name="update" dataPrefix="D">
@@ -165,6 +211,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
+<modifier name="swap-db" dataAlias="SwapDB" dataValue="1" description="For database-packaged modules: swap the namespace routines database with the packaged IRIS.DAT. Required to proceed without confirmation." />
 </command>
 
 <command name="makedeployed">
@@ -293,6 +340,7 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="swap-db" dataAlias="SwapDB" dataValue="1" description="For database-packaged modules: swap the namespace routines database with the packaged IRIS.DAT. Required to proceed without confirmation." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -420,6 +468,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="swap-db" dataAlias="SwapDB" dataValue="1" description="For database-packaged modules: swap the namespace routines database with the packaged IRIS.DAT. Required to proceed without confirmation." />
 
 </command>
 
@@ -1062,6 +1111,29 @@ ClassMethod ShellInternal(
                 do ..Unpublish(.tCommandInfo)
             }  elseif (tCommandInfo = "update") {
                 do ..Update(.tCommandInfo)
+            } elseif (tCommandInfo = "package-source") {
+                // Identical to "package": route to the Package phase using current lifecycle
+                set tCommandInfo = "package"
+                do ..RunOnePhase(.tCommandInfo)
+            } elseif (tCommandInfo = "package-database") {
+                // Fail fast before any work begins — same check as %IPM.Lifecycle.Database:%Package
+                do ##class(%IPM.Lifecycle.Database).ValidateIPMNotInRoutinesDB()
+                // Force the Database lifecycle class and route to the Package phase
+                set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.Database"
+                set tCommandInfo = "package"
+                do ..RunOnePhase(.tCommandInfo)
+            } elseif (tCommandInfo = "publish-database") {
+                // Fail fast before any work begins — same check as %IPM.Lifecycle.Database:%Package
+                do ##class(%IPM.Lifecycle.Database).ValidateIPMNotInRoutinesDB()
+                // Force the Database lifecycle class and route to the Publish phase
+                set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.Database"
+                set tCommandInfo = "publish"
+                do ..RunOnePhase(.tCommandInfo)
+            } elseif (tCommandInfo = "package-studio-project") {
+                // Force the StudioProject lifecycle class and route to the Package phase
+                set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.StudioProject"
+                set tCommandInfo = "package"
+                do ..RunOnePhase(.tCommandInfo)
             } elseif ($listfind(..#STANDARDPHASES,tCommandInfo)) {
                 do ..RunOnePhase(.tCommandInfo)
             } elseif (tCommandInfo = "generate") {
@@ -2449,7 +2521,24 @@ ClassMethod Install(
         set tSearchCriteria.Name = $$$lcase(tModuleName)
         set tSearchCriteria.VersionExpression = tVersion
         set tSearchCriteria.Keywords = tKeywords
+        if ($get(pCommandInfo("data","SwapDB"))) {
+            set tSearchCriteria.Packaging = "database"
+        } else {
+            set tSearchCriteria.Packaging = "source"
+        }
         $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+
+        // If no source package found, check whether a database-only package exists and give a helpful error
+        if (tResults.Count() = 0) && (tSearchCriteria.Packaging = "source") {
+            set checkCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+            set checkCriteria.Name = tSearchCriteria.Name
+            set checkCriteria.VersionExpression = tSearchCriteria.VersionExpression
+            set checkCriteria.Packaging = "database"
+            $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(checkCriteria,.fallbackResults))
+            if (fallbackResults.Count() > 0) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Module '"_tModuleName_"' is only available as a database package. Re-run with -swap-db to install it."))
+            }
+        }
 
         if (tResults.Count() > 0) {
             set tResult = ""

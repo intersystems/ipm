@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="module-with-requirements.ZPM">
+    <Module>
+      <Name>module-with-requirements</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="ReqModule.Main.CLS" />
+    </Module>
+  </Document>
+</Export>

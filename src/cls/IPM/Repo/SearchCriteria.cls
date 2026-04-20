@@ -25,6 +25,9 @@ Property Keywords As list Of %String;
 /// empty: resolving dependencies
 Property AllVersions As %Boolean;
 
+/// Filter by packaging type: "source" or "database". Empty means no filter.
+Property Packaging As %String(VALUELIST = ",source,database");
+
 Method KeywordsSet(%value) As %Status
 {
     if $isobject(%value) {
