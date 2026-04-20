@@ -273,6 +273,8 @@ Method GetOrCreateSharedNS1() As %String
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ depsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ testsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ invokesDir))
+    // Configure the local zot ORAS registry once for ORAS-related tests
+    $$$ThrowOnError(##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000"))
 
     set ..SharedNS1 = ns
     quit ns
@@ -309,8 +311,6 @@ Method GetOrCreateSharedNS2() As %String
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ reqsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ mixPyDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ nonCmpDir))
-    // Configure the local zot ORAS registry once
-    $$$ThrowOnError(##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000"))
 
     set ..SharedNS2 = ns
     quit ns
@@ -356,6 +356,10 @@ Method TestSimplePackageAndInstall()
     set xmlContent = stream.Read()
     do $$$AssertTrue(xmlContent [ "<Packaging>database</Packaging>", "module.xml contains <Packaging>database</Packaging>")
     do $$$AssertTrue(xmlContent [ "<Checksum Algorithm=""SHA-256"">", "module.xml contains SHA-256 checksum")
+
+    // SystemRequirements Version should be auto-populated with the current IRIS version
+    set currentIrisVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
+    do $$$AssertTrue(xmlContent [ "Version=""" _ currentIrisVersion _ """", "module.xml SystemRequirements Version matches current IRIS version")
 
     // Verify deps/ directory exists
     set depsDir = ##class(%File).NormalizeDirectory(extractDir) _ "deps/"
@@ -1157,63 +1161,175 @@ Method TestUpdateStepsWithDatabasePackaging()
     kill ^DBPkgUpdateSteps
 }
 
-/// Test that publish-database packages a module as a database package and publishes it to
-/// an ORAS registry (zot at http://oras:5000), and that install from that registry performs
-/// a database swap in a fresh namespace. Uses all-resources-module to verify that compiled
-/// classes, Python wheels (colorama), FileCopy output, and WebApplication are all present
-/// after a registry-based install.
+/// Verifies packaging-type-aware registry filtering via zot (http://oras:5000).
+/// Publishes dep-module as both source and database, and main-with-deps as source only.
+/// Then verifies: source install (no -swap-db), database install (-swap-db), dependency
+/// resolution always picks source, and a helpful error is returned when only a database
+/// package is available and -swap-db is not specified.
 Method TestPublishDatabaseWithORAS()
 {
-    // all-resources-module is already loaded in SharedNS2; zot is configured there at NS init time
-    set packagingNS = ..GetOrCreateSharedNS2()
+    // dep-module and main-with-deps are pre-loaded in NS1; zot is configured there at NS init time.
+    // This test focuses on registry-specific packaging-type filtering behavior.
+    set packagingNS = ..GetOrCreateSharedNS1()
 
-    new $namespace
-    set $namespace = packagingNS
-
-    // publish-database: packages as database .tgz and uploads to zot in one step
-    set sc = ##class(%IPM.Main).Shell("publish-database all-resources-module -r zot -v")
-    do $$$AssertStatusOK(sc, "Published all-resources-module as database package to zot")
-
-    // Fresh install namespace — separate globals DB so dismount during swap is safe
+    // Create a fresh install namespace for all install steps
     set installNS = "TESTDBORASINSTNS"
     set sc = ..CreateTestNamespace(installNS)
     do $$$AssertStatusOK(sc, "Created ORAS install namespace")
 
+    new $namespace
     set $namespace = installNS
-
     set sc = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
     do $$$AssertStatusOK(sc, "Configured zot registry in install NS")
 
-    set sc = ##class(%IPM.Main).Shell("install all-resources-module -swap-db")
-    do $$$AssertStatusOK(sc, "Installed all-resources-module from zot registry")
+    // --- Pre-test cleanup: purge any stale versions from a prior run ---
+    set $namespace = packagingNS
+    do ##class(%IPM.Main).Shell("unpublish zot/dep-module all -f")
+    do ##class(%IPM.Main).Shell("unpublish zot/main-with-deps all -f")
 
-    // Compiled classes from routines DB (DB swap)
-    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("AllResources.Main"), "AllResources.Main class exists after registry install")
-    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("AllResources.Generated"), "AllResources.Generated class exists after registry install")
+    // --- Publish phase (all publishes first, then installs) ---
 
-    // Include file constant accessible
-    set result = ##class(AllResources.Main).Process()
-    do $$$AssertTrue(result [ "TestValue", "Include file constant accessible after registry install")
+    // Step 1: publish dep-module as source to zot
+    set sc = ##class(%IPM.Main).Shell("publish dep-module -r zot")
+    do $$$AssertStatusOK(sc, "Published dep-module as source to zot")
 
-    // Generated resource works
-    set genResult = ##class(AllResources.Generated).GetGeneratedValue()
-    do $$$AssertEquals(genResult, "Generated resource value", "Generated resource class works after registry install")
+    // Step 2: publish dep-module as database to zot
+    set sc = ##class(%IPM.Main).Shell("publish-database dep-module -r zot")
+    do $$$AssertStatusOK(sc, "Published dep-module as database to zot")
 
-    // Python wheel (colorama) installed via PythonWheel resource processor (Initialize phase)
-    set coloramaVersion = ..GetPythonVersion("colorama")
-    do $$$AssertTrue(coloramaVersion '= "", "colorama wheel installed after registry install")
+    // Step 3: publish main-with-deps as source to zot (exercises dependency filtering path)
+    set sc = ##class(%IPM.Main).Shell("publish main-with-deps -r zot")
+    do $$$AssertStatusOK(sc, "Published main-with-deps as source to zot")
 
-    // WebApplication created by resource processor hook at install time
-    new $namespace
-    set $namespace = "%SYS"
-    set webAppExists = ##class(Security.Applications).Exists("/allresources")
+    // --- Install phase ---
     set $namespace = installNS
-    do $$$AssertTrue(webAppExists, "WebApplication /allresources created after registry install")
 
-    // Module record: packaging must be database
-    set mod = ##class(%IPM.Storage.Module).NameOpen("all-resources-module", , .modSC)
-    do $$$AssertStatusOK(modSC, "Module record accessible after registry install")
-    do $$$AssertEquals(mod.Packaging, "database", "Module packaging is database after registry install")
+    // Step 4: install without -swap-db → should install source package
+    set sc = ##class(%IPM.Main).Shell("install dep-module")
+    do $$$AssertStatusOK(sc, "Installed dep-module (source) without -swap-db")
+    set mod = ##class(%IPM.Storage.Module).NameOpen("dep-module", , .modSC)
+    do $$$AssertStatusOK(modSC, "dep-module record accessible after source install")
+    do $$$AssertEquals(mod.Packaging, "module", "dep-module packaging is module (source) after non-swap-db install")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "DepModule.Core class exists after source install")
+    set sc = ##class(%IPM.Main).Shell("uninstall dep-module -f")
+    do $$$AssertStatusOK(sc, "Uninstalled dep-module before next step")
+
+    // Step 5: install with -swap-db → should install database package
+    set sc = ##class(%IPM.Main).Shell("install dep-module -swap-db")
+    do $$$AssertStatusOK(sc, "Installed dep-module with -swap-db")
+    set mod = ##class(%IPM.Storage.Module).NameOpen("dep-module", , .modSC)
+    do $$$AssertStatusOK(modSC, "dep-module record accessible after database install")
+    do $$$AssertEquals(mod.Packaging, "database", "dep-module packaging is database after -swap-db install")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "DepModule.Core class exists after database install")
+    set sc = ##class(%IPM.Main).Shell("uninstall dep-module -f")
+    do $$$AssertStatusOK(sc, "Uninstalled dep-module (database) before next step")
+
+    // Step 6: install main-with-deps → dep-module should resolve as source
+    set sc = ##class(%IPM.Main).Shell("install main-with-deps")
+    do $$$AssertStatusOK(sc, "Installed main-with-deps (source)")
+    set depMod = ##class(%IPM.Storage.Module).NameOpen("dep-module", , .depModSC)
+    do $$$AssertStatusOK(depModSC, "dep-module record accessible after main-with-deps install")
+    do $$$AssertEquals(depMod.Packaging, "module", "dep-module resolved as source when installing main-with-deps")
+    set sc = ##class(%IPM.Main).Shell("uninstall main-with-deps -f")
+    do $$$AssertStatusOK(sc, "Uninstalled main-with-deps")
+    set sc = ##class(%IPM.Main).Shell("uninstall dep-module -f")
+    do $$$AssertStatusOK(sc, "Uninstalled dep-module after main-with-deps test")
+
+    // Step 7: unpublish only the source version of dep-module, leaving database tag intact
+    set $namespace = packagingNS
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/dep-module 1.0.0 -f")
+    do $$$AssertStatusOK(sc, "Unpublished source version of dep-module from zot")
+
+    // Step 8: install without -swap-db → should fail with helpful error pointing to -swap-db
+    set $namespace = installNS
+    set sc = ##class(%IPM.Main).Shell("install dep-module")
+    do $$$AssertTrue($$$ISERR(sc), "Install dep-module without -swap-db fails when only database package available")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "-swap-db", "Error message references -swap-db flag")
+
+    // --- Cleanup ---
+    // Unpublish all remaining versions of dep-module and main-with-deps from zot
+    set $namespace = packagingNS
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/dep-module all -f")
+    // Ignore error — database tag may already be gone if step 7 deleted all
+    set sc = ##class(%IPM.Main).Shell("unpublish zot/main-with-deps all -f")
+    // Ignore error — already cleaned up above
+}
+
+/// Verifies that package-database overwrites an existing SystemRequirements Version
+/// with the current IRIS version and emits a warning when the versions differ.
+Method TestSystemRequirementsOverwrite()
+{
+    set packagingNS = ..GetOrCreateSharedNS1()
+
+    // Build a previous-major IRIS version string dynamically to avoid hardcoding invalid values
+    set prevIrisVersion = ($system.Version.GetMajor() - 1) _ "." _ $system.Version.GetMinor()
+    set currentIrisVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
+
+    // Read XData template before switching namespaces — %Dictionary.CompiledXData looks up
+    // class metadata in the current namespace, and the test class is not compiled in packagingNS.
+    set xData = ##class(%Dictionary.CompiledXData).IDKEYOpen($classname(), "SimpleModuleWithSysReqTemplate", , .sc)
+    $$$ThrowOnError(sc)
+    set rawXML = ""
+    while 'xData.Data.AtEnd {
+        set rawXML = rawXML _ xData.Data.Read()
+    }
+    set rawXML = $replace(rawXML, "REPLACEPREVIRISVERSION", prevIrisVersion)
+
+    new $namespace
+    set $namespace = packagingNS
+
+    // simple-db-module is already loaded in NS1. Temporarily overwrite its on-disk module.xml
+    // with one that declares the previous IRIS version in SystemRequirements, package it,
+    // then restore the original. This avoids re-loading (which would enforce SystemRequirements).
+    set mod = ##class(%IPM.Storage.Module).NameOpen("simple-db-module", , .sc)
+    $$$ThrowOnError(sc)
+    set moduleXMLPath = ##class(%Library.File).NormalizeFilename("module.xml", mod.Root)
+
+    // Read and preserve the original module.xml
+    set origStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(origStream.LinkToFile(moduleXMLPath))
+    set origXML = origStream.Read(, .sc)
+    $$$ThrowOnError(sc)
+
+    set writeStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(writeStream.LinkToFile(moduleXMLPath))
+    $$$ThrowOnError(writeStream.Clear())
+    $$$ThrowOnError(writeStream.Write(rawXML))
+    $$$ThrowOnError(writeStream.%Save())
+
+    // Package as database — should overwrite SystemRequirements Version with current IRIS version
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
+
+    // Restore original module.xml unconditionally before asserting, so a failure doesn't leave
+    // the shared NS in a broken state for subsequent tests
+    set restoreStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(restoreStream.LinkToFile(moduleXMLPath))
+    $$$ThrowOnError(restoreStream.Clear())
+    $$$ThrowOnError(restoreStream.Write(origXML))
+    $$$ThrowOnError(restoreStream.%Save())
+
+    do $$$AssertStatusOK(sc, "Packaged simple-db-module with overwrite of SystemRequirements Version")
+
+    // Extract and read the packaged module.xml
+    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
+    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-sysreq")
+    if '##class(%Library.File).CreateDirectory(extractDir) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create extract dir: " _ extractDir))
+    }
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir, .extractOutput)
+    do $$$AssertStatusOK(sc, "Extracted package for SystemRequirements verification")
+
+    set readStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(readStream.LinkToFile(extractDir _ "module.xml"))
+    set pkgXML = readStream.Read()
+
+    set tHasCurrentVersion = (pkgXML [ ("Version=""" _ currentIrisVersion _ """"))
+    set tLacksPrevVersion = '(pkgXML [ ("Version=""" _ prevIrisVersion _ """"))
+    do $$$AssertTrue(tHasCurrentVersion, "Packaged module.xml has current IRIS version in SystemRequirements")
+    do $$$AssertTrue(tLacksPrevVersion, "Packaged module.xml does not contain previous IRIS version")
+
+    // Cleanup
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)
 }
 
 /// Get the installed version of a Python package.
@@ -1283,6 +1399,26 @@ ClassMethod PurgePythonPackage(name As %String)
     set target = ##class(%Library.File).NormalizeDirectory("python", ##class(%Library.File).ManagerDirectory())
     do ..DeletePath(target _ name)
     do ..DeletePattern(target, name _ "-*" _ ".dist-info")
+}
+
+/// Template module.xml for TestSystemRequirementsOverwrite.
+/// REPLACEPREVIRISVERSION is substituted at runtime with a dynamically computed previous IRIS version.
+XData SimpleModuleWithSysReqTemplate
+{
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="simple-db-module.ZPM">
+    <Module>
+      <Name>simple-db-module</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <SystemRequirements Version="REPLACEPREVIRISVERSION"/>
+      <Resource Name="SimpleModule.Main.CLS" />
+      <Resource Name="SimpleModule.Utils.CLS" />
+    </Module>
+  </Document>
+</Export>
 }
 
 }
