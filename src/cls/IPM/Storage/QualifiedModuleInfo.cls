@@ -22,6 +22,8 @@ Method %OnNew(
         set ..PlatformVersions = pResolvedReference.PlatformVersions
         set ..VersionString = pResolvedReference.VersionString
         set ..AllVersions = pResolvedReference.AllVersions
+        set ..IPMPackaging = pResolvedReference.IPMPackaging
+        set ..PlatformVersion = pResolvedReference.PlatformVersion
     }
     quit $$$OK
 }
@@ -64,6 +66,9 @@ Storage Default
 </Value>
 <Value name="12">
 <Value>DisplayName</Value>
+</Value>
+<Value name="13">
+<Value>IPMPackaging</Value>
 </Value>
 </Data>
 <Type>%Storage.Serial</Type>
