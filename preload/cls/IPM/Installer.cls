@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class IPM.Installer Extends %Projection.AbstractProjection
 {
 
@@ -487,7 +489,7 @@ ClassMethod InstallScripts() As %Status
     }
     try {
         // The scripts are staged under ${ipmdir}bin/ by <FileCopy> in module.xml.
-        set module = ##class(%IPM.Storage.Module).NameOpen("ZPM", , .openSC)
+        set module = ##class(%IPM.Storage.Module).NameOpen($$$IPMModuleName, , .openSC)
         $$$ThrowOnError(openSC)
         if '$isobject(module) {
             write !,"Could not resolve module directory for script installation."

@@ -1,44 +1,73 @@
 #!/bin/bash
 
-# ipm: convenience wrapper to run a ZPM command in an IRIS session
-# Usage examples:
-#   ipm isc.genai test -only
-#   ipm -U PLAZA isc.genai test -only
+# ipm: convenience wrapper to run an IPM command in an IRIS session
+#
+# Usage: ipm [-U <namespace>] [-i <instance>] <IPM command and args...>
+#
+# Options:
+#   -U <namespace>   IRIS namespace to run in (default: USER, or $IRIS_NAMESPACE / $IRISNAMESPACE)
+#   -i <instance>    IRIS instance name (default: $ISC_PACKAGE_INSTANCENAME, then "iris")
+#   -h, --help       Show this help message
+#
+# Examples:
+#   ipm list                         # list all installed modules
+#   ipm install MyModule             # install a module from the registry
+#   ipm test MyModule -only          # run tests for a module
+#   ipm -U USER list                 # run in a specific namespace
+#   ipm -i iris list                 # run against a specific IRIS instance
 
+# Arrays to accumulate iris session flags and the IPM command tokens
 ARGS=()
 CMD=()
 
-# Allow namespace via env like iriscli
+# Default instance: prefer the container-standard env var, fall back to "iris"
+INSTANCE="${ISC_PACKAGE_INSTANCENAME:-iris}"
+
+# Seed ARGS with a namespace from the environment if one is set
 if [ -n "$IRIS_NAMESPACE" ]; then
   ARGS+=( -U "$IRIS_NAMESPACE" )
 elif [ -n "$IRISNAMESPACE" ]; then
   ARGS+=( -U "$IRISNAMESPACE" )
 fi
 
-# Optional leading -U <ns>
-if [ "$1" = "-U" ] && [ -n "$2" ]; then
-  ARGS+=( -U "$2" )
-  shift 2
-fi
-
-# Remaining args compose the ZPM command string
+# Parse command-line arguments
 while [[ $# -gt 0 ]]; do
-  CMD+=( "$1" )
-  shift
+  case "$1" in
+    -h|--help)
+      # Print the comment block at the top of this file, stripping the leading "# "
+      sed -n '3,17p' "$0" | sed 's/^# \?//'
+      exit 0
+      ;;
+    -U)
+      # Explicit -U overrides any namespace set from the environment
+      ARGS=( -U "$2" )
+      shift 2
+      ;;
+    -i)
+      INSTANCE="$2"
+      shift 2
+      ;;
+    *)
+      # All remaining arguments form the IPM command string
+      CMD+=( "$1" )
+      shift
+      ;;
+  esac
 done
 
 if [ ${#CMD[@]} -eq 0 ]; then
-  echo "Usage: ipm [ -U <NAMESPACE> ] <zpm command and args...>" >&2
+  echo "Usage: ipm [-U <namespace>] [-i <instance>] <IPM command and args...>" >&2
+  echo "       ipm --help for more information" >&2
   exit 1
 fi
 
-# Join CMD array into a single string
+# Join the CMD array into a single string for the ObjectScript zpm call
 CMDSTR="${CMD[*]}"
-# Escape quotes for ObjectScript string literal
+# Escape any double-quotes in the command string ("" is a literal " in ObjectScript strings)
 CMDSTR_ESC=${CMDSTR//\"/\"\"}
 
-# Build an OS snippet and feed to iris session
+# Pipe the zpm command into iris session; :1:1 flags suppress the session banner and prompt
 (
   echo "zpm \"${CMDSTR_ESC}\":1:1"
   echo "halt"
-) | iris session ${ISC_PACKAGE_INSTANCENAME:-iris} "${ARGS[@]}"
+) | iris session "$INSTANCE" "${ARGS[@]}"
