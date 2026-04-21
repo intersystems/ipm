@@ -18,6 +18,14 @@ Method OnPhase(
 	ByRef pParams,
 	Output pResourceHandled As %Boolean = 0) As %Status
 {
+    if (pPhase = "Clean") {
+        // Mark as handled to prevent fallback to generic cleanup
+        // which tries to delete wheels as Studio documents
+        // TODO: actually cleanup the python wheel. This is non-trivial because we don't want to delete the wheel if it's shared with other modules
+        set pResourceHandled = 1
+        quit $$$OK
+    }
+
     if (pPhase '= "Initialize") {
         set pResourceHandled = 0
         quit $$$OK

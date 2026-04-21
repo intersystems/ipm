@@ -103,4 +103,31 @@ Method TestPublishWithoutDevMode()
   do ..DeployedItemsHelper(1)
 }
 
+Method TestDeployedDependencies()
+{
+    do ..SetupModule()
+
+    set tmpDir = $$$FileTempDir _ "package"
+    set sc = ##class(%IPM.Main).Shell("package " _..#ModuleName _ " -v -export-deps 1 -path " _ tmpDir)
+    do $$$AssertStatusOK(sc, "Successfully packaged module to "_tmpDir)
+
+    // Uninstall modules and delete repos, then load from tarball
+    set sc = ##class(%IPM.Main).Shell("uninstall -all")
+    do $$$AssertStatusOK(sc, "Successfully uninstalled modules")
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc, "Successfully deleted repos")
+    set sc = ##class(%IPM.Main).Shell("load -v "_tmpDir_".tgz")
+    do $$$AssertStatusOK(sc, "Successfully loaded module with deployed items at "_tmpDir)
+
+    // Check the class properties to confirm loaded as deployed
+    set baseClass = ##class(%Dictionary.ClassDefinition).%OpenId("DeployableTest.Main")
+    do $$$AssertTrue(baseClass.Deployed, "Base class deployed.")
+    set depClass = ##class(%Dictionary.ClassDefinition).%OpenId("DeployableDepTest.Main")
+    do $$$AssertTrue(depClass.Deployed, "Dep class deployed.")
+
+    // Uninstall module and reset registry
+    do ..UninstallModule()
+    do ..RestoreDefaultRegistry()
+}
+
 }

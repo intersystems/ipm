@@ -51,6 +51,20 @@ Method OnCustomPhase(
     quit $$$OK
 }
 
+Method OnPhase(
+	pPhase As %String,
+	ByRef pParams,
+	Output pResourceHandled As %Boolean = 0) As %Status
+{
+    // CPF resources don't need any cleanup during Clean phase
+    // Mark as handled to prevent the generic resource cleanup code from trying to delete them
+    // as if they were classes/routines, which causes error `#5006: File name is invalid`
+    if (pPhase = "Clean") {
+        set pResourceHandled = 1
+    }
+    quit $$$OK
+}
+
 Method DoMerge(ByRef pParams) As %Status
 {
     set tempFile = ""

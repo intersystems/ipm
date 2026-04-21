@@ -8,6 +8,7 @@ Method TestCPFMerge()
     set moduleDir = ..GetModuleDir(..#TargetModuleName)
 
     // During load, only the config-globals.cpf file should be merged
+    set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .pLoadOutput)
@@ -79,6 +80,7 @@ Method TestSystemExpressions()
     do $$$AssertStatusOK(sc, "Loaded module successfully")
 
     // Run the custom phase that merges the CPF with system expressions
+    set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set sc = ##class(%IPM.Main).Shell("cpf-merge testsystemexpressions -v -only")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .pOutput)

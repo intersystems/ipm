@@ -114,7 +114,7 @@ ClassMethod LoadModuleReference(
 
         // Ensure requested versions match those required by other modules in the namespace, excluding versions currently being installed
         // (the requirements of such modules are already known to be satisfied)
-        set tSC = ..GetRequiredVersionExpression(pModuleName,,.tExpression,.tSourceList)
+        set tSC = ..GetRequiredVersionExpression(pModuleName,,.pDependencyGraph,.tExpression,.tSourceList)
         if $$$ISERR(tSC) {
             quit
         }
@@ -352,36 +352,79 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
+/// 
+/// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
+/// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
-	pModuleName As %String,
-	pExcludeModules As %List = "",
-	Output pExpression As %IPM.General.SemanticVersionExpression,
-	Output pSourceList As %List) As %Status
+	moduleName As %String,
+	excludeModules As %List = "",
+	ByRef dependencyGraph,
+	Output expression As %IPM.General.SemanticVersionExpression,
+	Output sourceList As %List) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
-        set pExpression = ##class(%IPM.General.SemanticVersionExpression).%New()
-        set pSourceList = ""
-
-        set tResult = ##class(%IPM.Storage.Module).VersionRequirementsFunc(pModuleName,pExcludeModules)
-        if (tResult.%SQLCODE < 0) {
-            $$$ThrowStatus($$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message))
+        // Add modules from the dependency graph to the excludeModules list
+        if ($data(dependencyGraph)) {
+            do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
+            set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
+            for i = 1:1:flatDepList.Count() {
+                set excludeModules = excludeModules _ $listbuild(flatDepList.GetAt(i).Name)
+            }
         }
 
-        while tResult.%Next(.tSC) {
-            $$$ThrowOnError(tSC)
-            set tVersion = tResult.%Get("Version")
-            $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(tVersion,.tVersionExpr))
-            set pExpression = pExpression.And(tVersionExpr)
-            set pSourceList = pSourceList_$listbuild($listtostring(tResult.%Get("ModuleNames"),", ")_": "_tVersion)
+        set expression = ##class(%IPM.General.SemanticVersionExpression).%New()
+        set sourceList = ""
+
+        set result = ##class(%IPM.Storage.Module).VersionRequirementsFunc(moduleName,excludeModules)
+        if (result.%SQLCODE < 0) {
+            $$$ThrowStatus($$$ERROR($$$SQLCode,result.%SQLCODE,result.%Message))
         }
-        $$$ThrowOnError(tSC)
+
+        while result.%Next(.sc) {
+            $$$ThrowOnError(sc)
+            set version = result.%Get("Version")
+            $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(version,.versionExpr))
+            set expression = expression.And(versionExpr)
+            set sourceList = sourceList_$listbuild($listtostring(result.%Get("ModuleNames"),", ")_": "_version)
+        }
+        $$$ThrowOnError(sc)
+
+        // Add modules from the dependency graph to the expression and sourceList objects
+        if ($data(dependencyGraph)) {
+            set key = ""
+            for {
+                set key = $order(dependencyGraph(moduleName, key))
+                if (key = "") {
+                    quit
+                }
+                // Name of module which requires this one + the version expression string it requires
+                set requiringModuleName = $piece(key, " ")
+                set version = dependencyGraph(moduleName, key)
+
+                // Iterate over sourceList; if the required version expression is equivalent to this one, add this module name to that version
+                set newVersion = 1
+                for i=1:1:$listlength(sourceList) {
+                    if $find($listget(sourceList, i), version) {
+                        set $list(sourceList, i) = requiringModuleName _ ", " _ $list(sourceList, i)
+                        set newVersion = 0
+                        quit
+                    }
+                }
+                // If this is a new required version expression, add a new item to the list
+                if (newVersion) {
+                    $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(version, .versionExpr))
+                    set expression = expression.And(versionExpr)
+                    set sourceList = sourceList _ $listbuild(requiringModuleName _ ": " _ version)
+                }
+            }
+        }
     } catch e {
-        set pExpression = $$$NULLOREF
-        set pSourceList = ""
-        set tSC = e.AsStatus()
+        set expression = $$$NULLOREF
+        set sourceList = ""
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 /// Returns a flat list of dependents for a given module name (and optional version) <br />
@@ -1285,7 +1328,7 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, .dependencyGraph)
         $$$ThrowOnError(sc)
     }
 
@@ -1437,15 +1480,18 @@ ClassMethod AddPackageMapping(
 ClassMethod RemovePackageMapping(
 	pNamespace As %String,
 	pMapping As %String,
-	pSkipActivation As %Boolean = 0) As %Status
+	pSkipActivation As %Boolean = 0,
+	ByRef changed As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set changed = 0
     try {
         set tPrevNS = $namespace
         new $namespace
         set $namespace = "%SYS"
         if ##class(Config.MapPackages).Exists(pNamespace,pMapping) {
             $$$ThrowOnError(##class(Config.MapPackages).Delete(pNamespace,pMapping,,$$$CPFSave))
+            set changed = 1
             if 'pSkipActivation {
                 new $namespace
                 set $namespace = tPrevNS
@@ -1453,9 +1499,9 @@ ClassMethod RemovePackageMapping(
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod AddRoutineMapping(
@@ -1496,9 +1542,11 @@ ClassMethod RemoveRoutineMapping(
 	pNamespace As %String,
 	pMapping As %String,
 	pType As %String = "ALL",
-	pSkipActivation As %Boolean = 0) As %Status
+	pSkipActivation As %Boolean = 0,
+	ByRef changed As %Boolean = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set changed = 0
     try {
         set tPrevNS = $namespace
         new $namespace
@@ -1506,6 +1554,7 @@ ClassMethod RemoveRoutineMapping(
         set pMapping = pMapping_$select(pType="ALL":"",1:"_"_pType)
         if ##class(Config.MapRoutines).Exists(pNamespace,pMapping) {
             $$$ThrowOnError(##class(Config.MapRoutines).Delete(pNamespace,pMapping,,$$$CPFSave))
+            set changed = 1
             if 'pSkipActivation {
                 new $namespace
                 set $namespace = tPrevNS
@@ -1513,9 +1562,9 @@ ClassMethod RemoveRoutineMapping(
             }
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 ClassMethod AddGlobalMapping(
@@ -1666,6 +1715,55 @@ ClassMethod ActivateMappings(pNamespace = {$namespace}) As %Status [ Internal ]
         set tSC = ex.AsStatus()
     }
     quit tSC
+}
+
+/// Activate configuration changes for multiple namespaces in a single operation.
+/// namespaces(ns)=1 for each namespace to activate.
+ClassMethod PerformBatchActivation(
+	ByRef namespaces,
+	useTransactions As %Boolean = 1,
+	verbose As %Boolean = 0) As %Status [ Internal ]
+{
+    set sc = $$$OK
+    set initTLevel = $tlevel
+    try {
+        set interruptManager = ##class(%IPM.Utils.InterruptManager).%New()
+        do interruptManager.DisableInterrupts()
+
+        if useTransactions {
+            tstart
+        }
+
+        new $namespace
+        set $namespace = "%SYS"
+        $$$ThrowOnError(##class(Config.CPF).Write())
+        $$$ThrowOnError(##class(Config.Map).MoveToActive())
+
+        set ns = ""
+        for {
+            set ns = $order(namespaces(ns))
+            quit:(ns = "")
+            if '##class(Config.Namespaces).Exists(ns) {
+                if verbose {
+                    write !, "Namespace "_ns_" does not exist; skipping activation."
+                }
+                continue
+            }
+            $$$ThrowOnError(##class(Config.Namespaces).Load(ns))
+        }
+
+        if useTransactions {
+            tcommit
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+
+    while ($tlevel > initTLevel) {
+        trollback 1
+    }
+
+    quit sc
 }
 
 /// Copy a package from one namespace to another. This works whether or not the contents of
@@ -1850,6 +1948,8 @@ ClassMethod EndCaptureOutput(
     } else {
         #; Otherwise switch redirection off
         do $zutil(82,12,0)
+        #; Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
+        use $io::("")
     }
 
     try {
