@@ -1,5 +1,3 @@
-Include %IPM.Common
-
 Class IPM.Installer Extends %Projection.AbstractProjection
 {
 
@@ -10,6 +8,10 @@ Parameter VERSION;
 
 /// Number of files for autoinstall release
 Parameter FILESCOUNT = 0;
+
+/// IPM's own module name. Mirrors $$$IPMModuleName in %IPM.Common — duplicated here
+/// because this class is loaded during bootstrapping before that include is available.
+Parameter MODULENAME = "zpm";
 
 /// Application Definition
 XData PM [ XMLNamespace = INSTALLER ]
@@ -489,7 +491,7 @@ ClassMethod InstallScripts() As %Status
     }
     try {
         // The scripts are staged under ${ipmdir}bin/ by <FileCopy> in module.xml.
-        set module = ##class(%IPM.Storage.Module).NameOpen($$$IPMModuleName, , .openSC)
+        set module = ##class(%IPM.Storage.Module).NameOpen(..#MODULENAME, , .openSC)
         $$$ThrowOnError(openSC)
         if '$isobject(module) {
             write !,"Could not resolve module directory for script installation."
