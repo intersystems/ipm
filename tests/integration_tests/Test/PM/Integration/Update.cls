@@ -662,4 +662,65 @@ Method TestDevModePropagation()
     do $$$AssertEquals(dep.DeveloperMode, 0)
 }
 
+/// Test case to make sure that update doesn't fail due to version errors that get resolved as a part of update
+/// i.e. - Module A 2.0.0 requires Module B ^1.0.0
+///      - Module A 2.1.0 requires Module B ^2.0.0
+///      - Pre-Update: Module A 2.0.0, Module B 1.0.0
+///      - Post-Update: Module A 2.1.0, Module B 2.0.0
+///      - Don't want a version error to be thrown in flight when Module A is 2.1.0 and Module B is still 1.0.0
+Method TestDependencyVersionsUpdated()
+{
+    // Define variables for this test
+    set modA = "module-a"
+    set modB = "module-b"
+    set modC = "module-c"
+    set modD = "module-d"
+
+    set modAPreVersion = "2.0.0"
+    set modBPreVersion = "1.0.0"
+    set modCPreVersion = "5.6.45+snapshot"
+
+    set modAPostVersion = "2.1.0+snapshot"
+    set modBPostVersion = "2.0.0+snapshot"
+    set modCPostVersion = "6.2.0+snapshot"
+
+    // Install base module module-a
+    set sc = ##class(%IPM.Main).Shell("install -v " _ modA _ " " _ modAPreVersion)
+    do $$$AssertStatusOK(sc, "Successfully installed " _ modA _ " " _ modAPreVersion)
+
+    // Confirm that module-a and dependencies were installed with the correct versions
+    set mod = ##class(%IPM.Storage.Module).NameOpen(modA)
+    do $$$AssertEquals(mod.Version.ToString(), modAPreVersion, "Module " _ modA _ " correctly installed as " _ modAPreVersion)
+    set mod = ##class(%IPM.Storage.Module).NameOpen(modB)
+    do $$$AssertEquals(mod.Version.ToString(), modBPreVersion, "Module " _ modB _ " correctly installed as " _ modBPreVersion)
+    set mod = ##class(%IPM.Storage.Module).NameOpen(modC)
+    do $$$AssertEquals(mod.Version.ToString(), modCPreVersion, "Module " _ modC _ " correctly installed as " _ modCPreVersion)
+
+    // Install module-d prior to update
+    set sc = ##class(%IPM.Main).Shell("install -v " _ modD)
+    do $$$AssertStatusOK(sc, "Successfully installed " _ modD)
+
+    // Update base module module-a. Update should error due to version incompatabilities caused by module-d
+    set sc = ##class(%IPM.Main).Shell("update -v " _ modA _ " " _ modAPostVersion)
+    do $$$AssertStatusNotOK(sc, "Updating " _ modA _ " fails due to version errors with previously installed " _ modD)
+
+    // Uninstall module-d then try the update again
+    set sc = ##class(%IPM.Main).Shell("uninstall -v " _ modD)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled " _ modD)
+    set sc = ##class(%IPM.Main).Shell("update -v " _ modA _ " " _ modAPostVersion)
+    do $$$AssertStatusOK(sc, "Successfully updated " _ modA _ " and its dependencies")
+
+    // Confirm that module-a and dependencies were updated to the correct versions
+    set mod = ##class(%IPM.Storage.Module).NameOpen(modA)
+    do $$$AssertEquals(mod.Version.ToString(), modAPostVersion, "Module " _ modA _ " correctly installed as " _ modAPostVersion)
+    set mod = ##class(%IPM.Storage.Module).NameOpen(modB)
+    do $$$AssertEquals(mod.Version.ToString(), modBPostVersion, "Module " _ modB _ " correctly installed as " _ modBPostVersion)
+    set mod = ##class(%IPM.Storage.Module).NameOpen(modC)
+    do $$$AssertEquals(mod.Version.ToString(), modCPostVersion, "Module " _ modC _ " correctly installed as " _ modCPostVersion)
+
+    // Uninstall module-a and dependencies
+    set sc = ##class(%IPM.Main).Shell("uninstall -r " _ modA)
+    do $$$AssertStatusOK(sc, "Successfully uninstalled " _ modA _ " and dependencies")
+}
+
 }
