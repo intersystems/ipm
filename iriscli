@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# iriscli: convenience wrapper to open an IRIS terminal session or run a script file
+#
+# Usage: iriscli [-U <namespace>] [-i <instance>] [<script file> [param...]]
+#
+# Options:
+#   -U <namespace>   IRIS namespace to connect to (default: $IRIS_NAMESPACE / $IRISNAMESPACE)
+#   -i <instance>    IRIS instance name (default: $ISC_PACKAGE_INSTANCENAME, then "iris")
+#   -h, --help       Show this help message
+#
+# Examples:
+#   iriscli                          # interactive session
+#   iriscli -U USER                  # interactive session in USER namespace
+#   iriscli -i iris                  # interactive session on a named instance
+#   iriscli /path/to/script.script   # run a script file and halt
+#   iriscli /path/to/script.script arg1 arg2  # run with params exposed as params(1), params(2)
+#
+# Script file format: ObjectScript, one command per line; blank lines and lines
+# starting with ;, #, or // are ignored.
+
+# Arrays to accumulate iris session flags and script parameters
+ARGS=()
+PARAMS=()
+
+# Default instance: prefer the container-standard env var, fall back to "iris"
+INSTANCE="${ISC_PACKAGE_INSTANCENAME:-iris}"
+
+# Path to the script file to run (empty = interactive mode)
+file=
+
+# Seed ARGS with a namespace from the environment if one is set
+if [ -n "$IRIS_NAMESPACE" ]; then
+    ARGS+=( -U "$IRIS_NAMESPACE" )
+elif [ -n "$IRISNAMESPACE" ]; then
+    ARGS+=( -U "$IRISNAMESPACE" )
+fi
+
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            # Print the comment block at the top of this file, stripping the leading "# "
+            sed -n '3,20p' "$0" | sed 's/^# \?//'
+            exit 0
+            ;;
+        -U)
+            # Explicit -U overrides any namespace set from the environment
+            ARGS=( -U "$2" )
+            shift 2
+            ;;
+        -i)
+            INSTANCE="$2"
+            shift 2
+            ;;
+        *)
+            # First non-flag argument that is an existing file becomes the script to run;
+            # everything after that is treated as a parameter passed into the script.
+            if [ -z "$file" ] && [ -f "$1" ]; then
+                file=$1
+            else
+                PARAMS+=("$1")
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [ -n "$file" ]; then
+    # Script mode: pipe ObjectScript into iris session and halt when done.
+    # The subshell groups all input so iris session receives it as a single stdin stream.
+    (
+        # Expose any extra arguments as params(1), params(2), ... in ObjectScript.
+        # Double-quotes inside param values are escaped by doubling them ("" is a literal " in ObjectScript strings).
+        for param in "${PARAMS[@]}"; do
+            echo "Set params(\$i(params)) = \"${param//\"/\"\"}\""
+        done
+        # Strip comment lines (starting with ;, #, //) and blank lines before feeding to IRIS
+        grep -Ev '^(;|#|//)' "$file" | grep -v '^$'
+        echo halt
+    ) | iris session "$INSTANCE" "${ARGS[@]}"
+else
+    # Interactive mode: just open a session
+    iris session "$INSTANCE" "${ARGS[@]}"
+fi

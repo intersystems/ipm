@@ -9,3 +9,5 @@
 *.mac text eol=lf
 *.int text eol=lf
 Dockerfil* text eol=lf
+ipm text eol=lf
+iriscli text eol=lf
