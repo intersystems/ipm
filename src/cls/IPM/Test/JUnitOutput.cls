@@ -1,39 +1,40 @@
-Class %IPM.Test.JUnitOutput
+Class %IPM.Test.JUnitOutput Extends %IPM.Test.Abstract
 {
 
 ClassMethod ToFile(
-	pFileName As %String,
-	pTestIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+	fileName As %String,
+	caseStatus As %String = "",
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
 {
     set tSC = $$$OK
     try {
         set tFile = ##class(%Stream.FileCharacter).%New()
         set tFile.TranslateTable="UTF8"
-        do tFile.LinkToFile(pFileName)
+        do tFile.LinkToFile(fileName)
 
         kill ^||TMP // results global
         set tSuite=""
         for {
-            set tSuite=$order(^UnitTest.Result(pTestIndex,tSuite),1,tSuiteData)
+            set tSuite=$order(^UnitTest.Result(testIndex,tSuite),1,tSuiteData)
             quit:tSuite=""
             set ^||TMP("S",tSuite,"time")=$listget(tSuiteData,2)
 
             set tCase=""
             for {
-                set tCase=$order(^UnitTest.Result(pTestIndex,tSuite,tCase),1,tCaseData)
+                set tCase=$order(^UnitTest.Result(testIndex,tSuite,tCase),1,tCaseData)
                 quit:tCase=""
 
                 do $increment(^||TMP("S",tSuite,"tests"))
                 set ^||TMP("S",tSuite,"C",tCase,"time")=$listget(tCaseData,2)
                 set tMethod=""
                 for {
-                    set tMethod=$order(^UnitTest.Result(pTestIndex,tSuite,tCase,tMethod),1,tMethodData)
+                    set tMethod=$order(^UnitTest.Result(testIndex,tSuite,tCase,tMethod),1,tMethodData)
                     quit:tMethod=""
 
                     set ^||TMP("S",tSuite,"C",tCase,"M",tMethod,"time")=$listget(tMethodData,2)
                     set tAssert=""
                     for {
-                        set tAssert=$order(^UnitTest.Result(pTestIndex,tSuite,tCase,tMethod,tAssert),1,tAssertData)
+                        set tAssert=$order(^UnitTest.Result(testIndex,tSuite,tCase,tMethod,tAssert),1,tAssertData)
                         quit:tAssert=""
 
                         do $increment(^||TMP("S",tSuite,"assertions"))
@@ -131,7 +132,29 @@ ClassMethod ToFile(
     } catch e {
         set tSC = e.AsStatus()
     }
-    quit $$$OK
+    quit tSC
+}
+
+ClassMethod OutputToDevice(
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+	testStatus As %String = "") As %Status
+{
+    set sc = $$$OK
+    try {
+        set result = ..GetAllTestResultsFunc(testIndex)
+        set currentID = ""
+        while result.%Next() {
+            if currentID = "" {
+                set currentID = testIndex
+                write !,"JUnit Test Run #"_testIndex_" ("_result.namespace_") "_result.duration_"s "_result.testDateTime
+                write !
+            }
+            write !,result.suiteName_"/"_result.testcaseName_"/"_result.methodName_" "_result.assertAction_" ["_result.assertStatus_"]"
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    return sc
 }
 
 }

@@ -355,6 +355,8 @@ Method TestUninstallWithoutModuleName()
 /// Specifies the serialization format (json, toon, yaml) for unit and integration test results in the shell.
 Method TestReportFormatConfiguration()
 {
+    set originalFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+
     do ..RunCommand("config set TestReportFormat json")
     set format = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
     do $$$AssertEquals(format, "json", "Verify TestReportFormat is set to JSON")
@@ -362,6 +364,13 @@ Method TestReportFormatConfiguration()
     do ..RunCommand("config set TestReportFormat yaml")
     set format = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
     do $$$AssertEquals(format, "yaml", "Verify TestReportFormat is set to YAML")
+
+    // Restore original value so this test doesn't pollute subsequent tests
+    if originalFormat'="" {
+        do ..RunCommand("config set TestReportFormat "_originalFormat)
+    } else {
+        do ..RunCommand("config reset TestReportFormat")
+    }
 }
 
 }

@@ -3,21 +3,21 @@ Class %IPM.Test.Abstract Extends %RegisteredObject
 {
 
 ClassMethod ToFile(
-	FileName As %String,
-	CaseStatus As %String = "",
-	TestIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status [ Abstract ]
+	fileName As %String,
+	caseStatus As %String = "",
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status [ Abstract ]
 {
 }
 
 ClassMethod OutputToDevice(
-	TestIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-	TestStatus As %String = "") [ Abstract ]
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+	testStatus As %String = "") As %Status [ Abstract ]
 {
 }
 
 Query FilteredTestResults(
-	Instance As %Integer,
-	TestStatus) As %SQLQuery(ROWSPEC = "TotalCounts:%Integer,namespace:%String,duration:%String,testDateTime:%String,suiteName:%String,testcaseName:%String,methodName:%String,testMethod:%String,assertAction:%String,assertCounter:%Integer,assertDescription:%String,assertLocation:%String", SELECTMODE = "DISPLAY")
+	instance As %Integer,
+	testStatus) As %SQLQuery(ROWSPEC = "TotalCounts:%Integer,namespace:%String,duration:%String,testDateTime:%String,suiteName:%String,testcaseName:%String,methodName:%String,testMethod:%String,assertAction:%String,assertCounter:%Integer,assertDescription:%String,assertLocation:%String,assertStatus:%String", SELECTMODE = "DISPLAY")
 {
 SELECT
     count(*) as TotalCounts,
@@ -31,17 +31,18 @@ SELECT
     tassert.Action AS assertAction,
     tassert.Counter AS assertCounter,
     tassert.Description AS assertDescription,
-    tassert.Location AS assertLocation
+    tassert.Location AS assertLocation,
+    tassert.Status AS assertStatus
 FROM
 %UnitTest_Result.TestInstance tinstance
 JOIN %UnitTest_Result.TestSuite tsuite ON tsuite.TestInstance=tinstance.ID
 JOIN %UnitTest_Result.TestCase tcase  ON tcase.TestSuite=tsuite.ID
 JOIN %UnitTest_Result.TestMethod tmethod ON tmethod.TestCase=tcase.ID
 JOIN %UnitTest_Result.TestAssert tassert ON tassert.TestMethod=tmethod.ID
-WHERE tinstance.ID=:Instance AND tassert.Status=:TestStatus
+WHERE tinstance.ID=:instance AND tassert.Status=:testStatus
 }
 
-Query GetAllTestResults(Instance As %Integer) As %SQLQuery(ROWSPEC = "TotalCounts:%String,namespace:%String,duration:%String,testDateTime:%String,suiteName:%String,testcaseName:%String,methodName:%String,testMethod:%String,assertAction:%String,assertCounter:%Integer,assertDescription:%String,assertLocation:%String", SELECTMODE = "DISPLAY")
+Query GetAllTestResults(instance As %Integer) As %SQLQuery(ROWSPEC = "TotalCounts:%String,namespace:%String,duration:%String,testDateTime:%String,suiteName:%String,testcaseName:%String,methodName:%String,testMethod:%String,assertAction:%String,assertCounter:%Integer,assertDescription:%String,assertLocation:%String,assertStatus:%String", SELECTMODE = "DISPLAY")
 {
 SELECT
     count(*) as TotalCounts,
@@ -55,14 +56,15 @@ SELECT
     tassert.Action AS assertAction,
     tassert.Counter AS assertCounter,
     tassert.Description AS assertDescription,
-    tassert.Location AS assertLocation
+    tassert.Location AS assertLocation,
+    tassert.Status AS assertStatus
 FROM
 %UnitTest_Result.TestInstance tinstance
 JOIN %UnitTest_Result.TestSuite tsuite ON tsuite.TestInstance=tinstance.ID
 JOIN %UnitTest_Result.TestCase tcase  ON tcase.TestSuite=tsuite.ID
 JOIN %UnitTest_Result.TestMethod tmethod ON tmethod.TestCase=tcase.ID
 JOIN %UnitTest_Result.TestAssert tassert ON tassert.TestMethod=tmethod.ID
-WHERE tinstance.ID=:Instance
+WHERE tinstance.ID=:instance
 }
 
 }

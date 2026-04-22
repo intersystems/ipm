@@ -2,16 +2,16 @@ Class %IPM.Test.JsonOutput Extends %IPM.Test.Abstract
 {
 
 ClassMethod ToFile(
-	FileName As %String,
-	TestStatus As %String = "",
-	TestIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+	fileName As %String,
+	caseStatus As %String = "",
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
 {
     set sc = $$$OK
     try {
         set fileStream = ##class(%Stream.FileCharacter).%New()
         set fileStream.TranslateTable = "UTF8"
-        $$$ThrowOnError(fileStream.LinkToFile(FileName))
-        set responseJson = ..JSON(TestIndex, TestStatus)
+        $$$ThrowOnError(fileStream.LinkToFile(fileName))
+        set responseJson = ..JSON(testIndex, caseStatus)
         if $isobject(responseJson) {
             do fileStream.Write(responseJson.%ToJSON())
         }
@@ -23,12 +23,12 @@ ClassMethod ToFile(
 }
 
 ClassMethod OutputToDevice(
-	TestIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-	pCaseStatus As %String = "") As %Status
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+	caseStatus As %String = "") As %Status
 {
     set sc = $$$OK
     try {
-        set responseJson = ..JSON(TestIndex, pCaseStatus)
+        set responseJson = ..JSON(testIndex, caseStatus)
         write !
         if $isobject(responseJson) {
             do responseJson.%ToJSON()
@@ -40,28 +40,28 @@ ClassMethod OutputToDevice(
 }
 
 ClassMethod JSON(
-	TestIndex As %Integer,
-	TestStatus As %String) As %DynamicObject
+	testIndex As %Integer,
+	testStatus As %String) As %DynamicObject
 {
-    if TestStatus'="" {
-        set tResult = ..FilteredTestResultsFunc(TestIndex, TestStatus)
+    if testStatus'="" {
+        set result = ..FilteredTestResultsFunc(testIndex, testStatus)
     } else {
-         set tResult = ..GetAllTestResultsFunc(TestIndex)
+         set result = ..GetAllTestResultsFunc(testIndex)
     }
     set unitTest = {}
     set unitTest.results = []
     set (previousID,currentSuite,currentTestcase,suiteObj,testcaseObj) = ""
 
-    while tResult.%Next() {
+    while result.%Next() {
         if previousID = "" {
-            set unitTest.id = TestIndex
-            set unitTest.namespace = tResult.namespace
-            set unitTest.duration = tResult.duration
-            set unitTest.testDateTime = tResult.testDateTime
+            set unitTest.id = testIndex
+            set unitTest.namespace = result.namespace
+            set unitTest.duration = result.duration
+            set unitTest.testDateTime = result.testDateTime
         }
-        set previousID = TestIndex
-        if tResult.suiteName '= currentSuite {
-            set currentSuite = tResult.suiteName
+        set previousID = testIndex
+        if result.suiteName '= currentSuite {
+            set currentSuite = result.suiteName
             set suiteObj = {
                 "suiteName": (currentSuite),
                 "testcases": []
@@ -69,8 +69,8 @@ ClassMethod JSON(
             do unitTest.results.%Push(suiteObj)
             set currentTestcase = ""
         }
-        if tResult.testcaseName '= currentTestcase {
-            set currentTestcase = tResult.testcaseName
+        if result.testcaseName '= currentTestcase {
+            set currentTestcase = result.testcaseName
             set testcaseObj = {
                 "testcaseName": (currentTestcase),
                 "methods": []
@@ -78,12 +78,13 @@ ClassMethod JSON(
             do suiteObj.testcases.%Push(testcaseObj)
         }
         set methodObj = {
-            "methodName": (tResult.methodName),
-            "testMethod": (tResult.testMethod),
-            "assertAction": (tResult.assertAction),
-            "assertCounter": (tResult.assertCounter),
-            "assertDescription": (tResult.assertDescription),
-            "assertLocation": (tResult.assertLocation)
+            "methodName": (result.methodName),
+            "testMethod": (result.testMethod),
+            "assertAction": (result.assertAction),
+            "assertCounter": (result.assertCounter),
+            "assertDescription": (result.assertDescription),
+            "assertLocation": (result.assertLocation),
+            "assertStatus": (result.assertStatus)
         }
         do testcaseObj.methods.%Push(methodObj)
     }

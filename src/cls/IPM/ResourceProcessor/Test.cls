@@ -213,22 +213,17 @@ Method OnPhase(
             write !
             if $data(pParams("outputformat"),outputFormat)||('tVerbose) {
                 write !,"Test result summary",!
+                // CLI flag takes precedence; fall back to global config, then default to Toon
                 set defaultOutputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
-                if defaultOutputFormat'="" {
-                    set outputFormat = defaultOutputFormat
-                }
-                else {
-                    if $get(outputFormat)="" {
-                        set outputFormat="Toon"
-                    }
+                if $get(outputFormat)="" {
+                    set outputFormat = $select(defaultOutputFormat'="":defaultOutputFormat,1:"Toon")
                 }
 
                 set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
                 if '$$$defClassDefined(outputClass) {
-                    $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputType_" output format does not exist."))
+                    $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputFormat_" output format does not exist."))
                 }
-                set defaultTestStatus = "failed"
-                set sc = $classmethod(outputClass,"OutputToDevice",,defaultTestStatus)
+                set sc = $classmethod(outputClass,"OutputToDevice",,"failed")
                 $$$ThrowOnError(sc)
                 write !
             }

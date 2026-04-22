@@ -7,11 +7,14 @@
 Class Test.PM.Unit.TestResultsOPFormatAndFileGenTest Extends %UnitTest.TestCase
 {
 
+Method TestFail()
+{
+    do $$$AssertFailure("This test is designed to fail to validate the test framework's ability to capture failures.")
+}
+
 /// generate .yaml,.json,.toon files
 Method TestResultFileGeneration()
 {
-    #define NormalizeFilename(%file)  ##class(%File).NormalizeFilename(%file)
-
     do $$$LogMessage("This file generation picks the last or current unit test id and generate the reports")
 
     set fileDir = ##class(%File).NormalizeDirectory($get(^UnitTestRoot)_"/test-reports/")
@@ -21,25 +24,29 @@ Method TestResultFileGeneration()
     }
 
     do $$$LogMessage("Start generating the reports")
-    set fileName = $$$NormalizeFilename(fileDir_"/test.yaml")
+
+    set fileName = ##class(%File).NormalizeFilename(fileDir_"test.yaml")
     set status = ##class(%IPM.Test.YamlOutput).ToFile(fileName)
     do $$$AssertStatusOK(status,"yaml file generated successfully in "_fileDir)
+    do $$$AssertTrue(##class(%File).GetFileSize(fileName)>0,"yaml file is non-empty")
 
-    set fileName = $$$NormalizeFilename(fileDir_"/test.Json")
+    set fileName = ##class(%File).NormalizeFilename(fileDir_"test.json")
     set status = ##class(%IPM.Test.JsonOutput).ToFile(fileName)
     do $$$AssertStatusOK(status,"Json file generated successfully in "_fileDir)
+    do $$$AssertTrue(##class(%File).GetFileSize(fileName)>0,"json file is non-empty")
 
-    set fileName = $$$NormalizeFilename(fileDir_"/test.toon")
+    set fileName = ##class(%File).NormalizeFilename(fileDir_"test.toon")
     set status = ##class(%IPM.Test.ToonOutput).ToFile(fileName)
     do $$$AssertStatusOK(status,"Toon file generated successfully in "_fileDir)
+    do $$$AssertTrue(##class(%File).GetFileSize(fileName)>0,"toon file is non-empty")
 
     do ..ShowGeneratedFilesAndCleaup(fileDir)
 }
 
-Method ShowGeneratedFilesAndCleaup(FileDir As %String)
+Method ShowGeneratedFilesAndCleaup(fileDir As %String)
 {
     do $$$LogMessage("Display the generated unit test report files")
-    set fileSet = ##class(%File).FileSetFunc(FileDir)
+    set fileSet = ##class(%File).FileSetFunc(fileDir)
     while fileSet.%Next() {
         set file = fileSet.Name
         set fileNames(file) = fileSet.ItemName
