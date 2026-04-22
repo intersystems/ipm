@@ -20,15 +20,34 @@ ClassMethod ToFile(
 }
 
 ClassMethod OutputToDevice(
-	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-	testStatus As %String = "") As %Status
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
 {
     set sc = $$$OK
     try {
-        set yamlStream = ..YAML(testIndex, testStatus)
+        set summary = ..GetSummary(testIndex)
         write !
-        while 'yamlStream.AtEnd {
-            write yamlStream.Read()
+        write !,"summary:"
+        write !,"  id: "_summary.id
+        write !,"  namespace: """_summary.namespace_""""
+        write !,"  duration: "_summary.duration
+        write !,"  testDateTime: """_summary.testDateTime_""""
+        write !,"  methods:"
+        write !,"    total: "_summary.methods.total
+        write !,"    passed: "_summary.methods.passed
+        write !,"    failed: "_summary.methods.failed
+        write !,"  assertions:"
+        write !,"    total: "_summary.assertions.total
+        write !,"    passed: "_summary.assertions.passed
+        write !,"    failed: "_summary.assertions.failed
+
+        if summary.methods.failed > 0 {
+            write !
+            write !,"failures:"
+            set failureStream = ..YAML(testIndex, "failed", 0)
+            do failureStream.Rewind()
+            while 'failureStream.AtEnd {
+                write !,failureStream.ReadLine()
+            }
         }
     } catch ex {
         set sc = ex.AsStatus()
@@ -38,25 +57,28 @@ ClassMethod OutputToDevice(
 
 ClassMethod YAML(
 	testIndex = {$order(^UnitTest.Result(""),-1)},
-	testStatus As %String = "") As %Stream.TmpCharacter
+	testStatus As %String = "",
+	includeHeader As %Boolean = 1) As %Stream.TmpCharacter
 {
-	if testStatus'="" {
+    if testStatus '= "" {
         set result = ..FilteredTestResultsFunc(testIndex, testStatus)
     } else {
         set result = ..GetAllTestResultsFunc(testIndex)
     }
     set yamlStream = ##class(%Stream.TmpCharacter).%New()
-    set (currentID,currentSuite,currentTestcase) = ""
+    set (currentID, currentSuite, currentTestcase) = ""
     while result.%Next() {
         if currentID = "" {
             set currentID = testIndex
-            do yamlStream.WriteLine("unitTest:")
-            do yamlStream.WriteLine("  id: "_testIndex)
-            do yamlStream.WriteLine("  namespace: """_result.namespace_"""")
-            do yamlStream.WriteLine("  duration: "_result.duration)
-            do yamlStream.WriteLine("  testDateTime: """_result.testDateTime_"""")
-            do yamlStream.WriteLine()
-            do yamlStream.WriteLine("  results:")
+            if includeHeader {
+                do yamlStream.WriteLine("unitTest:")
+                do yamlStream.WriteLine("  id: "_testIndex)
+                do yamlStream.WriteLine("  namespace: """_result.namespace_"""")
+                do yamlStream.WriteLine("  duration: "_result.duration)
+                do yamlStream.WriteLine("  testDateTime: """_result.testDateTime_"""")
+                do yamlStream.WriteLine()
+                do yamlStream.WriteLine("  results:")
+            }
         }
         if result.suiteName '= currentSuite {
             set currentSuite = result.suiteName

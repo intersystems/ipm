@@ -12,28 +12,35 @@ ClassMethod ToFile(
         set fileStream.TranslateTable = "UTF8"
         $$$ThrowOnError(fileStream.LinkToFile(fileName))
 
-        if caseStatus'="" {
+        if caseStatus '= "" {
             set result = ..FilteredTestResultsFunc(testIndex, caseStatus)
         } else {
             set result = ..GetAllTestResultsFunc(testIndex)
         }
 
-        set currentID=""
+        set rowCount = 0
+        set (ns, duration, testDateTime) = ""
+        set rowStream = ##class(%Stream.TmpCharacter).%New()
         while result.%Next() {
-            if currentID = "" {
-                set currentID = testIndex
-                do fileStream.WriteLine("unitTest:")
-                do fileStream.WriteLine("  id: "_testIndex)
-                do fileStream.WriteLine("  namespace: "_result.namespace)
-                do fileStream.WriteLine("  duration: "_result.duration)
-                do fileStream.WriteLine("  testDateTime: "_result.testDateTime)
-                do fileStream.WriteLine()
-                do fileStream.WriteLine("results["_result.TotalCounts_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:")
+            if rowCount = 0 {
+                set ns = result.namespace
+                set duration = result.duration
+                set testDateTime = result.testDateTime
             }
+            set rowCount = rowCount + 1
             set data = "  "_result.suiteName_","_result.testcaseName_","_result.methodName_","_result.assertStatus_","_
                     result.assertAction_","_result.assertCounter_","""_$translate(result.assertDescription,"""")_""","""_result.assertLocation_""""
-            do fileStream.WriteLine(data)
+            do rowStream.WriteLine(data)
         }
+
+        do fileStream.WriteLine("unitTest:")
+        do fileStream.WriteLine("  id: "_testIndex)
+        do fileStream.WriteLine("  namespace: "_ns)
+        do fileStream.WriteLine("  duration: "_duration)
+        do fileStream.WriteLine("  testDateTime: "_testDateTime)
+        do fileStream.WriteLine()
+        do fileStream.WriteLine("results["_rowCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:")
+        do fileStream.CopyFrom(rowStream)
         $$$ThrowOnError(fileStream.%Save())
     } catch ex {
         set sc = ex.AsStatus()
@@ -42,31 +49,27 @@ ClassMethod ToFile(
 }
 
 ClassMethod OutputToDevice(
-	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-	testStatus As %String = "") As %Status
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
 {
     set sc = $$$OK
     try {
-        if testStatus'="" {
-            set result = ..FilteredTestResultsFunc(testIndex, testStatus)
-        } else {
-            set result = ..GetAllTestResultsFunc(testIndex)
-        }
-        set currentID=""
-        while result.%Next() {
-            if currentID = "" {
-                set currentID = testIndex
-                write !,"unitTest:"
-                write !,"  id: "_testIndex
-                write !,"  namespace: "_result.namespace
-                write !,"  duration: "_result.duration
-                write !,"  testDateTime: "_result.testDateTime
-                write !
-                write !,"results["_result.TotalCounts_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:"
+        set summary = ..GetSummary(testIndex)
+        write !
+        write !,"summary:"
+        write !,"  id: "_summary.id_"  namespace: "_summary.namespace_"  duration: "_summary.duration_"  testDateTime: "_summary.testDateTime
+        write !,"  methods["_summary.methods.total_"]: "_summary.methods.passed_" passed, "_summary.methods.failed_" failed"
+        write !,"  assertions["_summary.assertions.total_"]: "_summary.assertions.passed_" passed, "_summary.assertions.failed_" failed"
+
+        if summary.methods.failed > 0 {
+            set result = ..FilteredTestResultsFunc(testIndex, "failed")
+            set currentID = ""
+            write !
+            write !,"failures["_summary.assertions.failed_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:"
+            while result.%Next() {
+                set data = "  "_result.suiteName_","_result.testcaseName_","_result.methodName_","_result.assertStatus_","_
+                        result.assertAction_","_result.assertCounter_","""_$translate(result.assertDescription,"""")_""","""_result.assertLocation_""""
+                write !,data
             }
-            set data = "  "_result.suiteName_","_result.testcaseName_","_result.methodName_","_result.assertStatus_","_
-                    result.assertAction_","_result.assertCounter_","""_$translate(result.assertDescription,"""")_""","""_result.assertLocation_""""
-            write !,data
         }
     } catch ex {
         set sc = ex.AsStatus()

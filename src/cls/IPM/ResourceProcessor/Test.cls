@@ -189,30 +189,28 @@ Method OnPhase(
             zkill ^UnitTestRoot
             $$$ThrowOnError(tSC)
 
-             if $data(pParams("UnitTest"))>1 {
-                set outputType=""
-                for {
-                    set outputType = $order(pParams("UnitTest",outputType),1,fileName)
-                    quit:outputType=""
-                    set tPostfix = "-"_$$$lcase(pPhase)_"-"
-                    if (..Package '= "") {
-                        set tPostfix = tPostfix_$replace(..Package,".","-")_"-PKG"
-                    } elseif (..Class '= "") {
-                        set tPostfix = tPostfix_$replace(..Class,".","-")_"-CLS"
-                    }
-                    set outputClass = "%IPM.Test."_outputType
-                    if '$$$defClassDefined(outputClass) {
-                        $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputType_" output format does not exist."))
-                    }
-                    set extension = $select(outputType="JsonOutput":".json",outputType="ToonOutput":".toon",outputType="YamlOutput":".yaml",1:".xml")
-                    set fileName = $piece(fileName,".",1,*-1)_tPostfix_extension
-                    set tSC = $classmethod(outputClass,"ToFile",fileName)
-                    $$$ThrowOnError(tSC)
+            set testIndex = $order(^UnitTest.Result(""),-1)
+            if $data(pParams("outputfile"), outputFile) {
+                set fileExtension = $zconvert($piece(outputFile,".",*),"L")
+                set outputClass = $case(fileExtension,
+                    "json":"%IPM.Test.JsonOutput",
+                    "yaml":"%IPM.Test.YamlOutput",
+                    "toon":"%IPM.Test.ToonOutput",
+                    "xml":"%IPM.Test.JUnitOutput",
+                    :"")
+                if outputClass = "" {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported output-file extension '."_fileExtension_"'. Use .json, .yaml, .toon, or .xml."))
                 }
+                set outputDir = ##class(%File).GetDirectory(outputFile)
+                if outputDir '= "" {
+                    $$$ThrowOnError(##class(%File).CreateDirectoryChain(outputDir))
+                }
+                set tSC = $classmethod(outputClass,"ToFile",outputFile)
+                $$$ThrowOnError(tSC)
             }
             write !
             if $data(pParams("outputformat"),outputFormat)||('tVerbose) {
-                write !,"Test result summary",!
+                write !,"Test Result Summary",!
                 // CLI flag takes precedence; fall back to global config, then default to Toon
                 set defaultOutputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
                 if $get(outputFormat)="" {
@@ -223,8 +221,8 @@ Method OnPhase(
                 if '$$$defClassDefined(outputClass) {
                     $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputFormat_" output format does not exist."))
                 }
-                set sc = $classmethod(outputClass,"OutputToDevice",,"failed")
-                $$$ThrowOnError(sc)
+                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex)
+                $$$ThrowOnError(tSC)
                 write !
             }
             // By default, detect and report unit test failures as an error from this phase

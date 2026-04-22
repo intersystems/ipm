@@ -1,66 +1,138 @@
-/// Unit Test Class to validate the ZPM 'test' command output configuration.
-/// This class ensures two primary functions work correctly:
-/// 1. <b>Console Formatting:</b> Verifies the `-f` / `-output` flags correctly
-///    format test results for terminal display (e.g., YAML, JSON).
-/// 2. <b>File Generation:</b> Verifies the `-DUnitTest.<Format>Output` definitions
-///    successfully create and populate the structured results files (e.g., .json, .yaml, .toon).
+/// Unit tests for the ZPM test output format classes.
+/// Verifies that each format produces structurally valid, non-trivial output
+/// against the most recent test run at the time the tests execute.
 Class Test.PM.Unit.TestResultsOPFormatAndFileGenTest Extends %UnitTest.TestCase
 {
 
-Method TestFail()
+/// Temp directory for generated report files, created in OnBeforeAllTests.
+Property ReportDir As %String(MAXLEN = 512);
+
+/// Index of the most recent completed run before this test class starts.
+/// Captured in OnBeforeAllTests so TestGetSummaryHasCounts is not sensitive
+/// to which test method runs first.
+Property PriorRunIndex As %Integer;
+
+Method OnBeforeAllTests() As %Status
 {
-    do $$$AssertFailure("This test is designed to fail to validate the test framework's ability to capture failures.")
+    set dir = ##class(%File).NormalizeDirectory($get(^UnitTestRoot)_"/test-reports/")
+    if '##class(%File).DirectoryExists(dir) {
+        set sc = ##class(%File).CreateDirectoryChain(dir)
+        if $$$ISERR(sc) {
+            return sc
+        }
+    }
+    set ..ReportDir = dir
+    // Walk back one from the current (in-progress) run to get a completed run
+    // with populated SQL result tables.
+    set currentIndex = $order(^UnitTest.Result(""), -1)
+    set ..PriorRunIndex = $order(^UnitTest.Result(currentIndex), -1)
+    return $$$OK
 }
 
-/// generate .yaml,.json,.toon files
-Method TestResultFileGeneration()
+Method OnAfterAllTests() As %Status
 {
-    do $$$LogMessage("This file generation picks the last or current unit test id and generate the reports")
-
-    set fileDir = ##class(%File).NormalizeDirectory($get(^UnitTestRoot)_"/test-reports/")
-    if '##class(%File).DirectoryExists(fileDir){
-        set status = ##class(%File).CreateDirectoryChain(fileDir)
-        do $$$AssertStatusOK(status,"Directory created: "_fileDir)
+    if ##class(%File).DirectoryExists(..ReportDir) {
+        do ##class(%File).RemoveDirectoryTree(..ReportDir)
     }
-
-    do $$$LogMessage("Start generating the reports")
-
-    set fileName = ##class(%File).NormalizeFilename(fileDir_"test.yaml")
-    set status = ##class(%IPM.Test.YamlOutput).ToFile(fileName)
-    do $$$AssertStatusOK(status,"yaml file generated successfully in "_fileDir)
-    do $$$AssertTrue(##class(%File).GetFileSize(fileName)>0,"yaml file is non-empty")
-
-    set fileName = ##class(%File).NormalizeFilename(fileDir_"test.json")
-    set status = ##class(%IPM.Test.JsonOutput).ToFile(fileName)
-    do $$$AssertStatusOK(status,"Json file generated successfully in "_fileDir)
-    do $$$AssertTrue(##class(%File).GetFileSize(fileName)>0,"json file is non-empty")
-
-    set fileName = ##class(%File).NormalizeFilename(fileDir_"test.toon")
-    set status = ##class(%IPM.Test.ToonOutput).ToFile(fileName)
-    do $$$AssertStatusOK(status,"Toon file generated successfully in "_fileDir)
-    do $$$AssertTrue(##class(%File).GetFileSize(fileName)>0,"toon file is non-empty")
-
-    do ..ShowGeneratedFilesAndCleaup(fileDir)
+    return $$$OK
 }
 
-Method ShowGeneratedFilesAndCleaup(fileDir As %String)
+Method TestJsonOutputStructure()
 {
-    do $$$LogMessage("Display the generated unit test report files")
-    set fileSet = ##class(%File).FileSetFunc(fileDir)
-    while fileSet.%Next() {
-        set file = fileSet.Name
-        set fileNames(file) = fileSet.ItemName
-        do $$$LogMessage("Generated file "_file)
+    set testIndex = $order(^UnitTest.Result(""), -1)
+    set fileName = ##class(%File).NormalizeFilename(..ReportDir_"test.json")
+
+    set status = ##class(%IPM.Test.JsonOutput).ToFile(fileName, "", testIndex)
+    do $$$AssertStatusOK(status, "JsonOutput.ToFile succeeded")
+    do $$$AssertTrue(##class(%File).GetFileSize(fileName) > 0, "JSON file is non-empty")
+
+    set fileStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(fileStream.LinkToFile(fileName))
+    set parsed = ##class(%DynamicAbstractObject).%FromJSON(fileStream)
+    do $$$AssertTrue($isobject(parsed), "JSON output is parseable")
+    do $$$AssertTrue(parsed.id '= "", "JSON output has an id field")
+    do $$$AssertTrue(parsed.namespace '= "", "JSON output has a namespace field")
+    do $$$AssertTrue($isobject(parsed.results), "JSON output has a results array")
+}
+
+Method TestYamlOutputStructure()
+{
+    set testIndex = $order(^UnitTest.Result(""), -1)
+    set fileName = ##class(%File).NormalizeFilename(..ReportDir_"test.yaml")
+
+    set status = ##class(%IPM.Test.YamlOutput).ToFile(fileName, "", testIndex)
+    do $$$AssertStatusOK(status, "YamlOutput.ToFile succeeded")
+    do $$$AssertTrue(##class(%File).GetFileSize(fileName) > 0, "YAML file is non-empty")
+
+    set fileStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(fileStream.LinkToFile(fileName))
+    set content = ""
+    while 'fileStream.AtEnd {
+        set content = content _ fileStream.ReadLine() _ $char(10)
     }
-    do $$$LogMessage("Started Cleanup the generated unit test report files")
-    set file = ""
-    for {
-        set file = $order(fileNames(file),1,fileName)
-        quit:file=""
-        set status = ##class(%File).Delete(file)
-        do $$$AssertStatusOK(status," File '"_fileName_"' has been deleted successfully")
+    do $$$AssertTrue(content [ "unitTest:", "YAML output has unitTest header")
+    do $$$AssertTrue(content [ "id: ", "YAML output has id field")
+    do $$$AssertTrue(content [ "namespace:", "YAML output has namespace field")
+    do $$$AssertTrue(content [ "results:", "YAML output has results section")
+}
+
+Method TestToonOutputStructure()
+{
+    set testIndex = $order(^UnitTest.Result(""), -1)
+    set fileName = ##class(%File).NormalizeFilename(..ReportDir_"test.toon")
+
+    set status = ##class(%IPM.Test.ToonOutput).ToFile(fileName, "", testIndex)
+    do $$$AssertStatusOK(status, "ToonOutput.ToFile succeeded")
+    do $$$AssertTrue(##class(%File).GetFileSize(fileName) > 0, "Toon file is non-empty")
+
+    set fileStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(fileStream.LinkToFile(fileName))
+    set content = ""
+    while 'fileStream.AtEnd {
+        set content = content _ fileStream.ReadLine() _ $char(10)
     }
-    do $$$LogMessage("File cleanup completed")
+    do $$$AssertTrue(content [ "unitTest:", "Toon output has unitTest header")
+    do $$$AssertTrue(content [ "results[", "Toon output has results header with row count")
+    do $$$AssertTrue(content [ "{suiteName,", "Toon output has column header line")
+}
+
+Method TestJUnitOutputStructure()
+{
+    set testIndex = $order(^UnitTest.Result(""), -1)
+    set fileName = ##class(%File).NormalizeFilename(..ReportDir_"test.xml")
+
+    set status = ##class(%IPM.Test.JUnitOutput).ToFile(fileName, "", testIndex)
+    do $$$AssertStatusOK(status, "JUnitOutput.ToFile succeeded")
+    do $$$AssertTrue(##class(%File).GetFileSize(fileName) > 0, "JUnit XML file is non-empty")
+
+    set fileStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(fileStream.LinkToFile(fileName))
+    set content = ""
+    while 'fileStream.AtEnd {
+        set content = content _ fileStream.ReadLine() _ $char(10)
+    }
+    do $$$AssertTrue(content [ "<?xml", "JUnit output starts with XML declaration")
+    do $$$AssertTrue(content [ "<testsuites>", "JUnit output has <testsuites> root element")
+    do $$$AssertTrue(content [ "<testsuite", "JUnit output has at least one <testsuite> element")
+    do $$$AssertTrue(content [ "</testsuites>", "JUnit output has closing </testsuites> element")
+}
+
+Method TestGetSummaryHasCounts()
+{
+    set testIndex = ..PriorRunIndex
+    if testIndex = "" {
+        do $$$LogMessage("No prior test run available; skipping GetSummary count check")
+        quit
+    }
+
+    set summary = ##class(%IPM.Test.Abstract).GetSummary(testIndex)
+    do $$$AssertTrue($isobject(summary), "GetSummary returns an object")
+    do $$$AssertTrue($isobject(summary.methods), "Summary has a methods sub-object")
+    do $$$AssertTrue($isobject(summary.assertions), "Summary has an assertions sub-object")
+    do $$$AssertTrue(summary.methods.total > 0, "Summary reports at least one method")
+    do $$$AssertTrue(summary.assertions.total > 0, "Summary reports at least one assertion")
+    do $$$AssertEquals(summary.methods.passed + summary.methods.failed, summary.methods.total, "Method counts add up")
+    do $$$AssertEquals(summary.assertions.passed + summary.assertions.failed, summary.assertions.total, "Assertion counts add up")
 }
 
 }

@@ -23,16 +23,18 @@ ClassMethod ToFile(
 }
 
 ClassMethod OutputToDevice(
-	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-	caseStatus As %String = "") As %Status
+	testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
 {
     set sc = $$$OK
     try {
-        set responseJson = ..JSON(testIndex, caseStatus)
-        write !
-        if $isobject(responseJson) {
-            do responseJson.%ToJSON()
+        set summary = ..GetSummary(testIndex)
+        set failures = ..JSON(testIndex, "failed")
+        set output = {
+            "summary": (summary),
+            "failures": (failures.results)
         }
+        write !
+        do output.%ToJSON()
     } catch ex {
         set sc = ex.AsStatus()
     }
