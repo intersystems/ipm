@@ -210,7 +210,7 @@ Method OnPhase(
             }
             write !
             if $data(pParams("outputformat"),outputFormat)||('tVerbose) {
-                write !,"Test Result Summary",!
+                write !,"Test Result Summary"
                 // CLI flag takes precedence; fall back to global config, then default to Toon
                 set defaultOutputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
                 if $get(outputFormat)="" {

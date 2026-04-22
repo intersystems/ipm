@@ -49,6 +49,7 @@ ClassMethod LoadTestDirectory(
 }
 
 /// Returns $$$OK if the last unit test run was successful, or an error if it was unsuccessful.
+/// Uses ^UnitTest.Result directly so that lifecycle/hook/throw failures are counted alongside assertion failures.
 ClassMethod GetLastStatus(Output pFailureCount As %Integer) As %Status
 {
     set tSC = $$$OK
@@ -58,31 +59,10 @@ ClassMethod GetLastStatus(Output pFailureCount As %Integer) As %Status
         }
         kill ^||%UnitTest.Manager.LastResult // Clean up
         if tLogIndex {
-            set tRes = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
-                "from %UnitTest_Result.TestAssert where Status = 0 "_
-                "and TestMethod->TestCase->TestSuite->TestInstance->InstanceIndex = ?",tLogIndex)
-            if (tRes.%SQLCODE < 0) {
-                throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-            }
-            do tRes.%Next(.tSC)
-            $$$ThrowOnError(tSC)
-            set pFailureCount = tRes.%GetData(1)
+            set summary = ##class(%IPM.Test.Abstract).GetSummary(tLogIndex)
+            set pFailureCount = summary.methods.failed
             if (pFailureCount > 0) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("%1 assertion(s) failed.",pFailureCount))
-            } else {
-                // Double check that no other failures were reported - e.g., failures loading that would lead to no assertions passing or failing!
-                set tRes = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
-                    "from %UnitTest_Result.TestSuite where Status = 0 "_
-                    "and TestInstance->InstanceIndex = ?",tLogIndex)
-                if (tRes.%SQLCODE < 0) {
-                    throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-                }
-                do tRes.%Next(.tSC)
-                $$$ThrowOnError(tSC)
-                set pFailureCount = tRes.%GetData(1)
-                if (pFailureCount > 0) {
-                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("%1 test suite(s) failed.",pFailureCount))
-                }
+                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("%1 failure(s).",pFailureCount))
             }
         } else {
             set tSC = $$$ERROR($$$GeneralError,"No unit test results recorded.")
@@ -104,27 +84,27 @@ ClassMethod OutputFailures()
         if 'tLogIndex {
             quit
         }
-        set tLogGN = $name(^UnitTest.Result(tLogIndex))
-        set tRoot = ""
-        for {
-            set tRoot = $order(@tLogGN@(tRoot))
-            quit:tRoot=""
-            set tSuite = ""
-            for {
-                set tSuite = $order(@tLogGN@(tRoot, tSuite))
-                quit:tSuite=""
-                set tMethod = ""
-                for {
-                    set tMethod = $order(@tLogGN@(tRoot, tSuite, tMethod))
-                    quit:tMethod=""
-
-                    set tAssert = ""
-                    for {
-                        set tAssert = $order(@tLogGN@(tRoot, tSuite, tMethod, tAssert), 1, tAssertInfo)
-                        quit:tAssert=""
-                        set $listbuild(status, type, text) = tAssertInfo
-                        continue:status
-                        write !,$$$FormattedLine($$$Red, "FAILED " _ tSuite _ ":" _ tMethod), ": " _ type _ " - " _ text
+        set tree = ##class(%IPM.Test.Abstract).BuildResultTree(tLogIndex)
+        set suiteIter = tree.suites.%GetIterator()
+        while suiteIter.%GetNext(, .suiteObj) {
+            set caseIter = suiteObj.cases.%GetIterator()
+            while caseIter.%GetNext(, .caseObj) {
+                // Case-level failure (e.g. OnBeforeAllTests) — no methods ran
+                if caseObj.error '= "" {
+                    write !,$$$FormattedLine($$$Red, "FAILED " _ suiteObj.name _ ":" _ caseObj.name), ": " _ caseObj.error
+                }
+                set methodIter = caseObj.methods.%GetIterator()
+                while methodIter.%GetNext(, .methodObj) {
+                    if methodObj.status '= "failed" { continue }
+                    // Method-level lifecycle/throw failure (no assert row)
+                    if methodObj.error '= "" {
+                        write !,$$$FormattedLine($$$Red, "FAILED " _ suiteObj.name _ ":" _ methodObj.name), ": " _ methodObj.error
+                    }
+                    // Individual assertion failures
+                    set assertIter = methodObj.asserts.%GetIterator()
+                    while assertIter.%GetNext(, .assertObj) {
+                        if assertObj.status '= "failed" { continue }
+                        write !,$$$FormattedLine($$$Red, "FAILED " _ suiteObj.name _ ":" _ methodObj.name), ": " _ assertObj.action _ " - " _ assertObj.description
                     }
                 }
             }

@@ -42,7 +42,7 @@ Method TestJsonOutputStructure()
     set testIndex = $order(^UnitTest.Result(""), -1)
     set fileName = ##class(%File).NormalizeFilename(..ReportDir_"test.json")
 
-    set status = ##class(%IPM.Test.JsonOutput).ToFile(fileName, "", testIndex)
+    set status = ##class(%IPM.Test.JsonOutput).ToFile(fileName, testIndex)
     do $$$AssertStatusOK(status, "JsonOutput.ToFile succeeded")
     do $$$AssertTrue(##class(%File).GetFileSize(fileName) > 0, "JSON file is non-empty")
 
@@ -52,7 +52,7 @@ Method TestJsonOutputStructure()
     do $$$AssertTrue($isobject(parsed), "JSON output is parseable")
     do $$$AssertTrue(parsed.id '= "", "JSON output has an id field")
     do $$$AssertTrue(parsed.namespace '= "", "JSON output has a namespace field")
-    do $$$AssertTrue($isobject(parsed.results), "JSON output has a results array")
+    do $$$AssertTrue($isobject(parsed.suites), "JSON output has a suites array")
 }
 
 Method TestYamlOutputStructure()
@@ -60,7 +60,7 @@ Method TestYamlOutputStructure()
     set testIndex = $order(^UnitTest.Result(""), -1)
     set fileName = ##class(%File).NormalizeFilename(..ReportDir_"test.yaml")
 
-    set status = ##class(%IPM.Test.YamlOutput).ToFile(fileName, "", testIndex)
+    set status = ##class(%IPM.Test.YamlOutput).ToFile(fileName, testIndex)
     do $$$AssertStatusOK(status, "YamlOutput.ToFile succeeded")
     do $$$AssertTrue(##class(%File).GetFileSize(fileName) > 0, "YAML file is non-empty")
 
@@ -81,7 +81,7 @@ Method TestToonOutputStructure()
     set testIndex = $order(^UnitTest.Result(""), -1)
     set fileName = ##class(%File).NormalizeFilename(..ReportDir_"test.toon")
 
-    set status = ##class(%IPM.Test.ToonOutput).ToFile(fileName, "", testIndex)
+    set status = ##class(%IPM.Test.ToonOutput).ToFile(fileName, testIndex)
     do $$$AssertStatusOK(status, "ToonOutput.ToFile succeeded")
     do $$$AssertTrue(##class(%File).GetFileSize(fileName) > 0, "Toon file is non-empty")
 
@@ -101,7 +101,7 @@ Method TestJUnitOutputStructure()
     set testIndex = $order(^UnitTest.Result(""), -1)
     set fileName = ##class(%File).NormalizeFilename(..ReportDir_"test.xml")
 
-    set status = ##class(%IPM.Test.JUnitOutput).ToFile(fileName, "", testIndex)
+    set status = ##class(%IPM.Test.JUnitOutput).ToFile(fileName, testIndex)
     do $$$AssertStatusOK(status, "JUnitOutput.ToFile succeeded")
     do $$$AssertTrue(##class(%File).GetFileSize(fileName) > 0, "JUnit XML file is non-empty")
 
@@ -133,6 +133,31 @@ Method TestGetSummaryHasCounts()
     do $$$AssertTrue(summary.assertions.total > 0, "Summary reports at least one assertion")
     do $$$AssertEquals(summary.methods.passed + summary.methods.failed, summary.methods.total, "Method counts add up")
     do $$$AssertEquals(summary.assertions.passed + summary.assertions.failed, summary.assertions.total, "Assertion counts add up")
+}
+
+Method TestBuildResultTreeStructure()
+{
+    set testIndex = ..PriorRunIndex
+    if testIndex = "" {
+        do $$$LogMessage("No prior test run available; skipping tree structure check")
+        quit
+    }
+
+    set tree = ##class(%IPM.Test.Abstract).BuildResultTree(testIndex)
+    do $$$AssertTrue($isobject(tree), "BuildResultTree returns an object")
+    do $$$AssertTrue(tree.id '= "", "Tree has an id")
+    do $$$AssertTrue(tree.namespace '= "", "Tree has a namespace")
+    do $$$AssertTrue($isobject(tree.suites), "Tree has a suites array")
+    do $$$AssertTrue(tree.suites.%Size() > 0, "Tree has at least one suite")
+
+    set suiteObj = tree.suites.%Get(0)
+    do $$$AssertTrue($isobject(suiteObj), "First suite is an object")
+    do $$$AssertTrue(suiteObj.name '= "", "Suite has a name")
+    do $$$AssertTrue($isobject(suiteObj.cases), "Suite has a cases array")
+
+    set caseObj = suiteObj.cases.%Get(0)
+    do $$$AssertTrue($isobject(caseObj), "First case is an object")
+    do $$$AssertTrue($isobject(caseObj.methods), "Case has a methods array")
 }
 
 }

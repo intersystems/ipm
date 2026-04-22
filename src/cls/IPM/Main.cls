@@ -75,8 +75,8 @@ Can also specify desired version to update to.
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="output-format" aliases="f" dataAlias="outputformat" value="true" valueList="json,yaml,toon" description="Specifies the output format for test results displayed in the terminal (json, yaml, toon)." />
-<modifier name="output-file" dataAlias="outputfile" value="true" description="Path to write test results to a file. Format is inferred from the file extension (.json, .yaml, .toon)." />
+<modifier name="output-format" aliases="f" dataAlias="outputformat" value="true" valueList="json,yaml,toon" description="Specifies the output format for test result summary displayed in the terminal." />
+<modifier name="output-file" dataAlias="outputfile" value="true" description="Path to write test results to a file. Format is inferred from the file extension (.json, .yaml, .toon, .xml)." />
 <modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
 
 </command>
