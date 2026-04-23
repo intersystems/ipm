@@ -29,7 +29,7 @@ ClassMethod OutputToDevice(
         write !,"summary:"
         write !,"  id: "_summary.id
         write !,"  namespace: """_summary.namespace_""""
-        write !,"  duration: "_summary.duration
+        write !,"  duration: "_summary.duration_"s"
         write !,"  testDateTime: """_summary.testDateTime_""""
         write !,"  methods:"
         write !,"    total: "_summary.methods.total
@@ -73,7 +73,7 @@ ClassMethod YAML(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %
     do yamlStream.WriteLine("unitTest:")
     do yamlStream.WriteLine("  id: "_tree.id)
     do yamlStream.WriteLine("  namespace: """_tree.namespace_"""")
-    do yamlStream.WriteLine("  duration: "_tree.duration)
+    do yamlStream.WriteLine("  duration: "_tree.duration_"s")
     do yamlStream.WriteLine("  testDateTime: """_tree.testDateTime_"""")
     do yamlStream.WriteLine()
     do yamlStream.WriteLine("  results:")

@@ -236,8 +236,8 @@ Method TestOutputToDeviceVerboseYaml()
         quit:i=""
         set content = content _ captured(i) _ $char(10)
     }
-    do $$$AssertTrue(content [ "results:", "Verbose YAML output contains 'results:' block")
-    do $$$AssertTrue('(content [ "failures:"), "Verbose YAML output does not contain 'failures:' block")
+    do $$$AssertTrue(content [ ($char(10)_"results:"), "Verbose YAML output contains 'results:' block")
+    do $$$AssertTrue('(content [ ($char(10)_"failures:")), "Verbose YAML output does not contain 'failures:' block")
 }
 
 Method TestOutputToDeviceDefaultYaml()
@@ -260,9 +260,9 @@ Method TestOutputToDeviceDefaultYaml()
         quit:i=""
         set content = content _ captured(i) _ $char(10)
     }
-    do $$$AssertTrue('(content [ "results:"), "Default YAML output does not contain 'results:' block")
+    do $$$AssertTrue('(content [ ($char(10)_"results:")), "Default YAML output does not contain 'results:' block")
     if summary.methods.failed > 0 {
-        do $$$AssertTrue(content [ "failures:", "Default YAML output contains 'failures:' block when failures exist")
+        do $$$AssertTrue(content [ ($char(10)_"failures:"), "Default YAML output contains 'failures:' block when failures exist")
     }
 }
 

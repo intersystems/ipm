@@ -42,7 +42,7 @@ ClassMethod ToFile(
         do fileStream.WriteLine("unitTest:")
         do fileStream.WriteLine("  id: "_tree.id)
         do fileStream.WriteLine("  namespace: "_tree.namespace)
-        do fileStream.WriteLine("  duration: "_tree.duration)
+        do fileStream.WriteLine("  duration: "_tree.duration_"s")
         do fileStream.WriteLine("  testDateTime: "_tree.testDateTime)
         do fileStream.WriteLine()
         do fileStream.WriteLine("results["_rowCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:")
@@ -64,7 +64,7 @@ ClassMethod OutputToDevice(
         set summary = ..GetSummary(testIndex)
         write !
         write !,"summary:"
-        write !,"  id: "_summary.id_"  namespace: "_summary.namespace_"  duration: "_summary.duration_"  testDateTime: "_summary.testDateTime
+        write !,"  id: "_summary.id_"  namespace: "_summary.namespace_"  duration: "_summary.duration_"s  testDateTime: "_summary.testDateTime
         write !,"  methods["_summary.methods.total_"]: "_summary.methods.passed_" passed, "_summary.methods.failed_" failed"
         write !,"  assertions["_summary.assertions.total_"]: "_summary.assertions.passed_" passed, "_summary.assertions.failed_" failed"
 

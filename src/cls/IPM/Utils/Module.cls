@@ -948,7 +948,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-/// 
+///
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1820,6 +1820,18 @@ getPackage(itemlist,package)
     }
     quit
     ;
+}
+
+/// Suppresses all output written during the enclosed block (discards it).
+/// Safe to call while a BeginCaptureOutput capture is already active.
+ClassMethod BeginSuppressOutput(Output pCookie As %String) As %Status
+{
+    quit ##class(%IPM.Utils.OutputSuppressor).Begin(.pCookie)
+}
+
+ClassMethod EndSuppressOutput(pCookie As %String) As %Status
+{
+    quit ##class(%IPM.Utils.OutputSuppressor).End(pCookie)
 }
 
 /// This method enables I/O redirection (see EndCaptureOutput for retrieval). <var>pCookie</var> has the previous I/O redirection info.

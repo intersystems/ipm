@@ -104,7 +104,7 @@ Method OnPhase(
             set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
             set capturing = 0
             if explicitQuiet {
-                $$$ThrowOnError(##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie))
+                $$$ThrowOnError(##class(%IPM.Utils.Module).BeginSuppressOutput(.cookie))
                 set capturing = 1
             }
 
@@ -217,7 +217,7 @@ Method OnPhase(
                 $$$ThrowOnError(tSC)
             }
             if capturing {
-                do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .discarded)
+                $$$ThrowOnError(##class(%IPM.Utils.Module).EndSuppressOutput(cookie))
                 set capturing = 0
             }
 
@@ -250,7 +250,7 @@ Method OnPhase(
         }
     } catch e {
         if capturing {
-            do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .discarded)
+            do ##class(%IPM.Utils.Module).EndSuppressOutput(cookie)
         }
         set tSC = e.AsStatus()
     }
