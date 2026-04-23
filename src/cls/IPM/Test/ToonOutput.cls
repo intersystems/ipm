@@ -56,7 +56,8 @@ ClassMethod ToFile(
 }
 
 ClassMethod OutputToDevice(
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+    verbose As %Boolean = 0) As %Status
 {
     set sc = $$$OK
     try {
@@ -67,7 +68,44 @@ ClassMethod OutputToDevice(
         write !,"  methods["_summary.methods.total_"]: "_summary.methods.passed_" passed, "_summary.methods.failed_" failed"
         write !,"  assertions["_summary.assertions.total_"]: "_summary.assertions.passed_" passed, "_summary.assertions.failed_" failed"
 
-        if summary.methods.failed > 0 {
+        if verbose {
+            set tree = ..BuildResultTree(testIndex)
+            set rowCount = 0
+            set rowStream = ##class(%Stream.TmpCharacter).%New()
+            set suiteIter = tree.suites.%GetIterator()
+            while suiteIter.%GetNext(, .suiteObj) {
+                set caseIter = suiteObj.cases.%GetIterator()
+                while caseIter.%GetNext(, .caseObj) {
+                    if caseObj.error '= "" {
+                        set rowCount = rowCount + 1
+                        do rowStream.WriteLine("  "_suiteObj.name_","_caseObj.name_","_caseObj.name_",failed,OnBeforeAllTests,0,"""_$translate(caseObj.error,"""")_""",""""")
+                    }
+                    set methodIter = caseObj.methods.%GetIterator()
+                    while methodIter.%GetNext(, .methodObj) {
+                        if methodObj.error '= "" {
+                            set rowCount = rowCount + 1
+                            do rowStream.WriteLine("  "_suiteObj.name_","_caseObj.name_","_methodObj.name_",failed,error,0,"""_$translate(methodObj.error,"""")_""",""""")
+                        }
+                        set assertIter = methodObj.asserts.%GetIterator()
+                        while assertIter.%GetNext(, .assertObj) {
+                            set rowCount = rowCount + 1
+                            set row = "  "_suiteObj.name_","_caseObj.name_","_methodObj.name_","_assertObj.status_","_assertObj.action_","_assertObj.counter_","""_$translate(assertObj.description,"""")_""","""_assertObj.location_""""
+                            do rowStream.WriteLine(row)
+                        }
+                        if methodObj.asserts.%Size() = 0 {
+                            set rowCount = rowCount + 1
+                            do rowStream.WriteLine("  "_suiteObj.name_","_caseObj.name_","_methodObj.name_","_methodObj.status_",,,,""""")
+                        }
+                    }
+                }
+            }
+            write !
+            write !,"results["_rowCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:"
+            do rowStream.Rewind()
+            while 'rowStream.AtEnd {
+                write !,rowStream.ReadLine()
+            }
+        } elseif summary.methods.failed > 0 {
             set tree = ..BuildResultTree(testIndex)
             set failCount = 0
             set failStream = ##class(%Stream.TmpCharacter).%New()

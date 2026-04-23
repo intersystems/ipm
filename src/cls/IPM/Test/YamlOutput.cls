@@ -19,7 +19,8 @@ ClassMethod ToFile(
 }
 
 ClassMethod OutputToDevice(
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+    verbose As %Boolean = 0) As %Status
 {
     set sc = $$$OK
     try {
@@ -39,7 +40,16 @@ ClassMethod OutputToDevice(
         write !,"    passed: "_summary.assertions.passed
         write !,"    failed: "_summary.assertions.failed
 
-        if summary.methods.failed > 0 {
+        if verbose {
+            write !
+            write !,"results:"
+            set tree = ..BuildResultTree(testIndex)
+            set resultStream = ..YAMLResults(tree)
+            do resultStream.Rewind()
+            while 'resultStream.AtEnd {
+                write !,resultStream.ReadLine()
+            }
+        } elseif summary.methods.failed > 0 {
             write !
             write !,"failures:"
             set failStream = ..YAMLFailures(testIndex)

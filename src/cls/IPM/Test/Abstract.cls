@@ -9,7 +9,8 @@ ClassMethod ToFile(
 }
 
 ClassMethod OutputToDevice(
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status [ Abstract ]
+    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+    verbose As %Boolean = 0) As %Status [ Abstract ]
 {
 }
 

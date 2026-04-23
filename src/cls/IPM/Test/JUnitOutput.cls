@@ -96,7 +96,8 @@ ClassMethod ToFile(
 }
 
 ClassMethod OutputToDevice(
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
+    verbose As %Boolean = 0) As %Status
 {
     set sc = $$$OK
     try {
@@ -105,7 +106,24 @@ ClassMethod OutputToDevice(
         write !,"Methods: "_summary.methods.total_" total, "_summary.methods.passed_" passed, "_summary.methods.failed_" failed"
         write !,"Assertions: "_summary.assertions.total_" total, "_summary.assertions.passed_" passed, "_summary.assertions.failed_" failed"
 
-        if summary.methods.failed > 0 {
+        if verbose {
+            set tree = ..BuildResultTree(testIndex)
+            write !
+            set suiteIter = tree.suites.%GetIterator()
+            while suiteIter.%GetNext(, .suiteObj) {
+                set caseIter = suiteObj.cases.%GetIterator()
+                while caseIter.%GetNext(, .caseObj) {
+                    if caseObj.error '= "" {
+                        write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
+                    }
+                    set methodIter = caseObj.methods.%GetIterator()
+                    while methodIter.%GetNext(, .methodObj) {
+                        write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" ["_methodObj.status_"]"
+                        if methodObj.error '= "" { write " "_methodObj.error }
+                    }
+                }
+            }
+        } elseif summary.methods.failed > 0 {
             set tree = ..BuildResultTree(testIndex)
             write !
             set suiteIter = tree.suites.%GetIterator()

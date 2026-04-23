@@ -101,6 +101,12 @@ Method OnPhase(
             // In test/verify phase, run unit tests.
             set tVerbose = $get(pParams("Verbose"), 0)
             set tFlags = $select(tVerbose:"/display=all",1:"/display=none")
+            set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
+            set capturing = 0
+            if explicitQuiet {
+                $$$ThrowOnError(##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie))
+                set capturing = 1
+            }
 
             // Ensure unit tests and related classes are loaded.
             set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
@@ -189,7 +195,9 @@ Method OnPhase(
             zkill ^UnitTestRoot
             $$$ThrowOnError(tSC)
 
-            set testIndex = $order(^UnitTest.Result(""),-1)
+            if '$data(^||%UnitTest.Manager.LastResult, testIndex)#2 {
+                set testIndex = $order(^UnitTest.Result(""),-1)
+            }
             if $data(pParams("outputfile"), outputFile) {
                 set fileExtension = $zconvert($piece(outputFile,".",*),"L")
                 set outputClass = $case(fileExtension,
@@ -208,20 +216,27 @@ Method OnPhase(
                 set tSC = $classmethod(outputClass,"ToFile",outputFile)
                 $$$ThrowOnError(tSC)
             }
+            if capturing {
+                do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .discarded)
+                set capturing = 0
+            }
+
+            set hasOutputFormat = $data(pParams("outputformat"),outputFormat)
             write !
-            if $data(pParams("outputformat"),outputFormat)||('tVerbose) {
-                write !,"Test Result Summary"
+            if explicitQuiet || hasOutputFormat || ('tVerbose) {
+                if 'explicitQuiet {
+                    write !,"Test Result Summary"
+                }
                 // CLI flag takes precedence; fall back to global config, then default to Toon
                 set defaultOutputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
                 if $get(outputFormat)="" {
                     set outputFormat = $select(defaultOutputFormat'="":defaultOutputFormat,1:"Toon")
                 }
-
                 set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
                 if '$$$defClassDefined(outputClass) {
                     $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputFormat_" output format does not exist."))
                 }
-                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex)
+                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose)
                 $$$ThrowOnError(tSC)
                 write !
             }
@@ -234,6 +249,9 @@ Method OnPhase(
             write !
         }
     } catch e {
+        if capturing {
+            do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .discarded)
+        }
         set tSC = e.AsStatus()
     }
     if $data(tOldUnitTestRoot,^UnitTestRoot) // Restore ^UnitTestRoot

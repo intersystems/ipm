@@ -22,10 +22,18 @@ Method OnBeforeAllTests() As %Status
         }
     }
     set ..ReportDir = dir
-    // Walk back one from the current (in-progress) run to get a completed run
-    // with populated SQL result tables.
+    // Walk back from the current (in-progress) run to find a completed run that
+    // has at least one suite with test cases. Runs with no suites (e.g. aborted
+    // or setup-only runs) produce empty result trees that break tree-structure tests.
     set currentIndex = $order(^UnitTest.Result(""), -1)
-    set ..PriorRunIndex = $order(^UnitTest.Result(currentIndex), -1)
+    set priorIndex = $order(^UnitTest.Result(currentIndex), -1)
+    while priorIndex '= "" {
+        if $order(^UnitTest.Result(priorIndex, "")) '= "" {
+            quit
+        }
+        set priorIndex = $order(^UnitTest.Result(priorIndex), -1)
+    }
+    set ..PriorRunIndex = priorIndex
     return $$$OK
 }
 
@@ -158,6 +166,104 @@ Method TestBuildResultTreeStructure()
     set caseObj = suiteObj.cases.%Get(0)
     do $$$AssertTrue($isobject(caseObj), "First case is an object")
     do $$$AssertTrue($isobject(caseObj.methods), "Case has a methods array")
+}
+
+Method TestOutputToDeviceVerboseJson()
+{
+    set testIndex = ..PriorRunIndex
+    if testIndex = "" {
+        do $$$LogMessage("No prior test run available; skipping")
+        quit
+    }
+    $$$ThrowOnError(##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie))
+    set sc = ##class(%IPM.Test.JsonOutput).OutputToDevice(testIndex, 1)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .captured)
+    $$$ThrowOnError(sc)
+
+    set jsonStr = ""
+    set i = ""
+    for {
+        set i = $order(captured(i))
+        quit:i=""
+        set jsonStr = jsonStr _ captured(i)
+    }
+    set parsed = ##class(%DynamicAbstractObject).%FromJSON(jsonStr)
+    do $$$AssertTrue($isobject(parsed.methods), "Verbose JSON output has 'methods' key")
+    do $$$AssertTrue(parsed.methods.%Size() > 0, "Verbose JSON 'methods' array is non-empty")
+    do $$$AssertTrue('$isobject(parsed.failures), "Verbose JSON output does not have 'failures' key")
+}
+
+Method TestOutputToDeviceDefaultJson()
+{
+    set testIndex = ..PriorRunIndex
+    if testIndex = "" {
+        do $$$LogMessage("No prior test run available; skipping")
+        quit
+    }
+    $$$ThrowOnError(##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie))
+    set sc = ##class(%IPM.Test.JsonOutput).OutputToDevice(testIndex, 0)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .captured)
+    $$$ThrowOnError(sc)
+
+    set jsonStr = ""
+    set i = ""
+    for {
+        set i = $order(captured(i))
+        quit:i=""
+        set jsonStr = jsonStr _ captured(i)
+    }
+    set parsed = ##class(%DynamicAbstractObject).%FromJSON(jsonStr)
+    do $$$AssertTrue($isobject(parsed.failures), "Default JSON output has 'failures' key")
+    do $$$AssertTrue('$isobject(parsed.methods), "Default JSON output does not have 'methods' key")
+}
+
+Method TestOutputToDeviceVerboseYaml()
+{
+    set testIndex = ..PriorRunIndex
+    if testIndex = "" {
+        do $$$LogMessage("No prior test run available; skipping")
+        quit
+    }
+    $$$ThrowOnError(##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie))
+    set sc = ##class(%IPM.Test.YamlOutput).OutputToDevice(testIndex, 1)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .captured)
+    $$$ThrowOnError(sc)
+
+    set content = ""
+    set i = ""
+    for {
+        set i = $order(captured(i))
+        quit:i=""
+        set content = content _ captured(i) _ $char(10)
+    }
+    do $$$AssertTrue(content [ "results:", "Verbose YAML output contains 'results:' block")
+    do $$$AssertTrue('(content [ "failures:"), "Verbose YAML output does not contain 'failures:' block")
+}
+
+Method TestOutputToDeviceDefaultYaml()
+{
+    set testIndex = ..PriorRunIndex
+    if testIndex = "" {
+        do $$$LogMessage("No prior test run available; skipping")
+        quit
+    }
+    set summary = ##class(%IPM.Test.Abstract).GetSummary(testIndex)
+    $$$ThrowOnError(##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie))
+    set sc = ##class(%IPM.Test.YamlOutput).OutputToDevice(testIndex, 0)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .captured)
+    $$$ThrowOnError(sc)
+
+    set content = ""
+    set i = ""
+    for {
+        set i = $order(captured(i))
+        quit:i=""
+        set content = content _ captured(i) _ $char(10)
+    }
+    do $$$AssertTrue('(content [ "results:"), "Default YAML output does not contain 'results:' block")
+    if summary.methods.failed > 0 {
+        do $$$AssertTrue(content [ "failures:", "Default YAML output contains 'failures:' block when failures exist")
+    }
 }
 
 }
