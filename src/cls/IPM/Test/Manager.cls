@@ -68,41 +68,40 @@ ClassMethod GetAllTestsStatus(
         // This ensures nested phases only see their own results, not parent's
         for i=(startIndex+1):1:testCount {
             set logIndex = $get(^||%UnitTest.Manager.AllResults(i))
-            if (logIndex '= "") {
-                // Query for assertion failures in this test run
-                set res = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
-                    "from %UnitTest_Result.TestAssert where Status = 0 "_
-                    "and TestMethod->TestCase->TestSuite->TestInstance->InstanceIndex = ?",logIndex)
-                if (res.%SQLCODE < 0) {
-                    throw ##class(%Exception.SQL).CreateFromSQLCODE(res.%SQLCODE,res.%Message)
-                }
-                do res.%Next(.sc)
-                $$$ThrowOnError(sc)
-                set failures = res.%GetData(1)
-                set failureCount = failureCount + failures
-
-                // Also check for test suite failures (e.g., loading errors)
-                if (failures = 0) {
-                    set res = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
-                        "from %UnitTest_Result.TestSuite where Status = 0 "_
-                        "and TestInstance->InstanceIndex = ?",logIndex)
-                    if (res.%SQLCODE < 0) {
-                        throw ##class(%Exception.SQL).CreateFromSQLCODE(res.%SQLCODE,res.%Message)
+            if logIndex '= "" {
+                // Count failure rows to match what OutputFailuresForLogIndex displays:
+                // one row per case error, one per method error, one per failed assertion
+                set tree = ##class(%IPM.Test.Abstract).BuildResultTree(logIndex)
+                set suiteIter = tree.suites.%GetIterator()
+                while suiteIter.%GetNext(, .suiteObj) {
+                    set caseIter = suiteObj.cases.%GetIterator()
+                    while caseIter.%GetNext(, .caseObj) {
+                        if caseObj.error '= "" {
+                            set failureCount = failureCount + 1
+                        }
+                        set methodIter = caseObj.methods.%GetIterator()
+                        while methodIter.%GetNext(, .methodObj) {
+                            if methodObj.error '= "" {
+                                set failureCount = failureCount + 1
+                            }
+                            set assertIter = methodObj.asserts.%GetIterator()
+                            while assertIter.%GetNext(, .assertObj) {
+                                if assertObj.status = "failed" {
+                                    set failureCount = failureCount + 1
+                                }
+                            }
+                        }
                     }
-                    do res.%Next(.sc)
-                    $$$ThrowOnError(sc)
-                    set failures = res.%GetData(1)
-                    set failureCount = failureCount + failures
                 }
             }
         }
 
-        if (failureCount > 0) {
-            set sc = $$$ERROR($$$GeneralError, failureCount_" assertion(s) failed.")
+        if failureCount > 0 {
+            set sc = $$$ERROR($$$GeneralError, failureCount_" failure(s).")
         }
 
         // Only clean up AllResults at top level (startIndex=0), not in nested phases
-        if (startIndex = 0) {
+        if startIndex = 0 {
             kill ^||%UnitTest.Manager.AllResults
             kill ^||%UnitTest.Manager.AllResultsCount
         }
@@ -141,27 +140,24 @@ ClassMethod OutputFailuresForLogIndex(logIndex As %Integer)
     if 'logIndex {
         quit
     }
-    set logGN = $name(^UnitTest.Result(logIndex))
-    set root = ""
-    for {
-        set root = $order(@logGN@(root))
-        quit:root=""
-        set suite = ""
-        for {
-            set suite = $order(@logGN@(root, suite))
-            quit:suite=""
-            set method = ""
-            for {
-                set method = $order(@logGN@(root, suite, method))
-                quit:method=""
-
-                set assert = ""
-                for {
-                    set assert = $order(@logGN@(root, suite, method, assert), 1, assertInfo)
-                    quit:assert=""
-                    set $listbuild(status, type, text) = assertInfo
-                    continue:status
-                    write !,$$$FormattedLine($$$Red, "FAILED " _ suite _ ":" _ method), ": " _ type _ " - " _ text
+    set tree = ##class(%IPM.Test.Abstract).BuildResultTree(logIndex)
+    set suiteIter = tree.suites.%GetIterator()
+    while suiteIter.%GetNext(, .suiteObj) {
+        set caseIter = suiteObj.cases.%GetIterator()
+        while caseIter.%GetNext(, .caseObj) {
+            if caseObj.error '= "" {
+                write !,$$$FormattedLine($$$Red, "FAILED " _ suiteObj.name _ ":" _ caseObj.name), ": " _ caseObj.error
+            }
+            set methodIter = caseObj.methods.%GetIterator()
+            while methodIter.%GetNext(, .methodObj) {
+                if methodObj.status '= "failed" { continue }
+                if methodObj.error '= "" {
+                    write !,$$$FormattedLine($$$Red, "FAILED " _ suiteObj.name _ ":" _ methodObj.name), ": " _ methodObj.error
+                }
+                set assertIter = methodObj.asserts.%GetIterator()
+                while assertIter.%GetNext(, .assertObj) {
+                    if assertObj.status '= "failed" { continue }
+                    write !,$$$FormattedLine($$$Red, "FAILED " _ suiteObj.name _ ":" _ methodObj.name), ": " _ assertObj.action _ " - " _ assertObj.description
                 }
             }
         }

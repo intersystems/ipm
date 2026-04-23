@@ -55,7 +55,15 @@ ClassMethod OutputToDevice(
                         set methodIter = caseObj.methods.%GetIterator()
                         while methodIter.%GetNext(, .methodObj) {
                             if methodObj.status = "failed" {
-                                do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "error": (methodObj.error), "asserts": (methodObj.asserts)})
+                                if methodObj.error '= "" {
+                                    do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "error": (methodObj.error)})
+                                }
+                                set assertIter = methodObj.asserts.%GetIterator()
+                                while assertIter.%GetNext(, .assertObj) {
+                                    if assertObj.status = "failed" {
+                                        do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "action": (assertObj.action), "description": (assertObj.description), "location": (assertObj.location)})
+                                    }
+                                }
                             }
                         }
                     }
