@@ -210,10 +210,18 @@ ClassMethod DeleteHistoryGlobally(
         set ns = rs.%Get("Nsp")
         set $namespace = ns
         if ##class(%Dictionary.ClassDefinition).%Exists($listbuild("%IPM.General.History")) {
-            set subcount = ..DeleteHistory(.filter)
-            set count = count + subcount
-            if verbose {
-                write !, "Deleted " _ subcount _ " record(s) from " _ ns, !
+            // Use try/catch to handle permission errors in locked-down namespaces
+            try {
+                set subcount = ..DeleteHistory(.filter)
+                set count = count + subcount
+                if verbose {
+                    write !, "Deleted " _ subcount _ " record(s) from " _ ns, !
+                }
+            } catch ex {
+                // Ignore permission errors in locked namespaces
+                if verbose {
+                    write !, "Skipped " _ ns _ " (no permission): " _ ex.DisplayString(), !
+                }
             }
         }
     }

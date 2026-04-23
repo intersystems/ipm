@@ -114,7 +114,7 @@ ClassMethod LoadModuleReference(
 
         // Ensure requested versions match those required by other modules in the namespace, excluding versions currently being installed
         // (the requirements of such modules are already known to be satisfied)
-        set tSC = ..GetRequiredVersionExpression(pModuleName,,.tExpression,.tSourceList)
+        set tSC = ..GetRequiredVersionExpression(pModuleName,,.pDependencyGraph,.tExpression,.tSourceList)
         if $$$ISERR(tSC) {
             quit
         }
@@ -349,36 +349,79 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
+/// 
+/// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
+/// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
-	pModuleName As %String,
-	pExcludeModules As %List = "",
-	Output pExpression As %IPM.General.SemanticVersionExpression,
-	Output pSourceList As %List) As %Status
+	moduleName As %String,
+	excludeModules As %List = "",
+	ByRef dependencyGraph,
+	Output expression As %IPM.General.SemanticVersionExpression,
+	Output sourceList As %List) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
-        set pExpression = ##class(%IPM.General.SemanticVersionExpression).%New()
-        set pSourceList = ""
-
-        set tResult = ##class(%IPM.Storage.Module).VersionRequirementsFunc(pModuleName,pExcludeModules)
-        if (tResult.%SQLCODE < 0) {
-            $$$ThrowStatus($$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message))
+        // Add modules from the dependency graph to the excludeModules list
+        if ($data(dependencyGraph)) {
+            do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
+            set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
+            for i = 1:1:flatDepList.Count() {
+                set excludeModules = excludeModules _ $listbuild(flatDepList.GetAt(i).Name)
+            }
         }
 
-        while tResult.%Next(.tSC) {
-            $$$ThrowOnError(tSC)
-            set tVersion = tResult.%Get("Version")
-            $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(tVersion,.tVersionExpr))
-            set pExpression = pExpression.And(tVersionExpr)
-            set pSourceList = pSourceList_$listbuild($listtostring(tResult.%Get("ModuleNames"),", ")_": "_tVersion)
+        set expression = ##class(%IPM.General.SemanticVersionExpression).%New()
+        set sourceList = ""
+
+        set result = ##class(%IPM.Storage.Module).VersionRequirementsFunc(moduleName,excludeModules)
+        if (result.%SQLCODE < 0) {
+            $$$ThrowStatus($$$ERROR($$$SQLCode,result.%SQLCODE,result.%Message))
         }
-        $$$ThrowOnError(tSC)
+
+        while result.%Next(.sc) {
+            $$$ThrowOnError(sc)
+            set version = result.%Get("Version")
+            $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(version,.versionExpr))
+            set expression = expression.And(versionExpr)
+            set sourceList = sourceList_$listbuild($listtostring(result.%Get("ModuleNames"),", ")_": "_version)
+        }
+        $$$ThrowOnError(sc)
+
+        // Add modules from the dependency graph to the expression and sourceList objects
+        if ($data(dependencyGraph)) {
+            set key = ""
+            for {
+                set key = $order(dependencyGraph(moduleName, key))
+                if (key = "") {
+                    quit
+                }
+                // Name of module which requires this one + the version expression string it requires
+                set requiringModuleName = $piece(key, " ")
+                set version = dependencyGraph(moduleName, key)
+
+                // Iterate over sourceList; if the required version expression is equivalent to this one, add this module name to that version
+                set newVersion = 1
+                for i=1:1:$listlength(sourceList) {
+                    if $find($listget(sourceList, i), version) {
+                        set $list(sourceList, i) = requiringModuleName _ ", " _ $list(sourceList, i)
+                        set newVersion = 0
+                        quit
+                    }
+                }
+                // If this is a new required version expression, add a new item to the list
+                if (newVersion) {
+                    $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(version, .versionExpr))
+                    set expression = expression.And(versionExpr)
+                    set sourceList = sourceList _ $listbuild(requiringModuleName _ ": " _ version)
+                }
+            }
+        }
     } catch e {
-        set pExpression = $$$NULLOREF
-        set pSourceList = ""
-        set tSC = e.AsStatus()
+        set expression = $$$NULLOREF
+        set sourceList = ""
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
 /// Returns a flat list of dependents for a given module name (and optional version) <br />
@@ -1278,7 +1321,7 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, .dependencyGraph)
         $$$ThrowOnError(sc)
     }
 

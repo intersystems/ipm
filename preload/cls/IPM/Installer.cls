@@ -9,6 +9,10 @@ Parameter VERSION;
 /// Number of files for autoinstall release
 Parameter FILESCOUNT = 0;
 
+/// IPM's own module name. Mirrors $$$IPMModuleName in %IPM.Common — duplicated here
+/// because this class is loaded during bootstrapping before that include is available.
+Parameter MODULENAME = "zpm";
+
 /// Application Definition
 XData PM [ XMLNamespace = INSTALLER ]
 {
@@ -475,6 +479,70 @@ ClassMethod CleanupOldMappings() As %Status
     }
 
     return sc
+}
+
+/// Copies the ipm and iriscli scripts to the user's local bin directories.
+/// Runs after Activate so the module version is resolvable in storage.
+/// Always returns $$$OK — script installation is best-effort and must not block the install.
+ClassMethod InstallScripts() As %Status
+{
+    // Scripts are bash; skip entirely on non-Unix platforms.
+    if '$$$isUNIX {
+        quit $$$OK
+    }
+    try {
+        // The scripts are staged under ${ipmdir}bin/ by <FileCopy> in module.xml.
+        set module = ##class(%IPM.Storage.Module).NameOpen(..#MODULENAME, , .openSC)
+        $$$ThrowOnError(openSC)
+        if '$isobject(module) {
+            write !,"Could not resolve module directory for script installation."
+            quit
+        }
+        set binDir = ##class(%Library.File).NormalizeDirectory($system.Util.DataDirectory() _ "ipm/" _ module.Name _ "/" _ module.VersionString _ "/bin")
+
+        set homeDir = $system.Util.GetEnviron("HOME")
+        if homeDir = "" {
+            write !,"$HOME not set, skipping script installation."
+            quit
+        }
+        set localBin = ##class(%Library.File).NormalizeDirectory(homeDir _ "/.local/bin")
+
+        // ~/.local/bin is the XDG standard for user scripts; create it if absent.
+        if '##class(%Library.File).DirectoryExists(localBin) {
+            if '##class(%Library.File).CreateDirectoryChain(localBin) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Could not create directory: " _ localBin))
+            }
+        }
+
+        // ~/bin is on PATH in the IRIS container; ~/.local/bin covers most Unix/Linux distros.
+        // We skip ~/bin if it doesn't exist to avoid creating unexpected directories on systems that don't use it.
+        set homeBin = ##class(%Library.File).NormalizeDirectory(homeDir _ "/bin")
+
+        for script = "ipm","iriscli" {
+            set src = binDir _ script
+            if '##class(%Library.File).Exists(src) {
+                write !,"Warning - source script not found: ",src
+                continue
+            }
+            for targetDir = localBin,homeBin {
+                if (targetDir = homeBin) && '##class(%Library.File).DirectoryExists(homeBin) {
+                    continue
+                }
+                set dest = targetDir _ script
+                if '##class(%Library.File).CopyFile(src, dest, 1) {
+                    write !,"Warning - could not copy ",script," to ",targetDir
+                    continue
+                }
+                set cmd = $listbuild("chmod", "+x", dest)
+                $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommand(, cmd, , , .rc))
+            }
+        }
+        write !,"Installed ipm and iriscli scripts to ",localBin
+    } catch ex {
+        // Swallow all errors — a failed script copy must not fail the module install.
+        write !,"Warning - script installation failed: ",ex.DisplayString()
+    }
+    quit $$$OK
 }
 
 }

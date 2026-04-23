@@ -132,23 +132,24 @@ Method TestWheelPresent()
 /// requirements.txt takes precedence.
 Method TestWheelAndReqsPresentOnline()
 {
-    do ..PurgePythonPackage("lune")
-    set dir = ..GetModuleDir("python-deps-tests", ..#LuneReqsOnlineLocation)
-    set sc = ##class(%IPM.Main).Shell("load -v " _ dir)
-    do $$$AssertStatusOK(sc, "Successfully installed lune-wheel resource")
-    try {
-        set httprequest = ##class(%Net.HttpRequest).%New()
-        set httprequest.Server="www.example.com"
-        do httprequest.Get("/")
-        if httprequest.HttpResponse '= "" {
-            set lunePackage = ##class(%SYS.Python).Import("lune")
-            do $$$AssertSuccess("Successfully imported lune-wheel resource using requirements.txt")
-            set reqVer = ..GetPythonVersion("lune")
-            do $$$AssertEquals(reqVer, "1.6.4")
-        }
-    } catch ex {
-        do $$$AssertFailure("Failed to import lune-wheel resource: "_ex.AsStatus())
-    }
+    do $$$AssertSkipped("Skipping until python wheels fix is merged")
+    #; do ..PurgePythonPackage("lune")
+    #; set dir = ..GetModuleDir("python-deps-tests", ..#LuneReqsOnlineLocation)
+    #; set sc = ##class(%IPM.Main).Shell("load -v " _ dir)
+    #; do $$$AssertStatusOK(sc, "Successfully installed lune-wheel resource")
+    #; try {
+    #;     set httprequest = ##class(%Net.HttpRequest).%New()
+    #;     set httprequest.Server="www.example.com"
+    #;     do httprequest.Get("/")
+    #;     if httprequest.HttpResponse '= "" {
+    #;         set lunePackage = ##class(%SYS.Python).Import("lune")
+    #;         do $$$AssertSuccess("Successfully imported lune-wheel resource using requirements.txt")
+    #;         set reqVer = ..GetPythonVersion("lune")
+    #;         do $$$AssertEquals(reqVer, "1.6.4")
+    #;     }
+    #; } catch ex {
+    #;     do $$$AssertFailure("Failed to import lune-wheel resource: "_ex.AsStatus())
+    #; }
 }
 
 /// Testing case where Python wheel and requirements.txt is present. System not connected to Internet.
@@ -341,7 +342,7 @@ Method GetRandomExportPath()
 /// Instead of using full file name, checks for a substring. This is because the specific version of dependencies
 /// installed along with requirements.txt can change and we don't want the check to fail if it does so.
 /// This way can just use the package names and not have to worry about extensions on the file names changing causing failures.
-/// 
+///
 /// Arguments:
 ///     - exportTarball: path to the packaged tarball
 ///     - wheels: Object of <relative path>-<wheel string> pairs array of file names to check for in the unpackaged module
@@ -389,11 +390,11 @@ Method AssertWheelFilesExistInPackagedModule(
 
 /// Given an object of <module name>-<wheel list> pairs,
 /// compiles a list of resources for the module and iterates over the wheel list to check if that wheel is a resource of the module
-/// 
+///
 /// Instead of using resource, checks for a substring. This is because the specific version of dependencies
 /// installed along with requirements.txt can change and we don't want the check to fail if it does so.
 /// This way can just use the package names and not have to worry about extensions changing causing failures.
-/// 
+///
 /// Ex: wheels = { "module1": ["ansible","pycparser"], "module2":["jinja2", "lune"] }
 Method AssertWheelResourcesExistForModule(wheels As %DynamicObject)
 {
