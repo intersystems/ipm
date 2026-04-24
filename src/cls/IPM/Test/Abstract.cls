@@ -196,7 +196,7 @@ ClassMethod BuildResultTree(testIndex As %Integer = {$order(^UnitTest.Result("")
 /// Pass a pre-built tree to avoid a second ^UnitTest.Result traversal.
 ClassMethod GetSummary(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}, tree As %DynamicObject = "") As %DynamicObject
 {
-    if tree = "" {
+    if '$isobject(tree) {
         set tree = ..BuildResultTree(testIndex)
     }
     set (assertTotal, assertPassed, assertFailed) = 0

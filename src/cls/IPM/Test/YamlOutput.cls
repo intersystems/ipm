@@ -20,9 +20,9 @@ ClassMethod OutputToDevice(
         write !
         write !,"summary:"
         write !,"  id: "_summary.id
-        write !,"  namespace: """_summary.namespace_""""
+        write !,"  namespace: """_..EscapeYamlString(summary.namespace)_""""
         write !,"  duration: "_summary.duration_"s"
-        write !,"  testDateTime: """_summary.testDateTime_""""
+        write !,"  testDateTime: """_..EscapeYamlString(summary.testDateTime)_""""
         write !,"  methods:"
         write !,"    total: "_summary.methods.total
         write !,"    passed: "_summary.methods.passed
@@ -63,13 +63,21 @@ ClassMethod BuildYaml(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)})
 
     do yamlStream.WriteLine("unitTest:")
     do yamlStream.WriteLine("  id: "_tree.id)
-    do yamlStream.WriteLine("  namespace: """_tree.namespace_"""")
+    do yamlStream.WriteLine("  namespace: """_..EscapeYamlString(tree.namespace)_"""")
     do yamlStream.WriteLine("  duration: "_tree.duration_"s")
-    do yamlStream.WriteLine("  testDateTime: """_tree.testDateTime_"""")
+    do yamlStream.WriteLine("  testDateTime: """_..EscapeYamlString(tree.testDateTime)_"""")
     do yamlStream.WriteLine()
     do yamlStream.WriteLine("  results:")
     do yamlStream.CopyFrom(..BuildYamlRows(tree, 0))
     return yamlStream
+}
+
+/// Escapes backslashes and double-quotes for use inside YAML double-quoted strings.
+ClassMethod EscapeYamlString(val As %String) As %String [ Private ]
+{
+    set val = $replace(val, "\", "\\")
+    set val = $replace(val, """", "\""")
+    return val
 }
 
 /// Returns a stream of YAML rows. failuresOnly=1 skips passing methods/assertions.
@@ -87,10 +95,10 @@ ClassMethod BuildYamlRows(tree As %DynamicObject, failuresOnly As %Boolean) As %
                 if suiteObj.name '= currentSuite {
                     set currentSuite = suiteObj.name
                     set currentCase = ""
-                    do stream.WriteLine(indent_"- suiteName: """_suiteObj.name_"""")
+                    do stream.WriteLine(indent_"- suiteName: """_..EscapeYamlString(suiteObj.name)_"""")
                     do stream.WriteLine(indent_"  testcases:")
                 }
-                do stream.WriteLine(indent_"    - testcaseName: """_caseObj.name_"""")
+                do stream.WriteLine(indent_"    - testcaseName: """_..EscapeYamlString(caseObj.name)_"""")
                 do stream.WriteLine(indent_"      error: |")
                 do stream.WriteLine(indent_"        "_$replace(caseObj.error, $char(10), $char(10)_indent_"        "))
             }
@@ -100,15 +108,15 @@ ClassMethod BuildYamlRows(tree As %DynamicObject, failuresOnly As %Boolean) As %
                 if suiteObj.name '= currentSuite {
                     set currentSuite = suiteObj.name
                     set currentCase = ""
-                    do stream.WriteLine(indent_"- suiteName: """_suiteObj.name_"""")
+                    do stream.WriteLine(indent_"- suiteName: """_..EscapeYamlString(suiteObj.name)_"""")
                     do stream.WriteLine(indent_"  testcases:")
                 }
                 if caseObj.name '= currentCase {
                     set currentCase = caseObj.name
-                    do stream.WriteLine(indent_"    - testcaseName: """_caseObj.name_"""")
+                    do stream.WriteLine(indent_"    - testcaseName: """_..EscapeYamlString(caseObj.name)_"""")
                     do stream.WriteLine(indent_"      methods:")
                 }
-                do stream.WriteLine(indent_"        - methodName: """_methodObj.name_"""")
+                do stream.WriteLine(indent_"        - methodName: """_..EscapeYamlString(methodObj.name)_"""")
                 do stream.WriteLine(indent_"          status: """_methodObj.status_"""")
                 if methodObj.error '= "" {
                     do stream.WriteLine(indent_"          error: |")
@@ -119,12 +127,12 @@ ClassMethod BuildYamlRows(tree As %DynamicObject, failuresOnly As %Boolean) As %
                     set assertIter = methodObj.asserts.%GetIterator()
                     while assertIter.%GetNext(, .assertObj) {
                         if failuresOnly && (assertObj.status '= "failed") { continue }
-                        do stream.WriteLine(indent_"            - action: """_assertObj.action_"""")
+                        do stream.WriteLine(indent_"            - action: """_..EscapeYamlString(assertObj.action)_"""")
                         do stream.WriteLine(indent_"              counter: "_assertObj.counter)
                         do stream.WriteLine(indent_"              status: """_assertObj.status_"""")
                         do stream.WriteLine(indent_"              description: |")
                         do stream.WriteLine(indent_"                "_$replace(assertObj.description, $char(10), $char(10)_indent_"                "))
-                        do stream.WriteLine(indent_"              location: """_assertObj.location_"""")
+                        do stream.WriteLine(indent_"              location: """_..EscapeYamlString(assertObj.location)_"""")
                     }
                 }
             }

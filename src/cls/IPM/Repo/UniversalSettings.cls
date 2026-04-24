@@ -109,11 +109,16 @@ ClassMethod UpdateOne(
         write "Config key = """_key_""" not found",!
         quit
     }
-    set sc = ..SetValue($parameter(..%ClassName(1),key), value)
+    if key = "TestReportFormat" {
+        // Validate format value before saving it
+        set sc = ..SetTestReportFormat(value)
+    } else {
+        set sc = ..SetValue($parameter(..%ClassName(1),key), value)
+    }
     if $$$ISOK(sc) {
         write !,"Key """_key_""" succesfully updated",!
     } else {
-        write !,"Error updating """_key_"""",!
+        write !,$system.Status.GetErrorText(sc),!
     }
     return sc
 }
@@ -197,11 +202,10 @@ ClassMethod GetHistoryRetain() As %Integer
 
 ClassMethod SetTestReportFormat(
 	val As %String,
-	overwrite As %Boolean = 1) As %Boolean
+	overwrite As %Boolean = 1) As %Status
 {
-    // Validate format value
     if val '= "" && ('$listfind($listfromstring(##class(%IPM.Test.Abstract).#VALIDFORMATS), $zconvert(val, "l"))) {
-        return 0
+        return $$$ERROR($$$GeneralError, "Unknown format '"_val_"'. Valid formats: "_##class(%IPM.Test.Abstract).#VALIDFORMATS)
     }
     return ..SetValue(..#TestReportFormat, val, overwrite)
 }

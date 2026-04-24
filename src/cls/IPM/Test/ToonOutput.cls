@@ -57,6 +57,15 @@ ClassMethod OutputToDevice(
     return sc
 }
 
+/// RFC 4180 quoting: doubles internal quotes, wraps in quotes if value contains comma/quote/newline.
+ClassMethod EscapeToonField(val As %String) As %String [ Private ]
+{
+    if val [ """" || (val [ ",") || (val [ $char(10)) {
+        return """"_$replace(val, """", """""")_""""
+    }
+    return """"_val_""""
+}
+
 /// Returns a %Stream.TmpCharacter containing Toon result rows.
 /// failuresOnly=0: all methods (for ToFile and verbose OutputToDevice).
 /// failuresOnly=1: failed methods and assert failures only (for non-verbose OutputToDevice).
@@ -71,20 +80,20 @@ ClassMethod BuildToonRows(tree As %DynamicObject, failuresOnly As %Boolean, Outp
         while caseIter.%GetNext(, .caseObj) {
             if caseObj.error '= "" {
                 set rowCount = rowCount + 1
-                do rowStream.WriteLine("  "_suiteObj.name_","_caseObj.name_","_caseObj.name_",failed,OnBeforeAllTests,0,"""_$translate(caseObj.error,"""")_""",""""")
+                do rowStream.WriteLine("  "_suiteObj.name_","_caseObj.name_","_caseObj.name_",failed,OnBeforeAllTests,0,"_..EscapeToonField(caseObj.error)_",""""")
             }
             set methodIter = caseObj.methods.%GetIterator()
             while methodIter.%GetNext(, .methodObj) {
                 if failuresOnly && (methodObj.status '= "failed") { continue }
                 if methodObj.error '= "" {
                     set rowCount = rowCount + 1
-                    do rowStream.WriteLine("  "_suiteObj.name_","_caseObj.name_","_methodObj.name_",failed,error,0,"""_$translate(methodObj.error,"""")_""",""""")
+                    do rowStream.WriteLine("  "_suiteObj.name_","_caseObj.name_","_methodObj.name_",failed,error,0,"_..EscapeToonField(methodObj.error)_",""""")
                 }
                 set assertIter = methodObj.asserts.%GetIterator()
                 while assertIter.%GetNext(, .assertObj) {
                     if failuresOnly && (assertObj.status '= "failed") { continue }
                     set rowCount = rowCount + 1
-                    set row = "  "_suiteObj.name_","_caseObj.name_","_methodObj.name_","_assertObj.status_","_assertObj.action_","_assertObj.counter_","""_$translate(assertObj.description,"""")_""","""_assertObj.location_""""
+                    set row = "  "_suiteObj.name_","_caseObj.name_","_methodObj.name_","_assertObj.status_","_assertObj.action_","_assertObj.counter_","_..EscapeToonField(assertObj.description)_","_..EscapeToonField(assertObj.location)
                     do rowStream.WriteLine(row)
                 }
                 if 'failuresOnly && (methodObj.asserts.%Size() = 0) {

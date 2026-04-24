@@ -86,8 +86,10 @@ ClassMethod WriteToFileStream(
 
 ClassMethod EncodeXMLAttr(msg As %String) As %String [ Private ]
 {
-    set msg = $zstrip(msg, "*C")
+    // Strip control chars but preserve LF/CR for entity encoding below
+    set msg = $translate(msg, $char(0,1,2,3,4,5,6,7,8,11,12,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31))
     set msg = $zconvert($zconvert(msg, "O", "UTF8"), "O", "XML")
+    set msg = $replace(msg, $char(13,10), "&#13;&#10;")
     set msg = $replace(msg, $char(10), "&#10;")
     set msg = $replace(msg, $char(13), "&#13;")
     return msg
