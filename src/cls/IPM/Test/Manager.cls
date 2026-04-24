@@ -100,10 +100,19 @@ ClassMethod GetAllTestsStatus(
             set sc = $$$ERROR($$$GeneralError, failureCount_" failure(s).")
         }
 
-        // Only clean up AllResults at top level (startIndex=0), not in nested phases
+        // Always consume the entries this phase owned.
+        // At top level (startIndex=0) kill everything; for nested phases, roll the count
+        // back so the outer phase does not re-count entries the inner phase already handled.
+        // Outer phases learn about inner failures via the Shell return status, not by
+        // re-inspecting these entries.
         if startIndex = 0 {
             kill ^||%UnitTest.Manager.AllResults
             kill ^||%UnitTest.Manager.AllResultsCount
+        } else {
+            for i=(startIndex+1):1:testCount {
+                kill ^||%UnitTest.Manager.AllResults(i)
+            }
+            set ^||%UnitTest.Manager.AllResultsCount = startIndex
         }
     } catch e {
         set sc = e.AsStatus()
@@ -119,8 +128,6 @@ ClassMethod OutputFailures(startIndex As %Integer = 0)
     try {
         set testCount = $get(^||%UnitTest.Manager.AllResultsCount, 0)
 
-        // Output failures from all tracked test LogIndexes from startIndex onwards
-        // This ensures parent phase outputs failures from both parent and nested tests
         for i=(startIndex+1):1:testCount {
             set logIndex = $get(^||%UnitTest.Manager.AllResults(i))
             if (logIndex '= "") {

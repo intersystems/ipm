@@ -2,15 +2,22 @@
 Class %IPM.Test.Abstract Extends %RegisteredObject
 {
 
+/// Comma-separated list of valid output format names (lowercase).
+/// Must stay in sync with the valueList on the output-format modifier in %IPM.Main.
+Parameter VALIDFORMATS = "json,yaml,toon";
+
 ClassMethod ToFile(
     fileName As %String,
     testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status [ Abstract ]
 {
 }
 
+/// verbose: show all methods (not just failures) in the detail section.
+/// showDetail: show the results/failures section at all; when 0 only the summary is written.
 ClassMethod OutputToDevice(
     testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-    verbose As %Boolean = 0) As %Status [ Abstract ]
+    verbose As %Boolean = 0,
+    showDetail As %Boolean = 1) As %Status [ Abstract ]
 {
 }
 
@@ -122,9 +129,12 @@ ClassMethod BuildResultTree(testIndex As %Integer = {$order(^UnitTest.Result("")
 
 /// Returns a summary %DynamicObject with run metadata and method/assertion counts.
 /// Counts methods as failed if any assert failed OR if a non-assertion error occurred.
-ClassMethod GetSummary(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %DynamicObject
+/// Pass a pre-built tree to avoid a second ^UnitTest.Result traversal.
+ClassMethod GetSummary(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}, tree As %DynamicObject = "") As %DynamicObject
 {
-    set tree = ..BuildResultTree(testIndex)
+    if tree = "" {
+        set tree = ..BuildResultTree(testIndex)
+    }
     set (assertTotal, assertPassed, assertFailed) = 0
     set (methodTotal, methodPassed, methodFailed) = 0
 
@@ -150,7 +160,7 @@ ClassMethod GetSummary(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}
                     }
                 }
             }
-            // Case-level error (e.g. OnBeforeAllTests failure) — no methods ran
+            // Case-level error from a lifecycle hook (OnBeforeAllTests, OnAfterAllTests) — count it as one failed method
             if caseObj.error '= "" {
                 set methodTotal = methodTotal + 1
                 set methodFailed = methodFailed + 1

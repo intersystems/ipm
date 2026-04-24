@@ -1,6 +1,6 @@
 /// IPM settings are placed in ^IPM.settings global in %SYS namespace
 /// Use this class to set or get settings
-/// 
+///
 /// Available settings
 /// default_registry (string) - default registry url
 /// analytics_tracking_id
@@ -197,12 +197,16 @@ ClassMethod SetTestReportFormat(
 	val As %String,
 	overwrite As %Boolean = 1) As %Boolean
 {
+    // Validate format value
+    if val '= "" && ('$listfind($listfromstring(##class(%IPM.Test.Abstract).#VALIDFORMATS), $zconvert(val, "l"))) {
+        return 0
+    }
     return ..SetValue(..#TestReportFormat, val, overwrite)
 }
 
 ClassMethod GetTestReportFormat() As %String
 {
-     return ..GetValue(..#TestReportFormat)
+    return ..GetValue(..#TestReportFormat)
 }
 
 }

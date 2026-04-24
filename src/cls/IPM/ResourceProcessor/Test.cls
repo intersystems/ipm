@@ -232,28 +232,29 @@ Method OnPhase(
                 set capturing = 0
             }
 
-            set hasOutputFormat = $data(pParams("outputformat"),outputFormat)
-            write !
-            if explicitQuiet || hasOutputFormat || ('tVerbose) {
-                if 'explicitQuiet {
-                    write !,"Test Result Summary"
-                }
-                // CLI flag takes precedence; fall back to global config, then default to Toon
-                set defaultOutputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
-                if $get(outputFormat)="" {
-                    set outputFormat = $select(defaultOutputFormat'="":defaultOutputFormat,1:"Toon")
-                }
-                set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
-                if '$$$defClassDefined(outputClass) {
-                    $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputFormat_" output format does not exist."))
-                }
-                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose)
-                $$$ThrowOnError(tSC)
-                write !
+            set hasOutputFormat = $data(pParams("outputformat"))
+            write !!,"Test Result Summary"
+            // -f enables the failures/results detail section. The format is driven by
+            // 'config set TestReportFormat'; falls back to Toon if not configured.
+            // Without -f only the summary line is shown, matching pre-existing behavior.
+            set showDetail = hasOutputFormat
+            set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+            if outputFormat = "" {
+                set outputFormat = "Toon"
             }
-            // By default, detect and report unit test failures as an error from this phase
+            set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
+            if '$$$defClassDefined(outputClass) {
+                $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputFormat_" output format does not exist."))
+            }
+            set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose,showDetail)
+            $$$ThrowOnError(tSC)
+            write !
+            // By default, detect and report unit test failures as an error from this phase.
+            // OutputFailures is skipped when detail is shown since the formatter already includes failures.
             if $get(pParams("UnitTest","FailuresAreFatal"),1) {
-                do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+                if 'showDetail {
+                    do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+                }
                 set tSC = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
                 $$$ThrowOnError(tSC)
             }

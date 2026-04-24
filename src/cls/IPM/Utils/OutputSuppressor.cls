@@ -1,32 +1,33 @@
 /// I/O redirect routine that discards all writes.
+/// Modeled after CaptureOutput, but instead of capturing output to a variable, it simply discards it.
 /// Used as the mnemonic device routine for BeginSuppressOutput / EndSuppressOutput.
 /// Unlike BeginCaptureOutput, suppress does not use ^||%capture, so it is safe
 /// to call while a capture is already active.
 Class %IPM.Utils.OutputSuppressor
 {
 
-ClassMethod Begin(Output pCookie As %String) As %Status [ ProcedureBlock = 0 ]
+ClassMethod Begin(Output cookie As %String) As %Status [ ProcedureBlock = 0 ]
 {
-    new tSC,e
+    new sc,ex
 
-    #dim tSC As %Status = $$$OK
-    #dim e As %Exception.AbstractException
+    #dim sc As %Status = $$$OK
+    #dim ex As %Exception.AbstractException
 
     try {
         if $zutil(82,12) {
-            set pCookie=$zutil(96,12)
+            set cookie=$zutil(96,12)
         } else {
-            set pCookie=""
+            set cookie=""
         }
 
         use $io::("^"_$zname)
 
         do $zutil(82,12,1)
 
-    } catch (e) {
-        set tSC=e.AsStatus()
+    } catch (ex) {
+        set sc=ex.AsStatus()
     }
-    quit tSC
+    quit sc
 
 rstr(sz,to) [rt] public {
     new rt set vr="rt"
@@ -45,10 +46,10 @@ wtab(s) public { }
 write(s) public { }
 }
 
-ClassMethod End(pCookie As %String) As %Status
+ClassMethod End(cookie As %String) As %Status
 {
-    if pCookie '= "" {
-        use $io::("^"_pCookie)
+    if cookie '= "" {
+        use $io::("^"_cookie)
     } else {
         do $zutil(82,12,0)
         use $io::("")

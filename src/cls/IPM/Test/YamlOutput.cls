@@ -10,7 +10,7 @@ ClassMethod ToFile(
         set fileStream = ##class(%Stream.FileCharacter).%New()
         set fileStream.TranslateTable = "UTF8"
         $$$ThrowOnError(fileStream.LinkToFile(fileName))
-        do fileStream.CopyFrom(..YAML(testIndex))
+        do fileStream.CopyFrom(..BuildYaml(testIndex))
         $$$ThrowOnError(fileStream.%Save())
     } catch ex {
         set sc = ex.AsStatus()
@@ -20,11 +20,13 @@ ClassMethod ToFile(
 
 ClassMethod OutputToDevice(
     testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-    verbose As %Boolean = 0) As %Status
+    verbose As %Boolean = 0,
+    showDetail As %Boolean = 1) As %Status
 {
     set sc = $$$OK
     try {
-        set summary = ..GetSummary(testIndex)
+        set tree = ..BuildResultTree(testIndex)
+        set summary = ..GetSummary(testIndex, tree)
         write !
         write !,"summary:"
         write !,"  id: "_summary.id
@@ -40,19 +42,18 @@ ClassMethod OutputToDevice(
         write !,"    passed: "_summary.assertions.passed
         write !,"    failed: "_summary.assertions.failed
 
-        if verbose {
+        if showDetail && verbose {
             write !
             write !,"results:"
-            set tree = ..BuildResultTree(testIndex)
-            set resultStream = ..YAMLResults(tree)
+            set resultStream = ..BuildYamlResults(tree)
             do resultStream.Rewind()
             while 'resultStream.AtEnd {
                 write !,resultStream.ReadLine()
             }
-        } elseif summary.methods.failed > 0 {
+        } elseif showDetail && (summary.methods.failed > 0) {
             write !
             write !,"failures:"
-            set failStream = ..YAMLFailures(testIndex)
+            set failStream = ..BuildYamlFailures(tree)
             do failStream.Rewind()
             while 'failStream.AtEnd {
                 write !,failStream.ReadLine()
@@ -65,7 +66,7 @@ ClassMethod OutputToDevice(
 }
 
 /// Returns a stream with the full YAML document (header + all results).
-ClassMethod YAML(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Stream.TmpCharacter
+ClassMethod BuildYaml(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Stream.TmpCharacter
 {
     set tree = ..BuildResultTree(testIndex)
     set yamlStream = ##class(%Stream.TmpCharacter).%New()
@@ -77,13 +78,13 @@ ClassMethod YAML(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %
     do yamlStream.WriteLine("  testDateTime: """_tree.testDateTime_"""")
     do yamlStream.WriteLine()
     do yamlStream.WriteLine("  results:")
-    do yamlStream.CopyFrom(..YAMLResults(tree))
+    do yamlStream.CopyFrom(..BuildYamlResults(tree))
     return yamlStream
 }
 
 /// Returns a stream of YAML result rows for all entries in the tree (no header).
 /// Used by ToFile via YAML, and by OutputToDevice for the failures section.
-ClassMethod YAMLResults(tree As %DynamicObject) As %Stream.TmpCharacter [ Private ]
+ClassMethod BuildYamlResults(tree As %DynamicObject) As %Stream.TmpCharacter [ Private ]
 {
     set resultStream = ##class(%Stream.TmpCharacter).%New()
     set (currentSuite, currentCase) = ""
@@ -137,9 +138,8 @@ ClassMethod YAMLResults(tree As %DynamicObject) As %Stream.TmpCharacter [ Privat
 }
 
 /// Returns a stream of YAML failure rows only (no header). Used by OutputToDevice.
-ClassMethod YAMLFailures(testIndex As %Integer) As %Stream.TmpCharacter [ Private ]
+ClassMethod BuildYamlFailures(tree As %DynamicObject) As %Stream.TmpCharacter [ Private ]
 {
-    set tree = ..BuildResultTree(testIndex)
     set failStream = ##class(%Stream.TmpCharacter).%New()
     set (currentSuite, currentCase) = ""
     set suiteIter = tree.suites.%GetIterator()

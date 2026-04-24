@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
-- #971: Adds support for JSON, YAML, and Toon formats via the -output-format/-f flag for outputting into the terminal and the -output-file flag for outputting to a file
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
+- #971: Adds support for JSON, YAML, and Toon formats via the -output-format/-f flag for outputting into the terminal, adds the -output-file flag for outputting to a file, and improves the -quiet flag to suppress most output
 
 ### Fixed
 - #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace

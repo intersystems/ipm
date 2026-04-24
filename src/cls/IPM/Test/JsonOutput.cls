@@ -20,13 +20,14 @@ ClassMethod ToFile(
 
 ClassMethod OutputToDevice(
     testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-    verbose As %Boolean = 0) As %Status
+    verbose As %Boolean = 0,
+    showDetail As %Boolean = 1) As %Status
 {
     set sc = $$$OK
     try {
-        set summary = ..GetSummary(testIndex)
         set tree = ..BuildResultTree(testIndex)
-        if verbose {
+        set summary = ..GetSummary(testIndex, tree)
+        if showDetail && verbose {
             set allMethods = []
             set suiteIter = tree.suites.%GetIterator()
             while suiteIter.%GetNext(, .suiteObj) {
@@ -42,7 +43,7 @@ ClassMethod OutputToDevice(
                 }
             }
             set output = {"summary": (summary), "methods": (allMethods)}
-        } else {
+        } elseif showDetail {
             set failedMethods = []
             if summary.methods.failed > 0 {
                 set suiteIter = tree.suites.%GetIterator()
@@ -70,6 +71,8 @@ ClassMethod OutputToDevice(
                 }
             }
             set output = {"summary": (summary), "failures": (failedMethods)}
+        } else {
+            set output = {"summary": (summary)}
         }
         write !
         do output.%ToJSON()

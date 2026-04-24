@@ -1,6 +1,14 @@
 Class Test.PM.Integration.TestOutputFormat Extends Test.PM.Integration.Base
 {
 
+/// The module is loaded once for the class rather than per-method because each `test` run
+/// is fast and re-loading would dominate test time. This is safe because:
+///   (1) each test method triggers its own `test` run, producing a new ^UnitTest.Result index,
+///   (2) all tests that need the latest index use $order(^UnitTest.Result(""),-1), so they
+///       always query their own run rather than a stale one,
+///   (3) the test module has no side effects outside ^UnitTest.Result.
+/// Adding new test methods: trigger a fresh `test` run or re-use the latest index — do not
+/// rely on a specific index value from a previous test method.
 Method OnBeforeAllTests() As %Status
 {
     set sc = ##class(%IPM.Main).Shell("load " _ ..GetModuleDir("test-output-format"))
@@ -10,7 +18,15 @@ Method OnBeforeAllTests() As %Status
 
 Method OnAfterAllTests() As %Status
 {
+    do ##class(%IPM.Main).Shell("config delete TestReportFormat")
     do ##class(%IPM.Main).Shell("uninstall test-output-format")
+    return $$$OK
+}
+
+/// Reset format config before each test so format-specific tests don't pollute each other.
+Method OnBeforeOneTest(testName As %String) As %Status
+{
+    do ##class(%IPM.Main).Shell("config delete TestReportFormat")
     return $$$OK
 }
 
@@ -28,8 +44,7 @@ ClassMethod JoinOutput(ByRef pOutput) As %String [ Private ]
 }
 
 
-/// Default (non-verbose) output: summary + failures section, no results section.
-/// Expects 12 failed methods and 13 failure rows.
+/// Default (non-verbose, no -f) output: summary only, no failures or results section.
 Method TestDefaultOutput()
 {
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
@@ -39,26 +54,39 @@ Method TestDefaultOutput()
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
     set content = ..JoinOutput(.output)
     do $$$AssertTrue(content [ "12 failed", "summary reports 12 failed methods")
-    do $$$AssertTrue(content [ "failures[13]", "failures section has 13 rows")
-    do $$$AssertNotTrue(content [ "results[", "no results section in default mode")
+    do $$$AssertNotTrue(content [ "failures[", "no failures section without -f")
+    do $$$AssertNotTrue(content [ "results[", "no results section without -f")
 }
 
-/// Verbose output requires -f to route through OutputToDevice.
-/// With -verbose -f toon: results section with all methods, no failures section.
+/// Verbose without -f: summary only (no results/failures section).
 Method TestVerboseOutput()
 {
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -verbose -f toon")
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
     set content = ..JoinOutput(.output)
     do $$$AssertTrue(content [ "12 failed", "summary reports 12 failed methods")
-    do $$$AssertTrue(content [ "results[", "results section present in verbose mode")
+    do $$$AssertNotTrue(content [ "results[", "no results section without -f")
+    do $$$AssertNotTrue(content [ "failures[", "no failures section without -f")
+}
+
+/// Verbose with -f: results section with all methods, no failures section.
+Method TestVerboseOutputFormat()
+{
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -verbose -f")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
+    set content = ..JoinOutput(.output)
+    do $$$AssertTrue(content [ "12 failed", "summary reports 12 failed methods")
+    do $$$AssertTrue(content [ "results[", "results section present with -verbose -f")
     do $$$AssertNotTrue(content [ "failures[", "no failures section in verbose mode")
 }
 
-/// Quiet output: suppresses test runner noise, still shows summary and failures.
+/// Quiet output: suppresses test runner noise, shows summary only (no failures section without -f).
 /// Known gap: two pre-phase lines ([USER|ZPM] Test START, Building dependency graph) still escape suppression.
 Method TestQuietOutput()
 {
@@ -69,20 +97,33 @@ Method TestQuietOutput()
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
     set content = ..JoinOutput(.output)
     do $$$AssertTrue(content [ "12 failed", "summary reports 12 failed methods in quiet mode")
-    do $$$AssertTrue(content [ "failures[13]", "failures section has 13 rows in quiet mode")
+    do $$$AssertNotTrue(content [ "failures[", "no failures section without -f")
 }
 
-/// -f json: summary + failures as JSON object (not verbose, so failures key not methods).
-Method TestOutputFormatJson()
+/// -f with toon format (default): summary + failures section with 13 rows.
+Method TestOutputFormatToon()
 {
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -f json")
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -f")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
+    set content = ..JoinOutput(.output)
+    do $$$AssertTrue(content [ "12 failed", "summary reports 12 failed methods")
+    do $$$AssertTrue(content [ "failures[13]", "failures section has 13 rows")
+    do $$$AssertNotTrue(content [ "results[", "no results section in default mode")
+}
+
+/// -f with json format configured: summary + failures as JSON object.
+Method TestOutputFormatJson()
+{
+    do ##class(%IPM.Main).Shell("config set TestReportFormat json")
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -f")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
 
-    // Extract just the JSON object from the output: first "{" to last "}"
-    // OutputFailures writes "FAILED ..." lines after the JSON, so we must not include them
     set raw = ..JoinOutput(.output)
     set jsonStart = $find(raw, "{") - 1
     set jsonEnd = $length(raw) - $find($reverse(raw), "}") + 2
@@ -95,11 +136,12 @@ Method TestOutputFormatJson()
     do $$$AssertNotTrue($isobject(parsed.methods), "JSON output does not have methods array in default mode")
 }
 
-/// -verbose -f json: methods array with all methods, no failures array.
+/// -verbose -f with json format configured: methods array with all methods, no failures array.
 Method TestVerboseOutputFormatJson()
 {
+    do ##class(%IPM.Main).Shell("config set TestReportFormat json")
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -verbose -f json")
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -verbose -f")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
@@ -116,12 +158,13 @@ Method TestVerboseOutputFormatJson()
     do $$$AssertNotTrue($isobject(parsed.failures), "Verbose JSON output does not have failures array")
 }
 
-/// -f yaml: summary + failures block (not verbose).
+/// -f with yaml format configured: summary + failures block.
 /// YAML summary uses nested "failed: N" structure, not inline "N failed".
 Method TestOutputFormatYaml()
 {
+    do ##class(%IPM.Main).Shell("config set TestReportFormat yaml")
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -f yaml")
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -f")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
@@ -131,11 +174,12 @@ Method TestOutputFormatYaml()
     do $$$AssertNotTrue(content [ ($char(10)_"results:"), "YAML output has no results block in default mode")
 }
 
-/// -verbose -f yaml: results block present, no failures block.
+/// -verbose -f with yaml format configured: results block present, no failures block.
 Method TestVerboseOutputFormatYaml()
 {
+    do ##class(%IPM.Main).Shell("config set TestReportFormat yaml")
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -verbose -f yaml")
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -verbose -f")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
@@ -148,7 +192,7 @@ Method TestVerboseOutputFormatYaml()
 Method TestOutputFileToon()
 {
     set tmpFile = ##class(%Library.File).TempFilename() _ ".toon"
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -output-file " _ tmpFile)
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -output-file """ _ tmpFile _ """")
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
     do $$$AssertTrue(##class(%File).GetFileSize(tmpFile) > 0, "Toon output file is non-empty")
 
@@ -168,7 +212,7 @@ Method TestOutputFileToon()
 Method TestOutputFileYaml()
 {
     set tmpFile = ##class(%Library.File).TempFilename() _ ".yaml"
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -output-file " _ tmpFile)
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -output-file """ _ tmpFile _ """")
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
     do $$$AssertTrue(##class(%File).GetFileSize(tmpFile) > 0, "YAML output file is non-empty")
 
@@ -189,7 +233,7 @@ Method TestOutputFileYaml()
 Method TestOutputFileJson()
 {
     set tmpFile = ##class(%Library.File).TempFilename() _ ".json"
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -output-file " _ tmpFile)
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -output-file """ _ tmpFile _ """")
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
     do $$$AssertTrue(##class(%File).GetFileSize(tmpFile) > 0, "JSON output file is non-empty")
 
@@ -207,7 +251,7 @@ Method TestOutputFileJson()
 Method TestOutputFileXml()
 {
     set tmpFile = ##class(%Library.File).TempFilename() _ ".xml"
-    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -output-file " _ tmpFile)
+    set sc = ##class(%IPM.Main).Shell("test test-output-format -only -output-file """ _ tmpFile _ """")
     do $$$AssertStatusNotOK(sc, "test run returns error when failures exist")
     do $$$AssertTrue(##class(%File).GetFileSize(tmpFile) > 0, "XML output file is non-empty")
 
