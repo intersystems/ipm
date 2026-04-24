@@ -1,60 +1,32 @@
-/// I/O redirect routine that discards all writes.
-/// Modeled after CaptureOutput, but instead of capturing output to a variable, it simply discards it.
-/// Used as the mnemonic device routine for BeginSuppressOutput / EndSuppressOutput.
-/// Unlike BeginCaptureOutput, suppress does not use ^||%capture, so it is safe
-/// to call while a capture is already active.
-Class %IPM.Utils.OutputSuppressor
+/// Suppresses all output by switching to the null device.
+/// Instantiate via %New() to begin suppression; output is restored automatically
+/// when the instance goes out of scope (or on error via %OnClose).
+/// Safe to nest inside or outside BeginCaptureOutput.
+Class %IPM.Utils.OutputSuppressor Extends %RegisteredObject
 {
 
-ClassMethod Begin(Output cookie As %String) As %Status [ ProcedureBlock = 0 ]
+Property PreviousDevice As %String [ Private ];
+
+Property NullDevice As %String [ Private ];
+
+Method %OnNew() As %Status
 {
-    new sc,ex
-
-    #dim sc As %Status = $$$OK
-    #dim ex As %Exception.AbstractException
-
+    set ..PreviousDevice = $io
+    set ..NullDevice = ##class(%Library.Device).GetNullDevice()
     try {
-        if $zutil(82,12) {
-            set cookie=$zutil(96,12)
-        } else {
-            set cookie=""
-        }
-
-        use $io::("^"_$zname)
-
-        do $zutil(82,12,1)
-
-    } catch (ex) {
-        set sc=ex.AsStatus()
+        open ..NullDevice
+        use ..NullDevice
+    } catch ex {
+        return ex.AsStatus()
     }
-    quit sc
-
-rstr(sz,to) [rt] public {
-    new rt set vr="rt"
-    set rd=$zutil(82,12,0)
-    set:$data(sz) vr=vr_"#"_sz set:$data(to) vr=vr_":"_to
-    read @vr
-    do:$data(to) $zutil(96,4,$test)
-    do $zutil(82,12,rd)
-    quit rt
-  }
-wchr(s) public { }
-wff() public { }
-wnl() public { }
-wstr(s) public { }
-wtab(s) public { }
-write(s) public { }
+    return $$$OK
 }
 
-ClassMethod End(cookie As %String) As %Status
+Method %OnClose() As %Status
 {
-    if cookie '= "" {
-        use $io::("^"_cookie)
-    } else {
-        do $zutil(82,12,0)
-        use $io::("")
-    }
-    quit $$$OK
+    close ..NullDevice
+    use ..PreviousDevice
+    return $$$OK
 }
 
 }

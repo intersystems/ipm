@@ -112,10 +112,8 @@ Method OnPhase(
             set tVerbose = $get(pParams("Verbose"), 0)
             set tFlags = $select(tVerbose:"/display=all",1:"/display=none")
             set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
-            set capturing = 0
             if explicitQuiet {
-                $$$ThrowOnError(##class(%IPM.Utils.Module).BeginSuppressOutput(.cookie))
-                set capturing = 1
+                set suppressor = ##class(%IPM.Utils.OutputSuppressor).%New()
             }
 
             // Ensure unit tests and related classes are loaded.
@@ -227,10 +225,7 @@ Method OnPhase(
                 set tSC = $classmethod(outputClass,"ToFile",outputFile)
                 $$$ThrowOnError(tSC)
             }
-            if capturing {
-                $$$ThrowOnError(##class(%IPM.Utils.Module).EndSuppressOutput(cookie))
-                set capturing = 0
-            }
+            set suppressor = ""
 
             set outputFormat = $get(pParams("outputformat"))
             if outputFormat = "" {
@@ -262,9 +257,6 @@ Method OnPhase(
             write !
         }
     } catch e {
-        if capturing {
-            do ##class(%IPM.Utils.Module).EndSuppressOutput(cookie)
-        }
         set tSC = e.AsStatus()
     }
     if $data(tOldUnitTestRoot,^UnitTestRoot) // Restore ^UnitTestRoot
