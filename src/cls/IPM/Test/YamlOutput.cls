@@ -1,21 +1,11 @@
 Class %IPM.Test.YamlOutput Extends %IPM.Test.Abstract
 {
 
-ClassMethod ToFile(
-    fileName As %String,
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+ClassMethod WriteToFileStream(
+    fileStream As %Stream.FileCharacter,
+    testIndex As %Integer)
 {
-    set sc = $$$OK
-    try {
-        set fileStream = ##class(%Stream.FileCharacter).%New()
-        set fileStream.TranslateTable = "UTF8"
-        $$$ThrowOnError(fileStream.LinkToFile(fileName))
-        do fileStream.CopyFrom(..BuildYaml(testIndex))
-        $$$ThrowOnError(fileStream.%Save())
-    } catch ex {
-        set sc = ex.AsStatus()
-    }
-    return sc
+    do fileStream.CopyFrom(..BuildYaml(testIndex))
 }
 
 ClassMethod OutputToDevice(
@@ -45,7 +35,7 @@ ClassMethod OutputToDevice(
         if showDetail && verbose {
             write !
             write !,"results:"
-            set resultStream = ..BuildYamlResults(tree)
+            set resultStream = ..BuildYamlRows(tree, 0)
             do resultStream.Rewind()
             while 'resultStream.AtEnd {
                 write !,resultStream.ReadLine()
@@ -53,7 +43,7 @@ ClassMethod OutputToDevice(
         } elseif showDetail && (summary.methods.failed > 0) {
             write !
             write !,"failures:"
-            set failStream = ..BuildYamlFailures(tree)
+            set failStream = ..BuildYamlRows(tree, 1)
             do failStream.Rewind()
             while 'failStream.AtEnd {
                 write !,failStream.ReadLine()
@@ -78,15 +68,16 @@ ClassMethod BuildYaml(testIndex As %Integer = {$order(^UnitTest.Result(""),-1)})
     do yamlStream.WriteLine("  testDateTime: """_tree.testDateTime_"""")
     do yamlStream.WriteLine()
     do yamlStream.WriteLine("  results:")
-    do yamlStream.CopyFrom(..BuildYamlResults(tree))
+    do yamlStream.CopyFrom(..BuildYamlRows(tree, 0))
     return yamlStream
 }
 
-/// Returns a stream of YAML result rows for all entries in the tree (no header).
-/// Used by ToFile via YAML, and by OutputToDevice for the failures section.
-ClassMethod BuildYamlResults(tree As %DynamicObject) As %Stream.TmpCharacter [ Private ]
+/// Returns a stream of YAML rows. failuresOnly=1 skips passing methods/assertions.
+/// Each method's assertions are emitted under an `asserts:` list to produce valid YAML.
+ClassMethod BuildYamlRows(tree As %DynamicObject, failuresOnly As %Boolean) As %Stream.TmpCharacter [ Private ]
 {
-    set resultStream = ##class(%Stream.TmpCharacter).%New()
+    set indent = $select(failuresOnly: "  ", 1: "    ")
+    set stream = ##class(%Stream.TmpCharacter).%New()
     set (currentSuite, currentCase) = ""
     set suiteIter = tree.suites.%GetIterator()
     while suiteIter.%GetNext(, .suiteObj) {
@@ -96,99 +87,50 @@ ClassMethod BuildYamlResults(tree As %DynamicObject) As %Stream.TmpCharacter [ P
                 if suiteObj.name '= currentSuite {
                     set currentSuite = suiteObj.name
                     set currentCase = ""
-                    do resultStream.WriteLine("    - suiteName: """_suiteObj.name_"""")
-                    do resultStream.WriteLine("      testcases:")
+                    do stream.WriteLine(indent_"- suiteName: """_suiteObj.name_"""")
+                    do stream.WriteLine(indent_"  testcases:")
                 }
-                do resultStream.WriteLine("        - testcaseName: """_caseObj.name_"""")
-                do resultStream.WriteLine("          error: |")
-                do resultStream.WriteLine("            "_$replace(caseObj.error, $char(10), $char(10)_"            "))
+                do stream.WriteLine(indent_"    - testcaseName: """_caseObj.name_"""")
+                do stream.WriteLine(indent_"      error: |")
+                do stream.WriteLine(indent_"        "_$replace(caseObj.error, $char(10), $char(10)_indent_"        "))
             }
             set methodIter = caseObj.methods.%GetIterator()
             while methodIter.%GetNext(, .methodObj) {
+                if failuresOnly && (methodObj.status '= "failed") { continue }
                 if suiteObj.name '= currentSuite {
                     set currentSuite = suiteObj.name
                     set currentCase = ""
-                    do resultStream.WriteLine("    - suiteName: """_suiteObj.name_"""")
-                    do resultStream.WriteLine("      testcases:")
+                    do stream.WriteLine(indent_"- suiteName: """_suiteObj.name_"""")
+                    do stream.WriteLine(indent_"  testcases:")
                 }
                 if caseObj.name '= currentCase {
                     set currentCase = caseObj.name
-                    do resultStream.WriteLine("        - testcaseName: """_caseObj.name_"""")
-                    do resultStream.WriteLine("          methods:")
+                    do stream.WriteLine(indent_"    - testcaseName: """_caseObj.name_"""")
+                    do stream.WriteLine(indent_"      methods:")
                 }
-                do resultStream.WriteLine("            - methodName: """_methodObj.name_"""")
-                do resultStream.WriteLine("              status: """_methodObj.status_"""")
+                do stream.WriteLine(indent_"        - methodName: """_methodObj.name_"""")
+                do stream.WriteLine(indent_"          status: """_methodObj.status_"""")
                 if methodObj.error '= "" {
-                    do resultStream.WriteLine("              error: |")
-                    do resultStream.WriteLine("                "_$replace(methodObj.error, $char(10), $char(10)_"                "))
+                    do stream.WriteLine(indent_"          error: |")
+                    do stream.WriteLine(indent_"            "_$replace(methodObj.error, $char(10), $char(10)_indent_"            "))
                 }
-                set assertIter = methodObj.asserts.%GetIterator()
-                while assertIter.%GetNext(, .assertObj) {
-                    do resultStream.WriteLine("              assertAction: """_assertObj.action_"""")
-                    do resultStream.WriteLine("              assertCounter: "_assertObj.counter)
-                    do resultStream.WriteLine("              assertStatus: """_assertObj.status_"""")
-                    do resultStream.WriteLine("              assertDescription: |")
-                    do resultStream.WriteLine("                "_$replace(assertObj.description, $char(10), $char(10)_"                "))
-                    do resultStream.WriteLine("              assertLocation: """_assertObj.location_"""")
+                if methodObj.asserts.%Size() > 0 {
+                    do stream.WriteLine(indent_"          asserts:")
+                    set assertIter = methodObj.asserts.%GetIterator()
+                    while assertIter.%GetNext(, .assertObj) {
+                        if failuresOnly && (assertObj.status '= "failed") { continue }
+                        do stream.WriteLine(indent_"            - action: """_assertObj.action_"""")
+                        do stream.WriteLine(indent_"              counter: "_assertObj.counter)
+                        do stream.WriteLine(indent_"              status: """_assertObj.status_"""")
+                        do stream.WriteLine(indent_"              description: |")
+                        do stream.WriteLine(indent_"                "_$replace(assertObj.description, $char(10), $char(10)_indent_"                "))
+                        do stream.WriteLine(indent_"              location: """_assertObj.location_"""")
+                    }
                 }
             }
         }
     }
-    return resultStream
-}
-
-/// Returns a stream of YAML failure rows only (no header). Used by OutputToDevice.
-ClassMethod BuildYamlFailures(tree As %DynamicObject) As %Stream.TmpCharacter [ Private ]
-{
-    set failStream = ##class(%Stream.TmpCharacter).%New()
-    set (currentSuite, currentCase) = ""
-    set suiteIter = tree.suites.%GetIterator()
-    while suiteIter.%GetNext(, .suiteObj) {
-        set caseIter = suiteObj.cases.%GetIterator()
-        while caseIter.%GetNext(, .caseObj) {
-            if caseObj.error '= "" {
-                if suiteObj.name '= currentSuite {
-                    set currentSuite = suiteObj.name
-                    set currentCase = ""
-                    do failStream.WriteLine("  - suiteName: """_suiteObj.name_"""")
-                    do failStream.WriteLine("    testcases:")
-                }
-                do failStream.WriteLine("      - testcaseName: """_caseObj.name_"""")
-                do failStream.WriteLine("        error: |")
-                do failStream.WriteLine("          "_$replace(caseObj.error, $char(10), $char(10)_"          "))
-            }
-            set methodIter = caseObj.methods.%GetIterator()
-            while methodIter.%GetNext(, .methodObj) {
-                if methodObj.status '= "failed" { continue }
-                if suiteObj.name '= currentSuite {
-                    set currentSuite = suiteObj.name
-                    set currentCase = ""
-                    do failStream.WriteLine("  - suiteName: """_suiteObj.name_"""")
-                    do failStream.WriteLine("    testcases:")
-                }
-                if caseObj.name '= currentCase {
-                    set currentCase = caseObj.name
-                    do failStream.WriteLine("      - testcaseName: """_caseObj.name_"""")
-                    do failStream.WriteLine("        methods:")
-                }
-                do failStream.WriteLine("          - methodName: """_methodObj.name_"""")
-                if methodObj.error '= "" {
-                    do failStream.WriteLine("            error: |")
-                    do failStream.WriteLine("              "_$replace(methodObj.error, $char(10), $char(10)_"              "))
-                }
-                set assertIter = methodObj.asserts.%GetIterator()
-                while assertIter.%GetNext(, .assertObj) {
-                    if assertObj.status '= "failed" { continue }
-                    do failStream.WriteLine("            assertAction: """_assertObj.action_"""")
-                    do failStream.WriteLine("            assertCounter: "_assertObj.counter)
-                    do failStream.WriteLine("            assertDescription: |")
-                    do failStream.WriteLine("              "_$replace(assertObj.description, $char(10), $char(10)_"              "))
-                    do failStream.WriteLine("            assertLocation: """_assertObj.location_"""")
-                }
-            }
-        }
-    }
-    return failStream
+    return stream
 }
 
 }

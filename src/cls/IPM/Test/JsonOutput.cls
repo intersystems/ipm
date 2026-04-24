@@ -1,21 +1,11 @@
 Class %IPM.Test.JsonOutput Extends %IPM.Test.Abstract
 {
 
-ClassMethod ToFile(
-    fileName As %String,
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+ClassMethod WriteToFileStream(
+    fileStream As %Stream.FileCharacter,
+    testIndex As %Integer)
 {
-    set sc = $$$OK
-    try {
-        set fileStream = ##class(%Stream.FileCharacter).%New()
-        set fileStream.TranslateTable = "UTF8"
-        $$$ThrowOnError(fileStream.LinkToFile(fileName))
-        do fileStream.Write(..BuildResultTree(testIndex).%ToJSON())
-        $$$ThrowOnError(fileStream.%Save())
-    } catch ex {
-        set sc = ex.AsStatus()
-    }
-    return sc
+    do fileStream.Write(..BuildResultTree(testIndex).%ToJSON())
 }
 
 ClassMethod OutputToDevice(

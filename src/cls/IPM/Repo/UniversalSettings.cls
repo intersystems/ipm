@@ -89,11 +89,13 @@ ClassMethod ResetToDefault(key As %String) As %Status
         write "Config key = """_key_""" not found",!
         quit
     }
-    set sc = ..SetValue($parameter(..%ClassName(1),key), ..GetDefaultValue($parameter(..%ClassName(1),key)))
+    // TestReportFormat has no factory default; empty means "use legacy output"
+    set defaultValue = $select(key = "TestReportFormat": "", 1: ..GetDefaultValue($parameter(..%ClassName(1),key)))
+    set sc = ..SetValue($parameter(..%ClassName(1),key), defaultValue)
     if $$$ISOK(sc) {
-        write "Value for """_key_""" succesfully reset to default",!
+        write !,"Value for """_key_""" succesfully reset to default",!
     } else {
-        write "Error reseting value for """_key_"""",!
+        write !,"Error reseting value for """_key_"""",!
     }
     return sc
 }
@@ -109,9 +111,9 @@ ClassMethod UpdateOne(
     }
     set sc = ..SetValue($parameter(..%ClassName(1),key), value)
     if $$$ISOK(sc) {
-        write "Key """_key_""" succesfully updated",!
+        write !,"Key """_key_""" succesfully updated",!
     } else {
-        write "Error updating """_key_"""",!
+        write !,"Error updating """_key_"""",!
     }
     return sc
 }

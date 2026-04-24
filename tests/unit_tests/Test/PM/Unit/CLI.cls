@@ -369,7 +369,7 @@ Method TestReportFormatConfiguration()
     if originalFormat'="" {
         do ..RunCommand("config set TestReportFormat "_originalFormat)
     } else {
-        do ..RunCommand("config reset TestReportFormat")
+        do ..RunCommand("config delete TestReportFormat")
     }
 }
 

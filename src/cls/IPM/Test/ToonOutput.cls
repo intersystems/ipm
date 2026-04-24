@@ -1,33 +1,22 @@
 Class %IPM.Test.ToonOutput Extends %IPM.Test.Abstract
 {
 
-ClassMethod ToFile(
-    fileName As %String,
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+ClassMethod WriteToFileStream(
+    fileStream As %Stream.FileCharacter,
+    testIndex As %Integer)
 {
-    set sc = $$$OK
-    try {
-        set fileStream = ##class(%Stream.FileCharacter).%New()
-        set fileStream.TranslateTable = "UTF8"
-        $$$ThrowOnError(fileStream.LinkToFile(fileName))
+    set tree = ..BuildResultTree(testIndex)
+    set rowStream = ..BuildToonRows(tree, 0, .rowCount)
 
-        set tree = ..BuildResultTree(testIndex)
-        set rowStream = ..BuildToonRows(tree, 0, .rowCount)
-
-        do fileStream.WriteLine("unitTest:")
-        do fileStream.WriteLine("  id: "_tree.id)
-        do fileStream.WriteLine("  namespace: "_tree.namespace)
-        do fileStream.WriteLine("  duration: "_tree.duration_"s")
-        do fileStream.WriteLine("  testDateTime: "_tree.testDateTime)
-        do fileStream.WriteLine()
-        do fileStream.WriteLine("results["_rowCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:")
-        do rowStream.Rewind()
-        do fileStream.CopyFrom(rowStream)
-        $$$ThrowOnError(fileStream.%Save())
-    } catch ex {
-        set sc = ex.AsStatus()
-    }
-    return sc
+    do fileStream.WriteLine("unitTest:")
+    do fileStream.WriteLine("  id: "_tree.id)
+    do fileStream.WriteLine("  namespace: "_tree.namespace)
+    do fileStream.WriteLine("  duration: "_tree.duration_"s")
+    do fileStream.WriteLine("  testDateTime: "_tree.testDateTime)
+    do fileStream.WriteLine()
+    do fileStream.WriteLine("results["_rowCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:")
+    do rowStream.Rewind()
+    do fileStream.CopyFrom(rowStream)
 }
 
 ClassMethod OutputToDevice(

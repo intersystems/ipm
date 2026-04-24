@@ -3,12 +3,29 @@ Class %IPM.Test.Abstract Extends %RegisteredObject
 {
 
 /// Comma-separated list of valid output format names (lowercase).
-/// Must stay in sync with the valueList on the output-format modifier in %IPM.Main.
+/// Must stay in sync with the valueList on the format modifier in %IPM.Main.
 Parameter VALIDFORMATS = "json,yaml,toon";
 
 ClassMethod ToFile(
     fileName As %String,
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status [ Abstract ]
+    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+{
+    set sc = $$$OK
+    try {
+        set fileStream = ##class(%Stream.FileCharacter).%New()
+        set fileStream.TranslateTable = "UTF8"
+        $$$ThrowOnError(fileStream.LinkToFile(fileName))
+        do ..WriteToFileStream(fileStream, testIndex)
+        $$$ThrowOnError(fileStream.%Save())
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    return sc
+}
+
+ClassMethod WriteToFileStream(
+    fileStream As %Stream.FileCharacter,
+    testIndex As %Integer) [ Abstract ]
 {
 }
 
@@ -17,8 +34,55 @@ ClassMethod ToFile(
 ClassMethod OutputToDevice(
     testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
     verbose As %Boolean = 0,
-    showDetail As %Boolean = 1) As %Status [ Abstract ]
+    showDetail As %Boolean = 1) As %Status
 {
+    set sc = $$$OK
+    try {
+        set tree = ..BuildResultTree(testIndex)
+        set summary = ..GetSummary(testIndex, tree)
+        write !!,"Test Run #"_summary.id_" ("_summary.namespace_") "_summary.duration_"s "_summary.testDateTime
+        write !,"Methods: "_summary.methods.total_" total, "_summary.methods.passed_" passed, "_summary.methods.failed_" failed"
+        write !,"Assertions: "_summary.assertions.total_" total, "_summary.assertions.passed_" passed, "_summary.assertions.failed_" failed"
+
+        if showDetail && verbose {
+            write !
+            set suiteIter = tree.suites.%GetIterator()
+            while suiteIter.%GetNext(, .suiteObj) {
+                set caseIter = suiteObj.cases.%GetIterator()
+                while caseIter.%GetNext(, .caseObj) {
+                    if caseObj.error '= "" {
+                        write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
+                    }
+                    set methodIter = caseObj.methods.%GetIterator()
+                    while methodIter.%GetNext(, .methodObj) {
+                        write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" ["_methodObj.status_"]"
+                        if methodObj.error '= "" { write " "_methodObj.error }
+                    }
+                }
+            }
+        } elseif showDetail && (summary.methods.failed > 0) {
+            write !
+            set suiteIter = tree.suites.%GetIterator()
+            while suiteIter.%GetNext(, .suiteObj) {
+                set caseIter = suiteObj.cases.%GetIterator()
+                while caseIter.%GetNext(, .caseObj) {
+                    if caseObj.error '= "" {
+                        write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
+                    }
+                    set methodIter = caseObj.methods.%GetIterator()
+                    while methodIter.%GetNext(, .methodObj) {
+                        if methodObj.status = "failed" {
+                            write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" [failed]"
+                            if methodObj.error '= "" { write " "_methodObj.error }
+                        }
+                    }
+                }
+            }
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    return sc
 }
 
 /// Walks ^UnitTest.Result and returns a fully-populated result tree.

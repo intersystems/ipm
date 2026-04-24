@@ -232,27 +232,28 @@ Method OnPhase(
                 set capturing = 0
             }
 
-            set hasOutputFormat = $data(pParams("outputformat"))
-            write !!,"Test Result Summary"
-            // -f enables the failures/results detail section. The format is driven by
-            // 'config set TestReportFormat'; falls back to Toon if not configured.
-            // Without -f only the summary line is shown, matching pre-existing behavior.
-            set showDetail = hasOutputFormat
-            set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+            set outputFormat = $get(pParams("outputformat"))
             if outputFormat = "" {
-                set outputFormat = "Toon"
+                set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
             }
-            set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
-            if '$$$defClassDefined(outputClass) {
-                $$$ThrowOnError($$$ERROR($$$GeneralError,"The requested "_outputFormat_" output format does not exist."))
+
+            write !!,"Test Results:"
+            if outputFormat '= "" {
+                set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
+                if '$$$defClassDefined(outputClass) {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
+                }
+                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose,1)
+                $$$ThrowOnError(tSC)
+            } else {
+                set tSC = ##class(%IPM.Test.Abstract).OutputToDevice(testIndex,tVerbose,0)
+                $$$ThrowOnError(tSC)
             }
-            set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose,showDetail)
-            $$$ThrowOnError(tSC)
             write !
-            // By default, detect and report unit test failures as an error from this phase.
-            // OutputFailures is skipped when detail is shown since the formatter already includes failures.
+            // Detect and report unit test failures as an error from this phase.
+            // OutputFailures shows legacy red FAILED lines only when no format is active.
             if $get(pParams("UnitTest","FailuresAreFatal"),1) {
-                if 'showDetail {
+                if outputFormat = "" {
                     do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
                 }
                 set tSC = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)

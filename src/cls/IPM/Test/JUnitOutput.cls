@@ -1,152 +1,87 @@
 Class %IPM.Test.JUnitOutput Extends %IPM.Test.Abstract
 {
 
-ClassMethod ToFile(
-    fileName As %String,
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+ClassMethod WriteToFileStream(
+    fileStream As %Stream.FileCharacter,
+    testIndex As %Integer)
 {
-    set sc = $$$OK
-    try {
-        set fileStream = ##class(%Stream.FileCharacter).%New()
-        set fileStream.TranslateTable = "UTF8"
-        $$$ThrowOnError(fileStream.LinkToFile(fileName))
+    set tree = ..BuildResultTree(testIndex)
 
-        set tree = ..BuildResultTree(testIndex)
+    do fileStream.WriteLine("<?xml version=""1.0"" encoding=""UTF-8"" ?>")
+    do fileStream.WriteLine("<testsuites>")
 
-        do fileStream.WriteLine("<?xml version=""1.0"" encoding=""UTF-8"" ?>")
-        do fileStream.WriteLine("<testsuites>")
-
-        set suiteIter = tree.suites.%GetIterator()
-        while suiteIter.%GetNext(, .suiteObj) {
-            set suiteTests = 0
-            set suiteFailures = 0
-            set suiteAssertions = 0
-            set suiteDuration = 0
-            set caseIter2 = suiteObj.cases.%GetIterator()
-            while caseIter2.%GetNext(, .caseObj2) {
-                set methodIter2 = caseObj2.methods.%GetIterator()
-                while methodIter2.%GetNext(, .methodObj2) {
-                    set suiteTests = suiteTests + 1
-                    if methodObj2.status = "failed" { set suiteFailures = suiteFailures + 1 }
-                    set suiteDuration = suiteDuration + methodObj2.duration
-                    set assertIter2 = methodObj2.asserts.%GetIterator()
-                    while assertIter2.%GetNext(, .unused) { set suiteAssertions = suiteAssertions + 1 }
-                }
-                if caseObj2.error '= "" {
-                    set suiteTests = suiteTests + 1
-                    set suiteFailures = suiteFailures + 1
-                }
+    set suiteIter = tree.suites.%GetIterator()
+    while suiteIter.%GetNext(, .suiteObj) {
+        set suiteTests = 0
+        set suiteFailures = 0
+        set suiteAssertions = 0
+        set suiteDuration = 0
+        set caseIter2 = suiteObj.cases.%GetIterator()
+        while caseIter2.%GetNext(, .caseObj2) {
+            set methodIter2 = caseObj2.methods.%GetIterator()
+            while methodIter2.%GetNext(, .methodObj2) {
+                set suiteTests = suiteTests + 1
+                if methodObj2.status = "failed" { set suiteFailures = suiteFailures + 1 }
+                set suiteDuration = suiteDuration + methodObj2.duration
+                set assertIter2 = methodObj2.asserts.%GetIterator()
+                while assertIter2.%GetNext(, .unused) { set suiteAssertions = suiteAssertions + 1 }
             }
+            if caseObj2.error '= "" {
+                set suiteTests = suiteTests + 1
+                set suiteFailures = suiteFailures + 1
+            }
+        }
 
+        do fileStream.Write("<testsuite")
+        do fileStream.Write(" name="""_$zconvert(suiteObj.name,"O","XML")_"""")
+        do fileStream.Write(" tests="""_suiteTests_"""")
+        do fileStream.Write(" failures="""_suiteFailures_"""")
+        do fileStream.Write(" assertions="""_suiteAssertions_"""")
+        do fileStream.Write(" time="""_suiteDuration_"""")
+        do fileStream.WriteLine(">")
+
+        set caseIter = suiteObj.cases.%GetIterator()
+        while caseIter.%GetNext(, .caseObj) {
             do fileStream.Write("<testsuite")
-            do fileStream.Write(" name="""_$zconvert(suiteObj.name,"O","XML")_"""")
-            do fileStream.Write(" tests="""_suiteTests_"""")
-            do fileStream.Write(" failures="""_suiteFailures_"""")
-            do fileStream.Write(" assertions="""_suiteAssertions_"""")
-            do fileStream.Write(" time="""_suiteDuration_"""")
+            do fileStream.Write(" name="""_$zconvert(caseObj.name,"O","XML")_"""")
             do fileStream.WriteLine(">")
 
-            set caseIter = suiteObj.cases.%GetIterator()
-            while caseIter.%GetNext(, .caseObj) {
-                do fileStream.Write("<testsuite")
-                do fileStream.Write(" name="""_$zconvert(caseObj.name,"O","XML")_"""")
+            if caseObj.error '= "" {
+                do fileStream.Write("<testcase name="""_$zconvert(caseObj.name,"O","XML")_""">")
+                set msg = ..EncodeXMLAttr(caseObj.error)
+                do fileStream.Write("<failure type=""cache-error"" message="""_msg_""">")
+                do fileStream.WriteLine("</failure></testcase>")
+            }
+
+            set methodIter = caseObj.methods.%GetIterator()
+            while methodIter.%GetNext(, .methodObj) {
+                set methodAssertions = methodObj.asserts.%Size()
+                do fileStream.Write("<testcase")
+                do fileStream.Write(" name="""_$zconvert(methodObj.name,"O","XML")_"""")
+                do fileStream.Write(" assertions="""_methodAssertions_"""")
+                do fileStream.Write(" time="""_methodObj.duration_"""")
                 do fileStream.WriteLine(">")
 
-                if caseObj.error '= "" {
-                    do fileStream.Write("<testcase name="""_$zconvert(caseObj.name,"O","XML")_""">")
-                    set msg = ..EncodeXMLAttr(caseObj.error)
-                    do fileStream.Write("<failure type=""cache-error"" message="""_msg_""">")
-                    do fileStream.WriteLine("</failure></testcase>")
-                }
-
-                set methodIter = caseObj.methods.%GetIterator()
-                while methodIter.%GetNext(, .methodObj) {
-                    set methodAssertions = methodObj.asserts.%Size()
-                    do fileStream.Write("<testcase")
-                    do fileStream.Write(" name="""_$zconvert(methodObj.name,"O","XML")_"""")
-                    do fileStream.Write(" assertions="""_methodAssertions_"""")
-                    do fileStream.Write(" time="""_methodObj.duration_"""")
-                    do fileStream.WriteLine(">")
-
-                    set assertIter = methodObj.asserts.%GetIterator()
-                    while assertIter.%GetNext(, .assertObj) {
-                        if assertObj.status = "failed" {
-                            set msg = ..EncodeXMLAttr(assertObj.action_": "_assertObj.description)
-                            do fileStream.Write("<failure type=""cache-error"" message="""_msg_""">")
-                            do fileStream.WriteLine("</failure>")
-                        }
-                    }
-                    if (methodObj.status = "failed") && (methodObj.error '= "") {
-                        set msg = ..EncodeXMLAttr(methodObj.error)
+                set assertIter = methodObj.asserts.%GetIterator()
+                while assertIter.%GetNext(, .assertObj) {
+                    if assertObj.status = "failed" {
+                        set msg = ..EncodeXMLAttr(assertObj.action_": "_assertObj.description)
                         do fileStream.Write("<failure type=""cache-error"" message="""_msg_""">")
                         do fileStream.WriteLine("</failure>")
                     }
-                    do fileStream.WriteLine("</testcase>")
                 }
-                do fileStream.WriteLine("</testsuite>")
+                if (methodObj.status = "failed") && (methodObj.error '= "") {
+                    set msg = ..EncodeXMLAttr(methodObj.error)
+                    do fileStream.Write("<failure type=""cache-error"" message="""_msg_""">")
+                    do fileStream.WriteLine("</failure>")
+                }
+                do fileStream.WriteLine("</testcase>")
             }
             do fileStream.WriteLine("</testsuite>")
         }
-        do fileStream.WriteLine("</testsuites>")
-        $$$ThrowOnError(fileStream.%Save())
-    } catch ex {
-        set sc = ex.AsStatus()
+        do fileStream.WriteLine("</testsuite>")
     }
-    return sc
-}
-
-ClassMethod OutputToDevice(
-    testIndex As %Integer = {$order(^UnitTest.Result(""),-1)},
-    verbose As %Boolean = 0) As %Status
-{
-    set sc = $$$OK
-    try {
-        set summary = ..GetSummary(testIndex)
-        write !,"JUnit Test Run #"_summary.id_" ("_summary.namespace_") "_summary.duration_"s "_summary.testDateTime
-        write !,"Methods: "_summary.methods.total_" total, "_summary.methods.passed_" passed, "_summary.methods.failed_" failed"
-        write !,"Assertions: "_summary.assertions.total_" total, "_summary.assertions.passed_" passed, "_summary.assertions.failed_" failed"
-
-        if verbose {
-            set tree = ..BuildResultTree(testIndex)
-            write !
-            set suiteIter = tree.suites.%GetIterator()
-            while suiteIter.%GetNext(, .suiteObj) {
-                set caseIter = suiteObj.cases.%GetIterator()
-                while caseIter.%GetNext(, .caseObj) {
-                    if caseObj.error '= "" {
-                        write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
-                    }
-                    set methodIter = caseObj.methods.%GetIterator()
-                    while methodIter.%GetNext(, .methodObj) {
-                        write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" ["_methodObj.status_"]"
-                        if methodObj.error '= "" { write " "_methodObj.error }
-                    }
-                }
-            }
-        } elseif summary.methods.failed > 0 {
-            set tree = ..BuildResultTree(testIndex)
-            write !
-            set suiteIter = tree.suites.%GetIterator()
-            while suiteIter.%GetNext(, .suiteObj) {
-                set caseIter = suiteObj.cases.%GetIterator()
-                while caseIter.%GetNext(, .caseObj) {
-                    if caseObj.error '= "" {
-                        write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
-                    }
-                    set methodIter = caseObj.methods.%GetIterator()
-                    while methodIter.%GetNext(, .methodObj) {
-                        if methodObj.status = "failed" {
-                            write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" [failed]"
-                            if methodObj.error '= "" { write " "_methodObj.error }
-                        }
-                    }
-                }
-            }
-        }
-    } catch ex {
-        set sc = ex.AsStatus()
-    }
-    return sc
+    do fileStream.WriteLine("</testsuites>")
 }
 
 ClassMethod EncodeXMLAttr(msg As %String) As %String [ Private ]
