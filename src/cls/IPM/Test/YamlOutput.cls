@@ -32,21 +32,23 @@ ClassMethod OutputToDevice(
         write !,"    passed: "_summary.assertions.passed
         write !,"    failed: "_summary.assertions.failed
 
-        if showDetail && verbose {
-            write !
-            write !,"results:"
-            set resultStream = ..BuildYamlRows(tree, 0)
-            do resultStream.Rewind()
-            while 'resultStream.AtEnd {
-                write !,resultStream.ReadLine()
-            }
-        } elseif showDetail && (summary.methods.failed > 0) {
-            write !
-            write !,"failures:"
-            set failStream = ..BuildYamlRows(tree, 1)
-            do failStream.Rewind()
-            while 'failStream.AtEnd {
-                write !,failStream.ReadLine()
+        if showDetail {
+            if verbose {
+                write !
+                write !,"results:"
+                set resultStream = ..BuildYamlRows(tree, 0)
+                do resultStream.Rewind()
+                while 'resultStream.AtEnd {
+                    write !,resultStream.ReadLine()
+                }
+            } elseif summary.methods.failed > 0 {
+                write !
+                write !,"failures:"
+                set failStream = ..BuildYamlRows(tree, 1)
+                do failStream.Rewind()
+                while 'failStream.AtEnd {
+                    write !,failStream.ReadLine()
+                }
             }
         }
     } catch ex {

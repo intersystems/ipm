@@ -17,50 +17,52 @@ ClassMethod OutputToDevice(
     try {
         set tree = ..BuildResultTree(testIndex)
         set summary = ..GetSummary(testIndex, tree)
-        if showDetail && verbose {
-            set allMethods = []
-            set suiteIter = tree.suites.%GetIterator()
-            while suiteIter.%GetNext(, .suiteObj) {
-                set caseIter = suiteObj.cases.%GetIterator()
-                while caseIter.%GetNext(, .caseObj) {
-                    if caseObj.error '= "" {
-                        do allMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "status": "failed", "error": (caseObj.error)})
-                    }
-                    set methodIter = caseObj.methods.%GetIterator()
-                    while methodIter.%GetNext(, .methodObj) {
-                        do allMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "status": (methodObj.status), "error": (methodObj.error)})
-                    }
-                }
-            }
-            set output = {"summary": (summary), "methods": (allMethods)}
-        } elseif showDetail {
-            set failedMethods = []
-            if summary.methods.failed > 0 {
+        if showDetail {
+            if verbose {
+                set allMethods = []
                 set suiteIter = tree.suites.%GetIterator()
                 while suiteIter.%GetNext(, .suiteObj) {
                     set caseIter = suiteObj.cases.%GetIterator()
                     while caseIter.%GetNext(, .caseObj) {
                         if caseObj.error '= "" {
-                            do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "error": (caseObj.error)})
+                            do allMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "status": "failed", "error": (caseObj.error)})
                         }
                         set methodIter = caseObj.methods.%GetIterator()
                         while methodIter.%GetNext(, .methodObj) {
-                            if methodObj.status = "failed" {
-                                if methodObj.error '= "" {
-                                    do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "error": (methodObj.error)})
-                                }
-                                set assertIter = methodObj.asserts.%GetIterator()
-                                while assertIter.%GetNext(, .assertObj) {
-                                    if assertObj.status = "failed" {
-                                        do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "action": (assertObj.action), "description": (assertObj.description), "location": (assertObj.location)})
+                            do allMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "status": (methodObj.status), "error": (methodObj.error)})
+                        }
+                    }
+                }
+                set output = {"summary": (summary), "methods": (allMethods)}
+            } else {
+                set failedMethods = []
+                if summary.methods.failed > 0 {
+                    set suiteIter = tree.suites.%GetIterator()
+                    while suiteIter.%GetNext(, .suiteObj) {
+                        set caseIter = suiteObj.cases.%GetIterator()
+                        while caseIter.%GetNext(, .caseObj) {
+                            if caseObj.error '= "" {
+                                do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "error": (caseObj.error)})
+                            }
+                            set methodIter = caseObj.methods.%GetIterator()
+                            while methodIter.%GetNext(, .methodObj) {
+                                if methodObj.status = "failed" {
+                                    if methodObj.error '= "" {
+                                        do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "error": (methodObj.error)})
+                                    }
+                                    set assertIter = methodObj.asserts.%GetIterator()
+                                    while assertIter.%GetNext(, .assertObj) {
+                                        if assertObj.status = "failed" {
+                                            do failedMethods.%Push({"suite": (suiteObj.name), "case": (caseObj.name), "method": (methodObj.name), "action": (assertObj.action), "description": (assertObj.description), "location": (assertObj.location)})
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
+                set output = {"summary": (summary), "failures": (failedMethods)}
             }
-            set output = {"summary": (summary), "failures": (failedMethods)}
         } else {
             set output = {"summary": (summary)}
         }

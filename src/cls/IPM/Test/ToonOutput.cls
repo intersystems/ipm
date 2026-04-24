@@ -34,21 +34,23 @@ ClassMethod OutputToDevice(
         write !,"  methods["_summary.methods.total_"]: "_summary.methods.passed_" passed, "_summary.methods.failed_" failed"
         write !,"  assertions["_summary.assertions.total_"]: "_summary.assertions.passed_" passed, "_summary.assertions.failed_" failed"
 
-        if showDetail && verbose {
-            set rowStream = ..BuildToonRows(tree, 0, .rowCount)
-            write !
-            write !,"results["_rowCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:"
-            do rowStream.Rewind()
-            while 'rowStream.AtEnd {
-                write !,rowStream.ReadLine()
-            }
-        } elseif showDetail && (summary.methods.failed > 0) {
-            set failStream = ..BuildToonRows(tree, 1, .failCount)
-            write !
-            write !,"failures["_failCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:"
-            do failStream.Rewind()
-            while 'failStream.AtEnd {
-                write !,failStream.ReadLine()
+        if showDetail {
+            if verbose {
+                set rowStream = ..BuildToonRows(tree, 0, .rowCount)
+                write !
+                write !,"results["_rowCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:"
+                do rowStream.Rewind()
+                while 'rowStream.AtEnd {
+                    write !,rowStream.ReadLine()
+                }
+            } elseif summary.methods.failed > 0 {
+                set failStream = ..BuildToonRows(tree, 1, .failCount)
+                write !
+                write !,"failures["_failCount_"]{suiteName,testcaseName,methodName,status,assertAction,assertCounter,assertDescription,assertLocation}:"
+                do failStream.Rewind()
+                while 'failStream.AtEnd {
+                    write !,failStream.ReadLine()
+                }
             }
         }
     } catch ex {

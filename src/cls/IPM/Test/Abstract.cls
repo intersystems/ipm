@@ -44,36 +44,38 @@ ClassMethod OutputToDevice(
         write !,"Methods: "_summary.methods.total_" total, "_summary.methods.passed_" passed, "_summary.methods.failed_" failed"
         write !,"Assertions: "_summary.assertions.total_" total, "_summary.assertions.passed_" passed, "_summary.assertions.failed_" failed"
 
-        if showDetail && verbose {
-            write !
-            set suiteIter = tree.suites.%GetIterator()
-            while suiteIter.%GetNext(, .suiteObj) {
-                set caseIter = suiteObj.cases.%GetIterator()
-                while caseIter.%GetNext(, .caseObj) {
-                    if caseObj.error '= "" {
-                        write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
-                    }
-                    set methodIter = caseObj.methods.%GetIterator()
-                    while methodIter.%GetNext(, .methodObj) {
-                        write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" ["_methodObj.status_"]"
-                        if methodObj.error '= "" { write " "_methodObj.error }
+        if showDetail {
+            if verbose {
+                write !
+                set suiteIter = tree.suites.%GetIterator()
+                while suiteIter.%GetNext(, .suiteObj) {
+                    set caseIter = suiteObj.cases.%GetIterator()
+                    while caseIter.%GetNext(, .caseObj) {
+                        if caseObj.error '= "" {
+                            write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
+                        }
+                        set methodIter = caseObj.methods.%GetIterator()
+                        while methodIter.%GetNext(, .methodObj) {
+                            write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" ["_methodObj.status_"]"
+                            if methodObj.error '= "" { write " "_methodObj.error }
+                        }
                     }
                 }
-            }
-        } elseif showDetail && (summary.methods.failed > 0) {
-            write !
-            set suiteIter = tree.suites.%GetIterator()
-            while suiteIter.%GetNext(, .suiteObj) {
-                set caseIter = suiteObj.cases.%GetIterator()
-                while caseIter.%GetNext(, .caseObj) {
-                    if caseObj.error '= "" {
-                        write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
-                    }
-                    set methodIter = caseObj.methods.%GetIterator()
-                    while methodIter.%GetNext(, .methodObj) {
-                        if methodObj.status = "failed" {
-                            write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" [failed]"
-                            if methodObj.error '= "" { write " "_methodObj.error }
+            } elseif summary.methods.failed > 0 {
+                write !
+                set suiteIter = tree.suites.%GetIterator()
+                while suiteIter.%GetNext(, .suiteObj) {
+                    set caseIter = suiteObj.cases.%GetIterator()
+                    while caseIter.%GetNext(, .caseObj) {
+                        if caseObj.error '= "" {
+                            write !,suiteObj.name_"/"_caseObj.name_" [failed] "_caseObj.error
+                        }
+                        set methodIter = caseObj.methods.%GetIterator()
+                        while methodIter.%GetNext(, .methodObj) {
+                            if methodObj.status = "failed" {
+                                write !,suiteObj.name_"/"_caseObj.name_"/"_methodObj.name_" [failed]"
+                                if methodObj.error '= "" { write " "_methodObj.error }
+                            }
                         }
                     }
                 }
