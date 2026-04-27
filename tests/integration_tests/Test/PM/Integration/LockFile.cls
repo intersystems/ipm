@@ -205,7 +205,7 @@ Method Test06ModuleMultipleVersions()
         do $$$AssertStatusOK(sc, "Uninstalled "_moduleName)
 
         // Install module from lock file
-        set sc = ##class(%IPM.Main).Shell("ci "_moduleName)
+        set sc = ##class(%IPM.Main).Shell("install -from-lockfile "_moduleName)
         do $$$AssertStatusOK(sc, "Able to install "_moduleName_" v"_latestVersion_" from the lock file")
 
         // Confirm classes and dependencies get installed as well
@@ -236,7 +236,7 @@ Method Test06ModuleMultipleVersions()
         do $$$AssertStatusOK(sc, "Uninstalled "_moduleName)
 
         // Install module from lock file
-        set sc = ##class(%IPM.Main).Shell("ci "_moduleName_" "_olderVersion)
+        set sc = ##class(%IPM.Main).Shell("install -from-lockfile "_moduleName_" "_olderVersion)
         do $$$AssertStatusOK(sc, "Able to install "_moduleName_" v"_olderVersion_" from the lock file")
 
         // Confirm classes and dependencies get installed as well
@@ -272,8 +272,8 @@ Method Test07ModuleNoLockFile()
         do $$$AssertStatusOK(sc, "Uninstalled "_moduleName)
 
         // This should fail due to no lock file
-        set sc = ##class(%IPM.Main).Shell("ci "_moduleName)
-        do $$$AssertStatusNotOK(sc, "zpm ""ci"" fails on module "_moduleName_"due to not having a lock file")
+        set sc = ##class(%IPM.Main).Shell("install -from-lockfile "_moduleName)
+        do $$$AssertStatusNotOK(sc, "Installing from a lock file fails on module "_moduleName_"due to not having a lock file")
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test07ModuleNoLockFile.")
     }
@@ -318,25 +318,14 @@ Method Test10InstallViaLoad()
         set sc = ##class(%IPM.Main).Shell("uninstall -r " _ moduleName)
         do $$$AssertStatusOK(sc, "Successfully packaged " _ moduleName _ " and dependencies prior to load")
 
-        do $$$LogMessage("GOING TO repo -list")
-        zpm "repo -list"
-
         set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-base")
         do $$$AssertStatusOK(sc, "Successfully removed repo lock-file-base prior to load")
         set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-edge")
         do $$$AssertStatusOK(sc, "Successfully removed repo lock-file-edge prior to load")
 
-        do $$$LogMessage("GOING TO repo -list")
-        zpm "repo -list"
-
         set sc = ##class(%IPM.Main).Shell("load -from-lockfile " _ packagePath _ ".tgz")
         do $$$AssertStatusOK(sc, "Successfully loaded packaged module from its lock file")
-
-        do $$$LogMessage("GOING TO repo -list")
-        zpm "repo -list"
     } catch e {
-        do $$$LogMessage("GOING TO repo -list")
-        zpm "repo -list"
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test10InstallViaLoad.")
     }
 }
@@ -402,7 +391,7 @@ Method AssertInstallFromLockFileAsExpected(
 	moduleName As %String,
 	className As %String = "")
 {
-    set sc = ##class(%IPM.Main).Shell("ci "_moduleName)
+    set sc = ##class(%IPM.Main).Shell("install -from-lockfile "_moduleName)
     do $$$AssertStatusOK(sc, "Installed "_moduleName_" via the lock file successfully")
 
     set sc = $$$OK

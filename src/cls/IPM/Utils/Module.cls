@@ -271,7 +271,7 @@ ClassMethod LoadModuleFromDirectory(
 {
     set tSC = $$$OK
     try {
-        if $get(pParams("CleanInstall"), 0) && '$get(pParams("LockFileInstallStarted"), 0) {
+        if $get(pParams("FromLockFile"), 0) && '$get(pParams("LockFileInstallStarted"), 0) {
             do ##class(%IPM.General.LockFile).InstallFromLockFile(pDirectory, .pParams)
         }
         set tVerbose = $get(pParams("Verbose"))
@@ -1252,8 +1252,8 @@ ClassMethod LoadNewModule(
         }
 
         // If installing from a lock file, don't need to load dependencies since dependencies will be installed in order anyways
-        if ('$get(params("CleanInstall"), 0)) {
-            do ..LoadDependencies(tModule, .params)
+        if ('$get(params("FromLockFile"), 0)) {
+            do ..LoadDependencies(tModule,,.params)
         }
 
 

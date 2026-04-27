@@ -66,11 +66,6 @@ ClassMethod InstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.Abs
     quit ..Init("install", Package)
 }
 
-ClassMethod CleanInstallInit(Package As %IPM.DataType.ModuleName) As %IPM.General.AbstractHistory
-{
-    quit ..Init("ci", Package)
-}
-
 ClassMethod LoadInit(Package As %IPM.DataType.ModuleName = "") As %IPM.General.AbstractHistory
 {
     // Package name may not known at this point, so use a placeholder

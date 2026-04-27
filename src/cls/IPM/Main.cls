@@ -292,8 +292,8 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
-<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
-<modifier name="from-lockfile" aliases="ci" dataAlias="LoadFromLockFile" dataValue="1" description="Load the module from the lock file present at the path." />
+<modifier name="create-lockfile" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="from-lockfile" dataAlias="FromLockFile" dataValue="1" description="Load the module from the lock file present at the path." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -420,7 +420,8 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
-<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="create-lockfile" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="from-lockfile" dataAlias="FromLockFile" dataValue="1" description="Load the module from the lock file present at the path." />
 
 </command>
 
@@ -795,26 +796,6 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
     <example description="Display the current history retention setting.">config get HistoryRetain</example>
 </command>
 
-<command name="ci">
-<summary>Installs a module from a lock file</summary>
-<description>
-    Installs a module from its lock file. Will first install all listed repositories followed by dependency modules and then the base module.
-</description>
-
-<!-- Examples -->
-<example description="Reads from the module-lock.json defined for mymodule and installs the repositories, module, and dependencies">
-    ci mymodule 3.0.0
-</example>
-
-<!-- Parameters -->
-<parameter name="module" required="true" description="Name of module on which to perform update actions" />
-<parameter name="version" description="Version (or version expression) of module to install; defaults to the latest available if unspecified." />
-
-<!-- Modifiers -->
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
-<modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
-</command>
-
 </commands>
 }
 
@@ -1103,8 +1084,6 @@ ClassMethod ShellInternal(
                 do ..Information(.tCommandInfo)
             } elseif (tCommandInfo = "history") {
                 do ..History(.tCommandInfo)
-            } elseif (tCommandInfo = "ci") {
-                do ..CleanInstall(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -2401,7 +2380,7 @@ ClassMethod LoadInternal(
     }
 
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
-    if ($get(pCommandInfo("data", "LoadFromLockFile"))) {
+    if ($get(pCommandInfo("data", "FromLockFile"))) {
         do ##class(%IPM.General.LockFile).InstallFromLockFile(tTargetDirectory, .tParams)
     } else {
         // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
@@ -2540,35 +2519,6 @@ ClassMethod Install(
         throw ex
     }
     $$$ThrowOnError(log.Finalize($$$OK, devMode))
-}
-
-ClassMethod CleanInstall(ByRef commandInfo) [ Internal ]
-{
-    set moduleName = $get(commandInfo("parameters","module"))
-    set version = $get(commandInfo("parameters","version"))
-    set verbose = $get(commandInfo("data","Verbose"))
-    set log = ##class(%IPM.General.HistoryTemp).CleanInstallInit(moduleName)
-
-    // TODO: Add "path"? (see Update() for more info of calling install v load)
-
-    if verbose {
-        write !, "Going to run a clean install on "_moduleName
-    }
-
-    // Indicating to commandInfo that this is a clean install command, not an install or load command. commandInfo will be passed to either Install() or Load() to continue performing the update.
-    set commandInfo("data","cmd") = "ci"
-    set commandInfo("data","CleanInstall") = 1
-    //set log = ##class(%IPM.General.HistoryTemp).UpdateInit(moduleName)
-
-    // A path to a tarball is specified. Call ..Load() in order to load the newer version of the module.
-    set path = $$$GetModifier(pCommandInfo,"path")
-    if (path) {
-        set pCommandInfo("parameters","path") = path
-        do ..Load(.pCommandInfo, log)
-    } else {
-        // Forward execution to install
-        do ..Install(.commandInfo, log)
-    }
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]

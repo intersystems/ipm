@@ -123,7 +123,11 @@ ClassMethod InstallFromLockFile(
     set verbose = $get(params("Verbose"), 0)
 
     set lockFilePath = ##class(%File).NormalizeFilename("module-lock.json", directory)
-    set lockFileJSON = ##class(%DynamicObject).%FromJSONFile(lockFilePath)
+    try {
+        set lockFileJSON = ##class(%DynamicObject).%FromJSONFile(lockFilePath)
+    } catch {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Unable to parse lock file JSON at path: %1", lockFilePath)))
+    }
 
     set repositories = lockFileJSON.%Get("repositories", {})
     set dependencies = lockFileJSON.%Get("dependencies", {})
@@ -156,17 +160,15 @@ ClassMethod InstallFromLockFile(
         set version = depVals.version
         set repository = depVals.repository
 
-        // Call CleanInstall() on dependency modules but set flag "LockFileInstallStarted" so we don't try installing from the dependency module's lock file
-        set commandInfo = "ci"
+        // Call Install() on dependency modules but set flag "LockFileInstallStarted" so we don't try installing from the dependency module's lock file
+        set commandInfo = "install"
         set commandInfo("data", "Verbose") = verbose
         set commandInfo("parameters","module") = repository_"/"_depName
         set commandInfo("parameters", "version") = version
         set commandInfo("data", "LockFileInstallStarted") = 1
+        set commandInfo("data","FromLockFile") = 1
 
-        set commandInfo("data","cmd") = "ci"
-        set commandInfo("data","CleanInstall") = 1
-
-        do ##class(%IPM.Main).CleanInstall(.commandInfo)
+        do ##class(%IPM.Main).Install(.commandInfo)
     }
 }
 
