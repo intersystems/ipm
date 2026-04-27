@@ -136,8 +136,7 @@ ClassMethod InstallFromLockFile(
                 write !, "Repo: "_repoName_" already exists, skipping creating new one from lock file"
             }
             continue
-        }
-        elseif (verbose) {
+        } elseif (verbose) {
             write !, "Creating repo: "_repoName_" from lock file"
         }
         do ##class(%IPM.Repo.Definition).CollectServerTypes(.types)
@@ -163,6 +162,10 @@ ClassMethod InstallFromLockFile(
         set commandInfo("parameters","module") = repository_"/"_depName
         set commandInfo("parameters", "version") = version
         set commandInfo("data", "LockFileInstallStarted") = 1
+
+        set commandInfo("data","cmd") = "ci"
+        set commandInfo("data","CleanInstall") = 1
+
         do ##class(%IPM.Main).CleanInstall(.commandInfo)
     }
 }

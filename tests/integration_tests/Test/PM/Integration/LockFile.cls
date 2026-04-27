@@ -286,7 +286,7 @@ Method Test08Module2DependenciesSameTransient()
     try {
         do ..ExecuteGenericLockFileTest(..#ModuleK)
     } catch e {
-        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test09Module2DependenciesSameTransient.")
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test08Module2DependenciesSameTransient.")
     }
 }
 
@@ -297,7 +297,47 @@ Method Test09ComplexNestedDependencies()
     try {
         do ..ExecuteGenericLockFileTest(..#ModuleL)
     } catch e {
-        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test10ComplexNestedDependencies.")
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test09ComplexNestedDependencies.")
+    }
+}
+
+/// Installing from lock file by loading from a packaged tarball
+/// Uses Module K
+Method Test10InstallViaLoad()
+{
+    try {
+        set moduleName = ..#ModuleK
+
+        set sc = ##class(%IPM.Main).Shell("install " _ moduleName)
+        do $$$AssertStatusOK(sc, "Successfully installed " _ moduleName)
+
+        set packagePath = "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/package/pack"
+        set sc = ##class(%IPM.Main).Shell("package " _ moduleName _ " -path " _ packagePath)
+        do $$$AssertStatusOK(sc, "Successfully packaged " _ moduleName)
+
+        set sc = ##class(%IPM.Main).Shell("uninstall -r " _ moduleName)
+        do $$$AssertStatusOK(sc, "Successfully packaged " _ moduleName _ " and dependencies prior to load")
+
+        do $$$LogMessage("GOING TO repo -list")
+        zpm "repo -list"
+
+        set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-base")
+        do $$$AssertStatusOK(sc, "Successfully removed repo lock-file-base prior to load")
+        set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-edge")
+        do $$$AssertStatusOK(sc, "Successfully removed repo lock-file-edge prior to load")
+
+        do $$$LogMessage("GOING TO repo -list")
+        zpm "repo -list"
+
+        set sc = ##class(%IPM.Main).Shell("load -from-lockfile " _ packagePath _ ".tgz")
+        do $$$AssertStatusOK(sc, "Successfully loaded packaged module from its lock file")
+
+        do $$$LogMessage("GOING TO repo -list")
+        zpm "repo -list"
+    } catch e {
+        do $$$LogMessage("GOING TO repo -list")
+        zpm "repo -list"
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test10InstallViaLoad.")
     }
 }
 

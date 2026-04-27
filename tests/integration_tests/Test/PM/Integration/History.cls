@@ -535,6 +535,41 @@ Method TestUpdate()
     }
 }
 
+Method TestCleanInstall()
+{
+    // Setup repo for "ci" test
+    set repoName = "lock-file-base"
+    do ##class(%IPM.Main).Shell("repo -n " _ repoName _ " -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/")
+
+    // Call zpm "ci" on a simple module
+    set moduleName = "lock-mod-a-no-deps"
+    set command = "ci " _ moduleName
+    set sc = ##class(%IPM.Main).Shell(command)
+    do $$$AssertStatusOK(sc, "Successfully installed " _ moduleName _ " from lock file")
+
+    // get history
+    set rs = ##class(%IPM.General.History).GetHistory(,,1)
+    while rs.%Next() {
+        do $$$AssertTrue(rs.%Get("ID") '= "")
+        do $$$AssertEquals(rs.%Get("Action"), "ci")
+        do $$$AssertEquals(rs.%Get("Package"), moduleName)
+        do $$$AssertEquals(rs.%Get("Version_Major"), "1")
+        do $$$AssertEquals(rs.%Get("Version_Minor"), "0")
+        do $$$AssertEquals(rs.%Get("Version_Patch"), "0")
+        do $$$AssertEquals(rs.%Get("UserName"), "irisowner")
+        do $$$AssertTrue(rs.%Get("TimeStart") '= "")
+        do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
+        do $$$AssertEquals(rs.%Get("Success"),1)
+        do $$$AssertEquals(rs.%Get("Committed"),1)
+        do $$$AssertEquals(rs.%Get("CommandString"), command)
+        do $$$AssertEquals(rs.%Get("SourceMoniker"), "filesystem")
+        do $$$AssertEquals(rs.%Get("SourceName"), repoName)
+    }
+
+    // Remove this test's repo now that the test is over
+    do ##class(%IPM.Main).Shell("repo -n " _ repoName _ " -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/lock-test/mods-base-cases/")
+}
+
 /// Tests that history entries correctly record all phases of module operations.
 /// Verifies that:
 /// - Load and install operations record 5 phases: Initialize, Reload, Validate, Compile, Activate
