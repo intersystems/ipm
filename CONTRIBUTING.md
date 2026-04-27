@@ -92,6 +92,49 @@ From time to time, you may also want to remove unused Docker data to save disk s
 docker system prune -a
 ```
 
+#### Convenience Scripts: `ipm` and `iriscli`
+
+The repo ships two bash scripts that wrap common IRIS interactions so you don't have to type `iris session iris` boilerplate every time. When IPM is installed on Unix/Linux, they are automatically copied to `~/.local/bin/` and `~/bin/` (if it exists), making them available on PATH in most environments including the dev containers.
+
+**`ipm`** — runs a single IPM/ZPM command non-interactively and exits:
+```bash
+# List installed packages
+docker exec -it <container-name, e.g. ipm-iris-1> ipm list
+
+# Install a package
+docker exec -it <container-name, e.g. ipm-iris-1> ipm install zpm-registry
+
+# Run tests for a module
+docker exec -it <container-name, e.g. ipm-iris-1> ipm test mymodule -only
+
+# Using docker compose exec (works for any container defined in docker-compose.yml)
+# Note: must be run from the directory containing docker-compose.yml
+docker compose exec iris ipm list
+```
+
+**`iriscli`** — opens an interactive IRIS terminal session:
+```bash
+# Either this command
+docker exec -it <container-name, e.g. ipm-iris-1> iriscli
+
+# Or this equivalent command (must be run from the directory containing docker-compose.yml)
+docker compose exec -it iris iriscli
+```
+
+`iriscli` also accepts an ObjectScript script file, executing each line and then halting:
+```bash
+docker compose exec -it iris iriscli /path/to/demo.script
+```
+
+A sample `demo.script`:
+```objectscript
+zn "USER"
+write $zversion,!
+zpm "list"
+```
+
+> **Namespace:** Both scripts respect the `IRIS_NAMESPACE` environment variable, or accept `-U <namespace>` as the first argument. For example: `docker exec -it <container-name> ipm -U %SYS list`.
+
 
 ### Developing IPM in an Existing IRIS Instance
 If you already have an IRIS instance running and you want to test IPM in this instance, run the following command:
