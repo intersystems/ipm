@@ -1174,7 +1174,7 @@ ClassMethod LoadNewModule(
         }
 
         // Mark relevant resources for update
-        if ($get(params("cmd")) = "update") {
+        if (commandLineModuleName '= "") && ($get(params("cmd")) = "update") {
             set tSC = moduleCurrent.GetResolvedReferences(.resourceArray, 1)
             set moduleKey = ""
             for {

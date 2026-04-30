@@ -1336,13 +1336,6 @@ Method GetResolvedReferences(
 {
     set tSC = $$$OK
     try {
-        if pLockedDependencies && '$data(pDependencyGraph) {
-            set tSC = ..BuildDependencyGraph(.pDependencyGraph,,,,pPhases)
-            if $$$ISERR(tSC) {
-                quit
-            }
-        }
-
         set pReferenceArray(..Name, ..Name_".ZPM") = ""
 
         set orderedResourceList = ..GetOrderedResourceList()
@@ -1371,6 +1364,12 @@ Method GetResolvedReferences(
         }
 
         if pLockedDependencies {
+            if '$data(pDependencyGraph) {
+                set tSC = ..BuildDependencyGraph(.pDependencyGraph,,,,pPhases)
+                if $$$ISERR(tSC) {
+                    quit
+                }
+            }
             set tModName = ""
             for {
                 set tModName = $order(pDependencyGraph(tModName))
