@@ -1336,7 +1336,7 @@ Method GetResolvedReferences(
 {
     set tSC = $$$OK
     try {
-        if '$data(pDependencyGraph) {
+        if pLockedDependencies && '$data(pDependencyGraph) {
             set tSC = ..BuildDependencyGraph(.pDependencyGraph,,,,pPhases)
             if $$$ISERR(tSC) {
                 quit

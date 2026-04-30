@@ -54,6 +54,14 @@ Property Children As array Of %String(MAXLEN = 1, XMLPROJECTION = "NONE");
 
 Index Children On Children(KEYS);
 
+/// Tells us if this resource belongs to a module that will be processed as a part of the "Update" command
+/// If set to true, %OnBeforeSave() will not error if another resource of the same name tries to be saved
+///     and will instead save that resource with the other module as new
+/// This is useful for an "Update" command where a resource was moved from one module to another.
+///     If the resource's new module gets updated first, we don't want to error on a resource listed in two modules
+///     when it will only be in one in the final environment once the resource's previous home gets updated
+Property MarkedForUpdate As %Boolean [ InitialExpression = 0 ];
+
 Method ProcessorGet() As %IPM.ResourceProcessor.Abstract
 {
     // Similar to LifecycleGet in Module.
@@ -344,6 +352,21 @@ ClassMethod NonNullResourceNameOpen(
     quit tResult
 }
 
+/// When given a name for a resource, set its MarkedForUpdate flag
+/// See property description for more details on the usage of MarkedForUpdate
+ClassMethod MarkResourceForUpdate(
+	resourceName As %String,
+	marking As %Boolean = 1)
+{
+    set resource = ..NonNullResourceNameOpen(resourceName,,.sc)
+    if (resource = $$$NULLOREF) {
+        // If unable to find a resource with this name, do nothing
+        quit
+    }
+    set resource.MarkedForUpdate = marking
+    $$$ThrowOnError(resource.%Save())
+}
+
 ClassMethod GetStatus(
 	InternalName As %String,
 	Output pReferenced As %Boolean,
@@ -430,6 +453,11 @@ Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
         if ..NonNullResourceNameExists(..UniqueName,.tExistingID) && (tExistingID '= ..%Id()) {
             set tOtherInstance = ..%OpenId(tExistingID,,.tSC)
             if $$$ISERR(tSC) {
+                quit
+            }
+            if (tOtherInstance.MarkedForUpdate) {
+                // If other instance marked for update, then we should overwrite it with this instead of throwing an error
+                $$$ThrowOnError(..%DeleteId(tExistingID))
                 quit
             }
             if (tOtherInstance.Module.Name = ..Module.Name) {
@@ -541,6 +569,9 @@ Storage Default
 </Value>
 <Value name="10">
 <Value>IsAPI</Value>
+</Value>
+<Value name="11">
+<Value>MarkedForUpdate</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Resources")</DataLocation>

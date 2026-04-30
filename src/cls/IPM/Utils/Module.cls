@@ -1173,6 +1173,26 @@ ClassMethod LoadNewModule(
             }
         }
 
+        // Mark relevant resources for update
+        if ($get(params("cmd")) = "update") {
+            set tSC = moduleCurrent.GetResolvedReferences(.resourceArray, 1)
+            set moduleKey = ""
+            for {
+                set moduleKey = $order(resourceArray(moduleKey))
+                if (moduleKey = "") {
+                    quit
+                }
+                set resourceKey = ""
+                for {
+                    set resourceKey = $order(resourceArray(moduleKey, resourceKey))
+                    if (resourceKey = "") {
+                        quit
+                    }
+                    do ##class(%IPM.Storage.ResourceReference).MarkResourceForUpdate(resourceKey)
+                }
+            }
+        }
+
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
