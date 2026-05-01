@@ -5,6 +5,7 @@
       <Name>module-c</Name>
       <Version>6.2.0+snapshot</Version>
       <Resource Name="ModuleC.PKG" />
+      <Resource Name="Shared.Class1.CLS" />
     </Module>
   </Document>
 </Export>
