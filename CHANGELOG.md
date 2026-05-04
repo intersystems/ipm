@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
 
 ### Fixed
+- #1130: Fix issue with ORAS repositories pointing to some OCI registries that require authentication (e.g. ghcr.io) not accepting credentials properly. `repo -list` now shows an `Authenticated?` status for ORAS repos with credentials configured.
 - #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
 - #1052: In a namespace with mapped IPM, the `info` command works again and the intro message displays the IPM version and where its mapped from
 - #1102: %IPM.Storage.QualifiedModuleInfo:%New() will now copy over version properties when passed in a resolvedReference

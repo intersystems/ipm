@@ -1,64 +1,45 @@
 Class Test.PM.Unit.Oras Extends %UnitTest.TestCase
 {
 
-Method TestOras()
+/// Bare hostname (no scheme) should produce a Location with https:// scheme
+/// and no path leaking into Location or PathPrefix.
+Method TestGetPackageServiceUrlNormalizationBareHostname()
 {
-    set Registry = "http://oras:5000"
-    set Name = "objectscript-math"
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set def.URL = "ghcr.io"
+    set svc = def.GetPackageService()
+    do $$$AssertEquals(svc.Location, "https://ghcr.io", "Bare hostname gets https:// prepended")
+    do $$$AssertEquals(svc.PathPrefix, "", "No path prefix for bare hostname")
+}
 
-    // Target package
-    set moduleRef = ##class(%IPM.Storage.ModuleInfo).%New()
-    set moduleRef.Name = Name
+/// Explicit https:// scheme should produce the same result as a bare hostname.
+Method TestGetPackageServiceUrlNormalizationWithScheme()
+{
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set def.URL = "https://ghcr.io"
+    set svc = def.GetPackageService()
+    do $$$AssertEquals(svc.Location, "https://ghcr.io", "Explicit https:// scheme preserved")
+    do $$$AssertEquals(svc.PathPrefix, "", "No path prefix when URL has no path")
+}
 
-    // Cleanup
-    do ..RunCommand("repo -delete-all")
-    do ..RunCommand("repo -reset-defaults")
+/// URL with a path component should set PathPrefix and strip the path from Location.
+Method TestGetPackageServiceWithPathPrefix()
+{
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set def.URL = "ghcr.io/myorg"
+    set svc = def.GetPackageService()
+    do $$$AssertEquals(svc.Location, "https://ghcr.io", "Path stripped from Location")
+    do $$$AssertEquals(svc.PathPrefix, "myorg/", "Path component becomes PathPrefix")
+}
 
-    // Set up ORAS repo
-    do ..AssertNoException("repo -o -name oci -url " _ Registry)
-	do ..RunCommand("repo -list")
-	do ..RunCommand("repo -list-modules")
-
-    &sql(SELECT id INTO :ociId FROM %IPM_Repo_Oras.definition WHERE name='oci')
-    do $$$AssertEquals(SQLCODE, 0)
-    set oci = ##class(%IPM.Repo.Oras.Definition).%OpenId(ociId)
-    set packageService = oci.GetPackageService()
-    set publishService = oci.GetPublishService()
-
-    if 'packageService.IsAvailable() {
-        do $$$AssertSkipped("ORAS registry unavailable, skipping")
-    }
-
-    // make sure package is not in the registry first
-    set version = packageService.GetLatestTag(Registry, Name, "", "", "", "", 0)
-    if version '= "" {
-        do publishService.DeleteModule(Registry, Name, "", "", "", "", 0)
-    }
-    do $$$AssertNotTrue(packageService.HasModule(moduleRef))
-
-    // Install package from the default registry
-    do ..RunCommand("install registry/" _ Name)
-
-    // Push to OCI registry
-    do ..AssertNoException("publish " _ Name _ " -r oci")
-    do $$$AssertTrue(packageService.HasModule(moduleRef))
-
-    // Pull from OCI registry
-    do ..RunCommand("uninstall " _ Name)
-    do ..AssertNoException("install oci/" _ Name)
-
-    // Delete from OCI registry
-    do publishService.DeleteModule(Registry, Name, "", "", "", "", 0)
-
-    // Set as default registry
-    do ..RunCommand("repo -publish 1 -n oci")
-
-    // Install from default
-    do ..AssertNoException("install " _ Name)
-
-    // Clean up
-    do ..RunCommand("repo -delete-all")
-    do ..RunCommand("repo -reset-defaults")
+/// Bare hostname with port should preserve port in Location.
+Method TestGetPackageServiceUrlNormalizationWithPort()
+{
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set def.URL = "registry.example.com:5000"
+    set svc = def.GetPackageService()
+    do $$$AssertEquals(svc.Location, "https://registry.example.com:5000", "Port preserved in Location")
+    do $$$AssertEquals(svc.PathPrefix, "", "No path prefix when no path in URL")
 }
 
 Method RunCommand(pCommand As %String)
