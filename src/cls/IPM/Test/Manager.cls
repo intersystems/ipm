@@ -9,15 +9,19 @@ ClassMethod RunTest(
 	qspec As %String,
 	ByRef userparam) As %Status
 {
-    kill ^||%UnitTest.Manager.LastResult
     quit ##super(.testspec,.qspec,.userparam)
 }
 
-/// Does the default behavior, then stashes the latest run index
+/// Does the default behavior, then accumulates the test run index
 Method SaveResult(duration)
 {
     do ##super(.duration)
-    set ^||%UnitTest.Manager.LastResult = i%LogIndex
+
+    // Accumulate ALL test LogIndexes in an array
+    // Uses $increment to append so nested calls add to the array
+    set count = $increment(^||%UnitTest.Manager.AllResultsCount)
+    set ^||%UnitTest.Manager.AllResults(count) = i%LogIndex
+
     quit
 }
 
@@ -48,91 +52,120 @@ ClassMethod LoadTestDirectory(
     quit tSC
 }
 
-/// Returns $$$OK if the last unit test run was successful, or an error if it was unsuccessful.
-ClassMethod GetLastStatus(Output pFailureCount As %Integer) As %Status
+/// Check all test LogIndexes accumulated in AllResults and return aggregated status
+/// Returns error if any test had failures
+/// startIndex: Only check results from this index onwards (for nested phases, e.g. calling `zpm verify` inside `zpm verify`)
+ClassMethod GetAllTestsStatus(
+	Output failureCount As %Integer,
+	startIndex As %Integer = 0) As %Status
 {
-    set tSC = $$$OK
+    set sc = $$$OK
+    set failureCount = 0
     try {
-        if '$data(^||%UnitTest.Manager.LastResult,tLogIndex)#2 {
-            set tLogIndex = $order(^UnitTest.Result(""),-1)
+        set testCount = $get(^||%UnitTest.Manager.AllResultsCount, 0)
+
+        // Check tracked test LogIndexes from startIndex onwards
+        // This ensures nested phases only see their own results, not parent's
+        for i=(startIndex+1):1:testCount {
+            set logIndex = $get(^||%UnitTest.Manager.AllResults(i))
+            if (logIndex '= "") {
+                // Query for assertion failures in this test run
+                set res = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
+                    "from %UnitTest_Result.TestAssert where Status = 0 "_
+                    "and TestMethod->TestCase->TestSuite->TestInstance->InstanceIndex = ?",logIndex)
+                if (res.%SQLCODE < 0) {
+                    throw ##class(%Exception.SQL).CreateFromSQLCODE(res.%SQLCODE,res.%Message)
+                }
+                do res.%Next(.sc)
+                $$$ThrowOnError(sc)
+                set failures = res.%GetData(1)
+                set failureCount = failureCount + failures
+
+                // Also check for test suite failures (e.g., loading errors)
+                if (failures = 0) {
+                    set res = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
+                        "from %UnitTest_Result.TestSuite where Status = 0 "_
+                        "and TestInstance->InstanceIndex = ?",logIndex)
+                    if (res.%SQLCODE < 0) {
+                        throw ##class(%Exception.SQL).CreateFromSQLCODE(res.%SQLCODE,res.%Message)
+                    }
+                    do res.%Next(.sc)
+                    $$$ThrowOnError(sc)
+                    set failures = res.%GetData(1)
+                    set failureCount = failureCount + failures
+                }
+            }
         }
-        kill ^||%UnitTest.Manager.LastResult // Clean up
-        if tLogIndex {
-            set tRes = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
-                "from %UnitTest_Result.TestAssert where Status = 0 "_
-                "and TestMethod->TestCase->TestSuite->TestInstance->InstanceIndex = ?",tLogIndex)
-            if (tRes.%SQLCODE < 0) {
-                throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-            }
-            do tRes.%Next(.tSC)
-            $$$ThrowOnError(tSC)
-            set pFailureCount = tRes.%GetData(1)
-            if (pFailureCount > 0) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("%1 assertion(s) failed.",pFailureCount))
-            } else {
-                // Double check that no other failures were reported - e.g., failures loading that would lead to no assertions passing or failing!
-                set tRes = ##class(%SQL.Statement).%ExecDirect(,"select count(*) "_
-                    "from %UnitTest_Result.TestSuite where Status = 0 "_
-                    "and TestInstance->InstanceIndex = ?",tLogIndex)
-                if (tRes.%SQLCODE < 0) {
-                    throw ##class(%Exception.SQL).CreateFromSQLCODE(tRes.%SQLCODE,tRes.%Message)
-                }
-                do tRes.%Next(.tSC)
-                $$$ThrowOnError(tSC)
-                set pFailureCount = tRes.%GetData(1)
-                if (pFailureCount > 0) {
-                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("%1 test suite(s) failed.",pFailureCount))
-                }
-            }
-        } else {
-            set tSC = $$$ERROR($$$GeneralError,"No unit test results recorded.")
+
+        if (failureCount > 0) {
+            set sc = $$$ERROR($$$GeneralError, failureCount_" assertion(s) failed.")
+        }
+
+        // Only clean up AllResults at top level (startIndex=0), not in nested phases
+        if (startIndex = 0) {
+            kill ^||%UnitTest.Manager.AllResults
+            kill ^||%UnitTest.Manager.AllResultsCount
         }
     } catch e {
-        set tSC = e.AsStatus()
+        set sc = e.AsStatus()
     }
-    quit tSC
+    quit sc
 }
 
-ClassMethod OutputFailures()
+/// Output test failures from accumulated results
+/// startIndex: Only output failures from this index onwards (for nested phases)
+ClassMethod OutputFailures(startIndex As %Integer = 0)
 {
-    set tSC = $$$OK
+    set sc = $$$OK
     try {
-        if '$data(^||%UnitTest.Manager.LastResult,tLogIndex)#2 {
-            set tLogIndex = $order(^UnitTest.Result(""),-1)
-        }
-        kill ^||%UnitTest.Manager.LastResult // Clean up
-        if 'tLogIndex {
-            quit
-        }
-        set tLogGN = $name(^UnitTest.Result(tLogIndex))
-        set tRoot = ""
-        for {
-            set tRoot = $order(@tLogGN@(tRoot))
-            quit:tRoot=""
-            set tSuite = ""
-            for {
-                set tSuite = $order(@tLogGN@(tRoot, tSuite))
-                quit:tSuite=""
-                set tMethod = ""
-                for {
-                    set tMethod = $order(@tLogGN@(tRoot, tSuite, tMethod))
-                    quit:tMethod=""
+        set testCount = $get(^||%UnitTest.Manager.AllResultsCount, 0)
 
-                    set tAssert = ""
-                    for {
-                        set tAssert = $order(@tLogGN@(tRoot, tSuite, tMethod, tAssert), 1, tAssertInfo)
-                        quit:tAssert=""
-                        set $listbuild(status, type, text) = tAssertInfo
-                        continue:status
-                        write !,$$$FormattedLine($$$Red, "FAILED " _ tSuite _ ":" _ tMethod), ": " _ type _ " - " _ text
-                    }
+        // Output failures from all tracked test LogIndexes from startIndex onwards
+        // This ensures parent phase outputs failures from both parent and nested tests
+        for i=(startIndex+1):1:testCount {
+            set logIndex = $get(^||%UnitTest.Manager.AllResults(i))
+            if (logIndex '= "") {
+                do ..OutputFailuresForLogIndex(logIndex)
+            }
+        }
+
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// Helper method to output failures for a single LogIndex
+ClassMethod OutputFailuresForLogIndex(logIndex As %Integer)
+{
+    if 'logIndex {
+        quit
+    }
+    set logGN = $name(^UnitTest.Result(logIndex))
+    set root = ""
+    for {
+        set root = $order(@logGN@(root))
+        quit:root=""
+        set suite = ""
+        for {
+            set suite = $order(@logGN@(root, suite))
+            quit:suite=""
+            set method = ""
+            for {
+                set method = $order(@logGN@(root, suite, method))
+                quit:method=""
+
+                set assert = ""
+                for {
+                    set assert = $order(@logGN@(root, suite, method, assert), 1, assertInfo)
+                    quit:assert=""
+                    set $listbuild(status, type, text) = assertInfo
+                    continue:status
+                    write !,$$$FormattedLine($$$Red, "FAILED " _ suite _ ":" _ method), ": " _ type _ " - " _ text
                 }
             }
         }
-    } catch e {
-        set tSC = e.AsStatus()
     }
-    quit tSC
 }
 
 }

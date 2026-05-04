@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+    <Document name="module-d.ZPM">
+    <Module>
+      <Name>module-d</Name>
+      <Version>1.0.0</Version>
+      <Resource Name="ModuleD.PKG" />
+      <Dependencies>
+        <ModuleReference>
+          <Name>module-c</Name>
+          <Version>^5.3.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

@@ -10,11 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
+- #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
 - #1013: Implement recursive placeholder resolution in Default parameters
+
 ### Fixed
 - #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
 - #1052: In a namespace with mapped IPM, the `info` command works again and the intro message displays the IPM version and where its mapped from
 - #1102: %IPM.Storage.QualifiedModuleInfo:%New() will now copy over version properties when passed in a resolvedReference
+- #1112: Packaging a module with a globals resource now respects SourcesRoot, placing the exported file at the correct path in the tarball
+- #1057: Fix IPM not cleaning up after itself on self-uninstall
+- #1122: Packaging should recognize resources in dependency modules set to deploy
+- #1119: The update command should check version requirements using post-update values instead of what's currently installed
+- #1097: The Test resource processor now supports nested tests
 
 ## [0.10.6] - 2026-02-24
 
