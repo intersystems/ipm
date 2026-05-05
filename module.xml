@@ -43,7 +43,7 @@
         ExtraPipFlags="--no-deps" />
       <PythonWheel Name="oras-0.1.30-py3-none-any.whl" ExtraPipFlags="--no-deps" />
       <PythonWheel Name="referencing-0.36.2-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-      <PythonWheel Name="requests-2.32.4-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+      <PythonWheel Name="requests-2.33.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
       <PythonWheel Name="typing_extensions-4.12.2-py3-none-any.whl" ExtraPipFlags="--no-deps" />
       <PythonWheel Name="urllib3-2.6.3-py3-none-any.whl" ExtraPipFlags="--no-deps" />
 
