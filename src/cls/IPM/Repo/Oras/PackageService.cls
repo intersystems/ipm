@@ -20,7 +20,7 @@ Parameter ALLOWPREFIXINLOCATION = 0;
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.
 /// Returns true if the registry is reachable.
-/// Per the Docker Distribution Spec, GET /v2/ returning 401 means the registry is up but requires
+/// Per the OCI Distribution Spec, GET /v2/ returning 401 means the registry is up but requires
 /// authentication — this is not a failure. We check for WWW-Authenticate (required by RFC 7235 on
 /// any proper 401) rather than Docker-Distribution-Api-Version, since many registries omit the latter.
 Method IsAvailable() As %Boolean
