@@ -42,18 +42,4 @@ Method TestGetPackageServiceUrlNormalizationWithPort()
     do $$$AssertEquals(svc.PathPrefix, "", "No path prefix when no path in URL")
 }
 
-Method RunCommand(pCommand As %String)
-{
-	do ##class(%IPM.Main).Shell(pCommand)
-	do $$$LogMessage("Run command: "_pCommand)
-}
-
-Method AssertNoException(pCommand As %String)
-{
-	do ##class(%IPM.Main).ShellInternal(pCommand,.tException)
-	if '$$$AssertEquals(tException,"","No exceptions occurred running command: "_pCommand) {
-		do $$$LogMessage(tException.DisplayString())
-	}
-}
-
 }
