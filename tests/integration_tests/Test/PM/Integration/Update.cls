@@ -641,6 +641,32 @@ Method TestInterchangeableNameUpdate()
     $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n zot -delete"))
 }
 
+/// Tests that updating a module whose dependencies share a transitive dependency (diamond pattern)
+/// succeeds without a version conflict error (pre-fix: ERROR #5001: Exact version matches do not agree).
+/// parent -> [a, b] -> base; all modules update from 1.0.0 to 1.1.0.
+Method TestSharedTransitiveDependencyUpdate()
+{
+    set v1Dir = ..GetModuleDir("update-shared-transitive-dep", "1.0.0")
+    set v2Dir = ..GetModuleDir("update-shared-transitive-dep", "1.1.0")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ v1Dir)
+    do $$$AssertStatusOK(sc, "Loaded update-shared-transitive-dep 1.0.0")
+
+    set sc = ##class(%IPM.Main).Shell("update update-shared-transitive-dep-parent -path " _ v2Dir)
+    do $$$AssertStatusOK(sc, "Updated to 1.1.0 without version conflict error")
+
+    // Verify all four modules are at 1.1.0
+    for modName = "update-shared-transitive-dep-parent","update-shared-transitive-dep-a","update-shared-transitive-dep-b","update-shared-transitive-dep-base" {
+        set mod = ##class(%IPM.Storage.Module).NameOpen(modName, , .openSC)
+        do $$$AssertStatusOK(openSC, modName _ " opened after update")
+        if $$$ISOK(openSC) {
+            do $$$AssertEquals(mod.VersionString, "1.1.0", modName _ " updated to 1.1.0")
+        }
+    }
+
+    do ..CleanUp()
+}
+
 /// Tests that dev mode is not propagated to dependencies during update
 Method TestDevModePropagation()
 {

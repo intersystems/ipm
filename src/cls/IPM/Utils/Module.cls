@@ -1323,7 +1323,8 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade)
+    set coUpdatingModules = $get(pParams("CoUpdatingModules"))
+    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade,,,,.coUpdatingModules)
     $$$ThrowOnError(sc)
     write "Done."
 
@@ -1340,6 +1341,12 @@ ClassMethod LoadDependencies(
         write !, "Starting installation of dependencies..."
         write !
     }
+
+    set coUpdatingModules = ""
+    for i = 1:1:flatDepList.Count() {
+        set coUpdatingModules = coUpdatingModules _ $listbuild(flatDepList.GetAt(i).Name)
+    }
+    set pParams("CoUpdatingModules") = coUpdatingModules
 
     for i = 1:1:flatDepList.Count() {
         #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
