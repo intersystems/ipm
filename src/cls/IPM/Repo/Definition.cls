@@ -288,6 +288,16 @@ Method LockFileTypeGet()
     return ..#MONIKER
 }
 
+/// We use the "LockFileMapping" XData block to export a repo definition to a lock file.
+/// When importing from a lock file, doing an import and save using the same XData block won't work.
+/// Instead, we must create a set of modifiers and call %IPM.Repo.Definition::Configure()
+/// This method accepts the JSON repository values from a lock file and populates a modifers object to then call Configure() with
+ClassMethod LockFileValuesToModifiers(
+	lockFileValues As %DynamicObject,
+	Output modifiers) [ Abstract ]
+{
+}
+
 Storage Default
 {
 <Data name="RepoDefinitionDefaultData">
