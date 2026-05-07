@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1119: The update command should check version requirements using post-update values instead of what's currently installed
 - #1097: The Test resource processor now supports nested tests
 
+### Security
+- requests Python wheel updated to 2.33.0
+
 ## [0.10.6] - 2026-02-24
 
 ### Added
