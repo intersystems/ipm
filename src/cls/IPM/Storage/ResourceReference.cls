@@ -54,12 +54,9 @@ Property Children As array Of %String(MAXLEN = 1, XMLPROJECTION = "NONE");
 
 Index Children On Children(KEYS);
 
-/// Tells us if this resource belongs to a module that will be processed as a part of the "Update" command
-/// If set to true, %OnBeforeSave() will not error if another resource of the same name tries to be saved
-///     and will instead save that resource with the other module as new
-/// This is useful for an "Update" command where a resource was moved from one module to another.
-///     If the resource's new module gets updated first, we don't want to error on a resource listed in two modules
-///     when it will only be in one in the final environment once the resource's previous home gets updated
+/// Tells us if this resource belongs to a module currently being processed as part of the update command
+/// If set to false, incoming resources with the same name will throw an error
+/// If set to true, incoming resources with the same name will overwrite this entry
 Property MarkedForUpdate As %Boolean [ InitialExpression = 0 ];
 
 Method ProcessorGet() As %IPM.ResourceProcessor.Abstract

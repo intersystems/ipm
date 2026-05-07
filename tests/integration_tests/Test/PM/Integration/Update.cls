@@ -711,11 +711,11 @@ Method TestDependencyVersionsUpdated()
     set sc = ##class(%IPM.Main).Shell("uninstall -v " _ modD)
     do $$$AssertStatusOK(sc, "Successfully uninstalled " _ modD)
 
-    // Try updating module-a to a version that will fail with same resource as in module-c
+    // Try updating module-a to a version that will fail with the same resource defined in module-a and module-c post-update
     set sc = ##class(%IPM.Main).Shell("update -v " _ modA _ " " _ modAErrorVersion)
     do $$$AssertStatusNotOK(sc, "Updating " _ modA _ " to version " _ modAErrorVersion _ " fails due to same resource in modules a and c")
 
-    // Not do an update that should succeed
+    // Now do an update that should succeed
     set sc = ##class(%IPM.Main).Shell("update -v " _ modA _ " " _ modAPostVersion)
     do $$$AssertStatusOK(sc, "Successfully updated " _ modA _ " and its dependencies")
 
