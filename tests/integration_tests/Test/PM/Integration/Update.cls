@@ -641,13 +641,18 @@ Method TestInterchangeableNameUpdate()
     $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n zot -delete"))
 }
 
-/// Tests that updating a module whose dependencies share a transitive dependency (diamond pattern)
+/// Tests that updating a module whose dependencies share a transitive dependency (simple diamond)
 /// succeeds without a version conflict error (pre-fix: ERROR #5001: Exact version matches do not agree).
-/// parent -> [a, b] -> base; all modules update from 1.0.0 to 1.1.0.
+/// All modules update from 1.0.0 to 1.1.0.
+///     parent
+///     /    \
+///    a      b
+///     \    /
+///      base
 Method TestSharedTransitiveDependencyUpdate()
 {
-    set v1Dir = ..GetModuleDir("update-shared-transitive-dep", "1.0.0")
-    set v2Dir = ..GetModuleDir("update-shared-transitive-dep", "1.1.0")
+    set v1Dir = ..GetModuleDir("update-shared-transitive-dep", "simple-diamond", "1.0.0")
+    set v2Dir = ..GetModuleDir("update-shared-transitive-dep", "simple-diamond", "1.1.0")
 
     set sc = ##class(%IPM.Main).Shell("load " _ v1Dir)
     do $$$AssertStatusOK(sc, "Loaded update-shared-transitive-dep 1.0.0")
@@ -655,8 +660,42 @@ Method TestSharedTransitiveDependencyUpdate()
     set sc = ##class(%IPM.Main).Shell("update update-shared-transitive-dep-parent -path " _ v2Dir)
     do $$$AssertStatusOK(sc, "Updated to 1.1.0 without version conflict error")
 
-    // Verify all four modules are at 1.1.0
     for modName = "update-shared-transitive-dep-parent","update-shared-transitive-dep-a","update-shared-transitive-dep-b","update-shared-transitive-dep-base" {
+        set mod = ##class(%IPM.Storage.Module).NameOpen(modName, , .openSC)
+        do $$$AssertStatusOK(openSC, modName _ " opened after update")
+        if $$$ISOK(openSC) {
+            do $$$AssertEquals(mod.VersionString, "1.1.0", modName _ " updated to 1.1.0")
+        }
+    }
+
+    do ..CleanUp()
+}
+
+/// Tests that updating a module with an offset-diamond dependency topology succeeds without a version
+/// conflict error. All modules update from 1.0.0 to 1.1.0.
+/// Without the fix, installing c 1.1.0 sees stale d 1.0.0 in the DB constraining base to =1.0.0,
+/// conflicting with c's =1.1.0 requirement.
+///     parent
+///    /  |   \
+///   a   b    |
+///    \  /    |
+///    mid     d
+///     |      |
+///     c      |
+///      \    /
+///       base
+Method TestOffsetDiamondUpdate()
+{
+    set v1Dir = ..GetModuleDir("update-shared-transitive-dep", "offset-diamond", "1.0.0")
+    set v2Dir = ..GetModuleDir("update-shared-transitive-dep", "offset-diamond", "1.1.0")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ v1Dir)
+    do $$$AssertStatusOK(sc, "Loaded offset-diamond 1.0.0")
+
+    set sc = ##class(%IPM.Main).Shell("update update-shared-transitive-dep-od-parent -path " _ v2Dir)
+    do $$$AssertStatusOK(sc, "Updated to 1.1.0 without version conflict error")
+
+    for modName = "update-shared-transitive-dep-od-parent","update-shared-transitive-dep-od-a","update-shared-transitive-dep-od-b","update-shared-transitive-dep-od-d","update-shared-transitive-dep-od-mid","update-shared-transitive-dep-od-c","update-shared-transitive-dep-od-base" {
         set mod = ##class(%IPM.Storage.Module).NameOpen(modName, , .openSC)
         do $$$AssertStatusOK(openSC, modName _ " opened after update")
         if $$$ISOK(openSC) {

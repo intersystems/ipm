@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-  <Document name="update-force-deps-base.ZPM">
+  <Document name="update-shared-transitive-dep-od-base.ZPM">
     <Module>
-      <Name>update-force-deps-base</Name>
+      <Name>update-shared-transitive-dep-od-base</Name>
       <Version>1.1.0</Version>
       <Packaging>module</Packaging>
     </Module>

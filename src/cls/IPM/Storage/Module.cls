@@ -1104,7 +1104,7 @@ Method ProcessSingleDependencyIterative(
 
         if 'pIgnoreInstalledModules {
             // Apply requirements from other installed modules
-            // pCoUpdatingModules excludes sibling co-update modules whose DB rows are stale mid-batch
+            // Excludes sibling modules that are also being concurrently updated
             set otherDepsList = pKnownDependencies _ pCoUpdatingModules
             set existingDepKey = ""
             for {
