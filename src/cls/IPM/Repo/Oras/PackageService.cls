@@ -380,9 +380,9 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
             do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
         } elseif response.StatusCode '= 200 {
             if response.StatusCode = 401 {
-                set msg = "Error: Registry requires authorization for catalog listing or does not support it."
+                set msg = "Registry requires authorization for catalog listing or does not support it."
             } else {
-                set msg = "Error: Call to /v2/_catalog endpoint failed. This registry may not support it."
+                set msg = "Call to /v2/_catalog endpoint failed. This registry may not support it."
                 set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.ReasonPhrase
             }
             $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
