@@ -349,7 +349,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-/// 
+///
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -888,10 +888,17 @@ ClassMethod GetModuleListExecute(
             set tSearchCriteria.IncludePrerelease = tServer.Prereleases
             set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
             set tSearchCriteria.AllVersions = pShowAllVersions
-            set tList = tClient.ListModules(tSearchCriteria)
-            for i=1:1:tList.Count() {
-                set tMod = tList.GetAt(i)
-                set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+            set tList = ""
+            try {
+                set tList = tClient.ListModules(tSearchCriteria)
+            } catch e {
+                write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
+            }
+            if $isobject(tList) {
+                for i=1:1:tList.Count() {
+                    set tMod = tList.GetAt(i)
+                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+                }
             }
         }
 
