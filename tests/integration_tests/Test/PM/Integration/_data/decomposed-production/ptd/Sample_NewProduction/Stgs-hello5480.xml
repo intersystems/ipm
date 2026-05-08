@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Project name="Settings-hello" LastModified="1841-01-01 00:00:00.0000000">
+  <Items>
+    <ProjectItem name="EnsExportNotes.Settings-hello.PTD" type="PTD"></ProjectItem>
+    <ProjectItem name="Settings:hello.PTD" type="PTD"></ProjectItem>
+  </Items>
+</Project>
+
+
+<Document name="EnsExportNotes.Settings-hello.PTD"><ProjectTextDocument name="EnsExportNotes.Settings-hello" description="Export Notes for export Settings-hello">
+<![CDATA[<Deployment>
+<Creation>
+<SourceProduction>Sample.NewProduction</SourceProduction>
+<UTC>1841-01-01 00:00:00.000</UTC>
+</Creation>
+<Notes>
+</Notes>
+<Contents>
+<ExportProject>Settings-hello</ExportProject>
+<Item num="1">Settings:hello.PTD</Item>
+</Contents>
+<ProductionClassInExport></ProductionClassInExport>
+</Deployment>
+
+]]></ProjectTextDocument>
+</Document>
+
+<Document name="Settings:hello.PTD"><ProjectTextDocument name="Settings:hello" description="Settings for hello in Production Sample.NewProduction">
+<![CDATA[<Item Name="hello" Category="" ClassName="Ens.BusinessMetric" PoolSize="1" Enabled="true" Foreground="false" Comment="" LogTraceEvents="false" Schedule=""></Item>
+]]></ProjectTextDocument>
+</Document></Export>
