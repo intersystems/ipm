@@ -1,137 +1,98 @@
-Class %IPM.Test.JUnitOutput
+Class %IPM.Test.JUnitOutput Extends %IPM.Test.Abstract
 {
 
-ClassMethod ToFile(
-	pFileName As %String,
-	pTestIndex As %Integer = {$order(^UnitTest.Result(""),-1)}) As %Status
+ClassMethod WriteToFileStream(
+    fileStream As %Stream.FileCharacter,
+    testIndex As %Integer)
 {
-    set tSC = $$$OK
-    try {
-        set tFile = ##class(%Stream.FileCharacter).%New()
-        set tFile.TranslateTable="UTF8"
-        do tFile.LinkToFile(pFileName)
+    set tree = ..BuildResultTree(testIndex)
 
-        kill ^||TMP // results global
-        set tSuite=""
-        for {
-            set tSuite=$order(^UnitTest.Result(pTestIndex,tSuite),1,tSuiteData)
-            quit:tSuite=""
-            set ^||TMP("S",tSuite,"time")=$listget(tSuiteData,2)
+    do fileStream.WriteLine("<?xml version=""1.0"" encoding=""UTF-8"" ?>")
+    do fileStream.WriteLine("<testsuites>")
 
-            set tCase=""
-            for {
-                set tCase=$order(^UnitTest.Result(pTestIndex,tSuite,tCase),1,tCaseData)
-                quit:tCase=""
-
-                do $increment(^||TMP("S",tSuite,"tests"))
-                set ^||TMP("S",tSuite,"C",tCase,"time")=$listget(tCaseData,2)
-                set tMethod=""
-                for {
-                    set tMethod=$order(^UnitTest.Result(pTestIndex,tSuite,tCase,tMethod),1,tMethodData)
-                    quit:tMethod=""
-
-                    set ^||TMP("S",tSuite,"C",tCase,"M",tMethod,"time")=$listget(tMethodData,2)
-                    set tAssert=""
-                    for {
-                        set tAssert=$order(^UnitTest.Result(pTestIndex,tSuite,tCase,tMethod,tAssert),1,tAssertData)
-                        quit:tAssert=""
-
-                        do $increment(^||TMP("S",tSuite,"assertions"))
-                        do $increment(^||TMP("S",tSuite,"C",tCase,"assertions"))
-                        do $increment(^||TMP("S",tSuite,"C",tCase,"M",tMethod,"assertions"))
-                        if $listget(tAssertData)=0 {
-                            do $increment(^||TMP("S",tSuite,"failures"))
-                            do $increment(^||TMP("S",tSuite,"C",tCase,"failures"))
-                            set tIndex = $increment(^||TMP("S",tSuite,"C",tCase,"M",tMethod,"failures"))
-                            set ^||TMP("S",tSuite,"C",tCase,"M",tMethod,"failures",tIndex) =
-                                $listget(tAssertData,2) _ ": " _ $listget(tAssertData,3)
-                        }
-                    }
-                    if ($listget(tMethodData)=0)
-                    && ('$data(^||TMP("S",tSuite,"C",tCase,"M",tMethod,"failures"))) {
-                        do $increment(^||TMP("S",tSuite,"failures"))
-                        do $increment(^||TMP("S",tSuite,"C",tCase,"failures"))
-                        set tIndex = $increment(^||TMP("S",tSuite,"C",tCase,"M",tMethod,"failures"))
-                        set ^||TMP("S",tSuite,"C",tCase,"M",tMethod,"failures",tIndex) =
-                            $listget(tMethodData,3) _ ": " _ $listget(tMethodData,4)
-                    }
-                }
-
-                if $listget(tCaseData)=0
-                && ('$data(^||TMP("S",tSuite,"C",tCase,"failures"))) {
-                    do $increment(^||TMP("S",tSuite,"failures"))
-                    do $increment(^||TMP("S",tSuite,"C",tCase,"failures"))
-                    set tIndex = $increment(^||TMP("S",tSuite,"C",tCase,"M",tCase,"failures"))
-                    set ^||TMP("S",tSuite,"C",tCase,"M",tCase,"failures",tIndex) =
-                        $listget(tCaseData,3) _ ": " _ $listget(tCaseData,4)
-                }
+    set suiteIter = tree.suites.%GetIterator()
+    while suiteIter.%GetNext(, .suiteObj) {
+        set suiteTests = 0
+        set suiteFailures = 0
+        set suiteAssertions = 0
+        set suiteDuration = 0
+        set caseIter2 = suiteObj.cases.%GetIterator()
+        while caseIter2.%GetNext(, .caseObj2) {
+            set methodIter2 = caseObj2.methods.%GetIterator()
+            while methodIter2.%GetNext(, .methodObj2) {
+                set suiteTests = suiteTests + 1
+                if methodObj2.status = "failed" { set suiteFailures = suiteFailures + 1 }
+                set suiteDuration = suiteDuration + methodObj2.duration
+                set assertIter2 = methodObj2.asserts.%GetIterator()
+                while assertIter2.%GetNext(, .unused) { set suiteAssertions = suiteAssertions + 1 }
+            }
+            if caseObj2.error '= "" {
+                set suiteTests = suiteTests + 1
+                set suiteFailures = suiteFailures + 1
             }
         }
 
-        do tFile.WriteLine("<?xml version=""1.0"" encoding=""UTF-8"" ?>")
-        do tFile.WriteLine("<testsuites>")
-        set tSuite=""
-        for {
-            set tSuite=$order(^||TMP("S",tSuite))
-            quit:tSuite=""
+        do fileStream.Write("<testsuite")
+        do fileStream.Write(" name="""_$zconvert(suiteObj.name,"O","XML")_"""")
+        do fileStream.Write(" tests="""_suiteTests_"""")
+        do fileStream.Write(" failures="""_suiteFailures_"""")
+        do fileStream.Write(" assertions="""_suiteAssertions_"""")
+        do fileStream.Write(" time="""_suiteDuration_"""")
+        do fileStream.WriteLine(">")
 
-            do tFile.Write("<testsuite")
-            do tFile.Write(" name="""_$zconvert(tSuite,"O","XML")_"""")
-            do tFile.Write(" assertions="""_$get(^||TMP("S",tSuite,"assertions"))_"""")
-            do tFile.Write(" time="""_$get(^||TMP("S",tSuite,"time"))_"""")
-            do tFile.Write(" tests="""_$get(^||TMP("S",tSuite,"tests"))_"""")
-            do tFile.WriteLine(">")
+        set caseIter = suiteObj.cases.%GetIterator()
+        while caseIter.%GetNext(, .caseObj) {
+            do fileStream.Write("<testsuite")
+            do fileStream.Write(" name="""_$zconvert(caseObj.name,"O","XML")_"""")
+            do fileStream.WriteLine(">")
 
-            set tCase=""
-            for {
-                set tCase=$order(^||TMP("S",tSuite,"C",tCase))
-                quit:tCase=""
-
-                do tFile.Write("<testsuite")
-                do tFile.Write(" name="""_$zconvert(tCase,"O","XML")_"""")
-                do tFile.Write(" assertions="""_$get(^||TMP("S",tSuite,"C",tCase,"assertions"))_"""")
-                do tFile.Write(" time="""_$get(^||TMP("S",tSuite,"C",tCase,"time"))_"""")
-                do tFile.Write(" tests="""_$get(^||TMP("S",tSuite,"C",tCase,"tests"))_"""")
-                do tFile.WriteLine(">")
-
-                set tMethod=""
-                for {
-                    set tMethod=$order(^||TMP("S",tSuite,"C",tCase,"M",tMethod))
-                    quit:tMethod=""
-
-                    do tFile.Write("<testcase")
-                    do tFile.Write(" name="""_$zconvert(tMethod,"O","XML")_"""")
-                    do tFile.Write(" assertions="""_$get(^||TMP("S",tSuite,"C",tCase,"M",tMethod,"assertions"))_"""")
-                    do tFile.Write(" time="""_$get(^||TMP("S",tSuite,"C",tCase,"M",tMethod,"time"))_"""")
-                    do tFile.WriteLine(">")
-                    set tFailureKey = ""
-                    for {
-                        set tFailureKey = $order(^||TMP("S",tSuite,"C",tCase,"M",tMethod,"failures",tFailureKey),1,tMessage)
-                        if (tFailureKey = "") {
-                            quit
-                        }
-                        set tMessage = $zstrip(tMessage,"*C")
-                        set tMessage = $zconvert($zconvert(tMessage,"O","UTF8"),"O","XML")
-                        // Also encode newlines - $zconvert doesn't do this.
-                        set tMessage = $replace(tMessage,$char(10),"&#10;")
-                        set tMessage = $replace(tMessage,$char(13),"&#13;")
-                        do tFile.Write("<failure type=""cache-error"" message="""_tMessage_""">")
-                        do tFile.WriteLine("</failure>")
-                    }
-                    do tFile.WriteLine("</testcase>")
-                }
-                do tFile.WriteLine("</testsuite>")
+            if caseObj.error '= "" {
+                do fileStream.Write("<testcase name="""_$zconvert(caseObj.name,"O","XML")_""">")
+                set msg = ..EncodeXMLAttr(caseObj.error)
+                do fileStream.Write("<failure type=""cache-error"" message="""_msg_""">")
+                do fileStream.WriteLine("</failure></testcase>")
             }
-            do tFile.WriteLine("</testsuite>")
-        }
-        do tFile.WriteLine("</testsuites>")
-        kill ^||TMP
 
-        $$$ThrowOnError(tFile.%Save())
-    } catch e {
-        set tSC = e.AsStatus()
+            set methodIter = caseObj.methods.%GetIterator()
+            while methodIter.%GetNext(, .methodObj) {
+                set methodAssertions = methodObj.asserts.%Size()
+                do fileStream.Write("<testcase")
+                do fileStream.Write(" name="""_$zconvert(methodObj.name,"O","XML")_"""")
+                do fileStream.Write(" assertions="""_methodAssertions_"""")
+                do fileStream.Write(" time="""_methodObj.duration_"""")
+                do fileStream.WriteLine(">")
+
+                set assertIter = methodObj.asserts.%GetIterator()
+                while assertIter.%GetNext(, .assertObj) {
+                    if assertObj.status = "failed" {
+                        set msg = ..EncodeXMLAttr(assertObj.action_": "_assertObj.description)
+                        do fileStream.Write("<failure type=""cache-error"" message="""_msg_""">")
+                        do fileStream.WriteLine("</failure>")
+                    }
+                }
+                if (methodObj.status = "failed") && (methodObj.error '= "") {
+                    set msg = ..EncodeXMLAttr(methodObj.error)
+                    do fileStream.Write("<failure type=""cache-error"" message="""_msg_""">")
+                    do fileStream.WriteLine("</failure>")
+                }
+                do fileStream.WriteLine("</testcase>")
+            }
+            do fileStream.WriteLine("</testsuite>")
+        }
+        do fileStream.WriteLine("</testsuite>")
     }
-    quit $$$OK
+    do fileStream.WriteLine("</testsuites>")
+}
+
+ClassMethod EncodeXMLAttr(msg As %String) As %String [ Private ]
+{
+    // Strip control chars but preserve LF/CR for entity encoding below
+    set msg = $translate(msg, $char(0,1,2,3,4,5,6,7,8,11,12,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31))
+    set msg = $zconvert($zconvert(msg, "O", "UTF8"), "O", "XML")
+    set msg = $replace(msg, $char(13,10), "&#13;&#10;")
+    set msg = $replace(msg, $char(10), "&#10;")
+    set msg = $replace(msg, $char(13), "&#13;")
+    return msg
 }
 
 }
