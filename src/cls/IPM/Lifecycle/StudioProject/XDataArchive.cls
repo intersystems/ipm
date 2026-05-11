@@ -156,7 +156,7 @@ ClassMethod CreateDirectoryChain(pName As %String) As %Status
 {
     set tSC = $$$OK
     if '##class(%Library.File).CreateDirectoryChain(pName,.tReturn) {
-        set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",pName,$zutil(209,tReturn)))
+        set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",pName,$zutil(209,$select(tReturn<0:-tReturn,1:tReturn))))
     }
     quit tSC
 }
