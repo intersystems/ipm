@@ -2351,6 +2351,9 @@ ClassMethod LoadInternal(
     set extension = $$$lcase($piece(tDirectoryName,".",*))
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = $$$FileTempDirSys
+        if '##class(%Library.File).Writeable(tTargetDirectory) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Insufficient file system permissions to write to '%1'. Cannot load module from archive.", tTargetDirectory)))
+        }
         if $get(pCommandInfo("data", "Verbose")) {
             write !,"Extracting archive to ",tTargetDirectory
         }
