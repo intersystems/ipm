@@ -2435,9 +2435,9 @@ ClassMethod Install(
             $$$ThrowOnError(..CheckModuleNamespace())
         }
         // check if any registries are configured and enabled
-        new SQLCODE, count
+        new SQLCODE, count, %msg
         &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
-        $$$ThrowSQLIfError(SQLCODE,%message)
+        $$$ThrowSQLIfError(SQLCODE,%msg)
         if (SQLCODE = 0) && (count = 0) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
         }
