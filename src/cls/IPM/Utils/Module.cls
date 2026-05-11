@@ -226,6 +226,7 @@ ClassMethod LoadModuleFromArchive(
     try {
         set tVerbose = $get(pParams("Verbose"))
 
+        // Check base IPM install location
         set ipmBaseDir = ##class(%Library.File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm")
         set writeCheckDir = $select(##class(%File).DirectoryExists(ipmBaseDir): ipmBaseDir, 1: ##class(%SYSTEM.Util).DataDirectory())
         if '##class(%Library.File).Writeable(writeCheckDir) {
