@@ -2351,6 +2351,9 @@ ClassMethod LoadInternal(
     set extension = $$$lcase($piece(tDirectoryName,".",*))
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = $$$FileTempDirSys
+        if tTargetDirectory = ("-" _ -tTargetDirectory) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create system temporary directory. Error code: " _ -tTargetDirectory))
+        }
         if '##class(%Library.File).Writeable(tTargetDirectory) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Insufficient file system permissions to write to '%1'. Cannot load module from archive.", tTargetDirectory)))
         }
