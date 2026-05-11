@@ -2350,7 +2350,8 @@ ClassMethod LoadInternal(
     }
     set extension = $$$lcase($piece(tDirectoryName,".",*))
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
-        set tTargetDirectory = $$$FileTempDirSys
+        set tTempExtractionRoot = $$$FileTempDirSys
+        set tTargetDirectory = tTempExtractionRoot
         if $get(pCommandInfo("data", "Verbose")) {
             write !,"Extracting archive to ",tTargetDirectory
         }
@@ -2387,13 +2388,16 @@ ClassMethod LoadInternal(
     // where the developer works on files in-place.
     if '$get(tParams("DeveloperMode"), 0) {
         set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
-        if 'tFound {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "No module.xml found in " _ tTargetDirectory))
-        }
         set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
             ##class(%SYSTEM.Util).DataDirectory() _ "ipm/" _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
+        if ##class(%File).DirectoryExists(tFinalDirectory) {
+            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
+        }
         $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
-        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory))
+        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
+        if $get(tTempExtractionRoot) '= "" {
+            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
+        }
         set tTargetDirectory = tFinalDirectory
     }
 
