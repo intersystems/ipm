@@ -53,9 +53,8 @@ ClassMethod Extract(
             quit
         }
         if '##class(%File).DirectoryExists(pTargetDirectory) {
-            set tResult = ##class(%File).CreateDirectoryChain(pTargetDirectory,.tReturn)
-            if 'tResult {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",pTargetDirectory,tReturn))
+            set tSC = ##class(%IPM.Utils.File).CreateDirectoryChain(pTargetDirectory)
+            if $$$ISERR(tSC) {
                 quit
             }
         }

@@ -235,9 +235,8 @@ ClassMethod LoadModuleFromArchive(
                 quit
             }
         }
-        set tCreated = ##class(%File).CreateDirectoryChain(tTargetDirectory,.tReturnValue)
-        if 'tCreated {
-            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tTargetDirectory,tReturnValue))
+        set tSC = ##class(%IPM.Utils.File).CreateDirectoryChain(tTargetDirectory)
+        if $$$ISERR(tSC) {
             quit
         }
         set tTargetDirectory = ##class(%File).NormalizeFilenameWithSpaces(tTargetDirectory)

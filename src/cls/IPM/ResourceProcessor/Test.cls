@@ -220,7 +220,7 @@ Method OnPhase(
                 }
                 set outputDir = ##class(%File).GetDirectory(outputFile)
                 if outputDir '= "" {
-                    $$$ThrowOnError(##class(%File).CreateDirectoryChain(outputDir))
+                    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
                 }
                 set tSC = $classmethod(outputClass,"ToFile",outputFile)
                 $$$ThrowOnError(tSC)
