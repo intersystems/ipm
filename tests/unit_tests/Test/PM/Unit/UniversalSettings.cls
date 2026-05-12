@@ -47,16 +47,15 @@ Method OnBeforeOneTest(testname As %String) As %Status
     quit $$$OK
 }
 
-Method TestModuleRootValidationRejectsNonexistentDir()
+Method TestModuleRootValidationRejectsEmptyPath()
 {
-    set sc = $$$OK
     set exceptionThrown = 0
     try {
-        do ##class(%IPM.Repo.UniversalSettings).UpdateOne("ModuleRoot", "/nonexistent_ipm_test_dir_xyz/")
+        do ##class(%IPM.Repo.UniversalSettings).UpdateOne("ModuleRoot", "")
     } catch ex {
         set exceptionThrown = 1
     }
-    do $$$AssertTrue(exceptionThrown, "Setting ModuleRoot to a nonexistent directory throws an exception.")
+    do $$$AssertTrue(exceptionThrown, "Setting ModuleRoot to an empty string throws an exception.")
 }
 
 Method TestModuleRootResetToDefault()

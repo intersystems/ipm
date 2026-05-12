@@ -115,6 +115,9 @@ ClassMethod UpdateOne(
         // Validate format value before saving it
         set sc = ..SetTestReportFormat(value)
     } elseif key = "ModuleRoot" {
+        if value = "" {
+            $$$ThrowOnError($$$ERROR($$$DirectoryNameRequired))
+        }
         set value = ##class(%File).NormalizeDirectory(value)
         do ..CheckDirPermission(value)
     }
@@ -225,15 +228,13 @@ ClassMethod GetModuleRoot() As %String
 }
 
 /// Expects a normalized directory path (caller must call NormalizeDirectory first).
-ClassMethod CheckDirPermission(directory As %String = "")
+ClassMethod CheckDirPermission(directory As %String)
 {
-    if directory="" {
-        $$$ThrowOnError($$$ERROR($$$DirectoryNameRequired))
-    }
     if '##class(%File).DirectoryExists(directory) {
-        $$$ThrowOnError($$$ERROR($$$DirectoryNotFound))
-    } elseif '##class(%File).Writeable(directory) {
-         $$$ThrowOnError($$$ERROR($$$GeneralError,"No write permission on directory "_directory))
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(directory))
+    }
+    if '##class(%File).Writeable(directory) {
+        $$$ThrowOnError($$$ERROR($$$GeneralError,"No write permission on directory "_directory))
     }
 }
 
