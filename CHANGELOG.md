@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 - requests Python wheel updated to 2.33.0
+- #1138: Warn when using `-password` instead of `-password-stdin`.
 
 ## [0.10.6] - 2026-02-24
 
