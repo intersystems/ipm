@@ -1,6 +1,6 @@
 /// IPM settings are placed in ^IPM.settings global in %SYS namespace
 /// Use this class to set or get settings
-/// 
+///
 /// Available settings
 /// default_registry (string) - default registry url
 /// analytics_tracking_id
@@ -45,7 +45,10 @@ Parameter SemVerPostRelease = "SemVerPostRelease";
 /// to retain IPM history records before they are eligible for cleanup.
 Parameter HistoryRetain = "history_retain";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain";
+/// Specifies the serialization format (JSON, TOON, YAML) for unit and integration test results in the shell.
+Parameter TestReportFormat = "TestReportFormat";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -86,11 +89,13 @@ ClassMethod ResetToDefault(key As %String) As %Status
         write "Config key = """_key_""" not found",!
         quit
     }
-    set sc = ..SetValue($parameter(..%ClassName(1),key), ..GetDefaultValue($parameter(..%ClassName(1),key)))
+    // TestReportFormat has no factory default; empty means "use legacy output"
+    set defaultValue = $select(key = "TestReportFormat": "", 1: ..GetDefaultValue($parameter(..%ClassName(1),key)))
+    set sc = ..SetValue($parameter(..%ClassName(1),key), defaultValue)
     if $$$ISOK(sc) {
-        write "Value for """_key_""" succesfully reset to default",!
+        write !,"Value for """_key_""" succesfully reset to default",!
     } else {
-        write "Error reseting value for """_key_"""",!
+        write !,"Error reseting value for """_key_"""",!
     }
     return sc
 }
@@ -104,11 +109,16 @@ ClassMethod UpdateOne(
         write "Config key = """_key_""" not found",!
         quit
     }
-    set sc = ..SetValue($parameter(..%ClassName(1),key), value)
-    if $$$ISOK(sc) {
-        write "Key """_key_""" succesfully updated",!
+    if key = "TestReportFormat" {
+        // Validate format value before saving it
+        set sc = ..SetTestReportFormat(value)
     } else {
-        write "Error updating """_key_"""",!
+        set sc = ..SetValue($parameter(..%ClassName(1),key), value)
+    }
+    if $$$ISOK(sc) {
+        write !,"Key """_key_""" succesfully updated",!
+    } else {
+        write !,$system.Status.GetErrorText(sc),!
     }
     return sc
 }
@@ -188,6 +198,21 @@ ClassMethod SetAnalyticsAvailable(
 ClassMethod GetHistoryRetain() As %Integer
 {
     return ..GetValue(..#HistoryRetain)
+}
+
+ClassMethod SetTestReportFormat(
+	val As %String,
+	overwrite As %Boolean = 1) As %Status
+{
+    if val '= "" && ('$listfind($listfromstring(##class(%IPM.Test.Abstract).#VALIDFORMATS), $zconvert(val, "l"))) {
+        return $$$ERROR($$$GeneralError, "Unknown format '"_val_"'. Valid formats: "_##class(%IPM.Test.Abstract).#VALIDFORMATS)
+    }
+    return ..SetValue(..#TestReportFormat, val, overwrite)
+}
+
+ClassMethod GetTestReportFormat() As %String
+{
+    return ..GetValue(..#TestReportFormat)
 }
 
 }

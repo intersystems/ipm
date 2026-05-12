@@ -130,13 +130,15 @@ ClassMethod GetChildren(
                     set tResourceCache($$$lcase(tCacheResult.%Get("UniqueName"))) = ""
                 }
             }
-            // include hidden files by temporarily enable showHidden global for Studio search
+            // Include hidden files by temporarily enabling showHidden global for Studio search.
+            // Use %SQLUPPER for case-insensitive package prefix matching instead of relying on
+            // StudioOpenDialog's built-in prefix filter, which is case-sensitive.
             set tHidden = $get(^%SYS("Studio", "ShowHidden"), $char(0))
             set ^%SYS("Studio","ShowHidden") = 1
-            // PKG extension should only cover .CLS files
             set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
-                "select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
-                tPackage_"*.cls,"_tPackage_"*.mac,"_tPackage_"*.int,"_tPackage_"*.inc")
+                "select Name from %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0) "
+                _"where %SQLUPPER(Name) %STARTSWITH %SQLUPPER(?)",
+                "*.cls,*.mac,*.int,*.inc", tPackage)
             if (tFilesResult.%SQLCODE < 0) {
                 set tSC = $$$ERROR($$$SQLCode,tFilesResult.%SQLCODE,tFilesResult.%Message)
                 quit

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="test-output-format.ZPM">
+    <Module>
+      <Name>test-output-format</Name>
+      <Version>0.0.1</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <UnitTest Name="/tests/" Package="Test.Output.Format" Phase="test"/>
+    </Module>
+  </Document>
+</Export>

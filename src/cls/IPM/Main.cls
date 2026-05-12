@@ -73,8 +73,10 @@ Can also specify desired version to update to.
 <modifier name="env" aliases="e" dataAlias="EnvFiles" value="true" description="Semicolon separated paths to the environment files in json format. See wiki for details." />
 <modifier name="only" aliases="o" description="Only runs the specified phase(s), rather than also running predecessors." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
-<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output. For test and verify: suppresses build/install noise while still showing the result summary and any failures." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output. For test and verify: shows per-method results in the result summary when combined with -f; without -f only the summary is shown." />
+<modifier name="format" aliases="f" dataAlias="outputformat" value="true" valueList="json,yaml,toon" description="(test and verify only) One-shot output format override for the test result summary. Overrides the persistent default set via 'config set TestReportFormat &lt;format&gt;'. When neither -f nor config is set, the default summary and legacy failure lines are shown. Use 'config delete TestReportFormat' to revert to default." />
+<modifier name="output-file" dataAlias="outputfile" value="true" description="(test and verify only) Path to write full test results to a file. Format is inferred from the file extension (.json, .yaml, .toon, .xml)." />
 <modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="If specified, controls whether dependencies are exported. If omitted, defaults to the value of the #EXPORTDEPENDENCIES in lifecycle class. This modifier is only used in &quot;Package&quot; and &quot;Publish&quot; lifecycles." />
 
 </command>
@@ -2433,9 +2435,9 @@ ClassMethod Install(
             $$$ThrowOnError(..CheckModuleNamespace())
         }
         // check if any registries are configured and enabled
-        new SQLCODE, count
+        new SQLCODE, count, %msg
         &sql(SELECT COUNT(*) into :count FROM %IPM_Repo.Definition WHERE Enabled = 1)
-        $$$ThrowSQLIfError(SQLCODE,%message)
+        $$$ThrowSQLIfError(SQLCODE,%msg)
         if (SQLCODE = 0) && (count = 0) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
         }
