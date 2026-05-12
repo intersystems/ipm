@@ -1,6 +1,21 @@
 Class Test.PM.Integration.ModuleRoot Extends Test.PM.Integration.Base
 {
 
+Method OnBeforeAllTests() As %Status
+{
+    set sc = ##class(%IPM.Main).Shell("repo -remote -n registry -url https://pm.community.intersystems.com/ -user """" -pass """"")
+    do $$$AssertStatusOK(sc, "Community registry configured.")
+    return sc
+}
+
+Method OnAfterAllTests() As %Status
+{
+    set sc = ##class(%IPM.Main).Shell("uninstall objectscript-math -force")
+    set sc = ##class(%IPM.Main).Shell("repo -delete -n registry")
+    do $$$AssertStatusOK(sc, "Community registry removed.")
+    return sc
+}
+
 Method OnAfterOneTest(testname As %String) As %Status
 {
     set sc = ##class(%IPM.Repo.UniversalSettings).ResetToDefault("ModuleRoot")
