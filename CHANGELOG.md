@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1116: Fix behavior inconsistencies between install and uninstall for package name casing.
 
 ### Security
+- urllib Python wheel updated to 2.7.0
 - requests Python wheel updated to 2.33.0
 - #1138: Warn when using `-password` instead of `-password-stdin`.
 
