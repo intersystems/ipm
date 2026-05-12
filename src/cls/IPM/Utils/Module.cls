@@ -230,14 +230,13 @@ ClassMethod LoadModuleFromArchive(
         // Precedence:
         // 1. User-configured 'ModuleRoot' via UniversalSettings.
         // 2. Default system location (IRIS data directory /ipm/).
-        set ipmRoot = ##class(%IPM.Repo.UniversalSettings).GetMouleRoot()
-        if ipmRoot'="" {
-            set impRoot = ##class(%File).NormalizeDirectory(ipmRoot)
-        }
-        else {
+        set ipmRoot = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
+        if ipmRoot '= "" {
+            set ipmRoot = ##class(%File).NormalizeDirectory(ipmRoot)
+        } else {
             set ipmRoot = ##class(%SYSTEM.Util).DataDirectory() _ "ipm/"
         }
-        set ipmModuleRootDir =  ipmRoot_ pModuleName _ "/" _ pModuleVersion
+        set ipmModuleRootDir = ipmRoot_ pModuleName _ "/" _ pModuleVersion
         set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(ipmModuleRootDir)
         if ##class(%File).DirectoryExists(tTargetDirectory) {
             // Delete it.

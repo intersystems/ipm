@@ -272,7 +272,7 @@ Method %Evaluate(pAttrValue As %String) As %String [ Internal ]
     set tAttrValue = ##class(%IPM.Utils.Module).%EvaluateMacro(tAttrValue)
     set attrValue = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(tAttrValue)
     set customParams("packagename") = ..ResourceReference.Module.Name
-    set ipmDir = ##class(%IPM.Repo.UniversalSettings).GetMouleRoot()
+    set ipmDir = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
     if ipmDir="" {
         set ipmDir = $system.Util.DataDirectory() _ "ipm/"
     }

@@ -41,7 +41,6 @@ Parameter UseStandalonePip = "UseStandalonePip";
 /// Default value is 0, where 1.0.0-anystring is considered a pre-release of 1.0.0, hence 1.0.0-anystring < 1.0.0
 Parameter SemVerPostRelease = "SemVerPostRelease";
 
-
 /// Configuration setting name used to determine the number of days
 /// to retain IPM history records before they are eligible for cleanup.
 Parameter HistoryRetain = "history_retain";
@@ -116,10 +115,10 @@ ClassMethod UpdateOne(
         // Validate format value before saving it
         set sc = ..SetTestReportFormat(value)
     } elseif key = "ModuleRoot" {
+        set value = ##class(%File).NormalizeDirectory(value)
         do ..CheckDirPermission(value)
-    } else {
-        set sc = ..SetValue($parameter(..%ClassName(1),key), value)
     }
+    set sc = ..SetValue($parameter(..%ClassName(1),key), value)
     if $$$ISOK(sc) {
         write !,"Key """_key_""" succesfully updated",!
     } else {
@@ -220,17 +219,17 @@ ClassMethod GetTestReportFormat() As %String
     return ..GetValue(..#TestReportFormat)
 }
 
-ClassMethod GetMouleRoot() As %String
+ClassMethod GetModuleRoot() As %String
 {
     return ..GetValue(..#ModuleRoot)
 }
 
+/// Expects a normalized directory path (caller must call NormalizeDirectory first).
 ClassMethod CheckDirPermission(directory As %String = "")
 {
     if directory="" {
         $$$ThrowOnError($$$ERROR($$$DirectoryNameRequired))
     }
-    set directory = ##class(%File).NormalizeDirectory(directory)
     if '##class(%File).DirectoryExists(directory) {
         $$$ThrowOnError($$$ERROR($$$DirectoryNotFound))
     } elseif '##class(%File).Writeable(directory) {

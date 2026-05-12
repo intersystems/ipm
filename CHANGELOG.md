@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
 - #971: Adds structured test output formats (JSON, YAML, Toon). Use `-f <format>` for a one-shot override or `config set TestReportFormat <format>` for a persistent default. Without either, legacy output is shown. Also adds `-output-file` for writing results to a file (including JUnit XML via `.xml` extension) and improves `-quiet` to suppress build noise.
+- #1031: Add support for user-configurable ModuleRoot for IPM module installation
 
 ### Fixed
 - #964: Fix poor error handling on some install failures due to incorrect error message variable in embedded SQL
@@ -56,7 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #959: In ORAS repos, external name can now be used interchangeably with (default) name for `install` and `update`, i.e. a module published with its (default) name can be installed using its external name.
 - #951: The `unpublish` command will skip user confirmation prompt if the `-force` flag is provided.
 - #1018: Require module name for uninstall when not using the -all flag
-- #1031: Add support for user-configurable ModuleRoot for IPM module installation
 
 ### Changed
 - #316: All parameters, except developer mode, included with a `load`, `install` or `update` command will be propagated to dependencies
