@@ -222,9 +222,14 @@ ClassMethod GetTestReportFormat() As %String
     return ..GetValue(..#TestReportFormat)
 }
 
+/// Returns the configured ModuleRoot. Falls back to an ipm/ subdirectory under the IRIS data directory if not set.
 ClassMethod GetModuleRoot() As %String
 {
-    return ..GetValue(..#ModuleRoot)
+    set value = ..GetValue(..#ModuleRoot)
+    if value = "" {
+        return ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
+    }
+    return value
 }
 
 /// Expects a normalized directory path (caller must call NormalizeDirectory first).
