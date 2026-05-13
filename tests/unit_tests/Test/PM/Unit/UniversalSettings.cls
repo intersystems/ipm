@@ -31,7 +31,6 @@ Method OnAfterOneTest(testname As %String) As %Status
     new $namespace
     set $namespace = "%SYS"
     kill ^IPM.settings(..#TestIndx)
-    kill ^IPM.settings(##class(%IPM.Repo.UniversalSettings).#ModuleRoot)
     quit $$$OK
 }
 
