@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.7] - Unreleased
 
 ### Added
+- #408: Modules can now list dependencies without specifying version; will be assumed to be "*"
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
