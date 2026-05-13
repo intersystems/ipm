@@ -1153,11 +1153,8 @@ Method %Export(
         }
 
         if '##class(%File).DirectoryExists(pTargetDirectory) {
-            kill %objlasterror
-            set tCreated = ##class(%File).CreateDirectoryChain(pTargetDirectory,.tReturnValue)
-            if 'tCreated {
-                set tLastErr = $get(%objlasterror)
-                set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",pTargetDirectory,tReturnValue)),tLastErr)
+            set tSC = ##class(%IPM.Utils.File).CreateDirectoryChain(pTargetDirectory)
+            if $$$ISERR(tSC) {
                 quit
             }
         }
@@ -1956,12 +1953,7 @@ Method ExportSingleModule(
             set tSC = $$$OK
             set tDirectory = ##class(%File).GetDirectory(tExportPath,1)
             if '##class(%File).DirectoryExists(tDirectory) {
-                set tGood = ##class(%File).CreateDirectoryChain(tDirectory,.tReturn)
-                if 'tGood {
-                    set tLastErr = $get(%objlasterror)
-                    set tSC = $$$EMBEDSC($$$ERROR($$$GeneralError,$$$FormatText("Error creating directory '%1': %2",tDirectory,tReturn)),tLastErr)
-                    $$$ThrowOnError(tSC)
-                }
+                $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tDirectory))
                 write:pVerbose !,"Created ",tDirectory
             }
             if ##class(%File).DirectoryExists(tSourcePath) {
@@ -1981,7 +1973,7 @@ Method ExportSingleModule(
             }
         } elseif (tExt = "CLS") || (tExt = "DFI") || (tExt = "PRJ") || ($zconvert($extract(tFullPath,$length(tFullPath)-2,*),"l")="xml") || (##class(%RoutineMgr).UserType(tFullResourceName)) {
             if '##class(%File).Exists(tFullPath) {
-                do ##class(%File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath))
+                $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(##class(%File).GetDirectory(tFullPath)))
             }
             set tSC = $$Export^%occXMLExport(tFullPath,"-d /diffexport/createdirs",tFullResourceName)
             $$$ThrowOnError(tSC)
