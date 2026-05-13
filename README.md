@@ -45,9 +45,17 @@ zpm: USER>
 
 | IPM Version    | IRIS Version               |
 |----------------|----------------------------|
-| 0.10.x         | >2022.1                    |
+| 0.10.x         | 2022.1+                    |
 | 0.9.x          | Any                        |
 | <0.9.x         | <2025.1                    |
+
+## Python Compatibility
+
+| IRIS Version | Supported Python Versions |
+|--------------|---------------------------|
+| <2025.1      | 3.10 - 3.12               |
+| 2025.x       | 3.10 - 3.13               |
+| 2026.1+      | 3.10 - 3.14               |
 
 ## Compatibility Notes
 
