@@ -18,8 +18,14 @@ Method OnAfterAllTests() As %Status
 
 Method OnAfterOneTest(testname As %String) As %Status
 {
-    set sc = ##class(%IPM.Repo.UniversalSettings).ResetToDefault("ModuleRoot")
+    set sc = ##class(%IPM.Repo.UniversalSettings).ResetToDefault(##class(%IPM.Repo.UniversalSettings).#ModuleRoot)
     do $$$AssertStatusOK(sc, "ModuleRoot reset to default after test.")
+    for dir = "ipm-test-root-exists/","ipm-test-root-new/" {
+        set fullPath = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ dir)
+        if ##class(%File).DirectoryExists(fullPath) {
+            do ##class(%File).RemoveDirectoryTree(fullPath)
+        }
+    }
     return sc
 }
 
@@ -49,7 +55,7 @@ Method TestModuleRootCustomPathExists()
     set sc = $$$OK
     try {
         set defaultRoot = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
-        set customPath = ##class(%File).NormalizeDirectory("/tmp/ipm-test-root-exists/")
+        set customPath = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "ipm-test-root-exists/")
 
         do $$$AssertTrue(##class(%File).CreateDirectoryChain(customPath), "Created custom ModuleRoot directory.")
 
@@ -77,7 +83,7 @@ Method TestModuleRootCustomPathCreated()
     set sc = $$$OK
     try {
         set defaultRoot = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
-        set customPath = ##class(%File).NormalizeDirectory("/tmp/ipm-test-root-new/")
+        set customPath = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "ipm-test-root-new/")
 
         // Remove the directory if it exists from a prior run
         if ##class(%File).DirectoryExists(customPath) {

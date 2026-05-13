@@ -113,25 +113,33 @@ ClassMethod UpdateOne(
 	key As %String,
 	value As %String) As %Status
 {
+    set sc = $$$OK
     set SettingsList = $listfromstring(..#CONFIGURABLE)
     if ('$listfind(SettingsList,key)) {
         write "Config key = """_key_""" not found",!
-        quit
+        quit sc
     }
-    if key = ..#TestReportFormat {
-        // Validate format value before saving it
-        set sc = ..SetTestReportFormat(value)
-    } elseif key = ..#ModuleRoot {
-        if value = "" {
-            $$$ThrowOnError($$$ERROR($$$DirectoryNameRequired))
+    try {
+        if key = ..#TestReportFormat {
+            // Validate format value before saving it; SetTestReportFormat also calls SetValue internally
+            set sc = ..SetTestReportFormat(value)
+        } else {
+            if key = ..#ModuleRoot {
+                if value = "" {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError, "ModuleRoot cannot be empty"))
+                }
+                set value = ##class(%File).NormalizeDirectory(value)
+                do ..EnsureWritableDirectory(value)
+            }
+            set sc = ..SetValue($parameter(..%ClassName(1),key), value)
         }
-        set value = ##class(%File).NormalizeDirectory(value)
-        do ..EnsureWritableDirectory(value)
-    }
-    set sc = ..SetValue($parameter(..%ClassName(1),key), value)
-    if $$$ISOK(sc) {
-        write !,"Key """_key_""" succesfully updated",!
-    } else {
+        if $$$ISOK(sc) {
+            write !,"Key """_key_""" succesfully updated",!
+        } else {
+            write !,$system.Status.GetErrorText(sc),!
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
         write !,$system.Status.GetErrorText(sc),!
     }
     return sc

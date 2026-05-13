@@ -31,6 +31,7 @@ Method OnAfterOneTest(testname As %String) As %Status
     new $namespace
     set $namespace = "%SYS"
     kill ^IPM.settings(..#TestIndx)
+    kill ^IPM.settings(##class(%IPM.Repo.UniversalSettings).#ModuleRoot)
     quit $$$OK
 }
 
@@ -49,13 +50,8 @@ Method OnBeforeOneTest(testname As %String) As %Status
 
 Method TestModuleRootValidationRejectsEmptyPath()
 {
-    set exceptionThrown = 0
-    try {
-        do ##class(%IPM.Repo.UniversalSettings).UpdateOne("ModuleRoot", "")
-    } catch ex {
-        set exceptionThrown = 1
-    }
-    do $$$AssertTrue(exceptionThrown, "Setting ModuleRoot to an empty string throws an exception.")
+    set sc = ##class(%IPM.Repo.UniversalSettings).UpdateOne(##class(%IPM.Repo.UniversalSettings).#ModuleRoot, "")
+    do $$$AssertStatusNotOK(sc, "Setting ModuleRoot to an empty string returns an error status.")
 }
 
 Method TestModuleRootResetToDefault()
@@ -63,12 +59,12 @@ Method TestModuleRootResetToDefault()
     set sc = $$$OK
     try {
         set expectedDefault = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
-        set customPath = ##class(%File).NormalizeDirectory("/tmp/ipm-test-root/")
+        set customPath = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "ipm-test-root-" _ $job _ "/")
         do $$$AssertTrue(##class(%File).CreateDirectoryChain(customPath), "Created custom ModuleRoot directory.")
 
-        do $$$AssertStatusOK(##class(%IPM.Repo.UniversalSettings).UpdateOne("ModuleRoot", customPath), "Set ModuleRoot to custom path.")
+        do $$$AssertStatusOK(##class(%IPM.Repo.UniversalSettings).UpdateOne(##class(%IPM.Repo.UniversalSettings).#ModuleRoot, customPath), "Set ModuleRoot to custom path.")
 
-        do $$$AssertStatusOK(##class(%IPM.Repo.UniversalSettings).ResetToDefault("ModuleRoot"), "Reset ModuleRoot to default.")
+        do $$$AssertStatusOK(##class(%IPM.Repo.UniversalSettings).ResetToDefault(##class(%IPM.Repo.UniversalSettings).#ModuleRoot), "Reset ModuleRoot to default.")
         set resetValue = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
         do $$$AssertEquals(resetValue, expectedDefault, "ModuleRoot reset value matches expected default.")
     } catch ex {
