@@ -25,11 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1119: The update command should check version requirements using post-update values instead of what's currently installed
 - #1097: The Test resource processor now supports nested tests
 - #1116: Fix behavior inconsistencies between install and uninstall for package name casing.
-<<<<<<< fix-1128
-- #1128: Fixed an issue where an update can fail if a resource is moved from one module to another
-=======
 - #1114: Fix issue with SystemRequirements being confused by multiple namespaces with different version of IPM installed
->>>>>>> main
+- #1128: Fixed an issue where an update can fail if a resource is moved from one module to another
 
 ### Security
 - urllib Python wheel updated to 2.7.0
