@@ -112,12 +112,12 @@ ClassMethod ZPMInit(
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("PipCaller", "", 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("UseStandalonePip", "", 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("SemVerPostRelease", 0, 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("DefaultLogEntryLimit",20, 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ModuleRoot",##class(%SYSTEM.Util).DataDirectory() _ "ipm/", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#ColorScheme, "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#PipCaller, "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#UseStandalonePip, "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#SemVerPostRelease, 0, 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#DefaultLogEntryLimit, 20, 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#ModuleRoot, ##class(%SYSTEM.Util).DataDirectory() _ "ipm/", 0))
     quit $$$OK
 }
 

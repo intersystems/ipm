@@ -91,8 +91,15 @@ ClassMethod ResetToDefault(key As %String) As %Status
         write "Config key = """_key_""" not found",!
         quit
     }
-    // TestReportFormat has no factory default; empty means "use legacy output"
-    set defaultValue = $select(key = "TestReportFormat": "", 1: ..GetDefaultValue($parameter(..%ClassName(1),key)))
+    if key = ..#TestReportFormat {
+        // No factory default; empty string means "use legacy output"
+        set defaultValue = ""
+    } elseif key = ..#ModuleRoot {
+        // Computed directly rather than read from storage — older IPM versions did not seed this default node
+        set defaultValue = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
+    } else {
+        set defaultValue = ..GetDefaultValue($parameter(..%ClassName(1),key))
+    }
     set sc = ..SetValue($parameter(..%ClassName(1),key), defaultValue)
     if $$$ISOK(sc) {
         write !,"Value for """_key_""" succesfully reset to default",!
@@ -111,15 +118,15 @@ ClassMethod UpdateOne(
         write "Config key = """_key_""" not found",!
         quit
     }
-    if key = "TestReportFormat" {
+    if key = ..#TestReportFormat {
         // Validate format value before saving it
         set sc = ..SetTestReportFormat(value)
-    } elseif key = "ModuleRoot" {
+    } elseif key = ..#ModuleRoot {
         if value = "" {
             $$$ThrowOnError($$$ERROR($$$DirectoryNameRequired))
         }
         set value = ##class(%File).NormalizeDirectory(value)
-        do ..CheckDirPermission(value)
+        do ..EnsureWritableDirectory(value)
     }
     set sc = ..SetValue($parameter(..%ClassName(1),key), value)
     if $$$ISOK(sc) {
@@ -223,6 +230,10 @@ ClassMethod GetTestReportFormat() As %String
 }
 
 /// Returns the configured ModuleRoot. Falls back to an ipm/ subdirectory under the IRIS data directory if not set.
+/// Note: "config list" shows a blank ModuleRoot on installs upgraded from versions that predate this setting,
+/// because ZPMInit (which seeds the default) only runs during bootstraps, not upgrades through IPM itself.
+/// Fixing this cleanly would require either splitting seeding logic across ZPMInit and an <Invoke>,
+/// or adding a special-case to GetAll/PrintOne — both add more complexity than the gap warrants.
 ClassMethod GetModuleRoot() As %String
 {
     set value = ..GetValue(..#ModuleRoot)
@@ -233,7 +244,8 @@ ClassMethod GetModuleRoot() As %String
 }
 
 /// Expects a normalized directory path (caller must call NormalizeDirectory first).
-ClassMethod CheckDirPermission(directory As %String)
+/// Creates the directory chain if it does not already exist, then verifies write access.
+ClassMethod EnsureWritableDirectory(directory As %String)
 {
     if '##class(%File).DirectoryExists(directory) {
         $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(directory))
