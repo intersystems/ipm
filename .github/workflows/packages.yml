@@ -28,7 +28,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - id: set-matrix
         run: |
           matrix=$(curl -L "$PM_URL" | jq -cr "$JQ_SCRIPT" | python3 .github/scripts/batcher.py ${{ inputs.nJobs }} | jq -cr .)

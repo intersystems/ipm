@@ -18,7 +18,7 @@ jobs:
         run: |
           unzip logs.zip -d /tmp/logs/
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Summarize logs
         run: |
           # Could also use awk script, but python is easier to read and debug
