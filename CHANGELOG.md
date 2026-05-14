@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.7] - Unreleased
 
 ### Added
+- #1141: New `Production` resource processor that allows managing auto-start and auto-update of interoperability productions.
+- #1141: New `DecomposedProduction` resource processor for managing an interoperability production class constituted from PTD files.
 - #408: Modules can now list dependencies without specifying version; will be assumed to be "*"
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml

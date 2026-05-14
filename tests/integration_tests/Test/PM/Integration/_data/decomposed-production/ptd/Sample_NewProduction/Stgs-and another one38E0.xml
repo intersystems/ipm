@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Project name="Settings-and another one" LastModified="1841-01-01 00:00:00.0000000">
+  <Items>
+    <ProjectItem name="EnsExportNotes.Settings-and another one.PTD" type="PTD"></ProjectItem>
+    <ProjectItem name="Settings:and another one.PTD" type="PTD"></ProjectItem>
+  </Items>
+</Project>
+
+
+<Document name="EnsExportNotes.Settings-and another one.PTD"><ProjectTextDocument name="EnsExportNotes.Settings-and another one" description="Export Notes for export Settings-and another one">
+<![CDATA[<Deployment>
+<Creation>
+<SourceProduction>Sample.NewProduction</SourceProduction>
+<UTC>1841-01-01 00:00:00.000</UTC>
+</Creation>
+<Notes>
+</Notes>
+<Contents>
+<ExportProject>Settings-and another one</ExportProject>
+<Item num="1">Settings:and another one.PTD</Item>
+</Contents>
+<ProductionClassInExport></ProductionClassInExport>
+</Deployment>
+
+]]></ProjectTextDocument>
+</Document>
+
+<Document name="Settings:and another one.PTD"><ProjectTextDocument name="Settings:and another one" description="Settings for and another one in Production Sample.NewProduction">
+<![CDATA[<Item Name="and another one" Category="" ClassName="Ens.ProductionMonitorService" PoolSize="1" Enabled="false" Foreground="false" Comment="" LogTraceEvents="false" Schedule=""></Item>
+]]></ProjectTextDocument>
+</Document></Export>
