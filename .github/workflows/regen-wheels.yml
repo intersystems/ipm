@@ -54,7 +54,7 @@ jobs:
             ls ${pkg}-${ver}-*.whl 2>/dev/null | grep -q . || (echo "Missing wheel for $pkg==$ver" && exit 1)
           done < requirements.txt
 
-      - uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403  # v5
+      - uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9  # v7.1.0
         with:
           commit_message: "Regenerate wheels for updated requirements"
           file_pattern: "wheels/*.whl"
