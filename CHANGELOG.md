@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.7] - Unreleased
 
 ### Added
+- #408: Modules can now list dependencies without specifying version; will be assumed to be "*"
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
@@ -26,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1119: The update command should check version requirements using post-update values instead of what's currently installed
 - #1097: The Test resource processor now supports nested tests
 - #1116: Fix behavior inconsistencies between install and uninstall for package name casing.
+- #1114: Fix issue with SystemRequirements being confused by multiple namespaces with different version of IPM installed
+- #1128: Fixed an issue where an update can fail if a resource is moved from one module to another
 
 ### Security
 - urllib Python wheel updated to 2.7.0

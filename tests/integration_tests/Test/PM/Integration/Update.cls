@@ -680,6 +680,8 @@ Method TestDependencyVersionsUpdated()
     set modBPreVersion = "1.0.0"
     set modCPreVersion = "5.6.45+snapshot"
 
+    set modAErrorVersion = "2.0.5+snapshot"
+
     set modAPostVersion = "2.1.0+snapshot"
     set modBPostVersion = "2.0.0+snapshot"
     set modCPostVersion = "6.2.0+snapshot"
@@ -695,6 +697,7 @@ Method TestDependencyVersionsUpdated()
     do $$$AssertEquals(mod.Version.ToString(), modBPreVersion, "Module " _ modB _ " correctly installed as " _ modBPreVersion)
     set mod = ##class(%IPM.Storage.Module).NameOpen(modC)
     do $$$AssertEquals(mod.Version.ToString(), modCPreVersion, "Module " _ modC _ " correctly installed as " _ modCPreVersion)
+    kill mod
 
     // Install module-d prior to update
     set sc = ##class(%IPM.Main).Shell("install -v " _ modD)
@@ -704,9 +707,15 @@ Method TestDependencyVersionsUpdated()
     set sc = ##class(%IPM.Main).Shell("update -v " _ modA _ " " _ modAPostVersion)
     do $$$AssertStatusNotOK(sc, "Updating " _ modA _ " fails due to version errors with previously installed " _ modD)
 
-    // Uninstall module-d then try the update again
+    // Uninstall module-d since we don't need it anymore
     set sc = ##class(%IPM.Main).Shell("uninstall -v " _ modD)
     do $$$AssertStatusOK(sc, "Successfully uninstalled " _ modD)
+
+    // Try updating module-a to a version that will fail with the same resource defined in module-a and module-c post-update
+    set sc = ##class(%IPM.Main).Shell("update -v " _ modA _ " " _ modAErrorVersion)
+    do $$$AssertStatusNotOK(sc, "Updating " _ modA _ " to version " _ modAErrorVersion _ " fails due to same resource in modules a and c")
+
+    // Now do an update that should succeed
     set sc = ##class(%IPM.Main).Shell("update -v " _ modA _ " " _ modAPostVersion)
     do $$$AssertStatusOK(sc, "Successfully updated " _ modA _ " and its dependencies")
 

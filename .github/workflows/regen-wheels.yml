@@ -1,0 +1,60 @@
+name: Regenerate Python wheels
+
+on:
+  pull_request:
+    paths:
+      - wheels/requirements.txt
+  workflow_dispatch:
+
+jobs:
+  regen-wheels:
+    runs-on: ubuntu-latest
+    # Only restrict to Dependabot on pull_request triggers — manual runs
+    # (workflow_dispatch) are already gated by who has repo write access.
+    if: github.event_name == 'workflow_dispatch' || github.actor == 'dependabot[bot]'
+    permissions:
+      contents: write
+
+    steps:
+      # SHA-pinned actions prevent a compromised or malicious action maintainer from
+      # pushing new code to a tag (e.g. v4) and having it silently run here with
+      # write access to the repo. The comment shows the human-readable tag so the
+      # pin is auditable. Dependabot keeps these SHAs current (see dependabot.yml).
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+
+      - name: Regenerate wheels
+        run: |
+          cd wheels
+          rm -f *.whl
+          python3 -m pip wheel --no-deps -r requirements.txt
+
+      - name: Validate wheels
+        run: |
+          cd wheels
+
+          # All wheels must be pure Python (no native extensions that are platform-specific)
+          for f in *.whl; do
+            [[ "$f" == *-py3-none-any.whl ]] || (echo "Non-pure wheel: $f" && exit 1)
+          done
+
+          # Wheel count must match package count in requirements.txt
+          EXPECTED=$(grep -cP '^\s*[^#\s]' requirements.txt)
+          ACTUAL=$(ls *.whl | wc -l)
+          [ "$EXPECTED" -eq "$ACTUAL" ] || (echo "Expected $EXPECTED wheels, got $ACTUAL" && exit 1)
+
+          # Every pinned package must have a corresponding wheel
+          while IFS= read -r line; do
+            [[ "$line" =~ ^# || -z "$line" ]] && continue
+            pkg=$(echo "$line" | grep -oP '^[a-zA-Z0-9_.-]+' | tr '-' '_' | tr '[:upper:]' '[:lower:]')
+            ver=$(echo "$line" | grep -oP '==\K[^\s\\]+')
+            ls ${pkg}-${ver}-*.whl 2>/dev/null | grep -q . || (echo "Missing wheel for $pkg==$ver" && exit 1)
+          done < requirements.txt
+
+      - uses: stefanzweifel/git-auto-commit-action@b863ae1933cb653a53c021fe36dbb774e1fb9403  # v5
+        with:
+          commit_message: "Regenerate wheels for updated requirements"
+          file_pattern: "wheels/*.whl"
