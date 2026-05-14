@@ -1163,7 +1163,16 @@ Method %Export(
         }
 
         set tExportDependencies = $get(pParams("ExportDependencies"), ..#EXPORTDEPENDENCIES)
-        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies,..PhaseList,.pDependencyGraph)
+        set phaseList = ..PhaseList
+        if $get(pParams("IncludeTests"), ..Module.IncludeTests) {
+            if '$listfind(phaseList, "Test") {
+                set phaseList = phaseList_$listbuild("Test")
+            }
+            if '$listfind(phaseList, "Verify") {
+                set phaseList = phaseList_$listbuild("Verify")
+            }
+        }
+        set tSC = ..Module.GetResolvedReferences(.tResourceArray, tExportDependencies, phaseList, .pDependencyGraph)
         if $$$ISERR(tSC) {
             quit
         }
@@ -1201,7 +1210,7 @@ Method %Export(
                 set tModule = ##class(%IPM.Storage.Module).NameOpen(tModuleName)
                 do ..ExportPythonDependencies(tModule, .pParams)
                 // Recalculate resource array to pick up any python dependencies added during export
-                $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tExportDependencies,..PhaseList,.pDependencyGraph))
+                $$$ThrowOnError(..Module.GetResolvedReferences(.tResourceArray,tExportDependencies,phaseList,.pDependencyGraph))
             }
             kill tSingleModuleArray
             merge tSingleModuleArray = tResourceArray(tModuleName)

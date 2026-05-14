@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
 - #971: Adds structured test output formats (JSON, YAML, Toon). Use `-f <format>` for a one-shot override or `config set TestReportFormat <format>` for a persistent default. Without either, legacy output is shown. Also adds `-output-file` for writing results to a file (including JUnit XML via `.xml` extension) and improves `-quiet` to suppress build noise.
+- #870: When running tests for just a single suite or class, will only load and compile the relevant classes instead of all the tests
+- #843: Optionally include tests when packaging using either the `-include-tests` flag or `<IncludeTests>1</IncludeTests>` in module.xml
 
 ### Fixed
 - #964: Fix poor error handling on some install failures due to incorrect error message variable in embedded SQL
