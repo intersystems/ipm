@@ -7,7 +7,7 @@ charset_normalizer==2.1.1
 idna==3.10
 jsonschema_specifications==2024.10.1
 jsonschema==4.23.0
-oras==0.1.30
+oras==0.2.42
 referencing==0.36.2
 requests==2.33.0
 typing_extensions==4.12.2
