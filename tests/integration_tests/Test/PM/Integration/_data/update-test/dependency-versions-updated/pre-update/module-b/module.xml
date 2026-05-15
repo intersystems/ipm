@@ -5,6 +5,7 @@
       <Name>module-b</Name>
       <Version>1.0.0</Version>
       <Resource Name="ModuleB.PKG" />
+      <Resource Name="Shared.Class1.CLS" />
       <Dependencies>
         <ModuleReference>
           <Name>module-c</Name>

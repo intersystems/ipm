@@ -8,12 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.7] - Unreleased
 
 ### Added
+- #408: Modules can now list dependencies without specifying version; will be assumed to be "*"
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
 - #1013: Implement recursive placeholder resolution in Default parameters
+- #971: Adds structured test output formats (JSON, YAML, Toon). Use `-f <format>` for a one-shot override or `config set TestReportFormat <format>` for a persistent default. Without either, legacy output is shown. Also adds `-output-file` for writing results to a file (including JUnit XML via `.xml` extension) and improves `-quiet` to suppress build noise.
 
 ### Fixed
+- #964: Fix poor error handling on some install failures due to incorrect error message variable in embedded SQL
+- #1130: Fix issue with ORAS repositories pointing to some OCI registries that require authentication (e.g. ghcr.io) not accepting credentials properly. `repo -list` now shows an `Authenticated?` status for ORAS repos with credentials configured.
 - #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
 - #1052: In a namespace with mapped IPM, the `info` command works again and the intro message displays the IPM version and where its mapped from
 - #1102: %IPM.Storage.QualifiedModuleInfo:%New() will now copy over version properties when passed in a resolvedReference
@@ -22,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1122: Packaging should recognize resources in dependency modules set to deploy
 - #1119: The update command should check version requirements using post-update values instead of what's currently installed
 - #1097: The Test resource processor now supports nested tests
+- #1116: Fix behavior inconsistencies between install and uninstall for package name casing.
+- #1114: Fix issue with SystemRequirements being confused by multiple namespaces with different version of IPM installed
+- #1128: Fixed an issue where an update can fail if a resource is moved from one module to another
+- #430: Updating shared transitive dependencies with lock-step version requirements now works instead of erroring out
+
+### Security
+- urllib Python wheel updated to 2.7.0
+- requests Python wheel updated to 2.33.0
+- #1138: Warn when using `-password` instead of `-password-stdin`.
 
 ## [0.10.6] - 2026-02-24
 

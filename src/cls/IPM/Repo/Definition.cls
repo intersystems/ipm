@@ -1,4 +1,4 @@
-Include (%syPrompt, %IPM.Common)
+Include (%syPrompt, %IPM.Common, %IPM.Formatting)
 
 Class %IPM.Repo.Definition Extends (%Persistent, %ZEN.DataModel.Adaptor, %IPM.CLI.Commands, %JSON.Adaptor) [ Abstract ]
 {
@@ -190,6 +190,8 @@ ClassMethod Configure(
             read "Password: ", pwd
             close $io
             set pModifiers("password") = pwd
+        } elseif $data(pModifiers("password")) {
+            write !, $$$FormattedLine($$$Yellow, "WARNING: Using --password via the CLI is insecure. Use --password-stdin.")
         }
 
         $$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))

@@ -52,7 +52,14 @@ Method OnPhase(
         if verbose {
             write !,"Running command: ",command
         }
-        $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommand(, command))
+        set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
+        if explicitQuiet {
+            // Redirect pip stdout/stderr to a sink stream so subprocess output doesn't bypass device suppression
+            set pipOutput = ##class(%Stream.TmpCharacter).%New()
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommand(, command, .pipOutput, .pipOutput))
+        } else {
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommand(, command))
+        }
     } catch ex {
         set pResourceHandled = 0
         // Special case: we want the installation of IPM to continue, even if the wheel package fails to install

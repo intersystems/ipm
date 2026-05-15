@@ -111,6 +111,10 @@ Method OnPhase(
             // In test/verify phase, run unit tests.
             set tVerbose = $get(pParams("Verbose"), 0)
             set tFlags = $select(tVerbose:"/display=all",1:"/display=none")
+            set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
+            if explicitQuiet {
+                set suppressor = ##class(%IPM.Utils.OutputSuppressor).%New()
+            }
 
             // Ensure unit tests and related classes are loaded.
             set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
@@ -199,21 +203,54 @@ Method OnPhase(
             zkill ^UnitTestRoot
             $$$ThrowOnError(tSC)
 
-            if $data(pParams("UnitTest","JUnitOutput"),tJUnitFile) {
-                set tPostfix = "-"_$zconvert(pPhase,"L")_"-"
-                if (..Package '= "") {
-                    set tPostfix = tPostfix_$replace(..Package,".","-")_"-PKG"
-                } elseif (..Class '= "") {
-                    set tPostfix = tPostfix_$replace(..Class,".","-")_"-CLS"
+            set testIndex = $get(^||%UnitTest.Manager.AllResults($get(^||%UnitTest.Manager.AllResultsCount)))
+            if testIndex = "" {
+                set testIndex = $order(^UnitTest.Result(""),-1)
+            }
+            if $data(pParams("outputfile"), outputFile) {
+                set fileExtension = $zconvert($piece(outputFile,".",*),"L")
+                set outputClass = $case(fileExtension,
+                    "json":"%IPM.Test.JsonOutput",
+                    "yaml":"%IPM.Test.YamlOutput",
+                    "toon":"%IPM.Test.ToonOutput",
+                    "xml":"%IPM.Test.JUnitOutput",
+                    :"")
+                if outputClass = "" {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported output-file extension '."_fileExtension_"'. Use .json, .yaml, .toon, or .xml."))
                 }
-                set tJUnitFile = $piece(tJUnitFile,".",1,*-1)_tPostfix_".xml"
-                set tSC = ##class(%IPM.Test.JUnitOutput).ToFile(tJUnitFile)
+                set outputDir = ##class(%File).GetDirectory(outputFile)
+                if outputDir '= "" {
+                    $$$ThrowOnError(##class(%File).CreateDirectoryChain(outputDir))
+                }
+                set tSC = $classmethod(outputClass,"ToFile",outputFile)
                 $$$ThrowOnError(tSC)
             }
+            set suppressor = ""
 
-            // By default, detect and report unit test failures as an error from this phase
+            set outputFormat = $get(pParams("outputformat"))
+            if outputFormat = "" {
+                set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+            }
+
+            write !!,"Test Results:"
+            if outputFormat '= "" {
+                set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
+                if '$$$defClassDefined(outputClass) {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
+                }
+                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose,1)
+                $$$ThrowOnError(tSC)
+            } else {
+                set tSC = ##class(%IPM.Test.Abstract).OutputToDevice(testIndex,tVerbose,0)
+                $$$ThrowOnError(tSC)
+            }
+            write !
+            // Detect and report unit test failures as an error from this phase.
+            // OutputFailures shows legacy red FAILED lines only when no format is active.
             if $get(pParams("UnitTest","FailuresAreFatal"),1) {
-                do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+                if outputFormat = "" {
+                    do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+                }
                 set tSC = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
                 $$$ThrowOnError(tSC)
             }

@@ -54,6 +54,11 @@ Property Children As array Of %String(MAXLEN = 1, XMLPROJECTION = "NONE");
 
 Index Children On Children(KEYS);
 
+/// Tells us if this resource belongs to a module currently being processed as part of the update command
+/// If set to false, incoming resources with the same name will throw an error
+/// If set to true, incoming resources with the same name will overwrite this entry
+Property MarkedForUpdate As %Boolean [ InitialExpression = 0 ];
+
 Method ProcessorGet() As %IPM.ResourceProcessor.Abstract
 {
     // Similar to LifecycleGet in Module.
@@ -125,13 +130,15 @@ ClassMethod GetChildren(
                     set tResourceCache($$$lcase(tCacheResult.%Get("UniqueName"))) = ""
                 }
             }
-            // include hidden files by temporarily enable showHidden global for Studio search
+            // Include hidden files by temporarily enabling showHidden global for Studio search.
+            // Use %SQLUPPER for case-insensitive package prefix matching instead of relying on
+            // StudioOpenDialog's built-in prefix filter, which is case-sensitive.
             set tHidden = $get(^%SYS("Studio", "ShowHidden"), $char(0))
             set ^%SYS("Studio","ShowHidden") = 1
-            // PKG extension should only cover .CLS files
             set tFilesResult = ##class(%SQL.Statement).%ExecDirect(,
-                "select Name from  %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0)",
-                tPackage_"*.cls,"_tPackage_"*.mac,"_tPackage_"*.int,"_tPackage_"*.inc")
+                "select Name from %Library.RoutineMgr_StudioOpenDialog(?,'',1,1,1,0,0) "
+                _"where %SQLUPPER(Name) %STARTSWITH %SQLUPPER(?)",
+                "*.cls,*.mac,*.int,*.inc", tPackage)
             if (tFilesResult.%SQLCODE < 0) {
                 set tSC = $$$ERROR($$$SQLCode,tFilesResult.%SQLCODE,tFilesResult.%Message)
                 quit
@@ -344,6 +351,21 @@ ClassMethod NonNullResourceNameOpen(
     quit tResult
 }
 
+/// When given a name for a resource, set its MarkedForUpdate flag
+/// See property description for more details on the usage of MarkedForUpdate
+ClassMethod MarkResourceForUpdate(
+	resourceName As %String,
+	marking As %Boolean = 1)
+{
+    set resource = ..NonNullResourceNameOpen(resourceName,,.sc)
+    if (resource = $$$NULLOREF) {
+        // If unable to find a resource with this name, do nothing
+        quit
+    }
+    set resource.MarkedForUpdate = marking
+    $$$ThrowOnError(resource.%Save())
+}
+
 ClassMethod GetStatus(
 	InternalName As %String,
 	Output pReferenced As %Boolean,
@@ -430,6 +452,11 @@ Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
         if ..NonNullResourceNameExists(..UniqueName,.tExistingID) && (tExistingID '= ..%Id()) {
             set tOtherInstance = ..%OpenId(tExistingID,,.tSC)
             if $$$ISERR(tSC) {
+                quit
+            }
+            if (tOtherInstance.MarkedForUpdate) {
+                // If other instance marked for update, then we should overwrite it with this instead of throwing an error
+                $$$ThrowOnError(..%DeleteId(tExistingID))
                 quit
             }
             if (tOtherInstance.Module.Name = ..Module.Name) {
@@ -541,6 +568,9 @@ Storage Default
 </Value>
 <Value name="10">
 <Value>IsAPI</Value>
+</Value>
+<Value name="11">
+<Value>MarkedForUpdate</Value>
 </Value>
 </Data>
 <DataLocation>{%%PARENT}("Resources")</DataLocation>

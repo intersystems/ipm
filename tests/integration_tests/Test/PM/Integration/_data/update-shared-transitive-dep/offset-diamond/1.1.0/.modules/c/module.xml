@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="update-shared-transitive-dep-od-c.ZPM">
+    <Module>
+      <Name>update-shared-transitive-dep-od-c</Name>
+      <Version>1.1.0</Version>
+      <Packaging>module</Packaging>
+      <Dependencies>
+        <ModuleReference>
+          <Name>update-shared-transitive-dep-od-base</Name>
+          <Version>1.1.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

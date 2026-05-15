@@ -19,15 +19,132 @@ Parameter ALLOWPREFIXINLOCATION = 0;
 // ** PACKAGE SERVICE FUNCTIONS **
 
 /// For run-time checks to ensure the service is available before attempting to invoke it.
+/// Returns true if the registry is reachable.
+/// Per the OCI Distribution Spec, GET /v2/ returning 401 means the registry is up but requires
+/// authentication — this is not a failure. We check for WWW-Authenticate (required by RFC 7235 on
+/// any proper 401) rather than Docker-Distribution-Api-Version, since many registries omit the latter.
 Method IsAvailable() As %Boolean
 {
     set request = ..GetHttpRequest(..Location)
     set request.Timeout = 5
     if $$$ISERR(request.Get(..PathPrefix _ "v2/")) {
-        quit 0
+        return 0
     }
     set statusCode = request.HttpResponse.StatusCode
-    quit (200 <= statusCode) && (statusCode < 300)
+    if (200 <= statusCode) && (statusCode < 300) {
+        return 1
+    }
+    if statusCode = 401 {
+        return (request.HttpResponse.GetHeader("WWW-AUTHENTICATE") '= "")
+    }
+    return 0
+}
+
+/// Returns true if the configured credentials are accepted by the registry.
+/// Always returns true when no credentials are configured (anonymous access).
+/// This is used only for display purposes (repo -list). Actual operations (pull, push,
+/// list modules) delegate to the Python ORAS client via GetClient(), which handles the
+/// full token exchange independently.
+Method IsAuthenticated() As %Boolean
+{
+    if (..Username = "") && (..Password = "") && (..Token = "") {
+        return 1
+    }
+    // Probe GET /v2/ with credentials attached by GetHttpRequest().
+    // Some registries accept credentials directly here and return 2xx.
+    set request = ..GetHttpRequest(..Location)
+    set request.Timeout = 5
+    if $$$ISERR(request.Get(..PathPrefix _ "v2/")) {
+        return 0
+    }
+    set statusCode = request.HttpResponse.StatusCode
+    if (200 <= statusCode) && (statusCode < 300) {
+        return 1
+    }
+    if statusCode '= 401 {
+        return 0
+    }
+    // 401 with a WWW-Authenticate header means the registry uses a token endpoint for auth.
+    // Parse the challenge and probe that endpoint to verify the credentials.
+    set wwwAuth = request.HttpResponse.GetHeader("WWW-AUTHENTICATE")
+    return ..ProbeTokenEndpoint(wwwAuth)
+}
+
+/// Probes the Bearer token endpoint from a WWW-Authenticate challenge to check whether
+/// the configured credentials are accepted. We do not use the returned token — a 2xx
+/// response is sufficient to confirm the credentials are valid.
+/// We probe here rather than delegating to the Python ORAS client because oras-py has
+/// no request timeout — client.get_tags() can hang indefinitely/for a long time.
+Method ProbeTokenEndpoint(wwwAuth As %String) As %Boolean [ Private ]
+{
+    if wwwAuth = "" {
+        return 0
+    }
+    set scheme = $zconvert($piece(wwwAuth, " ", 1), "L")
+    // Basic challenge: GetHttpRequest() already sent the credentials on /v2/ and they were rejected
+    if scheme = "basic" {
+        return 0
+    }
+    if scheme '= "bearer" {
+        return 0
+    }
+    // bearer/apiKey tokens were already sent as headers by GetHttpRequest() on /v2/ and rejected —
+    // sending them again to the token endpoint won't help
+    if (..Token '= "") && ((..TokenAuthMethod = "bearer") || (..TokenAuthMethod = "apiKey")) {
+        return 0
+    }
+    // Parse the token endpoint URL (realm) and optional service identifier from the challenge header.
+    // Example: Bearer realm="https://ghcr.io/token",service="ghcr.io"
+    set realmMatcher = ##class(%Regex.Matcher).%New("realm=""([^""]+)""", wwwAuth)
+    if 'realmMatcher.Locate() {
+        return 0
+    }
+    set realm = realmMatcher.Group(1)
+    set serviceMatcher = ##class(%Regex.Matcher).%New("service=""([^""]+)""", wwwAuth)
+    set service = ""
+    if serviceMatcher.Locate() {
+        set service = serviceMatcher.Group(1)
+    }
+    // Build a request to the token endpoint (which may be on a different host than the registry)
+    set tokenUrl = realm
+    if ($piece(tokenUrl, "://") '[ "http") {
+        set tokenUrl = "https://" _ tokenUrl
+    }
+    do ##class(%Net.URLParser).Decompose(tokenUrl, .comp)
+    set tokenRequest = ##class(%Net.HttpRequest).%New()
+    set tokenRequest.Timeout = 5
+    set tokenRequest.FollowRedirect = 1
+    set tokenRequest.Server = comp("host")
+    if ($data(comp("port")) # 2) && (comp("port") '= "") {
+        set tokenRequest.Port = comp("port")
+    }
+    if $zconvert(comp("scheme"), "L") = "https" {
+        set tokenRequest.Https = 1
+        set tokenRequest.SSLConfiguration = ..GetSSLConfiguration(tokenRequest.Server)
+    }
+    // Attach credentials: username+password via Basic auth, or a "basic"-method token as a
+    // pre-encoded Basic header (used by e.g. AWS ECR which issues a raw user:pass token string)
+    if (..Username '= "") && (..Password '= "") {
+        set tokenRequest.Username = ..Username
+        set tokenRequest.Password = ..Password
+    } elseif ..TokenAuthMethod = "basic" {
+        do tokenRequest.SetHeader("Authorization", "Basic " _ ..Token)
+    }
+    set path = $get(comp("path"), "")
+    if $extract(path, 1) = "/" {
+        set path = $extract(path, 2, *)
+    }
+    // scope is omitted — we are only probing whether the credentials are accepted, not
+    // requesting access to a specific repository. Registries that strictly require scope
+    // may return 400, causing this probe to falsely report unauthenticated.
+    if service '= "" {
+        set path = path _ "?service=" _ service
+    }
+    if $$$ISERR(tokenRequest.Get(path)) {
+        return 0
+    }
+    // 2xx means the token endpoint accepted the credentials — we don't need the token itself
+    return (200 <= tokenRequest.HttpResponse.StatusCode) && (tokenRequest.HttpResponse.StatusCode < 300)
 }
 
 Method GetModule(
@@ -262,9 +379,12 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
             }
             do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
         } elseif response.StatusCode '= 200 {
-            // If no name is specified and the /v2/_catalog endpoint failed, error out
-            set msg = "Error: Call to /v2/_catalog endpoint failed. This registry may not support it."
-            set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.ReasonPhrase
+            if response.StatusCode = 401 {
+                set msg = "Registry requires authorization for catalog listing or does not support it."
+            } else {
+                set msg = "Call to /v2/_catalog endpoint failed. This registry may not support it."
+                set msg = msg _ $char(10,13) _ "Response Code: "_response.StatusCode _ " - " _ response.ReasonPhrase
+            }
             $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
         }
     }

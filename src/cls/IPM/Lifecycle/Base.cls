@@ -1311,6 +1311,14 @@ Method %Verify(ByRef pParams) As %Status
         new $namespace
         set tInitNS = $select($namespace="%SYS": "USER", 1: $namespace)
         set tVerbose = $get(pParams("Verbose"))
+        set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
+
+        // Suppress module install/load noise in quiet mode; ended before resource processors
+        // run so each processor can manage its own output (Test.cls still shows summary + failures).
+        // Null device is process-scoped, so suppression survives the namespace switch below.
+        if explicitQuiet {
+            set suppressor = ##class(%IPM.Utils.OutputSuppressor).%New()
+        }
 
         if '$get(pParams("Verify","InCurrentNamespace"),0) {
             set tMustCreate = 1
@@ -1393,6 +1401,9 @@ Method %Verify(ByRef pParams) As %Status
 
         // Load dependencies scoped to the "Verify" phase that are not yet installed.
         do ##class(%IPM.Utils.Module).LoadDependencies(..Module, ..PhaseList, .pParams)
+
+        // End suppression before resource processors run — each handles its own output.
+        set suppressor = ""
 
         set orderedResourceList = ..Module.GetOrderedResourceList()
         set tKey = ""

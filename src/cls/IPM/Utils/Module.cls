@@ -349,7 +349,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-/// 
+///
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -888,10 +888,17 @@ ClassMethod GetModuleListExecute(
             set tSearchCriteria.IncludePrerelease = tServer.Prereleases
             set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
             set tSearchCriteria.AllVersions = pShowAllVersions
-            set tList = tClient.ListModules(tSearchCriteria)
-            for i=1:1:tList.Count() {
-                set tMod = tList.GetAt(i)
-                set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+            set tList = ""
+            try {
+                set tList = tClient.ListModules(tSearchCriteria)
+            } catch e {
+                write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
+            }
+            if $isobject(tList) {
+                for i=1:1:tList.Count() {
+                    set tMod = tList.GetAt(i)
+                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+                }
             }
         }
 
@@ -991,7 +998,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-/// 
+///
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1173,6 +1180,26 @@ ClassMethod LoadNewModule(
             }
         }
 
+        // Mark relevant resources for update
+        if (commandLineModuleName '= "") && ($get(params("cmd")) = "update") {
+            set tSC = moduleCurrent.GetResolvedReferences(.resourceArray, 1)
+            set moduleKey = ""
+            for {
+                set moduleKey = $order(resourceArray(moduleKey))
+                if (moduleKey = "") {
+                    quit
+                }
+                set resourceKey = ""
+                for {
+                    set resourceKey = $order(resourceArray(moduleKey, resourceKey))
+                    if (resourceKey = "") {
+                        quit
+                    }
+                    do ##class(%IPM.Storage.ResourceReference).MarkResourceForUpdate(resourceKey)
+                }
+            }
+        }
+
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1295,8 +1322,9 @@ ClassMethod LoadDependencies(
     set reloadSnapshots = +$get(pParams("UpdateSnapshots"))
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
+    set coUpdatingModules = $get(pParams("CoUpdatingModules"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade)
+    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade,,,,.coUpdatingModules)
     $$$ThrowOnError(sc)
     write "Done."
 
@@ -1313,6 +1341,12 @@ ClassMethod LoadDependencies(
         write !, "Starting installation of dependencies..."
         write !
     }
+
+    set coUpdatingModules = ""
+    for i = 1:1:flatDepList.Count() {
+        set coUpdatingModules = coUpdatingModules _ $listbuild(flatDepList.GetAt(i).Name)
+    }
+    set pParams("CoUpdatingModules") = coUpdatingModules
 
     for i = 1:1:flatDepList.Count() {
         #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
