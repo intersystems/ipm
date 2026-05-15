@@ -226,8 +226,7 @@ ClassMethod LoadModuleFromArchive(
     try {
         set tVerbose = $get(pParams("Verbose"))
 
-        // Modules have a well-defined location inside the archive
-        set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/" _ pModuleName _ "/" _ pModuleVersion)
+        set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ pModuleName _ "/" _ pModuleVersion)
         if ##class(%File).DirectoryExists(tTargetDirectory) {
             // Delete it.
             set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
