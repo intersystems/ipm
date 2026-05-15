@@ -85,6 +85,8 @@ Property AfterInstallMessage As %String(MAXLEN = "", XMLPROJECTION = "Element");
 
 Property Deployed As %Boolean(XMLPROJECTION = "Element");
 
+Property IncludeTests As %Boolean(XMLPROJECTION = "Element");
+
 Property UpdatePackage As %Dictionary.Classname;
 
 /// Iterates through all of a module's update step classes and tries to either execute or seed those steps.
@@ -1359,6 +1361,8 @@ Method GetResolvedReferences(
             set tSC = tResource.ResolveChildren(.tempArray)
             set resourceScope = tResource.Scope
             set attrScope = $get(tempArray("Scope"))
+            // Kill before merge so "Scope" doesn't leak into pReferenceArray as a resource name.
+            kill tempArray("Scope")
             if ..HasScope(pPhases, resourceScope) && ..HasScope(pPhases, attrScope) {
                 merge pReferenceArray(..Name) = tempArray
             }
@@ -1962,6 +1966,9 @@ Storage Default
 </Value>
 <Value name="29">
 <Value>UpdatePackage</Value>
+</Value>
+<Value name="30">
+<Value>IncludeTests</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.ModuleD</DataLocation>
