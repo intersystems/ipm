@@ -118,14 +118,35 @@ Method OnPhase(
 
             // Ensure unit tests and related classes are loaded.
             set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
-            set tSC = ##class(%IPM.Test.Manager).LoadTestDirectory(tUnitTestDir,tVerbose, ,..Format)
-            $$$ThrowOnError(tSC)
+            set fileExt = $case(..Format, "XML":"xml", :"cls")
+
+            if $data(pParams("UnitTest","Case"), earlyCase)#2 {
+                // Convert dotted package prefix to directory path, e.g. Test.PM.Unit -> Test/PM/Unit
+                set caseDir = $replace($piece(earlyCase,".",1,*-1),".","/")
+                set caseFilePath = ##class(%File).NormalizeFilename(tUnitTestDir_caseDir_"/"_$piece(earlyCase,".",*)_"."_fileExt)
+                // Fall back to full directory if the specific file isn't on disk
+                // (e.g., the class lives in a different resource's directory).
+                if ##class(%File).Exists(caseFilePath) {
+                    $$$ThrowOnError($system.OBJ.Load(caseFilePath, "k"_$select(tVerbose:"/display",1:"/nodisplay")))
+                } else {
+                    $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(tUnitTestDir, tVerbose, , ..Format))
+                }
+            } elseif $data(pParams("UnitTest","Suite"), earlySuite)#2 {
+                set suiteDir = ##class(%File).NormalizeDirectory(tUnitTestDir_$replace(earlySuite,".","\"))
+                $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(suiteDir, tVerbose, , ..Format))
+            } else {
+                $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(tUnitTestDir, tVerbose, , ..Format))
+            }
 
             set tCompileFlags = "ck"_$select(tVerbose:"d",1:"-d")
             set tDoDelete = 1
             set tTestSpec = ""
             if (..Package '= "") {
-                $$$ThrowOnError($system.OBJ.CompilePackage(..Package, tCompileFlags))
+                if $data(pParams("UnitTest","Case"), tTestCase)#2 {
+                    $$$ThrowOnError($system.OBJ.Compile(tTestCase, tCompileFlags))
+                } else {
+                    $$$ThrowOnError($system.OBJ.CompilePackage(..Package, tCompileFlags))
+                }
 
                 // See if package contains any classes.
                 // If it does, we won't delete the classes after running the test.
@@ -276,9 +297,16 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
         set tResourceInfo("Processor") = $this
         set tResourceInfo("UnitTest") = 1
         set tResource = $case(..Package '= "", 1: ..Package, : ..Class)_..Extension
-        $$$ThrowOnError(##class(%IPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.pResourceArray))
-        $$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.pResourceArray))
-        merge pResourceArray = tResourceInfo
+        // GetChildren has Output semantics — it kills its output array before populating it.
+        // Using tClassArray (not pResourceArray directly) preserves any existing entries
+        // in pResourceArray (e.g., the "/tests/" path entry added before this call).
+        kill tClassArray
+        $$$ThrowOnError(##class(%IPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.tClassArray))
+        $$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.tClassArray))
+        merge pResourceArray = tClassArray
+        // pResourceArray("Scope") is read by GetResolvedReferences for the HasScope check.
+        // tResourceInfo("Scope") above stamps each child class node — different consumers.
+        set pResourceArray("Scope") = ..Phase
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -327,6 +355,12 @@ Method OnExportItem(
 	ByRef pParams,
 	Output pItemHandled As %Boolean = 0) As %Status
 {
+    // Path resources (Name="/tests/...") are handled by directory-copy in ExportSingleModule,
+    // not by ExportUDL. Returning here with pItemHandled=0 lets ExportSingleModule fall through
+    // to that branch. Delegating to EmbeddedProcessor would attempt ExportUDL("/tests/"), which fails.
+    if ($extract(pItemName) = "/") {
+        quit $$$OK
+    }
     quit ..EmbeddedProcessor.OnExportItem(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
 }
 
