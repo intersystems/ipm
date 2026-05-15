@@ -151,6 +151,11 @@ Method TestParser()
     set tResults(tCommands,"data","EnvFiles")="/etc/three;/etc/four"
     set tResults(tCommands,"data","zpm","EnvFiles")="/etc/one;/etc/two"
 
+    // sort modifier parses correctly
+    set tCommands($increment(tCommands)) = "list -s name"
+    set tResults(tCommands)="list-installed"
+    set tResults(tCommands,"modifiers","sort")="name"
+
 	// Verify output matches
 	for i=1:1:tCommands {
 		kill tParsedCommandInfo,tExpectedCommandInfo
@@ -371,6 +376,75 @@ Method TestReportFormatConfiguration()
     } else {
         do ..RunCommand("config delete TestReportFormat")
     }
+}
+
+Method TestSortList()
+{
+    // Build a synthetic list matching the format produced by GetListModules:
+    // $listbuild(name, versionString, externalName, developerMode, root, lastUpdated)
+    // Deliberately different orderings per field so each sort is independently verified:
+    //   name asc:    apple, mango, zebra
+    //   date asc:    mango (jan01), zebra (jan02), apple (jan03)
+    //   version asc: zebra (1.0.0), apple (2.0.0), mango (3.0.0)
+    set list = 3
+    set list(1) = $listbuild("zebra", "1.0.0", "", 0, "", "2026-01-02 10:00:00")
+    set list(2) = $listbuild("apple", "2.0.0", "", 0, "", "2026-01-03 10:00:00")
+    set list(3) = $listbuild("mango", "3.0.0", "", 0, "", "2026-01-01 10:00:00")
+
+    // Sort by name ascending: apple, mango, zebra
+    kill sorted  merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "n")
+    do $$$AssertEquals($listget(sorted(1),1), "apple", "name asc: first is apple")
+    do $$$AssertEquals($listget(sorted(2),1), "mango", "name asc: second is mango")
+    do $$$AssertEquals($listget(sorted(3),1), "zebra", "name asc: third is zebra")
+
+    // Sort by name descending: zebra, mango, apple
+    kill sorted  merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "n-d")
+    do $$$AssertEquals($listget(sorted(1),1), "zebra", "name desc: first is zebra")
+    do $$$AssertEquals($listget(sorted(2),1), "mango", "name desc: second is mango")
+    do $$$AssertEquals($listget(sorted(3),1), "apple", "name desc: third is apple")
+
+    // Sort by date ascending: mango (jan01), zebra (jan02), apple (jan03)
+    kill sorted  merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "d")
+    do $$$AssertEquals($listget(sorted(1),1), "mango", "date asc: first is mango")
+    do $$$AssertEquals($listget(sorted(2),1), "zebra", "date asc: second is zebra")
+    do $$$AssertEquals($listget(sorted(3),1), "apple", "date asc: third is apple")
+
+    // Sort by date descending: apple (jan03), zebra (jan02), mango (jan01)
+    kill sorted  merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "d-d")
+    do $$$AssertEquals($listget(sorted(1),1), "apple", "date desc: first is apple")
+    do $$$AssertEquals($listget(sorted(2),1), "zebra", "date desc: second is zebra")
+    do $$$AssertEquals($listget(sorted(3),1), "mango", "date desc: third is mango")
+
+    // Sort by version ascending: zebra (1.0.0), apple (2.0.0), mango (3.0.0)
+    kill sorted  merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "v")
+    do $$$AssertEquals($listget(sorted(1),1), "zebra", "version asc: first is zebra")
+    do $$$AssertEquals($listget(sorted(2),1), "apple", "version asc: second is apple")
+    do $$$AssertEquals($listget(sorted(3),1), "mango", "version asc: third is mango")
+
+    // Sort by version descending: mango (3.0.0), apple (2.0.0), zebra (1.0.0)
+    kill sorted  merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "v-d")
+    do $$$AssertEquals($listget(sorted(1),1), "mango", "version desc: first is mango")
+    do $$$AssertEquals($listget(sorted(2),1), "apple", "version desc: second is apple")
+    do $$$AssertEquals($listget(sorted(3),1), "zebra", "version desc: third is zebra")
+
+    // Edge case: empty list — should not crash
+    kill sorted  set sorted = 0
+    do ##class(%IPM.Main).SortList(.sorted, "n")
+    do $$$AssertEquals(sorted, 0, "empty list: count is 0")
+
+    // Edge case: single-item list — should not crash or lose the item
+    kill sorted
+    set sorted = 1
+    set sorted(1) = $listbuild("only", "1.0.0", "", 0, "", "2026-01-01 10:00:00")
+    do ##class(%IPM.Main).SortList(.sorted, "n")
+    do $$$AssertEquals(sorted, 1, "single item: count is 1")
+    do $$$AssertEquals($listget(sorted(1),1), "only", "single item: item preserved")
 }
 
 }
