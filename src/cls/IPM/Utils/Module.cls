@@ -226,6 +226,15 @@ ClassMethod LoadModuleFromArchive(
     try {
         set tVerbose = $get(pParams("Verbose"))
 
+        // Check base IPM install location
+        set ipmBaseDir = ##class(%Library.File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm")
+        set writeCheckDir = $select(##class(%File).DirectoryExists(ipmBaseDir): ipmBaseDir, 1: ##class(%SYSTEM.Util).DataDirectory())
+        if '##class(%Library.File).Writeable(writeCheckDir) {
+            set msg = $$$FormatText("Insufficient file system permissions to write to '%1'. Cannot install module '%2'.", writeCheckDir, pModuleName)
+            set tSC = $$$ERROR($$$GeneralError, msg)
+            quit
+        }
+
         // Modules have a well-defined location inside the archive
         set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/" _ pModuleName _ "/" _ pModuleVersion)
         if ##class(%File).DirectoryExists(tTargetDirectory) {
