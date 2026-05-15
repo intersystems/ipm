@@ -1128,7 +1128,7 @@ Method ProcessSingleDependencyIterative(
         set serverName = ""
         set version = ""
         if $data(pDependencyGraph(pDep.Name),depInfo) {
-            set $listbuild(previousDepth,serverName,version) = depInfo
+            set $listbuild(previousDepth,serverName,version,scope) = depInfo
         }
 
         // Check if installed version satisfies requirements
@@ -1140,7 +1140,7 @@ Method ProcessSingleDependencyIterative(
                 localObj.Version.Satisfies(searchExpr) &&
                 ((version = "") || (version = localObj.VersionString))
             if installedVersionValid && '(localObj.Version.IsSnapshot() && pForceSnapshotReload) {
-                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName)
+                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName,pDep.Scope)
                 set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
                 // Add to work queue for next depth
@@ -1202,7 +1202,7 @@ Method ProcessSingleDependencyIterative(
             }
 
             set pDependencyGraph(pDep.Name) = $listbuild(
-                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, qualifiedReference.Deployed, qualifiedReference.PlatformVersion,pDep.DisplayName
+                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, qualifiedReference.Deployed, qualifiedReference.PlatformVersion,pDep.DisplayName,pDep.Scope
             )
             set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
@@ -1237,7 +1237,7 @@ Method ProcessSingleDependencyIterative(
                 // occurs if needed.
                 set depth = $select(previousDepth=0:pDepth,previousDepth>pDepth:previousDepth,1:pDepth)
                 set dependencyGraph(pDep.Name) = $listbuild(
-                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName
+                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName,pDep.Scope
                 )
                 set dependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
