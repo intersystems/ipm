@@ -57,6 +57,65 @@ ClassMethod EvaluateAttribute(
     return attribute
 }
 
+/// Processes configuration values to resolve variable references.
+/// Searches for placeholders using the ${var} or {$var} syntax and replaces them with
+/// the value of the corresponding 'Default' or 'Resource' name.
+ClassMethod ResolvePlaceholders(ByRef customParams)
+{
+    set found = 1
+    // maxLevels is a safety guard to prevents infinite loops caused by circular references.
+    set maxLevels = 20
+
+    while (found && (maxLevels > 0)) {
+        set found = 0
+        //Decrement levels and check for circular references
+		if (maxLevels <= 0) {
+            $$$ThrowOnError($$$ERROR($$$GeneralError,"Circular reference or too many levels in placeholders"))
+		}
+        set maxLevels = maxLevels - 1
+        set param = ""
+        for {
+            set param = $order(customParams(param), 1, data)
+            quit:param=""
+            //Skip if no placeholders remain
+            continue:data'["{"
+
+            set initialData = data
+            for delimiter = "${", "{$" {
+                continue:data'[delimiter
+                kill seen
+                set pCount = $length(data, delimiter)
+                for i=2:1:pCount {
+                    set chunk = $piece(data, delimiter, i)
+                    set key = $piece(chunk, "}", 1)
+                    continue:key=""
+                    continue:$data(seen(key))
+                    set seen(key) = ""
+
+                    // Evaluate the placeholders.
+                    // Perform a module-level lookup: check if local custom parameters are defined first;
+                    // if not found, attempt to resolve as a system expression.
+                    set search = delimiter _ key _ "}"
+                    if $data(customParams(key), val) {
+                        set data = $replace(data, search, val)
+                    } else {
+                        // If not found locally, attempt to resolve as an IPM system expression.
+                        // This returns the resolved value or the original string if no match is found.
+                        set resolved = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(search)
+                        if (resolved '= search) {
+                            set data = $replace(data, search, resolved)
+                        }
+                    }
+                }
+            }
+            if data '= initialData {
+                set customParams(param) = data
+                set found = 1
+            }
+        }
+    }
+}
+
 Storage Default
 {
 <Data name="DefaultState">
