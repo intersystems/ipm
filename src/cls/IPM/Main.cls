@@ -529,14 +529,14 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
     list -python
 </example>
 
-<example description="Shortforms: n, d, v. Add '-d' for descending (e.g., d-d).">
+<example description="Sort by name ascending (default). Shortforms: n=name, d=date, v=version. Append -d for descending.">
     list -s [name|date|version]
 </example>
 
-<example description="Shows installed modules in descending order">
+<example description="Sort by name descending">
     list -s name-desc
 </example>
-<example description="Shows installed modules in decending based on the installation date">
+<example description="Sort by installation date descending">
     list -s d-d
 </example>
 
@@ -551,7 +551,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 <modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of IPM modules." />
-<modifier name="sort" aliases="s" value="true" description="Sort the list. Options: name, name-desc, date, date-desc, version, version-desc" />
+<modifier name="sort" aliases="s" value="true" description="Sort the list. Default (no -s) is ascending by name with IPM on top. Options: name, name-desc, date, date-desc, version, version-desc. Shortforms: n, d, v; append -d for descending (e.g. n-d, d-d, v-d). Has no effect with -tree or -python." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -2866,44 +2866,77 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
         merge tModifiers = pCommandInfo("modifiers")
         set sortMode = $$$lcase($get(pCommandInfo("modifiers", "sort")))
 
-        if sortMode'="" {
-            set newlist =""
-            set type = $extract(sortMode, 1) // "d", "n", or "v"
-            set isDesc = (sortMode [ "-d")
-            set sortMode = $case(type, "n":"name", "d":"date", "v":"version", :"name")
-            if isDesc {
-                set sortMode = sortMode_"-desc"
-            }
-            for i=1:1:list {
-                set entry = list(i)
-                set name = $listget(entry,1)
-                set entry = entry_$listbuild(i)
-                if sortMode["name"{
-                    set newlist($$$lcase(name),i)=entry
-                } elseif sortMode["date" {
-                    set date = $listget(entry,6)
-                    set newlist(date,name) = entry
-                } elseif sortMode["version" {
-                    set newlist($listfromstring($listget(entry,2),"."),name) = entry
+        // Always sort; default is name ascending
+        do ..SortList(.list, $select(sortMode'="":sortMode, 1:"n"))
+
+        // IPM itself always appears first regardless of sort order.
+        // Position 1 holds the display name (e.g. "IPM (zpm)"); extract the actual name
+        // from inside the parentheses when present, otherwise use the display name as-is.
+        for i=1:1:list {
+            set displayName = $listget(list(i),1)
+            set actualName = $select(displayName["(": $piece($piece(displayName,"(",2),")",1), 1: displayName)
+            if $$$lcase(actualName) = $$$IPMModuleName {
+                set ipmEntry = list(i)
+                for j=i:-1:2 {
+                    set list(j) = list(j-1)
                 }
-                kill list(i)
-            }
-            set direction = $select(sortMode [ "desc": -1, 1: 1)
-            set sub = ""
-            if $data(newlist)>1 {
-                // create new list based on the sorting
-                for {
-                    set sub = $order(newlist(sub),direction) quit:sub=""
-                    set mod=""
-                    for {
-                        set mod = $order(newlist(sub,mod),direction,data) quit:mod=""
-                        set list($increment(mlist))=data
-                    }
-                }
+                set list(1) = ipmEntry
+                quit
             }
         }
+
         do ..DisplayModules(.list,,,, .tModifiers)
     }
+}
+
+/// Sort a module list in-place.
+/// sortMode is a raw sort string: first char "n"=name, "d"=date, "v"=version;
+/// append "-d" for descending (e.g. "n-d", "d-d", "v-d"). Default: ascending by name.
+/// List entries are $listbuild(name, versionString, externalName, developerMode, root, lastUpdated).
+ClassMethod SortList(ByRef list, sortModeRaw As %String) [ Internal ]
+{
+    set newlist = ""
+    set rawLower = $$$lcase(sortModeRaw)
+    set type = $extract(rawLower, 1) // "n"=name, "d"=date, "v"=version; default ascending by name
+    set isDesc = (rawLower [ "-d")
+    set sortMode = $case(type, "n":"name", "d":"date", "v":"version", :"name")
+    if isDesc {
+        set sortMode = sortMode_"-desc"
+    }
+    set mlist = 0
+    for i=1:1:list {
+        set entry = list(i)
+        set name = $listget(entry,1)
+        set entry = entry_$listbuild(i)
+        if sortMode = "name" || (sortMode = "name-desc") {
+            set newlist($$$lcase(name),i) = entry
+        } elseif sortMode = "date" || (sortMode = "date-desc") {
+            set date = $listget(entry,6)
+            set newlist(date,name) = entry
+        } elseif sortMode = "version" || (sortMode = "version-desc") {
+            // Build a zero-padded key so "1.10.0" sorts after "1.9.0" (numeric, not lexicographic)
+            set vParts = $listfromstring($listget(entry,2),".")
+            set vKey = $translate($justify($listget(vParts,1),5)," ","0")_"."_
+                       $translate($justify($listget(vParts,2),5)," ","0")_"."_
+                       $translate($justify($listget(vParts,3),5)," ","0")
+            set newlist(vKey,name) = entry
+        }
+        kill list(i)
+    }
+    set direction = $select(isDesc: -1, 1: 1)
+    set sub = ""
+    // if newlist is not empty, reconstruct list in sorted order
+    if $data(newlist)>1 {
+        for {
+            set sub = $order(newlist(sub),direction) quit:sub=""
+            set mod=""
+            for {
+                set mod = $order(newlist(sub,mod),direction,data) quit:mod=""
+                set list($increment(mlist)) = data
+            }
+        }
+    }
+    set list = mlist
 }
 
 /// Get module list in currently namespace
