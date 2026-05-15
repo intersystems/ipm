@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1116: Fix behavior inconsistencies between install and uninstall for package name casing.
 - #1114: Fix issue with SystemRequirements being confused by multiple namespaces with different version of IPM installed
 - #1128: Fixed an issue where an update can fail if a resource is moved from one module to another
+- #430: Updating shared transitive dependencies with lock-step version requirements now works instead of erroring out
 
 ### Security
 - urllib Python wheel updated to 2.7.0
