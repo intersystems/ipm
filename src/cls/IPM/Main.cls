@@ -2868,36 +2868,22 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
         merge tModifiers = pCommandInfo("modifiers")
         set sortMode = $$$lcase($get(pCommandInfo("modifiers", "sort")))
 
-        // Always sort; default is name ascending
+        // Always sort; default is name ascending; IPM is always positioned first
         do ..SortList(.list, $select(sortMode'="":sortMode, 1:"n"))
-
-        // IPM itself always appears first regardless of sort order.
-        // Position 1 holds the display name (e.g. "IPM (zpm)"); extract the actual name
-        // from inside the parentheses when present, otherwise use the display name as-is.
-        for i=1:1:list {
-            set displayName = $listget(list(i),1)
-            set actualName = $select(displayName["(": $piece($piece(displayName,"(",2),")",1), 1: displayName)
-            if $$$lcase(actualName) = $$$IPMModuleName {
-                set ipmEntry = list(i)
-                for j=i:-1:2 {
-                    set list(j) = list(j-1)
-                }
-                set list(1) = ipmEntry
-                quit
-            }
-        }
 
         do ..DisplayModules(.list,,,, .tModifiers)
     }
 }
 
-/// Sort a module list in-place.
+/// Sort a module list in-place. IPM is always placed first regardless of sort direction.
 /// sortMode is a raw sort string: first char "n"=name, "d"=date, "v"=version;
 /// append "-d" for descending (e.g. "n-d", "d-d", "v-d"). Default: ascending by name.
-/// List entries are $listbuild(name, versionString, externalName, developerMode, root, lastUpdated).
+/// List entries are $listbuild(label, versionString, externalName, developerMode, root, lastUpdated)
+/// where label may be "ExternalName (internalName)" (e.g. "IPM (zpm)").
 ClassMethod SortList(ByRef list, sortModeRaw As %String) [ Internal ]
 {
     set newlist = ""
+    set ipmEntry = ""
     set rawLower = $$$lcase(sortModeRaw)
     set type = $extract(rawLower, 1) // "n"=name, "d"=date, "v"=version; default ascending by name
     set isDesc = (rawLower [ "-d")
@@ -2908,22 +2894,38 @@ ClassMethod SortList(ByRef list, sortModeRaw As %String) [ Internal ]
     set mlist = 0
     for i=1:1:list {
         set entry = list(i)
-        set name = $listget(entry,1)
+        set label = $listget(entry,1)
+        // label may be "ExternalName (internalName)"; extract internal name to detect IPM
+        set internalName = $select(label["(": $piece($piece(label,"(",2),")",1), 1: label)
+        if $$$lcase(internalName) = $$$IPMModuleName {
+            set ipmEntry = entry
+            kill list(i)
+            continue
+        }
+        // guard against LastUpdated being absent — read field 6 before entry is extended with tiebreaker
+        set date = $listget(entry,6)
         set entry = entry_$listbuild(i)
         if sortMode = "name" || (sortMode = "name-desc") {
-            set newlist($$$lcase(name),i) = entry
+            set newlist($$$lcase(label),i) = entry
         } elseif sortMode = "date" || (sortMode = "date-desc") {
-            set date = $listget(entry,6)
-            set newlist(date,name) = entry
+            set newlist(date,label) = entry
         } elseif sortMode = "version" || (sortMode = "version-desc") {
-            // Build a zero-padded key so "1.10.0" sorts after "1.9.0" (numeric, not lexicographic)
-            set vParts = $listfromstring($listget(entry,2),".")
-            set vKey = $translate($justify($listget(vParts,1),5)," ","0")_"."_
-                       $translate($justify($listget(vParts,2),5)," ","0")_"."_
-                       $translate($justify($listget(vParts,3),5)," ","0")
-            set newlist(vKey,name) = entry
+            // Use SemanticVersion to parse the version string so all formats are handled correctly.
+            // Build a padded string key: pre-releases sort before their release (pre-release="~" means
+            // "no pre-release" and "~" collates after any alphabetic string, so releases sort last).
+            // Build metadata is ignored per semver spec.
+            set sv = ##class(%IPM.General.SemanticVersion).FromString($listget(entry,2))
+            set vKey = $translate($justify(sv.Major,5)," ","0")_"."_
+                       $translate($justify(sv.Minor,5)," ","0")_"."_
+                       $translate($justify(sv.Patch,5)," ","0")_"."_
+                       $select(sv.Prerelease'="": sv.Prerelease, 1: "~")
+            set newlist(vKey,label) = entry
         }
         kill list(i)
+    }
+    // IPM always goes first; place it at position 1 before the sorted entries
+    if ipmEntry '= "" {
+        set list($increment(mlist)) = ipmEntry
     }
     set direction = $select(isDesc: -1, 1: 1)
     set sub = ""

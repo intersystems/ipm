@@ -151,10 +151,34 @@ Method TestParser()
     set tResults(tCommands,"data","EnvFiles")="/etc/three;/etc/four"
     set tResults(tCommands,"data","zpm","EnvFiles")="/etc/one;/etc/two"
 
-    // sort modifier parses correctly
+    // sort modifier parses correctly — long and short forms, ascending and descending
     set tCommands($increment(tCommands)) = "list -s name"
     set tResults(tCommands)="list-installed"
     set tResults(tCommands,"modifiers","sort")="name"
+
+    set tCommands($increment(tCommands)) = "list -s n"
+    set tResults(tCommands)="list-installed"
+    set tResults(tCommands,"modifiers","sort")="n"
+
+    set tCommands($increment(tCommands)) = "list -s n-d"
+    set tResults(tCommands)="list-installed"
+    set tResults(tCommands,"modifiers","sort")="n-d"
+
+    set tCommands($increment(tCommands)) = "list -s date"
+    set tResults(tCommands)="list-installed"
+    set tResults(tCommands,"modifiers","sort")="date"
+
+    set tCommands($increment(tCommands)) = "list -s d-d"
+    set tResults(tCommands)="list-installed"
+    set tResults(tCommands,"modifiers","sort")="d-d"
+
+    set tCommands($increment(tCommands)) = "list -s v"
+    set tResults(tCommands)="list-installed"
+    set tResults(tCommands,"modifiers","sort")="v"
+
+    set tCommands($increment(tCommands)) = "list -s version-desc"
+    set tResults(tCommands)="list-installed"
+    set tResults(tCommands,"modifiers","sort")="version-desc"
 
 	// Verify output matches
 	for i=1:1:tCommands {
@@ -380,8 +404,8 @@ Method TestReportFormatConfiguration()
 
 Method TestSortList()
 {
-    // Build a synthetic list matching the format produced by GetListModules:
-    // $listbuild(name, versionString, externalName, developerMode, root, lastUpdated)
+    // Build a synthetic list matching the format SortList receives (post label substitution by ListInstalled):
+    // $listbuild(label, versionString, externalName, developerMode, root, lastUpdated)
     // Deliberately different orderings per field so each sort is independently verified:
     //   name asc:    apple, mango, zebra
     //   date asc:    mango (jan01), zebra (jan02), apple (jan03)
@@ -392,49 +416,56 @@ Method TestSortList()
     set list(3) = $listbuild("mango", "3.0.0", "", 0, "", "2026-01-01 10:00:00")
 
     // Sort by name ascending: apple, mango, zebra
-    kill sorted  merge sorted = list
+    kill sorted
+    merge sorted = list
     do ##class(%IPM.Main).SortList(.sorted, "n")
     do $$$AssertEquals($listget(sorted(1),1), "apple", "name asc: first is apple")
     do $$$AssertEquals($listget(sorted(2),1), "mango", "name asc: second is mango")
     do $$$AssertEquals($listget(sorted(3),1), "zebra", "name asc: third is zebra")
 
     // Sort by name descending: zebra, mango, apple
-    kill sorted  merge sorted = list
+    kill sorted
+    merge sorted = list
     do ##class(%IPM.Main).SortList(.sorted, "n-d")
     do $$$AssertEquals($listget(sorted(1),1), "zebra", "name desc: first is zebra")
     do $$$AssertEquals($listget(sorted(2),1), "mango", "name desc: second is mango")
     do $$$AssertEquals($listget(sorted(3),1), "apple", "name desc: third is apple")
 
     // Sort by date ascending: mango (jan01), zebra (jan02), apple (jan03)
-    kill sorted  merge sorted = list
+    kill sorted
+    merge sorted = list
     do ##class(%IPM.Main).SortList(.sorted, "d")
     do $$$AssertEquals($listget(sorted(1),1), "mango", "date asc: first is mango")
     do $$$AssertEquals($listget(sorted(2),1), "zebra", "date asc: second is zebra")
     do $$$AssertEquals($listget(sorted(3),1), "apple", "date asc: third is apple")
 
     // Sort by date descending: apple (jan03), zebra (jan02), mango (jan01)
-    kill sorted  merge sorted = list
+    kill sorted
+    merge sorted = list
     do ##class(%IPM.Main).SortList(.sorted, "d-d")
     do $$$AssertEquals($listget(sorted(1),1), "apple", "date desc: first is apple")
     do $$$AssertEquals($listget(sorted(2),1), "zebra", "date desc: second is zebra")
     do $$$AssertEquals($listget(sorted(3),1), "mango", "date desc: third is mango")
 
     // Sort by version ascending: zebra (1.0.0), apple (2.0.0), mango (3.0.0)
-    kill sorted  merge sorted = list
+    kill sorted
+    merge sorted = list
     do ##class(%IPM.Main).SortList(.sorted, "v")
     do $$$AssertEquals($listget(sorted(1),1), "zebra", "version asc: first is zebra")
     do $$$AssertEquals($listget(sorted(2),1), "apple", "version asc: second is apple")
     do $$$AssertEquals($listget(sorted(3),1), "mango", "version asc: third is mango")
 
     // Sort by version descending: mango (3.0.0), apple (2.0.0), zebra (1.0.0)
-    kill sorted  merge sorted = list
+    kill sorted
+    merge sorted = list
     do ##class(%IPM.Main).SortList(.sorted, "v-d")
     do $$$AssertEquals($listget(sorted(1),1), "mango", "version desc: first is mango")
     do $$$AssertEquals($listget(sorted(2),1), "apple", "version desc: second is apple")
     do $$$AssertEquals($listget(sorted(3),1), "zebra", "version desc: third is zebra")
 
     // Edge case: empty list — should not crash
-    kill sorted  set sorted = 0
+    kill sorted
+    set sorted = 0
     do ##class(%IPM.Main).SortList(.sorted, "n")
     do $$$AssertEquals(sorted, 0, "empty list: count is 0")
 
@@ -445,6 +476,126 @@ Method TestSortList()
     do ##class(%IPM.Main).SortList(.sorted, "n")
     do $$$AssertEquals(sorted, 1, "single item: count is 1")
     do $$$AssertEquals($listget(sorted(1),1), "only", "single item: item preserved")
+
+}
+
+Method TestSortListIPMFirst()
+{
+    // IPM always appears first regardless of sort direction.
+    // Entries use the label format produced by ListInstalled before SortList is called:
+    // plain internal name ("zpm") or formatted "ExternalName (internalName)" ("IPM (zpm)")
+    set list = 3
+    set list(1) = $listbuild("zebra", "1.0.0", "", 0, "", "2026-01-02 10:00:00")
+    set list(2) = $listbuild("IPM (zpm)", "0.10.0", "", 0, "", "2026-01-03 10:00:00")
+    set list(3) = $listbuild("apple", "2.0.0", "", 0, "", "2026-01-01 10:00:00")
+
+    kill sorted
+    merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "n")
+    do $$$AssertEquals($listget(sorted(1),1), "IPM (zpm)", "IPM first (name asc)")
+
+    kill sorted
+    merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "n-d")
+    do $$$AssertEquals($listget(sorted(1),1), "IPM (zpm)", "IPM first (name desc)")
+
+    kill sorted
+    merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "d")
+    do $$$AssertEquals($listget(sorted(1),1), "IPM (zpm)", "IPM first (date asc)")
+
+    kill sorted
+    merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "v-d")
+    do $$$AssertEquals($listget(sorted(1),1), "IPM (zpm)", "IPM first (version desc)")
+}
+
+Method TestSortListSemanticVersions()
+{
+    // Verify numeric component ordering: "1.10.0" must sort after "1.9.0".
+    // Pre-release and build metadata cases are covered in TestSortListVersionPrerelease.
+    set list = 4
+    set list(1) = $listbuild("alpha", "1.10.2", "", 0, "", "2026-01-01 10:00:00")
+    set list(2) = $listbuild("beta",  "1.9.10", "", 0, "", "2026-01-02 10:00:00")
+    set list(3) = $listbuild("gamma", "1.10.1", "", 0, "", "2026-01-03 10:00:00")
+    set list(4) = $listbuild("delta", "2.0.0",  "", 0, "", "2026-01-04 10:00:00")
+
+    // Double-check ordering with Follows before relying on it in sort assertions
+    do $$$AssertTrue(##class(%IPM.General.SemanticVersion).FromString("1.10.1").Follows(##class(%IPM.General.SemanticVersion).FromString("1.9.10")), "1.10.1 follows 1.9.10")
+    do $$$AssertTrue(##class(%IPM.General.SemanticVersion).FromString("1.10.2").Follows(##class(%IPM.General.SemanticVersion).FromString("1.10.1")), "1.10.2 follows 1.10.1")
+    do $$$AssertTrue(##class(%IPM.General.SemanticVersion).FromString("2.0.0").Follows(##class(%IPM.General.SemanticVersion).FromString("1.10.2")), "2.0.0 follows 1.10.2")
+
+    // Version ascending: beta (1.9.10) < gamma (1.10.1) < alpha (1.10.2) < delta (2.0.0)
+    kill sorted
+    merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "v")
+    do $$$AssertEquals($listget(sorted(1),1), "beta",  "version asc: first is beta (1.9.10)")
+    do $$$AssertEquals($listget(sorted(2),1), "gamma", "version asc: second is gamma (1.10.1)")
+    do $$$AssertEquals($listget(sorted(3),1), "alpha", "version asc: third is alpha (1.10.2)")
+    do $$$AssertEquals($listget(sorted(4),1), "delta", "version asc: fourth is delta (2.0.0)")
+
+    // Version descending: reverse of above
+    kill sorted
+    merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "v-d")
+    do $$$AssertEquals($listget(sorted(1),1), "delta", "version desc: first is delta (2.0.0)")
+    do $$$AssertEquals($listget(sorted(2),1), "alpha", "version desc: second is alpha (1.10.2)")
+    do $$$AssertEquals($listget(sorted(3),1), "gamma", "version desc: third is gamma (1.10.1)")
+    do $$$AssertEquals($listget(sorted(4),1), "beta",  "version desc: fourth is beta (1.9.10)")
+}
+
+Method TestSortListVersionPrerelease()
+{
+    // Verify pre-release and build metadata sort correctly per semver spec:
+    //   pre-release < release with same major.minor.patch
+    //   build metadata is ignored (treated as release)
+    //   pre-release ordering is case-sensitive (consistent with SemanticVersion.Follows):
+    //     uppercase letters (A-Z, 65-90) sort before lowercase (a-z, 97-122)
+    //     so "SNAPSHOT" (S=83) < "alpha" (a=97) < "beta.1" < "rc.1"
+    //   "~" (126) is used as the key suffix for release/build-only versions so they sort last
+    // Expected ascending order:
+    //   snap  (1.0.0-SNAPSHOT)   — pre-release, S=83 sorts before lowercase labels
+    //   a     (1.0.0-alpha)      — pre-release
+    //   b     (1.0.0-beta.1)     — pre-release
+    //   c     (1.0.0-rc.1)       — pre-release
+    //   bld   (1.0.0+build.42)   — build metadata only: treated same as release (key suffix "~")
+    //   rel   (1.0.0)            — release (key suffix "~"), "rel" > "bld" as secondary key
+    set list = 6
+    set list(1) = $listbuild("rel",  "1.0.0",           "", 0, "", "2026-01-01 10:00:00")
+    set list(2) = $listbuild("snap", "1.0.0-SNAPSHOT",  "", 0, "", "2026-01-02 10:00:00")
+    set list(3) = $listbuild("a",    "1.0.0-alpha",     "", 0, "", "2026-01-03 10:00:00")
+    set list(4) = $listbuild("bld",  "1.0.0+build.42",  "", 0, "", "2026-01-04 10:00:00")
+    set list(5) = $listbuild("b",    "1.0.0-beta.1",    "", 0, "", "2026-01-05 10:00:00")
+    set list(6) = $listbuild("c",    "1.0.0-rc.1",      "", 0, "", "2026-01-06 10:00:00")
+
+    // Follows is a partial order — pairs with different MMP where both have pre-release are incomparable.
+    // Our sort imposes a total order (every entry gets a string key), so these Follows checks only
+    // validate the pairs that semver itself defines an answer for.
+    do $$$AssertTrue(##class(%IPM.General.SemanticVersion).FromString("1.0.0").Follows(##class(%IPM.General.SemanticVersion).FromString("1.0.0-SNAPSHOT")), "release follows pre-release (SNAPSHOT)")
+    do $$$AssertTrue(##class(%IPM.General.SemanticVersion).FromString("1.0.0").Follows(##class(%IPM.General.SemanticVersion).FromString("1.0.0-alpha")), "release follows pre-release (alpha)")
+    do $$$AssertTrue(##class(%IPM.General.SemanticVersion).FromString("1.0.0-beta.1").Follows(##class(%IPM.General.SemanticVersion).FromString("1.0.0-alpha")), "beta.1 follows alpha")
+    do $$$AssertTrue(##class(%IPM.General.SemanticVersion).FromString("1.0.0-rc.1").Follows(##class(%IPM.General.SemanticVersion).FromString("1.0.0-beta.1")), "rc.1 follows beta.1")
+
+    kill sorted
+    merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "v")
+    do $$$AssertEquals($listget(sorted(1),1), "snap", "version asc: snap (1.0.0-SNAPSHOT)")
+    do $$$AssertEquals($listget(sorted(2),1), "a",    "version asc: a (1.0.0-alpha)")
+    do $$$AssertEquals($listget(sorted(3),1), "b",    "version asc: b (1.0.0-beta.1)")
+    do $$$AssertEquals($listget(sorted(4),1), "c",    "version asc: c (1.0.0-rc.1)")
+    // rel and bld both have key suffix "~"; their relative order is by label (name)
+    do $$$AssertEquals($listget(sorted(5),1), "bld",  "version asc: bld (1.0.0+build.42)")
+    do $$$AssertEquals($listget(sorted(6),1), "rel",  "version asc: rel (1.0.0)")
+
+    kill sorted
+    merge sorted = list
+    do ##class(%IPM.Main).SortList(.sorted, "v-d")
+    do $$$AssertEquals($listget(sorted(1),1), "rel",  "version desc: rel (1.0.0)")
+    do $$$AssertEquals($listget(sorted(2),1), "bld",  "version desc: bld (1.0.0+build.42)")
+    do $$$AssertEquals($listget(sorted(3),1), "c",    "version desc: c (1.0.0-rc.1)")
+    do $$$AssertEquals($listget(sorted(4),1), "b",    "version desc: b (1.0.0-beta.1)")
+    do $$$AssertEquals($listget(sorted(5),1), "a",    "version desc: a (1.0.0-alpha)")
+    do $$$AssertEquals($listget(sorted(6),1), "snap", "version desc: snap (1.0.0-SNAPSHOT)")
 }
 
 }
