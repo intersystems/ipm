@@ -12,7 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
+- #1013: Implement recursive placeholder resolution in Default parameters
 - #971: Adds structured test output formats (JSON, YAML, Toon). Use `-f <format>` for a one-shot override or `config set TestReportFormat <format>` for a persistent default. Without either, legacy output is shown. Also adds `-output-file` for writing results to a file (including JUnit XML via `.xml` extension) and improves `-quiet` to suppress build noise.
+- #870: When running tests for just a single suite or class, will only load and compile the relevant classes instead of all the tests
+- #843: Optionally include tests when packaging using either the `-include-tests` flag or `<IncludeTests>1</IncludeTests>` in module.xml
 - #1152: Adds information about scoped dependencies in the output array of BuildDependencyGraph()
 
 ### Fixed
@@ -29,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1116: Fix behavior inconsistencies between install and uninstall for package name casing.
 - #1114: Fix issue with SystemRequirements being confused by multiple namespaces with different version of IPM installed
 - #1128: Fixed an issue where an update can fail if a resource is moved from one module to another
+- #430: Updating shared transitive dependencies with lock-step version requirements now works instead of erroring out
 
 ### Security
 - urllib Python wheel updated to 2.7.0
