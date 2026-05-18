@@ -43,10 +43,14 @@ Method TestDependencyGraphScopedDependency()
     set $listbuild(,,,,moduleBScope) = dependencyGraph("module-b")
     do $$$AssertEquals(moduleBScope, "", "module-b scope succssfully checked to be empty.")
 
-    // Check scoped dependency
+    // Check scoped dependencies
     do $$$AssertTrue($data(dependencyGraph("module-c")))
     set $listbuild(,,,,moduleCScope) = dependencyGraph("module-c")
     do $$$AssertEquals(moduleCScope, "test", "module-c scope succssfully checked to be 'test'.")
+
+    do $$$AssertTrue($data(dependencyGraph("module-d")))
+    set $listbuild(,,,,moduleDScope) = dependencyGraph("module-d")
+    do $$$AssertEquals(moduleDScope, "verify", "module-d scope succssfully checked to be 'verify'.")
 }
 
 }

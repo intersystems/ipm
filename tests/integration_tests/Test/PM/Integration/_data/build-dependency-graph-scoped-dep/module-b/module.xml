@@ -9,6 +9,10 @@
           <Name>module-c</Name>
           <Version>^3.0.0</Version>
         </ModuleReference>
+        <ModuleReference Scope="verify">
+          <Name>module-d</Name>
+          <Version>^4.0.0</Version>
+        </ModuleReference>
       </Dependencies>
     </Module>
   </Document>
