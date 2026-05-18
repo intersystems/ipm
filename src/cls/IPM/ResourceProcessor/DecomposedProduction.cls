@@ -10,6 +10,11 @@ Parameter ATTRIBUTES As STRING = "Name";
 /// The class name of the production to manage.
 Property Name As %String(MAXLEN = "") [ Required ];
 
+ClassMethod IsSupported() As %Boolean
+{
+    quit ##class(%Dictionary.ClassDefinition).%ExistsId("%Studio.SourceControl.Production")
+}
+
 Method OnGetUniqueName(Output pUniqueName)
 {
     set pUniqueName = ..Name _ ".CLS"
@@ -33,7 +38,7 @@ Method OnBeforePhase(
                 quit
             }
 
-            if '##class(%Dictionary.ClassDefinition).%ExistsId("%Studio.SourceControl.Production") {
+            if '##class(%IPM.ResourceProcessor.DecomposedProduction).IsSupported() {
                 set sc = $$$ERROR($$$GeneralError, "DecomposedProduction resource processor is not supported on this InterSystems IRIS version.")
                 quit
             }

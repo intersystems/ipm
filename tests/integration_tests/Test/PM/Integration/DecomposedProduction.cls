@@ -14,6 +14,14 @@ Method OnBeforeAllTests() As %Status
     quit $$$OK
 }
 
+Method OnBeforeOneTest(testname As %String) As %Status
+{
+    if '##class(%IPM.ResourceProcessor.DecomposedProduction).IsSupported() {
+        do $$$AssertSkipped("DecomposedProduction requires %Studio.SourceControl.Production, which is not available on this IRIS version.")
+    }
+    quit $$$OK
+}
+
 Method TestLoadFromDirectory()
 {
     set status = $$$OK
