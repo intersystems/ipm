@@ -2394,24 +2394,28 @@ ClassMethod LoadInternal(
         }
     }
 
-    // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+    // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
     // It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
 
-    // Copy source to the standard module location (DataDirectory/ipm/<name>/<version>/) unless in developer mode,
-    // where the developer works on files in-place.
-    if '$get(tParams("DeveloperMode"), 0) {
+    // For tarball and URL sources, copy the extracted content to <ModuleRoot>/<name>/<version>/
+    // and clean up the temp extraction directory. Directory loads are left in-place so that
+    // live-edit workflows (mounted volumes, bootstrap) continue to work without re-loading.
+    if $get(tTempExtractionRoot) '= "" {
         set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
+        if 'tFound {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"No Module element found in module.xml at "_tTargetDirectory))
+        }
         set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
             ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
         if ##class(%File).DirectoryExists(tFinalDirectory) {
             $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
         }
         $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
+        // Destination was just created empty above, so pDeleteFirst=0 is intentional.
+        // If CopyDir fails partway through, tFinalDirectory may be left in a partial state.
         $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
-        if $get(tTempExtractionRoot) '= "" {
-            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
-        }
+        $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
         set tTargetDirectory = tFinalDirectory
     }
 

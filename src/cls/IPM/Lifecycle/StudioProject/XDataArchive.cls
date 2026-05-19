@@ -151,7 +151,9 @@ Method GetDirectoryContentsRecursive(
     quit tSC
 }
 
-/// Copied from %IPM.Utils.File to support use in classes cloned from this one
+/// Copied from %IPM.Utils.File to support use in classes cloned from this one.
+/// Cannot delegate to %IPM.Utils.File because subclasses generated via XData self-cloning
+/// are deployed as standalone classes without a dependency on the rest of the IPM codebase.
 ClassMethod CreateDirectoryChain(pName As %String) As %Status
 {
     set tSC = $$$OK

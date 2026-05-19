@@ -118,19 +118,9 @@ Method OnPhase(
 
             // Ensure unit tests and related classes are loaded.
             set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
-            set fileExt = $case(..Format, "XML":"xml", :"cls")
-
             if $data(pParams("UnitTest","Case"), earlyCase)#2 {
-                // Convert dotted package prefix to directory path, e.g. Test.PM.Unit -> Test/PM/Unit
-                set caseDir = $replace($piece(earlyCase,".",1,*-1),".","/")
-                set caseFilePath = ##class(%File).NormalizeFilename(tUnitTestDir_caseDir_"/"_$piece(earlyCase,".",*)_"."_fileExt)
-                // Fall back to full directory if the specific file isn't on disk
-                // (e.g., the class lives in a different resource's directory).
-                if ##class(%File).Exists(caseFilePath) {
-                    $$$ThrowOnError($system.OBJ.Load(caseFilePath, "k"_$select(tVerbose:"/display",1:"/nodisplay")))
-                } else {
-                    $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(tUnitTestDir, tVerbose, , ..Format))
-                }
+                // Load the full directory so base classes are available before compiling the target case.
+                $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(tUnitTestDir, tVerbose, , ..Format))
             } elseif $data(pParams("UnitTest","Suite"), earlySuite)#2 {
                 set suiteDir = ##class(%File).NormalizeDirectory(tUnitTestDir_$replace(earlySuite,".","\"))
                 $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(suiteDir, tVerbose, , ..Format))
