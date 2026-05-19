@@ -241,4 +241,16 @@ ClassMethod Exists(
     return 0
 }
 
+/// Creates a new temporary directory and returns its normalized path.
+/// pBaseDirectory optionally specifies the parent; defaults to the OS temp directory.
+/// $zu(140,17) returns a negative integer error code on failure (e.g., -28 = no space left on device).
+ClassMethod CreateTempDirectory(pBaseDirectory As %String = "") As %String
+{
+    set dir = $zu(140,17,pBaseDirectory)
+    if dir = ("-" _ -dir) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create temporary directory. Error code: " _ -dir))
+    }
+    return ##class(%File).NormalizeDirectory(dir)
+}
+
 }

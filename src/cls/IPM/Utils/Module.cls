@@ -226,16 +226,17 @@ ClassMethod LoadModuleFromArchive(
     try {
         set tVerbose = $get(pParams("Verbose"))
 
-        // Check base IPM install location
-        set ipmBaseDir = ##class(%Library.File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm")
-        set writeCheckDir = $select(##class(%File).DirectoryExists(ipmBaseDir): ipmBaseDir, 1: ##class(%SYSTEM.Util).DataDirectory())
+        set moduleRoot = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
+        // Custom roots are always pre-created by EnsureWritableDirectory at config time, so the fallback
+        // only triggers for the default ipm/ path before first use — one level up reaches DataDirectory(), which always exists.
+        set writeCheckDir = $select(##class(%File).DirectoryExists(moduleRoot): moduleRoot, 1: ##class(%File).GetDirectory(##class(%File).NormalizeFilename(moduleRoot)))
         if '##class(%Library.File).Writeable(writeCheckDir) {
             set msg = $$$FormatText("Insufficient file system permissions to write to '%1'. Cannot install module '%2'.", writeCheckDir, pModuleName)
             set tSC = $$$ERROR($$$GeneralError, msg)
             quit
         }
 
-        set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ pModuleName _ "/" _ pModuleVersion)
+        set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(moduleRoot _ pModuleName _ "/" _ pModuleVersion)
         if ##class(%File).DirectoryExists(tTargetDirectory) {
             // Delete it.
             set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
