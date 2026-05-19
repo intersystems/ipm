@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1029: Add support for user-configurable ModuleRoot for IPM module installation
 - #870: When running tests for just a single suite or class, will only load and compile the relevant classes instead of all the tests
 - #843: Optionally include tests when packaging using either the `-include-tests` flag or `<IncludeTests>1</IncludeTests>` in module.xml
+- #1079: Add semantic sorting and shortcuts to list-installed
 
 ### Fixed
 - #964: Fix poor error handling on some install failures due to incorrect error message variable in embedded SQL
