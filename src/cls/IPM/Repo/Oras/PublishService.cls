@@ -10,7 +10,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
         set repo = pModule.Name
         set tag = $$$Semver2Tag(pModule.VersionString)
 
-        set tempDirectory = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory() _ "/" _ repo _ "/" _ tag _ "/")
+        set tempDirectory = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory() _ repo _ "/" _ tag _ "/")
 
         #; Create temp directory
         set tCreated = ##class(%File).CreateDirectoryChain(tempDirectory,.tReturnValue)
