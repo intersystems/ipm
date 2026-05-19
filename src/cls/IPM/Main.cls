@@ -2403,7 +2403,7 @@ ClassMethod LoadInternal(
     if '$get(tParams("DeveloperMode"), 0) {
         set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
         set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
-            ##class(%SYSTEM.Util).DataDirectory() _ "ipm/" _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
+            ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
         if ##class(%File).DirectoryExists(tFinalDirectory) {
             $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
         }
