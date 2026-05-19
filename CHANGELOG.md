@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1079: Add semantic sorting and shortcuts to list-installed
 
 ### Fixed
+- #1175: Fix issue parsing version for packages with both deployed and non-deployed versions
 - #964: Fix poor error handling on some install failures due to incorrect error message variable in embedded SQL
 - #1130: Fix issue with ORAS repositories pointing to some OCI registries that require authentication (e.g. ghcr.io) not accepting credentials properly. `repo -list` now shows an `Authenticated?` status for ORAS repos with credentials configured.
 - #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
