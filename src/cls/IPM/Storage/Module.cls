@@ -879,6 +879,8 @@ ClassMethod HasScope(
 /// <li>Depth in the dependency tree (1 for direct dependencies, 2 for transitive, etc.)</li>
 /// <li>Repository from which the module will be obtained (empty if already installed)</li>
 /// <li>Version string of the module to be installed</li>
+/// <li>Display name of the module</li>
+/// <li>Scope of the module, or empty string if the dependency is not scoped</li>
 /// </ul>
 /// <p>
 /// <b>Parameters:</b><br>

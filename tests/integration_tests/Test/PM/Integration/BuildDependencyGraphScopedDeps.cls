@@ -31,7 +31,7 @@ Method TestDependencyGraphScopedDependency()
 {
     do $$$AssertStatusOK(##class(%IPM.Utils.Module).LoadModuleFromDirectory(..RepoPath_..#MODNAME), "Successfully loaded module from directory.")
     set module = ##class(%IPM.Storage.Module).NameOpen(..#MODNAME,,.sc)
-    do $$$AssertStatusOK(sc, "Succcessfully opened module object.")
+    do $$$AssertStatusOK(sc, "Successfully opened module object.")
 
     // Expected dependencyGraph format: dependencyGraph(<module name>) = $listbuild(<depth>, <server>, <version>, <display name>, <scope>)
     set scopes = $listbuild("test", "verify")
@@ -41,16 +41,16 @@ Method TestDependencyGraphScopedDependency()
     // Check non-scoped dependency
     do $$$AssertTrue($data(dependencyGraph("module-b")))
     set $listbuild(,,,,moduleBScope) = dependencyGraph("module-b")
-    do $$$AssertEquals(moduleBScope, "", "module-b scope succssfully checked to be empty.")
+    do $$$AssertEquals(moduleBScope, "", "module-b scope successfully checked to be empty.")
 
     // Check scoped dependencies
     do $$$AssertTrue($data(dependencyGraph("module-c")))
     set $listbuild(,,,,moduleCScope) = dependencyGraph("module-c")
-    do $$$AssertEquals(moduleCScope, "test", "module-c scope succssfully checked to be 'test'.")
+    do $$$AssertEquals(moduleCScope, "test", "module-c scope successfully checked to be 'test'.")
 
     do $$$AssertTrue($data(dependencyGraph("module-d")))
     set $listbuild(,,,,moduleDScope) = dependencyGraph("module-d")
-    do $$$AssertEquals(moduleDScope, "verify", "module-d scope succssfully checked to be 'verify'.")
+    do $$$AssertEquals(moduleDScope, "verify", "module-d scope successfully checked to be 'verify'.")
 }
 
 }
