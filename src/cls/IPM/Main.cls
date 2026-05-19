@@ -531,6 +531,17 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
     list -python
 </example>
 
+<example description="Sort by name ascending (default). Shortforms: n=name, d=date, v=version. Append -d for descending.">
+    list -s [name|date|version]
+</example>
+
+<example description="Sort by name descending">
+    list -s name-desc
+</example>
+<example description="Sort by installation date descending">
+    list -s d-d
+</example>
+
 <!-- Parameters -->
 <parameter name="searchString" description="Search string, * can be used." />
 
@@ -542,6 +553,7 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="showupstream" aliases="su" description="If specified, show the latest version for each module in configured repos if it's different than the local version." />
 <modifier name="repository" aliases="repo" value="true" description="If specified, only show modules installed that belong to the provided repository." />
 <modifier name="python" aliases="py" description="If specified, lists installed Embedded Python libraries instead of IPM modules." />
+<modifier name="sort" aliases="s" value="true" description="Sort the list. Default (no -s) is ascending by name with IPM on top. Options: name, name-desc, date, date-desc, version, version-desc. Shortforms: n, d, v; append -d for descending (e.g. n-d, d-d, v-d). Has no effect with -tree or -python." />
 </command>
 
 <command name="list-dependents" aliases="dependents">
@@ -2854,8 +2866,81 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
             }
         }
         merge tModifiers = pCommandInfo("modifiers")
+        set sortMode = $$$lcase($get(pCommandInfo("modifiers", "sort")))
+
+        // Always sort; default is name ascending; IPM is always positioned first
+        do ..SortList(.list, $select(sortMode'="":sortMode, 1:"n"))
+
         do ..DisplayModules(.list,,,, .tModifiers)
     }
+}
+
+/// Sort a module list in-place. IPM is always placed first regardless of sort direction.
+/// sortMode is a raw sort string: first char "n"=name, "d"=date, "v"=version;
+/// append "-d" for descending (e.g. "n-d", "d-d", "v-d"). Default: ascending by name.
+/// List entries are $listbuild(label, versionString, externalName, developerMode, root, lastUpdated)
+/// where label may be "ExternalName (internalName)" (e.g. "IPM (zpm)").
+ClassMethod SortList(ByRef list, sortModeRaw As %String) [ Internal ]
+{
+    set newlist = ""
+    set ipmEntry = ""
+    set rawLower = $$$lcase(sortModeRaw)
+    set type = $extract(rawLower, 1) // "n"=name, "d"=date, "v"=version; default ascending by name
+    set isDesc = (rawLower [ "-d")
+    set sortMode = $case(type, "n":"name", "d":"date", "v":"version", :"name")
+    if isDesc {
+        set sortMode = sortMode_"-desc"
+    }
+    set mlist = 0
+    for i=1:1:list {
+        set entry = list(i)
+        set label = $listget(entry,1)
+        // label may be "ExternalName (internalName)"; extract internal name to detect IPM
+        set internalName = $select(label["(": $piece($piece(label,"(",2),")",1), 1: label)
+        if $$$lcase(internalName) = $$$IPMModuleName {
+            set ipmEntry = entry
+            kill list(i)
+            continue
+        }
+        // guard against LastUpdated being absent — read field 6 before entry is extended with tiebreaker
+        set date = $listget(entry,6)
+        set entry = entry_$listbuild(i)
+        if sortMode = "name" || (sortMode = "name-desc") {
+            set newlist($$$lcase(label),i) = entry
+        } elseif sortMode = "date" || (sortMode = "date-desc") {
+            set newlist(date,label) = entry
+        } elseif sortMode = "version" || (sortMode = "version-desc") {
+            // Use SemanticVersion to parse the version string so all formats are handled correctly.
+            // Build a padded string key: pre-releases sort before their release (pre-release="~" means
+            // "no pre-release" and "~" collates after any alphabetic string, so releases sort last).
+            // Build metadata is ignored per semver spec.
+            set sv = ##class(%IPM.General.SemanticVersion).FromString($listget(entry,2))
+            set vKey = $translate($justify(sv.Major,5)," ","0")_"."_
+                       $translate($justify(sv.Minor,5)," ","0")_"."_
+                       $translate($justify(sv.Patch,5)," ","0")_"."_
+                       $select(sv.Prerelease'="": sv.Prerelease, 1: "~")
+            set newlist(vKey,label) = entry
+        }
+        kill list(i)
+    }
+    // IPM always goes first; place it at position 1 before the sorted entries
+    if ipmEntry '= "" {
+        set list($increment(mlist)) = ipmEntry
+    }
+    set direction = $select(isDesc: -1, 1: 1)
+    set sub = ""
+    // if newlist is not empty, reconstruct list in sorted order
+    if $data(newlist)>1 {
+        for {
+            set sub = $order(newlist(sub),direction) quit:sub=""
+            set mod=""
+            for {
+                set mod = $order(newlist(sub,mod),direction,data) quit:mod=""
+                set list($increment(mlist)) = data
+            }
+        }
+    }
+    set list = mlist
 }
 
 /// Get module list in currently namespace

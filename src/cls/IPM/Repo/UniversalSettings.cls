@@ -48,7 +48,9 @@ Parameter HistoryRetain = "history_retain";
 /// Specifies the serialization format (JSON, TOON, YAML) for unit and integration test results in the shell.
 Parameter TestReportFormat = "TestReportFormat";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat";
+Parameter ModuleRoot = "ModuleRoot";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -89,8 +91,15 @@ ClassMethod ResetToDefault(key As %String) As %Status
         write "Config key = """_key_""" not found",!
         quit
     }
-    // TestReportFormat has no factory default; empty means "use legacy output"
-    set defaultValue = $select(key = "TestReportFormat": "", 1: ..GetDefaultValue($parameter(..%ClassName(1),key)))
+    if key = ..#TestReportFormat {
+        // No factory default; empty string means "use legacy output"
+        set defaultValue = ""
+    } elseif key = ..#ModuleRoot {
+        // Computed directly rather than read from storage — older IPM versions did not seed this default node
+        set defaultValue = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
+    } else {
+        set defaultValue = ..GetDefaultValue($parameter(..%ClassName(1),key))
+    }
     set sc = ..SetValue($parameter(..%ClassName(1),key), defaultValue)
     if $$$ISOK(sc) {
         write !,"Value for """_key_""" succesfully reset to default",!
@@ -104,20 +113,33 @@ ClassMethod UpdateOne(
 	key As %String,
 	value As %String) As %Status
 {
+    set sc = $$$OK
     set SettingsList = $listfromstring(..#CONFIGURABLE)
     if ('$listfind(SettingsList,key)) {
         write "Config key = """_key_""" not found",!
-        quit
+        quit sc
     }
-    if key = "TestReportFormat" {
-        // Validate format value before saving it
-        set sc = ..SetTestReportFormat(value)
-    } else {
-        set sc = ..SetValue($parameter(..%ClassName(1),key), value)
-    }
-    if $$$ISOK(sc) {
-        write !,"Key """_key_""" succesfully updated",!
-    } else {
+    try {
+        if key = ..#TestReportFormat {
+            // Validate format value before saving it; SetTestReportFormat also calls SetValue internally
+            set sc = ..SetTestReportFormat(value)
+        } else {
+            if key = ..#ModuleRoot {
+                if value = "" {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError, "ModuleRoot cannot be empty"))
+                }
+                set value = ##class(%File).NormalizeDirectory(value)
+                do ..EnsureWritableDirectory(value)
+            }
+            set sc = ..SetValue($parameter(..%ClassName(1),key), value)
+        }
+        if $$$ISOK(sc) {
+            write !,"Key """_key_""" succesfully updated",!
+        } else {
+            write !,$system.Status.GetErrorText(sc),!
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
         write !,$system.Status.GetErrorText(sc),!
     }
     return sc
@@ -213,6 +235,32 @@ ClassMethod SetTestReportFormat(
 ClassMethod GetTestReportFormat() As %String
 {
     return ..GetValue(..#TestReportFormat)
+}
+
+/// Returns the configured ModuleRoot. Falls back to an ipm/ subdirectory under the IRIS data directory if not set.
+/// Note: "config list" shows a blank ModuleRoot on installs upgraded from versions that predate this setting,
+/// because ZPMInit (which seeds the default) only runs during bootstraps, not upgrades through IPM itself.
+/// Fixing this cleanly would require either splitting seeding logic across ZPMInit and an <Invoke>,
+/// or adding a special-case to GetAll/PrintOne — both add more complexity than the gap warrants.
+ClassMethod GetModuleRoot() As %String
+{
+    set value = ..GetValue(..#ModuleRoot)
+    if value = "" {
+        return ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
+    }
+    return value
+}
+
+/// Expects a normalized directory path (caller must call NormalizeDirectory first).
+/// Creates the directory chain if it does not already exist, then verifies write access.
+ClassMethod EnsureWritableDirectory(directory As %String)
+{
+    if '##class(%File).DirectoryExists(directory) {
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(directory))
+    }
+    if '##class(%File).Writeable(directory) {
+        $$$ThrowOnError($$$ERROR($$$GeneralError,"No write permission on directory "_directory))
+    }
 }
 
 }
