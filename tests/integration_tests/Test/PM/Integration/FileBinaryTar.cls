@@ -56,6 +56,7 @@ Method TestLoadDestinationDirectory()
     do $$$AssertTrue(##class(%File).Exists(tExpectedDir_"module.xml"),"module.xml present at standard path after load from directory.")
     set sc = ##class(%IPM.Main).Shell("uninstall simplemodule")
     do $$$AssertStatusOK(sc,"Uninstalled SimpleModule.")
+    $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tExpectedDir))
 
     // Load from tarball — files should also land in DataDirectory/ipm/<name>/<version>/
     set tempDir = ##class(%Library.File).TempFilename()_"dir"
