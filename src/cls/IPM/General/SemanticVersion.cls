@@ -116,8 +116,10 @@ Method IsBackwardCompatibleWith(pVersion As %IPM.General.SemanticVersion) As %Bo
 
 /// Returns 1 if this version is a later version than <var>pVersion</var>. <br />
 /// From <a href="http://semver.org/spec/v2.0.0.html#spec-item-11">the SemVer 2.0.0 specification</a>: <br />
-/// 1.0.0-alpha &lt; 1.0.0-alpha.1 &lt; 1.0.0-alpha.beta &lt; 1.0.0-beta &lt; 1.0.0-beta.2 &lt; 1.0.0-beta.11 &lt; 1.0.0-rc.1 &lt; 1.0.0
-/// Also, two prerelease versions with mismatched major/minor/patch should *not* follow each other; see: <a href="https://github.com/npm/node-semver#prerelease-tags">node-semver</a>
+/// 1.0.0-alpha &lt; 1.0.0-alpha.1 &lt; 1.0.0-alpha.beta &lt; 1.0.0-beta &lt; 1.0.0-beta.2 &lt; 1.0.0-beta.11 &lt; 1.0.0-rc.1 &lt; 1.0.0 <br />
+/// Also, two prerelease versions with mismatched major/minor/patch should *not* follow each other; see: <a href="https://github.com/npm/node-semver#prerelease-tags">node-semver</a> <br />
+/// This defines a partial order: two pre-release versions with different major/minor/patch are incomparable
+/// (both return 0), so callers must not assume a total order over all version strings.
 Method Follows(pVersion As %IPM.General.SemanticVersion) As %Boolean
 {
     set tFollows = (..Major > pVersion.Major) ||
