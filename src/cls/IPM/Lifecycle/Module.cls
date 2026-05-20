@@ -148,8 +148,8 @@ Method %Package(ByRef pParams) As %Status
             // create temporary subdirectory to prevent clashes
             set randomDir = $translate($system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
             set tExportSubDirectory = ##class(%Library.File).NormalizeDirectory(tExportDirectory) _ randomDir _ "/"
-            if '##class(%File).CreateDirectoryChain(tExportSubDirectory,.tReturn) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",tExportSubDirectory,tReturn))
+            set tSC = ##class(%IPM.Utils.File).CreateDirectoryChain(tExportSubDirectory)
+            if $$$ISERR(tSC) {
                 quit
             }
         }

@@ -619,7 +619,7 @@ Method TestFailingPhases()
         // Check history log entry is good
         do $$$AssertTrue(rs.%Get("ID") '= "")
         do $$$AssertEquals(rs.%Get("Action"),"load")
-        do $$$AssertEquals(rs.%Get("Package"),"invoke")
+        do $$$AssertEquals(rs.%Get("Package"),"invoke-non-status-return-check-status")
         do $$$AssertEquals(rs.%Get("Version_Major"),"0")
         do $$$AssertEquals(rs.%Get("Version_Minor"),"0")
         do $$$AssertEquals(rs.%Get("Version_Patch"),"1")

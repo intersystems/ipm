@@ -9,7 +9,7 @@ Method TestInvokeCheckStatus()
     do $$$AssertStatusOK(sc,"Loaded module successfully")
 
     // Uninstall module
-    set sc = ##class(%IPM.Main).Shell("uninstall -verbose invoke")
+    set sc = ##class(%IPM.Main).Shell("uninstall -verbose invoke-success")
     do $$$AssertStatusOK(sc,"Uninstalled module successfully")
 
     // These invokes should fail
@@ -42,7 +42,7 @@ Method TestInvokeIpmDirExpression()
         // Verify the path is correct
         set receivedPath = $get(^IRIS.Temp.Test.IpmDir)
         set expectedPath = ##class(%Library.File).NormalizeDirectory(
-            $system.Util.DataDirectory() _ "ipm/invoke-ipmdir-test/1.0.0/")
+            ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ "invoke-ipmdir-test/1.0.0/")
         do $$$AssertEquals(receivedPath, expectedPath, "ipmDir expression correctly evaluated to: " _ expectedPath)
 
         // Clean up - uninstall module

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #408: Modules can now list dependencies without specifying version; will be assumed to be "*"
+- #945: When loading from a tarball, the `load` command now unpacks into the configured module root (defaults to `$System.Util.DataDirectory()/ipm/`) under `<packagename>/<version>/` instead of a temporary directory, matching the behavior of the `install` command. Directory loads are unaffected and continue to load in-place.
 - #992: Implement automatic history purge logic
 - #973: Enables CORS and JWT configuration for WebApplications in module.xml
 - #1110: Add `iriscli` and `ipm` container utility scripts that are auto-installed to `~/.local/bin/` and `~/bin/` so they work both inside and outside of containers (Unix/Linux only)
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1152: Adds information about scoped dependencies in the output array of BuildDependencyGraph()
 
 ### Fixed
+- #1175: Fix issue parsing version for packages with both deployed and non-deployed versions
 - #964: Fix poor error handling on some install failures due to incorrect error message variable in embedded SQL
 - #1130: Fix issue with ORAS repositories pointing to some OCI registries that require authentication (e.g. ghcr.io) not accepting credentials properly. `repo -list` now shows an `Authenticated?` status for ORAS repos with credentials configured.
 - #1001: The `unmap` and `enable` commands will now only activate CPF merge once after all namespaces have been configured instead after every namespace
