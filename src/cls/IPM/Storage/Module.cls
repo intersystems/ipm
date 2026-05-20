@@ -1132,7 +1132,7 @@ Method ProcessSingleDependencyIterative(
         set serverName = ""
         set version = ""
         if $data(pDependencyGraph(pDep.Name),depInfo) {
-            set $listbuild(previousDepth,serverName,version,scope) = depInfo
+            set $listbuild(previousDepth,serverName,version) = depInfo
         }
 
         // Check if installed version satisfies requirements
