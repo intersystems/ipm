@@ -2288,7 +2288,7 @@ ClassMethod LoadFromRepo(
 {
     set slash=$select($zversion(1)=3:"/",1:"\")
     set TempDir = ##class(%File).GetDirectory(##class(%File).GetDirectory($zutil(86))_"mgr"_slash_"Temp"_slash_$translate($ztimestamp,".,")_slash)
-    $$$ThrowOnError(##class(%File).CreateDirectoryChain(TempDir))
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(TempDir))
     set:$extract(tDirectoryName,*)="/" tDirectoryName=$extract(tDirectoryName,1,*-1)
     set RepoName=$piece($piece($piece(tDirectoryName,"/",*),".git")," ")
     set tCmd="cd "_TempDir_" && git clone "_tDirectoryName
@@ -2364,7 +2364,8 @@ ClassMethod LoadInternal(
     }
     set extension = $$$lcase($piece(tDirectoryName,".",*))
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
-        set tTargetDirectory = $$$FileTempDirSys
+        set tTempExtractionRoot = $$$FileTempDirSys
+        set tTargetDirectory = tTempExtractionRoot
         if $get(pCommandInfo("data", "Verbose")) {
             write !,"Extracting archive to ",tTargetDirectory
         }
@@ -2393,9 +2394,31 @@ ClassMethod LoadInternal(
         }
     }
 
-    // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containining dependencies.
+    // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
     // It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
+
+    // For tarball and URL sources, copy the extracted content to <ModuleRoot>/<name>/<version>/
+    // and clean up the temp extraction directory. Directory loads are left in-place so that
+    // live-edit workflows (mounted volumes, bootstrap) continue to work without re-loading.
+    if $get(tTempExtractionRoot) '= "" {
+        set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
+        if 'tFound {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"No Module element found in module.xml at "_tTargetDirectory))
+        }
+        set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
+            ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
+        if ##class(%File).DirectoryExists(tFinalDirectory) {
+            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
+        }
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
+        // Destination was just created empty above, so pDeleteFirst=0 is intentional.
+        // If CopyDir fails partway through, tFinalDirectory may be left in a partial state.
+        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
+        $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
+        set tTargetDirectory = tFinalDirectory
+    }
+
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
     set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , pLog)
