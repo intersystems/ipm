@@ -11,7 +11,7 @@ Method TestWSGIApp()
     set tModuleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(tTestRoot)_"/_data/static-file-export-test/")
     set tSC = ##class(%IPM.Main).Shell("load -verbose " _ tModuleDir)
     do $$$AssertStatusOK(tSC,"Module successfully. " _ tModuleDir)
-    set exportDir = ##class(%File).NormalizeDirectory($$$FileTempDirSys)
+    set exportDir = ##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory())
     set tSC = ##class(%IPM.Main).Shell("static-file-export-test package -verbose -DPath="_exportDir)
     do $$$AssertStatusOK(tSC,"Exported to directory " _ exportDir _ " successfully.")
     // Need to unpack the tgz file

@@ -463,7 +463,7 @@ ClassMethod Pull(
     try {
         #; Pull into temp directory
         set tempFile = ""
-        set tempDirectory = $$$FileTempDir _ "/" _ package _ "/" _ tag
+        set tempDirectory = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory() _ package _ "/" _ tag)
 
         #; Empty temp directory first
         if ##class(%File).DirectoryExists(tempDirectory) {

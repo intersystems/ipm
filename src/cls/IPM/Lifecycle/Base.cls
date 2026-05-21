@@ -1149,7 +1149,7 @@ Method %Export(
         kill pDependencyGraph
         if ($get(pTargetDirectory) = "") {
             set pTargetDirectory = $$$lcase(..Module.Name_"-"_..Module.VersionString)
-            set pTargetDirectory = ##class(%File).NormalizeDirectory(pTargetDirectory, $$$FileTempDirSys)
+            set pTargetDirectory = ##class(%File).NormalizeDirectory(pTargetDirectory, ##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory()))
         }
 
         if '##class(%File).DirectoryExists(pTargetDirectory) {
