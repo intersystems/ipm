@@ -173,9 +173,6 @@ ClassMethod ValidatePythonRuntime() As %Boolean
         if (+version < 3.10) {
             write !!,"WARNING: Python version "_version_" is not supported. IPM requires Python 3.10 or higher.",!
             return 0
-        } elseif (+version > 3.12) {
-            write !!,"WARNING: Python version "_version_" is not yet supported. IPM cannot use Python 3.13 or higher due to IRIS incompatibilities.",!
-            return 0
         }
     } catch e {
         return 0

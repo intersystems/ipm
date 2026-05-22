@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1114: Fix issue with SystemRequirements being confused by multiple namespaces with different version of IPM installed
 - #1128: Fixed an issue where an update can fail if a resource is moved from one module to another
 - #430: Updating shared transitive dependencies with lock-step version requirements now works instead of erroring out
+- #1179: IPM will no longer erroneously complain about Python 3.13+ on compatible versions of IRIS. The lower bound check (3.10+) remains, but the upper bound is left to the user. There is a compatibility matrix in the README.
 
 ### Security
 - urllib Python wheel updated to 2.7.0
