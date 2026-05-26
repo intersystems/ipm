@@ -250,9 +250,9 @@ Method GetOrCreateSharedNS1() As %String
     set ns = "TESTDBPKGNS1"
 
     // Resolve all module dirs before switching namespace (^UnitTestRoot only in original NS)
-    set depDir = ..GetModuleDir("db-packaging", "dependency-module")
+    set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
     set simpleDir = ..GetModuleDir("db-packaging", "simple-module")
-    set depsDir = ..GetModuleDir("db-packaging", "module-with-deps")
+    set withDepsDir = ..GetModuleDir("db-packaging", "module-with-deps")
     set testsDir = ..GetModuleDir("db-packaging", "module-with-tests")
     set invokesDir = ..GetModuleDir("db-packaging", "module-with-invokes")
 
@@ -268,9 +268,9 @@ Method GetOrCreateSharedNS1() As %String
 
     new $namespace
     set $namespace = ns
-    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ depDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ depModuleDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ simpleDir))
-    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ depsDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ withDepsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ testsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ invokesDir))
     // Configure the local zot ORAS registry once for ORAS-related tests
@@ -336,7 +336,7 @@ Method TestSimplePackageAndInstall()
     // Extract and verify contents
     set extractDir = ##class(%File).NormalizeDirectory(..PackageOutputDir _ "extract")
     do ##class(%File).CreateDirectory(extractDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir, .extractOutput)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
     do $$$AssertStatusOK(sc, "Extracted package contents for verification")
 
     // Verify IRIS.DAT exists in extracted package
@@ -362,8 +362,8 @@ Method TestSimplePackageAndInstall()
     do $$$AssertTrue(xmlContent [ "Version=""" _ currentIrisVersion _ """", "module.xml SystemRequirements Version matches current IRIS version")
 
     // Verify deps/ directory exists
-    set depsDir = ##class(%File).NormalizeDirectory(extractDir) _ "deps/"
-    do $$$AssertTrue(##class(%File).DirectoryExists(depsDir), "deps/ directory exists in package")
+    set extractedDepsDir = ##class(%File).NormalizeDirectory(extractDir) _ "deps/"
+    do $$$AssertTrue(##class(%File).DirectoryExists(extractedDepsDir), "deps/ directory exists in package")
 
     // Create a new test namespace for installation
     set installNS = "TESTDBINST1"
@@ -519,8 +519,6 @@ Method TestPackageAndInstallAllResourceTypes()
     set $namespace = installNS
     do $$$AssertTrue(webAppExists, "WebApplication /allresources created")
 
-    // Verify all resource types work correctly
-    do $$$AssertStatusOK($$$OK, "All resource types verified")
 }
 
 /// Test packaging with and without test resources
@@ -642,30 +640,7 @@ Method TestPackagingAndInstallValidation()
 
     set sc = ##class(%IPM.Main).Shell("load " _ tamperedPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Tampered IRIS.DAT rejected by checksum validation")
-
-    // Test: Zero-sized IRIS.DAT fails validation
-    set zeroDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "zero-extract")
-    do ##class(%Library.File).CreateDirectory(zeroDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, zeroDir)
-    do $$$AssertStatusOK(sc, "Extracted package for zero-size IRIS.DAT test")
-
-    set zeroIRISDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", zeroDir)
-    do ##class(%Library.File).Delete(zeroIRISDAT)
-    set zeroStream = ##class(%Stream.FileBinary).%New()
-    $$$ThrowOnError(zeroStream.LinkToFile(zeroIRISDAT))
-    $$$ThrowOnError(zeroStream.%Save())
-
-    set zeroPackage = ..PackageOutputDir _ "simple-db-module-zero.tgz"
-    set sc = ##class(%IPM.General.Archive).Create(zeroDir, zeroPackage)
-    do $$$AssertStatusOK(sc, "Repacked archive with zero-sized IRIS.DAT")
-
-    set installNS3 = "TESTDBVALIDINS3"
-    set sc = ..CreateTestNamespace(installNS3)
-    do $$$AssertStatusOK(sc, "Created namespace for zero-size test")
-    set $namespace = installNS3
-
-    set sc = ##class(%IPM.Main).Shell("load " _ zeroPackage _ " -swap-db")
-    do $$$AssertStatusNotOK(sc, "Zero-sized IRIS.DAT rejected by validation")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "SHA-256", "Error mentions SHA-256 checksum mismatch")
 
     // Test: Missing deps/ directory fails validation
     set missingDepsDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "missing-deps-extract")
@@ -681,13 +656,14 @@ Method TestPackagingAndInstallValidation()
     set sc = ##class(%IPM.General.Archive).Create(missingDepsDir, missingDepsPackage)
     do $$$AssertStatusOK(sc, "Repacked archive without deps/ directory")
 
-    set installNS4 = "TESTDBVALIDINS4"
-    set sc = ..CreateTestNamespace(installNS4)
+    set installNS3 = "TESTDBVALIDINS3"
+    set sc = ..CreateTestNamespace(installNS3)
     do $$$AssertStatusOK(sc, "Created namespace for missing-deps test")
-    set $namespace = installNS4
+    set $namespace = installNS3
 
     set sc = ##class(%IPM.Main).Shell("load " _ missingDepsPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Missing deps/ directory rejected by validation")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "deps/", "Error mentions missing deps/ directory")
 }
 
 /// Test backup and rollback during installation
@@ -874,6 +850,7 @@ Method TestMixedPackaging()
     // Attempt to install second database package should fail
     set sc = ##class(%IPM.Main).Shell("load " _ dbPackage2 _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Cannot install second database package in same namespace")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "Only one database package", "Error mentions one-package-per-namespace constraint")
 }
 
 /// Tests all Python dependency packaging behaviour in one pass:
@@ -1291,22 +1268,33 @@ Method TestSystemRequirementsOverwrite()
     set origXML = origStream.Read(, .sc)
     $$$ThrowOnError(sc)
 
-    set writeStream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(writeStream.LinkToFile(moduleXMLPath))
-    $$$ThrowOnError(writeStream.Clear())
-    $$$ThrowOnError(writeStream.Write(rawXML))
-    $$$ThrowOnError(writeStream.%Save())
+    // Mutate module.xml then run packaging inside a try/catch so that a write failure
+    // still reaches the restore block below — the file may be partially written.
+    set sc = $$$OK
+    try {
+        set writeStream = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(writeStream.LinkToFile(moduleXMLPath))
+        $$$ThrowOnError(writeStream.Clear())
+        $$$ThrowOnError(writeStream.Write(rawXML))
+        $$$ThrowOnError(writeStream.%Save())
 
-    // Package as database — should overwrite SystemRequirements Version with current IRIS version
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
+        // Package as database — should overwrite SystemRequirements Version with current IRIS version
+        set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
 
-    // Restore original module.xml unconditionally before asserting, so a failure doesn't leave
-    // the shared NS in a broken state for subsequent tests
-    set restoreStream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(restoreStream.LinkToFile(moduleXMLPath))
-    $$$ThrowOnError(restoreStream.Clear())
-    $$$ThrowOnError(restoreStream.Write(origXML))
-    $$$ThrowOnError(restoreStream.%Save())
+    // Restore original module.xml unconditionally — writing origXML over an untouched file
+    // (if the mutation write never completed) is harmless. Protects SharedNS1 in all paths.
+    try {
+        set restoreStream = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(restoreStream.LinkToFile(moduleXMLPath))
+        $$$ThrowOnError(restoreStream.Clear())
+        $$$ThrowOnError(restoreStream.Write(origXML))
+        $$$ThrowOnError(restoreStream.%Save())
+    } catch restoreEx {
+        set sc = $$$ADDSC(sc, restoreEx.AsStatus())
+    }
 
     do $$$AssertStatusOK(sc, "Packaged simple-db-module with overwrite of SystemRequirements Version")
 
@@ -1316,7 +1304,7 @@ Method TestSystemRequirementsOverwrite()
     if '##class(%Library.File).CreateDirectory(extractDir) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create extract dir: " _ extractDir))
     }
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir, .extractOutput)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
     do $$$AssertStatusOK(sc, "Extracted package for SystemRequirements verification")
 
     set readStream = ##class(%Stream.FileCharacter).%New()

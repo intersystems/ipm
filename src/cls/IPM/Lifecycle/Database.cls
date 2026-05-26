@@ -93,7 +93,7 @@ Method %Package(ByRef params) As %Status
             // Export Generated resources from source namespace BEFORE remapping.
             // Once the old DB is dismounted, compiled Generated classes are inaccessible.
             write:verbose !, "Exporting generated resources from source namespace..."
-            do ..ExportGeneratedResources(ns, includeTests, .params, .generatedExports)
+            do ..ExportGeneratedResources(ns, includeTests, .generatedExports)
 
             // Remap namespace routines to the temp DB
             // Note: globals mapping is unchanged — ^IPM.* globals remain in the real globals DB
@@ -260,8 +260,9 @@ ClassMethod CreateTempDatabase(
 }
 
 /// Remaps the namespace's routines to newDBName, then dismounts the old routines DB.
-/// Remap-before-dismount avoids a window where the namespace has no mounted routines DB.
-/// Stores the original DB name in oldDBName for later restoration.
+/// @param ns Namespace whose routines DB is being replaced.
+/// @param newDBName Config.Databases name to remap the namespace routines to.
+/// @param oldDBName Output: the previous routines DB name, stored for later restoration.
 ClassMethod RemapRoutinesDB(
 	ns As %String,
 	newDBName As %String,
@@ -285,6 +286,10 @@ ClassMethod RemapRoutinesDB(
 /// Dismounts the temp DB, remaps the namespace back to oldDBName, remounts it,
 /// and removes the temp database config entry.
 /// Logs warnings on partial failures but always attempts full restoration.
+/// @param ns Namespace to restore.
+/// @param oldDBName Config.Databases name to remap the namespace routines back to.
+/// @param tempDBName Config.Databases name of the temp DB to dismount and delete.
+/// @param tempDBPath Filesystem directory of the temp DB (used for dismount).
 ClassMethod RestoreRoutinesDB(
 	ns As %String,
 	oldDBName As %String,
@@ -319,6 +324,9 @@ ClassMethod RestoreRoutinesDB(
 }
 
 /// Runs the Reload and Compile lifecycle phases in ns (which maps to the temp DB).
+/// @param ns Namespace whose routines DB is the temp DB to compile into.
+/// @param includeTestResources If 1, test- and verify-scoped resources are loaded and compiled.
+/// @param params Packaging params forwarded to %Reload and %Compile (e.g. Verbose).
 Method LoadResourcesIntoDatabase(
 	ns As %String,
 	includeTestResources As %Boolean,
@@ -349,10 +357,12 @@ Method LoadResourcesIntoDatabase(
 /// auto-generates their .1.cls subclass; <Invoke After Compile> explicitly creates
 /// a class via %Dictionary API), the import is redundant but harmless — the class
 /// already exists in the temp DB by import time.
+/// @param ns Namespace containing the source DB with compiled Generated classes.
+/// @param includeTestResources If 1, test- and verify-scoped resources are also exported.
+/// @param generatedExports Output $list of temp XML file paths, one per exported class.
 Method ExportGeneratedResources(
 	ns As %String,
 	includeTestResources As %Boolean,
-	ByRef params,
 	Output generatedExports As %List) [ Private ]
 {
     set generatedExports = ""
@@ -734,8 +744,12 @@ Method CopyNonCompiledResources(
 
 /// Moves (or copies) IRIS.DAT into stagingDir, writes module.xml and dependencies.xml,
 /// then calls Archive.Create to build the final .tgz. Returns path to .tgz.
-/// moveFile=1 (default): rename IRIS.DAT into staging — avoids copying multi-GB files.
-/// moveFile=0: copy instead — required for -use-current-db where irisDAT is the live routines DB.
+/// @param irisDAT Full path to the IRIS.DAT to package.
+/// @param stagingDir Temporary directory to assemble package contents into.
+/// @param checksumHex SHA-256 hex string to embed in module.xml.
+/// @param params Packaging params (Path for output dir, IncludeTestResources, ExportPythonDependencies, Verbose).
+/// @param moveFile 1 (default): rename IRIS.DAT into staging — avoids copying multi-GB files.
+///                 0: copy instead — required for -use-current-db where irisDAT is the routines DB.
 Method AssemblePackage(
 	irisDAT As %String,
 	stagingDir As %String,
@@ -778,7 +792,7 @@ Method AssemblePackage(
 
     set outputDir = $get(params("Path"))
     if outputDir = "" {
-        set outputDir = ##class(%Library.File).NormalizeDirectory($$$FileTempDirSys)
+        set outputDir = ##class(%Library.File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory())
     } else {
         set outputDir = ##class(%Library.File).NormalizeDirectory(outputDir)
         if '##class(%Library.File).DirectoryExists(outputDir) {
@@ -801,23 +815,18 @@ Method AssemblePackage(
 }
 
 /// Pre-install validation for a database swap.
-/// Checks: IRIS.DAT exists and non-zero, module.xml declares database packaging,
+/// Checks: IRIS.DAT exists, module.xml declares database packaging,
 /// dependencies.xml present, SHA-256 checksum matches, no other database package
 /// already installed in this namespace, and IPM is not in the target routines DB.
 /// Throws on any failure. Does not modify any state.
-Method ValidateBeforeSwap(
-	packageDir As %String,
-	ns As %String) [ Private ]
+/// @param packageDir Extracted package directory containing IRIS.DAT and module.xml.
+Method ValidateBeforeSwap(packageDir As %String) [ Private ]
 {
     set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
     if '##class(%Library.File).Exists(irisDAT) {
         set msg = "Database package is missing IRIS.DAT in: " _ packageDir
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
-    if ##class(%Library.File).GetFileSize(irisDAT) <= 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "IRIS.DAT in database package is zero-sized."))
-    }
-
     set moduleXML = ##class(%Library.File).NormalizeFilename("module.xml", packageDir)
     if '##class(%Library.File).Exists(moduleXML) {
         set msg = "Database package is missing module.xml in: " _ packageDir
@@ -871,6 +880,10 @@ Method ValidateBeforeSwap(
 /// Dismounts the current routines DB, renames IRIS.DAT to a timestamped backup,
 /// moves the packaged IRIS.DAT into place, and remounts.
 /// Sets dbDir and backupPath for use in rollback on failure.
+/// @param packageDir Extracted package directory containing the new IRIS.DAT to swap in.
+/// @param ns Namespace whose routines DB is being replaced.
+/// @param dbDir Output: filesystem directory of the routines DB (used by rollback).
+/// @param backupPath Output: full path of the timestamped backup file (used by rollback).
 Method PerformDatabaseSwap(
 	packageDir As %String,
 	ns As %String,
@@ -908,6 +921,8 @@ Method PerformDatabaseSwap(
 
 /// Best-effort rollback after a failed swap. Never throws — called from a catch block.
 /// Dismounts new DB, removes new IRIS.DAT if present, restores backup, remounts.
+/// @param dbDir Filesystem directory of the routines DB, as set by PerformDatabaseSwap.
+/// @param backupPath Full path of the timestamped backup, as set by PerformDatabaseSwap.
 Method RollbackDatabaseSwap(
 	dbDir As %String,
 	backupPath As %String) [ Private ]
@@ -1011,7 +1026,7 @@ Method %Activate(ByRef params) As %Status
         set ns = $namespace
         set packageDir = ..Module.Root
 
-        do ..ValidateBeforeSwap(packageDir, ns)
+        do ..ValidateBeforeSwap(packageDir)
 
         if '$get(params("SwapDB")) {
             do ..PromptForSwapConfirmation(ns)
