@@ -267,9 +267,7 @@ ClassMethod RetrieveArtifact(
 
     // Create directory if it doesn't exist
     if '##class(%File).DirectoryExists(downloadDirectory) {
-        if '##class(%File).CreateDirectoryChain(downloadDirectory) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to create destination directory: "_downloadDirectory))
-        }
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(downloadDirectory))
     }
 
     set localPath = ##class(%File).NormalizeFilename(artifactName, downloadDirectory)

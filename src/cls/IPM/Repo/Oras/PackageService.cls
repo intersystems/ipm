@@ -192,7 +192,9 @@ ClassMethod AggregatePlatformVersions(
     set ptr = 0
     while $listnext(tagsList, ptr, tag) {
         // aggregate
-        set $listbuild(version, platformVersion) = $listfromstring(tag, $$$OrasTagPlatformSeparator)
+        set parsed = $listfromstring(tag, $$$OrasTagPlatformSeparator)
+        set version = $listget(parsed, 1)
+        set platformVersion = $listget(parsed, 2, "")  // Default to empty string if no platform
         set value = $get(aggregatedPlatformVersion(version))
         set aggregatedPlatformVersion(version) = value _ $listbuild(platformVersion)
     }
