@@ -2364,8 +2364,8 @@ ClassMethod LoadInternal(
     }
     set extension = $$$lcase($piece(tDirectoryName,".",*))
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
-        set tTempExtractionRoot = $$$FileTempDirSys
-        set tTargetDirectory = tTempExtractionRoot
+        set tTargetDirectory = ##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory())
+        set tTempExtractionRoot = tTargetDirectory
         if $get(pCommandInfo("data", "Verbose")) {
             write !,"Extracting archive to ",tTargetDirectory
         }
