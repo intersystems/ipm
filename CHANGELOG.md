@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #870: When running tests for just a single suite or class, will only load and compile the relevant classes instead of all the tests
 - #843: Optionally include tests when packaging using either the `-include-tests` flag or `<IncludeTests>1</IncludeTests>` in module.xml
 - #1079: Add semantic sorting and shortcuts to list-installed
+- #1152: Adds information about scoped dependencies in the output array of BuildDependencyGraph()
 
 ### Fixed
 - #1175: Fix issue parsing version for packages with both deployed and non-deployed versions

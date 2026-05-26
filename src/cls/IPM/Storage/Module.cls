@@ -879,6 +879,8 @@ ClassMethod HasScope(
 /// <li>Depth in the dependency tree (1 for direct dependencies, 2 for transitive, etc.)</li>
 /// <li>Repository from which the module will be obtained (empty if already installed)</li>
 /// <li>Version string of the module to be installed</li>
+/// <li>Display name of the module</li>
+/// <li>Scope of the module, or empty string if the dependency is not scoped</li>
 /// </ul>
 /// <p>
 /// <b>Parameters:</b><br>
@@ -1142,7 +1144,7 @@ Method ProcessSingleDependencyIterative(
                 localObj.Version.Satisfies(searchExpr) &&
                 ((version = "") || (version = localObj.VersionString))
             if installedVersionValid && '(localObj.Version.IsSnapshot() && pForceSnapshotReload) {
-                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName)
+                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName,pDep.Scope)
                 set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
                 // Add to work queue for next depth
@@ -1204,7 +1206,7 @@ Method ProcessSingleDependencyIterative(
             }
 
             set pDependencyGraph(pDep.Name) = $listbuild(
-                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, qualifiedReference.Deployed, qualifiedReference.PlatformVersion,pDep.DisplayName
+                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, pDep.DisplayName, pDep.Scope
             )
             set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
@@ -1239,7 +1241,7 @@ Method ProcessSingleDependencyIterative(
                 // occurs if needed.
                 set depth = $select(previousDepth=0:pDepth,previousDepth>pDepth:previousDepth,1:pDepth)
                 set dependencyGraph(pDep.Name) = $listbuild(
-                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName
+                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName,pDep.Scope
                 )
                 set dependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
