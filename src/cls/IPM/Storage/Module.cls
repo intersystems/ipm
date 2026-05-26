@@ -1206,7 +1206,7 @@ Method ProcessSingleDependencyIterative(
             }
 
             set pDependencyGraph(pDep.Name) = $listbuild(
-                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, qualifiedReference.Deployed, qualifiedReference.PlatformVersion,pDep.DisplayName,pDep.Scope
+                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, pDep.DisplayName, pDep.Scope
             )
             set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
