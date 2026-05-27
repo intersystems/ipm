@@ -98,7 +98,7 @@ jobs:
           for package in $packages; do
             echo "::group::Set up container for package $package"
             CONTAINER=$(docker run -d --rm -v `pwd`:/home/irisowner/zpm/ zpm)
-            docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitISC.sh
+            docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
             docker exec -i $CONTAINER iris session IRIS <<- EOF
               zpm "config set analytics 0":1
               zpm "repo -r -name registry -url https://pm.community.intersystems.com/":1
