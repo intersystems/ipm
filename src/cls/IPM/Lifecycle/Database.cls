@@ -16,7 +16,7 @@ Parameter PACKAGING As STRING [ Final ] = "database";
 // =====================================================================
 
 /// Entry point for database packaging. Orchestrates the full pipeline:
-/// 1. Validate IPM is externally mapped (not in routines DB)
+/// 1. Validate IPM is externally mapped (not in routines DB) and routines DB is not mirrored
 /// 2. Create a temp IRIS.DAT and remap the namespace routines to it
 ///    (or use the current DB with -use-current-db)
 /// 3. Export Generated resources before remapping (they become inaccessible after dismount)
@@ -51,6 +51,7 @@ Method %Package(ByRef params) As %Status
         // Validate IPM is externally mapped — must not be in the routines DB being packaged
         write:verbose !, "Validating IPM mapping..."
         do ..ValidateIPMNotInRoutinesDB()
+        do ..ValidateRoutinesDatabaseNotMirrored(ns)
 
         // Warn about <Invoke> elements that won't run during database install.
         // The routines DB isn't mounted until %Activate completes, so invoke targets
@@ -344,6 +345,24 @@ ClassMethod ValidateIPMNotInRoutinesDB()
         if ..IsClassInLocalRoutinesDB("%IPM.Main") {
             $$$ThrowStatus($$$ERROR($$$GeneralError,"IPM must be mapped from another namespace. %IPM classes were found in the current routines database. Map IPM from a non-system code namespace before packaging."))
         }
+    }
+}
+
+/// Validates that the routines database for a namespace is not mirrored.
+/// Database packaging is not currently supported for mirrored databases — dismounting a
+/// mirrored database will break the mirror.
+/// ns: namespace whose routines database is being checked.
+ClassMethod ValidateRoutinesDatabaseNotMirrored(ns As %String)
+{
+    new $namespace
+    set $namespace = "%SYS"
+    set dbName = ..GetRoutinesDBName(ns)
+    set dbDir = ..GetDatabaseDirectory(dbName)
+    set db = ##class(SYS.Database).%OpenId(dbDir, , .sc)
+    $$$ThrowOnError(sc)
+    if db.Mirrored {
+        set msg = "Database packaging is not currently supported for mirrored databases (namespace: " _ ns _ ", database: " _ dbName _ ")."
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
 }
 
@@ -871,7 +890,8 @@ Method IsInstallContext() As %Boolean [ Private ]
 /// Pre-install validation for a database swap.
 /// Checks: IRIS.DAT exists, module.xml declares database packaging,
 /// dependencies.xml present, SHA-256 checksum matches, no other database package
-/// already installed in this namespace, and IPM is not in the target routines DB.
+/// already installed in this namespace, IPM is not in the target routines DB,
+/// and the target routines DB is not mirrored.
 /// Throws on any failure. Does not modify any state.
 /// packageDir: extracted package directory containing IRIS.DAT and module.xml.
 Method ValidateBeforeSwap(packageDir As %String) [ Private ]
@@ -929,6 +949,7 @@ Method ValidateBeforeSwap(packageDir As %String) [ Private ]
 
     // Validate IPM is not in the target namespace's routines DB
     do ..ValidateIPMNotInRoutinesDB()
+    do ..ValidateRoutinesDatabaseNotMirrored($namespace)
 }
 
 /// Shows the namespace and current DB path, then prompts for y/N confirmation.
