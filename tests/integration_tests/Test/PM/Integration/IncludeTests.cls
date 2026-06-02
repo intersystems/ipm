@@ -107,4 +107,41 @@ Method TestIncludeTestsModuleXml()
   }
 }
 
+// Regression test: ResolveChildren must not return path entries (names starting with /)
+// as top-level keys. Path resources have no Studio document representation; returning them
+// as document names can crash callers.
+Method TestResolveChildrenNoPathEntries()
+{
+    set status = $$$OK
+    try {
+        set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+        set moduleDir = ##class(%File).NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/test-output-format/")
+        set status = ##class(%IPM.Main).Shell("load "_moduleDir)
+        do $$$AssertStatusOK(status,"Loaded test-output-format module successfully.")
+
+        set module = ##class(%IPM.Storage.Module).NameOpen("test-output-format",,.status)
+        do $$$AssertStatusOK(status,"Opened test-output-format module.")
+
+        set foundPathEntry = 0
+        set key = ""
+        for {
+            set tResource = module.Resources.GetNext(.key)
+            quit:(key = "")
+            kill tChildren
+            do $$$AssertStatusOK(tResource.ResolveChildren(.tChildren),"ResolveChildren succeeded for "_tResource.Name)
+            set childKey = ""
+            for {
+                set childKey = $order(tChildren(childKey))
+                quit:(childKey = "")
+                if ($extract(childKey) = "/") {
+                    set foundPathEntry = 1
+                }
+            }
+        }
+        do $$$AssertNotTrue(foundPathEntry,"ResolveChildren output contains no path entries.")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+    }
+}
+
 }
