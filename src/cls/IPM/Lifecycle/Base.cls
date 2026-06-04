@@ -944,11 +944,20 @@ ClassMethod DetectFlexiblePythonCaller(useStandalonePip As %Boolean, verbose As 
     set dylibDir = ##class(%File).GetDirectory(pyDylib, 1)
     set versionedName = ..VersionedPythonName(pyDylib)
 
-    // Search both the .so directory and the sibling bin/ directory.
-    // The sibling bin/ covers distros where the runtime lib is under lib/ but
-    // executables are in the adjacent bin/ (e.g. /usr/lib64/libpython3.12.so
-    // paired with /usr/bin/python3.12).
+    // Search the .so directory, the sibling bin/, and all PATH directories.
+    // The sibling bin/ covers distros where the runtime lib and executables are
+    // co-located under lib/ (e.g. RHEL: /usr/lib64/libpython3.12.so + /usr/lib64/python3.12).
+    // PATH covers distros with a multiarch layout where the .so and executables
+    // are not co-located (e.g. Ubuntu: /usr/lib/x86_64-linux-gnu/libpython3.12.so.1.0
+    // but /usr/bin/python3.12).
     set searchDirs = $listbuild(dylibDir, ##class(%File).NormalizeDirectory(##class(%File).NormalizeFilename("../bin", dylibDir)))
+    set envPath = $system.Util.GetEnviron("PATH")
+    for i=1:1:$length(envPath, ":") {
+        set dir = $piece(envPath, ":", i)
+        if dir '= "" {
+            set searchDirs = searchDirs _ $listbuild(##class(%File).NormalizeDirectory(dir))
+        }
+    }
 
     if useStandalonePip '= 1 {
         set pythonNames = $listbuild("python3", "python")
