@@ -816,6 +816,9 @@ ClassMethod ResolvePipCaller(ByRef pParams) As %List
     return ..DetectPipCaller(tUseStandalonePip, $get(pParams("Verbose"), 0))
 }
 
+/// Auto-detects a pip caller when PipCaller is not configured. Tries, in order:
+/// flexible Python (PythonRuntimeLibrary), irispip.exe (Windows),
+/// python3/python in PATH, pip3/pip in PATH. Throws if nothing is found.
 ClassMethod DetectPipCaller(
 	pUseStandalonePip As %Boolean,
 	pVerbose As %Boolean = 0) As %List
@@ -825,31 +828,9 @@ ClassMethod DetectPipCaller(
     }
 
     // First try to detect flexible python (in 2024.2 and later)
-    // This is a hack that doesn't always work because the python interpreter may not be in the same directory as the so/dylib/dll.
-    if $system.CLS.IsMthd("%SYS.Python","GetPythonInfo") {
-        if pVerbose {
-            write !, "Attempting to find flexible python... "
-        }
-        do ##class(%SYS.Python).GetPythonInfo(.info)
-        if $data(info("CPF_PythonRuntimeLibrary"), tPyDylib) && (tPyDylib '= "") {
-            // TODO: try `../bin/python3` or `../bin/python` in case the .so is in subfolder `lib`
-            // TODO: try to find `pip3` or `pip` if pUseStandalonePip is 1
-            for filename = "python3", "python" {
-                set tInterpreter = ##class(%File).GetDirectory(tPyDylib, 1) _ filename
-                if $$$isWINDOWS {
-                    set tInterpreter = tInterpreter_".exe"
-                }
-                if ##class(%File).Exists(tInterpreter) {
-                    if pVerbose{
-                        write "Success!"
-                    }
-                    return $listbuild(tInterpreter, "-m", "pip")
-                }
-                if pVerbose {
-                    write "Not Found"
-                }
-            }
-        }
+    set result = ..DetectFlexiblePythonCaller(pUseStandalonePip, pVerbose)
+    if result '= "" {
+        return result
     }
 
     // For windows, try to find irispip.exe (in 2024.1 and earlier)
@@ -868,6 +849,9 @@ ClassMethod DetectPipCaller(
             write "Not Found"
         }
     }
+
+    // UseStandalonePip is a tristate: 0 = python only, 1 = pip only, "" = try both.
+    // The '=1 / '=0 checks implement that: when unset, both blocks run.
 
     // Unless UseStandalonePip is set to 1, try to find python3 or python
     if pUseStandalonePip '= 1 {
@@ -917,7 +901,119 @@ ClassMethod DetectPipCaller(
         }
     }
 
-    throw ##class(%Exception.General).%New("Could not find a suitable pip caller. Consider setting UseStandalonePip and PipCaller")
+    throw ##class(%Exception.General).%New("Could not find a suitable pip caller. Run: zpm ""config set PipCaller <path>"" and zpm ""config set UseStandalonePip 0"" (python executable) or 1 (pip executable)")
+}
+
+/// Looks for the first executable from names found in any of dirs.
+/// Returns the full path, or "" if none exists.
+ClassMethod FindExecutableInDirs(dirs As %List, names As %List) As %String
+{
+    set dirPtr = 0
+    while $listnext(dirs, dirPtr, dir) {
+        set namePtr = 0
+        while $listnext(names, namePtr, name) {
+            set path = dir _ name
+            if $$$isWINDOWS {
+                set path = path _ ".exe"
+            }
+            if ##class(%File).Exists(path) {
+                return path
+            }
+        }
+    }
+    return ""
+}
+
+/// Attempts to find a pip caller using PythonRuntimeLibrary from iris.cpf (IRIS 2024.2+).
+/// Returns a $list command suitable for RunCommand, or "" if unavailable or not found.
+ClassMethod DetectFlexiblePythonCaller(useStandalonePip As %Boolean, verbose As %Boolean = 0) As %List
+{
+    if '$system.CLS.IsMthd("%SYS.Python", "GetPythonInfo") {
+        return ""
+    }
+
+    if verbose {
+        write !, "Attempting to find flexible python... "
+    }
+
+    do ##class(%SYS.Python).GetPythonInfo(.info)
+    if '$data(info("CPF_PythonRuntimeLibrary"), pyDylib) || (pyDylib = "") {
+        return ""
+    }
+
+    set dylibDir = ##class(%File).GetDirectory(pyDylib, 1)
+    set versionedName = ..VersionedPythonName(pyDylib)
+
+    // Search both the .so directory and the sibling bin/ directory.
+    // The sibling bin/ covers distros where the runtime lib is under lib/ but
+    // executables are in the adjacent bin/ (e.g. /usr/lib64/libpython3.12.so
+    // paired with /usr/bin/python3.12).
+    set searchDirs = $listbuild(dylibDir, ##class(%File).NormalizeDirectory(##class(%File).NormalizeFilename("../bin", dylibDir)))
+
+    if useStandalonePip '= 1 {
+        set pythonNames = $listbuild("python3", "python")
+        if versionedName '= "" {
+            set pythonNames = $listbuild(versionedName) _ pythonNames
+        }
+        set interpreter = ..FindExecutableInDirs(searchDirs, pythonNames)
+        if interpreter '= "" {
+            if verbose {
+                write "Success!"
+            }
+            return $listbuild(interpreter, "-m", "pip")
+        }
+        if verbose {
+            write !, "Python interpreter not found in flexible Python directories"
+        }
+    }
+
+    if useStandalonePip '= 0 {
+        set pipNames = $listbuild("pip3", "pip")
+        if versionedName '= "" {
+            set pipNames = $listbuild("pip" _ $piece(versionedName, "python", 2)) _ pipNames
+        }
+        set pipExec = ..FindExecutableInDirs(searchDirs, pipNames)
+        if pipExec '= "" {
+            if verbose {
+                write "Success!"
+            }
+            return $listbuild(pipExec)
+        }
+        if verbose {
+            write !, "pip not found in flexible Python directories"
+        }
+    }
+
+    return ""
+}
+
+/// Given a path to a Python runtime shared library, returns the versioned executable
+/// name (e.g. "python3.12") derived from the filename, or "" if one cannot be determined.
+/// Only handles the Linux .so convention (libpythonX.Y.so[.1.0]); other platforms
+/// (macOS .dylib, Windows .dll) return "" and fall through to unversioned PATH search.
+ClassMethod VersionedPythonName(dylib As %String) As %String
+{
+    // Strip the directory to work with just the filename
+    set filename = ##class(%File).GetFilename(dylib)
+
+    // libpythonX.Y.so[.anything] -> "libpythonX.Y"
+    set base = $piece(filename, ".so")
+    if base = filename {
+        // No ".so" in the name — not a Linux shared library we can parse
+        return ""
+    }
+
+    // "libpythonX.Y" -> "pythonX.Y"
+    if $extract(base, 1, 3) '= "lib" {
+        return ""
+    }
+    set name = $extract(base, 4, *)
+
+    // Require the result to look like pythonX.Y (major.minor, both numeric)
+    if '$match(name, "^python[0-9]+\.[0-9]+$") {
+        return ""
+    }
+    return name
 }
 
 Method %Validate(ByRef pParams) As %Status

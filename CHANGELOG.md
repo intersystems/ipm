@@ -13,6 +13,7 @@ semver Intersection would incorrectly pass if an exact version is compared again
 no overlap.
 - #1077: Fixed error handling of dependency resolution to correctly report what the offending
 modules are.
+- #1191: Fixed issue where configured Python version would not be used automatically
 
 ## [0.10.7] - 2026-05-29
 
