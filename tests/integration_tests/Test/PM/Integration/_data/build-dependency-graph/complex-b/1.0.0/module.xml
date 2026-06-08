@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="complex-b.ZPM">
+        <Module>
+            <Name>complex-b</Name>
+            <Version>1.0.0</Version>
+            <!-- Requires the same range as complex-a: diamond resolves cleanly -->
+            <Dependencies>
+                <ModuleReference>
+                    <Name>complex-c</Name>
+                    <Version>^2.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

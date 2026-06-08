@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="scoped-root.ZPM">
+        <Module>
+            <Name>scoped-root</Name>
+            <Version>4.0.0</Version>
+            <!-- Test-scoped dep on scoped-b ^2.0.0. scoped-b 2.0.0 has:
+             scoped-c ^3.0.0 Scope=test and scoped-d ^4.0.0 Scope=verify.
+           With test-only phases: scoped-b and scoped-c are in graph; scoped-d (verify) is excluded.
+           With test+verify phases: scoped-b, scoped-c, and scoped-d are all in graph. -->
+            <Dependencies>
+                <ModuleReference Scope="test">
+                    <Name>scoped-b</Name>
+                    <Version>^2.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

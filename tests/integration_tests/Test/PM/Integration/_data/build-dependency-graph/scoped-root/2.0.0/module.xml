@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="scoped-root.ZPM">
+        <Module>
+            <Name>scoped-root</Name>
+            <Version>2.0.0</Version>
+            <!-- loop-a (prod) requires loop-c ^1.0.0. scoped-b 3.0.0 (prod) requires loop-c ^2.0.0
+            Scope=test.
+           Without test phase: scoped-b's test dep is excluded, no conflict — loop-c resolves to 1.0.0.
+           With test phase: loop-c ^1.0.0 (from loop-a) conflicts with loop-c ^2.0.0 (from scoped-b).
+           Using loop-a with a RANGE dep (^1.0.0) rather than exact dep (1.0.0) ensures the
+           range-vs-range intersection detects the incompatibility correctly. -->
+            <Dependencies>
+                <ModuleReference>
+                    <Name>loop-a</Name>
+                    <Version>^1.0.0</Version>
+                </ModuleReference>
+                <ModuleReference>
+                    <Name>scoped-b</Name>
+                    <Version>^3.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

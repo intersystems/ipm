@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="loop-a.ZPM">
+        <Module>
+            <Name>loop-a</Name>
+            <Version>1.0.0</Version>
+            <!-- Range dep on loop-c — used to create a detectable range-vs-range conflict
+                 when combined with scoped-b 3.0.0's test-scoped dep on loop-c ^2.0.0.
+                 Using a range (^1.0.0) rather than exact (1.0.0) ensures the Intersect
+                 computation detects the incompatibility. -->
+            <Dependencies>
+                <ModuleReference>
+                    <Name>loop-c</Name>
+                    <Version>^1.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="complex-e.ZPM">
+        <Module>
+            <Name>complex-e</Name>
+            <Version>2.0.0</Version>
+            <!-- Leaf module. Satisfies complex-root 5.0.0's direct ^2.0.0 constraint so that
+                 the incompatibility with complex-c's ^3.0.0 constraint surfaces as a version
+                 conflict rather than a "module not found" error. -->
+        </Module>
+    </Document>
+</Export>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="loop-c.ZPM">
+        <Module>
+            <Name>loop-c</Name>
+            <Version>3.0.0</Version>
+            <!-- Closes a 3-hop indirect cycle: loop-root → loop-b → loop-c 3.0.0 → loop-root.
+                 Cycle is detected here when loop-root is found already in the traversal path. -->
+            <Dependencies>
+                <ModuleReference>
+                    <Name>loop-root</Name>
+                    <Version>^1.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

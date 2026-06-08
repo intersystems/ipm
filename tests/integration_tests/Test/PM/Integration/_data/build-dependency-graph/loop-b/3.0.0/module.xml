@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="loop-b.ZPM">
+        <Module>
+            <Name>loop-b</Name>
+            <Version>3.0.0</Version>
+            <!-- Middle hop in a 3-hop indirect cycle: loop-root → loop-b 3.0.0 → loop-c 3.0.0 →
+            loop-root -->
+            <Dependencies>
+                <ModuleReference>
+                    <Name>loop-c</Name>
+                    <Version>^3.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>
