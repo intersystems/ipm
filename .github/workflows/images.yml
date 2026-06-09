@@ -29,8 +29,8 @@ jobs:
             tags=$(curl -su ":" https://containers.intersystems.com/v2/intersystems/${n}/tags/list | jq -r '.tags[]' | awk '!/(-linux)|([1-4]-preview)|(-em)|(-cd)/' | awk '!/\.[1-4]\./' | sort | uniq)
             for tag in $tags
             do
-              # Skip 2023.3 and 2023.2 because the license has expired
-              if [ "$tag" = "2023.3" -o "$tag" = "2023.2" ];
+              # Skip those with expired licenses
+              if [ "$tag" = "2023.3" -o "$tag" = "2023.2" -o "$tag" = "2024.3" -o "$tag" = "2025.1" ];
                 then
                   continue
               fi
