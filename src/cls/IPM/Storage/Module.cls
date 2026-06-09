@@ -1100,7 +1100,7 @@ Method ProcessSingleDependencyIterative(
             set sc = ##class(%IPM.General.SemanticVersionExpression).FromString(otherReq,.tExpr)
             $$$ThrowOnError(sc)
             set constraintList = constraintList_$listbuild(sourcePath_": "_otherReq)
-            set searchExpr = ..AndConstraint(searchExpr, tExpr, pDep.Name, constraintList)
+            set searchExpr = searchExpr.And(tExpr, pDep.Name, constraintList)
         }
 
         if 'pIgnoreInstalledModules {
@@ -1121,7 +1121,7 @@ Method ProcessSingleDependencyIterative(
             )
             $$$ThrowOnError(sc)
             set constraintList = constraintList_installedConstraintList
-            set searchExpr = ..AndConstraint(searchExpr, installedReqExpr, pDep.Name, constraintList)
+            set searchExpr = searchExpr.And(installedReqExpr, pDep.Name, constraintList)
         }
 
         // Check if we already have a satisfactory version
@@ -1156,7 +1156,7 @@ Method ProcessSingleDependencyIterative(
                 set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(rangeString,.currentlyInstalledExpr)
                 $$$ThrowOnError(tSC)
                 set constraintList = constraintList_$listbuild(localObj.Name_": "_rangeString_" (currently installed, downgrade not permitted)")
-                set searchExpr = ..AndConstraint(searchExpr, currentlyInstalledExpr, pDep.Name, constraintList)
+                set searchExpr = searchExpr.And(currentlyInstalledExpr, pDep.Name, constraintList)
             }
         }
 
@@ -1291,30 +1291,6 @@ Method ProcessSingleDependencyIterative(
         set sc = e.AsStatus()
     }
     quit sc
-}
-
-/// Combines two version expressions with AND.
-/// Throws a descriptive error listing all conflicting requirements if the expressions are incompatible.
-/// <p>
-/// <b>Parameters:</b><br>
-/// <var>pSearchExpr</var> - Accumulated version expression to AND into<br>
-/// <var>pNewExpr</var> - New version expression to AND with<br>
-/// <var>pDepName</var> - Name of the dependency being resolved (for error message)<br>
-/// <var>pConstraintList</var> - %List of "source: constraint" strings accumulated so far (for error message)<br>
-ClassMethod AndConstraint(
-	pSearchExpr As %IPM.General.SemanticVersionExpression,
-	pNewExpr As %IPM.General.SemanticVersionExpression,
-	pDepName As %String,
-	pConstraintList As %List) As %IPM.General.SemanticVersionExpression [ Internal, Private ]
-{
-    set result = ""
-    try {
-        set result = pSearchExpr.And(pNewExpr)
-    } catch {
-        set msg = $$$FormatText("Incompatible version constraints for '%1'. Conflicting requirements: %2",pDepName, $listtostring(pConstraintList, "; "))
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-    }
-    return result
 }
 
 /// Retrieves all known dependencies for a module, including transitive dependencies.

@@ -117,7 +117,16 @@ Method IsSatisfiedBy(version As %IPM.General.SemanticVersion) As %Boolean
     return 0
 }
 
-Method And(versionExpression As %IPM.General.SemanticVersionExpression) As %IPM.General.SemanticVersionExpression
+/// Combines two version expressions with AND. <br />
+/// Throw an error if versions are incompatible. <br />
+/// If <var>moduleName</var> and <var>constraintList</var> are provided, throws a descriptive error
+/// listing all conflicting requirements if the expressions are incompatible. <br />
+/// <p>
+/// <b>Parameters:</b><br />
+/// <var>versionExpression</var> - Version expression to AND with<br />
+/// <var>moduleName</var> - Name of the module whose versions are being resolved (for error message)<br />
+/// <var>constraintList</var> - %List of "source: constraint" strings accumulated so far (for error message)<br />
+Method And(versionExpression As %IPM.General.SemanticVersionExpression, moduleName As %String = "", constraintList As %List = "") As %IPM.General.SemanticVersionExpression
 {
     if versionExpression.Expression '= "" {
         if (..AnyOf.Count() = 0) {
@@ -146,6 +155,9 @@ Method And(versionExpression As %IPM.General.SemanticVersionExpression) As %IPM.
         set resolvedString = ..ToResolvedString()
         if (resolvedString = "") {
             set msg = $$$FormatText("No overlapping versions in AND operation for %1 and %2",current.ToResolvedString(),versionExpression.ToResolvedString())
+            if (moduleName '= "") && (constraintList '= "") {
+                set msg = msg_" for module "_moduleName_" with constraints: "_$listtostring(constraintList,", ")
+            }
             $$$ThrowStatus($$$ERROR($$$GeneralError,msg))
         }
         set i%Expression = resolvedString
