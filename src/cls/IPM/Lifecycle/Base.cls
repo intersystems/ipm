@@ -904,14 +904,14 @@ ClassMethod DetectPipCaller(
     throw ##class(%Exception.General).%New("Could not find a suitable pip caller. Run: zpm ""config set PipCaller <path>"" and zpm ""config set UseStandalonePip 0"" (python executable) or 1 (pip executable)")
 }
 
-/// Looks for the first executable from names found in any of dirs.
-/// Returns the full path, or "" if none exists.
+/// Looks for executables by searching names in priority order across all dirs.
+/// Returns the full path of the highest-priority name found, or "" if none exists.
 ClassMethod FindExecutableInDirs(dirs As %List, names As %List) As %String
 {
-    set dirPtr = 0
-    while $listnext(dirs, dirPtr, dir) {
-        set namePtr = 0
-        while $listnext(names, namePtr, name) {
+    set namePtr = 0
+    while $listnext(names, namePtr, name) {
+        set dirPtr = 0
+        while $listnext(dirs, dirPtr, dir) {
             set path = dir _ name
             if $$$isWINDOWS {
                 set path = path _ ".exe"
