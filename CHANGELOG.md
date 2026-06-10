@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.7] - Unreleased
+## [0.10.8] - Unreleased
+
+### Fixed
+- #1192: Fix dependency resolution dropping incompatibilities and along with that fix a bug where
+semver Intersection would incorrectly pass if an exact version is compared against a range even with
+no overlap.
+- #1077: Fixed error handling of dependency resolution to correctly report what the offending
+modules are.
+
+## [0.10.7] - 2026-05-29
 
 ### Added
 - #408: Modules can now list dependencies without specifying version; will be assumed to be "*"

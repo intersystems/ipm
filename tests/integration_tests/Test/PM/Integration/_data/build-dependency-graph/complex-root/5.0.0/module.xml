@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="complex-root.ZPM">
+        <Module>
+            <Name>complex-root</Name>
+            <Version>5.0.0</Version>
+            <!-- Invalid multi-level shared dep: root directly requires complex-e ^2.0.0, but
+                 complex-a 1.0.0 transitively requires complex-e ^3.0.0 via complex-c 2.0.0.
+                 The constraints ^2.0.0 (depth 1) AND ^3.0.0 (depth 3) are incompatible. -->
+            <Dependencies>
+                <ModuleReference>
+                    <Name>complex-a</Name>
+                    <Version>^1.0.0</Version>
+                </ModuleReference>
+                <ModuleReference>
+                    <Name>complex-e</Name>
+                    <Version>^2.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

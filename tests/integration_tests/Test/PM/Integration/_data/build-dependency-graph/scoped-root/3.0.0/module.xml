@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="scoped-root.ZPM">
+        <Module>
+            <Name>scoped-root</Name>
+            <Version>3.0.0</Version>
+            <!-- Test-scoped dep on loop-b ^1.0.0. loop-b prod-depends on loop-c 1.0.0.
+           Without test phase: neither loop-b nor loop-c appear in the graph.
+           With test phase: loop-b is included (test scope) and loop-c is included transitively. -->
+            <Dependencies>
+                <ModuleReference Scope="test">
+                    <Name>loop-b</Name>
+                    <Version>^1.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

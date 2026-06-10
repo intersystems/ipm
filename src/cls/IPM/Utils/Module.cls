@@ -390,8 +390,8 @@ ClassMethod GetRequiredVersionExpression(
             $$$ThrowOnError(sc)
             set version = result.%Get("Version")
             $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(version,.versionExpr))
-            set expression = expression.And(versionExpr)
             set sourceList = sourceList_$listbuild($listtostring(result.%Get("ModuleNames"),", ")_": "_version)
+            set expression = expression.And(versionExpr, moduleName, sourceList)
         }
         $$$ThrowOnError(sc)
 
@@ -419,8 +419,8 @@ ClassMethod GetRequiredVersionExpression(
                 // If this is a new required version expression, add a new item to the list
                 if (newVersion) {
                     $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(version, .versionExpr))
-                    set expression = expression.And(versionExpr)
                     set sourceList = sourceList _ $listbuild(requiringModuleName _ ": " _ version)
+                    set expression = expression.And(versionExpr, moduleName, sourceList)
                 }
             }
         }

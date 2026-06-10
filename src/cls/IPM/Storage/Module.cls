@@ -1014,10 +1014,7 @@ Method BuildDependencyGraph(
                         // Caches
                         .repoSearchCache, .manifestCache, .moduleCache,
                         pCoUpdatingModules)
-                    // For fuzzy, continue even if one fails
-                    if $$$ISERR(sc) {
-                        // Error will surface later if unresolvable
-                    }
+                    $$$ThrowOnError(sc)
                 }
             }
 
@@ -1102,8 +1099,8 @@ Method ProcessSingleDependencyIterative(
 
             set sc = ##class(%IPM.General.SemanticVersionExpression).FromString(otherReq,.tExpr)
             $$$ThrowOnError(sc)
-            set searchExpr = searchExpr.And(tExpr)
             set constraintList = constraintList_$listbuild(sourcePath_": "_otherReq)
+            set searchExpr = searchExpr.And(tExpr, pDep.Name, constraintList)
         }
 
         if 'pIgnoreInstalledModules {
@@ -1123,8 +1120,8 @@ Method ProcessSingleDependencyIterative(
                 pDep.Name,otherDepsList,,.installedReqExpr,.installedConstraintList
             )
             $$$ThrowOnError(sc)
-            set searchExpr = searchExpr.And(installedReqExpr)
             set constraintList = constraintList_installedConstraintList
+            set searchExpr = searchExpr.And(installedReqExpr, pDep.Name, constraintList)
         }
 
         // Check if we already have a satisfactory version
@@ -1158,8 +1155,8 @@ Method ProcessSingleDependencyIterative(
                 set rangeString = ">="_localObj.VersionString
                 set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(rangeString,.currentlyInstalledExpr)
                 $$$ThrowOnError(tSC)
-                set searchExpr = searchExpr.And(currentlyInstalledExpr)
                 set constraintList = constraintList_$listbuild(localObj.Name_": "_rangeString_" (currently installed, downgrade not permitted)")
+                set searchExpr = searchExpr.And(currentlyInstalledExpr, pDep.Name, constraintList)
             }
         }
 
@@ -1252,6 +1249,11 @@ Method ProcessSingleDependencyIterative(
                     #dim subDep As %IPM.Storage.ModuleReference
                     set subDep = moduleObj.Dependencies.GetAt(k)
 
+                    // Skip out-of-scope dependencies (same logic as BuildDependencyGraph main loop)
+                    if '..HasScope(pPhases, subDep.Scope) {
+                        continue
+                    }
+
                     // Check if this dependency conflicts with what we already have
                     if $data(dependencyGraph(subDep.Name), existingInfo) {
                         set existingVersion = $listget(existingInfo, 3)
@@ -1276,7 +1278,9 @@ Method ProcessSingleDependencyIterative(
                 }
             }
 
-            // If no candidate worked, use last one and let errors surface later
+            // If no valid candidate was found via quick validation, fall through with the last
+            // candidate. The real constraint conflict will surface when BFS processes its
+            // sub-dependencies and the constraint accumulation detects the incompatibility.
             if 'resultFound {
                 merge pDependencyGraph = dependencyGraph
                 set pWorkQueue(pDepth + 1, pDep.Name) = $listbuild(pModulePath_$listbuild(pDep.Name), pDep.Scope)

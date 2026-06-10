@@ -291,6 +291,32 @@ Method TestIntersection()
         set sc = e.AsStatus()
     }
     do $$$AssertStatusNotOK(sc)
+
+    // exact version below range
+    set sc = ##class(%IPM.General.SemanticVersionExpression).FromString("1.0.0",.expr1)
+    do $$$AssertStatusOK(sc)
+    set sc = ##class(%IPM.General.SemanticVersionExpression).FromString(">=2.0.0 <3.0.0",.expr2)
+    do $$$AssertStatusOK(sc)
+    set sc = $$$OK
+    try {
+        set exprMerged = expr1.And(expr2)
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    do $$$AssertStatusNotOK(sc)
+
+    // exact version above range
+    set sc = ##class(%IPM.General.SemanticVersionExpression).FromString(">=2.0.0 <3.0.0",.expr1)
+    do $$$AssertStatusOK(sc)
+    set sc = ##class(%IPM.General.SemanticVersionExpression).FromString("4.0.0",.expr2)
+    do $$$AssertStatusOK(sc)
+    set sc = $$$OK
+    try {
+        set exprMerged = expr1.And(expr2)
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    do $$$AssertStatusNotOK(sc)
 }
 
 Method TestOnTheFlyMigration()
