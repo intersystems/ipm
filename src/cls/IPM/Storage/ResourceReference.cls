@@ -193,7 +193,7 @@ ClassMethod GetChildren(
                 quit
             }
         } else {
-            if pResourceName '= "" {
+            if (pResourceName '= "") && ($extract(pResourceName) '= "/") {
                 merge pResourceArray(pResourceName) = pResourceInfoArray
             }
 

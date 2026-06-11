@@ -288,8 +288,7 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
         set tResourceInfo("UnitTest") = 1
         set tResource = $case(..Package '= "", 1: ..Package, : ..Class)_..Extension
         // GetChildren has Output semantics — it kills its output array before populating it.
-        // Using tClassArray (not pResourceArray directly) preserves any existing entries
-        // in pResourceArray (e.g., the "/tests/" path entry added before this call).
+        // Use tClassArray as the intermediate to avoid killing any existing entries in pResourceArray.
         kill tClassArray
         $$$ThrowOnError(##class(%IPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.tClassArray))
         $$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.tClassArray))
