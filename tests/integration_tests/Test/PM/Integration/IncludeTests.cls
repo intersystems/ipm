@@ -122,7 +122,6 @@ Method TestResolveChildrenNoPathEntries()
         set module = ##class(%IPM.Storage.Module).NameOpen("test-output-format",,.status)
         do $$$AssertStatusOK(status,"Opened test-output-format module.")
 
-        set foundPathEntry = 0
         set key = ""
         for {
             set tResource = module.Resources.GetNext(.key)
@@ -133,12 +132,11 @@ Method TestResolveChildrenNoPathEntries()
             for {
                 set childKey = $order(tChildren(childKey))
                 quit:(childKey = "")
-                if ($extract(childKey) = "/") {
-                    set foundPathEntry = 1
+                if $extract(childKey) = "/" {
+                    do $$$AssertTrue(0,"Path entry '"_childKey_"' found in ResolveChildren output for "_tResource.Name)
                 }
             }
         }
-        do $$$AssertNotTrue(foundPathEntry,"ResolveChildren output contains no path entries.")
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
     }
