@@ -1371,6 +1371,11 @@ Method GetResolvedReferences(
             kill tempArray("Scope")
             if ..HasScope(pPhases, resourceScope) && ..HasScope(pPhases, attrScope) {
                 merge pReferenceArray(..Name) = tempArray
+                // ResolveChildren does not emit path entries for document enumeration. Re-add here
+                // because ExportSingleModule needs the path entry to trigger its directory-copy branch.
+                if $extract(tResource.Name) = "/" {
+                    set pReferenceArray(..Name, tResource.Name) = ..Name
+                }
             }
             if $$$ISERR(tSC) {
                 quit
