@@ -186,10 +186,19 @@ ClassMethod Configure(
 
         if $data(pModifiers("password-stdin")) {
             // prompt for password using secret input terminal mode
-            open $io:(:"S")
-            read "Password: ", pwd
-            close $io
-            set pModifiers("password") = pwd
+            set ioDevice = $io
+            set readSC = $$$OK
+            try {
+                open ioDevice:(:"S")
+                read "Password: ", pwd
+                write !
+                set pModifiers("password") = pwd
+            } catch ex {
+                set readSC = ex.AsStatus()
+            }
+            // Restore normal echo mode — must happen even on Ctrl+C or error
+            open ioDevice:(:"")
+            $$$ThrowOnError(readSC)
         } elseif $data(pModifiers("password")) {
             write !, $$$FormattedLine($$$Yellow, "WARNING: Using --password via the CLI is insecure. Use --password-stdin.")
         }

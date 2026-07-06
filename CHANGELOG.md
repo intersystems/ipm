@@ -15,6 +15,7 @@ no overlap.
 modules are.
 - #1187: Remove extra path entries in output of %IPM.Storage.ResourceReference:ResolveChildren() that broke unguarded downstream callers.
 - #1191: Fixed issue where configured Python version would not be used automatically during calls to pip
+- #1198: Fixed bug where using `-password-stdin` would leave the IPM terminal in secret mode
 
 ## [0.10.7] - 2026-05-29
 
