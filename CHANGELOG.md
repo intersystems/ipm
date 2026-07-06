@@ -14,6 +14,7 @@ no overlap.
 - #1077: Fixed error handling of dependency resolution to correctly report what the offending
 modules are.
 - #1187: Remove extra path entries in output of %IPM.Storage.ResourceReference:ResolveChildren() that broke unguarded downstream callers.
+- #1191: Fixed issue where configured Python version would not be used automatically during calls to pip
 
 ## [0.10.7] - 2026-05-29
 
