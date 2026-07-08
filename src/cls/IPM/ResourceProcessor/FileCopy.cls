@@ -158,8 +158,8 @@ Method DoCopy(
         do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
 
         if '##class(%File).DirectoryExists(tTargetDir) {
-            if '##class(%File).CreateDirectoryChain(tTargetDir,.tReturn) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tTargetDir,$zutil(209,tReturn)))
+            set tSC = ##class(%IPM.Utils.File).CreateDirectoryChain(tTargetDir)
+            if $$$ISERR(tSC) {
                 quit
             }
         }

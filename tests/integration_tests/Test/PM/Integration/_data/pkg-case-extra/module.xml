@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+<Document name="pkg-case-extra.ZPM"><Module>
+  <Name>pkg-case-extra</Name>
+  <Version>0.0.1</Version>
+  <Resources>
+    <Resource Name="Test.PkgCase.ExtraClass.CLS"/>
+  </Resources>
+</Module>
+</Document></Export>

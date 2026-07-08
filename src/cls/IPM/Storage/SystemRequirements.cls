@@ -84,8 +84,12 @@ Method CheckIPMVersion() As %Status
     if ..IPMVersion = "" {
         return $$$OK
     }
-    do ##class(%IPM.Main).GetVersion($$$IPMModuleName,.out)
-    set tVersion = ##class(%IPM.General.SemanticVersion).FromString($listget(out($$$IPMModuleName), 2))
+    set tVersionString = ""
+    set tRS = ##class(%SQL.Statement).%ExecDirect(, "SELECT VersionString FROM %IPM_Storage.ModuleItem WHERE Name = ?", $$$IPMModuleName)
+    if tRS.%Next() {
+        set tVersionString = tRS.%Get("VersionString")
+    }
+    set tVersion = ##class(%IPM.General.SemanticVersion).FromString(tVersionString)
     $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(..IPMVersion,.tExpression))
     if tVersion.Satisfies(tExpression) {
         return $$$OK

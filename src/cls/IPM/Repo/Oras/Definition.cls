@@ -27,8 +27,17 @@ Method GetPackageService() As %IPM.Repo.IPackageService
     set tClient = ##class(%IPM.Repo.Oras.PackageService).%New()
     // We want to preprend the prefix to the "GET"/"POST"/etc. requests
     // Otherwise, it will be overwritten
-    do ##class(%Net.URLParser).Decompose(..URL,.comp)
-    if $data(comp("path"), path) && (path '= "") {
+    set tUrl = ..URL
+    // %Net.URLParser.Decompose misparses bare hostnames as path components; scheme must be present.
+    if ($piece(tUrl, "://")'["http") {
+        set tUrl = "https://" _ tUrl
+    }
+    do ##class(%Net.URLParser).Decompose(tUrl,.comp)
+    if $data(comp("path"), path) && (path '= "") && (path '= "/") {
+        // Decompose includes a leading slash; strip it for use as a prefix
+        if $extract(path, 1) = "/" {
+            set path = $extract(path, 2, *)
+        }
         if $extract(path, *) '= "/" {
             set path = path _ "/"
         }
@@ -64,6 +73,11 @@ Method Display()
     do ##super()
     if (..Namespace '= "") {
         write !,$char(9),"Namespace: ",..Padding(1),..Namespace
+    }
+    if (..Username '= "") || (..Password '= "") || (..Token '= "") {
+        set packageService = ..GetPackageService()
+        set authenticated = (packageService.IsAvailable() && packageService.IsAuthenticated())
+        write !,$char(9),"Authenticated?",..Padding(1),$$$YesNo(authenticated)
     }
 }
 

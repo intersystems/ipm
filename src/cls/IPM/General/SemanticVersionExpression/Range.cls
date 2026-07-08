@@ -247,7 +247,19 @@ ClassMethod Intersect(
                 $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Exact version matches do not agree: %1 and %2", firstExact.ToResolvedString(), comp.ToResolvedString())))
             }
         }
-        // All exact matches agree; return that version after converting to range
+        // Verify the exact version satisfies all lower and upper bounds from both ranges
+        set exactVersion = firstExact.ExtractToSemanticVersion()
+        for i = 1:1:lowerBounds.Count() {
+            if 'lowerBounds.GetAt(i).Evaluate(exactVersion) {
+                return ""
+            }
+        }
+        for i = 1:1:upperBounds.Count() {
+            if 'upperBounds.GetAt(i).Evaluate(exactVersion) {
+                return ""
+            }
+        }
+        // All exact matches agree and satisfy all bounds; return that version after converting to range
         set sc = ..FromString(firstExact.ToString(), .firstExactRange)
         $$$ThrowOnError(sc)
         return firstExactRange

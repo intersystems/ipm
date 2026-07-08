@@ -226,8 +226,17 @@ ClassMethod LoadModuleFromArchive(
     try {
         set tVerbose = $get(pParams("Verbose"))
 
-        // Modules have a well-defined location inside the archive
-        set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/" _ pModuleName _ "/" _ pModuleVersion)
+        set moduleRoot = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
+        // Custom roots are always pre-created by EnsureWritableDirectory at config time, so the fallback
+        // only triggers for the default ipm/ path before first use — one level up reaches DataDirectory(), which always exists.
+        set writeCheckDir = $select(##class(%File).DirectoryExists(moduleRoot): moduleRoot, 1: ##class(%File).GetDirectory(##class(%File).NormalizeFilename(moduleRoot)))
+        if '##class(%Library.File).Writeable(writeCheckDir) {
+            set msg = $$$FormatText("Insufficient file system permissions to write to '%1'. Cannot install module '%2'.", writeCheckDir, pModuleName)
+            set tSC = $$$ERROR($$$GeneralError, msg)
+            quit
+        }
+
+        set tTargetDirectory = ##class(%Library.File).NormalizeDirectory(moduleRoot _ pModuleName _ "/" _ pModuleVersion)
         if ##class(%File).DirectoryExists(tTargetDirectory) {
             // Delete it.
             set tSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(tTargetDirectory)
@@ -235,9 +244,8 @@ ClassMethod LoadModuleFromArchive(
                 quit
             }
         }
-        set tCreated = ##class(%File).CreateDirectoryChain(tTargetDirectory,.tReturnValue)
-        if 'tCreated {
-            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory %1: %2",tTargetDirectory,tReturnValue))
+        set tSC = ##class(%IPM.Utils.File).CreateDirectoryChain(tTargetDirectory)
+        if $$$ISERR(tSC) {
             quit
         }
         set tTargetDirectory = ##class(%File).NormalizeFilenameWithSpaces(tTargetDirectory)
@@ -352,7 +360,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-/// 
+///
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -385,8 +393,8 @@ ClassMethod GetRequiredVersionExpression(
             $$$ThrowOnError(sc)
             set version = result.%Get("Version")
             $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(version,.versionExpr))
-            set expression = expression.And(versionExpr)
             set sourceList = sourceList_$listbuild($listtostring(result.%Get("ModuleNames"),", ")_": "_version)
+            set expression = expression.And(versionExpr, moduleName, sourceList)
         }
         $$$ThrowOnError(sc)
 
@@ -414,8 +422,8 @@ ClassMethod GetRequiredVersionExpression(
                 // If this is a new required version expression, add a new item to the list
                 if (newVersion) {
                     $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString(version, .versionExpr))
-                    set expression = expression.And(versionExpr)
                     set sourceList = sourceList _ $listbuild(requiringModuleName _ ": " _ version)
+                    set expression = expression.And(versionExpr, moduleName, sourceList)
                 }
             }
         }
@@ -891,10 +899,17 @@ ClassMethod GetModuleListExecute(
             set tSearchCriteria.IncludePrerelease = tServer.Prereleases
             set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
             set tSearchCriteria.AllVersions = pShowAllVersions
-            set tList = tClient.ListModules(tSearchCriteria)
-            for i=1:1:tList.Count() {
-                set tMod = tList.GetAt(i)
-                set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+            set tList = ""
+            try {
+                set tList = tClient.ListModules(tSearchCriteria)
+            } catch e {
+                write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
+            }
+            if $isobject(tList) {
+                for i=1:1:tList.Count() {
+                    set tMod = tList.GetAt(i)
+                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+                }
             }
         }
 
@@ -994,6 +1009,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
+///
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1175,6 +1191,26 @@ ClassMethod LoadNewModule(
             }
         }
 
+        // Mark relevant resources for update
+        if (commandLineModuleName '= "") && ($get(params("cmd")) = "update") {
+            set tSC = moduleCurrent.GetResolvedReferences(.resourceArray, 1)
+            set moduleKey = ""
+            for {
+                set moduleKey = $order(resourceArray(moduleKey))
+                if (moduleKey = "") {
+                    quit
+                }
+                set resourceKey = ""
+                for {
+                    set resourceKey = $order(resourceArray(moduleKey, resourceKey))
+                    if (resourceKey = "") {
+                        quit
+                    }
+                    do ##class(%IPM.Storage.ResourceReference).MarkResourceForUpdate(resourceKey)
+                }
+            }
+        }
+
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1302,8 +1338,9 @@ ClassMethod LoadDependencies(
     set reloadSnapshots = +$get(pParams("UpdateSnapshots"))
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
+    set coUpdatingModules = $get(pParams("CoUpdatingModules"))
     write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
-    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade)
+    set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade,,,,.coUpdatingModules)
     $$$ThrowOnError(sc)
     write "Done."
 
@@ -1320,6 +1357,12 @@ ClassMethod LoadDependencies(
         write !, "Starting installation of dependencies..."
         write !
     }
+
+    set coUpdatingModules = ""
+    for i = 1:1:flatDepList.Count() {
+        set coUpdatingModules = coUpdatingModules _ $listbuild(flatDepList.GetAt(i).Name)
+    }
+    set pParams("CoUpdatingModules") = coUpdatingModules
 
     for i = 1:1:flatDepList.Count() {
         #dim moduleReference As %IPM.Storage.QualifiedModuleInfo

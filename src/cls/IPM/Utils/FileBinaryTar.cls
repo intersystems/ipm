@@ -155,7 +155,7 @@ Method ExtractTo(pDest As %String) As %Status
     if ..name'="" {
         if ..typeflag=5 {
             set fullPath = ##class(%File).NormalizeDirectory(..name, pDest)
-            set sc = ##class(%File).CreateDirectoryChain(fullPath)
+            set sc = ##class(%IPM.Utils.File).CreateDirectoryChain(fullPath)
             if $$$ISERR(sc) {
                 return sc
             }
@@ -164,8 +164,9 @@ Method ExtractTo(pDest As %String) As %Status
             set path = pDest_..name
             set directory = ##class(%File).GetDirectory(path)
             if '##class(%File).DirectoryExists(directory) {
-                if '##class(%File).CreateDirectoryChain(directory, .ret) {
-                    return $$$ERROR($$$GeneralError, $$$FormatText("Error creating directory chain %1: %2", directory, ret))
+                set sc = ##class(%IPM.Utils.File).CreateDirectoryChain(directory)
+                if $$$ISERR(sc) {
+                    return sc
                 }
             }
             #; no idea, why it's needed, but IRIS.DAT filename not allowed

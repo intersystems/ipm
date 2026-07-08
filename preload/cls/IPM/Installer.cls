@@ -112,11 +112,12 @@ ClassMethod ZPMInit(
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetDefaultRegistry(pRegistry, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsAvailable(1, 0))
     $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetAnalyticsTrackingId(pAnalyticsTrackingID, 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("ColorScheme","", 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("PipCaller", "", 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("UseStandalonePip", "", 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("SemVerPostRelease", 0, 0))
-    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue("DefaultLogEntryLimit",20, 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#ColorScheme, "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#PipCaller, "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#UseStandalonePip, "", 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#SemVerPostRelease, 0, 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#DefaultLogEntryLimit, 20, 0))
+    $$$QuitOnError(##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#ModuleRoot, ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/"), 0))
     quit $$$OK
 }
 
@@ -171,9 +172,6 @@ ClassMethod ValidatePythonRuntime() As %Boolean
         set version = ..PythonMajorMinorVersion()
         if (+version < 3.10) {
             write !!,"WARNING: Python version "_version_" is not supported. IPM requires Python 3.10 or higher.",!
-            return 0
-        } elseif (+version > 3.12) {
-            write !!,"WARNING: Python version "_version_" is not yet supported. IPM cannot use Python 3.13 or higher due to IRIS incompatibilities.",!
             return 0
         }
     } catch e {

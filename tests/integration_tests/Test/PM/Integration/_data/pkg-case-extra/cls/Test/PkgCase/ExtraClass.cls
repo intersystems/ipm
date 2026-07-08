@@ -1,0 +1,4 @@
+Class Test.PkgCase.ExtraClass
+{
+
+}

@@ -111,17 +111,32 @@ Method OnPhase(
             // In test/verify phase, run unit tests.
             set tVerbose = $get(pParams("Verbose"), 0)
             set tFlags = $select(tVerbose:"/display=all",1:"/display=none")
+            set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
+            if explicitQuiet {
+                set suppressor = ##class(%IPM.Utils.OutputSuppressor).%New()
+            }
 
             // Ensure unit tests and related classes are loaded.
             set tUnitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
-            set tSC = ##class(%IPM.Test.Manager).LoadTestDirectory(tUnitTestDir,tVerbose, ,..Format)
-            $$$ThrowOnError(tSC)
+            if $data(pParams("UnitTest","Case"), earlyCase)#2 {
+                // Load the full directory so base classes are available before compiling the target case.
+                $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(tUnitTestDir, tVerbose, , ..Format))
+            } elseif $data(pParams("UnitTest","Suite"), earlySuite)#2 {
+                set suiteDir = ##class(%File).NormalizeDirectory(tUnitTestDir_$replace(earlySuite,".","\"))
+                $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(suiteDir, tVerbose, , ..Format))
+            } else {
+                $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(tUnitTestDir, tVerbose, , ..Format))
+            }
 
             set tCompileFlags = "ck"_$select(tVerbose:"d",1:"-d")
             set tDoDelete = 1
             set tTestSpec = ""
             if (..Package '= "") {
-                $$$ThrowOnError($system.OBJ.CompilePackage(..Package, tCompileFlags))
+                if $data(pParams("UnitTest","Case"), tTestCase)#2 {
+                    $$$ThrowOnError($system.OBJ.Compile(tTestCase, tCompileFlags))
+                } else {
+                    $$$ThrowOnError($system.OBJ.CompilePackage(..Package, tCompileFlags))
+                }
 
                 // See if package contains any classes.
                 // If it does, we won't delete the classes after running the test.
@@ -199,21 +214,54 @@ Method OnPhase(
             zkill ^UnitTestRoot
             $$$ThrowOnError(tSC)
 
-            if $data(pParams("UnitTest","JUnitOutput"),tJUnitFile) {
-                set tPostfix = "-"_$zconvert(pPhase,"L")_"-"
-                if (..Package '= "") {
-                    set tPostfix = tPostfix_$replace(..Package,".","-")_"-PKG"
-                } elseif (..Class '= "") {
-                    set tPostfix = tPostfix_$replace(..Class,".","-")_"-CLS"
+            set testIndex = $get(^||%UnitTest.Manager.AllResults($get(^||%UnitTest.Manager.AllResultsCount)))
+            if testIndex = "" {
+                set testIndex = $order(^UnitTest.Result(""),-1)
+            }
+            if $data(pParams("outputfile"), outputFile) {
+                set fileExtension = $zconvert($piece(outputFile,".",*),"L")
+                set outputClass = $case(fileExtension,
+                    "json":"%IPM.Test.JsonOutput",
+                    "yaml":"%IPM.Test.YamlOutput",
+                    "toon":"%IPM.Test.ToonOutput",
+                    "xml":"%IPM.Test.JUnitOutput",
+                    :"")
+                if outputClass = "" {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported output-file extension '."_fileExtension_"'. Use .json, .yaml, .toon, or .xml."))
                 }
-                set tJUnitFile = $piece(tJUnitFile,".",1,*-1)_tPostfix_".xml"
-                set tSC = ##class(%IPM.Test.JUnitOutput).ToFile(tJUnitFile)
+                set outputDir = ##class(%File).GetDirectory(outputFile)
+                if outputDir '= "" {
+                    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
+                }
+                set tSC = $classmethod(outputClass,"ToFile",outputFile)
                 $$$ThrowOnError(tSC)
             }
+            set suppressor = ""
 
-            // By default, detect and report unit test failures as an error from this phase
+            set outputFormat = $get(pParams("outputformat"))
+            if outputFormat = "" {
+                set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+            }
+
+            write !!,"Test Results:"
+            if outputFormat '= "" {
+                set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
+                if '$$$defClassDefined(outputClass) {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
+                }
+                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose,1)
+                $$$ThrowOnError(tSC)
+            } else {
+                set tSC = ##class(%IPM.Test.Abstract).OutputToDevice(testIndex,tVerbose,0)
+                $$$ThrowOnError(tSC)
+            }
+            write !
+            // Detect and report unit test failures as an error from this phase.
+            // OutputFailures shows legacy red FAILED lines only when no format is active.
             if $get(pParams("UnitTest","FailuresAreFatal"),1) {
-                do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+                if outputFormat = "" {
+                    do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+                }
                 set tSC = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
                 $$$ThrowOnError(tSC)
             }
@@ -239,9 +287,15 @@ Method OnResolveChildren(ByRef pResourceArray) As %Status
         set tResourceInfo("Processor") = $this
         set tResourceInfo("UnitTest") = 1
         set tResource = $case(..Package '= "", 1: ..Package, : ..Class)_..Extension
-        $$$ThrowOnError(##class(%IPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.pResourceArray))
-        $$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.pResourceArray))
-        merge pResourceArray = tResourceInfo
+        // GetChildren has Output semantics — it kills its output array before populating it.
+        // Use tClassArray as the intermediate to avoid killing any existing entries in pResourceArray.
+        kill tClassArray
+        $$$ThrowOnError(##class(%IPM.Storage.ResourceReference).GetChildren(tResource,tModuleName,1,.tResourceInfo,.tClassArray))
+        $$$ThrowOnError(..EmbeddedProcessor.OnResolveChildren(.tClassArray))
+        merge pResourceArray = tClassArray
+        // pResourceArray("Scope") is read by GetResolvedReferences for the HasScope check.
+        // tResourceInfo("Scope") above stamps each child class node — different consumers.
+        set pResourceArray("Scope") = ..Phase
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -290,6 +344,12 @@ Method OnExportItem(
 	ByRef pParams,
 	Output pItemHandled As %Boolean = 0) As %Status
 {
+    // Path resources (Name="/tests/...") are handled by directory-copy in ExportSingleModule,
+    // not by ExportUDL. Returning here with pItemHandled=0 lets ExportSingleModule fall through
+    // to that branch. Delegating to EmbeddedProcessor would attempt ExportUDL("/tests/"), which fails.
+    if ($extract(pItemName) = "/") {
+        quit $$$OK
+    }
     quit ..EmbeddedProcessor.OnExportItem(pFullExportPath, pItemName, .pItemParams, .pParams, .pItemHandled)
 }
 

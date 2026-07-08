@@ -10,9 +10,9 @@ Parameter NAMESPACE As STRING = "http://www.intersystems.com/PackageManager";
 Property Name As %String(MAXLEN = 255) [ Required ];
 
 /// Does not need code generation for comparison because <property>VersionString</property> comparison is good enough
-Property Version As %IPM.General.SemanticVersionExpression(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ Required ];
+Property Version As %IPM.General.SemanticVersionExpression(ForceCodeGenerate = 0, XMLPROJECTION = "NONE");
 
-Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version") [ Required ];
+Property VersionString As %String(MAXLEN = 100, XMLNAME = "Version") [ InitialExpression = "*" ];
 
 /// Restrict the scope in which this reference is relevant. Default is "all scopes"
 Property Scope As %String(VALUELIST = ",test,verify", XMLPROJECTION = "ATTRIBUTE");
@@ -21,6 +21,7 @@ Property DisplayName As %String(MAXLEN = 255) [ Internal ];
 
 Method VersionStringSet(tValue) As %Status
 {
+    set tValue = $select(tValue = "": "*", 1: tValue)
     set i%VersionString = tValue
     set tSC = ##class(%IPM.General.SemanticVersionExpression).FromString(tValue,.tExpression)
     if $$$ISOK(tSC) {

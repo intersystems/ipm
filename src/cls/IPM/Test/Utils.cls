@@ -211,7 +211,9 @@ ClassMethod CloseConnectionsForNamespace(pNamespace As %String) As %Status
         }
         while tProcs.%Next(.tStatus) {
             set tProc = ##class(SYS.Process).%OpenId(tProcs.%Get("PID"))
-            set tStatus = $$$ADDSC(tStatus,tProc.Terminate())
+            if $isobject(tProc) {
+                set tStatus = $$$ADDSC(tStatus,tProc.Terminate())
+            }
         }
     } catch e {
         set tStatus = e.AsStatus()

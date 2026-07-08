@@ -10,18 +10,10 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
         set repo = pModule.Name
         set tag = $$$Semver2Tag(pModule.VersionString)
 
-        #; Use a temp directory
-        set tDir = $$$FileTempDir
-        if tDir = ("-" _ -tDir) { // $zu(140,17) can return a negative number if it fails
-            throw ##class(%Exception.General).%New("Failed to create temporary directory. Error code: " _ -tDir)
-        }
-        set tempDirectory = ##class(%File).NormalizeDirectory(tDir _ "/" _ repo _ "/" _ tag _ "/")
+        set tempDirectory = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory() _ repo _ "/" _ tag _ "/")
 
         #; Create temp directory
-        set tCreated = ##class(%File).CreateDirectoryChain(tempDirectory,.tReturnValue)
-        if 'tCreated {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Error creating directory %1: %2", tempDirectory, tReturnValue)))
-        }
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tempDirectory))
 
         #; Create tgz file in temp directory
         set tFileBinStream = ##class(%Stream.FileBinary).%New()

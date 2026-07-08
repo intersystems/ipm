@@ -1,0 +1,2 @@
+ROUTINE Test.PkgCase.MyRoutine
+ write !, "Hello from Test.PkgCase.MyRoutine"

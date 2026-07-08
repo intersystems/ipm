@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="loop-b.ZPM">
+        <Module>
+            <Name>loop-b</Name>
+            <Version>1.0.0+snapshot</Version>
+            <Dependencies>
+                <ModuleReference>
+                    <Name>loop-c</Name>
+                    <Version>1.0.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

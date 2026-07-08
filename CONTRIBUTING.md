@@ -63,6 +63,8 @@ This will spin up 3 (or 4, if you're working on v0.10.x) containers, which are:
 - `ipm-sandbox-1`, a container with a vanilla IRIS instance, where the management portal (52773) is published to the host OS at 52776. On the Docker network, this container has the hostname `sandbox`.
 - `ipm-oras-1`, a container WITHOUT any IRIS instance. This container is based on [zot](https://github.com/project-zot/zot) and provides an OCI image registry, with port 5000 published to the host OS at 5001. On the Docker network, this container has the hostname `oras`.
 
+The **registry** container runs [zpm-registry](https://github.com/intersystems-community/zpm-registry), the InterSystems community-maintained package registry — this is the same software that powers [pm.community.intersystems.com](https://pm.community.intersystems.com). The **oras** container runs [zot](https://github.com/project-zot/zot), a lightweight open-source OCI registry. OCI registries are the industry-standard type used by tools like Artifactory; zot is included here for easy local testing.
+
 #### Important Notes
 - In both `ipm-iris-1` and `ipm-sandbox-1`, the IPM repo itself is mounted at `/home/irisowner/zpm/`.
 - Sometimes `ipm-registry-1` doesn't install zpm-registry properly; you may need to perform the following steps to manually make it work:
@@ -70,19 +72,34 @@ This will spin up 3 (or 4, if you're working on v0.10.x) containers, which are:
   - Inside the container, run `iris session iris` to access the IRIS instance.
   - Inside the IRIS instance, run `zn "REGISTRY"` and `zpm "install zpm-registry"` to install and configure the registry. When this finishes successfully, the registry will be up and running, accessible to other containers at `http://registry:52773/registry`.
 - If any of the ports 52774, 52775, 52776, or 5001 are in use, you may need to modify the port forwarding configuration in `docker-compose.yml`.
+- **Windows only:** If you see an error like `ports are not available: exposing port TCP 0.0.0.0:52775 ... An attempt was made to access a socket in a way forbidden by its access permissions`, this may be a WinNat conflict. In a terminal running as administrator, run:
+  ```
+  net stop winnat
+  docker-compose up -d
+  net start winnat
+  ```
 - If you are on an ARM chip (e.g., M-series Macs), you may need to change the `oras` section in `docker-compose.yml` to use `ghcr.io/project-zot/zot-linux-arm64:latest` instead of `ghcr.io/project-zot/zot-linux-amd64:latest`.
-- The VS Code workspace settings in `.vscode/settings.json` automatically connect to the IRIS instance on 52774. If you didn't change the port mapping in `docker-compose.yml`, when you save and compile changes in VS Code, it should automatically update the `%IPM.*` code in the `USER` namespace of the `ipm-iris-1` container.
-
 #### Development
-Make any necessary changes, compile them (which should be handled by VS Code on save), and test in the `ipm-iris-1` container by running:
+The VS Code workspace settings in `.vscode/settings.json` automatically connect to the IRIS instance on 52774. With the "Compile on Save" VS Code option enabled, saving any IPM source file will automatically compile it into the running `ipm-iris-1` container.
+
+To get a shell inside the container:
 ```bash
-docker exec -it ipm-iris-1 /bin/bash
-$ iris session iris
+docker exec -it ipm-iris-1 bash
 ```
-OR as a single line:
-```bash
-docker exec -it ipm-iris-1 /bin/bash -c "iris session iris"
+From there, run `iris session iris` to open the IRIS shell, then `zpm` to enter the IPM shell.
+
+To point the IPM instance at the **registry** container (zpm-registry):
 ```
+repo -r -name local -url http://registry:52773/registry -username admin -password SYS
+```
+
+To point the IPM instance at the **oras** container (OCI registry):
+```
+repo -o -name zot -url http://oras:5000/
+```
+
+You can browse the contents of the zot registry at [http://localhost:5001/home](http://localhost:5001/home) in your browser.
+
 If you need to shut down all the containers (either to switch to another branch or to revert back to a clean state) involved in the `docker-compose.yml`, run the following command in the project folder:
 ```bash
 docker compose down --remove-orphans --volumes
@@ -92,7 +109,7 @@ From time to time, you may also want to remove unused Docker data to save disk s
 docker system prune -a
 ```
 
-#### Convenience Scripts: `ipm` and `iriscli`
+#### Convenience Scripts: `ipm` and `iriscli` (IPM 0.10.7+)
 
 The repo ships two bash scripts that wrap common IRIS interactions so you don't have to type `iris session iris` boilerplate every time. When IPM is installed on Unix/Linux, they are automatically copied to `~/.local/bin/` and `~/bin/` (if it exists), making them available on PATH in most environments including the dev containers.
 
