@@ -365,6 +365,13 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
                             }
                         }
                     }
+                    // Inject global log-file modifier into every command
+                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"",""log-file"",""value"") = 1")
+                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"",""log-file"",""required"") = 0")
+                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"",""log-file"",""deprecated"") = 0")
+                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"",""log-file"",""description"") = ""Write session output to this log file""")
+                    do %code.WriteLine(" Set pCommandStructure("_tName_",""modifiers"",""log-file"",""group"") = ""-""")
+                    do %code.WriteLine(" Set pCommandStructure("_tName_",""groups"",""-"",""modifiers"",$i(pCommandStructure("_tName_",""groups"",""-"",""modifiers""))) = ""log-file""")
                 }
             }
             do %code.WriteLine(" Set pCommandStructure(-1, ""maxLength"") = "_tMaxLengthCommand)

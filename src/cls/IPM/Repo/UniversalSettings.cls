@@ -50,7 +50,11 @@ Parameter TestReportFormat = "TestReportFormat";
 
 Parameter ModuleRoot = "ModuleRoot";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot";
+Parameter LogDirectory = "LogDirectory";
+
+Parameter AutoLog = "AutoLog";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot,LogDirectory,AutoLog";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -97,6 +101,12 @@ ClassMethod ResetToDefault(key As %String) As %Status
     } elseif key = ..#ModuleRoot {
         // Computed directly rather than read from storage — older IPM versions did not seed this default node
         set defaultValue = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
+    } elseif key = ..#LogDirectory {
+        // Computed directly rather than read from storage — older IPM versions did not seed this default node
+        set defaultValue = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/logs/")
+    } elseif key = ..#AutoLog {
+        // No factory default; empty string means AutoLog is disabled
+        set defaultValue = ""
     } else {
         set defaultValue = ..GetDefaultValue($parameter(..%ClassName(1),key))
     }
@@ -130,6 +140,16 @@ ClassMethod UpdateOne(
                 }
                 set value = ##class(%File).NormalizeDirectory(value)
                 do ..EnsureWritableDirectory(value)
+            } elseif key = ..#LogDirectory {
+                if value = "" {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError, "LogDirectory cannot be empty"))
+                }
+                set value = ##class(%File).NormalizeDirectory(value)
+                do ..EnsureWritableDirectory(value)
+            } elseif key = ..#AutoLog {
+                if '$listfind($lb("","0","1"), value) {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError, "AutoLog must be 0 or 1"))
+                }
             }
             set sc = ..SetValue($parameter(..%ClassName(1),key), value)
         }
@@ -249,6 +269,22 @@ ClassMethod GetModuleRoot() As %String
         return ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
     }
     return value
+}
+
+/// Returns the configured LogDirectory. Falls back to an ipm/logs/ subdirectory under the IRIS data directory if not set.
+ClassMethod GetLogDirectory() As %String
+{
+    set value = ..GetValue(..#LogDirectory)
+    if value = "" {
+        return ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/logs/")
+    }
+    return value
+}
+
+/// Returns the AutoLog setting. Returns 1 if enabled, 0 otherwise.
+ClassMethod GetAutoLog() As %Boolean
+{
+    return +..GetValue(..#AutoLog)
 }
 
 /// Expects a normalized directory path (caller must call NormalizeDirectory first).

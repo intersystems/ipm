@@ -110,7 +110,7 @@ Method DoMerge(ByRef pParams) As %Status
             $$$ThrowOnError(outputStream.OutputToDevice())
         }
 
-        do ..MergeCPF(tempFile)
+        do ..MergeCPF(tempFile, verbose)
     } catch ex {
         set sc = ex.AsStatus()
     }
@@ -118,19 +118,39 @@ Method DoMerge(ByRef pParams) As %Status
     return sc
 }
 
-ClassMethod MergeCPF(file As %String)
+ClassMethod MergeCPF(
+	file As %String,
+	verbose As %Boolean = 0)
 {
     // TODO The $zf(-100) callout is much slower than ##class(Config.CPF).Merge()
     //      Figure out why ##class(Config.CPF).Merge() doesn't work
     //      c.f. https://github.com/intersystems/ipm/pull/703#discussion_r1917290136
 
+    // Capture merge output to a log file under LogDirectory; $zf(-100) child
+    // process output bypasses IRIS device redirection so we must bind it here.
+    set logDir = ##class(%IPM.Repo.UniversalSettings).GetLogDirectory()
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(logDir))
+    set h = $horolog
+    set logTs = $zdate(h,3) _ "-" _ $translate($ztime($piece(h,",",2)),":")
+    set logPath = logDir _ "cpf-merge-" _ logTs _ "-" _ $job _ ".log"
+
     set args($increment(args)) = "merge"
     set args($increment(args)) = ##class(%SYS.System).GetInstanceName()
     set args($increment(args)) = file
 
-    // Somehow, if the STDOUT is not set, the merge will silently fail
-    set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
+    // Bind STDOUT and STDERR to logPath so merge output is captured
+    set flags = "/SHELL/LOGCMD/STDOUT="""_logPath_"""/STDERR="""_logPath_""""
     set status = $zf(-100, flags, "iris", .args)
+
+    write !, "CPF merge log: ", logPath, !
+    if verbose && ##class(%File).Exists(logPath) {
+        set logStream = ##class(%Stream.FileCharacter).%New()
+        do logStream.LinkToFile(logPath)
+        while 'logStream.AtEnd {
+            write logStream.ReadLine(), !
+        }
+    }
+
     if status '= 0 {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Error merging CPF file. $zf(-100) exited with "_status))
     }

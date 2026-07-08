@@ -1014,6 +1014,25 @@ ClassMethod ShellInternal(
     }
     set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
     set tInShell = 0
+
+    // Start AutoLog session if configured and no log already active
+    if '##class(%IPM.General.OutputLog).IsActive() && ##class(%IPM.Repo.UniversalSettings).GetAutoLog() {
+        set tAutoLogDir = ##class(%IPM.Repo.UniversalSettings).GetLogDirectory()
+        set h = $horolog
+        set tAutoLogTs = $zdate(h,3) _ "-" _ $translate($ztime($piece(h,",",2)),":")
+        set tAutoLogStem = "ipm-" _ tAutoLogTs _ "-" _ $job
+        set tAutoLogPath = tAutoLogDir _ tAutoLogStem _ ".log"
+        set tAutoLogSuffix = 0
+        while ##class(%File).Exists(tAutoLogPath) {
+            set tAutoLogSuffix = tAutoLogSuffix + 1
+            set tAutoLogPath = tAutoLogDir _ tAutoLogStem _ "-" _ tAutoLogSuffix _ ".log"
+        }
+        set tAutoLogSC = ##class(%IPM.General.OutputLog).Start(tAutoLogPath, 0)
+        if $$$ISERR(tAutoLogSC) {
+            write !,$$$FormattedLine($$$Yellow,"WARNING: AutoLog failed: "),$system.Status.GetOneStatusText(tAutoLogSC),!
+        }
+    }
+
     for {
         kill $$$DeprecationWarned
         try {
@@ -1049,7 +1068,23 @@ ClassMethod ShellInternal(
 			new $$$ZPMCommandToLog
 			set $$$ZPMCommandToLog = tCommand
 
+            // Handle -log-file modifier: start or redirect the session tee
+            set tLogFile = $get(tCommandInfo("modifiers","log-file"))
+            if tLogFile '= "" {
+                if ##class(%File).GetDirectory(tLogFile) = "" {
+                    set tLogFile = ##class(%IPM.Repo.UniversalSettings).GetLogDirectory() _ tLogFile
+                }
+                if tLogFile '= ##class(%IPM.General.OutputLog).GetActivePath() {
+                    do ##class(%IPM.General.OutputLog).Stop()
+                    $$$ThrowOnError(##class(%IPM.General.OutputLog).Start(tLogFile))
+                }
+            }
+            if ##class(%IPM.General.OutputLog).IsActive() {
+                do ##class(%IPM.General.OutputLog).WriteCommandHeader(tCommand, $namespace)
+            }
+
             if (tCommandInfo = "quit") {
+                do ##class(%IPM.General.OutputLog).Stop()
                 return
             } elseif (tCommandInfo = "help") {
                 do ..%Help(.tCommandInfo)
@@ -1117,6 +1152,7 @@ ClassMethod ShellInternal(
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
+                do ##class(%IPM.General.OutputLog).Stop()
                 return
             }
             do ..DisplayError(pException.AsStatus())
@@ -1125,6 +1161,7 @@ ClassMethod ShellInternal(
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
             write !,!,$$$FormattedLine($$$Yellow, "IPM has been uninstalled from this namespace. Exiting shell..."),!
+            do ##class(%IPM.General.OutputLog).Stop()
             return
         }
 
@@ -1134,6 +1171,7 @@ ClassMethod ShellInternal(
         }
         write !
     }
+    do ##class(%IPM.General.OutputLog).Stop()
 }
 
 /// Warn for deprecated parameters/modifiers
