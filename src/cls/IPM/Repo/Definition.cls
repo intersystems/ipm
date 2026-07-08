@@ -199,8 +199,24 @@ ClassMethod Configure(
             // Restore normal echo mode — must happen even on Ctrl+C or error
             open ioDevice:(:"")
             $$$ThrowOnError(readSC)
+        } elseif $data(pModifiers("password-env"), passwordEnvVar) {
+            set pwd = $system.Util.GetEnviron(passwordEnvVar)
+            if (pwd = "") {
+                set msg = "Environment variable '"_passwordEnvVar_"' (from -password-env) is not set or is empty."
+                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            }
+            set pModifiers("password") = pwd
         } elseif $data(pModifiers("password")) {
-            write !, $$$FormattedLine($$$Yellow, "WARNING: Using --password via the CLI is insecure. Use --password-stdin.")
+            write !, $$$FormattedLine($$$Yellow, "WARNING: Using --password via the CLI is insecure. Use --password-stdin or --password-env.")
+        }
+
+        if $data(pModifiers("token-env"), tokenEnvVar) {
+            set tkn = $system.Util.GetEnviron(tokenEnvVar)
+            if (tkn = "") {
+                set msg = "Environment variable '"_tokenEnvVar_"' (from -token-env) is not set or is empty."
+                $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            }
+            set pModifiers("token") = tkn
         }
 
         $$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))

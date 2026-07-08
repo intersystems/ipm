@@ -74,6 +74,14 @@ Method TestParser()
 	set tResults(tCommands,"modifiers","username")="user"
 	set tResults(tCommands,"modifiers","password")="pass"
 
+	set tCommands($increment(tCommands)) = "repo -r -n registry -url http://x/ -password-env MY_PW -token-env MY_TOK"
+	set tResults(tCommands)="repo"
+	set tResults(tCommands,"modifiers","name")="registry"
+	set tResults(tCommands,"modifiers","remote")=""
+	set tResults(tCommands,"modifiers","url")="http://x/"
+	set tResults(tCommands,"modifiers","password-env")="MY_PW"
+	set tResults(tCommands,"modifiers","token-env")="MY_TOK"
+
 	/*
 	Set tCommands($i(tCommands)) =
 	Set tResults(tCommands)=
@@ -219,6 +227,42 @@ Method TestRepository()
 	do ..RunCommand("repo -name TEST -delete")
 
 	do ..RunCommand("repo -r -name registry -reset-defaults")
+}
+
+Method TestRepositoryEnvVars()
+{
+	set os = ##class(%SYS.Python).Import("os")
+
+	// Test positive path: password-env with valid env var
+	do os.putenv("IPM_TEST_PW", "secret")
+	do ..AssertNoException("repo -r -n registry-pw-test -url http://127.0.0.1:9999/ -username u -password-env IPM_TEST_PW")
+
+	set repoDef = ##class(%IPM.Repo.Remote.Definition).ServerDefinitionKeyOpen("registry-pw-test")
+	do $$$AssertTrue($isobject(repoDef), "Repository registry-pw-test should exist")
+	do $$$AssertEquals(repoDef.Password, "secret", "Password should be set from env var")
+
+	// Cleanup
+	do ..RunCommand("repo -n registry-pw-test -delete")
+	do os.putenv("IPM_TEST_PW", "")
+
+	// Test negative path: password-env with unset env var
+	set sc = ..RunCommand("repo -r -n registry-pw-fail -url http://127.0.0.1:9999/ -username u -password-env IPM_TEST_PW")
+	do $$$AssertStatusNotOK(sc, "Command should fail when env var is not set")
+
+	// Cleanup failed repo attempt if it somehow got created
+	do ..RunCommand("repo -n registry-pw-fail -delete")
+
+	// Test token-env with valid env var
+	do os.putenv("IPM_TEST_TOK", "mytoken123")
+	do ..AssertNoException("repo -r -n registry-tok-test -url http://127.0.0.1:9999/ -token-env IPM_TEST_TOK")
+
+	set repoDef = ##class(%IPM.Repo.Remote.Definition).ServerDefinitionKeyOpen("registry-tok-test")
+	do $$$AssertTrue($isobject(repoDef), "Repository registry-tok-test should exist")
+	do $$$AssertEquals(repoDef.Token, "mytoken123", "Token should be set from env var")
+
+	// Cleanup
+	do ..RunCommand("repo -n registry-tok-test -delete")
+	do os.putenv("IPM_TEST_TOK", "")
 }
 
 Method TestModifiers()

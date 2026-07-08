@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.9] - Unreleased
+
+### Added
+- #1178: Add `-password-env` and `-token-env` modifiers to the `repo` command to read the password/token from a named environment variable (secure alternatives to `-password` and `token`).
+
 ## [0.10.8] - Unreleased
 
 ### Fixed
