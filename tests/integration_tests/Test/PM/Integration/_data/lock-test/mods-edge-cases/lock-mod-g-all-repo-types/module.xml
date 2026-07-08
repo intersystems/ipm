@@ -7,7 +7,7 @@
       <Resource Name="LockModG.PKG" />
       <Dependencies>
         <ModuleReference>
-          <Name>lock-mod-b</Name>
+          <Name>lock-mod-b-no-deps</Name>
           <Version>^1.0.0</Version>
         </ModuleReference>
         <ModuleReference>
