@@ -253,6 +253,7 @@ Method TestRepositoryEnvVars()
 	do ..RunCommand("repo -n registry-pw-fail -delete")
 
 	// Test negative path: password-env conflict with password
+	// Note: -password-stdin conflict is not tested here because it requires interactive terminal input
 	set sc = ..RunCommand("repo -r -n registry-pw-conflict -url http://127.0.0.1:9999/ -username u -password-env IPM_TEST_PW -password plaintext")
 	do $$$AssertStatusNotOK(sc, "Command should fail when both -password-env and -password are specified")
 	do ..RunCommand("repo -n registry-pw-conflict -delete")

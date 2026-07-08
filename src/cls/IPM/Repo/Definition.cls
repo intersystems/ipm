@@ -184,7 +184,9 @@ ClassMethod Configure(
             set tInstance.ReadOnly = 0
         }
 
-        set passwordFlagsSet = $data(pModifiers("password-stdin")) + $data(pModifiers("password-env")) + $data(pModifiers("password"))
+        set passwordFlagsSet = ($data(pModifiers("password-stdin"))'=0)
+            + ($data(pModifiers("password-env"))'=0)
+            + ($data(pModifiers("password"))'=0)
         if (passwordFlagsSet > 1) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Only one of -password, -password-stdin, or -password-env may be specified."))
         }
@@ -211,10 +213,11 @@ ClassMethod Configure(
             }
             set pModifiers("password") = pwd
         } elseif $data(pModifiers("password")) {
-            write !, $$$FormattedLine($$$Yellow, "WARNING: Using --password via the CLI is insecure. Use --password-stdin or --password-env.")
+            write !, $$$FormattedLine($$$Yellow, "WARNING: Using -password via the CLI is insecure. Use -password-stdin or -password-env.")
         }
 
-        if ($data(pModifiers("token-env")) && $data(pModifiers("token"))) {
+        set tokenFlagsSet = ($data(pModifiers("token-env"))'=0) + ($data(pModifiers("token"))'=0)
+        if (tokenFlagsSet > 1) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Only one of -token or -token-env may be specified."))
         }
         if $data(pModifiers("token-env"), tokenEnvVar) {
@@ -225,7 +228,7 @@ ClassMethod Configure(
             }
             set pModifiers("token") = tkn
         } elseif $data(pModifiers("token")) {
-            write !, $$$FormattedLine($$$Yellow, "WARNING: Using --token via the CLI is insecure. Use --token-env.")
+            write !, $$$FormattedLine($$$Yellow, "WARNING: Using -token via the CLI is insecure. Use -token-env.")
         }
 
         $$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
