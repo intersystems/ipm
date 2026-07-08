@@ -249,8 +249,13 @@ Method TestRepositoryEnvVars()
 	set sc = ..RunCommand("repo -r -n registry-pw-fail -url http://127.0.0.1:9999/ -username u -password-env IPM_TEST_PW")
 	do $$$AssertStatusNotOK(sc, "Command should fail when env var is not set")
 
-	// Cleanup failed repo attempt if it somehow got created
+	// Defensive cleanup in case the repo was somehow created before the failure
 	do ..RunCommand("repo -n registry-pw-fail -delete")
+
+	// Test negative path: password-env conflict with password
+	set sc = ..RunCommand("repo -r -n registry-pw-conflict -url http://127.0.0.1:9999/ -username u -password-env IPM_TEST_PW -password plaintext")
+	do $$$AssertStatusNotOK(sc, "Command should fail when both -password-env and -password are specified")
+	do ..RunCommand("repo -n registry-pw-conflict -delete")
 
 	// Test token-env with valid env var
 	do os.putenv("IPM_TEST_TOK", "mytoken123")
@@ -263,6 +268,16 @@ Method TestRepositoryEnvVars()
 	// Cleanup
 	do ..RunCommand("repo -n registry-tok-test -delete")
 	do os.putenv("IPM_TEST_TOK", "")
+
+	// Test negative path: token-env with unset env var
+	set sc = ..RunCommand("repo -r -n registry-tok-fail -url http://127.0.0.1:9999/ -token-env IPM_TEST_TOK")
+	do $$$AssertStatusNotOK(sc, "Command should fail when token env var is not set")
+	do ..RunCommand("repo -n registry-tok-fail -delete")
+
+	// Test negative path: token-env conflict with token
+	set sc = ..RunCommand("repo -r -n registry-tok-conflict -url http://127.0.0.1:9999/ -token-env IPM_TEST_TOK -token hardcoded")
+	do $$$AssertStatusNotOK(sc, "Command should fail when both -token-env and -token are specified")
+	do ..RunCommand("repo -n registry-tok-conflict -delete")
 }
 
 Method TestModifiers()

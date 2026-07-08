@@ -184,6 +184,10 @@ ClassMethod Configure(
             set tInstance.ReadOnly = 0
         }
 
+        set passwordFlagsSet = $data(pModifiers("password-stdin")) + $data(pModifiers("password-env")) + $data(pModifiers("password"))
+        if (passwordFlagsSet > 1) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Only one of -password, -password-stdin, or -password-env may be specified."))
+        }
         if $data(pModifiers("password-stdin")) {
             // prompt for password using secret input terminal mode
             set ioDevice = $io
@@ -210,6 +214,9 @@ ClassMethod Configure(
             write !, $$$FormattedLine($$$Yellow, "WARNING: Using --password via the CLI is insecure. Use --password-stdin or --password-env.")
         }
 
+        if ($data(pModifiers("token-env")) && $data(pModifiers("token"))) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Only one of -token or -token-env may be specified."))
+        }
         if $data(pModifiers("token-env"), tokenEnvVar) {
             set tkn = $system.Util.GetEnviron(tokenEnvVar)
             if (tkn = "") {
@@ -217,6 +224,8 @@ ClassMethod Configure(
                 $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
             set pModifiers("token") = tkn
+        } elseif $data(pModifiers("token")) {
+            write !, $$$FormattedLine($$$Yellow, "WARNING: Using --token via the CLI is insecure. Use --token-env.")
         }
 
         $$$ThrowOnError(..OnConfigure(tInstance,pInteractive,.pModifiers,.pData))
