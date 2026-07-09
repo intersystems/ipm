@@ -25,6 +25,8 @@ modules are.
 ## [0.10.7] - 2026-05-29
 
 ### Added
+- #1141: New `Production` resource processor that allows managing auto-start and auto-update of interoperability productions.
+- #1141: New `DecomposedProduction` resource processor for managing an interoperability production class constituted from PTD files.
 - #408: Modules can now list dependencies without specifying version; will be assumed to be "*"
 - #945: When loading from a tarball, the `load` command now unpacks into the configured module root (defaults to `$System.Util.DataDirectory()/ipm/`) under `<packagename>/<version>/` instead of a temporary directory, matching the behavior of the `install` command. Directory loads are unaffected and continue to load in-place.
 - #992: Implement automatic history purge logic
