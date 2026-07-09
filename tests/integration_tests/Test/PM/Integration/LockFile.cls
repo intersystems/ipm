@@ -39,6 +39,9 @@ Parameter ModuleI As String = "lock-mod-i-no-prior-lock-file";
 /// 2 dependencies: C & E, both with same transient dependency: A
 Parameter ModuleK As String = "lock-mod-k-common-transient";
 
+/// 1 dependency: H, but installs different versions based on if using lock file or not
+Parameter ModuleM As String = "lock-mod-m-multiple-dep-versions";
+
 /// Module with complex set of nested dependencies
 /// Dependencies D, E, & F
 ///     - D -> C -> A & B
@@ -187,8 +190,8 @@ Method Test06ModuleMultipleVersions()
         set moduleName = ..#ModuleH
 
         // First test with the latest version of the module
-        set latestVersion = "3.0.0"
-        set latestLockFileName = "lock-mod-h-multiple-versions-v3.json"
+        set latestVersion = "2.1.0"
+        set latestLockFileName = "lock-mod-h-multiple-versions-v210.json"
 
         // Do an initial install of the latest version of the module and create a lock file for it
         set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName)
@@ -218,7 +221,7 @@ Method Test06ModuleMultipleVersions()
 
 
         // Now test with an older version of the same module
-        set olderLockFileName =  "lock-mod-h-multiple-versions-v2.json"
+        set olderLockFileName =  "lock-mod-h-multiple-versions-v200.json"
         set olderVersion = "2.0.0"
 
         // Do an initial install of the module and create a lock file for it
@@ -303,7 +306,7 @@ Method Test09ComplexNestedDependencies()
 
 /// Installing from lock file by loading from a packaged tarball
 /// Uses Module K
-Method Test10InstallViaLoad()
+Method Test10LoadFromLockfile()
 {
     try {
         set moduleName = ..#ModuleK
@@ -326,7 +329,41 @@ Method Test10InstallViaLoad()
         set sc = ##class(%IPM.Main).Shell("load -from-lockfile " _ packagePath _ ".tgz")
         do $$$AssertStatusOK(sc, "Successfully loaded packaged module from its lock file")
     } catch e {
-        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test10InstallViaLoad.")
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test10LoadFromLockfile.")
+    }
+}
+
+/// Have a dependency of a module with two valid options in configured repositories.
+/// Regular install should pick the highest version but install from lock file picks exact version
+/// 
+/// Uses Module M
+Method Test11MultipleDependencyVersions()
+{
+    try {
+        set moduleName = ..#ModuleM
+
+        // First install without a lock file and confirm that the latest version of module H was chosen
+        set sc = ##class(%IPM.Main).Shell("install " _ moduleName)
+        do $$$AssertStatusOK(sc, "Successfully installed " _ moduleName _ " and dependencies using ""install""")
+        zpm "list-installed"
+
+        // Confirm module H v2.1.0 was installed
+        set modH = ##class(%IPM.Storage.Module).NameOpen(..#ModuleH)
+        do $$$AssertEquals(modH.VersionString, "2.1.0", "Version 2.1.0 of dependency module H was installed via ""install""")
+
+        // Uninstall prior to installing from a lock file
+        set sc = ##class(%IPM.Main).Shell("uninstall -r " _ moduleName)
+
+        // Now install using module M's lock file
+        set sc = ##class(%IPM.Main).Shell("install -from-lockfile " _ moduleName)
+        do $$$AssertStatusOK(sc, "Successfully installed " _ moduleName _ " and dependencies using its lock file")
+        zpm "list-installed"
+
+        // Confirm module H v2.0.0 was installed
+        set modH = ##class(%IPM.Storage.Module).NameOpen(..#ModuleH)
+        do $$$AssertEquals(modH.VersionString, "2.0.0", "Version 2.0.0 of dependency module H was installed using a lock file")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test11MultipleDependencyVersions.")
     }
 }
 
@@ -369,7 +406,7 @@ Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
 /// Comparison is done as a string so if the keys are in a different order the comparison will fail, even if data is equivalent
 /// This is intended as the keys being in a different order should alert us to further investigate
 /// Especially for the dependencies list where order is explicitly required (for zpm "ci" to install in correct order)
-///
+/// 
 /// Returns: 1 - if lock files have equivalent contents
 ///          0 - if lock files are different
 ClassMethod AreLockFilesEqual(

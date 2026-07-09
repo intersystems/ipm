@@ -3,7 +3,7 @@
     <Document name="lock-mod-h-multiple-versions.ZPM">
     <Module>
       <Name>lock-mod-h-multiple-versions</Name>
-      <Version>3.0.0</Version>
+      <Version>2.1.0</Version>
       <Resource Name="LockModH.PKG" />
       <Dependencies>
         <ModuleReference>

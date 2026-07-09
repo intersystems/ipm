@@ -1,6 +1,6 @@
 {
     "name": "lock-mod-h-multiple-versions",
-    "version": "3.0.0",
+    "version": "2.1.0",
     "repository": "lock-file-edge",
     "lockFileVersion": "1",
     "repositories": {

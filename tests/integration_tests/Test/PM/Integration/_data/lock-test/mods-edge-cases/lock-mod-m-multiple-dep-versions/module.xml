@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+    <Document name="lock-mod-m-multiple-dep-versions.ZPM">
+    <Module>
+      <Name>lock-mod-m-multiple-dep-versions</Name>
+      <Version>1.0.0</Version>
+      <Resource Name="LockModM.PKG" />
+      <Dependencies>
+        <ModuleReference>
+          <Name>lock-mod-h-multiple-versions</Name>
+          <Version>^2.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>
