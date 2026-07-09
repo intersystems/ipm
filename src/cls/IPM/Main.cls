@@ -810,7 +810,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
     <example description="Display the current history retention setting.">config get HistoryRetain</example>
 </command>
 
-<command name="locate-resource">
+<command name="locate-resource" aliases="locate">
     <description>Find the module that owns a specific resource.</description>
     <parameter name="resource" required="true" description="resource: The full name of the resource (e.g., My.Class.cls, Utils.inc)." />
     <example description="Finds the module containing the specified class.">locate-resource %IPM.Main.cls</example>

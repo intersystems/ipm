@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1178: Add `-password-env` and `-token-env` modifiers to the `repo` command to read the password/token from a named environment variable (secure alternatives to `-password` and `-token`).
+- #1081: Implement locate-resource command for resource-to-module mapping
 
 ## [0.10.8] - 2026-07-08
 
@@ -66,7 +67,6 @@ modules are.
 
 ### Added
 - #1024: Added flag -export-python-deps to publish command
-- #1081: implement locate command for resource-to-module mapping
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
