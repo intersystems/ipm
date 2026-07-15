@@ -799,12 +799,9 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             $$$ThrowOnError(..SyncCompile(module, verbose, .params))
         }
 
-        // Step 8: Run changed test-phase tests if -test flag is set
-        if runTests {
-            $$$ThrowOnError(..SyncRunTests(orderedResourceList, verbose, .params))
-        }
-
-        // Step 9: Commit new hashes on success (skipped on error so next sync re-detects)
+        // Step 8: Commit new hashes on success (skipped on error so next sync re-detects).
+        // Done before running tests below so a test failure doesn't prevent the file-sync
+        // outcome from being committed and reported — file sync and test results are independent.
         $$$ThrowOnError(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, processDeletes))
         if moduleXmlChanged {
             do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
@@ -838,6 +835,11 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             do ..SyncPrintModuleXmlWarning()
         }
         do ..SyncPrintUnsupportedWarnings(.unsupportedWarnings)
+
+        // Step 9: Run changed test-phase tests if -test flag is set (after sync is reported)
+        if runTests {
+            $$$ThrowOnError(..SyncRunTests(orderedResourceList, verbose, .params))
+        }
 
     } catch e {
         set sc = e.AsStatus()
