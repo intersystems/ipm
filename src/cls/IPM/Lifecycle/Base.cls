@@ -732,7 +732,6 @@ Method %Reload(ByRef pParams) As %Status
 Method GetTrackedPaths(Output trackedPaths)
 {
     kill trackedPaths
-    set root = ##class(%File).NormalizeDirectory(..Module.Root)
 
     // Include module.xml
     set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath("module.xml")) = ""
@@ -1249,14 +1248,16 @@ Method %Compile(ByRef pParams) As %Status
             }
         }
 
-        // Stamp file baselines for sync change detection (dev mode only, non-fatal).
+        // Stamp file baselines for sync change detection (dev mode only).
+        // Non-fatal: stamping failure must not break a normal compile cycle.
         // Done here after compile so test classes are in ^oddDEF and appear in trackedPaths.
         if tDevMode {
             try {
                 set trackedPaths = ""
                 do ..GetTrackedPaths(.trackedPaths)
                 do ##class(%IPM.Storage.FileHash).StampModule(..Module, .trackedPaths)
-            } catch {
+            } catch stampEx {
+                write !, "Warning: sync baseline stamping failed: ", $system.Status.GetOneErrorText(stampEx.AsStatus())
             }
         }
     } catch e {

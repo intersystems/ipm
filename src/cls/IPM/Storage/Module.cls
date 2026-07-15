@@ -766,6 +766,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         kill modified(moduleXmlRelPath)
         kill deleted(moduleXmlRelPath)
 
+        // Falls through when only deletes exist and processDeletes=1
         if '$data(modified) && ('$data(deleted) || 'processDeletes) {
             write !, "[", moduleName, "] Nothing to sync."
             if moduleXmlChanged {
@@ -788,12 +789,12 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         $$$ThrowOnError(..SyncDispatchProcessors(module, root, verbose, .syncByResource, .params, .loadItems))
 
         // Step 6: Compile the full resource set with u-flag to pick up dependent recompiles
-        if loadItems > 0 || processDeletes {
+        if loadItems > 0 {
             $$$ThrowOnError(..SyncCompile(module, verbose, .params))
         }
 
         // Step 7: Delete server-side documents for removed files, then recompile
-        if processDeletes {
+        if processDeletes && ($data(deleted) > 1) {
             do ..SyncApplyDeletes(.deleted, .reverseIndex, .syncByResource, verbose)
             $$$ThrowOnError(..SyncCompile(module, verbose, .params))
         }
@@ -927,9 +928,23 @@ ClassMethod SyncRouteChanges(
     ByRef syncByResource,
     ByRef unsupportedWarnings)
 {
+    do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource, .unsupportedWarnings)
+    if processDeletes {
+        do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource, .unsupportedWarnings)
+    }
+}
+
+/// Route a set of changed paths to their owning resources, categorized by type (modified/deleted).
+ClassMethod SyncRoutePathSet(
+    ByRef paths,
+    ByRef reverseIndex,
+    category As %String,
+    ByRef syncByResource,
+    ByRef unsupportedWarnings) [ Private ]
+{
     set relPath = ""
     for {
-        set relPath = $order(modified(relPath))
+        set relPath = $order(paths(relPath))
         quit:relPath=""
 
         if '$data(reverseIndex(relPath)) {
@@ -940,29 +955,7 @@ ClassMethod SyncRouteChanges(
         if 'processor.SupportsSync() {
             set unsupportedWarnings(resName, relPath) = ""
         } else {
-            set syncByResource(resName, "modified", relPath) = ""
-            set syncByResource(resName, "Processor") = processor
-            set syncByResource(resName, "Resource") = reverseIndex(relPath, "Resource")
-        }
-    }
-
-    if 'processDeletes {
-        quit
-    }
-    set relPath = ""
-    for {
-        set relPath = $order(deleted(relPath))
-        quit:relPath=""
-
-        if '$data(reverseIndex(relPath)) {
-            continue
-        }
-        set resName = reverseIndex(relPath)
-        set processor = reverseIndex(relPath, "Processor")
-        if 'processor.SupportsSync() {
-            set unsupportedWarnings(resName, relPath) = ""
-        } else {
-            set syncByResource(resName, "deleted", relPath) = ""
+            set syncByResource(resName, category, relPath) = ""
             set syncByResource(resName, "Processor") = processor
             set syncByResource(resName, "Resource") = reverseIndex(relPath, "Resource")
         }
@@ -1063,9 +1056,8 @@ ClassMethod SyncRunTests(
     try {
         set className = ""
         for {
-            set className = $order(params("Sync", "ChangedTestCases", className))
+            set className = $order(params("Sync", "ChangedTestCases", className), 1, owningResource)
             quit:className=""
-
 
             set testKey = ""
             for {
@@ -1076,6 +1068,9 @@ ClassMethod SyncRunTests(
                     continue
                 }
                 if 'testResource.Processor.%IsA("%IPM.ResourceProcessor.Test") {
+                    continue
+                }
+                if testResource.Name '= owningResource {
                     continue
                 }
                 if '$listfind(testResource.Processor.Phase, "test") {
@@ -1202,12 +1197,14 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
         // Convert path like src/cls/My/Package/Class.cls -> My.Package.Class.cls
         set parts = $length(relPath, "/")
         set className = ""
-        // Skip common source prefixes to get class package path
+        // Skip leading source prefixes (e.g. "src/cls/") to get class package path
         set startPiece = 1
         for i = 1:1:parts-1 {
             set piece = $piece(relPath, "/", i)
             if $listfind($listbuild("src", "cls"), $zconvert(piece, "L")) {
                 set startPiece = i + 1
+            } else {
+                quit
             }
         }
         for i = startPiece:1:parts-1 {

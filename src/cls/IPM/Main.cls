@@ -115,7 +115,6 @@ If no module is specified, syncs all modules in development mode.
 <modifier name="delete" dataAlias="ProcessDeletes" dataValue="1" description="Also process deleted files (remove server documents and recompile dependents)." />
 <modifier name="test" aliases="t" dataAlias="RunTests" dataValue="1" description="After sync, run test-phase unit tests that were added or modified." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output." />
-<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output." />
 </command>
 
 <command name="compile">

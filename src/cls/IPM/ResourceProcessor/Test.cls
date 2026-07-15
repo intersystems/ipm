@@ -404,7 +404,7 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
             if $zconvert($piece(fileName, ".", *), "U") = "CLS"
                 && $$$comClassDefined(className)
                 && $classmethod(className, "%Extends", "%UnitTest.TestCase") {
-                set params("Sync", "ChangedTestCases", className) = ""
+                set params("Sync", "ChangedTestCases", className) = ..ResourceReference.Name
             }
         }
     } catch e {
