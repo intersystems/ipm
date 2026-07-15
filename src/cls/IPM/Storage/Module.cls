@@ -922,6 +922,24 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIn
             set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
             set reverseIndex(normalizedRelPath, "Resource") = resource
         }
+
+        // Sync-only enumeration for resources whose files aren't captured by ResolveChildren
+        // (e.g. FileCopy's directory-scanned source). Does not affect packaging/export.
+        kill syncOnlyPaths
+        set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
+        if $$$ISERR(childSC) {
+            continue
+        }
+        set relPath = ""
+        for {
+            set relPath = $order(syncOnlyPaths(relPath))
+            quit:relPath=""
+
+            set normalizedRelPath = ##class(%IPM.Storage.FileHash).NormalizePath(relPath)
+            set reverseIndex(normalizedRelPath) = resource.Name
+            set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
+            set reverseIndex(normalizedRelPath, "Resource") = resource
+        }
     }
 }
 

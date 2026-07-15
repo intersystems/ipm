@@ -218,6 +218,18 @@ Method SupportsSync() As %Boolean
     quit 0
 }
 
+/// Called by sync's tracked-path scan (only) to discover files owned by this resource that
+/// aren't captured by OnResolveChildren/OnItemRelativePath — e.g. a directory-scanned resource
+/// whose file set isn't declared as individual module.xml resources. Output relPaths(relPath)=""
+/// relative to the module root. Base returns nothing. Do NOT populate ResolveChildren's shared
+/// pResourceArray for this purpose — that array is also consumed by packaging/export
+/// (GetResolvedReferences/ExportSingleModule), which expects entries keyed by resource name with
+/// owning-module context, not by raw filesystem path.
+Method OnSyncResolveFiles(Output relPaths) As %Status
+{
+    quit $$$OK
+}
+
 /// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
 Method OnItemRelativePath(pItemName As %String) As %String
 {
