@@ -72,6 +72,49 @@ Method TestNoChangeIsNoOp()
     do $$$AssertTrue(..FindInOutput(.output, "Nothing to sync"), "Reports nothing to sync")
 }
 
+/// Simulates a module installed before this feature existed (zero FileHash baseline rows).
+/// The first sync call must self-heal by stamping a baseline rather than failing or reporting
+/// every tracked file as changed; only a second sync call (after a real edit) detects changes.
+Method TestMigrationFromNoBaseline()
+{
+    set deleteRS = ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM %IPM_Storage.FileHash WHERE ModuleName = ?", "sync-test")
+    do $$$AssertTrue(deleteRS.%SQLCODE >= 0, "Deleted existing baseline rows to simulate a pre-sync-feature module")
+    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "No baseline rows remain")
+
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    do ..ReplaceInFile(filePath, """original""", """modified""")
+
+    kill params
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "First sync after baseline loss succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Baseline established"), "First sync self-heals by establishing a baseline")
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "Baseline rows now exist")
+
+    // The edit made before the self-heal is captured in the new baseline (not retroactively
+    // detected), so a second sync with no further changes reports nothing to do.
+    kill params2, output2
+    set params2("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+    set sc2 = ##class(%IPM.Storage.Module).Sync("sync-test", .params2)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+    do $$$AssertStatusOK(sc2, "Second sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Second sync finds no changes (baseline already reflects the modified file)")
+
+    // A genuinely new edit after the baseline is established is detected normally.
+    do ..ReplaceInFile(filePath, """modified""", """modified again""")
+    kill params3, output3
+    set params3("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie3)
+    set sc3 = ##class(%IPM.Storage.Module).Sync("sync-test", .params3)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie3, .output3)
+    do $$$AssertStatusOK(sc3, "Third sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output3, "Sync complete"), "Third sync detects the post-baseline edit normally")
+}
+
 /// A modified class file is detected and recompiled by sync.
 Method TestModifiedClassRecompiles()
 {
@@ -143,6 +186,24 @@ Method TestDeleteSkippedByDefault()
     set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
     do $$$AssertStatusOK(sc, "Sync with -delete succeeds")
     do $$$AssertNotTrue($$$comClassDefined("SyncTest.Deletable"), "Deletable class removed after -delete sync")
+}
+
+/// Deleting a superclass (with -delete) leaves its subclass referencing a now-missing class.
+/// The post-delete recompile pass (SyncApplyDeletes + SyncCompile) must still run and surface
+/// this as a compile error, rather than silently leaving the subclass in a stale-but-compiled state.
+Method TestDeleteRecompilesDependents()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    do ##class(%Library.File).Delete(filePath)
+
+    do $$$AssertTrue($$$comClassDefined("SyncTest.SubClass"), "SubClass still compiled before delete sync")
+
+    kill params
+    set params("ProcessDeletes") = 1
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+
+    do $$$AssertStatusNotOK(sc, "Sync with -delete fails: SubClass now references a deleted superclass")
+    do $$$AssertNotTrue($$$comClassDefined("SyncTest.SuperClass"), "SuperClass was removed from the server")
 }
 
 /// A changed module.xml is detected and its manifest reloaded, with a warning that a full
