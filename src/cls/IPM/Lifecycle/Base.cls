@@ -770,14 +770,6 @@ Method GetTrackedPaths(Output trackedPaths)
             set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath(relPath)) = ""
         }
     }
-    set debugCount = 0
-    set debugKey = ""
-    for {
-        set debugKey = $order(trackedPaths(debugKey))
-        quit:debugKey=""
-        set debugCount = debugCount + 1
-    }
-    write !, "[DEBUG GetTrackedPaths] module=", ..Module.Name, " trackedCount=", debugCount
 }
 
 Method InstallOrDownloadPythonRequirements(
@@ -1263,15 +1255,8 @@ Method %Compile(ByRef pParams) As %Status
             try {
                 set trackedPaths = ""
                 do ..GetTrackedPaths(.trackedPaths)
-                write !, "[DEBUG %Compile] Stamping baselines for module: ", ..Module.Name
-                set stampSC = ##class(%IPM.Storage.FileHash).StampModule(..Module, .trackedPaths)
-                if $$$ISERR(stampSC) {
-                    write !, "[DEBUG %Compile] StampModule error: ", $system.Status.GetErrorText(stampSC)
-                } else {
-                    write !, "[DEBUG %Compile] StampModule OK"
-                }
-            } catch stampErr {
-                write !, "[DEBUG %Compile] StampModule exception: ", stampErr.DisplayString()
+                do ##class(%IPM.Storage.FileHash).StampModule(..Module, .trackedPaths)
+            } catch {
             }
         }
     } catch e {

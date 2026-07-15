@@ -767,9 +767,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         kill deleted(moduleXmlRelPath)
 
         if '$data(modified) && ('$data(deleted) || 'processDeletes) {
-            if verbose {
-                write !, "[", moduleName, "] Nothing to sync."
-            }
+            write !, "[", moduleName, "] Nothing to sync."
             if moduleXmlChanged {
                 do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
                 do ..SyncPrintModuleXmlWarning()
@@ -817,6 +815,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             set key = $order(modified(key))
             quit:key=""
             set modCount = modCount + 1
+            write !, "  Updated: ", key
         }
         set delCount = 0
         if processDeletes {
@@ -825,6 +824,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
                 set key = $order(deleted(key))
                 quit:key=""
                 set delCount = delCount + 1
+                write !, "  Deleted: ", key
             }
         }
         write !, "[", moduleName, "] Sync complete: ", modCount, " file(s) updated"

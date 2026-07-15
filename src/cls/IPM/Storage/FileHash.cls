@@ -36,24 +36,12 @@ ClassMethod StampModule(module As %IPM.Storage.Module, ByRef trackedPaths) As %S
     set sc = $$$OK
     try {
         set root = ##class(%File).NormalizeDirectory(module.Root)
-        write !, "[DEBUG StampModule] module=", module.Name, " root=", root
-        &sql(SELECT COUNT(*) INTO :debugCount FROM %IPM_Storage.FileHash WHERE ModuleName = :module.Name)
-        write !, "[DEBUG StampModule] existing rows=", debugCount, " SQLCODE=", SQLCODE
-        set debugCount = 0
-        set debugKey = ""
-        for {
-            set debugKey = $order(trackedPaths(debugKey))
-            quit:debugKey=""
-            set debugCount = debugCount + 1
-        }
-        write !, "[DEBUG StampModule] tracked path count=", debugCount
         set relPath = ""
         for {
             set relPath = $order(trackedPaths(relPath))
             quit:relPath=""
 
             set fullPath = ##class(%File).NormalizeFilename(relPath, root)
-            write !, "[DEBUG StampModule] relPath=", relPath, " fullPath=", fullPath, " exists=", ##class(%File).Exists(fullPath)
             if '##class(%File).Exists(fullPath) {
                 continue
             }
@@ -186,10 +174,7 @@ ClassMethod HasBaseline(moduleName As %String) As %Boolean
     set result = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT TOP 1 1 FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
         moduleName)
-    write !, "[DEBUG HasBaseline] moduleName=", moduleName, " SQLCODE=", result.%SQLCODE
-    set found = result.%Next()
-    write !, "[DEBUG HasBaseline] found=", found
-    quit found
+    quit result.%Next()
 }
 
 /// Normalize a relative path: forward slashes, collapse //, strip leading slash.
