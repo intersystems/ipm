@@ -43,6 +43,7 @@ Method OnAfterAllTests() As %Status
     quit $$$OK
 }
 
+/// Sync with no files changed on disk since the last load/sync reports nothing to do.
 Method TestNoChangeIsNoOp()
 {
     do $$$AssertTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "Baseline rows exist after load")
@@ -57,6 +58,7 @@ Method TestNoChangeIsNoOp()
     do $$$AssertTrue(..FindInOutput(.output, "Nothing to sync"), "Reports nothing to sync")
 }
 
+/// A modified class file is detected and recompiled by sync.
 Method TestModifiedClassRecompiles()
 {
     set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
@@ -72,6 +74,8 @@ Method TestModifiedClassRecompiles()
     do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Reports sync complete")
 }
 
+/// Editing a superclass recompiles its subclasses via the u-flag, even though the
+/// subclass's own file on disk never changed.
 Method TestSuperclassEditRecompilesSubclass()
 {
     // Add property to SuperClass — SubClass recompiles via u-flag
@@ -83,6 +87,8 @@ Method TestSuperclassEditRecompilesSubclass()
     do $$$AssertStatusOK(sc, "Sync after superclass edit succeeds (subclass recompiles via u-flag)")
 }
 
+/// A file outside every tracked resource (e.g. under node_modules/) is ignored by sync
+/// and never given a baseline row.
 Method TestUntrackedFileIgnored()
 {
     set junkDir = ..TempDir _ "node_modules/"
@@ -104,6 +110,8 @@ Method TestUntrackedFileIgnored()
     do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).ModulePathIndexExists("sync-test", "node_modules/x.js"), "No FileHash row for untracked file")
 }
 
+/// A deleted file is left alone unless -delete is passed. With -delete, the corresponding
+/// server-side class is removed.
 Method TestDeleteSkippedByDefault()
 {
     set filePath = ..TempDir _ "src/cls/SyncTest/Deletable.cls"
@@ -123,6 +131,8 @@ Method TestDeleteSkippedByDefault()
     do $$$AssertNotTrue($$$comClassDefined("SyncTest.Deletable"), "Deletable class removed after -delete sync")
 }
 
+/// A changed module.xml is detected and its manifest reloaded, with a warning that a full
+/// reload may still be needed to apply manifest-level changes (mappings, dependencies, etc.).
 Method TestModuleXmlChangedWarning()
 {
     set filePath = ..TempDir _ "module.xml"
@@ -138,6 +148,8 @@ Method TestModuleXmlChangedWarning()
     do $$$AssertTrue(..FindInOutput(.output, "module.xml changed"), "Warning about module.xml change is shown")
 }
 
+/// A changed file owned by a resource processor that doesn't support sync produces a
+/// warning directing the user to run a full reload.
 Method TestNonSyncProcessorWarning()
 {
     set filePath = ..TempDir _ "static/config.txt"
@@ -153,6 +165,8 @@ Method TestNonSyncProcessorWarning()
     do $$$AssertTrue(..FindInOutput(.output, "does not support sync"), "Warning about non-sync resource shown")
 }
 
+/// Without -test, a changed test-phase class is loaded but not executed. With -test, it is
+/// executed and its results are shown.
 Method TestSyncTestFlag()
 {
     set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
@@ -182,6 +196,136 @@ Method TestSyncTestFlag()
     do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial"), "Changed test class appears in output")
 }
 
+/// A change to a file owned by a processor that doesn't support sync is never applied, so
+/// its baseline must stay unchanged. The warning should reappear on every subsequent sync
+/// until the change is actually applied (e.g. via a full reload).
+Method TestUnsupportedProcessorChangeNotCommitted()
+{
+    set filePath = ..TempDir _ "static/config.txt"
+    do ..ReplaceInFile(filePath, "static file content", "modified static content")
+
+    kill params
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "Sync with non-sync processor file change succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "does not support sync"), "Warning about non-sync resource shown")
+
+    // Baseline must NOT reflect the on-disk change, since it was never applied.
+    // If it were committed, running sync again would report "Nothing to sync" and
+    // silently drop the warning even though config.txt server-side content is still stale.
+    kill params2
+    set params2("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+    set sc2 = ##class(%IPM.Storage.Module).Sync("sync-test", .params2)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+    do $$$AssertStatusOK(sc2, "Second sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output2, "does not support sync"), "Warning still shown on next sync (baseline was not falsely committed)")
+}
+
+/// A brand-new file added under a directory-scanned FileCopy resource is recognized as a
+/// change on the next sync. FileCopy resources are directory-scanned (OnResolveChildren
+/// queries the source directory live), so a new file here is discoverable without any
+/// module.xml change — unlike individually-declared <Resource> classes, which require a
+/// manifest entry regardless of sync (see TestModuleXmlAddsResourcePicksUpNewFile).
+Method TestNewFileInFileCopyResourceDetected()
+{
+    set filePath = ..TempDir _ "static/new-file.txt"
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(filePath))
+    $$$ThrowOnError(stream.Write("new static file"))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    kill params
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with a new FileCopy file succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "does not support sync"), "New file under a non-sync-supporting resource is recognized as a change (warned, not silently ignored)")
+}
+
+/// With two UnitTest resources present, a changed test class in one resource's directory
+/// must only be dispatched through that owning resource — not through every Test processor
+/// in the module (which would waste a reload+compile+RunTest cycle per extra resource).
+Method TestSyncTestFlagOnlyRunsOwningResource()
+{
+    set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ..ReplaceInFile(filePath, "This test always passes.", "This test always passes (modified).")
+
+    kill params
+    set params("RunTests") = 1
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with RunTests succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial"), "Changed test in tests/unit ran")
+    do $$$AssertNotTrue(..FindInOutput(.output, "SyncTest2.Tests.Trivial2"), "Unrelated test in tests/unit2 was not run")
+}
+
+/// Running sync with no module name syncs every module currently in development mode.
+Method TestSyncAllDevModeModules()
+{
+    kill params
+    set sc = ##class(%IPM.Main).Shell("sync")
+    do $$$AssertStatusOK(sc, "Sync with no module name (sync-all) succeeds")
+}
+
+/// Sync fails with an error when given a module name that isn't installed.
+Method TestSyncModuleNotFound()
+{
+    kill params
+    set sc = ##class(%IPM.Storage.Module).Sync("this-module-does-not-exist", .params)
+    do $$$AssertStatusNotOK(sc, "Sync fails for a module that doesn't exist")
+}
+
+/// Sync fails with an error when the target module is not in development mode.
+Method TestSyncNonDevModeModule()
+{
+    // Reload without -dev so the installed module is not in development mode.
+    // OnAfterOneTest unconditionally uninstalls and reloads -dev afterward, so no manual restore is needed here.
+    do ##class(%IPM.Main).Shell("uninstall sync-test")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ ..TempDir))
+
+    kill params
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do $$$AssertStatusNotOK(sc, "Sync fails for a module not in development mode")
+}
+
+/// module.xml adds a brand-new <Resource> in the same edit that changes the version.
+/// After SyncCheckModuleXml reloads the manifest, the newly-declared resource's files
+/// must be tracked and picked up in that same sync call (not require a separate 'reload').
+Method TestModuleXmlAddsResourcePicksUpNewFile()
+{
+    set clsFilePath = ..TempDir _ "src/cls/SyncTest/AddedByManifest.cls"
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(clsFilePath))
+    $$$ThrowOnError(stream.Write("Class SyncTest.AddedByManifest" _ $char(10) _ "{" _ $char(10) _ "}" _ $char(10)))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    set moduleXmlPath = ..TempDir _ "module.xml"
+    do ..ReplaceInFile(moduleXmlPath, "<Version>1.0.0</Version>", "<Version>1.0.1</Version>")
+    do ..ReplaceInFile(moduleXmlPath, "<Resource Name=""SyncTest.Consumer.CLS"" />", "<Resource Name=""SyncTest.Consumer.CLS"" />" _ $char(10) _ "      <Resource Name=""SyncTest.AddedByManifest.CLS"" />")
+
+    kill params
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after module.xml adds a resource succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "module.xml changed"), "Warning about module.xml change is shown")
+    do $$$AssertTrue($$$comClassDefined("SyncTest.AddedByManifest"), "Newly-declared resource's class was loaded and compiled in the same sync call")
+}
+
+/// A sync that fails to compile leaves its baseline uncommitted, so the same file is
+/// re-detected as changed and retried on the next sync once the error is fixed.
 Method TestFailedCompileRetries()
 {
     // Introduce a syntax error
