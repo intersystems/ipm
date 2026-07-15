@@ -185,8 +185,8 @@ Method DoCopy(
 }
 
 /// Enumerate source files so sync can detect changes to FileCopy resources.
-/// Populates pResourceArray with RelativePath for each file under the source directory.
-Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean) As %Status
+/// Populates relPaths(relPath)="" for each file under the source directory, relative to module root.
+Method OnSyncResolveFiles(Output relPaths) As %Status
 {
     set sc = $$$OK
     try {
@@ -210,8 +210,7 @@ Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean
             // Compute path relative to module root
             set relPath = $extract(fullPath, $length(moduleRoot) + 1, *)
             if relPath '= "" {
-                set pResourceArray(fullPath) = ""
-                set pResourceArray(fullPath, "RelativePath") = relPath
+                set relPaths(relPath) = ""
             }
         }
     } catch e {

@@ -768,6 +768,20 @@ Method GetTrackedPaths(Output trackedPaths)
 
             set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath(relPath)) = ""
         }
+
+        // Sync-only enumeration for resources whose files aren't captured by ResolveChildren
+        // (e.g. FileCopy's directory-scanned source). Does not affect packaging/export.
+        kill syncOnlyPaths
+        set sc = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
+        if $$$ISERR(sc) {
+            continue
+        }
+        set relPath = ""
+        for {
+            set relPath = $order(syncOnlyPaths(relPath))
+            quit:relPath=""
+            set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath(relPath)) = ""
+        }
     }
 }
 
