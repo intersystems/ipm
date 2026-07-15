@@ -3,13 +3,24 @@ Class Test.PM.Integration.Sync Extends %UnitTest.TestCase
 
 Property TempDir As %String;
 
+// Native-filesystem copy of the fixture, made once. _data/sync-test/ lives on the repo's
+// bind mount (slow for the many small-file copies OnAfterOneTest does between every test),
+// so each restore copies from here instead of re-reading the mount every time.
+Property PristineDir As %String;
+
 Method OnBeforeAllTests() As %Status
 {
     set sourceDir = ..GetModuleDir("sync-test")
 
+    set ..PristineDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-test-pristine-" _ $job)
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..PristineDir))
+    if '##class(%Library.File).CopyDir(sourceDir, ..PristineDir, 1) {
+        quit $$$ERROR($$$GeneralError, "Failed to copy sync-test fixture to pristine directory")
+    }
+
     set ..TempDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-test-" _ $job)
     $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..TempDir))
-    if '##class(%Library.File).CopyDir(sourceDir, ..TempDir, 1) {
+    if '##class(%Library.File).CopyDir(..PristineDir, ..TempDir, 1) {
         quit $$$ERROR($$$GeneralError, "Failed to copy sync-test fixture to temp directory")
     }
 
@@ -27,7 +38,7 @@ Method OnAfterOneTest(testName As %String) As %Status
     } catch {}
     do ##class(%Library.File).RemoveDirectoryTree(..TempDir)
     $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..TempDir))
-    if '##class(%Library.File).CopyDir(..GetModuleDir("sync-test"), ..TempDir, 1) {
+    if '##class(%Library.File).CopyDir(..PristineDir, ..TempDir, 1) {
         quit $$$ERROR($$$GeneralError, "Failed to restore sync-test fixture after test: " _ testName)
     }
     quit ##class(%IPM.Main).Shell("load " _ ..TempDir _ " -dev")
@@ -36,9 +47,12 @@ Method OnAfterOneTest(testName As %String) As %Status
 Method OnAfterAllTests() As %Status
 {
     // OnAfterOneTest already uninstalled and reloaded after the last test.
-    // This just removes the temp directory.
+    // This just removes the temp directories.
     if ..TempDir '= "" {
         do ##class(%Library.File).RemoveDirectoryTree(..TempDir)
+    }
+    if ..PristineDir '= "" {
+        do ##class(%Library.File).RemoveDirectoryTree(..PristineDir)
     }
     quit $$$OK
 }
