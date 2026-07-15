@@ -95,7 +95,9 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, ByRef trackedPaths, Ou
 
             set existing = ..ModulePathIndexOpen(module.Name, normalizedRelPath, , .openSC)
             if '$isobject(existing) {
-                // No baseline row — file was never stamped; skip (not a tracked change)
+                // No baseline row — file is newly tracked (added since the last sync/stamp).
+                // Report it as modified so it gets loaded; no prior hash to compare against.
+                set modified(normalizedRelPath) = ##class(%File).SHA1Hash(fullPath, 1)
                 continue
             }
 

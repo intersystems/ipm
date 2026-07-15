@@ -13,6 +13,7 @@
       <Resource Name="SyncTest.Consumer.CLS" />
       <Resource Name="SyncTest.INC" />
       <UnitTest Name="/tests/unit/" Package="SyncTest.Tests" Phase="test" />
+      <UnitTest Name="/tests/unit2/" Package="SyncTest2.Tests" Phase="test" />
       <FileCopy Name="/static/" Target="${mgrDir}/../sync-test-static/" />
     </Module>
   </Document>

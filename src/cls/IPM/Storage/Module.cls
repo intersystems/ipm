@@ -785,6 +785,11 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         kill syncByResource, unsupportedWarnings
         do ..SyncRouteChanges(.modified, .deleted, .reverseIndex, processDeletes, .syncByResource, .unsupportedWarnings)
 
+        // Changes routed to a processor that doesn't support sync were never applied.
+        // Drop them from modified/deleted so CommitChanges (Step 8) doesn't advance their
+        // baseline — otherwise the next sync would see "no change" despite the pending edit.
+        do ..SyncExcludeUnsupported(.unsupportedWarnings, .modified, .deleted)
+
         // Step 5: Dispatch OnSync to each processor; load unhandled compilable files
         $$$ThrowOnError(..SyncDispatchProcessors(module, root, verbose, .syncByResource, .params, .loadItems))
 
@@ -933,6 +938,28 @@ ClassMethod SyncRouteChanges(
     do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource, .unsupportedWarnings)
     if processDeletes {
         do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource, .unsupportedWarnings)
+    }
+}
+
+/// Remove paths routed to a non-sync-supporting processor from modified/deleted, since
+/// those changes were never applied and must not advance the FileHash baseline.
+ClassMethod SyncExcludeUnsupported(
+    ByRef unsupportedWarnings,
+    ByRef modified,
+    ByRef deleted)
+{
+    set resName = ""
+    for {
+        set resName = $order(unsupportedWarnings(resName))
+        quit:resName=""
+
+        set relPath = ""
+        for {
+            set relPath = $order(unsupportedWarnings(resName, relPath))
+            quit:relPath=""
+            kill modified(relPath)
+            kill deleted(relPath)
+        }
     }
 }
 
