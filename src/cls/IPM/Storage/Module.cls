@@ -729,6 +729,11 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         set processDeletes = $get(params("ProcessDeletes"), 0)
         set runTests = $get(params("RunTests"), 0)
 
+        // params may be reused across modules by Main.Sync's sync-all-dev-mode-modules loop.
+        // Clear this module's own scratch subtree so a prior module's recorded test-case
+        // changes can't leak into this module's SyncRunTests dispatch.
+        kill params("Sync")
+
         set module = ..NameOpen(moduleName, , .sc)
         if '$isobject(module) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' not found.", moduleName)))
@@ -771,7 +776,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             write !, "[", moduleName, "] Nothing to sync."
             if moduleXmlChanged {
                 do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
-                do ..SyncPrintModuleXmlWarning()
+                do ..SyncPrintModuleXmlWarning(moduleName)
             }
             quit
         }
@@ -837,9 +842,9 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         write "."
 
         if moduleXmlChanged {
-            do ..SyncPrintModuleXmlWarning()
+            do ..SyncPrintModuleXmlWarning(moduleName)
         }
-        do ..SyncPrintUnsupportedWarnings(.unsupportedWarnings)
+        do ..SyncPrintUnsupportedWarnings(moduleName, .unsupportedWarnings)
 
         // Step 9: Run changed test-phase tests if -test flag is set (after sync is reported)
         if runTests {
@@ -1149,15 +1154,15 @@ ClassMethod SyncCommitModuleXml(
     do ##class(%IPM.Storage.FileHash).CommitChanges(module, .moduleXmlMod, .emptyDel, 0)
 }
 
-ClassMethod SyncPrintModuleXmlWarning()
+ClassMethod SyncPrintModuleXmlWarning(moduleName As %String)
 {
     write !
     write !, "Warning: module.xml changed and was reloaded."
-    write !, "  Resources may have been added/removed. A full 'reload' may be needed"
-    write !, "  to fully apply manifest-level changes (mappings, dependencies, defaults)."
+    write !, "  Resources may have been added/removed. Run `reload ", moduleName, "` to fully apply"
+    write !, "  manifest-level changes (mappings, dependencies, defaults)."
 }
 
-ClassMethod SyncPrintUnsupportedWarnings(ByRef unsupportedWarnings)
+ClassMethod SyncPrintUnsupportedWarnings(moduleName As %String, ByRef unsupportedWarnings)
 {
     set warnRes = ""
     for {
@@ -1171,7 +1176,7 @@ ClassMethod SyncPrintUnsupportedWarnings(ByRef unsupportedWarnings)
             quit:warnPath=""
             write !, "  ", warnPath
         }
-        write !, "  Run a full 'reload' to apply these changes."
+        write !, "  Run `reload ", moduleName, "` to apply these changes."
     }
 }
 
