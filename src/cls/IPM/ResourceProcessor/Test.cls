@@ -364,6 +364,72 @@ Method SupportsSync() As %Boolean
     quit 1
 }
 
+/// Enumerate test files on disk so sync can detect brand-new test classes.
+/// ResolveChildren (via GetChildren's StudioOpenDialog query) only sees already-compiled
+/// classes, so a test file that was never compiled — e.g. one just added to the test
+/// directory — is otherwise invisible to GetTrackedPaths/ComputeChanges until something
+/// else compiles it first. This live directory scan closes that gap, mirroring FileCopy's
+/// OnSyncResolveFiles for the same reason.
+Method OnSyncResolveFiles(Output relPaths) As %Status
+{
+    set sc = $$$OK
+    try {
+        set unitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root _ ..ResourceReference.Name)
+        set moduleRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root)
+        if '##class(%File).DirectoryExists(unitTestDir) {
+            quit
+        }
+        $$$ThrowOnError(..WalkClsFilesRecursive(unitTestDir, moduleRoot, .relPaths))
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// Recursively collects .cls files under pDir into relPaths(relPath), relative to pModuleRoot.
+/// %Library.File_FileSet's own recursive flag only returns immediate children per call
+/// (confirmed experimentally — it does not descend through multiple directory levels in one
+/// call), so each subdirectory must be visited with its own call, same as %UnitTest.Manager's
+/// own GetSubDirectories does internally.
+ClassMethod WalkClsFilesRecursive(
+    pDir As %String,
+    pModuleRoot As %String,
+    ByRef relPaths) As %Status
+{
+    set sc = $$$OK
+    try {
+        set rs = ##class(%SQL.Statement).%ExecDirect(,
+            "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
+            pDir, "*.cls", "", 0)
+        if rs.%SQLCODE < 0 {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "FileSet query error: " _ rs.%Message))
+        }
+        while rs.%Next() {
+            continue:rs.%Get("Type")="D"
+            set fullPath = rs.%Get("Name")
+            set relPath = $extract(fullPath, $length(pModuleRoot) + 1, *)
+            if relPath '= "" {
+                set relPaths(relPath) = ""
+            }
+        }
+
+        set dirRs = ##class(%SQL.Statement).%ExecDirect(,
+            "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
+            pDir, "*", "", 0)
+        if dirRs.%SQLCODE < 0 {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "FileSet query error: " _ dirRs.%Message))
+        }
+        while dirRs.%Next() {
+            continue:dirRs.%Get("Type")'="D"
+            set subDir = ##class(%File).NormalizeDirectory(dirRs.%Get("Name"))
+            $$$ThrowOnError(..WalkClsFilesRecursive(subDir, pModuleRoot, .relPaths))
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
 Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output handled As %Boolean = 0) As %Status
 {
     set sc = $$$OK
@@ -404,12 +470,121 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
             if $zconvert($piece(fileName, ".", *), "U") = "CLS"
                 && $$$comClassDefined(className)
                 && $classmethod(className, "%Extends", "%UnitTest.TestCase") {
-                set params("Sync", "ChangedTestCases", className) = ..ResourceReference.Name
+                // dirPart (the class's real on-disk subdirectory, "/"-separated) travels with the
+                // resource name so SyncRunTests can build a batched, correctly-scoped RunTest
+                // testspec later without re-deriving the directory from the class name.
+                set params("Sync", "ChangedTestCases", className) = $listbuild(..ResourceReference.Name, dirPart)
             }
         }
     } catch e {
         set sc = e.AsStatus()
     }
+    quit sc
+}
+
+/// Called once per resource by SyncRunTests: runs every changed test-phase case belonging
+/// to this resource in a single RunTest invocation instead of one call per class.
+/// classInfo(className) = dirPart (path relative to this resource's test directory, "/"-separated).
+/// Assumes OnSync already loaded and compiled these classes earlier in the same sync() call,
+/// so no reload/recompile happens here — only testspec construction, RunTest, and reporting.
+Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
+{
+    set sc = $$$OK
+    try {
+        set verbose = $get(params("Verbose"), 0)
+        set unitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root _ ..ResourceReference.Name)
+
+        // Initialize test result accumulator for this phase if not already initialized (i.e., we're at top level, not nested)
+        // Mirrors OnPhase's accumulator so multiple resources synced in one -test run share one result set.
+        if '$data(^||%UnitTest.Manager.AllResultsCount) {
+            kill ^||%UnitTest.Manager.AllResults
+            set ^||%UnitTest.Manager.AllResultsCount = 0
+        }
+        set phaseStartIndex = $get(^||%UnitTest.Manager.AllResultsCount, 0)
+
+        // Build one testspec covering every changed class in this resource. Classes sharing
+        // a subdirectory must join with ";" within ONE "dir:Class1;Class2" entry — repeating
+        // the same dirPart across separate comma-joined entries is invalid grammar (RunTest
+        // treats each comma-separated entry as its own testsuite scope; a second entry naming
+        // the same dir errors instead of adding to the first). Distinct subdirectories become
+        // separate comma-joined entries so unrelated sibling test classes elsewhere in the
+        // resource are not swept in.
+        kill byDir
+        set className = ""
+        for {
+            set className = $order(classInfo(className), 1, dirPart)
+            quit:className=""
+            set byDir(dirPart, className) = ""
+        }
+        set testSpec = ""
+        set dirPart = ""
+        for {
+            set dirPart = $order(byDir(dirPart))
+            quit:dirPart=""
+            set classList = ""
+            set className = ""
+            for {
+                set className = $order(byDir(dirPart, className))
+                quit:className=""
+                set classList = classList _ $select(classList="":"", 1: ";") _ className
+            }
+            set testSpec = testSpec _ $select(testSpec="":"", 1: ",") _ dirPart _ ":" _ classList
+        }
+
+        set explicitQuiet = ($data(params("Verbose")) && (params("Verbose") = 0))
+        if explicitQuiet {
+            set suppressor = ##class(%IPM.Utils.OutputSuppressor).%New()
+        }
+
+        set flags = $select(verbose:"/display=all",1:"/display=none")_"/nodelete/norecursive"
+
+        if $data(^UnitTestRoot,oldUnitTestRoot) // Stash ^UnitTestRoot
+        set ^UnitTestRoot = unitTestDir
+        set managerClass = $get(params("UnitTest","ManagerClass"),..ManagerClass)
+        if (managerClass = "") {
+            set managerClass = "%IPM.Test.Manager"
+        }
+        merge userParams = params("UnitTest","UserParam")
+        set sc = $classmethod(managerClass,"RunTest",testSpec,flags,.userParams)
+        zkill ^UnitTestRoot
+        $$$ThrowOnError(sc)
+
+        set testIndex = $get(^||%UnitTest.Manager.AllResults($get(^||%UnitTest.Manager.AllResultsCount)))
+        if testIndex = "" {
+            set testIndex = $order(^UnitTest.Result(""),-1)
+        }
+        set suppressor = ""
+
+        set outputFormat = $get(params("outputformat"))
+        if outputFormat = "" {
+            set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+        }
+
+        write !!,"Test Results:"
+        if outputFormat '= "" {
+            set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
+            if '$$$defClassDefined(outputClass) {
+                $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
+            }
+            set sc = $classmethod(outputClass,"OutputToDevice",testIndex,verbose,1)
+            $$$ThrowOnError(sc)
+        } else {
+            set sc = ##class(%IPM.Test.Abstract).OutputToDevice(testIndex,verbose,0)
+            $$$ThrowOnError(sc)
+        }
+        write !
+        if $get(params("UnitTest","FailuresAreFatal"),1) {
+            if outputFormat = "" {
+                do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+            }
+            set sc = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
+            $$$ThrowOnError(sc)
+        }
+        write !
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    if $data(oldUnitTestRoot,^UnitTestRoot) // Restore ^UnitTestRoot
     quit sc
 }
 

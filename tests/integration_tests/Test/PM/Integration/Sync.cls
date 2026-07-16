@@ -268,7 +268,52 @@ Method TestSyncTestFlag()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
     do $$$AssertStatusOK(sc, "Sync with RunTests runs changed tests")
     do $$$AssertTrue(..FindInOutput(.output, "Test Results"), "Test results shown with RunTests flag")
-    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial"), "Changed test class appears in output")
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "Changed test class actually ran, not just compiled")
+}
+
+/// Editing an existing test class and adding a brand-new test class in the same resource,
+/// in the same sync call, batches both changed classes into a single RunTest invocation
+/// (one "Test Results:" block) rather than one call per class — and both tests still run.
+Method TestSyncTestFlagBatchesMultipleChangedClasses()
+{
+    set existingFilePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ..ReplaceInFile(existingFilePath, "This test always passes.", "This test always passes (modified).")
+
+    set newFilePath = ..TempDir _ "tests/unit/SyncTest/Tests/BatchedNew.cls"
+    set newClassContent = "Class SyncTest.Tests.BatchedNew Extends %UnitTest.TestCase" _ $char(10) _ "{" _ $char(10)
+    set newClassContent = newClassContent _ "Method TestBatchedNewPasses()" _ $char(10) _ "{" _ $char(10)
+    set newClassContent = newClassContent _ "    do $$$AssertTrue(1, ""BatchedNew always passes."")" _ $char(10) _ "}" _ $char(10) _ "}" _ $char(10)
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(newFilePath))
+    $$$ThrowOnError(stream.Write(newClassContent))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    kill params
+    set params("RunTests") = 1
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with two changed classes in one resource succeeds")
+    // "ClassName begins ..." / "ClassName passed" only appear when the test runner actually
+    // executes that class — unlike a bare class-name substring, which also matches the
+    // "Loading file .../Trivial.cls" and "Compiling class SyncTest.Tests.Trivial" lines
+    // that show up regardless of whether the test itself ran.
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "Modified existing class actually ran, not just compiled")
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.BatchedNew begins"), "New class in the same resource actually ran, not just compiled")
+
+    set testResultsCount = 0
+    set lineKey = ""
+    for {
+        set lineKey = $order(output(lineKey), 1, line)
+        quit:lineKey=""
+        if line [ "Test Results:" {
+            set testResultsCount = testResultsCount + 1
+        }
+    }
+    do $$$AssertEquals(testResultsCount, 1, "Both changed classes ran in a single batched Test Results block, not one per class")
 }
 
 /// A change to a file owned by a processor that doesn't support sync is never applied, so
@@ -339,7 +384,7 @@ Method TestSyncTestFlagOnlyRunsOwningResource()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync with RunTests succeeds")
-    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial"), "Changed test in tests/unit ran")
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "Changed test in tests/unit actually ran, not just compiled")
     do $$$AssertNotTrue(..FindInOutput(.output, "SyncTest2.Tests.Trivial2"), "Unrelated test in tests/unit2 was not run")
 }
 
