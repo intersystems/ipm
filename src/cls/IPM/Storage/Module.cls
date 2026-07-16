@@ -1099,6 +1099,9 @@ ClassMethod SyncApplyDeletes(
 }
 
 /// Run test-phase tests for changed test case classes recorded in params("Sync","ChangedTestCases").
+/// Groups changed classes by owning resource first, then dispatches one batched RunTest call
+/// per resource (via OnSyncRunTests) instead of one call per class — avoids N separate
+/// reload/compile/run cycles when several test classes in the same resource changed together.
 ClassMethod SyncRunTests(
     orderedResourceList As %ListOfObjects,
     verbose As %Boolean,
@@ -1106,36 +1109,47 @@ ClassMethod SyncRunTests(
 {
     set sc = $$$OK
     try {
+        // Step 1: group changed classes by owning resource: byResource(resourceName, className) = dirPart
+        kill byResource
         set className = ""
         for {
-            set className = $order(params("Sync", "ChangedTestCases", className), 1, owningResource)
+            set className = $order(params("Sync", "ChangedTestCases", className), 1, resourceInfo)
             quit:className=""
+            set owningResource = $listget(resourceInfo, 1)
+            set dirPart = $listget(resourceInfo, 2)
+            set byResource(owningResource, className) = dirPart
+        }
 
-            set testKey = ""
-            for {
-                set testResource = orderedResourceList.GetNext(.testKey)
-                quit:testKey=""
+        // Step 2: one OnSyncRunTests call per resource
+        set testKey = ""
+        for {
+            set testResource = orderedResourceList.GetNext(.testKey)
+            quit:testKey=""
 
-                if '$isobject(testResource.Processor) {
-                    continue
-                }
-                if 'testResource.Processor.%IsA("%IPM.ResourceProcessor.Test") {
-                    continue
-                }
-                if testResource.Name '= owningResource {
-                    continue
-                }
-                if '$listfind(testResource.Processor.Phase, "test") {
-                    write:verbose !, "Skipping verify-scoped test: ", className, " (use 'verify' to run)"
-                    continue
-                }
-                kill testParams
-                merge testParams = params
-                set testParams("UnitTest", "Case") = className
-                set testParams("DeveloperMode") = 1
-                set handled = 0
-                $$$ThrowOnError(testResource.Processor.OnPhase("Test", .testParams, .handled))
+            if '$isobject(testResource.Processor) {
+                continue
             }
+            if 'testResource.Processor.%IsA("%IPM.ResourceProcessor.Test") {
+                continue
+            }
+            if '$data(byResource(testResource.Name)) {
+                continue
+            }
+            if '$listfind(testResource.Processor.Phase, "test") {
+                set skipClassName = ""
+                for {
+                    set skipClassName = $order(byResource(testResource.Name, skipClassName))
+                    quit:skipClassName=""
+                    write:verbose !, "Skipping verify-scoped test: ", skipClassName, " (use 'verify' to run)"
+                }
+                continue
+            }
+            kill classInfo
+            merge classInfo = byResource(testResource.Name)
+            kill testParams
+            merge testParams = params
+            set testParams("DeveloperMode") = 1
+            $$$ThrowOnError(testResource.Processor.OnSyncRunTests(.classInfo, .testParams))
         }
     } catch e {
         set sc = e.AsStatus()
