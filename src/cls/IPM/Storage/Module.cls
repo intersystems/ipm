@@ -1109,15 +1109,13 @@ ClassMethod SyncRunTests(
 {
     set sc = $$$OK
     try {
-        // Step 1: group changed classes by owning resource: byResource(resourceName, className) = dirPart
+        // Step 1: group changed classes by owning resource: byResource(resourceName, className) = ""
         kill byResource
         set className = ""
         for {
-            set className = $order(params("Sync", "ChangedTestCases", className), 1, resourceInfo)
+            set className = $order(params("Sync", "ChangedTestCases", className), 1, owningResource)
             quit:className=""
-            set owningResource = $listget(resourceInfo, 1)
-            set dirPart = $listget(resourceInfo, 2)
-            set byResource(owningResource, className) = dirPart
+            set byResource(owningResource, className) = ""
         }
 
         // Step 2: one OnSyncRunTests call per resource

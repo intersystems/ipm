@@ -214,64 +214,80 @@ Method OnPhase(
             zkill ^UnitTestRoot
             $$$ThrowOnError(tSC)
 
-            set testIndex = $get(^||%UnitTest.Manager.AllResults($get(^||%UnitTest.Manager.AllResultsCount)))
-            if testIndex = "" {
-                set testIndex = $order(^UnitTest.Result(""),-1)
-            }
-            if $data(pParams("outputfile"), outputFile) {
-                set fileExtension = $zconvert($piece(outputFile,".",*),"L")
-                set outputClass = $case(fileExtension,
-                    "json":"%IPM.Test.JsonOutput",
-                    "yaml":"%IPM.Test.YamlOutput",
-                    "toon":"%IPM.Test.ToonOutput",
-                    "xml":"%IPM.Test.JUnitOutput",
-                    :"")
-                if outputClass = "" {
-                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported output-file extension '."_fileExtension_"'. Use .json, .yaml, .toon, or .xml."))
-                }
-                set outputDir = ##class(%File).GetDirectory(outputFile)
-                if outputDir '= "" {
-                    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
-                }
-                set tSC = $classmethod(outputClass,"ToFile",outputFile)
-                $$$ThrowOnError(tSC)
-            }
             set suppressor = ""
-
-            set outputFormat = $get(pParams("outputformat"))
-            if outputFormat = "" {
-                set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
-            }
-
-            write !!,"Test Results:"
-            if outputFormat '= "" {
-                set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
-                if '$$$defClassDefined(outputClass) {
-                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
-                }
-                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose,1)
-                $$$ThrowOnError(tSC)
-            } else {
-                set tSC = ##class(%IPM.Test.Abstract).OutputToDevice(testIndex,tVerbose,0)
-                $$$ThrowOnError(tSC)
-            }
-            write !
-            // Detect and report unit test failures as an error from this phase.
-            // OutputFailures shows legacy red FAILED lines only when no format is active.
-            if $get(pParams("UnitTest","FailuresAreFatal"),1) {
-                if outputFormat = "" {
-                    do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
-                }
-                set tSC = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
-                $$$ThrowOnError(tSC)
-            }
-            write !
+            $$$ThrowOnError(..ReportTestResults(phaseStartIndex, tVerbose, .pParams))
         }
     } catch e {
         set tSC = e.AsStatus()
     }
     if $data(tOldUnitTestRoot,^UnitTestRoot) // Restore ^UnitTestRoot
     quit tSC
+}
+
+/// Shared result-reporting tail for OnPhase and OnSyncRunTests: resolves the test-run's log
+/// index, optionally exports full results to a file, then writes the "Test Results:" summary
+/// (format-specific output class, or the legacy default) and throws if FailuresAreFatal and
+/// any test in this phase failed. Callers must clear their own OutputSuppressor (if any)
+/// before calling — the file-export step is unaffected by device redirection, but the summary
+/// write below is not.
+ClassMethod ReportTestResults(
+    phaseStartIndex As %Integer,
+    verbose As %Boolean,
+    ByRef params) As %Status [ Private ]
+{
+    set sc = $$$OK
+    try {
+        set testIndex = $get(^||%UnitTest.Manager.AllResults($get(^||%UnitTest.Manager.AllResultsCount)))
+        if testIndex = "" {
+            set testIndex = $order(^UnitTest.Result(""),-1)
+        }
+        if $data(params("outputfile"), outputFile) {
+            set fileExtension = $zconvert($piece(outputFile,".",*),"L")
+            set outputClass = $case(fileExtension,
+                "json":"%IPM.Test.JsonOutput",
+                "yaml":"%IPM.Test.YamlOutput",
+                "toon":"%IPM.Test.ToonOutput",
+                "xml":"%IPM.Test.JUnitOutput",
+                :"")
+            if outputClass = "" {
+                $$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported output-file extension '."_fileExtension_"'. Use .json, .yaml, .toon, or .xml."))
+            }
+            set outputDir = ##class(%File).GetDirectory(outputFile)
+            if outputDir '= "" {
+                $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
+            }
+            $$$ThrowOnError($classmethod(outputClass,"ToFile",outputFile))
+        }
+
+        set outputFormat = $get(params("outputformat"))
+        if outputFormat = "" {
+            set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+        }
+
+        write !!,"Test Results:"
+        if outputFormat '= "" {
+            set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
+            if '$$$defClassDefined(outputClass) {
+                $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
+            }
+            $$$ThrowOnError($classmethod(outputClass,"OutputToDevice",testIndex,verbose,1))
+        } else {
+            $$$ThrowOnError(##class(%IPM.Test.Abstract).OutputToDevice(testIndex,verbose,0))
+        }
+        write !
+        // Detect and report unit test failures as an error from this phase.
+        // OutputFailures shows legacy red FAILED lines only when no format is active.
+        if $get(params("UnitTest","FailuresAreFatal"),1) {
+            if outputFormat = "" {
+                do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+            }
+            $$$ThrowOnError(##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex))
+        }
+        write !
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 Method OnResolveChildren(ByRef pResourceArray) As %Status
@@ -470,10 +486,7 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
             if $zconvert($piece(fileName, ".", *), "U") = "CLS"
                 && $$$comClassDefined(className)
                 && $classmethod(className, "%Extends", "%UnitTest.TestCase") {
-                // dirPart (the class's real on-disk subdirectory, "/"-separated) travels with the
-                // resource name so SyncRunTests can build a batched, correctly-scoped RunTest
-                // testspec later without re-deriving the directory from the class name.
-                set params("Sync", "ChangedTestCases", className) = $listbuild(..ResourceReference.Name, dirPart)
+                set params("Sync", "ChangedTestCases", className) = ..ResourceReference.Name
             }
         }
     } catch e {
@@ -484,7 +497,7 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
 
 /// Called once per resource by SyncRunTests: runs every changed test-phase case belonging
 /// to this resource in a single RunTest invocation instead of one call per class.
-/// classInfo(className) = dirPart (path relative to this resource's test directory, "/"-separated).
+/// classInfo(className) = "" for each changed TestCase class in this resource.
 /// Assumes OnSync already loaded and compiled these classes earlier in the same sync() call,
 /// so no reload/recompile happens here — only testspec construction, RunTest, and reporting.
 Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
@@ -508,12 +521,14 @@ Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
         // treats each comma-separated entry as its own testsuite scope; a second entry naming
         // the same dir errors instead of adding to the first). Distinct subdirectories become
         // separate comma-joined entries so unrelated sibling test classes elsewhere in the
-        // resource are not swept in.
+        // resource are not swept in. dirPart is derived from className (its inverse) rather
+        // than passed in, since a TestCase class name always mirrors its on-disk path.
         kill byDir
         set className = ""
         for {
-            set className = $order(classInfo(className), 1, dirPart)
+            set className = $order(classInfo(className))
             quit:className=""
+            set dirPart = $translate($piece(className, ".", 1, *-1), ".", "/")
             set byDir(dirPart, className) = ""
         }
         set testSpec = ""
@@ -549,38 +564,8 @@ Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
         zkill ^UnitTestRoot
         $$$ThrowOnError(sc)
 
-        set testIndex = $get(^||%UnitTest.Manager.AllResults($get(^||%UnitTest.Manager.AllResultsCount)))
-        if testIndex = "" {
-            set testIndex = $order(^UnitTest.Result(""),-1)
-        }
         set suppressor = ""
-
-        set outputFormat = $get(params("outputformat"))
-        if outputFormat = "" {
-            set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
-        }
-
-        write !!,"Test Results:"
-        if outputFormat '= "" {
-            set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
-            if '$$$defClassDefined(outputClass) {
-                $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
-            }
-            set sc = $classmethod(outputClass,"OutputToDevice",testIndex,verbose,1)
-            $$$ThrowOnError(sc)
-        } else {
-            set sc = ##class(%IPM.Test.Abstract).OutputToDevice(testIndex,verbose,0)
-            $$$ThrowOnError(sc)
-        }
-        write !
-        if $get(params("UnitTest","FailuresAreFatal"),1) {
-            if outputFormat = "" {
-                do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
-            }
-            set sc = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
-            $$$ThrowOnError(sc)
-        }
-        write !
+        $$$ThrowOnError(..ReportTestResults(phaseStartIndex, verbose, .params))
     } catch e {
         set sc = e.AsStatus()
     }
