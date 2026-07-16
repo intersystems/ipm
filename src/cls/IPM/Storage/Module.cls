@@ -853,7 +853,6 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
 
     } catch e {
         set sc = e.AsStatus()
-        do $system.OBJ.DisplayError(sc)
     }
     quit sc
 }
@@ -880,6 +879,11 @@ ClassMethod SyncCheckModuleXml(
     }
     set newHash = ##class(%File).SHA1Hash(moduleXmlPath, 1)
     if (existing.Hash '= "") && (newHash = existing.Hash) {
+        // Content unchanged despite mtime/size change — update stored metadata to avoid
+        // re-hashing on every subsequent sync until the file is written again.
+        set existing.FileSize = currentSize
+        set existing.FileTimestamp = currentTimestamp
+        do existing.%Save()
         quit 0
     }
     $$$ThrowOnError($system.OBJ.Load(moduleXmlPath, "-d"))
@@ -1093,7 +1097,10 @@ ClassMethod SyncApplyDeletes(
         set docName = ..RelPathToDocName(relPath)
         if docName '= "" {
             set delFlags = $select(verbose:"d", 1:"-d")
-            do $system.OBJ.Delete(docName, delFlags)
+            set delSC = $system.OBJ.Delete(docName, delFlags)
+            if $$$ISERR(delSC) {
+                write !, "Warning: could not delete ", docName, ": ", $system.Status.GetOneErrorText(delSC)
+            }
         }
     }
 }
@@ -1163,7 +1170,10 @@ ClassMethod SyncCommitModuleXml(
 {
     kill moduleXmlMod, emptyDel
     set moduleXmlMod(moduleXmlRelPath) = ##class(%File).SHA1Hash(moduleXmlPath, 1)
-    do ##class(%IPM.Storage.FileHash).CommitChanges(module, .moduleXmlMod, .emptyDel, 0)
+    set commitSC = ##class(%IPM.Storage.FileHash).CommitChanges(module, .moduleXmlMod, .emptyDel, 0)
+    if $$$ISERR(commitSC) {
+        write !, "Warning: failed to record module.xml hash: ", $system.Status.GetOneErrorText(commitSC)
+    }
 }
 
 ClassMethod SyncPrintModuleXmlWarning(moduleName As %String)

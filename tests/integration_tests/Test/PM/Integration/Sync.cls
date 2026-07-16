@@ -19,35 +19,32 @@ Method OnBeforeAllTests() As %Status
     }
 
     set ..TempDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-test-" _ $job)
+    quit $$$OK
+}
+
+// Load a clean copy of the fixture in dev mode before each test to stamp a baseline.
+// Uninstalling first handles version-change tests (e.g. TestModuleXmlChangedWarning bumps version).
+Method OnBeforeOneTest(testName As %String) As %Status
+{
     $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..TempDir))
     if '##class(%Library.File).CopyDir(..PristineDir, ..TempDir, 1) {
-        quit $$$ERROR($$$GeneralError, "Failed to copy sync-test fixture to temp directory")
+        quit $$$ERROR($$$GeneralError, "Failed to restore sync-test fixture before test: " _ testName)
     }
-
-    // Load in dev mode — this stamps the baseline via %Compile hook.
     quit ##class(%IPM.Main).Shell("load " _ ..TempDir _ " -dev")
 }
 
-// Uninstall and restore the fixture after each test to prevent state leakage between tests.
-// Uninstalling first handles version-change tests (e.g. TestModuleXmlChangedWarning bumps version).
 Method OnAfterOneTest(testName As %String) As %Status
 {
-    try {
-        // Uninstall may fail if the test left the module in a broken state — that's expected.
-        do ##class(%IPM.Main).Shell("uninstall sync-test")
-    } catch {}
+    // Shell never throws; ignore the returned status since uninstall may fail if the test
+    // left the module in a broken state — that's expected.
+    do ##class(%IPM.Main).Shell("uninstall sync-test")
     do ##class(%Library.File).RemoveDirectoryTree(..TempDir)
-    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..TempDir))
-    if '##class(%Library.File).CopyDir(..PristineDir, ..TempDir, 1) {
-        quit $$$ERROR($$$GeneralError, "Failed to restore sync-test fixture after test: " _ testName)
-    }
-    quit ##class(%IPM.Main).Shell("load " _ ..TempDir _ " -dev")
+    quit $$$OK
 }
 
 Method OnAfterAllTests() As %Status
 {
-    // OnAfterOneTest already uninstalled and reloaded after the last test.
-    // This just removes the temp directories.
+    do ##class(%IPM.Main).Shell("uninstall sync-test")
     if ..TempDir '= "" {
         do ##class(%Library.File).RemoveDirectoryTree(..TempDir)
     }
@@ -142,6 +139,19 @@ Method TestSuperclassEditRecompilesSubclass()
     kill params
     set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
     do $$$AssertStatusOK(sc, "Sync after superclass edit succeeds (subclass recompiles via u-flag)")
+}
+
+/// Editing an include file recompiles classes that include it, even though those class files
+/// on disk are unchanged. SyncTest.Consumer includes SyncTest.INC and calls $$$SyncTestValue.
+Method TestIncludeEditRecompilesConsumer()
+{
+    set incPath = ..TempDir _ "src/inc/SyncTest.inc"
+    do ..ReplaceInFile(incPath, """original-include""", """modified-include""")
+
+    kill params
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do $$$AssertStatusOK(sc, "Sync after include edit succeeds")
+    do $$$AssertEquals(##class(SyncTest.Consumer).GetMacroValue(), "modified-include", "Consumer reflects updated macro value after include sync")
 }
 
 /// A file outside every tracked resource (e.g. under node_modules/) is ignored by sync
@@ -392,8 +402,12 @@ Method TestSyncTestFlagOnlyRunsOwningResource()
 Method TestSyncAllDevModeModules()
 {
     kill params
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set sc = ##class(%IPM.Main).Shell("sync")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
     do $$$AssertStatusOK(sc, "Sync with no module name (sync-all) succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Nothing to sync"), "sync-test reports nothing to sync (no changes since baseline)")
 }
 
 /// Sync fails with an error when given a module name that isn't installed.
@@ -408,7 +422,7 @@ Method TestSyncModuleNotFound()
 Method TestSyncNonDevModeModule()
 {
     // Reload without -dev so the installed module is not in development mode.
-    // OnAfterOneTest unconditionally uninstalls and reloads -dev afterward, so no manual restore is needed here.
+    // OnAfterOneTest uninstalls, and OnBeforeOneTest will reinstall -dev for the next test.
     do ##class(%IPM.Main).Shell("uninstall sync-test")
     $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ ..TempDir))
 
