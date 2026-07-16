@@ -454,7 +454,8 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
         set verbose = $get(params("Verbose"))
         set unitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root _ ..ResourceReference.Name)
 
-        // Reload changed test files, then compile so %Extends checks are valid below.
+        // Reload all test files in the directory, then compile so %Extends checks are valid below.
+        // New test classes may not yet be in ^oddDEF, so we can't limit to changed files here.
         // Test resources are not AbstractCompilable, so SyncCompile never touches them —
         // OnSync owns the full load+compile cycle for this resource type.
         $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(unitTestDir, verbose, .loadedList, ..Format))

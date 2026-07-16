@@ -1267,7 +1267,6 @@ Method %Compile(ByRef pParams) As %Status
         // Done here after compile so test classes are in ^oddDEF and appear in trackedPaths.
         if tDevMode {
             try {
-                set trackedPaths = ""
                 do ..GetTrackedPaths(.trackedPaths)
                 do ##class(%IPM.Storage.FileHash).StampModule(..Module, .trackedPaths)
             } catch stampEx {
