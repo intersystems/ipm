@@ -1,4 +1,4 @@
-Include %IPM.Common
+Include (%IPM.Common, %occReference)
 
 Class %IPM.Storage.FileHash Extends %Persistent
 {
@@ -27,15 +27,16 @@ Index ModuleNameIndex On ModuleName;
 
 ForeignKey ModuleNameFK(ModuleName) References %IPM.Storage.Module(Name) [ OnDelete = cascade ];
 
-/// Record the current mtime+size for each tracked file without reading file content (no hash).
-/// This "stamp" establishes a baseline so subsequent sync calls can detect changes via ComputeChanges.
-/// Called after a successful dev-mode %Compile (after %Reload) so all resources, including
-/// unit test classes compiled during %Compile, are present on disk and in ^oddDEF.
+/// Stamp actual file paths for this module by combining two passes:
+/// Pass 1 covers convention-derived paths that exist on disk (standard layouts).
+/// Pass 2 walks the module root for compilable files not found at their derived location.
 ClassMethod StampModule(module As %IPM.Storage.Module, ByRef trackedPaths) As %Status
 {
     set sc = $$$OK
     try {
         set root = ##class(%File).NormalizeDirectory(module.Root)
+
+        // Pass 1: stamp all convention-derived paths that exist on disk.
         set relPath = ""
         for {
             set relPath = $order(trackedPaths(relPath))
@@ -45,25 +46,118 @@ ClassMethod StampModule(module As %IPM.Storage.Module, ByRef trackedPaths) As %S
             if '##class(%File).Exists(fullPath) {
                 continue
             }
+            $$$ThrowOnError(..StampOneFile(module.Name, root, fullPath))
+        }
 
-            set normalizedRelPath = ..NormalizePath(relPath)
-            set existing = ..ModulePathIndexOpen(module.Name, normalizedRelPath, , .openSC)
-            if $isobject(existing) {
-                set instance = existing
-            } else {
-                set instance = ..%New()
-                set instance.ModuleName = module.Name
-                set instance.RelativePath = normalizedRelPath
+        // Pass 2: walk the module root for compilable files not already in trackedPaths.
+        // Catches non-standard layouts where OnItemRelativePath produced a path that doesn't
+        // match the actual file location on disk.
+        // Uses a manual BFS queue because File_FileSet's recursive flag only returns
+        // immediate children — it does not descend through multiple directory levels in one call.
+        kill walkQueue
+        set walkHead = 1, walkTail = 1
+        set walkQueue(walkTail) = root
+        for {
+            quit:(walkHead > walkTail)
+            set walkDir = walkQueue(walkHead)
+            set walkHead = walkHead + 1
+
+            set walkResult = ##class(%SQL.Statement).%ExecDirect(,
+                "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
+                walkDir, "*", "", 0)
+            while walkResult.%Next() {
+                set entryType = walkResult.%Get("Type")
+                set entryPath = walkResult.%Get("Name")
+                if entryType = "D" {
+                    set walkTail = walkTail + 1
+                    set walkQueue(walkTail) = ##class(%File).NormalizeDirectory(entryPath)
+                    continue
+                }
+                set ext = $$$lcase($piece(entryPath, ".", *))
+                if ",cls,inc,mac,int," '[ (","_ext_",") {
+                    continue
+                }
+                set normalizedRelPath = ..NormalizePath($extract(entryPath, $length(root) + 1, *))
+                if $data(trackedPaths(normalizedRelPath)) {
+                    continue
+                }
+                set docName = ..RelPathToDocName(normalizedRelPath)
+                if docName = "" {
+                    continue
+                }
+                set docExt = $$$lcase($piece(docName, ".", *))
+                if docExt = "cls" {
+                    if '$$$comClassDefined($piece(docName, ".", 1, *-1)) {
+                        continue
+                    }
+                } else {
+                    if '##class(%RoutineMgr).Exists(docName) {
+                        continue
+                    }
+                }
+                $$$ThrowOnError(..StampOneFile(module.Name, root, entryPath))
             }
-
-            set instance.FileSize = ##class(%File).GetFileSize(fullPath)
-            set instance.FileTimestamp = ..GetFileTimestamp(fullPath)
-            $$$ThrowOnError(instance.%Save())
         }
     } catch e {
         set sc = e.AsStatus()
     }
     quit sc
+}
+
+/// Stamp (or update) the FileHash row for a single file. Computes hash at stamp time.
+ClassMethod StampOneFile(moduleName As %String, root As %String, fullPath As %String) As %Status
+{
+    set normalizedRelPath = ..NormalizePath($extract(fullPath, $length(root) + 1, *))
+    set existing = ..ModulePathIndexOpen(moduleName, normalizedRelPath, , .openSC)
+    if $isobject(existing) {
+        set instance = existing
+    } else {
+        set instance = ..%New()
+        set instance.ModuleName = moduleName
+        set instance.RelativePath = normalizedRelPath
+    }
+    set instance.Hash = ##class(%File).SHA1Hash(fullPath, 1)
+    set instance.FileSize = ##class(%File).GetFileSize(fullPath)
+    set instance.FileTimestamp = ..GetFileTimestamp(fullPath)
+    quit instance.%Save()
+}
+
+/// Derive a server document name from a module-root-relative path.
+/// Returns "" for paths that don't map to a compilable document.
+/// Examples:
+///   "src/cls/Foo/Bar.cls"  -> "Foo.Bar.CLS"
+///   "src/SyncFlat/Flat.cls" -> "SyncFlat.Flat.CLS"
+///   "src/inc/MyInc.inc"   -> "MyInc.INC"
+ClassMethod RelPathToDocName(relPath As %String) As %String
+{
+    set parts = $length(relPath, "/")
+    set ext = $$$lcase($piece(relPath, ".", *))
+    if ",cls,inc,mac,int," '[ (","_ext_",") {
+        quit ""
+    }
+    // Skip leading path segments that are conventional prefix directories.
+    // Stop at the first segment that isn't one of these well-known prefixes.
+    set startSeg = 1
+    for i = 1:1:parts {
+        set seg = $piece(relPath, "/", i)
+        if ",src,cls,inc,mac,int," [ (","_$$$lcase(seg)_",") {
+            set startSeg = i + 1
+        } else {
+            quit
+        }
+    }
+    if startSeg > parts {
+        quit ""
+    }
+    // Segments startSeg through (parts-1) are package/directory components.
+    // Segment parts is "ClassName.ext" — strip the extension for the final component.
+    set name = ""
+    for i = startSeg:1:(parts - 1) {
+        set name = name _ $select(name="":"", 1:".") _ $piece(relPath, "/", i)
+    }
+    set lastName = $piece($piece(relPath, "/", parts), ".", 1, *-1)
+    set name = name _ $select(name="":"", 1:".") _ lastName
+    quit name _ "." _ $$$UPPER(ext)
 }
 
 /// Compute which tracked files changed on disk vs stored baseline.
@@ -90,31 +184,18 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, ByRef trackedPaths, Ou
                 continue
             }
 
-            set currentSize = ##class(%File).GetFileSize(fullPath)
-            set currentTimestamp = ..GetFileTimestamp(fullPath)
-
             set existing = ..ModulePathIndexOpen(module.Name, normalizedRelPath, , .openSC)
             if '$isobject(existing) {
-                // No baseline row — file is newly tracked (added since the last sync/stamp).
-                // Report it as modified so it gets loaded; no prior hash to compare against.
-                set modified(normalizedRelPath) = ##class(%File).SHA1Hash(fullPath, 1)
+                // No baseline row — file joined trackedPaths after initial load (e.g. added via
+                // OnSyncResolveFiles). Stamp it silently so it doesn't trigger a spurious
+                // "modified" on every sync until someone edits it.
+                do ..StampOneFile(module.Name, root, fullPath)
                 continue
             }
 
-            // Fast path: size+mtime match means unchanged
-            if (existing.FileSize = currentSize) && (existing.FileTimestamp = currentTimestamp) {
-                continue
-            }
-
-            // Size or mtime differ — read hash to confirm real change
+            // Hash-only comparison. Avoids mtime unreliability on bind mounts.
             set newHash = ##class(%File).SHA1Hash(fullPath, 1)
-            if (existing.Hash '= "") && (newHash = existing.Hash) {
-                // Hash matches stored — content unchanged despite mtime/size difference; update fast-path
-                set existing.FileTimestamp = currentTimestamp
-                set existing.FileSize = currentSize
-                $$$ThrowOnError(existing.%Save())
-            } else {
-                // Content changed (or no prior hash to confirm otherwise)
+            if existing.Hash '= newHash {
                 set modified(normalizedRelPath) = newHash
             }
         }
@@ -177,6 +258,19 @@ ClassMethod HasBaseline(moduleName As %String) As %Boolean
         "SELECT TOP 1 1 FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
         moduleName)
     quit result.%Next()
+}
+
+/// Populate paths(normalizedRelPath)="" for all stored baseline rows for this module.
+/// Same structure as the trackedPaths array used by GetTrackedPaths and ComputeChanges.
+ClassMethod GetStoredPaths(moduleName As %String, Output paths)
+{
+    kill paths
+    set result = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
+        moduleName)
+    while result.%Next() {
+        set paths(result.%Get("RelativePath")) = ""
+    }
 }
 
 /// Normalize a relative path: forward slashes, collapse //, strip leading slash.

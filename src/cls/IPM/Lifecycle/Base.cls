@@ -733,10 +733,10 @@ Method GetTrackedPaths(Output trackedPaths)
 {
     kill trackedPaths
 
-    // Include module.xml
+    // Always derive paths from resource metadata — this discovers new files that aren't
+    // stamped yet (e.g. a newly-added resource or a new file in a directory-scanned resource).
     set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath("module.xml")) = ""
 
-    // Walk resources and resolve children to get all source file paths
     set orderedResourceList = ..Module.GetOrderedResourceList()
     set key = ""
     for {
@@ -769,8 +769,6 @@ Method GetTrackedPaths(Output trackedPaths)
             set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath(relPath)) = ""
         }
 
-        // Sync-only enumeration for resources whose files aren't captured by ResolveChildren
-        // (e.g. FileCopy's directory-scanned source). Does not affect packaging/export.
         kill syncOnlyPaths
         set sc = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
         if $$$ISERR(sc) {
@@ -782,6 +780,15 @@ Method GetTrackedPaths(Output trackedPaths)
             quit:relPath=""
             set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath(relPath)) = ""
         }
+    }
+
+    // Also merge stored paths. These cover files at non-standard locations that derivation
+    // would place at a different path (e.g. no cls/ subdir). Without stored paths, a change
+    // to such a file is never presented to ComputeChanges and sync can't detect it.
+    if ##class(%IPM.Storage.FileHash).HasBaseline(..Module.Name) {
+        kill storedPaths
+        do ##class(%IPM.Storage.FileHash).GetStoredPaths(..Module.Name, .storedPaths)
+        merge trackedPaths = storedPaths
     }
 }
 

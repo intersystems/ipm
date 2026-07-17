@@ -897,6 +897,7 @@ ClassMethod SyncCheckModuleXml(
 /// Used by SyncRouteChanges to map changed files back to their owning resource processors.
 ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIndex)
 {
+    // Pass 1: derive paths from resource metadata (covers standard layouts)
     set orderedResourceList = module.GetOrderedResourceList()
     set key = ""
     for {
@@ -932,8 +933,6 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIn
             set reverseIndex(normalizedRelPath, "Resource") = resource
         }
 
-        // Sync-only enumeration for resources whose files aren't captured by ResolveChildren
-        // (e.g. FileCopy's directory-scanned source). Does not affect packaging/export.
         kill syncOnlyPaths
         set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
         if $$$ISERR(childSC) {
@@ -948,6 +947,46 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIn
             set reverseIndex(normalizedRelPath) = resource.Name
             set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
             set reverseIndex(normalizedRelPath, "Resource") = resource
+        }
+    }
+
+    // Pass 2: for stored paths not covered by Pass 1 (non-standard layouts),
+    // derive the document name, find the owning resource, and add to index.
+    kill storedPaths
+    do ##class(%IPM.Storage.FileHash).GetStoredPaths(module.Name, .storedPaths)
+    set relPath = ""
+    for {
+        set relPath = $order(storedPaths(relPath))
+        quit:relPath=""
+
+        if $data(reverseIndex(relPath)) {
+            continue
+        }
+
+        set docName = ##class(%IPM.Storage.FileHash).RelPathToDocName(relPath)
+        if docName = "" {
+            continue
+        }
+
+        set key = ""
+        for {
+            set resource = orderedResourceList.GetNext(.key)
+            quit:key=""
+
+            if '$isobject(resource.Processor) {
+                continue
+            }
+
+            kill childArr
+            set childSC = resource.ResolveChildren(.childArr)
+            if $$$ISERR(childSC) || '$data(childArr(docName)) {
+                continue
+            }
+
+            set reverseIndex(relPath) = resource.Name
+            set reverseIndex(relPath, "Processor") = resource.Processor
+            set reverseIndex(relPath, "Resource") = resource
+            quit
         }
     }
 }

@@ -54,6 +54,83 @@ Method OnAfterAllTests() As %Status
     quit $$$OK
 }
 
+/// GetStoredPaths returns paths that were stamped by StampModule.
+Method TestGetStoredPathsReturnsStampedPaths()
+{
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "Baseline exists after load")
+
+    kill paths
+    do ##class(%IPM.Storage.FileHash).GetStoredPaths("sync-test", .paths)
+
+    do $$$AssertTrue($data(paths("module.xml")), "module.xml in stored paths")
+    do $$$AssertTrue($data(paths("src/cls/SyncTest/SuperClass.cls")), "SuperClass.cls in stored paths")
+    do $$$AssertTrue($data(paths("src/inc/SyncTest.inc")), "SyncTest.inc in stored paths")
+}
+
+/// ComputeChanges must detect a content change even when mtime and size are identical
+/// (simulates bind-mount stale mtime — Windows host edit invisible to container mtime).
+Method TestChangeDetectedWithStaleMtime()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+
+    // Modify content
+    do ..ReplaceInFile(filePath, "Property BaseValue", "Property BaseValueModified")
+
+    // Forge the FileHash row: update mtime and size to the post-edit values but keep the
+    // old hash. This is the bind-mount scenario: IRIS sees the new mtime+size but the
+    // fast-path would conclude "unchanged" because they match the forged row.
+    set existing = ##class(%IPM.Storage.FileHash).ModulePathIndexOpen("sync-test", "src/cls/SyncTest/SuperClass.cls")
+    set existing.FileTimestamp = ##class(%IPM.Storage.FileHash).GetFileTimestamp(filePath)
+    set existing.FileSize = ##class(%File).GetFileSize(filePath)
+    // Leave existing.Hash as the old value intentionally
+    $$$ThrowOnError(existing.%Save())
+
+    kill params
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync detects content change despite matching mtime/size")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Content change was detected and applied (not 'Nothing to sync')")
+}
+
+/// Confirm sync detects changes in a module whose file layout doesn't match the
+/// SourcesRoot/Directory/package.ext convention. sync-flat-test declares SyncFlat.Flat.CLS
+/// with SourcesRoot=src, but the file is at src/SyncFlat/Flat.cls (no cls/ subdirectory).
+/// OnItemRelativePath derives src/cls/SyncFlat/Flat.cls, which doesn't exist — so without
+/// filesystem-anchored stamping, the file never gets a baseline row and sync always reports
+/// "Nothing to sync" regardless of what changed.
+// This test manages its own install/uninstall because sync-flat-test uses a separate fixture
+// from sync-test and must not interfere with the per-test lifecycle. If the test throws before
+// cleanup, sync-flat-test and flatTempDir are leaked (no safety net from OnAfterOneTest).
+Method TestNonStandardLayoutDetectsChange()
+{
+    set flatSource = ..GetModuleDir("sync-flat-test")
+    set flatTempDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-flat-test-" _ $job)
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(flatTempDir))
+    if '##class(%Library.File).CopyDir(flatSource, flatTempDir, 1) {
+        $$$ThrowOnError($$$ERROR($$$GeneralError, "Failed to copy sync-flat-test to temp dir"))
+    }
+
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ flatTempDir _ " -dev"))
+
+    set filePath = flatTempDir _ "src/SyncFlat/Flat.cls"
+    do ..ReplaceInFile(filePath, "As %String", "As %Integer")
+
+    kill params
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-flat-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync succeeds for non-standard layout module")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Sync detects the file change (not 'Nothing to sync')")
+
+    do ##class(%IPM.Main).Shell("uninstall sync-flat-test")
+    do ##class(%Library.File).RemoveDirectoryTree(flatTempDir)
+}
+
 /// Sync with no files changed on disk since the last load/sync reports nothing to do.
 Method TestNoChangeIsNoOp()
 {
