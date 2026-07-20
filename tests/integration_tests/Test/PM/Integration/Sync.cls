@@ -74,31 +74,33 @@ Method TestGetStoredPathsReturnsStampedPaths()
 /// filesystem-anchored stamping, the file never gets a baseline row and sync always reports
 /// "Nothing to sync" regardless of what changed.
 // This test manages its own install/uninstall because sync-flat-test uses a separate fixture
-// from sync-test and must not interfere with the per-test lifecycle. If the test throws before
-// cleanup, sync-flat-test and flatTempDir are leaked (no safety net from OnAfterOneTest).
+// from sync-test and must not interfere with the per-test lifecycle.
 Method TestNonStandardLayoutDetectsChange()
 {
-    set flatSource = ..GetModuleDir("sync-flat-test")
     set flatTempDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-flat-test-" _ $job)
-    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(flatTempDir))
-    if '##class(%Library.File).CopyDir(flatSource, flatTempDir, 1) {
-        $$$ThrowOnError($$$ERROR($$$GeneralError, "Failed to copy sync-flat-test to temp dir"))
+    try {
+        set flatSource = ..GetModuleDir("sync-flat-test")
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(flatTempDir))
+        if '##class(%Library.File).CopyDir(flatSource, flatTempDir, 1) {
+            $$$ThrowOnError($$$ERROR($$$GeneralError, "Failed to copy sync-flat-test to temp dir"))
+        }
+
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ flatTempDir _ " -dev"))
+
+        set filePath = flatTempDir _ "src/SyncFlat/Flat.cls"
+        do ..ReplaceInFile(filePath, "As %String", "As %Integer")
+
+        kill params
+        set params("Verbose") = 1
+        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+        set sc = ##class(%IPM.Storage.Module).Sync("sync-flat-test", .params)
+        do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+        do $$$AssertStatusOK(sc, "Sync succeeds for non-standard layout module")
+        do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Sync detects the file change (not 'Nothing to sync')")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "TestNonStandardLayoutDetectsChange threw unexpectedly")
     }
-
-    $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ flatTempDir _ " -dev"))
-
-    set filePath = flatTempDir _ "src/SyncFlat/Flat.cls"
-    do ..ReplaceInFile(filePath, "As %String", "As %Integer")
-
-    kill params
-    set params("Verbose") = 1
-    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-flat-test", .params)
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-
-    do $$$AssertStatusOK(sc, "Sync succeeds for non-standard layout module")
-    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Sync detects the file change (not 'Nothing to sync')")
-
     do ##class(%IPM.Main).Shell("uninstall sync-flat-test")
     do ##class(%Library.File).RemoveDirectoryTree(flatTempDir)
 }
