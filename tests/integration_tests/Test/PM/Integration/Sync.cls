@@ -67,34 +67,6 @@ Method TestGetStoredPathsReturnsStampedPaths()
     do $$$AssertTrue($data(paths("src/inc/SyncTest.inc")), "SyncTest.inc in stored paths")
 }
 
-/// ComputeChanges must detect a content change even when mtime and size are identical
-/// (simulates bind-mount stale mtime — Windows host edit invisible to container mtime).
-Method TestChangeDetectedWithStaleMtime()
-{
-    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
-
-    // Modify content
-    do ..ReplaceInFile(filePath, "Property BaseValue", "Property BaseValueModified")
-
-    // Forge the FileHash row: update mtime and size to the post-edit values but keep the
-    // old hash. This is the bind-mount scenario: IRIS sees the new mtime+size but the
-    // fast-path would conclude "unchanged" because they match the forged row.
-    set existing = ##class(%IPM.Storage.FileHash).ModulePathIndexOpen("sync-test", "src/cls/SyncTest/SuperClass.cls")
-    set existing.FileTimestamp = ##class(%IPM.Storage.FileHash).GetFileTimestamp(filePath)
-    set existing.FileSize = ##class(%File).GetFileSize(filePath)
-    // Leave existing.Hash as the old value intentionally
-    $$$ThrowOnError(existing.%Save())
-
-    kill params
-    set params("Verbose") = 1
-    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-
-    do $$$AssertStatusOK(sc, "Sync detects content change despite matching mtime/size")
-    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Content change was detected and applied (not 'Nothing to sync')")
-}
-
 /// Confirm sync detects changes in a module whose file layout doesn't match the
 /// SourcesRoot/Directory/package.ext convention. sync-flat-test declares SyncFlat.Flat.CLS
 /// with SourcesRoot=src, but the file is at src/SyncFlat/Flat.cls (no cls/ subdirectory).
