@@ -9,17 +9,8 @@ Property ModuleName As %String(MAXLEN = 255) [ Required ];
 /// Used as the lookup key in ModulePathIndex — callers must normalize via NormalizePath before querying.
 Property RelativePath As %String(MAXLEN = 512) [ Required ];
 
-/// SHA-1 content hash (hex). Empty string means the row was stamped with mtime/size only and
-/// no hash was computed yet. On the next sync, any mtime/size mismatch will compute a fresh hash.
-Property Hash As %String(MAXLEN = 64) [ InitialExpression = "" ];
-
-/// Last-modified timestamp as returned by ##class(%File).GetFileDateModified — $H format.
-/// Used as a fast-path: if mtime and FileSize both match, assume content is unchanged.
-Property FileTimestamp As %String(MAXLEN = 64);
-
-/// File size in bytes. Combined with FileTimestamp forms the fast-path unchanged check.
-/// Both fields are needed: size alone misses same-size edits; mtime alone is unreliable on copies.
-Property FileSize As %Integer;
+/// SHA-1 content hash (hex).
+Property Hash As %String(MAXLEN = 64) [ Required ];
 
 Index ModulePathIndex On (ModuleName, RelativePath) [ Unique ];
 
@@ -132,8 +123,6 @@ ClassMethod StampOneFile(moduleName As %String, root As %String, fullPath As %St
         set instance.RelativePath = normalizedRelPath
     }
     set instance.Hash = ##class(%File).SHA1Hash(fullPath, 1)
-    set instance.FileSize = ##class(%File).GetFileSize(fullPath)
-    set instance.FileTimestamp = ..GetFileTimestamp(fullPath)
     quit instance.%Save()
 }
 
@@ -345,8 +334,6 @@ ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef d
             }
 
             set instance.Hash = newHash
-            set instance.FileSize = ##class(%File).GetFileSize(fullPath)
-            set instance.FileTimestamp = ..GetFileTimestamp(fullPath)
             $$$ThrowOnError(instance.%Save())
         }
 
@@ -402,12 +389,6 @@ ClassMethod NormalizePath(path As %String) As %String
     quit path
 }
 
-/// Get the last-modified timestamp of a file in $H format (as returned by GetFileDateModified).
-ClassMethod GetFileTimestamp(fullPath As %String) As %String
-{
-    quit ##class(%File).GetFileDateModified(fullPath)
-}
-
 Storage Default
 {
 <Data name="FileHashDefaultData">
@@ -422,12 +403,6 @@ Storage Default
 </Value>
 <Value name="4">
 <Value>Hash</Value>
-</Value>
-<Value name="5">
-<Value>FileTimestamp</Value>
-</Value>
-<Value name="6">
-<Value>FileSize</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.FileHashD</DataLocation>

@@ -876,18 +876,8 @@ ClassMethod SyncCheckModuleXml(
     if '$isobject(existing) {
         quit 0
     }
-    set currentSize = ##class(%File).GetFileSize(moduleXmlPath)
-    set currentTimestamp = ##class(%IPM.Storage.FileHash).GetFileTimestamp(moduleXmlPath)
-    if (existing.FileSize = currentSize) && (existing.FileTimestamp = currentTimestamp) {
-        quit 0
-    }
     set newHash = ##class(%File).SHA1Hash(moduleXmlPath, 1)
-    if (existing.Hash '= "") && (newHash = existing.Hash) {
-        // Content unchanged despite mtime/size change — update stored metadata to avoid
-        // re-hashing on every subsequent sync until the file is written again.
-        set existing.FileSize = currentSize
-        set existing.FileTimestamp = currentTimestamp
-        do existing.%Save()
+    if newHash = existing.Hash {
         quit 0
     }
     $$$ThrowOnError($system.OBJ.Load(moduleXmlPath, "-d"))
