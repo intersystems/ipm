@@ -394,50 +394,13 @@ Method OnSyncResolveFiles(Output relPaths) As %Status
         if '##class(%File).DirectoryExists(unitTestDir) {
             quit
         }
-        $$$ThrowOnError(..WalkClsFilesRecursive(unitTestDir, moduleRoot, .relPaths))
-    } catch e {
-        set sc = e.AsStatus()
-    }
-    quit sc
-}
-
-/// Recursively collects .cls files under pDir into relPaths(relPath), relative to pModuleRoot.
-/// %Library.File_FileSet's own recursive flag only returns immediate children per call
-/// (confirmed experimentally — it does not descend through multiple directory levels in one
-/// call), so each subdirectory must be visited with its own call, same as %UnitTest.Manager's
-/// own GetSubDirectories does internally.
-ClassMethod WalkClsFilesRecursive(
-    pDir As %String,
-    pModuleRoot As %String,
-    ByRef relPaths) As %Status
-{
-    set sc = $$$OK
-    try {
-        set rs = ##class(%SQL.Statement).%ExecDirect(,
-            "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
-            pDir, "*.cls", "", 0)
-        if rs.%SQLCODE < 0 {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "FileSet query error: " _ rs.%Message))
-        }
-        while rs.%Next() {
-            continue:rs.%Get("Type")="D"
-            set fullPath = rs.%Get("Name")
-            set relPath = $extract(fullPath, $length(pModuleRoot) + 1, *)
-            if relPath '= "" {
-                set relPaths(relPath) = ""
-            }
-        }
-
-        set dirRs = ##class(%SQL.Statement).%ExecDirect(,
-            "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
-            pDir, "*", "", 0)
-        if dirRs.%SQLCODE < 0 {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "FileSet query error: " _ dirRs.%Message))
-        }
-        while dirRs.%Next() {
-            continue:dirRs.%Get("Type")'="D"
-            set subDir = ##class(%File).NormalizeDirectory(dirRs.%Get("Name"))
-            $$$ThrowOnError(..WalkClsFilesRecursive(subDir, pModuleRoot, .relPaths))
+        kill walkFiles
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkFilesRecursive(unitTestDir, moduleRoot, .walkFiles, "cls"))
+        set relPath = ""
+        for {
+            set relPath = $order(walkFiles(relPath))
+            quit:relPath=""
+            set relPaths(relPath) = ""
         }
     } catch e {
         set sc = e.AsStatus()

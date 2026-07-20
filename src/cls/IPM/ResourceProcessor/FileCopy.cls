@@ -196,22 +196,13 @@ Method OnSyncResolveFiles(Output relPaths) As %Status
             quit
         }
 
-        set rs = ##class(%SQL.Statement).%ExecDirect(,
-            "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
-            sourceDir, "*", "", 1)
-        if rs.%SQLCODE < 0 {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "FileSet query error: " _ rs.%Message))
-        }
-        while rs.%Next() {
-            if rs.%Get("Type") = "D" {
-                continue
-            }
-            set fullPath = rs.%Get("Name")
-            // Compute path relative to module root
-            set relPath = $extract(fullPath, $length(moduleRoot) + 1, *)
-            if relPath '= "" {
-                set relPaths(relPath) = ""
-            }
+        kill walkFiles
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkFilesRecursive(sourceDir, moduleRoot, .walkFiles))
+        set relPath = ""
+        for {
+            set relPath = $order(walkFiles(relPath))
+            quit:relPath=""
+            set relPaths(relPath) = ""
         }
     } catch e {
         set sc = e.AsStatus()

@@ -35,47 +35,29 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
         }
 
         // Pass 1: BFS the module root for compilable files present in the namespace.
-        // Uses a manual BFS queue because File_FileSet's recursive flag only returns
-        // immediate children — it does not descend through multiple directory levels in one call.
-        kill walkQueue
-        set walkHead = 1, walkTail = 1
-        set walkQueue(walkTail) = root
+        kill bfsFiles
+        $$$ThrowOnError(..WalkFilesRecursive(root, root, .bfsFiles, "cls,inc,mac,int"))
+        set relPath = ""
         for {
-            quit:(walkHead > walkTail)
-            set walkDir = walkQueue(walkHead)
-            set walkHead = walkHead + 1
-
-            set walkResult = ##class(%SQL.Statement).%ExecDirect(,
-                "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
-                walkDir, "*", "", 0)
-            while walkResult.%Next() {
-                set entryType = walkResult.%Get("Type")
-                set entryPath = walkResult.%Get("Name")
-                if entryType = "D" {
-                    set walkTail = walkTail + 1
-                    set walkQueue(walkTail) = ##class(%File).NormalizeDirectory(entryPath)
+            set relPath = $order(bfsFiles(relPath), 1, entryPath)
+            quit:relPath=""
+            set docName = ..RelPathToDocName(relPath)
+            if docName = "" {
+                continue
+            }
+            set docExt = $$$lcase($piece(docName, ".", *))
+            if docExt = "cls" {
+                if '$$$comClassDefined($piece(docName, ".", 1, *-1)) {
                     continue
                 }
-                set ext = $$$lcase($piece(entryPath, ".", *))
-                if ",cls,inc,mac,int," '[ (","_ext_",") {
+            } else {
+                if '##class(%RoutineMgr).Exists(docName) {
                     continue
                 }
-                set normalizedRelPath = ..NormalizePath($extract(entryPath, $length(root) + 1, *))
-                set docName = ..RelPathToDocName(normalizedRelPath)
-                if docName = "" {
-                    continue
-                }
-                set docExt = $$$lcase($piece(docName, ".", *))
-                if docExt = "cls" {
-                    if '$$$comClassDefined($piece(docName, ".", 1, *-1)) {
-                        continue
-                    }
-                } else {
-                    if '##class(%RoutineMgr).Exists(docName) {
-                        continue
-                    }
-                }
-                $$$ThrowOnError(..StampOneFile(module.Name, root, entryPath))
+            }
+            set stampSC = ..StampOneFile(module.Name, root, entryPath)
+            if $$$ISERR(stampSC) {
+                write !, "Warning: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
             }
         }
 
@@ -101,7 +83,10 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
                 if '##class(%File).Exists(fullPath) {
                     continue
                 }
-                $$$ThrowOnError(..StampOneFile(module.Name, root, fullPath))
+                set stampSC = ..StampOneFile(module.Name, root, fullPath)
+                if $$$ISERR(stampSC) {
+                    write !, "Warning: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
+                }
             }
         }
     } catch e {
@@ -111,9 +96,14 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
 }
 
 /// Stamp (or update) the FileHash row for a single file. Computes hash at stamp time.
+/// Returns an error if the file cannot be hashed (locked/permission denied).
 ClassMethod StampOneFile(moduleName As %String, root As %String, fullPath As %String) As %Status
 {
     set normalizedRelPath = ..NormalizePath($extract(fullPath, $length(root) + 1, *))
+    set hash = ##class(%File).SHA1Hash(fullPath, 1)
+    if hash = "" {
+        quit $$$ERROR($$$GeneralError, "Could not compute hash for: " _ fullPath)
+    }
     set existing = ..ModulePathIndexOpen(moduleName, normalizedRelPath, , .openSC)
     if $isobject(existing) {
         set instance = existing
@@ -122,7 +112,7 @@ ClassMethod StampOneFile(moduleName As %String, root As %String, fullPath As %St
         set instance.ModuleName = moduleName
         set instance.RelativePath = normalizedRelPath
     }
-    set instance.Hash = ##class(%File).SHA1Hash(fullPath, 1)
+    set instance.Hash = hash
     quit instance.%Save()
 }
 
@@ -182,45 +172,27 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
         }
 
         // Pass 1: BFS module root for compilable files present in the namespace.
-        kill walkQueue
-        set walkHead = 1, walkTail = 1
-        set walkQueue(walkTail) = root
+        kill bfsFiles
+        $$$ThrowOnError(..WalkFilesRecursive(root, root, .bfsFiles, "cls,inc,mac,int"))
+        set relPath = ""
         for {
-            quit:(walkHead > walkTail)
-            set walkDir = walkQueue(walkHead)
-            set walkHead = walkHead + 1
-
-            set walkResult = ##class(%SQL.Statement).%ExecDirect(,
-                "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
-                walkDir, "*", "", 0)
-            while walkResult.%Next() {
-                set entryType = walkResult.%Get("Type")
-                set entryPath = walkResult.%Get("Name")
-                if entryType = "D" {
-                    set walkTail = walkTail + 1
-                    set walkQueue(walkTail) = ##class(%File).NormalizeDirectory(entryPath)
-                    continue
-                }
-                set ext = $$$lcase($piece(entryPath, ".", *))
-                if ",cls,inc,mac,int," '[ (","_ext_",") {
-                    continue
-                }
-                set docName = ..RelPathToDocName(..NormalizePath($extract(entryPath, $length(root) + 1, *)))
-                if docName = "" {
-                    continue
-                }
-                set docExt = $$$lcase($piece(docName, ".", *))
-                if docExt = "cls" {
-                    if '$$$comClassDefined($piece(docName, ".", 1, *-1)) {
-                        continue
-                    }
-                } else {
-                    if '##class(%RoutineMgr).Exists(docName) {
-                        continue
-                    }
-                }
-                do ..CheckOneFile(module.Name, root, entryPath, .modified, .seen)
+            set relPath = $order(bfsFiles(relPath), 1, entryPath)
+            quit:relPath=""
+            set docName = ..RelPathToDocName(relPath)
+            if docName = "" {
+                continue
             }
+            set docExt = $$$lcase($piece(docName, ".", *))
+            if docExt = "cls" {
+                if '$$$comClassDefined($piece(docName, ".", 1, *-1)) {
+                    continue
+                }
+            } else {
+                if '##class(%RoutineMgr).Exists(docName) {
+                    continue
+                }
+            }
+            do ..CheckOneFile(module.Name, root, entryPath, .modified, .seen)
         }
 
         // Pass 2: manifest-derived paths for files not yet compiled (e.g. newly-declared
@@ -293,6 +265,7 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
 }
 
 /// Check a single file against its stored baseline. If no row or hash differs, add to modified.
+/// If hash cannot be computed (locked/permission denied), reports as modified with "" hash and warns.
 ClassMethod CheckOneFile(moduleName As %String, root As %String, fullPath As %String, ByRef modified, ByRef seen) [ Private ]
 {
     set normalizedRelPath = ..NormalizePath($extract(fullPath, $length(root) + 1, *))
@@ -300,12 +273,17 @@ ClassMethod CheckOneFile(moduleName As %String, root As %String, fullPath As %St
         quit
     }
     set seen(normalizedRelPath) = ""
-    set existing = ..ModulePathIndexOpen(moduleName, normalizedRelPath, , .openSC)
-    if '$isobject(existing) {
-        set modified(normalizedRelPath) = ##class(%File).SHA1Hash(fullPath, 1)
+    set newHash = ##class(%File).SHA1Hash(fullPath, 1)
+    if newHash = "" {
+        write !, "Warning: could not hash ", normalizedRelPath, " (file may be locked)"
+        set modified(normalizedRelPath) = ""
         quit
     }
-    set newHash = ##class(%File).SHA1Hash(fullPath, 1)
+    set existing = ..ModulePathIndexOpen(moduleName, normalizedRelPath, , .openSC)
+    if '$isobject(existing) {
+        set modified(normalizedRelPath) = newHash
+        quit
+    }
     if existing.Hash '= newHash {
         set modified(normalizedRelPath) = newHash
     }
@@ -387,6 +365,52 @@ ClassMethod NormalizePath(path As %String) As %String
         set path = $extract(path, 2, *)
     }
     quit path
+}
+
+/// BFS walk all files under dir, returning paths relative to relativeToRoot.
+/// extensionFilter is comma-separated (e.g. "cls,inc,mac,int") or "" for all files.
+/// Output: files(normalizedRelPath) = fullPath.
+ClassMethod WalkFilesRecursive(dir As %String, relativeToRoot As %String, Output files, extensionFilter As %String = "") As %Status
+{
+    set sc = $$$OK
+    try {
+        set dir = ##class(%File).NormalizeDirectory(dir)
+        set relativeToRoot = ##class(%File).NormalizeDirectory(relativeToRoot)
+        kill walkQueue
+        set walkHead = 1, walkTail = 1
+        set walkQueue(walkTail) = dir
+        for {
+            quit:(walkHead > walkTail)
+            set walkDir = walkQueue(walkHead)
+            set walkHead = walkHead + 1
+
+            set rs = ##class(%SQL.Statement).%ExecDirect(,
+                "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
+                walkDir, "*", "", 0)
+            while rs.%Next() {
+                set entryType = rs.%Get("Type")
+                set entryPath = rs.%Get("Name")
+                if entryType = "D" {
+                    set walkTail = walkTail + 1
+                    set walkQueue(walkTail) = ##class(%File).NormalizeDirectory(entryPath)
+                    continue
+                }
+                if extensionFilter '= "" {
+                    set ext = $$$lcase($piece(entryPath, ".", *))
+                    if (","_extensionFilter_",") '[ (","_ext_",") {
+                        continue
+                    }
+                }
+                set relPath = ..NormalizePath($extract(entryPath, $length(relativeToRoot) + 1, *))
+                if relPath '= "" {
+                    set files(relPath) = entryPath
+                }
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 Storage Default

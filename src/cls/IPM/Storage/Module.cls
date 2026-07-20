@@ -753,7 +753,6 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         set moduleXmlRelPath = ##class(%IPM.Storage.FileHash).NormalizePath("module.xml")
         set moduleXmlPath = root _ "module.xml"
         set moduleXmlChanged = ..SyncCheckModuleXml(.module, moduleXmlPath, moduleXmlRelPath)
-        set lifecycle = module.Lifecycle
 
         if '##class(%IPM.Storage.FileHash).HasBaseline(moduleName) {
             // Self-heal: establish baseline for modules loaded before this feature
@@ -786,13 +785,16 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         }
 
         // Step 3: Build reverse index (relPath -> owning resource + processor)
-        kill reverseIndex
-        do ..SyncBuildReverseIndex(module, .reverseIndex)
         set orderedResourceList = module.GetOrderedResourceList()
+        kill reverseIndex
+        do ..SyncBuildReverseIndex(module, orderedResourceList, .reverseIndex)
 
         // Step 4: Partition changes by resource, separating unsupported processors
         kill syncByResource, unsupportedWarnings
-        do ..SyncRouteChanges(.modified, .deleted, .reverseIndex, processDeletes, .syncByResource, .unsupportedWarnings)
+        do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource, .unsupportedWarnings)
+        if processDeletes {
+            do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource, .unsupportedWarnings)
+        }
 
         // Changes routed to a processor that doesn't support sync were never applied.
         // Drop them from modified/deleted so CommitChanges (Step 8) doesn't advance their
@@ -804,13 +806,13 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
 
         // Step 6: Compile the full resource set with u-flag to pick up dependent recompiles
         if loadItems > 0 {
-            $$$ThrowOnError(..SyncCompile(module, verbose, .params))
+            $$$ThrowOnError(..SyncCompile(module, orderedResourceList, verbose, .params))
         }
 
         // Step 7: Delete server-side documents for removed files, then recompile
         if processDeletes && ($data(deleted) > 1) {
             do ..SyncApplyDeletes(.deleted, .reverseIndex, .syncByResource, verbose)
-            $$$ThrowOnError(..SyncCompile(module, verbose, .params))
+            $$$ThrowOnError(..SyncCompile(module, orderedResourceList, verbose, .params))
         }
 
         // Step 8: Commit new hashes on success (skipped on error so next sync re-detects).
@@ -888,11 +890,19 @@ ClassMethod SyncCheckModuleXml(
 }
 
 /// Build a reverse index: normalizedRelPath -> resource name, Processor, Resource object.
-/// Used by SyncRouteChanges to map changed files back to their owning resource processors.
-ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIndex)
+/// Used by SyncRoutePathSet to map changed files back to their owning resource processors.
+///
+/// Step 1 builds docToResource (docName → owner) from ResolveChildren and maps
+/// OnSyncResolveFiles paths directly into reverseIndex (non-compilable resources).
+/// Step 2 maps all stored baseline paths to owners via RelPathToDocName → docToResource.
+/// This is sufficient because every path in modified/deleted has a stored baseline row
+/// (guaranteed by the self-heal stamping on first sync).
+ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex)
 {
-    // Pass 1: derive paths from resource metadata (covers standard layouts)
-    set orderedResourceList = module.GetOrderedResourceList()
+    // docToResource maps server document names (e.g. "SyncTest.SuperClass.CLS") to the
+    // resource that owns them. This lets us resolve filesystem paths → owners in O(1) below,
+    // since RelPathToDocName converts a relPath to a docName deterministically.
+    kill docToResource
     set key = ""
     for {
         set resource = orderedResourceList.GetNext(.key)
@@ -902,6 +912,7 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIn
             continue
         }
 
+        // ResolveChildren returns childArr keyed by document name (server-side identifier).
         kill childArr
         set childSC = resource.ResolveChildren(.childArr)
         if $$$ISERR(childSC) {
@@ -912,21 +923,27 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIn
         for {
             set childName = $order(childArr(childName))
             quit:childName=""
+            set docToResource(childName) = resource.Name
+            set docToResource(childName, "Processor") = resource.Processor
+            set docToResource(childName, "Resource") = resource
 
+            // Newly-declared resources have no baseline row yet (StampModule skips uncompiled
+            // classes), so GetStoredPaths below won't find them. Map their relPath directly.
             set relPath = $get(childArr(childName, "RelativePath"))
             if relPath = "" {
                 set relPath = resource.Processor.OnItemRelativePath(childName)
             }
-            if relPath = "" {
-                continue
+            if relPath '= "" {
+                set normalizedRelPath = ##class(%IPM.Storage.FileHash).NormalizePath(relPath)
+                set reverseIndex(normalizedRelPath) = resource.Name
+                set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
+                set reverseIndex(normalizedRelPath, "Resource") = resource
             }
-
-            set normalizedRelPath = ##class(%IPM.Storage.FileHash).NormalizePath(relPath)
-            set reverseIndex(normalizedRelPath) = resource.Name
-            set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
-            set reverseIndex(normalizedRelPath, "Resource") = resource
         }
 
+        // OnSyncResolveFiles returns filesystem-relative paths for non-compilable resources
+        // (FileCopy directories, test directories). These have no document name, so they go
+        // directly into reverseIndex keyed by relPath.
         kill syncOnlyPaths
         set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
         if $$$ISERR(childSC) {
@@ -936,7 +953,6 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIn
         for {
             set relPath = $order(syncOnlyPaths(relPath))
             quit:relPath=""
-
             set normalizedRelPath = ##class(%IPM.Storage.FileHash).NormalizePath(relPath)
             set reverseIndex(normalizedRelPath) = resource.Name
             set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
@@ -944,8 +960,10 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIn
         }
     }
 
-    // Pass 2: for stored paths not covered by Pass 1 (non-standard layouts),
-    // derive the document name, find the owning resource, and add to index.
+    // Resolve compilable paths: every baseline path not already claimed by OnSyncResolveFiles
+    // above gets mapped through RelPathToDocName → docToResource. This handles both standard
+    // and non-standard directory layouts uniformly (the path on disk doesn't matter — only
+    // the derived document name needs to match what ResolveChildren reported).
     kill storedPaths
     do ##class(%IPM.Storage.FileHash).GetStoredPaths(module.Name, .storedPaths)
     set relPath = ""
@@ -961,43 +979,13 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIn
         if docName = "" {
             continue
         }
-
-        set key = ""
-        for {
-            set resource = orderedResourceList.GetNext(.key)
-            quit:key=""
-
-            if '$isobject(resource.Processor) {
-                continue
-            }
-
-            kill childArr
-            set childSC = resource.ResolveChildren(.childArr)
-            if $$$ISERR(childSC) || '$data(childArr(docName)) {
-                continue
-            }
-
-            set reverseIndex(relPath) = resource.Name
-            set reverseIndex(relPath, "Processor") = resource.Processor
-            set reverseIndex(relPath, "Resource") = resource
-            quit
+        if '$data(docToResource(docName)) {
+            continue
         }
-    }
-}
 
-/// Partition modified and deleted paths into syncByResource (keyed by resource name) and
-/// unsupportedWarnings (for processors that don't support sync).
-ClassMethod SyncRouteChanges(
-    ByRef modified,
-    ByRef deleted,
-    ByRef reverseIndex,
-    processDeletes As %Boolean,
-    ByRef syncByResource,
-    ByRef unsupportedWarnings)
-{
-    do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource, .unsupportedWarnings)
-    if processDeletes {
-        do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource, .unsupportedWarnings)
+        set reverseIndex(relPath) = docToResource(docName)
+        set reverseIndex(relPath, "Processor") = docToResource(docName, "Processor")
+        set reverseIndex(relPath, "Resource") = docToResource(docName, "Resource")
     }
 }
 
@@ -1053,6 +1041,8 @@ ClassMethod SyncRoutePathSet(
 
 /// Call OnSync on each processor, then load any unhandled compilable files.
 /// Returns the number of files loaded (used to decide whether SyncCompile is needed).
+/// If a processor sets handled=1 in OnSync, it fully owns the sync for that resource
+/// (e.g. Test reloads its own way). Otherwise the default path loads+compiles each file.
 ClassMethod SyncDispatchProcessors(
     module As %IPM.Storage.Module,
     root As %String,
@@ -1105,6 +1095,8 @@ ClassMethod SyncDispatchProcessors(
 }
 
 /// Delete server-side documents for compilable deleted files.
+/// Guards skip paths with no owner, no processor, or non-compilable processors — those are
+/// handled elsewhere (unsupported warnings) or aren't server-side documents at all.
 ClassMethod SyncApplyDeletes(
     ByRef deleted,
     ByRef reverseIndex,
@@ -1127,7 +1119,7 @@ ClassMethod SyncApplyDeletes(
         if 'processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
             continue
         }
-        set docName = ..RelPathToDocName(relPath)
+        set docName = ##class(%IPM.Storage.FileHash).RelPathToDocName(relPath)
         if docName '= "" {
             set delFlags = $select(verbose:"d", 1:"-d")
             set delSC = $system.OBJ.Delete(docName, delFlags)
@@ -1235,12 +1227,14 @@ ClassMethod SyncPrintUnsupportedWarnings(moduleName As %String, ByRef unsupporte
     }
 }
 
-/// Compile all compilable resources in a module with the 'u' (skip-up-to-date) flag.
-ClassMethod SyncCompile(module As %IPM.Storage.Module, verbose As %Boolean = 0, ByRef params) As %Status
+/// Recompile all compilable resources in the module to catch dependents invalidated by
+/// changes loaded in SyncDispatchProcessors. Skips CompileFromProject resources — those are
+/// deployed code loaded via Studio project files (.prj); compiling them individually would
+/// fail because deployed classes have no source in the routine database.
+ClassMethod SyncCompile(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, verbose As %Boolean = 0, ByRef params) As %Status
 {
     set sc = $$$OK
     try {
-        set orderedResourceList = module.GetOrderedResourceList()
         kill compileArray
 
         set key = ""
@@ -1291,38 +1285,6 @@ ClassMethod SyncCompile(module As %IPM.Storage.Module, verbose As %Boolean = 0, 
         set sc = e.AsStatus()
     }
     quit sc
-}
-
-/// Convert a normalized relative path to an IRIS server document name.
-ClassMethod RelPathToDocName(relPath As %String) As %String
-{
-    set fileName = $piece(relPath, "/", *)
-    set ext = $zconvert($piece(fileName, ".", *), "U")
-    set baseName = $piece(fileName, ".", 1, *-1)
-
-    if ext = "CLS" {
-        // Convert path like src/cls/My/Package/Class.cls -> My.Package.Class.cls
-        set parts = $length(relPath, "/")
-        set className = ""
-        // Skip leading source prefixes (e.g. "src/cls/") to get class package path
-        set startPiece = 1
-        for i = 1:1:parts-1 {
-            set piece = $piece(relPath, "/", i)
-            if $listfind($listbuild("src", "cls"), $zconvert(piece, "L")) {
-                set startPiece = i + 1
-            } else {
-                quit
-            }
-        }
-        for i = startPiece:1:parts-1 {
-            set className = className _ $select(className="":"", 1:".") _ $piece(relPath, "/", i)
-        }
-        set className = className _ $select(className="":"", 1:".") _ baseName
-        quit className _ ".cls"
-    } elseif (ext = "MAC") || (ext = "INC") || (ext = "INT") {
-        quit baseName _ "." _ $zconvert(ext, "L")
-    }
-    quit ""
 }
 
 /// Uninstalls a named module (<var>pModuleName</var>).
