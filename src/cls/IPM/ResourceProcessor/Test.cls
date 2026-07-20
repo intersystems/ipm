@@ -385,22 +385,20 @@ Method SupportsSync() As %Boolean
 /// classes, so a test file that was never compiled — e.g. one just added to the test
 /// directory — is otherwise invisible to ComputeChanges until something else compiles it
 /// first. This live directory scan closes that gap.
-Method OnSyncResolveFiles(Output relPaths) As %Status
+Method OnSyncResolveFiles(Output relPaths, ByRef allFiles) As %Status
 {
     set sc = $$$OK
     try {
-        set unitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root _ ..ResourceReference.Name)
-        set moduleRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root)
-        if '##class(%File).DirectoryExists(unitTestDir) {
-            quit
-        }
-        kill walkFiles
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkFilesRecursive(unitTestDir, moduleRoot, .walkFiles, "cls"))
-        set relPath = ""
+        set prefix = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name _ "/")
+        set prefixLen = $length(prefix)
+        set relPath = prefix
         for {
-            set relPath = $order(walkFiles(relPath))
+            set relPath = $order(allFiles(relPath))
             quit:relPath=""
-            set relPaths(relPath) = ""
+            quit:($extract(relPath, 1, prefixLen) '= prefix)
+            if $$$lcase($piece(relPath, ".", *)) = "cls" {
+                set relPaths(relPath) = ""
+            }
         }
     } catch e {
         set sc = e.AsStatus()
