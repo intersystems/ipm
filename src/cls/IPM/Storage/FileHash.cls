@@ -47,11 +47,12 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
             }
             set docExt = $$$lcase($piece(docName, ".", *))
             if docExt = "cls" {
-                if '$$$comClassDefined($piece(docName, ".", 1, *-1)) {
+                set className = $piece(docName, ".", 1, *-1)
+                if '$$$comClassDefined(className) && '$$$comClassDefined("%" _ className) {
                     continue
                 }
             } else {
-                if '##class(%RoutineMgr).Exists(docName) {
+                if '##class(%RoutineMgr).Exists(docName) && '##class(%RoutineMgr).Exists("%" _ docName) {
                     continue
                 }
             }
@@ -187,11 +188,12 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             }
             set docExt = $$$lcase($piece(docName, ".", *))
             if docExt = "cls" {
-                if '$$$comClassDefined($piece(docName, ".", 1, *-1)) {
+                set className = $piece(docName, ".", 1, *-1)
+                if '$$$comClassDefined(className) && '$$$comClassDefined("%" _ className) {
                     continue
                 }
             } else {
-                if '##class(%RoutineMgr).Exists(docName) {
+                if '##class(%RoutineMgr).Exists(docName) && '##class(%RoutineMgr).Exists("%" _ docName) {
                     continue
                 }
             }
