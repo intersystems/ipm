@@ -768,13 +768,13 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(module))
         }
 
-        // Step 2: Walk the entire module root once (Python os.walk, fast).
-        // This pre-walked data feeds both the reverse index and change detection,
-        // eliminating redundant filesystem walks by processors.
+        // Step 2: Walk the entire module root and hash all files in one Python pass.
+        // This pre-walked data feeds the reverse index, change detection, and deletion checks —
+        // no further filesystem I/O needed from ObjectScript.
         set walkStart = $zhorolog
-        kill allFiles, bfsFiles
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkFilesRecursive(root, root, .allFiles))
-        // Also build a compilable-only subset for ComputeChanges Pass 1.
+        kill allFiles, allHashes, bfsFiles
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkAndHashFiles(root, root, .allFiles, .allHashes))
+        // Build a compilable-only subset for ComputeChanges Pass 1.
         set relPath = ""
         for {
             set relPath = $order(allFiles(relPath), 1, fullPath)
@@ -784,8 +784,16 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
                 set bfsFiles(relPath) = fullPath
             }
         }
+        // Count files walked for verbose output.
+        set fileCount = 0
+        set countKey = ""
+        for {
+            set countKey = $order(allFiles(countKey))
+            quit:countKey=""
+            set fileCount = fileCount + 1
+        }
         if verbose {
-            write !, "[", moduleName, "] File walk: ", $fnumber($zhorolog - walkStart, "", 2), "s"
+            write !, "[", moduleName, "] Scanned ", fileCount, " file(s) in ", $fnumber($zhorolog - walkStart, "", 2), "s"
         }
 
         // Step 3: Build reverse index (relPath -> owning resource + processor).
@@ -804,15 +812,11 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             set riCount = riCount + 1
         }
         if verbose {
-            write !, "[", moduleName, "] Reverse index: ", riCount, " tracked path(s)"
+            write !, "[", moduleName, "] Tracking ", riCount, " path(s) across ", orderedResourceList.Count(), " resource(s)"
         }
 
         // Step 4: Compute disk changes vs baseline
-        set scanStart = $zhorolog
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .manifestPaths, .bfsFiles, .allFiles))
-        if verbose {
-            write !, "[", moduleName, "] Change detection: ", $fnumber($zhorolog - scanStart, "", 2), "s"
-        }
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .manifestPaths, .bfsFiles, .allFiles, .allHashes))
 
         // Exclude module.xml from file routing (handled by SyncCheckModuleXml above)
         kill modified(moduleXmlRelPath)
@@ -930,7 +934,7 @@ ClassMethod SyncCheckModuleXml(
     if '$isobject(existing) {
         quit 0
     }
-    set newHash = ##class(%File).SHA1Hash(moduleXmlPath, 1)
+    set newHash = $$$lcase(##class(%File).SHA1Hash(moduleXmlPath, 1))
     if newHash = existing.Hash {
         quit 0
     }
@@ -1227,7 +1231,7 @@ ClassMethod SyncCommitModuleXml(
     moduleXmlRelPath As %String)
 {
     kill moduleXmlMod, emptyDel
-    set moduleXmlMod(moduleXmlRelPath) = ##class(%File).SHA1Hash(moduleXmlPath, 1)
+    set moduleXmlMod(moduleXmlRelPath) = $$$lcase(##class(%File).SHA1Hash(moduleXmlPath, 1))
     set commitSC = ##class(%IPM.Storage.FileHash).CommitChanges(module, .moduleXmlMod, .emptyDel, 0)
     if $$$ISERR(commitSC) {
         write !, "Warning: failed to record module.xml hash: ", $system.Status.GetOneErrorText(commitSC)

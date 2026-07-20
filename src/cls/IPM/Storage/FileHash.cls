@@ -28,20 +28,20 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
     try {
         set root = ##class(%File).NormalizeDirectory(module.Root)
 
-        // module.xml is always tracked.
-        set moduleXmlPath = root _ "module.xml"
-        if ##class(%File).Exists(moduleXmlPath) {
-            $$$ThrowOnError(..StampOneFile(module.Name, root, moduleXmlPath))
-        }
+        // Single walk+hash of the entire module root.
+        kill allFiles, allHashes
+        $$$ThrowOnError(..WalkAndHashFiles(root, root, .allFiles, .allHashes))
 
-        // Single walk of the entire module root (uses Python os.walk for speed).
-        kill allFiles
-        $$$ThrowOnError(..WalkFilesRecursive(root, root, .allFiles))
+        // module.xml is always tracked.
+        set moduleXmlRel = "module.xml"
+        if $data(allHashes(moduleXmlRel)) {
+            $$$ThrowOnError(..StampOneFileWithHash(module.Name, moduleXmlRel, allHashes(moduleXmlRel)))
+        }
 
         // Pass 1: filter for compilable files present in the namespace.
         set relPath = ""
         for {
-            set relPath = $order(allFiles(relPath), 1, entryPath)
+            set relPath = $order(allFiles(relPath))
             quit:relPath=""
             set ext = $$$lcase($piece(relPath, ".", *))
             if ",cls,inc,mac,int," '[ (","_ext_",") {
@@ -54,15 +54,19 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
             set docExt = $$$lcase($piece(docName, ".", *))
             if docExt = "cls" {
                 set className = $piece(docName, ".", 1, *-1)
-                if '$$$comClassDefined(className) && '$$$comClassDefined("%" _ className) {
+                if '$$$comClassDefined(className) {
                     continue
                 }
             } else {
-                if '##class(%RoutineMgr).Exists(docName) && '##class(%RoutineMgr).Exists("%" _ docName) {
+                if '##class(%RoutineMgr).Exists(docName) {
                     continue
                 }
             }
-            set stampSC = ..StampOneFile(module.Name, root, entryPath)
+            set hash = $get(allHashes(relPath))
+            if hash = "" {
+                continue
+            }
+            set stampSC = ..StampOneFileWithHash(module.Name, relPath, hash)
             if $$$ISERR(stampSC) {
                 write !, "Warning: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
             }
@@ -86,11 +90,11 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
             for {
                 set relPath = $order(syncOnlyPaths(relPath))
                 quit:relPath=""
-                set fullPath = ##class(%File).NormalizeFilename(relPath, root)
-                if '##class(%File).Exists(fullPath) {
+                set hash = $get(allHashes(relPath))
+                if hash = "" {
                     continue
                 }
-                set stampSC = ..StampOneFile(module.Name, root, fullPath)
+                set stampSC = ..StampOneFileWithHash(module.Name, relPath, hash)
                 if $$$ISERR(stampSC) {
                     write !, "Warning: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
                 }
@@ -102,22 +106,19 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
     quit sc
 }
 
-/// Stamp (or update) the FileHash row for a single file. Computes hash at stamp time.
-/// Returns an error if the file cannot be hashed (locked/permission denied).
-ClassMethod StampOneFile(moduleName As %String, root As %String, fullPath As %String) As %Status
+/// Stamp (or update) the FileHash row for a single file using a pre-computed hash.
+ClassMethod StampOneFileWithHash(moduleName As %String, relPath As %String, hash As %String) As %Status
 {
-    set normalizedRelPath = ..NormalizePath($extract(fullPath, $length(root) + 1, *))
-    set hash = ##class(%File).SHA1Hash(fullPath, 1)
     if hash = "" {
-        quit $$$ERROR($$$GeneralError, "Could not compute hash for: " _ fullPath)
+        quit $$$ERROR($$$GeneralError, "Empty hash for: " _ relPath)
     }
-    set existing = ..ModulePathIndexOpen(moduleName, normalizedRelPath, , .openSC)
+    set existing = ..ModulePathIndexOpen(moduleName, relPath, , .openSC)
     if $isobject(existing) {
         set instance = existing
     } else {
         set instance = ..%New()
         set instance.ModuleName = moduleName
-        set instance.RelativePath = normalizedRelPath
+        set instance.RelativePath = relPath
     }
     set instance.Hash = hash
     quit instance.%Save()
@@ -164,29 +165,30 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
 /// Compute which files changed on disk vs stored baseline.
 /// Pass 1: filter pre-walked BFS data for compilable files present in the namespace.
 /// Pass 2: check manifest-derived paths (from reverseIndex) for files not yet compiled
-/// or non-compilable tracked files — avoids re-calling ResolveChildren/OnSyncResolveFiles.
+/// or non-compilable tracked files.
 /// Pass 3: iterate stored rows to detect deletions.
 /// allFiles(relPath)=fullPath is the full pre-walked module root (all extensions).
+/// allHashes(relPath)=sha1hex are pre-computed hashes from the same walk.
 /// bfsFiles(relPath)=fullPath is the compilable subset (cls,inc,mac,int).
 /// Returns modified(relPath)=newHash and deleted(relPath)="" arrays.
-ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef manifestPaths, ByRef bfsFiles, ByRef allFiles) As %Status
+ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef manifestPaths, ByRef bfsFiles, ByRef allFiles, ByRef allHashes) As %Status
 {
     set sc = $$$OK
     kill modified, deleted
     try {
-        set root = ##class(%File).NormalizeDirectory(module.Root)
+        set moduleName = module.Name
         kill seen
 
         // module.xml
-        set moduleXmlPath = root _ "module.xml"
-        if ##class(%File).Exists(moduleXmlPath) {
-            do ..CheckOneFile(module.Name, root, moduleXmlPath, .modified, .seen)
+        set moduleXmlRel = "module.xml"
+        if $data(allHashes(moduleXmlRel)) {
+            do ..CompareOneFile(moduleName, moduleXmlRel, $get(allHashes(moduleXmlRel)), .modified, .seen)
         }
 
         // Pass 1: filter pre-walked compilable files by namespace presence.
         set relPath = ""
         for {
-            set relPath = $order(bfsFiles(relPath), 1, entryPath)
+            set relPath = $order(bfsFiles(relPath))
             quit:relPath=""
             set docName = ..RelPathToDocName(relPath)
             if docName = "" {
@@ -195,20 +197,19 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             set docExt = $$$lcase($piece(docName, ".", *))
             if docExt = "cls" {
                 set className = $piece(docName, ".", 1, *-1)
-                if '$$$comClassDefined(className) && '$$$comClassDefined("%" _ className) {
+                if '$$$comClassDefined(className) {
                     continue
                 }
             } else {
-                if '##class(%RoutineMgr).Exists(docName) && '##class(%RoutineMgr).Exists("%" _ docName) {
+                if '##class(%RoutineMgr).Exists(docName) {
                     continue
                 }
             }
-            do ..CheckOneFile(module.Name, root, entryPath, .modified, .seen)
+            do ..CompareOneFile(moduleName, relPath, $get(allHashes(relPath)), .modified, .seen)
         }
 
         // Pass 2: check manifest-derived paths for files BFS missed (uncompiled new files,
-        // non-compilable tracked files). Use allFiles for existence check (O(1) $data)
-        // instead of filesystem calls.
+        // non-compilable tracked files).
         set relPath = ""
         for {
             set relPath = $order(manifestPaths(relPath))
@@ -216,13 +217,13 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             if '$data(allFiles(relPath)) {
                 continue
             }
-            do ..CheckOneFile(module.Name, root, allFiles(relPath), .modified, .seen)
+            do ..CompareOneFile(moduleName, relPath, $get(allHashes(relPath)), .modified, .seen)
         }
 
         // Pass 3: iterate all stored rows — file not in allFiles → deleted.
         set result = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
-            module.Name)
+            moduleName)
         while result.%Next() {
             set storedRelPath = result.%Get("RelativePath")
             if '$data(allFiles(storedRelPath)) {
@@ -235,28 +236,24 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
     quit sc
 }
 
-/// Check a single file against its stored baseline. If no row or hash differs, add to modified.
-/// If hash cannot be computed (locked/permission denied), reports as modified with "" hash and warns.
-ClassMethod CheckOneFile(moduleName As %String, root As %String, fullPath As %String, ByRef modified, ByRef seen) [ Private ]
+/// Compare a file's pre-computed hash against stored baseline. No filesystem I/O.
+ClassMethod CompareOneFile(moduleName As %String, relPath As %String, newHash As %String, ByRef modified, ByRef seen) [ Private ]
 {
-    set normalizedRelPath = ..NormalizePath($extract(fullPath, $length(root) + 1, *))
-    if $data(seen(normalizedRelPath)) {
+    if $data(seen(relPath)) {
         quit
     }
-    set seen(normalizedRelPath) = ""
-    set newHash = ##class(%File).SHA1Hash(fullPath, 1)
+    set seen(relPath) = ""
     if newHash = "" {
-        write !, "Warning: could not hash ", normalizedRelPath, " (file may be locked)"
-        set modified(normalizedRelPath) = ""
+        set modified(relPath) = ""
         quit
     }
-    set existing = ..ModulePathIndexOpen(moduleName, normalizedRelPath, , .openSC)
+    set existing = ..ModulePathIndexOpen(moduleName, relPath, , .openSC)
     if '$isobject(existing) {
-        set modified(normalizedRelPath) = newHash
+        set modified(relPath) = newHash
         quit
     }
     if existing.Hash '= newHash {
-        set modified(normalizedRelPath) = newHash
+        set modified(relPath) = newHash
     }
 }
 
@@ -265,14 +262,11 @@ ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef d
 {
     set sc = $$$OK
     try {
-        set root = ##class(%File).NormalizeDirectory(module.Root)
-
         set relPath = ""
         for {
             set relPath = $order(modified(relPath), 1, newHash)
             quit:relPath=""
 
-            set fullPath = ##class(%File).NormalizeFilename(relPath, root)
             set existing = ..ModulePathIndexOpen(module.Name, relPath, , .openSC)
             if $isobject(existing) {
                 set instance = existing
@@ -338,35 +332,32 @@ ClassMethod NormalizePath(path As %String) As %String
     quit path
 }
 
-/// Walk all files under dir using Python os.walk() for performance.
-/// Returns files(normalizedRelPath) = fullPath, relative to relativeToRoot.
-/// extensionFilter is comma-separated (e.g. "cls,inc,mac,int") or "" for all files.
-/// Falls back to SQL-based BFS if Python is unavailable.
-ClassMethod WalkFilesRecursive(dir As %String, relativeToRoot As %String, Output files, extensionFilter As %String = "") As %Status
+/// Walk all files and compute SHA1 hashes in a single pass.
+/// Returns files(relPath) = fullPath and hashes(relPath) = sha1hex (lowercase).
+/// Uses Python os.walk + hashlib for speed; falls back to SQL BFS + %File.SHA1Hash.
+ClassMethod WalkAndHashFiles(dir As %String, relativeToRoot As %String, Output files, Output hashes) As %Status
 {
-    set sc = ..WalkFilesRecursivePython(dir, relativeToRoot, .files, extensionFilter)
+    set sc = ..WalkAndHashFilesPython(dir, relativeToRoot, .files, .hashes)
     if $$$ISERR(sc) {
-        set sc = ..WalkFilesRecursiveSQL(dir, relativeToRoot, .files, extensionFilter)
+        set sc = ..WalkAndHashFilesSQL(dir, relativeToRoot, .files, .hashes)
     }
     quit sc
 }
 
-/// Python implementation of recursive file walk using os.walk().
-/// ~10x faster than SQL-based FileSet iteration.
-ClassMethod WalkFilesRecursivePython(dir As %String, relativeToRoot As %String, Output files, extensionFilter As %String = "") As %Status
+ClassMethod WalkAndHashFilesPython(dir As %String, relativeToRoot As %String, Output files, Output hashes) As %Status [ Private ]
 {
     set sc = $$$OK
     try {
         set dir = ##class(%File).NormalizeDirectory(dir)
         set relativeToRoot = ##class(%File).NormalizeDirectory(relativeToRoot)
-        set jsonStr = ..WalkFilesRecursivePythonImpl(dir, relativeToRoot, extensionFilter)
+        set jsonStr = ..WalkAndHashFilesPythonImpl(dir, relativeToRoot)
         set result = ##class(%DynamicArray).%FromJSON(jsonStr)
         set count = result.%Size()
         for i = 0:1:(count - 1) {
             set entry = result.%Get(i)
             set relPath = entry.%Get("rel")
-            set fullPath = entry.%Get("full")
-            set files(relPath) = fullPath
+            set files(relPath) = entry.%Get("full")
+            set hashes(relPath) = entry.%Get("hash")
         }
     } catch e {
         set sc = e.AsStatus()
@@ -374,37 +365,38 @@ ClassMethod WalkFilesRecursivePython(dir As %String, relativeToRoot As %String, 
     quit sc
 }
 
-ClassMethod WalkFilesRecursivePythonImpl(dir As %String, relativeToRoot As %String, extensionFilter As %String = "") As %String [ Language = python ]
+ClassMethod WalkAndHashFilesPythonImpl(dir As %String, relativeToRoot As %String) As %String [ Language = python ]
 {
 import os
 import json
+import hashlib
 
 SKIP_DIRS = {'.git', '__pycache__', 'node_modules'}
 
 results = []
-ext_filter = set()
-if extensionFilter:
-    ext_filter = set(extensionFilter.lower().split(','))
-
 root_len = len(relativeToRoot.rstrip(os.sep)) + 1
 
 for dirpath, dirnames, filenames in os.walk(dir):
     dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
     for fname in filenames:
-        if ext_filter:
-            ext = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
-            if ext not in ext_filter:
-                continue
         full_path = os.path.join(dirpath, fname)
         rel_path = full_path[root_len:].replace('\\', '/')
-        if rel_path:
-            results.append({"rel": rel_path, "full": full_path})
+        if not rel_path:
+            continue
+        try:
+            h = hashlib.sha1()
+            with open(full_path, 'rb') as f:
+                while chunk := f.read(65536):
+                    h.update(chunk)
+            results.append({"rel": rel_path, "full": full_path, "hash": h.hexdigest()})
+        except (OSError, PermissionError):
+            results.append({"rel": rel_path, "full": full_path, "hash": ""})
 
 return json.dumps(results)
 }
 
-/// SQL-based BFS fallback for environments without Python.
-ClassMethod WalkFilesRecursiveSQL(dir As %String, relativeToRoot As %String, Output files, extensionFilter As %String = "") As %Status
+/// SQL-based BFS fallback that walks and hashes without Python.
+ClassMethod WalkAndHashFilesSQL(dir As %String, relativeToRoot As %String, Output files, Output hashes) As %Status [ Private ]
 {
     set sc = $$$OK
     try {
@@ -425,19 +417,18 @@ ClassMethod WalkFilesRecursiveSQL(dir As %String, relativeToRoot As %String, Out
                 set entryType = rs.%Get("Type")
                 set entryPath = rs.%Get("Name")
                 if entryType = "D" {
+                    set childDirName = ##class(%File).GetFilename(entryPath)
+                    if ",.git,__pycache__,node_modules," [ (","_childDirName_",") {
+                        continue
+                    }
                     set walkTail = walkTail + 1
                     set walkQueue(walkTail) = ##class(%File).NormalizeDirectory(entryPath)
                     continue
                 }
-                if extensionFilter '= "" {
-                    set ext = $$$lcase($piece(entryPath, ".", *))
-                    if (","_extensionFilter_",") '[ (","_ext_",") {
-                        continue
-                    }
-                }
                 set relPath = ..NormalizePath($extract(entryPath, $length(relativeToRoot) + 1, *))
                 if relPath '= "" {
                     set files(relPath) = entryPath
+                    set hashes(relPath) = $$$lcase(##class(%File).SHA1Hash(entryPath, 1))
                 }
             }
         }
