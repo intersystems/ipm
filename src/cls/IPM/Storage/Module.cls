@@ -755,17 +755,21 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         set moduleXmlChanged = ..SyncCheckModuleXml(.module, moduleXmlPath, moduleXmlRelPath)
         set lifecycle = module.Lifecycle
 
-        // Step 2: Collect tracked paths and compute disk changes vs baseline
-        do lifecycle.GetTrackedPaths(.trackedPaths)
-
         if '##class(%IPM.Storage.FileHash).HasBaseline(moduleName) {
             // Self-heal: establish baseline for modules loaded before this feature
-            do ##class(%IPM.Storage.FileHash).StampModule(module, .trackedPaths)
+            $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(module))
             write !, "[", moduleName, "] Baseline established. Run sync again to detect changes."
             quit
         }
 
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .trackedPaths, .modified, .deleted))
+        // After a manifest reload, re-stamp so newly-declared resources get baseline rows
+        // in this same sync call rather than requiring a separate reload -dev.
+        if moduleXmlChanged {
+            $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(module))
+        }
+
+        // Step 2: Compute disk changes vs baseline (self-contained — BFS + stored rows)
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted))
 
         // Exclude module.xml from file routing (handled by SyncCheckModuleXml above)
         kill modified(moduleXmlRelPath)

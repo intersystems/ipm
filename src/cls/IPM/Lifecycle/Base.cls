@@ -727,71 +727,6 @@ Method %Reload(ByRef pParams) As %Status
     quit tSC
 }
 
-/// Build the set of tracked paths (resource-owned files + module.xml) for sync change detection.
-/// Output: trackedPaths(normalizedRelPath)=""
-Method GetTrackedPaths(Output trackedPaths)
-{
-    kill trackedPaths
-
-    // Always derive paths from resource metadata — this discovers new files that aren't
-    // stamped yet (e.g. a newly-added resource or a new file in a directory-scanned resource).
-    set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath("module.xml")) = ""
-
-    set orderedResourceList = ..Module.GetOrderedResourceList()
-    set key = ""
-    for {
-        set resource = orderedResourceList.GetNext(.key)
-        quit:key=""
-
-        if '$isobject(resource.Processor) {
-            continue
-        }
-
-        kill childArr
-        set sc = resource.ResolveChildren(.childArr)
-        if $$$ISERR(sc) {
-            continue
-        }
-
-        set childName = ""
-        for {
-            set childName = $order(childArr(childName))
-            quit:childName=""
-
-            set relPath = $get(childArr(childName, "RelativePath"))
-            if relPath = "" {
-                set relPath = resource.Processor.OnItemRelativePath(childName)
-            }
-            if relPath = "" {
-                continue
-            }
-
-            set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath(relPath)) = ""
-        }
-
-        kill syncOnlyPaths
-        set sc = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
-        if $$$ISERR(sc) {
-            continue
-        }
-        set relPath = ""
-        for {
-            set relPath = $order(syncOnlyPaths(relPath))
-            quit:relPath=""
-            set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath(relPath)) = ""
-        }
-    }
-
-    // Also merge stored paths. These cover files at non-standard locations that derivation
-    // would place at a different path (e.g. no cls/ subdir). Without stored paths, a change
-    // to such a file is never presented to ComputeChanges and sync can't detect it.
-    if ##class(%IPM.Storage.FileHash).HasBaseline(..Module.Name) {
-        kill storedPaths
-        do ##class(%IPM.Storage.FileHash).GetStoredPaths(..Module.Name, .storedPaths)
-        merge trackedPaths = storedPaths
-    }
-}
-
 Method InstallOrDownloadPythonRequirements(
 	pRoot As %String = "",
 	ByRef pParams,
@@ -1271,11 +1206,10 @@ Method %Compile(ByRef pParams) As %Status
 
         // Stamp file baselines for sync change detection (dev mode only).
         // Non-fatal: stamping failure must not break a normal compile cycle.
-        // Done here after compile so test classes are in ^oddDEF and appear in trackedPaths.
+        // Done after compile so test classes are in ^oddDEF and pass the namespace filter in StampModule.
         if tDevMode {
             try {
-                do ..GetTrackedPaths(.trackedPaths)
-                do ##class(%IPM.Storage.FileHash).StampModule(..Module, .trackedPaths)
+                $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(..Module))
             } catch stampEx {
                 write !, "Warning: sync baseline stamping failed: ", $system.Status.GetOneErrorText(stampEx.AsStatus())
             }

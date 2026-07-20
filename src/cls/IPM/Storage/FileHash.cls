@@ -27,31 +27,23 @@ Index ModuleNameIndex On ModuleName;
 
 ForeignKey ModuleNameFK(ModuleName) References %IPM.Storage.Module(Name) [ OnDelete = cascade ];
 
-/// Stamp actual file paths for this module by combining two passes:
-/// Pass 1 covers convention-derived paths that exist on disk (standard layouts).
-/// Pass 2 walks the module root for compilable files not found at their derived location.
-ClassMethod StampModule(module As %IPM.Storage.Module, ByRef trackedPaths) As %Status
+/// Stamp all tracked files for a module. Two passes:
+/// Pass 1 walks the module root for compilable files (cls/inc/mac/int) present in the namespace.
+/// Pass 2 calls OnSyncResolveFiles on each processor to stamp non-compilable tracked files (e.g. FileCopy).
+/// Also stamps module.xml.
+ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
 {
     set sc = $$$OK
     try {
         set root = ##class(%File).NormalizeDirectory(module.Root)
 
-        // Pass 1: stamp all convention-derived paths that exist on disk.
-        set relPath = ""
-        for {
-            set relPath = $order(trackedPaths(relPath))
-            quit:relPath=""
-
-            set fullPath = ##class(%File).NormalizeFilename(relPath, root)
-            if '##class(%File).Exists(fullPath) {
-                continue
-            }
-            $$$ThrowOnError(..StampOneFile(module.Name, root, fullPath))
+        // module.xml is always tracked.
+        set moduleXmlPath = root _ "module.xml"
+        if ##class(%File).Exists(moduleXmlPath) {
+            $$$ThrowOnError(..StampOneFile(module.Name, root, moduleXmlPath))
         }
 
-        // Pass 2: walk the module root for compilable files not already in trackedPaths.
-        // Catches non-standard layouts where OnItemRelativePath produced a path that doesn't
-        // match the actual file location on disk.
+        // Pass 1: BFS the module root for compilable files present in the namespace.
         // Uses a manual BFS queue because File_FileSet's recursive flag only returns
         // immediate children — it does not descend through multiple directory levels in one call.
         kill walkQueue
@@ -78,9 +70,6 @@ ClassMethod StampModule(module As %IPM.Storage.Module, ByRef trackedPaths) As %S
                     continue
                 }
                 set normalizedRelPath = ..NormalizePath($extract(entryPath, $length(root) + 1, *))
-                if $data(trackedPaths(normalizedRelPath)) {
-                    continue
-                }
                 set docName = ..RelPathToDocName(normalizedRelPath)
                 if docName = "" {
                     continue
@@ -96,6 +85,32 @@ ClassMethod StampModule(module As %IPM.Storage.Module, ByRef trackedPaths) As %S
                     }
                 }
                 $$$ThrowOnError(..StampOneFile(module.Name, root, entryPath))
+            }
+        }
+
+        // Pass 2: stamp non-compilable tracked files via OnSyncResolveFiles on each processor.
+        set orderedResourceList = module.GetOrderedResourceList()
+        set key = ""
+        for {
+            set resource = orderedResourceList.GetNext(.key)
+            quit:key=""
+            if '$isobject(resource.Processor) {
+                continue
+            }
+            kill syncOnlyPaths
+            set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
+            if $$$ISERR(childSC) {
+                continue
+            }
+            set relPath = ""
+            for {
+                set relPath = $order(syncOnlyPaths(relPath))
+                quit:relPath=""
+                set fullPath = ##class(%File).NormalizeFilename(relPath, root)
+                if '##class(%File).Exists(fullPath) {
+                    continue
+                }
+                $$$ThrowOnError(..StampOneFile(module.Name, root, fullPath))
             }
         }
     } catch e {
@@ -160,49 +175,151 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
     quit name _ "." _ $$$UPPER(ext)
 }
 
-/// Compute which tracked files changed on disk vs stored baseline.
+/// Compute which files changed on disk vs stored baseline. Self-contained: discovers files
+/// via BFS (compilable) + OnSyncResolveFiles (non-compilable), then iterates stored rows for deletions.
 /// Returns modified(relPath)=newHash and deleted(relPath)="" arrays.
-ClassMethod ComputeChanges(module As %IPM.Storage.Module, ByRef trackedPaths, Output modified, Output deleted) As %Status
+ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted) As %Status
 {
     set sc = $$$OK
     kill modified, deleted
     try {
         set root = ##class(%File).NormalizeDirectory(module.Root)
+        kill seen
 
-        set relPath = ""
+        // module.xml
+        set moduleXmlPath = root _ "module.xml"
+        if ##class(%File).Exists(moduleXmlPath) {
+            do ..CheckOneFile(module.Name, root, moduleXmlPath, .modified, .seen)
+        }
+
+        // Pass 1: BFS module root for compilable files present in the namespace.
+        kill walkQueue
+        set walkHead = 1, walkTail = 1
+        set walkQueue(walkTail) = root
         for {
-            set relPath = $order(trackedPaths(relPath))
-            quit:relPath=""
+            quit:(walkHead > walkTail)
+            set walkDir = walkQueue(walkHead)
+            set walkHead = walkHead + 1
 
-            set normalizedRelPath = ..NormalizePath(relPath)
-            set fullPath = ##class(%File).NormalizeFilename(relPath, root)
-
-            if '##class(%File).Exists(fullPath) {
-                if ..ModulePathIndexExists(module.Name, normalizedRelPath) {
-                    set deleted(normalizedRelPath) = ""
+            set walkResult = ##class(%SQL.Statement).%ExecDirect(,
+                "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
+                walkDir, "*", "", 0)
+            while walkResult.%Next() {
+                set entryType = walkResult.%Get("Type")
+                set entryPath = walkResult.%Get("Name")
+                if entryType = "D" {
+                    set walkTail = walkTail + 1
+                    set walkQueue(walkTail) = ##class(%File).NormalizeDirectory(entryPath)
+                    continue
                 }
+                set ext = $$$lcase($piece(entryPath, ".", *))
+                if ",cls,inc,mac,int," '[ (","_ext_",") {
+                    continue
+                }
+                set docName = ..RelPathToDocName(..NormalizePath($extract(entryPath, $length(root) + 1, *)))
+                if docName = "" {
+                    continue
+                }
+                set docExt = $$$lcase($piece(docName, ".", *))
+                if docExt = "cls" {
+                    if '$$$comClassDefined($piece(docName, ".", 1, *-1)) {
+                        continue
+                    }
+                } else {
+                    if '##class(%RoutineMgr).Exists(docName) {
+                        continue
+                    }
+                }
+                do ..CheckOneFile(module.Name, root, entryPath, .modified, .seen)
+            }
+        }
+
+        // Pass 2: manifest-derived paths for files not yet compiled (e.g. newly-declared
+        // resource after manifest reload). BFS skips these because they fail the namespace
+        // filter, but they exist on disk and should be detected as new.
+        set orderedResourceList = module.GetOrderedResourceList()
+        set key = ""
+        for {
+            set resource = orderedResourceList.GetNext(.key)
+            quit:key=""
+            if '$isobject(resource.Processor) {
                 continue
             }
-
-            set existing = ..ModulePathIndexOpen(module.Name, normalizedRelPath, , .openSC)
-            if '$isobject(existing) {
-                // No baseline row — file joined trackedPaths after initial load (e.g. added via
-                // OnSyncResolveFiles). Stamp it silently so it doesn't trigger a spurious
-                // "modified" on every sync until someone edits it.
-                do ..StampOneFile(module.Name, root, fullPath)
+            kill childArr
+            set childSC = resource.ResolveChildren(.childArr)
+            if $$$ISERR(childSC) {
                 continue
             }
+            set childName = ""
+            for {
+                set childName = $order(childArr(childName))
+                quit:childName=""
+                set relPath = $get(childArr(childName, "RelativePath"))
+                if relPath = "" {
+                    set relPath = resource.Processor.OnItemRelativePath(childName)
+                }
+                if relPath = "" {
+                    continue
+                }
+                set fullPath = ##class(%File).NormalizeFilename(relPath, root)
+                if '##class(%File).Exists(fullPath) {
+                    continue
+                }
+                do ..CheckOneFile(module.Name, root, fullPath, .modified, .seen)
+            }
 
-            // Hash-only comparison. Avoids mtime unreliability on bind mounts.
-            set newHash = ##class(%File).SHA1Hash(fullPath, 1)
-            if existing.Hash '= newHash {
-                set modified(normalizedRelPath) = newHash
+            // Also check OnSyncResolveFiles for non-compilable tracked files.
+            kill syncOnlyPaths
+            set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
+            if $$$ISERR(childSC) {
+                continue
+            }
+            set relPath = ""
+            for {
+                set relPath = $order(syncOnlyPaths(relPath))
+                quit:relPath=""
+                set fullPath = ##class(%File).NormalizeFilename(relPath, root)
+                if '##class(%File).Exists(fullPath) {
+                    continue
+                }
+                do ..CheckOneFile(module.Name, root, fullPath, .modified, .seen)
+            }
+        }
+
+        // Pass 3: iterate all stored rows — file missing from disk → deleted.
+        set result = ##class(%SQL.Statement).%ExecDirect(,
+            "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
+            module.Name)
+        while result.%Next() {
+            set storedRelPath = result.%Get("RelativePath")
+            set fullPath = ##class(%File).NormalizeFilename(storedRelPath, root)
+            if '##class(%File).Exists(fullPath) {
+                set deleted(storedRelPath) = ""
             }
         }
     } catch e {
         set sc = e.AsStatus()
     }
     quit sc
+}
+
+/// Check a single file against its stored baseline. If no row or hash differs, add to modified.
+ClassMethod CheckOneFile(moduleName As %String, root As %String, fullPath As %String, ByRef modified, ByRef seen) [ Private ]
+{
+    set normalizedRelPath = ..NormalizePath($extract(fullPath, $length(root) + 1, *))
+    if $data(seen(normalizedRelPath)) {
+        quit
+    }
+    set seen(normalizedRelPath) = ""
+    set existing = ..ModulePathIndexOpen(moduleName, normalizedRelPath, , .openSC)
+    if '$isobject(existing) {
+        set modified(normalizedRelPath) = ##class(%File).SHA1Hash(fullPath, 1)
+        quit
+    }
+    set newHash = ##class(%File).SHA1Hash(fullPath, 1)
+    if existing.Hash '= newHash {
+        set modified(normalizedRelPath) = newHash
+    }
 }
 
 /// After a successful sync, commit new hashes for modified files and optionally remove deleted rows.
@@ -261,7 +378,6 @@ ClassMethod HasBaseline(moduleName As %String) As %Boolean
 }
 
 /// Populate paths(normalizedRelPath)="" for all stored baseline rows for this module.
-/// Same structure as the trackedPaths array used by GetTrackedPaths and ComputeChanges.
 ClassMethod GetStoredPaths(moduleName As %String, Output paths)
 {
     kill paths
