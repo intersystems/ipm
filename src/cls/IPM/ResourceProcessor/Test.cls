@@ -383,9 +383,8 @@ Method SupportsSync() As %Boolean
 /// Enumerate test files on disk so sync can detect brand-new test classes.
 /// ResolveChildren (via GetChildren's StudioOpenDialog query) only sees already-compiled
 /// classes, so a test file that was never compiled — e.g. one just added to the test
-/// directory — is otherwise invisible to GetTrackedPaths/ComputeChanges until something
-/// else compiles it first. This live directory scan closes that gap, mirroring FileCopy's
-/// OnSyncResolveFiles for the same reason.
+/// directory — is otherwise invisible to ComputeChanges until something else compiles it
+/// first. This live directory scan closes that gap.
 Method OnSyncResolveFiles(Output relPaths) As %Status
 {
     set sc = $$$OK
