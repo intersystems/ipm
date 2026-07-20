@@ -34,13 +34,19 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
             $$$ThrowOnError(..StampOneFile(module.Name, root, moduleXmlPath))
         }
 
-        // Pass 1: BFS the module root for compilable files present in the namespace.
-        kill bfsFiles
-        $$$ThrowOnError(..WalkFilesRecursive(root, root, .bfsFiles, "cls,inc,mac,int"))
+        // Single walk of the entire module root (uses Python os.walk for speed).
+        kill allFiles
+        $$$ThrowOnError(..WalkFilesRecursive(root, root, .allFiles))
+
+        // Pass 1: filter for compilable files present in the namespace.
         set relPath = ""
         for {
-            set relPath = $order(bfsFiles(relPath), 1, entryPath)
+            set relPath = $order(allFiles(relPath), 1, entryPath)
             quit:relPath=""
+            set ext = $$$lcase($piece(relPath, ".", *))
+            if ",cls,inc,mac,int," '[ (","_ext_",") {
+                continue
+            }
             set docName = ..RelPathToDocName(relPath)
             if docName = "" {
                 continue
@@ -72,7 +78,7 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
                 continue
             }
             kill syncOnlyPaths
-            set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
+            set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths, .allFiles)
             if $$$ISERR(childSC) {
                 continue
             }
@@ -156,12 +162,14 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
 }
 
 /// Compute which files changed on disk vs stored baseline.
-/// Pass 1: BFS for compilable files present in the namespace.
+/// Pass 1: filter pre-walked BFS data for compilable files present in the namespace.
 /// Pass 2: check manifest-derived paths (from reverseIndex) for files not yet compiled
 /// or non-compilable tracked files — avoids re-calling ResolveChildren/OnSyncResolveFiles.
 /// Pass 3: iterate stored rows to detect deletions.
+/// allFiles(relPath)=fullPath is the full pre-walked module root (all extensions).
+/// bfsFiles(relPath)=fullPath is the compilable subset (cls,inc,mac,int).
 /// Returns modified(relPath)=newHash and deleted(relPath)="" arrays.
-ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef manifestPaths) As %Status
+ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef manifestPaths, ByRef bfsFiles, ByRef allFiles) As %Status
 {
     set sc = $$$OK
     kill modified, deleted
@@ -175,9 +183,7 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             do ..CheckOneFile(module.Name, root, moduleXmlPath, .modified, .seen)
         }
 
-        // Pass 1: BFS module root for compilable files present in the namespace.
-        kill bfsFiles
-        $$$ThrowOnError(..WalkFilesRecursive(root, root, .bfsFiles, "cls,inc,mac,int"))
+        // Pass 1: filter pre-walked compilable files by namespace presence.
         set relPath = ""
         for {
             set relPath = $order(bfsFiles(relPath), 1, entryPath)
@@ -201,27 +207,25 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
         }
 
         // Pass 2: check manifest-derived paths for files BFS missed (uncompiled new files,
-        // non-compilable tracked files). These come from reverseIndex which already called
-        // ResolveChildren + OnSyncResolveFiles, avoiding redundant iteration here.
+        // non-compilable tracked files). Use allFiles for existence check (O(1) $data)
+        // instead of filesystem calls.
         set relPath = ""
         for {
             set relPath = $order(manifestPaths(relPath))
             quit:relPath=""
-            set fullPath = ##class(%File).NormalizeFilename(relPath, root)
-            if '##class(%File).Exists(fullPath) {
+            if '$data(allFiles(relPath)) {
                 continue
             }
-            do ..CheckOneFile(module.Name, root, fullPath, .modified, .seen)
+            do ..CheckOneFile(module.Name, root, allFiles(relPath), .modified, .seen)
         }
 
-        // Pass 3: iterate all stored rows — file missing from disk → deleted.
+        // Pass 3: iterate all stored rows — file not in allFiles → deleted.
         set result = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
             module.Name)
         while result.%Next() {
             set storedRelPath = result.%Get("RelativePath")
-            set fullPath = ##class(%File).NormalizeFilename(storedRelPath, root)
-            if '##class(%File).Exists(fullPath) {
+            if '$data(allFiles(storedRelPath)) {
                 set deleted(storedRelPath) = ""
             }
         }
@@ -334,10 +338,73 @@ ClassMethod NormalizePath(path As %String) As %String
     quit path
 }
 
-/// BFS walk all files under dir, returning paths relative to relativeToRoot.
+/// Walk all files under dir using Python os.walk() for performance.
+/// Returns files(normalizedRelPath) = fullPath, relative to relativeToRoot.
 /// extensionFilter is comma-separated (e.g. "cls,inc,mac,int") or "" for all files.
-/// Output: files(normalizedRelPath) = fullPath.
+/// Falls back to SQL-based BFS if Python is unavailable.
 ClassMethod WalkFilesRecursive(dir As %String, relativeToRoot As %String, Output files, extensionFilter As %String = "") As %Status
+{
+    set sc = ..WalkFilesRecursivePython(dir, relativeToRoot, .files, extensionFilter)
+    if $$$ISERR(sc) {
+        set sc = ..WalkFilesRecursiveSQL(dir, relativeToRoot, .files, extensionFilter)
+    }
+    quit sc
+}
+
+/// Python implementation of recursive file walk using os.walk().
+/// ~10x faster than SQL-based FileSet iteration.
+ClassMethod WalkFilesRecursivePython(dir As %String, relativeToRoot As %String, Output files, extensionFilter As %String = "") As %Status
+{
+    set sc = $$$OK
+    try {
+        set dir = ##class(%File).NormalizeDirectory(dir)
+        set relativeToRoot = ##class(%File).NormalizeDirectory(relativeToRoot)
+        set jsonStr = ..WalkFilesRecursivePythonImpl(dir, relativeToRoot, extensionFilter)
+        set result = ##class(%DynamicArray).%FromJSON(jsonStr)
+        set count = result.%Size()
+        for i = 0:1:(count - 1) {
+            set entry = result.%Get(i)
+            set relPath = entry.%Get("rel")
+            set fullPath = entry.%Get("full")
+            set files(relPath) = fullPath
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+ClassMethod WalkFilesRecursivePythonImpl(dir As %String, relativeToRoot As %String, extensionFilter As %String = "") As %String [ Language = python ]
+{
+import os
+import json
+
+SKIP_DIRS = {'.git', '__pycache__', 'node_modules'}
+
+results = []
+ext_filter = set()
+if extensionFilter:
+    ext_filter = set(extensionFilter.lower().split(','))
+
+root_len = len(relativeToRoot.rstrip(os.sep)) + 1
+
+for dirpath, dirnames, filenames in os.walk(dir):
+    dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+    for fname in filenames:
+        if ext_filter:
+            ext = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
+            if ext not in ext_filter:
+                continue
+        full_path = os.path.join(dirpath, fname)
+        rel_path = full_path[root_len:].replace('\\', '/')
+        if rel_path:
+            results.append({"rel": rel_path, "full": full_path})
+
+return json.dumps(results)
+}
+
+/// SQL-based BFS fallback for environments without Python.
+ClassMethod WalkFilesRecursiveSQL(dir As %String, relativeToRoot As %String, Output files, extensionFilter As %String = "") As %Status
 {
     set sc = $$$OK
     try {

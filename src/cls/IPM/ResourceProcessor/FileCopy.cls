@@ -186,22 +186,27 @@ Method DoCopy(
 
 /// Enumerate source files so sync can detect changes to FileCopy resources.
 /// Populates relPaths(relPath)="" for each file under the source directory, relative to module root.
-Method OnSyncResolveFiles(Output relPaths) As %Status
+Method OnSyncResolveFiles(Output relPaths, ByRef allFiles) As %Status
 {
     set sc = $$$OK
     try {
         set sourceDir = ##class(%File).NormalizeDirectory(..GetSource())
         set moduleRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root)
-        if '##class(%File).DirectoryExists(sourceDir) {
+        // Source must be under module root to appear in allFiles.
+        if $$$lcase($extract(sourceDir, 1, $length(moduleRoot))) '= $$$lcase(moduleRoot) {
             quit
         }
-
-        kill walkFiles
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkFilesRecursive(sourceDir, moduleRoot, .walkFiles))
-        set relPath = ""
+        set relSourceDir = ##class(%IPM.Storage.FileHash).NormalizePath($extract(sourceDir, $length(moduleRoot) + 1, *))
+        if relSourceDir = "" {
+            quit
+        }
+        set prefix = relSourceDir _ "/"
+        set prefixLen = $length(prefix)
+        set relPath = prefix
         for {
-            set relPath = $order(walkFiles(relPath))
+            set relPath = $order(allFiles(relPath))
             quit:relPath=""
+            quit:($extract(relPath, 1, prefixLen) '= prefix)
             set relPaths(relPath) = ""
         }
     } catch e {

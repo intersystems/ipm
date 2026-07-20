@@ -768,15 +768,32 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(module))
         }
 
-        // Step 2: Build reverse index (relPath -> owning resource + processor).
-        // Done before ComputeChanges so we can pass manifest-derived paths to it,
-        // avoiding a redundant ResolveChildren + OnSyncResolveFiles iteration.
+        // Step 2: Walk the entire module root once (Python os.walk, fast).
+        // This pre-walked data feeds both the reverse index and change detection,
+        // eliminating redundant filesystem walks by processors.
+        set walkStart = $zhorolog
+        kill allFiles, bfsFiles
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkFilesRecursive(root, root, .allFiles))
+        // Also build a compilable-only subset for ComputeChanges Pass 1.
+        set relPath = ""
+        for {
+            set relPath = $order(allFiles(relPath), 1, fullPath)
+            quit:relPath=""
+            set ext = $$$lcase($piece(relPath, ".", *))
+            if ",cls,inc,mac,int," [ (","_ext_",") {
+                set bfsFiles(relPath) = fullPath
+            }
+        }
+        if verbose {
+            write !, "[", moduleName, "] File walk: ", $fnumber($zhorolog - walkStart, "", 2), "s"
+        }
+
+        // Step 3: Build reverse index (relPath -> owning resource + processor).
         set orderedResourceList = module.GetOrderedResourceList()
         kill reverseIndex, unsupportedResources
-        do ..SyncBuildReverseIndex(module, orderedResourceList, .reverseIndex, .unsupportedResources)
+        do ..SyncBuildReverseIndex(module, orderedResourceList, .reverseIndex, .unsupportedResources, .allFiles)
 
         // Collect manifest-derived paths from reverseIndex for ComputeChanges.
-        // These supplement the BFS walk (which only finds compiled files).
         kill manifestPaths
         set riCount = 0
         set riKey = ""
@@ -790,9 +807,9 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             write !, "[", moduleName, "] Reverse index: ", riCount, " tracked path(s)"
         }
 
-        // Step 3: Compute disk changes vs baseline
+        // Step 4: Compute disk changes vs baseline
         set scanStart = $zhorolog
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .manifestPaths))
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .manifestPaths, .bfsFiles, .allFiles))
         if verbose {
             write !, "[", moduleName, "] Change detection: ", $fnumber($zhorolog - scanStart, "", 2), "s"
         }
@@ -815,14 +832,14 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             quit
         }
 
-        // Step 4: Partition changes by owning resource
+        // Step 5: Partition changes by owning resource
         kill syncByResource
         do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource)
         if processDeletes {
             do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource)
         }
 
-        // Step 5: Dispatch OnSync to each processor; load unhandled compilable files
+        // Step 6: Dispatch OnSync to each processor; load unhandled compilable files
         if verbose {
             set resCount = 0
             set resName = ""
@@ -835,18 +852,18 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         }
         $$$ThrowOnError(..SyncDispatchProcessors(module, root, verbose, .syncByResource, .params, .loadItems))
 
-        // Step 6: Compile the full resource set with u-flag to pick up dependent recompiles
+        // Step 7: Compile the full resource set with u-flag to pick up dependent recompiles
         if loadItems > 0 {
             $$$ThrowOnError(..SyncCompile(module, orderedResourceList, verbose, .params))
         }
 
-        // Step 7: Delete server-side documents for removed files, then recompile
+        // Step 8: Delete server-side documents for removed files, then recompile
         if processDeletes && ($data(deleted) > 1) {
             do ..SyncApplyDeletes(.deleted, .reverseIndex, .syncByResource, verbose)
             $$$ThrowOnError(..SyncCompile(module, orderedResourceList, verbose, .params))
         }
 
-        // Step 8: Commit new hashes on success (skipped on error so next sync re-detects).
+        // Step 9: Commit new hashes on success (skipped on error so next sync re-detects).
         // Done before running tests below so a test failure doesn't prevent the file-sync
         // outcome from being committed and reported — file sync and test results are independent.
         $$$ThrowOnError(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, processDeletes))
@@ -887,7 +904,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
 
         write !, "[", moduleName, "] Done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
 
-        // Step 9: Run changed test-phase tests if -test flag is set (after sync is reported)
+        // Step 10: Run changed test-phase tests if -test flag is set (after sync is reported)
         if runTests {
             $$$ThrowOnError(..SyncRunTests(orderedResourceList, verbose, .params))
         }
@@ -932,7 +949,7 @@ ClassMethod SyncCheckModuleXml(
 /// Step 1 builds docToResource (docName → owner) from ResolveChildren and maps
 /// OnSyncResolveFiles paths directly into reverseIndex (non-compilable resources).
 /// Step 2 maps all stored baseline paths to owners via RelPathToDocName → docToResource.
-ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex, Output unsupportedResources)
+ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex, Output unsupportedResources, ByRef allFiles)
 {
     kill unsupportedResources
     // docToResource maps server document names (e.g. "SyncTest.SuperClass.CLS") to the
@@ -984,9 +1001,10 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
 
         // OnSyncResolveFiles returns filesystem-relative paths for non-compilable resources
         // (FileCopy directories, test directories). These have no document name, so they go
-        // directly into reverseIndex keyed by relPath.
+        // directly into reverseIndex keyed by relPath. Passes pre-walked allFiles so
+        // processors filter in-memory instead of re-walking the filesystem.
         kill syncOnlyPaths
-        set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
+        set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths, .allFiles)
         if $$$ISERR(childSC) {
             continue
         }
