@@ -154,10 +154,13 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
     quit name _ "." _ $$$UPPER(ext)
 }
 
-/// Compute which files changed on disk vs stored baseline. Self-contained: discovers files
-/// via BFS (compilable) + OnSyncResolveFiles (non-compilable), then iterates stored rows for deletions.
+/// Compute which files changed on disk vs stored baseline.
+/// Pass 1: BFS for compilable files present in the namespace.
+/// Pass 2: check manifest-derived paths (from reverseIndex) for files not yet compiled
+/// or non-compilable tracked files — avoids re-calling ResolveChildren/OnSyncResolveFiles.
+/// Pass 3: iterate stored rows to detect deletions.
 /// Returns modified(relPath)=newHash and deleted(relPath)="" arrays.
-ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted) As %Status
+ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef manifestPaths) As %Status
 {
     set sc = $$$OK
     kill modified, deleted
@@ -195,56 +198,18 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             do ..CheckOneFile(module.Name, root, entryPath, .modified, .seen)
         }
 
-        // Pass 2: manifest-derived paths for files not yet compiled (e.g. newly-declared
-        // resource after manifest reload). BFS skips these because they fail the namespace
-        // filter, but they exist on disk and should be detected as new.
-        set orderedResourceList = module.GetOrderedResourceList()
-        set key = ""
+        // Pass 2: check manifest-derived paths for files BFS missed (uncompiled new files,
+        // non-compilable tracked files). These come from reverseIndex which already called
+        // ResolveChildren + OnSyncResolveFiles, avoiding redundant iteration here.
+        set relPath = ""
         for {
-            set resource = orderedResourceList.GetNext(.key)
-            quit:key=""
-            if '$isobject(resource.Processor) {
+            set relPath = $order(manifestPaths(relPath))
+            quit:relPath=""
+            set fullPath = ##class(%File).NormalizeFilename(relPath, root)
+            if '##class(%File).Exists(fullPath) {
                 continue
             }
-            kill childArr
-            set childSC = resource.ResolveChildren(.childArr)
-            if $$$ISERR(childSC) {
-                continue
-            }
-            set childName = ""
-            for {
-                set childName = $order(childArr(childName))
-                quit:childName=""
-                set relPath = $get(childArr(childName, "RelativePath"))
-                if relPath = "" {
-                    set relPath = resource.Processor.OnItemRelativePath(childName)
-                }
-                if relPath = "" {
-                    continue
-                }
-                set fullPath = ##class(%File).NormalizeFilename(relPath, root)
-                if '##class(%File).Exists(fullPath) {
-                    continue
-                }
-                do ..CheckOneFile(module.Name, root, fullPath, .modified, .seen)
-            }
-
-            // Also check OnSyncResolveFiles for non-compilable tracked files.
-            kill syncOnlyPaths
-            set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths)
-            if $$$ISERR(childSC) {
-                continue
-            }
-            set relPath = ""
-            for {
-                set relPath = $order(syncOnlyPaths(relPath))
-                quit:relPath=""
-                set fullPath = ##class(%File).NormalizeFilename(relPath, root)
-                if '##class(%File).Exists(fullPath) {
-                    continue
-                }
-                do ..CheckOneFile(module.Name, root, fullPath, .modified, .seen)
-            }
+            do ..CheckOneFile(module.Name, root, fullPath, .modified, .seen)
         }
 
         // Pass 3: iterate all stored rows — file missing from disk → deleted.

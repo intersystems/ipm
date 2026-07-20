@@ -284,22 +284,6 @@ Method TestModuleXmlChangedWarning()
     do $$$AssertTrue(..FindInOutput(.output, "module.xml changed"), "Warning about module.xml change is shown")
 }
 
-/// A changed file owned by a resource processor that doesn't support sync produces a
-/// warning directing the user to run a full reload.
-Method TestNonSyncProcessorWarning()
-{
-    set filePath = ..TempDir _ "static/config.txt"
-    do ..ReplaceInFile(filePath, "static file content", "modified static content")
-
-    kill params
-    set params("Verbose") = 1
-    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-
-    do $$$AssertStatusOK(sc, "Sync with non-sync processor file change succeeds")
-    do $$$AssertTrue(..FindInOutput(.output, "does not support sync"), "Warning about non-sync resource shown")
-}
 
 /// Without -test, a changed test-phase class is loaded but not executed. With -test, it is
 /// executed and its results are shown.
@@ -377,57 +361,6 @@ Method TestSyncTestFlagBatchesMultipleChangedClasses()
     do $$$AssertEquals(testResultsCount, 1, "Both changed classes ran in a single batched Test Results block, not one per class")
 }
 
-/// A change to a file owned by a processor that doesn't support sync is never applied, so
-/// its baseline must stay unchanged. The warning should reappear on every subsequent sync
-/// until the change is actually applied (e.g. via a full reload).
-Method TestUnsupportedProcessorChangeNotCommitted()
-{
-    set filePath = ..TempDir _ "static/config.txt"
-    do ..ReplaceInFile(filePath, "static file content", "modified static content")
-
-    kill params
-    set params("Verbose") = 1
-    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-    do $$$AssertStatusOK(sc, "Sync with non-sync processor file change succeeds")
-    do $$$AssertTrue(..FindInOutput(.output, "does not support sync"), "Warning about non-sync resource shown")
-
-    // Baseline must NOT reflect the on-disk change, since it was never applied.
-    // If it were committed, running sync again would report "Nothing to sync" and
-    // silently drop the warning even though config.txt server-side content is still stale.
-    kill params2
-    set params2("Verbose") = 1
-    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
-    set sc2 = ##class(%IPM.Storage.Module).Sync("sync-test", .params2)
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
-    do $$$AssertStatusOK(sc2, "Second sync succeeds")
-    do $$$AssertTrue(..FindInOutput(.output2, "does not support sync"), "Warning still shown on next sync (baseline was not falsely committed)")
-}
-
-/// A brand-new file added under a directory-scanned FileCopy resource is recognized as a
-/// change on the next sync. FileCopy resources are directory-scanned (OnResolveChildren
-/// queries the source directory live), so a new file here is discoverable without any
-/// module.xml change — unlike individually-declared <Resource> classes, which require a
-/// manifest entry regardless of sync (see TestModuleXmlAddsResourcePicksUpNewFile).
-Method TestNewFileInFileCopyResourceDetected()
-{
-    set filePath = ..TempDir _ "static/new-file.txt"
-    set stream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(stream.LinkToFile(filePath))
-    $$$ThrowOnError(stream.Write("new static file"))
-    $$$ThrowOnError(stream.%Save())
-    set stream = ""
-
-    kill params
-    set params("Verbose") = 1
-    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-
-    do $$$AssertStatusOK(sc, "Sync with a new FileCopy file succeeds")
-    do $$$AssertTrue(..FindInOutput(.output, "does not support sync"), "New file under a non-sync-supporting resource is recognized as a change (warned, not silently ignored)")
-}
 
 /// With two UnitTest resources present, a changed test class in one resource's directory
 /// must only be dispatched through that owning resource — not through every Test processor

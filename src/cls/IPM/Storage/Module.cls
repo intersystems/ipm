@@ -725,6 +725,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
 {
     set sc = $$$OK
     try {
+        set syncStart = $zhorolog
         set verbose = $get(params("Verbose"), 0)
         set processDeletes = $get(params("ProcessDeletes"), 0)
         set runTests = $get(params("RunTests"), 0)
@@ -767,8 +768,34 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(module))
         }
 
-        // Step 2: Compute disk changes vs baseline (self-contained — BFS + stored rows)
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted))
+        // Step 2: Build reverse index (relPath -> owning resource + processor).
+        // Done before ComputeChanges so we can pass manifest-derived paths to it,
+        // avoiding a redundant ResolveChildren + OnSyncResolveFiles iteration.
+        set orderedResourceList = module.GetOrderedResourceList()
+        kill reverseIndex, unsupportedResources
+        do ..SyncBuildReverseIndex(module, orderedResourceList, .reverseIndex, .unsupportedResources)
+
+        // Collect manifest-derived paths from reverseIndex for ComputeChanges.
+        // These supplement the BFS walk (which only finds compiled files).
+        kill manifestPaths
+        set riCount = 0
+        set riKey = ""
+        for {
+            set riKey = $order(reverseIndex(riKey))
+            quit:riKey=""
+            set manifestPaths(riKey) = ""
+            set riCount = riCount + 1
+        }
+        if verbose {
+            write !, "[", moduleName, "] Reverse index: ", riCount, " tracked path(s)"
+        }
+
+        // Step 3: Compute disk changes vs baseline
+        set scanStart = $zhorolog
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .manifestPaths))
+        if verbose {
+            write !, "[", moduleName, "] Change detection: ", $fnumber($zhorolog - scanStart, "", 2), "s"
+        }
 
         // Exclude module.xml from file routing (handled by SyncCheckModuleXml above)
         kill modified(moduleXmlRelPath)
@@ -781,27 +808,31 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
                 do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
                 do ..SyncPrintModuleXmlWarning(moduleName)
             }
+            if verbose && $data(unsupportedResources) {
+                do ..SyncPrintUnsupportedNote(moduleName, .unsupportedResources)
+            }
+            write !, "[", moduleName, "] Done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
             quit
         }
 
-        // Step 3: Build reverse index (relPath -> owning resource + processor)
-        set orderedResourceList = module.GetOrderedResourceList()
-        kill reverseIndex
-        do ..SyncBuildReverseIndex(module, orderedResourceList, .reverseIndex)
-
-        // Step 4: Partition changes by resource, separating unsupported processors
-        kill syncByResource, unsupportedWarnings
-        do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource, .unsupportedWarnings)
+        // Step 4: Partition changes by owning resource
+        kill syncByResource
+        do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource)
         if processDeletes {
-            do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource, .unsupportedWarnings)
+            do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource)
         }
 
-        // Changes routed to a processor that doesn't support sync were never applied.
-        // Drop them from modified/deleted so CommitChanges (Step 8) doesn't advance their
-        // baseline — otherwise the next sync would see "no change" despite the pending edit.
-        do ..SyncExcludeUnsupported(.unsupportedWarnings, .modified, .deleted)
-
         // Step 5: Dispatch OnSync to each processor; load unhandled compilable files
+        if verbose {
+            set resCount = 0
+            set resName = ""
+            for {
+                set resName = $order(syncByResource(resName))
+                quit:resName=""
+                set resCount = resCount + 1
+            }
+            write !, "[", moduleName, "] Dispatching to ", resCount, " resource(s)"
+        }
         $$$ThrowOnError(..SyncDispatchProcessors(module, root, verbose, .syncByResource, .params, .loadItems))
 
         // Step 6: Compile the full resource set with u-flag to pick up dependent recompiles
@@ -850,7 +881,11 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         if moduleXmlChanged {
             do ..SyncPrintModuleXmlWarning(moduleName)
         }
-        do ..SyncPrintUnsupportedWarnings(moduleName, .unsupportedWarnings)
+        if verbose && $data(unsupportedResources) {
+            do ..SyncPrintUnsupportedNote(moduleName, .unsupportedResources)
+        }
+
+        write !, "[", moduleName, "] Done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
 
         // Step 9: Run changed test-phase tests if -test flag is set (after sync is reported)
         if runTests {
@@ -891,14 +926,15 @@ ClassMethod SyncCheckModuleXml(
 
 /// Build a reverse index: normalizedRelPath -> resource name, Processor, Resource object.
 /// Used by SyncRoutePathSet to map changed files back to their owning resource processors.
+/// Skips resources whose processor does not support sync — those are collected in
+/// unsupportedResources(resourceName)="" for informational display.
 ///
 /// Step 1 builds docToResource (docName → owner) from ResolveChildren and maps
 /// OnSyncResolveFiles paths directly into reverseIndex (non-compilable resources).
 /// Step 2 maps all stored baseline paths to owners via RelPathToDocName → docToResource.
-/// This is sufficient because every path in modified/deleted has a stored baseline row
-/// (guaranteed by the self-heal stamping on first sync).
-ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex)
+ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex, Output unsupportedResources)
 {
+    kill unsupportedResources
     // docToResource maps server document names (e.g. "SyncTest.SuperClass.CLS") to the
     // resource that owns them. This lets us resolve filesystem paths → owners in O(1) below,
     // since RelPathToDocName converts a relPath to a docName deterministically.
@@ -909,6 +945,11 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         quit:key=""
 
         if '$isobject(resource.Processor) {
+            continue
+        }
+
+        if 'resource.Processor.SupportsSync() {
+            set unsupportedResources(resource.Name) = ""
             continue
         }
 
@@ -989,35 +1030,14 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
     }
 }
 
-/// Remove paths routed to a non-sync-supporting processor from modified/deleted, since
-/// those changes were never applied and must not advance the FileHash baseline.
-ClassMethod SyncExcludeUnsupported(
-    ByRef unsupportedWarnings,
-    ByRef modified,
-    ByRef deleted)
-{
-    set resName = ""
-    for {
-        set resName = $order(unsupportedWarnings(resName))
-        quit:resName=""
-
-        set relPath = ""
-        for {
-            set relPath = $order(unsupportedWarnings(resName, relPath))
-            quit:relPath=""
-            kill modified(relPath)
-            kill deleted(relPath)
-        }
-    }
-}
 
 /// Route a set of changed paths to their owning resources, categorized by type (modified/deleted).
+/// Only sync-supporting resources appear in reverseIndex, so no filtering needed here.
 ClassMethod SyncRoutePathSet(
     ByRef paths,
     ByRef reverseIndex,
     category As %String,
-    ByRef syncByResource,
-    ByRef unsupportedWarnings) [ Private ]
+    ByRef syncByResource) [ Private ]
 {
     set relPath = ""
     for {
@@ -1028,14 +1048,9 @@ ClassMethod SyncRoutePathSet(
             continue
         }
         set resName = reverseIndex(relPath)
-        set processor = reverseIndex(relPath, "Processor")
-        if 'processor.SupportsSync() {
-            set unsupportedWarnings(resName, relPath) = ""
-        } else {
-            set syncByResource(resName, category, relPath) = ""
-            set syncByResource(resName, "Processor") = processor
-            set syncByResource(resName, "Resource") = reverseIndex(relPath, "Resource")
-        }
+        set syncByResource(resName, category, relPath) = ""
+        set syncByResource(resName, "Processor") = reverseIndex(relPath, "Processor")
+        set syncByResource(resName, "Resource") = reverseIndex(relPath, "Resource")
     }
 }
 
@@ -1209,22 +1224,24 @@ ClassMethod SyncPrintModuleXmlWarning(moduleName As %String)
     write !, "  manifest-level changes (mappings, dependencies, defaults)."
 }
 
-ClassMethod SyncPrintUnsupportedWarnings(moduleName As %String, ByRef unsupportedWarnings)
+ClassMethod SyncPrintUnsupportedNote(moduleName As %String, ByRef unsupportedResources)
 {
-    set warnRes = ""
+    set count = 0
+    set names = ""
+    set resName = ""
     for {
-        set warnRes = $order(unsupportedWarnings(warnRes))
-        quit:warnRes=""
-
-        write !, "Warning: resource '", warnRes, "' does not support sync. Changed files:"
-        set warnPath = ""
-        for {
-            set warnPath = $order(unsupportedWarnings(warnRes, warnPath))
-            quit:warnPath=""
-            write !, "  ", warnPath
+        set resName = $order(unsupportedResources(resName))
+        quit:resName=""
+        set count = count + 1
+        if count <= 3 {
+            set names = names _ $select(names="":"", 1:", ") _ resName
         }
-        write !, "  Run `reload ", moduleName, "` to apply these changes."
     }
+    if count > 3 {
+        set names = names _ ", ... (" _ (count - 3) _ " more)"
+    }
+    write !, "[", moduleName, "] ", count, " resource(s) skipped (no sync support): ", names
+    write !, "  Use `reload ", moduleName, "` to apply changes to those resources."
 }
 
 /// Recompile all compilable resources in the module to catch dependents invalidated by
