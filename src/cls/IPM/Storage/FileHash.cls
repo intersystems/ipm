@@ -304,6 +304,9 @@ ClassMethod HasBaseline(moduleName As %String) As %Boolean
     set result = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT TOP 1 1 FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
         moduleName)
+    if result.%SQLCODE < 0 {
+        quit 0
+    }
     quit result.%Next()
 }
 
@@ -314,6 +317,9 @@ ClassMethod GetStoredPaths(moduleName As %String, Output paths)
     set result = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
         moduleName)
+    if result.%SQLCODE < 0 {
+        quit
+    }
     while result.%Next() {
         set paths(result.%Get("RelativePath")) = ""
     }
