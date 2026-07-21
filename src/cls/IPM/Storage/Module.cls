@@ -762,11 +762,13 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             quit
         }
 
-        // After a manifest reload, re-stamp so newly-declared resources get baseline rows
-        // in this same sync call rather than requiring a separate reload -dev.
-        if moduleXmlChanged {
-            $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(module))
-        }
+        // No StampModule call here after a manifest reload: StampModule would overwrite current
+        // hashes for ALL files (including ones the user just edited), causing ComputeChanges to
+        // see current-vs-current and report zero changes for co-edited files.
+        // Newly-declared resources are handled without a full stamp: SyncBuildReverseIndex
+        // (step 3) calls ResolveChildren, which adds their derived relPaths to reverseIndex →
+        // manifestPaths. ComputeChanges Pass 2 finds those paths with no baseline row and
+        // reports them as modified, so they are loaded in this same sync call.
 
         // Step 2: Walk the entire module root and hash all files in one Python pass.
         // This pre-walked data feeds the reverse index, change detection, and deletion checks —
@@ -774,23 +776,16 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         set walkStart = $zhorolog
         kill allFiles, allHashes, bfsFiles
         $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkAndHashFiles(root, root, .allFiles, .allHashes))
-        // Build a compilable-only subset for ComputeChanges Pass 1.
-        set relPath = ""
+        // Build a compilable-only subset for ComputeChanges Pass 1; count total for verbose.
+        set relPath = "", fileCount = 0
         for {
             set relPath = $order(allFiles(relPath), 1, fullPath)
             quit:relPath=""
+            set fileCount = fileCount + 1
             set ext = $$$lcase($piece(relPath, ".", *))
             if ",cls,inc,mac,int," [ (","_ext_",") {
                 set bfsFiles(relPath) = fullPath
             }
-        }
-        // Count files walked for verbose output.
-        set fileCount = 0
-        set countKey = ""
-        for {
-            set countKey = $order(allFiles(countKey))
-            quit:countKey=""
-            set fileCount = fileCount + 1
         }
         if verbose {
             write !, "[", moduleName, "] Scanned ", fileCount, " file(s) in ", $fnumber($zhorolog - walkStart, "", 2), "s"
@@ -925,7 +920,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
 ClassMethod SyncCheckModuleXml(
     ByRef module As %IPM.Storage.Module,
     moduleXmlPath As %String,
-    moduleXmlRelPath As %String) As %Boolean
+    moduleXmlRelPath As %String) As %Boolean [ Private ]
 {
     if '##class(%File).Exists(moduleXmlPath) {
         quit 0
@@ -939,7 +934,6 @@ ClassMethod SyncCheckModuleXml(
         quit 0
     }
     $$$ThrowOnError($system.OBJ.Load(moduleXmlPath, "-d"))
-    $$$ThrowOnError(module.%Reload())
     set module = ..NameOpen(module.Name, , .openSC)
     $$$ThrowOnError(openSC)
     quit 1
@@ -950,10 +944,10 @@ ClassMethod SyncCheckModuleXml(
 /// Skips resources whose processor does not support sync — those are collected in
 /// unsupportedResources(resourceName)="" for informational display.
 ///
-/// Step 1 builds docToResource (docName → owner) from ResolveChildren and maps
-/// OnSyncResolveFiles paths directly into reverseIndex (non-compilable resources).
+/// Step 1 builds docToResource (docName → owner) from ResolveChildren and calls
+/// OnSyncResolveFiles for directory-based resources (e.g. test dirs) that have no doc name.
 /// Step 2 maps all stored baseline paths to owners via RelPathToDocName → docToResource.
-ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex, Output unsupportedResources, ByRef allFiles)
+ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex, Output unsupportedResources, ByRef allFiles) [ Private ]
 {
     kill unsupportedResources
     // docToResource maps server document names (e.g. "SyncTest.SuperClass.CLS") to the
@@ -1003,10 +997,10 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
             }
         }
 
-        // OnSyncResolveFiles returns filesystem-relative paths for non-compilable resources
-        // (FileCopy directories, test directories). These have no document name, so they go
-        // directly into reverseIndex keyed by relPath. Passes pre-walked allFiles so
-        // processors filter in-memory instead of re-walking the filesystem.
+        // OnSyncResolveFiles returns filesystem-relative paths for directory-based resources
+        // (e.g. test directories). These have no document name, so they go directly into
+        // reverseIndex keyed by relPath. Passes pre-walked allFiles so processors filter
+        // in-memory instead of re-walking the filesystem.
         kill syncOnlyPaths
         set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths, .allFiles)
         if $$$ISERR(childSC) {
@@ -1086,7 +1080,7 @@ ClassMethod SyncDispatchProcessors(
     verbose As %Boolean,
     ByRef syncByResource,
     ByRef params,
-    Output loadItems As %Integer = 0) As %Status
+    Output loadItems As %Integer = 0) As %Status [ Private ]
 {
     set sc = $$$OK
     try {
@@ -1138,7 +1132,7 @@ ClassMethod SyncApplyDeletes(
     ByRef deleted,
     ByRef reverseIndex,
     ByRef syncByResource,
-    verbose As %Boolean)
+    verbose As %Boolean) [ Private ]
 {
     set relPath = ""
     for {
@@ -1160,6 +1154,10 @@ ClassMethod SyncApplyDeletes(
         if docName '= "" {
             set delFlags = $select(verbose:"d", 1:"-d")
             set delSC = $system.OBJ.Delete(docName, delFlags)
+            // Delete failures are non-fatal: the SyncCompile pass that immediately follows
+            // will fail to compile any class that still references the deleted doc, surfacing
+            // the error with full context. Aborting the delete loop here would leave other
+            // deletions unapplied and make the overall error harder to diagnose.
             if $$$ISERR(delSC) {
                 write !, "Warning: could not delete ", docName, ": ", $system.Status.GetOneErrorText(delSC)
             }
@@ -1174,7 +1172,7 @@ ClassMethod SyncApplyDeletes(
 ClassMethod SyncRunTests(
     orderedResourceList As %ListOfObjects,
     verbose As %Boolean,
-    ByRef params) As %Status
+    ByRef params) As %Status [ Private ]
 {
     set sc = $$$OK
     try {
@@ -1228,7 +1226,7 @@ ClassMethod SyncRunTests(
 ClassMethod SyncCommitModuleXml(
     module As %IPM.Storage.Module,
     moduleXmlPath As %String,
-    moduleXmlRelPath As %String)
+    moduleXmlRelPath As %String) [ Private ]
 {
     kill moduleXmlMod, emptyDel
     set moduleXmlMod(moduleXmlRelPath) = $$$lcase(##class(%File).SHA1Hash(moduleXmlPath, 1))
@@ -1238,7 +1236,7 @@ ClassMethod SyncCommitModuleXml(
     }
 }
 
-ClassMethod SyncPrintModuleXmlWarning(moduleName As %String)
+ClassMethod SyncPrintModuleXmlWarning(moduleName As %String) [ Private ]
 {
     write !
     write !, "Warning: module.xml changed and was reloaded."
@@ -1246,7 +1244,7 @@ ClassMethod SyncPrintModuleXmlWarning(moduleName As %String)
     write !, "  manifest-level changes (mappings, dependencies, defaults)."
 }
 
-ClassMethod SyncPrintUnsupportedNote(moduleName As %String, ByRef unsupportedResources)
+ClassMethod SyncPrintUnsupportedNote(moduleName As %String, ByRef unsupportedResources) [ Private ]
 {
     set count = 0
     set names = ""
@@ -1270,7 +1268,7 @@ ClassMethod SyncPrintUnsupportedNote(moduleName As %String, ByRef unsupportedRes
 /// changes loaded in SyncDispatchProcessors. Skips CompileFromProject resources — those are
 /// deployed code loaded via Studio project files (.prj); compiling them individually would
 /// fail because deployed classes have no source in the routine database.
-ClassMethod SyncCompile(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, verbose As %Boolean = 0, ByRef params) As %Status
+ClassMethod SyncCompile(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, verbose As %Boolean = 0, ByRef params) As %Status [ Private ]
 {
     set sc = $$$OK
     try {

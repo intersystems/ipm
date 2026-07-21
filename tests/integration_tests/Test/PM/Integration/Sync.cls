@@ -473,6 +473,29 @@ Method TestFailedCompileRetries()
     do $$$AssertStatusOK(sc, "Sync succeeds after fixing syntax error (retry works)")
 }
 
+/// Editing module.xml and a source class in the same operation must sync BOTH changes.
+/// The StampModule call in the moduleXmlChanged branch must not clobber existing baseline
+/// rows for files edited at the same time — if it does, the class change is lost silently.
+Method TestModuleXmlAndClassEditedTogether()
+{
+    set moduleXmlPath = ..TempDir _ "module.xml"
+    set clsPath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+
+    // Edit both files before running sync
+    do ..ReplaceInFile(moduleXmlPath, "<Version>1.0.0</Version>", "<Version>1.0.1</Version>")
+    do ..ReplaceInFile(clsPath, """original""", """modified-with-xml""")
+
+    kill params
+    set params("Verbose") = 1
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after co-editing module.xml and a class succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Sync reports changes (not 'Nothing to sync')")
+    do $$$AssertTrue(..FindInOutput(.output, "SuperClass.cls"), "SuperClass.cls appears in sync output as updated")
+}
+
 /// Returns the path to a fixture directory under _data/.
 /// Matches the convention from Test.PM.Integration.Base.GetModuleDir.
 ClassMethod GetModuleDir(subfolders... As %String) As %String

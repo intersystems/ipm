@@ -222,7 +222,10 @@ Method SupportsSync() As %Boolean
 /// OnResolveChildren/OnItemRelativePath — e.g. a directory-scanned resource whose file set
 /// isn't declared as individual module.xml resources. Output relPaths(relPath)="" relative to
 /// the module root. allFiles(relPath)=fullPath contains the pre-walked module root — filter
-/// from it via $order prefix scan rather than doing filesystem I/O. Base returns nothing.
+/// from it via $order prefix scan rather than doing filesystem I/O.
+/// Base implementation returns an empty relPaths (no files claimed). Only processors with
+/// SupportsSync()=1 should override this — SyncBuildReverseIndex skips processors that
+/// return 0 from SupportsSync(), so an override on a non-sync processor has no effect.
 Method OnSyncResolveFiles(Output relPaths, ByRef allFiles) As %Status
 {
     quit $$$OK
