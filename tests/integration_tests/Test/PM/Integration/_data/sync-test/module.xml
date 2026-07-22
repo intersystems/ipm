@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<Export generator="Cache" version="25">
+<Export generator="IRIS" version="26">
   <Document name="sync-test.ZPM">
     <Module>
       <Name>sync-test</Name>
@@ -8,9 +8,7 @@
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
       <Resource Name="SyncTest.SuperClass.CLS" />
-      <Resource Name="SyncTest.SubClass.CLS" />
-      <Resource Name="SyncTest.Deletable.CLS" />
-      <Resource Name="SyncTest.Consumer.CLS" />
+      <Resource Name="SyncTest.PKG" />
       <Resource Name="SyncTest.INC" />
       <UnitTest Name="/tests/unit/" Package="SyncTest.Tests" Phase="test" />
       <UnitTest Name="/tests/unit2/" Package="SyncTest2.Tests" Phase="test" />
