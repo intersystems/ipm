@@ -213,6 +213,8 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
 }
 
 /// Returns 1 if this processor supports incremental sync. Base returns 0.
+/// Stage 2 TODO: FileCopy, WebApplication, PythonWheel — override to 1 + add OnSync.
+/// Stage 3 TODO: CPF, Copy, ArtifactoryTarball, LegacyLocalizedMessages, Default.Global.
 Method SupportsSync() As %Boolean
 {
     quit 0

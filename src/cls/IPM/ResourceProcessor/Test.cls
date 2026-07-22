@@ -431,6 +431,26 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
                 set params("Sync", "ChangedTestCases", className) = ..ResourceReference.Name
             }
         }
+
+        // Delete server-side classes for removed test files. SyncApplyDeletes skips Test
+        // resources (not AbstractCompilable), so OnSync must own the delete for this type.
+        set relPath = ""
+        for {
+            set relPath = $order(deletedPaths(relPath))
+            quit:relPath=""
+
+            set packageRelPath = relPath
+            if $extract(packageRelPath, 1, $length(resourceDir)) = resourceDir {
+                set packageRelPath = $extract(packageRelPath, $length(resourceDir) + 1, *)
+            }
+            set fileName = $piece(packageRelPath, "/", *)
+            set baseName = $piece(fileName, ".", 1, *-1)
+            set dirPart = $piece(packageRelPath, "/", 1, *-1)
+            set className = $select(dirPart '= "": $translate(dirPart, "/", ".") _ "." _ baseName, 1: baseName)
+            if $zconvert($piece(fileName, ".", *), "U") = "CLS" && $$$comClassDefined(className) {
+                $$$ThrowOnError($system.OBJ.Delete(className, "-d"))
+            }
+        }
     } catch e {
         set sc = e.AsStatus()
     }

@@ -519,6 +519,9 @@ Method GetSyncDirectory() As %String
 {
     if ..LoadAsDirectory {
         set dir = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
+        if $extract(dir, *) = "/" {
+            set dir = $extract(dir, 1, *-1)
+        }
     } else {
         set sourcesRoot = ..ResourceReference.Module.SourcesRoot
         set dir = ..Directory
