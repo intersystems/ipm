@@ -198,6 +198,19 @@ Method TestDeleteSkippedByDefault()
     do $$$AssertNotTrue($$$comClassDefined("SyncTest.Deletable"), "Deletable class removed after -delete sync")
 }
 
+/// Deleting a test class file with -delete must remove the server-side class.
+/// Without this, the %UnitTest.TestCase subclass persists with no on-disk source and no
+/// hash record — permanently invisible to future syncs.
+Method TestDeleteTestClassRemovesFromServer()
+{
+    set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ##class(%Library.File).Delete(filePath)
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -delete")
+    do $$$AssertStatusOK(sc, "Sync with -delete on a deleted test class succeeds")
+    do $$$AssertNotTrue($$$comClassDefined("SyncTest.Tests.Trivial"), "Deleted test class removed from server after -delete sync")
+}
+
 /// Deleting a superclass (with -delete) leaves its subclass referencing a now-missing class.
 /// The post-delete recompile pass (SyncApplyDeletes + SyncCompile) must still run and surface
 /// this as a compile error, rather than silently leaving the subclass in a stale-but-compiled state.
@@ -325,7 +338,7 @@ Method TestSyncAllDevModeModules()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync with no module name (sync-all) succeeds")
-    do $$$AssertTrue(..FindInOutput(.output, "Nothing to sync"), "sync-test reports nothing to sync (no changes since baseline)")
+    do $$$AssertTrue(..FindInOutput(.output, "[sync-test] Nothing to sync"), "sync-test specifically reports nothing to sync (no changes since baseline)")
 }
 
 /// Sync fails with an error when given a module name that isn't installed.

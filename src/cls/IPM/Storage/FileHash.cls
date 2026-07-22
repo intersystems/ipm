@@ -35,7 +35,7 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
         for {
             set resource = orderedResourceList.GetNext(.key)
             quit:key=""
-            if '$isobject(resource.Processor) {
+            if '$isobject(resource.Processor) || 'resource.Processor.SupportsSync() {
                 continue
             }
             set syncDir = resource.Processor.GetSyncDirectory()

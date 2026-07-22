@@ -1010,8 +1010,9 @@ ClassMethod SyncApplyDeletes(
     ByRef deleted,
     ByRef reverseIndex,
     ByRef syncByResource,
-    verbose As %Boolean) [ Private ]
+    verbose As %Boolean) As %Status [ Private ]
 {
+    set sc = $$$OK
     set relPath = ""
     for {
         set relPath = $order(deleted(relPath))
@@ -1038,9 +1039,11 @@ ClassMethod SyncApplyDeletes(
             // deletions unapplied and make the overall error harder to diagnose.
             if $$$ISERR(delSC) {
                 write !, "Warning: could not delete ", docName, ": ", $system.Status.GetOneErrorText(delSC)
+                set sc = $$$ADDSC(sc, delSC)
             }
         }
     }
+    quit sc
 }
 
 /// Run test-phase tests for changed test case classes recorded in params("Sync","ChangedTestCases").
