@@ -421,31 +421,42 @@ ClassMethod WalkAndHashFilesPythonImpl(dirsJson As %String, relativeToRoot As %S
 import os
 import json
 import hashlib
+import concurrent.futures
 
 SKIP_DIRS = {'.git', '__pycache__', 'node_modules'}
 
 dirs = json.loads(dirsJson)
 root_len = len(relativeToRoot.rstrip(os.sep)) + 1
-results = []
 
-for dir in dirs:
-    for dirpath, dirnames, filenames in os.walk(dir):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+# Walk all directories first, collecting (rel, full) pairs.
+file_list = []
+for d in dirs:
+    for dirpath, dirnames, filenames in os.walk(d):
+        dirnames[:] = [x for x in dirnames if x not in SKIP_DIRS]
         for fname in filenames:
             full_path = os.path.join(dirpath, fname)
             rel_path = full_path[root_len:].replace('\\', '/')
-            if not rel_path:
-                continue
-            try:
-                h = hashlib.sha1()
-                with open(full_path, 'rb') as f:
-                    while chunk := f.read(65536):
-                        h.update(chunk)
-                results.append({"rel": rel_path, "full": full_path, "hash": h.hexdigest()})
-            except (OSError, PermissionError):
-                results.append({"rel": rel_path, "full": full_path, "hash": ""})
+            if rel_path:
+                file_list.append((rel_path, full_path))
 
-return json.dumps(results)
+def hash_file(full_path):
+    try:
+        h = hashlib.sha1()
+        with open(full_path, 'rb') as f:
+            while chunk := f.read(65536):
+                h.update(chunk)
+        return h.hexdigest()
+    except (OSError, PermissionError):
+        return ""
+
+# Hash in parallel — SHA1 releases the GIL, so threads overlap I/O wait.
+with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    hash_results = list(executor.map(hash_file, [f for _, f in file_list]))
+
+return json.dumps([
+    {"rel": rel, "full": full, "hash": h}
+    for (rel, full), h in zip(file_list, hash_results)
+])
 }
 
 /// SQL-based BFS fallback that walks and hashes without Python.
