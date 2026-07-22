@@ -68,7 +68,7 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
             set relPath = $order(allFiles(relPath))
             quit:relPath=""
             set ext = $$$lcase($piece(relPath, ".", *))
-            if ",cls,inc,mac,int," '[ (","_ext_",") {
+            if ",cls,inc,mac,int,xml,rtn," '[ (","_ext_",") {
                 continue
             }
             set hash = $get(allHashes(relPath))
@@ -428,7 +428,7 @@ SKIP_DIRS = {'.git', '__pycache__', 'node_modules'}
 dirs = json.loads(dirsJson)
 root_len = len(relativeToRoot.rstrip(os.sep)) + 1
 
-# Walk all directories first, collecting (rel, full) pairs.
+# Walk all directories, collecting all files.
 file_list = []
 for d in dirs:
     for dirpath, dirnames, filenames in os.walk(d):
@@ -449,8 +449,8 @@ def hash_file(full_path):
     except (OSError, PermissionError):
         return ""
 
-# Hash in parallel — SHA1 releases the GIL, so threads overlap I/O wait.
-with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+# Hash all files in parallel — SHA1 releases the GIL, so threads overlap I/O wait.
+with concurrent.futures.ThreadPoolExecutor(max_workers=24) as executor:
     hash_results = list(executor.map(hash_file, [f for _, f in file_list]))
 
 return json.dumps([

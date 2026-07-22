@@ -2331,7 +2331,7 @@ ClassMethod Sync(ByRef commandInfo) [ Private ]
     merge params = commandInfo("data")
 
     if moduleName '= "" {
-        $$$ThrowOnError(##class(%IPM.Storage.Module).Sync(moduleName, .params))
+        $$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(moduleName, $listbuild("Sync"), 1, .params))
     } else {
         // Sync all dev-mode modules
         set result = ##class(%SQL.Statement).%ExecDirect(,
@@ -2349,7 +2349,7 @@ ClassMethod Sync(ByRef commandInfo) [ Private ]
             }
             set found = found + 1
             set name = result.%Get("Name")
-            set syncSC = ##class(%IPM.Storage.Module).Sync(name, .params)
+            set syncSC = ##class(%IPM.Storage.Module).ExecutePhases(name, $listbuild("Sync"), 1, .params)
             if $$$ISERR(syncSC) {
                 set failures = failures _ $listbuild(name)
                 do $system.OBJ.DisplayError(syncSC)
