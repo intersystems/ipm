@@ -380,30 +380,11 @@ Method SupportsSync() As %Boolean
     quit 1
 }
 
-/// Enumerate test files on disk so sync can detect brand-new test classes.
-/// ResolveChildren (via GetChildren's StudioOpenDialog query) only sees already-compiled
-/// classes, so a test file that was never compiled — e.g. one just added to the test
-/// directory — is otherwise invisible to ComputeChanges until something else compiles it
-/// first. This live directory scan closes that gap.
-Method OnSyncResolveFiles(Output relPaths, ByRef allFiles) As %Status
+/// The test directory (resource Name, e.g. "/tests/unit/") is the owned scan directory.
+/// Sync walks this directory directly so new test classes are detected before compilation.
+Method GetSyncDirectory() As %String
 {
-    set sc = $$$OK
-    try {
-        set prefix = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name _ "/")
-        set prefixLen = $length(prefix)
-        set relPath = prefix
-        for {
-            set relPath = $order(allFiles(relPath))
-            quit:relPath=""
-            quit:($extract(relPath, 1, prefixLen) '= prefix)
-            if $$$lcase($piece(relPath, ".", *)) = "cls" {
-                set relPaths(relPath) = ""
-            }
-        }
-    } catch e {
-        set sc = e.AsStatus()
-    }
-    quit sc
+    quit ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
 }
 
 Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output handled As %Boolean = 0) As %Status

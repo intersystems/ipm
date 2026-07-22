@@ -770,13 +770,39 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
         // manifestPaths. ComputeChanges Pass 2 finds those paths with no baseline row and
         // reports them as modified, so they are loaded in this same sync call.
 
-        // Step 2: Walk the entire module root and hash all files in one Python pass.
-        // This pre-walked data feeds the reverse index, change detection, and deletion checks —
-        // no further filesystem I/O needed from ObjectScript.
+        // Step 2: Collect scan directories from resource processors, then walk only those.
+        // Each processor declares its owned directory via GetSyncDirectory(); sync never
+        // touches files outside declared locations.
+        set orderedResourceList = module.GetOrderedResourceList()
+        kill scanDirs
+        set rlKey = ""
+        for {
+            set rlResource = orderedResourceList.GetNext(.rlKey)
+            quit:rlKey=""
+            if '$isobject(rlResource.Processor) {
+                continue
+            }
+            if 'rlResource.Processor.SupportsSync() {
+                continue
+            }
+            set syncDir = rlResource.Processor.GetSyncDirectory()
+            if syncDir '= "" {
+                set scanDirs(syncDir) = ""
+            }
+        }
+        do ##class(%IPM.Storage.FileHash).DeduplicateScanDirs(.scanDirs)
+
         set walkStart = $zhorolog
         kill allFiles, allHashes, bfsFiles
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkAndHashFiles(root, root, .allFiles, .allHashes))
-        // Build a compilable-only subset for ComputeChanges Pass 1; count total for verbose.
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkAndHashDirs(root, .scanDirs, .allFiles, .allHashes))
+
+        // module.xml is always tracked — add it to allFiles/allHashes explicitly.
+        if ##class(%File).Exists(root _ "module.xml") {
+            set allFiles("module.xml") = root _ "module.xml"
+            set allHashes("module.xml") = $$$lcase(##class(%File).SHA1Hash(root _ "module.xml", 1))
+        }
+
+        // Build compilable-only subset for ComputeChanges Pass 1; count total for verbose.
         set relPath = "", fileCount = 0
         for {
             set relPath = $order(allFiles(relPath), 1, fullPath)
@@ -788,11 +814,13 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             }
         }
         if verbose {
-            write !, "[", moduleName, "] Scanned ", fileCount, " file(s) in ", $fnumber($zhorolog - walkStart, "", 2), "s"
+            set dirCount = 0
+            set tmpDir = ""
+            for { set tmpDir = $order(scanDirs(tmpDir)) quit:tmpDir=""  set dirCount = dirCount + 1 }
+            write !, "[", moduleName, "] Scanned ", fileCount, " file(s) across ", dirCount, " director(ies) in ", $fnumber($zhorolog - walkStart, "", 2), "s"
         }
 
         // Step 3: Build reverse index (relPath -> owning resource + processor).
-        set orderedResourceList = module.GetOrderedResourceList()
         kill reverseIndex, unsupportedResources
         do ..SyncBuildReverseIndex(module, orderedResourceList, .reverseIndex, .unsupportedResources, .allFiles)
 
@@ -944,8 +972,8 @@ ClassMethod SyncCheckModuleXml(
 /// Skips resources whose processor does not support sync — those are collected in
 /// unsupportedResources(resourceName)="" for informational display.
 ///
-/// Step 1 builds docToResource (docName → owner) from ResolveChildren and calls
-/// OnSyncResolveFiles for directory-based resources (e.g. test dirs) that have no doc name.
+/// Step 1 builds docToResource (docName → owner) from ResolveChildren, and prefix-scans
+/// allFiles for directory-owned resources (e.g. test dirs) via GetSyncDirectory().
 /// Step 2 maps all stored baseline paths to owners via RelPathToDocName → docToResource.
 ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex, Output unsupportedResources, ByRef allFiles) [ Private ]
 {
@@ -997,30 +1025,28 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
             }
         }
 
-        // OnSyncResolveFiles returns filesystem-relative paths for directory-based resources
-        // (e.g. test directories). These have no document name, so they go directly into
-        // reverseIndex keyed by relPath. Passes pre-walked allFiles so processors filter
-        // in-memory instead of re-walking the filesystem.
-        kill syncOnlyPaths
-        set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths, .allFiles)
-        if $$$ISERR(childSC) {
-            continue
-        }
-        set relPath = ""
-        for {
-            set relPath = $order(syncOnlyPaths(relPath))
-            quit:relPath=""
-            set normalizedRelPath = ##class(%IPM.Storage.FileHash).NormalizePath(relPath)
-            set reverseIndex(normalizedRelPath) = resource.Name
-            set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
-            set reverseIndex(normalizedRelPath, "Resource") = resource
+        // Directory-based resources (e.g. test dirs) own all files under their declared
+        // directory. Prefix-scan allFiles to map every file under that dir to this resource.
+        set syncDir = resource.Processor.GetSyncDirectory()
+        if syncDir '= "" {
+            set prefix = ##class(%IPM.Storage.FileHash).NormalizePath(syncDir _ "/")
+            set prefixLen = $length(prefix)
+            set dirRelPath = prefix
+            for {
+                set dirRelPath = $order(allFiles(dirRelPath))
+                quit:dirRelPath=""
+                quit:($extract(dirRelPath, 1, prefixLen) '= prefix)
+                if '$data(reverseIndex(dirRelPath)) {
+                    set reverseIndex(dirRelPath) = resource.Name
+                    set reverseIndex(dirRelPath, "Processor") = resource.Processor
+                    set reverseIndex(dirRelPath, "Resource") = resource
+                }
+            }
         }
     }
 
-    // Resolve compilable paths: every baseline path not already claimed by OnSyncResolveFiles
-    // above gets mapped through RelPathToDocName → docToResource. This handles both standard
-    // and non-standard directory layouts uniformly (the path on disk doesn't matter — only
-    // the derived document name needs to match what ResolveChildren reported).
+    // Resolve compilable paths: every baseline path not already claimed above gets mapped
+    // through RelPathToDocName → docToResource.
     kill storedPaths
     do ##class(%IPM.Storage.FileHash).GetStoredPaths(module.Name, .storedPaths)
     set relPath = ""

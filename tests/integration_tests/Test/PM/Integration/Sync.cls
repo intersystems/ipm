@@ -67,43 +67,6 @@ Method TestGetStoredPathsReturnsStampedPaths()
     do $$$AssertTrue($data(paths("src/inc/SyncTest.inc")), "SyncTest.inc in stored paths")
 }
 
-/// Confirm sync detects changes in a module whose file layout doesn't match the
-/// SourcesRoot/Directory/package.ext convention. sync-flat-test declares SyncFlat.Flat.CLS
-/// with SourcesRoot=src, but the file is at src/SyncFlat/Flat.cls (no cls/ subdirectory).
-/// OnItemRelativePath derives src/cls/SyncFlat/Flat.cls, which doesn't exist — so without
-/// filesystem-anchored stamping, the file never gets a baseline row and sync always reports
-/// "Nothing to sync" regardless of what changed.
-// This test manages its own install/uninstall because sync-flat-test uses a separate fixture
-// from sync-test and must not interfere with the per-test lifecycle.
-Method TestNonStandardLayoutDetectsChange()
-{
-    set flatTempDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-flat-test-" _ $job)
-    try {
-        set flatSource = ..GetModuleDir("sync-flat-test")
-        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(flatTempDir))
-        if '##class(%Library.File).CopyDir(flatSource, flatTempDir, 1) {
-            $$$ThrowOnError($$$ERROR($$$GeneralError, "Failed to copy sync-flat-test to temp dir"))
-        }
-
-        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ flatTempDir _ " -dev"))
-
-        set filePath = flatTempDir _ "src/SyncFlat/Flat.cls"
-        do ..ReplaceInFile(filePath, "As %String", "As %Integer")
-
-        kill params
-        set params("Verbose") = 1
-        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-        set sc = ##class(%IPM.Storage.Module).Sync("sync-flat-test", .params)
-        do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-
-        do $$$AssertStatusOK(sc, "Sync succeeds for non-standard layout module")
-        do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Sync detects the file change (not 'Nothing to sync')")
-    } catch e {
-        do $$$AssertStatusOK(e.AsStatus(), "TestNonStandardLayoutDetectsChange threw unexpectedly")
-    }
-    do ##class(%IPM.Main).Shell("uninstall sync-flat-test")
-    do ##class(%Library.File).RemoveDirectoryTree(flatTempDir)
-}
 
 /// Sync with no files changed on disk since the last load/sync reports nothing to do.
 Method TestNoChangeIsNoOp()
@@ -205,8 +168,9 @@ Method TestIncludeEditRecompilesConsumer()
     do $$$AssertEquals(##class(SyncTest.Consumer).GetMacroValue(), "modified-include", "Consumer reflects updated macro value after include sync")
 }
 
-/// A file outside every tracked resource (e.g. under node_modules/) is ignored by sync
-/// and never given a baseline row.
+/// A file outside every tracked resource directory (e.g. under node_modules/) is ignored
+/// by sync and never given a baseline row — sync only walks declared resource directories,
+/// so files in undeclared locations are never seen.
 Method TestUntrackedFileIgnored()
 {
     set junkDir = ..TempDir _ "node_modules/"

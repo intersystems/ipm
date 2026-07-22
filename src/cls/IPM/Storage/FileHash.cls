@@ -18,61 +18,18 @@ Index ModuleNameIndex On ModuleName;
 
 ForeignKey ModuleNameFK(ModuleName) References %IPM.Storage.Module(Name) [ OnDelete = cascade ];
 
-/// Stamp all tracked files for a module. Two passes:
-/// Pass 1 walks the module root for compilable files (cls/inc/mac/int) present in the namespace.
-/// Pass 2 calls OnSyncResolveFiles on each processor to stamp non-compilable tracked files (e.g. FileCopy).
-/// Also stamps module.xml.
+/// Stamp all tracked files for a module.
+/// Collects scan directories from each resource processor via GetSyncDirectory(), deduplicates,
+/// walks only those directories, then stamps compilable files present in the namespace.
+/// Also stamps module.xml from the module root.
 ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
 {
     set sc = $$$OK
     try {
         set root = ##class(%File).NormalizeDirectory(module.Root)
 
-        // Single walk+hash of the entire module root.
-        kill allFiles, allHashes
-        $$$ThrowOnError(..WalkAndHashFiles(root, root, .allFiles, .allHashes))
-
-        // module.xml is always tracked.
-        set moduleXmlRel = "module.xml"
-        if $data(allHashes(moduleXmlRel)) {
-            $$$ThrowOnError(..StampOneFileWithHash(module.Name, moduleXmlRel, allHashes(moduleXmlRel)))
-        }
-
-        // Pass 1: filter for compilable files present in the namespace.
-        set relPath = ""
-        for {
-            set relPath = $order(allFiles(relPath))
-            quit:relPath=""
-            set ext = $$$lcase($piece(relPath, ".", *))
-            if ",cls,inc,mac,int," '[ (","_ext_",") {
-                continue
-            }
-            set docName = ..RelPathToDocName(relPath)
-            if docName = "" {
-                continue
-            }
-            set docExt = $$$lcase($piece(docName, ".", *))
-            if docExt = "cls" {
-                set className = $piece(docName, ".", 1, *-1)
-                if '$$$comClassDefined(className) {
-                    continue
-                }
-            } else {
-                if '##class(%RoutineMgr).Exists(docName) {
-                    continue
-                }
-            }
-            set hash = $get(allHashes(relPath))
-            if hash = "" {
-                continue
-            }
-            set stampSC = ..StampOneFileWithHash(module.Name, relPath, hash)
-            if $$$ISERR(stampSC) {
-                write !, "Warning: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
-            }
-        }
-
-        // Pass 2: stamp non-compilable tracked files via OnSyncResolveFiles on each processor.
+        // Collect and deduplicate scan directories from resource processors.
+        kill scanDirs
         set orderedResourceList = module.GetOrderedResourceList()
         set key = ""
         for {
@@ -81,23 +38,46 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
             if '$isobject(resource.Processor) {
                 continue
             }
-            kill syncOnlyPaths
-            set childSC = resource.Processor.OnSyncResolveFiles(.syncOnlyPaths, .allFiles)
-            if $$$ISERR(childSC) {
+            set syncDir = resource.Processor.GetSyncDirectory()
+            if syncDir '= "" {
+                set scanDirs(syncDir) = ""
+            }
+        }
+        do ..DeduplicateScanDirs(.scanDirs)
+
+        // Walk each declared directory.
+        kill allFiles, allHashes
+        $$$ThrowOnError(..WalkAndHashDirs(root, .scanDirs, .allFiles, .allHashes))
+
+        // module.xml is always tracked — hash it directly from root.
+        set moduleXmlPath = root _ "module.xml"
+        if ##class(%File).Exists(moduleXmlPath) {
+            set moduleXmlHash = $$$lcase(##class(%File).SHA1Hash(moduleXmlPath, 1))
+            if moduleXmlHash '= "" {
+                $$$ThrowOnError(..StampOneFileWithHash(module.Name, "module.xml", moduleXmlHash))
+            }
+        }
+
+        // Stamp all compilable files found in scan dirs.
+        // Targeted walks only visit declared resource directories, so every compilable file
+        // found here belongs to the module and should be tracked. No namespace presence check
+        // needed — directory-based resources (e.g. test dirs) use paths that RelPathToDocName
+        // can't resolve to the correct class name, so a namespace check would wrongly skip them.
+        set relPath = ""
+        for {
+            set relPath = $order(allFiles(relPath))
+            quit:relPath=""
+            set ext = $$$lcase($piece(relPath, ".", *))
+            if ",cls,inc,mac,int," '[ (","_ext_",") {
                 continue
             }
-            set relPath = ""
-            for {
-                set relPath = $order(syncOnlyPaths(relPath))
-                quit:relPath=""
-                set hash = $get(allHashes(relPath))
-                if hash = "" {
-                    continue
-                }
-                set stampSC = ..StampOneFileWithHash(module.Name, relPath, hash)
-                if $$$ISERR(stampSC) {
-                    write !, "Warning: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
-                }
+            set hash = $get(allHashes(relPath))
+            if hash = "" {
+                continue
+            }
+            set stampSC = ..StampOneFileWithHash(module.Name, relPath, hash)
+            if $$$ISERR(stampSC) {
+                write !, "Warning: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
             }
         }
     } catch e {
@@ -338,25 +318,90 @@ ClassMethod NormalizePath(path As %String) As %String
     quit path
 }
 
-/// Walk all files and compute SHA1 hashes in a single pass.
-/// Returns files(relPath) = fullPath and hashes(relPath) = sha1hex (lowercase).
-/// Uses Python os.walk + hashlib for speed; falls back to SQL BFS + %File.SHA1Hash.
-ClassMethod WalkAndHashFiles(dir As %String, relativeToRoot As %String, Output files, Output hashes) As %Status
+/// Walk each directory in scanDirs(relDir)="" under moduleRoot and hash all files.
+/// Returns files(relPath)=fullPath and hashes(relPath)=sha1hex (lowercase).
+/// Uses a single Python os.walk call across all directories for speed; falls back to SQL BFS.
+ClassMethod WalkAndHashDirs(moduleRoot As %String, ByRef scanDirs, Output files, Output hashes) As %Status
 {
-    set sc = ..WalkAndHashFilesPython(dir, relativeToRoot, .files, .hashes)
-    if $$$ISERR(sc) {
-        set sc = ..WalkAndHashFilesSQL(dir, relativeToRoot, .files, .hashes)
+    set sc = $$$OK
+    kill files, hashes
+    try {
+        set moduleRoot = ##class(%File).NormalizeDirectory(moduleRoot)
+
+        // Collect existing absolute directories to walk.
+        kill absDirList
+        set dirCount = 0
+        set relDir = ""
+        for {
+            set relDir = $order(scanDirs(relDir))
+            quit:relDir=""
+            set absDir = ##class(%File).NormalizeDirectory(moduleRoot _ relDir)
+            if ##class(%File).DirectoryExists(absDir) {
+                set dirCount = dirCount + 1
+                set absDirList(dirCount) = absDir
+            }
+        }
+        quit:dirCount=0
+
+        // Single Python call across all directories — avoids per-dir interpreter overhead.
+        set dirsJson = "["
+        for i = 1:1:dirCount {
+            if i > 1 { set dirsJson = dirsJson _ "," }
+            set dirsJson = dirsJson _ """" _ $replace(absDirList(i), "\", "\\") _ """"
+        }
+        set dirsJson = dirsJson _ "]"
+
+        set walkSC = ..WalkAndHashFilesPython(dirsJson, moduleRoot, .files, .hashes)
+        if $$$ISERR(walkSC) {
+            // SQL fallback: walk each directory individually.
+            kill files, hashes
+            for i = 1:1:dirCount {
+                kill dirFiles, dirHashes
+                $$$ThrowOnError(..WalkAndHashFilesSQL(absDirList(i), moduleRoot, .dirFiles, .dirHashes))
+                merge files = dirFiles
+                merge hashes = dirHashes
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
     }
     quit sc
 }
 
-ClassMethod WalkAndHashFilesPython(dir As %String, relativeToRoot As %String, Output files, Output hashes) As %Status [ Private ]
+/// Remove entries from scanDirs that are already covered by a shorter prefix.
+/// Sorts alphabetically; skips any entry that starts with a previously-kept entry + "/".
+ClassMethod DeduplicateScanDirs(ByRef scanDirs)
+{
+    kill kept
+    set relDir = ""
+    for {
+        set relDir = $order(scanDirs(relDir))
+        quit:relDir=""
+        set covered = 0
+        set keptDir = ""
+        for {
+            set keptDir = $order(kept(keptDir))
+            quit:keptDir=""
+            set keptPrefix = ..NormalizePath(keptDir _ "/")
+            if $extract(relDir, 1, $length(keptPrefix)) = keptPrefix {
+                set covered = 1
+                quit
+            }
+        }
+        if 'covered {
+            set kept(relDir) = ""
+        }
+    }
+    kill scanDirs
+    merge scanDirs = kept
+}
+
+ClassMethod WalkAndHashFilesPython(dirsJson As %String, relativeToRoot As %String, Output files, Output hashes) As %Status [ Private ]
 {
     set sc = $$$OK
     try {
-        set dir = ##class(%File).NormalizeDirectory(dir)
         set relativeToRoot = ##class(%File).NormalizeDirectory(relativeToRoot)
-        set jsonStr = ..WalkAndHashFilesPythonImpl(dir, relativeToRoot)
+        set jsonStr = ..WalkAndHashFilesPythonImpl(dirsJson, relativeToRoot)
         set result = ##class(%DynamicArray).%FromJSON(jsonStr)
         set count = result.%Size()
         for i = 0:1:(count - 1) {
@@ -371,7 +416,7 @@ ClassMethod WalkAndHashFilesPython(dir As %String, relativeToRoot As %String, Ou
     quit sc
 }
 
-ClassMethod WalkAndHashFilesPythonImpl(dir As %String, relativeToRoot As %String) As %String [ Language = python ]
+ClassMethod WalkAndHashFilesPythonImpl(dirsJson As %String, relativeToRoot As %String) As %String [ Language = python ]
 {
 import os
 import json
@@ -379,24 +424,26 @@ import hashlib
 
 SKIP_DIRS = {'.git', '__pycache__', 'node_modules'}
 
-results = []
+dirs = json.loads(dirsJson)
 root_len = len(relativeToRoot.rstrip(os.sep)) + 1
+results = []
 
-for dirpath, dirnames, filenames in os.walk(dir):
-    dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
-    for fname in filenames:
-        full_path = os.path.join(dirpath, fname)
-        rel_path = full_path[root_len:].replace('\\', '/')
-        if not rel_path:
-            continue
-        try:
-            h = hashlib.sha1()
-            with open(full_path, 'rb') as f:
-                while chunk := f.read(65536):
-                    h.update(chunk)
-            results.append({"rel": rel_path, "full": full_path, "hash": h.hexdigest()})
-        except (OSError, PermissionError):
-            results.append({"rel": rel_path, "full": full_path, "hash": ""})
+for dir in dirs:
+    for dirpath, dirnames, filenames in os.walk(dir):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        for fname in filenames:
+            full_path = os.path.join(dirpath, fname)
+            rel_path = full_path[root_len:].replace('\\', '/')
+            if not rel_path:
+                continue
+            try:
+                h = hashlib.sha1()
+                with open(full_path, 'rb') as f:
+                    while chunk := f.read(65536):
+                        h.update(chunk)
+                results.append({"rel": rel_path, "full": full_path, "hash": h.hexdigest()})
+            except (OSError, PermissionError):
+                results.append({"rel": rel_path, "full": full_path, "hash": ""})
 
 return json.dumps(results)
 }

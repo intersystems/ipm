@@ -218,17 +218,13 @@ Method SupportsSync() As %Boolean
     quit 0
 }
 
-/// Called by sync to discover files owned by this resource that aren't captured by
-/// OnResolveChildren/OnItemRelativePath — e.g. a directory-scanned resource whose file set
-/// isn't declared as individual module.xml resources. Output relPaths(relPath)="" relative to
-/// the module root. allFiles(relPath)=fullPath contains the pre-walked module root — filter
-/// from it via $order prefix scan rather than doing filesystem I/O.
-/// Base implementation returns an empty relPaths (no files claimed). Only processors with
-/// SupportsSync()=1 should override this — SyncBuildReverseIndex skips processors that
-/// return 0 from SupportsSync(), so an override on a non-sync processor has no effect.
-Method OnSyncResolveFiles(Output relPaths, ByRef allFiles) As %Status
+/// Returns the directory (relative to module root, normalized, no leading/trailing slash)
+/// that this processor owns on disk. Sync walks only declared directories rather than the
+/// full module root. Base returns "" (no owned directory; files are declared individually
+/// via OnItemRelativePath). Processors that own a directory override this.
+Method GetSyncDirectory() As %String
 {
-    quit $$$OK
+    quit ""
 }
 
 /// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
