@@ -448,7 +448,7 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
             set dirPart = $piece(packageRelPath, "/", 1, *-1)
             set className = $select(dirPart '= "": $translate(dirPart, "/", ".") _ "." _ baseName, 1: baseName)
             if $zconvert($piece(fileName, ".", *), "U") = "CLS" && $$$comClassDefined(className) {
-                $$$ThrowOnError($system.OBJ.Delete(className, "-d"))
+                $$$ThrowOnError($system.OBJ.Delete(className, $select(verbose:"d",1:"-d")))
             }
         }
     } catch e {

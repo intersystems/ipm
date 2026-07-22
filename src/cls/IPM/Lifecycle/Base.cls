@@ -700,6 +700,12 @@ Method %Sync(ByRef params) As %Status
         // Falls through when only deletes exist and processDeletes=1
         if '$data(modified) && ('$data(deleted) || 'processDeletes) {
             write !, "[", moduleName, "] Nothing to sync."
+            if '$data(modified) && $data(deleted) && 'processDeletes {
+                set delCount = 0
+                set key = ""
+                for { set key = $order(deleted(key)) quit:key=""  set delCount = delCount + 1 }
+                write !, "  ", delCount, " deleted file(s) detected but not applied. Use -delete to remove from server."
+            }
             if moduleXmlChanged {
                 do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
                 do ..SyncPrintModuleXmlWarning(moduleName)
