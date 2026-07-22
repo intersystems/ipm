@@ -73,10 +73,8 @@ Method TestNoChangeIsNoOp()
 {
     do $$$AssertTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "Baseline rows exist after load")
 
-    kill params
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync with no changes succeeds")
@@ -95,10 +93,8 @@ Method TestMigrationFromNoBaseline()
     set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
     do ..ReplaceInFile(filePath, """original""", """modified""")
 
-    kill params
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "First sync after baseline loss succeeds")
@@ -107,20 +103,18 @@ Method TestMigrationFromNoBaseline()
 
     // The edit made before the self-heal is captured in the new baseline (not retroactively
     // detected), so a second sync with no further changes reports nothing to do.
-    kill params2, output2
-    set params2("Verbose") = 1
+    kill output2
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
-    set sc2 = ##class(%IPM.Storage.Module).Sync("sync-test", .params2)
+    set sc2 = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
     do $$$AssertStatusOK(sc2, "Second sync succeeds")
     do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Second sync finds no changes (baseline already reflects the modified file)")
 
     // A genuinely new edit after the baseline is established is detected normally.
     do ..ReplaceInFile(filePath, """modified""", """modified again""")
-    kill params3, output3
-    set params3("Verbose") = 1
+    kill output3
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie3)
-    set sc3 = ##class(%IPM.Storage.Module).Sync("sync-test", .params3)
+    set sc3 = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie3, .output3)
     do $$$AssertStatusOK(sc3, "Third sync succeeds")
     do $$$AssertTrue(..FindInOutput(.output3, "Sync complete"), "Third sync detects the post-baseline edit normally")
@@ -132,10 +126,8 @@ Method TestModifiedClassRecompiles()
     set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
     do ..ReplaceInFile(filePath, """original""", """modified""")
 
-    kill params
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync after class modification succeeds")
@@ -150,8 +142,7 @@ Method TestSuperclassEditRecompilesSubclass()
     set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
     do ..ReplaceInFile(filePath, "Property BaseValue", "Property NewProp As %String;" _ $char(10) _ $char(10) _ "Property BaseValue")
 
-    kill params
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
     do $$$AssertStatusOK(sc, "Sync after superclass edit succeeds (subclass recompiles via u-flag)")
 }
 
@@ -162,8 +153,7 @@ Method TestIncludeEditRecompilesConsumer()
     set incPath = ..TempDir _ "src/inc/SyncTest.inc"
     do ..ReplaceInFile(incPath, """original-include""", """modified-include""")
 
-    kill params
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
     do $$$AssertStatusOK(sc, "Sync after include edit succeeds")
     do $$$AssertEquals(##class(SyncTest.Consumer).GetMacroValue(), "modified-include", "Consumer reflects updated macro value after include sync")
 }
@@ -181,10 +171,8 @@ Method TestUntrackedFileIgnored()
     $$$ThrowOnError(stream.%Save())
     set stream = ""
 
-    kill params
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync ignores untracked files")
@@ -200,15 +188,12 @@ Method TestDeleteSkippedByDefault()
     do ##class(%Library.File).Delete(filePath)
 
     // Without -delete: class still present
-    kill params
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
     do $$$AssertStatusOK(sc, "Sync without -delete succeeds")
     do $$$AssertTrue($$$comClassDefined("SyncTest.Deletable"), "Deletable class still exists without -delete flag")
 
     // With -delete: class is removed from server
-    kill params
-    set params("ProcessDeletes") = 1
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -delete")
     do $$$AssertStatusOK(sc, "Sync with -delete succeeds")
     do $$$AssertNotTrue($$$comClassDefined("SyncTest.Deletable"), "Deletable class removed after -delete sync")
 }
@@ -223,9 +208,7 @@ Method TestDeleteRecompilesDependents()
 
     do $$$AssertTrue($$$comClassDefined("SyncTest.SubClass"), "SubClass still compiled before delete sync")
 
-    kill params
-    set params("ProcessDeletes") = 1
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -delete")
 
     do $$$AssertStatusNotOK(sc, "Sync with -delete fails: SubClass now references a deleted superclass")
     do $$$AssertNotTrue($$$comClassDefined("SyncTest.SuperClass"), "SuperClass was removed from the server")
@@ -238,10 +221,8 @@ Method TestModuleXmlChangedWarning()
     set filePath = ..TempDir _ "module.xml"
     do ..ReplaceInFile(filePath, "<Version>1.0.0</Version>", "<Version>1.0.1</Version>")
 
-    kill params
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync after module.xml change succeeds")
@@ -257,10 +238,8 @@ Method TestSyncTestFlag()
     do ..ReplaceInFile(filePath, "This test always passes.", "This test always passes (modified).")
 
     // Without RunTests: loads the changed test but does not execute it
-    kill params
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
     do $$$AssertStatusOK(sc, "Sync without RunTests loads but does not run tests")
     do $$$AssertNotTrue(..FindInOutput(.output, "Test Results"), "No test results without RunTests flag")
@@ -269,11 +248,9 @@ Method TestSyncTestFlag()
     do ..ReplaceInFile(filePath, "(modified).", "(modified again).")
 
     // With RunTests: executes the changed test-phase test class
-    kill params, output
-    set params("RunTests") = 1
-    set params("Verbose") = 1
+    kill output
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
     do $$$AssertStatusOK(sc, "Sync with RunTests runs changed tests")
     do $$$AssertTrue(..FindInOutput(.output, "Test Results"), "Test results shown with RunTests flag")
@@ -298,11 +275,8 @@ Method TestSyncTestFlagBatchesMultipleChangedClasses()
     $$$ThrowOnError(stream.%Save())
     set stream = ""
 
-    kill params
-    set params("RunTests") = 1
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync with two changed classes in one resource succeeds")
@@ -334,11 +308,8 @@ Method TestSyncTestFlagOnlyRunsOwningResource()
     set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
     do ..ReplaceInFile(filePath, "This test always passes.", "This test always passes (modified).")
 
-    kill params
-    set params("RunTests") = 1
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync with RunTests succeeds")
@@ -349,7 +320,6 @@ Method TestSyncTestFlagOnlyRunsOwningResource()
 /// Running sync with no module name syncs every module currently in development mode.
 Method TestSyncAllDevModeModules()
 {
-    kill params
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set sc = ##class(%IPM.Main).Shell("sync")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
@@ -361,8 +331,7 @@ Method TestSyncAllDevModeModules()
 /// Sync fails with an error when given a module name that isn't installed.
 Method TestSyncModuleNotFound()
 {
-    kill params
-    set sc = ##class(%IPM.Storage.Module).Sync("this-module-does-not-exist", .params)
+    set sc = ##class(%IPM.Main).Shell("sync this-module-does-not-exist")
     do $$$AssertStatusNotOK(sc, "Sync fails for a module that doesn't exist")
 }
 
@@ -374,8 +343,7 @@ Method TestSyncNonDevModeModule()
     do ##class(%IPM.Main).Shell("uninstall sync-test")
     $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ ..TempDir))
 
-    kill params
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
     do $$$AssertStatusNotOK(sc, "Sync fails for a module not in development mode")
 }
 
@@ -395,10 +363,8 @@ Method TestModuleXmlAddsResourcePicksUpNewFile()
     do ..ReplaceInFile(moduleXmlPath, "<Version>1.0.0</Version>", "<Version>1.0.1</Version>")
     do ..ReplaceInFile(moduleXmlPath, "<Resource Name=""SyncTest.Consumer.CLS"" />", "<Resource Name=""SyncTest.Consumer.CLS"" />" _ $char(10) _ "      <Resource Name=""SyncTest.AddedByManifest.CLS"" />")
 
-    kill params
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync after module.xml adds a resource succeeds")
@@ -418,8 +384,7 @@ Method TestFailedCompileRetries()
     $$$ThrowOnError(stream.%Save())
     set stream = ""
 
-    kill params
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
     do $$$AssertStatusNotOK(sc, "Sync fails with syntax error")
 
     // Fix and retry — CommitChanges was skipped on failure, so file is still detected as changed
@@ -432,8 +397,7 @@ Method TestFailedCompileRetries()
     $$$ThrowOnError(stream.%Save())
     set stream = ""
 
-    kill params
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
     do $$$AssertStatusOK(sc, "Sync succeeds after fixing syntax error (retry works)")
 }
 
@@ -449,10 +413,8 @@ Method TestModuleXmlAndClassEditedTogether()
     do ..ReplaceInFile(moduleXmlPath, "<Version>1.0.0</Version>", "<Version>1.0.1</Version>")
     do ..ReplaceInFile(clsPath, """original""", """modified-with-xml""")
 
-    kill params
-    set params("Verbose") = 1
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Storage.Module).Sync("sync-test", .params)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     do $$$AssertStatusOK(sc, "Sync after co-editing module.xml and a class succeeds")
