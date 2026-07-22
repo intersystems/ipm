@@ -855,7 +855,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             if verbose && $data(unsupportedResources) {
                 do ..SyncPrintUnsupportedNote(moduleName, .unsupportedResources)
             }
-            write !, "[", moduleName, "] Done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
+            write !, "[", moduleName, "] Sync done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
             quit
         }
 
@@ -929,7 +929,7 @@ ClassMethod Sync(moduleName As %String, ByRef params) As %Status
             do ..SyncPrintUnsupportedNote(moduleName, .unsupportedResources)
         }
 
-        write !, "[", moduleName, "] Done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
+        write !, "[", moduleName, "] Sync done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
 
         // Step 10: Run changed test-phase tests if -test flag is set (after sync is reported)
         if runTests {
