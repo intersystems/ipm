@@ -79,15 +79,14 @@ jobs:
       - name: Run temporary registry
         timeout-minutes: 15
         run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
-          docker pull intersystemsdc/iris-community:latest
           docker network create zpm
+          docker build -f tests/registry/Dockerfile -t registry-image .
           REGISTRY=$(docker run --rm -d \
             --network zpm \
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
-            intersystemsdc/iris-community:latest \
+            registry-image \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $REGISTRY iris session iris -UUSER << EOF
@@ -136,7 +135,7 @@ jobs:
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
-            intersystemsdc/iris-community:latest \
+            registry-image \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
