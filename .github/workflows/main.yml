@@ -80,7 +80,7 @@ jobs:
         timeout-minutes: 15
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | docker login docker.pkg.github.com --username ${{ github.actor }} --password-stdin
-          docker pull containers.intersystems.com/intersystems/iris-community:latest-em
+          docker pull intersystemsdc/iris-community:latest
           docker network create zpm
           docker build -f tests/registry/Dockerfile -t registry-image .
           REGISTRY=$(docker run --rm -d \
@@ -88,7 +88,7 @@ jobs:
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
-            containers.intersystems.com/intersystems/iris-community:latest-em \
+            intersystemsdc/iris-community:latest \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $REGISTRY iris session iris -UUSER << EOF
@@ -137,7 +137,7 @@ jobs:
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
-            containers.intersystems.com/intersystems/iris-community:latest-em \
+            intersystemsdc/iris-community:latest \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
