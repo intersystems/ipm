@@ -134,6 +134,19 @@ Method TestModifiedClassRecompiles()
     do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Reports sync complete")
 }
 
+/// A modified XML-format class file is detected and recompiled by sync.
+/// Verifies that Format="XML" resources participate in the sync pipeline identically
+/// to UDL resources, and that the reloaded class reflects the edited content.
+Method TestModifiedXmlClassRecompiles()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/XmlClass.xml"
+    do ..ReplaceInFile(filePath, """xml-original""", """xml-modified""")
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
+    do $$$AssertStatusOK(sc, "Sync after XML class modification succeeds")
+    do $$$AssertEquals(##class(SyncTest.XmlClass).GetValue(), "xml-modified", "Class reflects updated value after XML sync")
+}
+
 /// Editing a superclass recompiles its subclasses via the u-flag, even though the
 /// subclass's own file on disk never changed.
 Method TestSuperclassEditRecompilesSubclass()

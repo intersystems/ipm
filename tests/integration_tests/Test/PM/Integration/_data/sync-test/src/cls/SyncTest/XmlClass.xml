@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Class name="SyncTest.XmlClass">
+<Description>
+XML-format fixture class for sync integration tests.</Description>
+
+<Method name="GetValue">
+<ClassMethod>1</ClassMethod>
+<ReturnType>%String</ReturnType>
+<Implementation><![CDATA[ quit "xml-original"
+]]></Implementation>
+</Method>
+</Class>
+</Export>
