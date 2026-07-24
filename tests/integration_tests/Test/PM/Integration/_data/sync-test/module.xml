@@ -8,6 +8,7 @@
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
       <Resource Name="SyncTest.SuperClass.CLS" />
+      <Resource Name="SyncTest.XmlClass.CLS" Format="XML" />
       <Resource Name="SyncTest.PKG" />
       <Resource Name="SyncTest.INC" />
       <UnitTest Name="/tests/unit/" Package="SyncTest.Tests" Phase="test" />
