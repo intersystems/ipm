@@ -354,6 +354,78 @@ Method TestSyncAllDevModeModules()
     do $$$AssertTrue(..FindInOutput(.output, "[sync-test] Nothing to sync"), "sync-test specifically reports nothing to sync (no changes since baseline)")
 }
 
+/// Naked `sync` (no module name) must process modules most-dependent last: a dependency is
+/// synced before the module that depends on it. This matters because sync recompiles each
+/// module's changed files against the currently-installed version of its dependencies — if a
+/// dependent is synced before its dependency, it recompiles against stale code.
+///
+/// The bug this guards against: Main.Sync selects dev-mode modules with no ORDER BY, so it
+/// iterates in row-ID (first-install) order. A clean install is coincidentally in dependency
+/// order (the installer forces deps-first), so the divergence only appears once a dependency
+/// edge is added between two already-installed modules. This test reproduces that: install
+/// a, b, c standalone (row IDs a < b < c), then add edges a->b->c so dependency order (c, b, a)
+/// is the reverse of row order. Reloading to register the edges preserves row IDs.
+Method TestSyncAllProcessesDependenciesFirst()
+{
+    // Fixture source dirs (resolve before any work — GetModuleDir needs ^UnitTestRoot).
+    set srcA = ..GetModuleDir("sync-dep", "a")
+    set srcB = ..GetModuleDir("sync-dep", "b")
+    set srcC = ..GetModuleDir("sync-dep", "c")
+
+    set depRoot = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-dep-work-" _ $job)
+    set workA = ##class(%File).NormalizeDirectory(depRoot _ "a")
+    set workB = ##class(%File).NormalizeDirectory(depRoot _ "b")
+    set workC = ##class(%File).NormalizeDirectory(depRoot _ "c")
+
+    try {
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(depRoot))
+        do $$$AssertTrue(##class(%Library.File).CopyDir(srcA, workA, 1), "Copied sync-dep-a fixture")
+        do $$$AssertTrue(##class(%Library.File).CopyDir(srcB, workB, 1), "Copied sync-dep-b fixture")
+        do $$$AssertTrue(##class(%Library.File).CopyDir(srcC, workC, 1), "Copied sync-dep-c fixture")
+
+        // Install standalone (no deps yet) in a, b, c order so row IDs are a < b < c.
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workA _ " -dev"))
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workB _ " -dev"))
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workC _ " -dev"))
+
+        // Add dependency edges: a depends on b, b depends on c. Dependency order is now c, b, a
+        // (the reverse of row order). Reloading registers the edges without changing row IDs.
+        do ..AddDependency(workA _ "module.xml", "SyncDepA.Top.CLS", "sync-dep-b")
+        do ..AddDependency(workB _ "module.xml", "SyncDepB.Middle.CLS", "sync-dep-c")
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workA _ " -dev"))
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workB _ " -dev"))
+
+        // Modify a file in every module so each one actually syncs (and prints its marker).
+        do ..ReplaceInFile(workA _ "src/cls/SyncDepA/Top.cls", """a-original""", """a-modified""")
+        do ..ReplaceInFile(workB _ "src/cls/SyncDepB/Middle.cls", """b-original""", """b-modified""")
+        do ..ReplaceInFile(workC _ "src/cls/SyncDepC/Base.cls", """c-original""", """c-modified""")
+
+        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+        set sc = ##class(%IPM.Main).Shell("sync")
+        do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+        do $$$AssertStatusOK(sc, "Naked sync succeeds")
+
+        set idxA = ..FirstLineContaining(.output, "sync-dep-a")
+        set idxB = ..FirstLineContaining(.output, "sync-dep-b")
+        set idxC = ..FirstLineContaining(.output, "sync-dep-c")
+        do $$$AssertTrue(idxA > 0, "sync-dep-a appears in output")
+        do $$$AssertTrue(idxB > 0, "sync-dep-b appears in output")
+        do $$$AssertTrue(idxC > 0, "sync-dep-c appears in output")
+
+        // c (least dependent) before b before a (most dependent).
+        do $$$AssertTrue(idxC < idxB, "Dependency sync-dep-c is processed before sync-dep-b")
+        do $$$AssertTrue(idxB < idxA, "Dependency sync-dep-b is processed before sync-dep-a")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "No unexpected exception during dependency-order sync")
+    }
+
+    // Cleanup: uninstall dependent-first (a needs b needs c) and remove the work tree.
+    do ##class(%IPM.Main).Shell("uninstall sync-dep-a")
+    do ##class(%IPM.Main).Shell("uninstall sync-dep-b")
+    do ##class(%IPM.Main).Shell("uninstall sync-dep-c")
+    do ##class(%Library.File).RemoveDirectoryTree(depRoot)
+}
+
 /// Sync fails with an error when given a module name that isn't installed.
 Method TestSyncModuleNotFound()
 {
@@ -486,6 +558,39 @@ ClassMethod FindInOutput(ByRef output, searchString As %String) As %Boolean
         }
     }
     return 0
+}
+
+/// Returns the 1-based line index of the first captured output line containing searchString,
+/// or 0 if not found. Used to assert relative ordering of per-module output in sync-all.
+ClassMethod FirstLineContaining(ByRef output, searchString As %String) As %Integer
+{
+    set sub = ""
+    for {
+        set sub = $order(output(sub), 1, line)
+        quit:sub=""
+        if line [ searchString {
+            return sub
+        }
+    }
+    return 0
+}
+
+/// Rewrites a module.xml to insert a single-dependency <Dependencies> block after the given
+/// <Resource> line. Assumes the resource line is present and no <Dependencies> block exists yet.
+ClassMethod AddDependency(
+    moduleXmlPath As %String,
+    afterResource As %String,
+    dependencyName As %String)
+{
+    set resourceLine = "<Resource Name=""" _ afterResource _ """ />"
+    set depBlock = resourceLine _ $char(10)
+        _ "      <Dependencies>" _ $char(10)
+        _ "        <ModuleReference>" _ $char(10)
+        _ "          <Name>" _ dependencyName _ "</Name>" _ $char(10)
+        _ "          <Version>1.0.0</Version>" _ $char(10)
+        _ "        </ModuleReference>" _ $char(10)
+        _ "      </Dependencies>"
+    do ..ReplaceInFile(moduleXmlPath, resourceLine, depBlock)
 }
 
 }

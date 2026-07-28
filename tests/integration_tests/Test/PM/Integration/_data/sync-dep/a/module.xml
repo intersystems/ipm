@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Export generator="IRIS" version="26">
+  <Document name="sync-dep-a.ZPM">
+    <Module>
+      <Name>sync-dep-a</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="SyncDepA.Top.CLS" />
+    </Module>
+  </Document>
+</Export>
