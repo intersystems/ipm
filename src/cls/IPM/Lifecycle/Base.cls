@@ -705,6 +705,7 @@ Method %Sync(ByRef params) As %Status
                 set key = ""
                 for { set key = $order(deleted(key)) quit:key=""  set delCount = delCount + 1 }
                 write !, "  ", delCount, " deleted file(s) detected but not applied. Use -delete to remove from server."
+                do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, delCount _ " deleted file(s) detected but not applied; use -delete to remove from server.")
             }
             if moduleXmlChanged {
                 do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
@@ -763,6 +764,7 @@ Method %Sync(ByRef params) As %Status
             quit:key=""
             set modCount = modCount + 1
             write !, "  Updated: ", key
+            do ##class(%IPM.General.Sync.Summary).RecordFile(moduleName, key, "Updated")
         }
         set delCount = 0
         if processDeletes {
@@ -772,6 +774,7 @@ Method %Sync(ByRef params) As %Status
                 quit:key=""
                 set delCount = delCount + 1
                 write !, "  Deleted: ", key
+                do ##class(%IPM.General.Sync.Summary).RecordFile(moduleName, key, "Deleted")
             }
         }
         write !, "[", moduleName, "] Sync complete: ", modCount, " file(s) updated"
@@ -788,6 +791,10 @@ Method %Sync(ByRef params) As %Status
         }
 
         write !, "[", moduleName, "] Sync done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
+
+        // File sync is committed and reported. Mark success before running tests so a fatal
+        // test failure below is reported as a test failure, not a sync error, in the summary.
+        do ##class(%IPM.General.Sync.Summary).MarkSyncOK(moduleName)
 
         // Step 10: Run changed test-phase tests if -test flag is set (after sync is reported)
         if runTests {
@@ -1093,6 +1100,7 @@ ClassMethod SyncRunTests(
                     set skipClassName = $order(byResource(testResource.Name, skipClassName))
                     quit:skipClassName=""
                     write:verbose !, "Skipping verify-scoped test: ", skipClassName, " (use 'verify' to run)"
+                    do ##class(%IPM.General.Sync.Summary).AddSkipped(testResource.Module.Name, skipClassName)
                 }
                 continue
             }
@@ -1129,6 +1137,7 @@ ClassMethod SyncPrintModuleXmlWarning(moduleName As %String) [ Private ]
     write !, "Warning: module.xml changed and was reloaded."
     write !, "  Resources may have been added/removed. Run `reload ", moduleName, "` to fully apply"
     write !, "  manifest-level changes (mappings, dependencies, defaults)."
+    do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, "module.xml changed and was reloaded; run `reload " _ moduleName _ "` to fully apply.")
 }
 
 ClassMethod SyncPrintUnsupportedNote(moduleName As %String, ByRef unsupportedResources) [ Private ]
@@ -1149,6 +1158,7 @@ ClassMethod SyncPrintUnsupportedNote(moduleName As %String, ByRef unsupportedRes
     }
     write !, "[", moduleName, "] ", count, " resource(s) skipped (no sync support): ", names
     write !, "  Use `reload ", moduleName, "` to apply changes to those resources."
+    do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, count _ " resource(s) skipped (no sync support): " _ names _ ".")
 }
 
 /// Recompile all compilable resources in the module to catch dependents invalidated by
