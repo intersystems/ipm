@@ -2338,18 +2338,28 @@ ClassMethod Sync(ByRef commandInfo) [ Private ]
         set orderedNames = ..GetDevModeModulesInDependencyOrder()
         set found = $listlength(orderedNames)
         set failures = ""
-        for i = 1:1:found {
-            set name = $list(orderedNames, i)
-            set syncSC = ##class(%IPM.Storage.Module).ExecutePhases(name, $listbuild("Sync"), 1, .params)
-            if $$$ISERR(syncSC) {
-                set failures = failures _ $listbuild(name)
-                do $system.OBJ.DisplayError(syncSC)
-            }
-        }
         if 'found {
             write !, "No modules in development mode."
-        } elseif failures '= "" {
-            write !, "Sync completed with errors in: ", $listtostring(failures, ", ")
+        } else {
+            // Turn on per-module summary recording for the duration of the loop, then print the
+            // aggregated bordered summary. Kept in a try/finally so a mid-loop error still clears
+            // the process-private accumulator.
+            do ##class(%IPM.General.Sync.Summary).Begin()
+            try {
+                for i = 1:1:found {
+                    set name = $list(orderedNames, i)
+                    set syncSC = ##class(%IPM.Storage.Module).ExecutePhases(name, $listbuild("Sync"), 1, .params)
+                    if $$$ISERR(syncSC) {
+                        set failures = failures _ $listbuild(name)
+                        do $system.OBJ.DisplayError(syncSC)
+                    }
+                }
+                do ##class(%IPM.General.Sync.Summary).Report(orderedNames, failures)
+            } catch e {
+                do ##class(%IPM.General.Sync.Summary).End()
+                throw e
+            }
+            do ##class(%IPM.General.Sync.Summary).End()
         }
     }
 }

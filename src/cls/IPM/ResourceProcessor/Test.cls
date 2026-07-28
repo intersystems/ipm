@@ -527,12 +527,54 @@ Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
         $$$ThrowOnError(sc)
 
         set suppressor = ""
+        // Tally this resource's per-method pass/fail into the naked-sync summary before
+        // ReportTestResults runs — at top level it consumes (kills) the result accumulator.
+        do ..SyncSummaryTallyTests(..ResourceReference.Module.Name, phaseStartIndex)
         $$$ThrowOnError(..ReportTestResults(phaseStartIndex, verbose, .params))
     } catch e {
         set sc = e.AsStatus()
     }
     if $data(oldUnitTestRoot,^UnitTestRoot) // Restore ^UnitTestRoot
     quit sc
+}
+
+/// Count the test methods run since phaseStartIndex and forward their pass/fail tally to the
+/// naked-sync summary. A method counts as failed if it errored or has any failed assertion,
+/// mirroring how GetAllTestsStatus/OutputFailures classify a failure; otherwise it passed.
+/// No-op unless a sync-all is in progress (%IPM.General.Sync.Summary gates on that).
+ClassMethod SyncSummaryTallyTests(
+    moduleName As %String,
+    phaseStartIndex As %Integer) [ Private ]
+{
+    set passed = 0, failed = 0
+    set testCount = $get(^||%UnitTest.Manager.AllResultsCount, 0)
+    for i = (phaseStartIndex + 1):1:testCount {
+        set logIndex = $get(^||%UnitTest.Manager.AllResults(i))
+        continue:logIndex=""
+        set tree = ##class(%IPM.Test.Abstract).BuildResultTree(logIndex)
+        set suiteIter = tree.suites.%GetIterator()
+        while suiteIter.%GetNext(, .suiteObj) {
+            set caseIter = suiteObj.cases.%GetIterator()
+            while caseIter.%GetNext(, .caseObj) {
+                set methodIter = caseObj.methods.%GetIterator()
+                while methodIter.%GetNext(, .methodObj) {
+                    set methodFailed = (methodObj.error '= "")
+                    set assertIter = methodObj.asserts.%GetIterator()
+                    while assertIter.%GetNext(, .assertObj) {
+                        if assertObj.status = "failed" {
+                            set methodFailed = 1
+                        }
+                    }
+                    if methodFailed {
+                        set failed = failed + 1
+                    } else {
+                        set passed = passed + 1
+                    }
+                }
+            }
+        }
+    }
+    do ##class(%IPM.General.Sync.Summary).AddTests(moduleName, passed, failed)
 }
 
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
