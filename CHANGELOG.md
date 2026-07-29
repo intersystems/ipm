@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - #1186: Change %IPM.Main:ShellScript() to return a status.
 
+### Fixed
+- #1207: Zero-byte files are now supported in IPM modules
+
 ## [0.10.8] - 2026-07-08
 
 ### Fixed

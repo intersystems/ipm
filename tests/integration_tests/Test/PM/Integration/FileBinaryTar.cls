@@ -86,4 +86,61 @@ Method TestLoadDestinationDirectory()
   }
 }
 
+Method TestZeroByteFilePreservedAfterExtract()
+{
+  set sc = $$$OK
+  try {
+    set testRoot = ##class(%Library.File).NormalizeDirectory($get(^UnitTestRoot))
+    set moduleDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).GetDirectory(testRoot)_"/_data/zero-byte-file")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ moduleDir)
+    do $$$AssertStatusOK(sc,"Loaded zero-byte-file successfully.")
+
+    set tempDir = ##class(%Library.File).ManagerDirectory()_"zero-byte-pkg-"_$job
+    set sc = ##class(%IPM.Main).Shell("zero-byte-file package -only -DPath="_tempDir)
+    do $$$AssertStatusOK(sc,"Packaged zero-byte-file successfully.")
+
+    set outDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).ManagerDirectory()_"zero-byte-out-"_$job)
+    do ##class(%Library.File).CreateDirectoryChain(outDir)
+    set sc = ##class(%IPM.General.Archive).Extract(tempDir_".tgz", outDir)
+    do $$$AssertStatusOK(sc,"Extracted archive successfully.")
+
+    do $$$AssertTrue(##class(%Library.File).Exists(outDir_"src/empty.txt"), "0-byte file exists after extraction.")
+    do $$$AssertEquals(##class(%Library.File).GetFileSize(outDir_"src/empty.txt"), 0, "0-byte file has size 0 after extraction.")
+    do $$$AssertTrue(##class(%Library.File).Exists(outDir_"src/nonempty.txt"), "Non-empty file exists after extraction.")
+
+    // Also verify the file survives a full publish/uninstall/reinstall round-trip through an ORAS registry
+    set fileCopyTarget = ##class(%Library.File).ManagerDirectory()_"../zero-byte-file/"
+
+    set sc = ##class(%IPM.Main).Shell("repo -o -name oras -url http://oras:5000 -publish 1")
+    do $$$AssertStatusOK(sc,"Set up oras repo successfully.")
+
+    set sc = ##class(%IPM.Main).Shell("publish zero-byte-file -r oras -verbose")
+    do $$$AssertStatusOK(sc,"Published zero-byte-file to ORAS successfully.")
+
+    set sc = ##class(%IPM.Main).Shell("uninstall zero-byte-file")
+    do $$$AssertStatusOK(sc,"Uninstalled zero-byte-file successfully.")
+    do $$$AssertNotTrue(##class(%Library.File).Exists(fileCopyTarget_"empty.txt"), "FileCopy target cleaned on uninstall.")
+
+    set sc = ##class(%IPM.Main).Shell("install zero-byte-file")
+    do $$$AssertStatusOK(sc,"Installed zero-byte-file from ORAS successfully.")
+
+    do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget_"empty.txt"), "0-byte file exists after ORAS reinstall.")
+    do $$$AssertEquals(##class(%Library.File).GetFileSize(fileCopyTarget_"empty.txt"), 0, "0-byte file has size 0 after ORAS reinstall.")
+    do $$$AssertTrue(##class(%Library.File).Exists(fileCopyTarget_"nonempty.txt"), "Non-empty file exists after ORAS reinstall.")
+
+    // Cleanup
+    set sc = ##class(%IPM.Main).Shell("unpublish oras/zero-byte-file all -force")
+    do $$$AssertStatusOK(sc,"Unpublished zero-byte-file successfully.")
+    set sc = ##class(%IPM.Main).Shell("uninstall zero-byte-file")
+    do $$$AssertStatusOK(sc,"Uninstalled zero-byte-file after reinstall.")
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc,"Deleted repos successfully.")
+    set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
+    do $$$AssertStatusOK(sc,"Reset repos to default successfully.")
+  } catch e {
+    do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
+  }
+}
+
 }
