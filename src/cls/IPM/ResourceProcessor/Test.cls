@@ -408,25 +408,13 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
 
         // Record changed TestCase subclasses for SyncRunTests.
         // relPath is relative to module root (e.g. "tests/unit/SyncTest/Tests/Trivial.cls").
-        // Strip the resource directory prefix (e.g. "tests/unit/") to get the package-relative path.
         set resourceDir = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
         set relPath = ""
         for {
             set relPath = $order(modifiedPaths(relPath))
             quit:relPath=""
-
-            // Strip resource directory prefix to get path relative to the test dir
-            set packageRelPath = relPath
-            if $extract(packageRelPath, 1, $length(resourceDir)) = resourceDir {
-                set packageRelPath = $extract(packageRelPath, $length(resourceDir) + 1, *)
-            }
-            // Convert path to class name: "SyncTest/Tests/Trivial.cls" -> "SyncTest.Tests.Trivial"
-            set fileName = $piece(packageRelPath, "/", *)
-            set baseName = $piece(fileName, ".", 1, *-1)
-            set dirPart = $piece(packageRelPath, "/", 1, *-1)
-            set className = $select(dirPart '= "": $translate(dirPart, "/", ".") _ "." _ baseName, 1: baseName)
-            if $zconvert($piece(fileName, ".", *), "U") = "CLS"
-                && $$$comClassDefined(className)
+            set className = ..RelPathToClassName(relPath, resourceDir)
+            if className '= "" && $$$comClassDefined(className)
                 && $classmethod(className, "%Extends", "%UnitTest.TestCase") {
                 set params("Sync", "ChangedTestCases", className) = ..ResourceReference.Name
             }
@@ -438,16 +426,8 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
         for {
             set relPath = $order(deletedPaths(relPath))
             quit:relPath=""
-
-            set packageRelPath = relPath
-            if $extract(packageRelPath, 1, $length(resourceDir)) = resourceDir {
-                set packageRelPath = $extract(packageRelPath, $length(resourceDir) + 1, *)
-            }
-            set fileName = $piece(packageRelPath, "/", *)
-            set baseName = $piece(fileName, ".", 1, *-1)
-            set dirPart = $piece(packageRelPath, "/", 1, *-1)
-            set className = $select(dirPart '= "": $translate(dirPart, "/", ".") _ "." _ baseName, 1: baseName)
-            if $zconvert($piece(fileName, ".", *), "U") = "CLS" && $$$comClassDefined(className) {
+            set className = ..RelPathToClassName(relPath, resourceDir)
+            if className '= "" && $$$comClassDefined(className) {
                 $$$ThrowOnError($system.OBJ.Delete(className, $select(verbose:"d",1:"-d")))
             }
         }
@@ -575,6 +555,28 @@ ClassMethod SyncSummaryTallyTests(
         }
     }
     do ##class(%IPM.General.Sync.Summary).AddTests(moduleName, passed, failed)
+}
+
+/// Convert a module-root-relative relPath to a class name within this test resource.
+/// relPath e.g. "tests/unit/SyncTest/Tests/Trivial.cls", resourceDir e.g. "tests/unit".
+/// Returns "" for non-.cls files or paths outside resourceDir.
+ClassMethod RelPathToClassName(relPath As %String, resourceDir As %String) As %String [ Private ]
+{
+    set packageRelPath = relPath
+    if $extract(packageRelPath, 1, $length(resourceDir)) = resourceDir {
+        set packageRelPath = $extract(packageRelPath, $length(resourceDir) + 1, *)
+    }
+    // Strip leading slash left after prefix removal (e.g. "/SyncTest/...")
+    if $extract(packageRelPath) = "/" {
+        set packageRelPath = $extract(packageRelPath, 2, *)
+    }
+    set fileName = $piece(packageRelPath, "/", *)
+    if $zconvert($piece(fileName, ".", *), "U") '= "CLS" {
+        quit ""
+    }
+    set baseName = $piece(fileName, ".", 1, *-1)
+    set dirPart = $piece(packageRelPath, "/", 1, *-1)
+    quit $select(dirPart '= "": $translate(dirPart, "/", ".") _ "." _ baseName, 1: baseName)
 }
 
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
