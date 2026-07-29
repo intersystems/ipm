@@ -2335,7 +2335,7 @@ ClassMethod Sync(ByRef commandInfo) [ Private ]
     } else {
         // Sync all dev-mode modules in dependency order (least dependent first) so each module
         // recompiles against dependencies that have already been synced this run.
-        set orderedNames = ..GetDevModeModulesInDependencyOrder()
+        set orderedNames = ##class(%IPM.Utils.Module).GetDevModeModulesInDependencyOrder()
         set found = $listlength(orderedNames)
         set failures = ""
         if 'found {
@@ -2364,87 +2364,6 @@ ClassMethod Sync(ByRef commandInfo) [ Private ]
     }
 }
 
-/// Returns a $list of dev-mode module names ordered least-dependent-first: a module's
-/// dependencies appear before it. Sync-all uses this so each module recompiles against
-/// dependencies already synced in the same run. Only dependency edges among the dev-mode set
-/// are considered; modules unconnected by any such edge keep their natural (row) order.
-ClassMethod GetDevModeModulesInDependencyOrder() As %List [ Private ]
-{
-    // Dev-mode modules in row order (stable tiebreaker for modules with no ordering constraint).
-    set result = ##class(%SQL.Statement).%ExecDirect(,
-        "select Name from %IPM_Storage.ModuleItem where DeveloperMode = 1")
-    if (result.%SQLCODE < 0) {
-        throw ##class(%Exception.SQL).CreateFromSQLCODE(result.%SQLCODE, result.%Message)
-    }
-    kill devMode
-    set rowOrder = ""
-    while result.%Next(.sc) {
-        $$$ThrowOnError(sc)
-        set name = result.%Get("Name")
-        set devMode(name) = ""
-        set rowOrder = rowOrder _ $listbuild(name)
-    }
-    $$$ThrowOnError(sc)
-
-    // Dependency edges restricted to the dev-mode set: dependsOn(modName, depName) = "".
-    set depRes = ##class(%SQL.Statement).%ExecDirect(,
-        "select ModuleItem->Name ModName, Dependencies_Name DepName from %IPM_Storage.ModuleItem_Dependencies")
-    if (depRes.%SQLCODE < 0) {
-        throw ##class(%Exception.SQL).CreateFromSQLCODE(depRes.%SQLCODE, depRes.%Message)
-    }
-    kill dependsOn
-    while depRes.%Next(.sc) {
-        $$$ThrowOnError(sc)
-        set modName = depRes.%Get("ModName")
-        set depName = depRes.%Get("DepName")
-        if $data(devMode(modName)) && $data(devMode(depName)) {
-            set dependsOn(modName, depName) = ""
-        }
-    }
-    $$$ThrowOnError(sc)
-
-    // Emit a module only once all its (dev-mode) dependencies are already emitted; repeat until
-    // every module is placed. Each pass scans in row order so independent modules keep their
-    // natural sequence.
-    set ordered = ""
-    kill emitted
-    set remaining = $listlength(rowOrder)
-    while remaining > 0 {
-        set progress = 0
-        set ptr = 0
-        while $listnext(rowOrder, ptr, name) {
-            continue:$data(emitted(name))
-            set ready = 1
-            set depName = ""
-            for {
-                set depName = $order(dependsOn(name, depName))
-                quit:depName=""
-                if '$data(emitted(depName)) {
-                    set ready = 0
-                    quit
-                }
-            }
-            if ready {
-                set ordered = ordered _ $listbuild(name)
-                set emitted(name) = ""
-                set remaining = remaining - 1
-                set progress = 1
-            }
-        }
-        if 'progress {
-            // A dependency cycle within the dev-mode set would stall the loop. Install rejects
-            // real cycles, so this is a safety net: emit the rest in row order and stop.
-            set ptr = 0
-            while $listnext(rowOrder, ptr, name) {
-                continue:$data(emitted(name))
-                set ordered = ordered _ $listbuild(name)
-                set emitted(name) = ""
-            }
-            set remaining = 0
-        }
-    }
-    quit ordered
-}
 
 ClassMethod Load(
 	ByRef pCommandInfo,
