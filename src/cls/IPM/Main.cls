@@ -104,6 +104,20 @@ This command is an alias for `module-action module-name reload`
 <parameter name="module" required="true" description="Name of module on which to perform reload action" />
 </command>
 
+<command name="sync" dataPrefix="D">
+<summary>Incrementally syncs changed files from disk into the namespace.</summary>
+<description>
+Detects files changed on disk since the last load/sync for development-mode modules,
+routes each to its resource processor, and recompiles only what is stale.
+If no module is specified, syncs all modules in development mode.
+</description>
+<parameter name="module" description="Name of module to sync (optional; if omitted, syncs all dev-mode modules)" />
+<modifier name="delete" dataAlias="ProcessDeletes" dataValue="1" description="Also process deleted files (remove server documents and recompile dependents)." />
+<modifier name="test" aliases="t" dataAlias="RunTests" dataValue="1" description="After sync, run test-phase unit tests that were added or modified." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output." />
+<modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output." />
+</command>
+
 <command name="compile">
 <description>
 This command is an alias for `module-action module-name compile`
@@ -1098,6 +1112,8 @@ ClassMethod ShellInternal(
                 do ..Information(.tCommandInfo)
 			} elseif (tCommandInfo = "history") {
 				do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "sync") {
+                do ..Sync(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -2308,6 +2324,44 @@ ClassMethod LoadFromRepo(
     }
     hang 2
     quit tDirectoryName
+}
+
+ClassMethod Sync(ByRef commandInfo) [ Private ]
+{
+    set moduleName = $get(commandInfo("parameters", "module"))
+    merge params = commandInfo("data")
+
+    if moduleName '= "" {
+        $$$ThrowOnError(##class(%IPM.Storage.Module).Sync(moduleName, .params))
+    } else {
+        // Sync all dev-mode modules
+        set result = ##class(%SQL.Statement).%ExecDirect(,
+            "select Name from %IPM_Storage.ModuleItem where DeveloperMode = 1")
+        if (result.%SQLCODE < 0) {
+            throw ##class(%Exception.SQL).CreateFromSQLCODE(result.%SQLCODE, result.%Message)
+        }
+        set found = 0
+        set failures = ""
+        for {
+            set hasData = result.%Next(.sc)
+            $$$ThrowOnError(sc)
+            if 'hasData {
+                quit
+            }
+            set found = found + 1
+            set name = result.%Get("Name")
+            set syncSC = ##class(%IPM.Storage.Module).Sync(name, .params)
+            if $$$ISERR(syncSC) {
+                set failures = failures _ $listbuild(name)
+                do $system.OBJ.DisplayError(syncSC)
+            }
+        }
+        if 'found {
+            write !, "No modules in development mode."
+        } elseif failures '= "" {
+            write !, "Sync completed with errors in: ", $listtostring(failures, ", ")
+        }
+    }
 }
 
 ClassMethod Load(

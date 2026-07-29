@@ -727,6 +727,59 @@ Method %Reload(ByRef pParams) As %Status
     quit tSC
 }
 
+/// Build the set of tracked paths (resource-owned files + module.xml) for sync change detection.
+/// Output: trackedPaths(normalizedRelPath)=""
+Method GetTrackedPaths(Output trackedPaths)
+{
+    kill trackedPaths
+    set root = ##class(%File).NormalizeDirectory(..Module.Root)
+
+    // Include module.xml
+    set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath("module.xml")) = ""
+
+    // Walk resources and resolve children to get all source file paths
+    set orderedResourceList = ..Module.GetOrderedResourceList()
+    set key = ""
+    for {
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+
+        if '$isobject(resource.Processor) {
+            continue
+        }
+
+        kill childArr
+        set sc = resource.ResolveChildren(.childArr)
+        if $$$ISERR(sc) {
+            continue
+        }
+
+        set childName = ""
+        for {
+            set childName = $order(childArr(childName))
+            quit:childName=""
+
+            set relPath = $get(childArr(childName, "RelativePath"))
+            if relPath = "" {
+                set relPath = resource.Processor.OnItemRelativePath(childName)
+            }
+            if relPath = "" {
+                continue
+            }
+
+            set trackedPaths(##class(%IPM.Storage.FileHash).NormalizePath(relPath)) = ""
+        }
+    }
+    set debugCount = 0
+    set debugKey = ""
+    for {
+        set debugKey = $order(trackedPaths(debugKey))
+        quit:debugKey=""
+        set debugCount = debugCount + 1
+    }
+    write !, "[DEBUG GetTrackedPaths] module=", ..Module.Name, " trackedCount=", debugCount
+}
+
 Method InstallOrDownloadPythonRequirements(
 	pRoot As %String = "",
 	ByRef pParams,
@@ -1201,6 +1254,24 @@ Method %Compile(ByRef pParams) As %Status
                 }
                 set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Failed to resolve compile order of module resources: %1",$listtostring(tFailedResources,", ")))
                 $$$ThrowStatus(tSC)
+            }
+        }
+
+        // Stamp file baselines for sync change detection (dev mode only, non-fatal).
+        // Done here after compile so test classes are in ^oddDEF and appear in trackedPaths.
+        if tDevMode {
+            try {
+                set trackedPaths = ""
+                do ..GetTrackedPaths(.trackedPaths)
+                write !, "[DEBUG %Compile] Stamping baselines for module: ", ..Module.Name
+                set stampSC = ##class(%IPM.Storage.FileHash).StampModule(..Module, .trackedPaths)
+                if $$$ISERR(stampSC) {
+                    write !, "[DEBUG %Compile] StampModule error: ", $system.Status.GetErrorText(stampSC)
+                } else {
+                    write !, "[DEBUG %Compile] StampModule OK"
+                }
+            } catch stampErr {
+                write !, "[DEBUG %Compile] StampModule exception: ", stampErr.DisplayString()
             }
         }
     } catch e {

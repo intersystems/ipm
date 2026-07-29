@@ -204,6 +204,20 @@ Method OnAfterPhase(
     quit $$$OK
 }
 
+/// Called during 'sync' for resources whose files changed on disk.
+/// modifiedPaths(relPath)="" for changed files; deletedPaths(relPath)="" for removed files.
+/// Set handled=1 to fully own sync for this resource (skip default load+compile handling).
+Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output handled As %Boolean = 0) As %Status
+{
+    quit $$$OK
+}
+
+/// Returns 1 if this processor supports incremental sync. Base returns 0.
+Method SupportsSync() As %Boolean
+{
+    quit 0
+}
+
 /// Returns the path relative to the module root for item <var>pItemName</var> within this resource.
 Method OnItemRelativePath(pItemName As %String) As %String
 {

@@ -7,7 +7,7 @@ services:
       - TEST_REGISTRY_USER=admin
       - TEST_REGISTRY_PASSWORD=SYS
     ports:
-      - 52774:52773
+      - 52777:52773
     volumes:
       - ~/iris.key:/usr/irissys/mgr/iris.key
       - ./:/home/irisowner/zpm/
@@ -28,7 +28,7 @@ services:
     build: ./tests/sandbox/
     restart: always
     ports:
-      - 52776:52773
+      - 52779:52773
     environment:
       - IRISPASSWORD=SYS
       - IRISUSERNAME=admin
@@ -43,4 +43,4 @@ services:
     image: ghcr.io/project-zot/zot-linux-amd64:latest
     restart: always
     ports:
-      - 5001:5000
+      - 5002:5000

@@ -359,6 +359,60 @@ Method OnItemRelativePath(pItemName As %String) As %String
     quit ..EmbeddedProcessor.OnItemRelativePath(pItemName)
 }
 
+Method SupportsSync() As %Boolean
+{
+    quit 1
+}
+
+Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output handled As %Boolean = 0) As %Status
+{
+    set sc = $$$OK
+    set handled = 1
+    try {
+        set verbose = $get(params("Verbose"))
+        set unitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root _ ..ResourceReference.Name)
+
+        // Reload changed test files, then compile so %Extends checks are valid below.
+        // Test resources are not AbstractCompilable, so SyncCompile never touches them —
+        // OnSync owns the full load+compile cycle for this resource type.
+        $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(unitTestDir, verbose, .loadedList, ..Format))
+        if ..Package '= "" {
+            $$$ThrowOnError($system.OBJ.CompilePackage(..Package, "ck"_$select(verbose:"d",1:"-d")))
+        } elseif ..Class '= "" {
+            $$$ThrowOnError($system.OBJ.Compile(..Class, "ck"_$select(verbose:"d",1:"-d")))
+        }
+
+        // Record changed TestCase subclasses for SyncRunTests.
+        // relPath is relative to module root (e.g. "tests/unit/SyncTest/Tests/Trivial.cls").
+        // Strip the resource directory prefix (e.g. "tests/unit/") to get the package-relative path.
+        set resourceDir = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
+        set relPath = ""
+        for {
+            set relPath = $order(modifiedPaths(relPath))
+            quit:relPath=""
+
+            // Strip resource directory prefix to get path relative to the test dir
+            set packageRelPath = relPath
+            if $extract(packageRelPath, 1, $length(resourceDir)) = resourceDir {
+                set packageRelPath = $extract(packageRelPath, $length(resourceDir) + 1, *)
+            }
+            // Convert path to class name: "SyncTest/Tests/Trivial.cls" -> "SyncTest.Tests.Trivial"
+            set fileName = $piece(packageRelPath, "/", *)
+            set baseName = $piece(fileName, ".", 1, *-1)
+            set dirPart = $piece(packageRelPath, "/", 1, *-1)
+            set className = $select(dirPart '= "": $translate(dirPart, "/", ".") _ "." _ baseName, 1: baseName)
+            if $zconvert($piece(fileName, ".", *), "U") = "CLS"
+                && $$$comClassDefined(className)
+                && $classmethod(className, "%Extends", "%UnitTest.TestCase") {
+                set params("Sync", "ChangedTestCases", className) = ""
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {
     if ((..Package = "") && (..Class = "")) || ((..Package '= "") && (..Class '= "")) {
