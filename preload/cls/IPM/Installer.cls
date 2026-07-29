@@ -456,22 +456,29 @@ ClassMethod CleanupOldMappings() As %Status
 
         // These mappings were suggested as a temporary workaround for IRIS 2023.x,
         // but whose underlying issues have been resolved in 2024.1 and later.
-        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(BEGIN):(""%ZP"")","IRISLIB")
-        if $$$ISERR(status) {
-            set sc = $$$ADDSC(sc, status)
-        }
-        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""%ZP""):(""A"")","IRISSYS")
-        if $$$ISERR(status) {
-            set sc = $$$ADDSC(sc, status)
-        }
-        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
-        if $$$ISERR(status) {
-            set sc = $$$ADDSC(sc, status)
-        }
-        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument",namespace)
-        if $$$ISERR(status) {
-            // this mapping deletion will fail if there are still sub-mappings present
-            // so we can ignore errors here
+        // %IPM.Utils.Module ships in the src payload imported later in this manifest, so
+        // on some upgrade paths the class/method may not yet exist when this runs. Tolerate
+        // that with a try/catch rather than reordering, since cleanup must precede the import.
+        try {
+            set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(BEGIN):(""%ZP"")","IRISLIB")
+            if $$$ISERR(status) {
+                set sc = $$$ADDSC(sc, status)
+            }
+            set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""%ZP""):(""A"")","IRISSYS")
+            if $$$ISERR(status) {
+                set sc = $$$ADDSC(sc, status)
+            }
+            set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
+            if $$$ISERR(status) {
+                set sc = $$$ADDSC(sc, status)
+            }
+            set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument",namespace)
+            if $$$ISERR(status) {
+                // this mapping deletion will fail if there are still sub-mappings present
+                // so we can ignore errors here
+            }
+        } catch e {
+            // %IPM.Utils.Module (or RemoveGlobalMapping) not available yet on this upgrade path; skip
         }
     }
 

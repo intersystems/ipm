@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #1207: Zero-byte files are now supported in IPM modules
+- #1209: Fix IPM installer failing on certain environments with (partially) installed older IPM versions
 
 ## [0.10.8] - 2026-07-08
 
