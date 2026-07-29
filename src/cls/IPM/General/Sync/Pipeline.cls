@@ -173,7 +173,7 @@ ClassMethod Run(
         }
         $$$ThrowOnError(..SyncDispatchProcessors(module, root, verbose, .syncByResource, .params, .loadItems))
 
-        // Step 7: Compile the full resource set with u-flag to pick up dependent recompiles
+        // Step 7: Compile the full resource set to pick up dependent recompiles
         if loadItems > 0 {
             $$$ThrowOnError(..SyncCompile(module, orderedResourceList, verbose, .params))
         }
@@ -271,16 +271,11 @@ ClassMethod SyncCheckModuleXml(
 /// Used by SyncRoutePathSet to map changed files back to their owning resource processors.
 /// Skips resources whose processor does not support sync — those are collected in
 /// unsupportedResources(resourceName)="" for informational display.
-///
-/// Step 1 builds docToResource (docName → owner) from ResolveChildren, and prefix-scans
-/// allFiles for directory-owned resources (e.g. test dirs) via GetSyncDirectory().
-/// Step 2 maps all stored baseline paths to owners via RelPathToDocName → docToResource.
 ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResourceList As %ListOfObjects, ByRef reverseIndex, Output unsupportedResources, ByRef allFiles) [ Private ]
 {
     kill unsupportedResources
     // docToResource maps server document names (e.g. "SyncTest.SuperClass.CLS") to the
-    // resource that owns them. This lets us resolve filesystem paths → owners in O(1) below,
-    // since RelPathToDocName converts a relPath to a docName deterministically.
+    // resource that owns them. This lets us map relPath → owner in O(1) below.
     kill docToResource
     set key = ""
     for {
@@ -345,8 +340,7 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         }
     }
 
-    // Resolve compilable paths: every baseline path not already claimed above gets mapped
-    // through RelPathToDocName → docToResource.
+    // Catch compilable files in the baseline not reachable via ResolveChildren.
     kill storedPaths
     do ##class(%IPM.Storage.FileHash).GetStoredPaths(module.Name, .storedPaths)
     set relPath = ""
@@ -481,13 +475,9 @@ ClassMethod SyncApplyDeletes(
         if docName '= "" {
             set delFlags = $select(verbose:"d", 1:"-d")
             set delSC = $system.OBJ.Delete(docName, delFlags)
-            // Delete failures are non-fatal: the SyncCompile pass that immediately follows
-            // will fail to compile any class that still references the deleted doc, surfacing
-            // the error with full context. Aborting the delete loop here would leave other
-            // deletions unapplied and make the overall error harder to diagnose.
             // Non-fatal: the SyncCompile pass that follows will surface any compilation errors
-            // caused by the still-present document, giving the user full context. Aborting here
-            // would leave remaining deletions unapplied and make the overall error harder to diagnose.
+            // caused by the still-present document. Aborting here would leave remaining deletions
+            // unapplied and make the overall error harder to diagnose.
             if $$$ISERR(delSC) {
                 set errText = $system.Status.GetOneErrorText(delSC)
                 write !, "Warning: could not delete ", docName, ": ", errText

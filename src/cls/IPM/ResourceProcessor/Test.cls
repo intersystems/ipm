@@ -397,8 +397,6 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
 
         // Reload all test files in the directory, then compile so %Extends checks are valid below.
         // New test classes may not yet be in ^oddDEF, so we can't limit to changed files here.
-        // Test resources are not AbstractCompilable, so SyncCompile never touches them —
-        // OnSync owns the full load+compile cycle for this resource type.
         $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(unitTestDir, verbose, .loadedList, ..Format))
         if ..Package '= "" {
             $$$ThrowOnError($system.OBJ.CompilePackage(..Package, "ck"_$select(verbose:"d",1:"-d")))
@@ -558,7 +556,7 @@ ClassMethod SyncSummaryTallyTests(
 }
 
 /// Convert a module-root-relative relPath to a class name within this test resource.
-/// relPath e.g. "tests/unit/SyncTest/Tests/Trivial.cls", resourceDir e.g. "tests/unit".
+/// e.g. "tests/unit/SyncTest/Tests/Trivial.cls" → "SyncTest.Tests.Trivial".
 /// Returns "" for non-.cls files or paths outside resourceDir.
 ClassMethod RelPathToClassName(relPath As %String, resourceDir As %String) As %String [ Private ]
 {
