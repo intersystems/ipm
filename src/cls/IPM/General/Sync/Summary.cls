@@ -168,7 +168,7 @@ ClassMethod Report(
                 set line = line _ "   " _ fileCount _ " file" _ $select(fileCount = 1:"", 1:"s")
             }
             if hasTests {
-                // "passed/total" already conveys the failure count; no redundant "N failed".
+                // Report how many tests passed/ran
                 set line = line _ "   tests " _ (+passed) _ "/" _ ((+passed) + (+failed))
             }
             if isError {
@@ -176,21 +176,21 @@ ClassMethod Report(
             }
             write !, line
             // Enumerate verify-scoped test classes that were detected but not run.
-            set sseq = ""
+            set skippedSeq = ""
             for {
-                set sseq = $order(^||IPM.Sync.Summary("Module", name, "Skipped", sseq), 1, skippedClass)
-                quit:sseq=""
+                set skippedSeq = $order(^||IPM.Sync.Summary("Module", name, "Skipped", skippedSeq), 1, skippedClass)
+                quit:skippedSeq=""
                 write !, "    skipped (verify-scoped): ", skippedClass
             }
         }
 
         // Collect this module's warnings for the aggregated section below.
-        set wseq = ""
+        set warningSeq = ""
         for {
-            set wseq = $order(^||IPM.Sync.Summary("Module", name, "Warning", wseq), 1, wtext)
-            quit:wseq=""
+            set warningSeq = $order(^||IPM.Sync.Summary("Module", name, "Warning", warningSeq), 1, warningText)
+            quit:warningSeq=""
             set warningCount = warningCount + 1
-            set warnings(warningCount) = "  [" _ name _ "] " _ wtext
+            set warnings(warningCount) = "  [" _ name _ "] " _ warningText
         }
     }
 
