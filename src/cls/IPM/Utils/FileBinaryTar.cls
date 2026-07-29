@@ -178,7 +178,14 @@ Method ExtractTo(pDest As %String) As %Status
             }
             set fs = ##class(%Stream.FileBinary).%OpenId(fullPath, , .sc)
             $$$ThrowOnError(sc)
-            $$$ThrowOnError(fs.CopyFromAndSave(..fileData))
+            if (..fileData.Size = 0) {
+                // CopyFromAndSave with an empty source stream is a no-op and never creates
+                // the file, so write an empty payload to materialize a 0-byte file on disk.
+                do fs.Write("")
+                $$$ThrowOnError(fs.%Save())
+            } else {
+                $$$ThrowOnError(fs.CopyFromAndSave(..fileData))
+            }
             if irisdat {
                 set to = $extract(fullPath, 1, * - 8) _ "IRIS.DAT"
                 $$$ThrowOnError(##class(%File).Rename(fullPath, to))
@@ -239,7 +246,6 @@ ClassMethod ExtractStream(
             do tFile.ExtractTo(pTargetDirectory)
         }
 
-        continue:fileSize=0
         set readBlocks=fileSize \ blockSize
         set:fileSize#blockSize>0 readBlocks=readBlocks + 1
         set tFile.fileData=##class(%Stream.FileBinary).%New()
