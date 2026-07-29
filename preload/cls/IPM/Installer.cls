@@ -479,6 +479,7 @@ ClassMethod CleanupOldMappings() As %Status
             }
         } catch e {
             // %IPM.Utils.Module (or RemoveGlobalMapping) not available yet on this upgrade path; skip
+            write !,"WARNING: CleanupOldMappings caught exception in ",namespace,": ",e.DisplayString()
         }
     }
 
