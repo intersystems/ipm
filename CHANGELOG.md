@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1178: Add `-password-env` and `-token-env` modifiers to the `repo` command to read the password/token from a named environment variable (secure alternatives to `-password` and `-token`).
 
+### Changed
+- #1186: Change %IPM.Main:ShellScript() to return a status.
+
 ### Fixed
 - #1207: Zero-byte files are now supported in IPM modules
 - #1209: Fix IPM installer failing on certain environments with (partially) installed older IPM versions
