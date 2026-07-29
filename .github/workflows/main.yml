@@ -89,6 +89,10 @@ jobs:
             registry-image \
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
+          docker exec -i $REGISTRY iris session iris -UUSER << EOF
+            zpm "install zpm-registry"
+            halt
+          EOF
           docker logs $REGISTRY
       - name: Run ORAS registry
         timeout-minutes: 5
@@ -135,6 +139,10 @@ jobs:
             -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
           REGISTRY=`docker ps -lq`
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
+          docker exec -i $REGISTRY iris session iris -UUSER << EOF
+            zpm "install zpm-registry"
+            halt
+          EOF
           docker logs $REGISTRY
       - name: Test and publish to temporary registry
         timeout-minutes: 15
