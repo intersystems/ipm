@@ -719,6 +719,508 @@ ClassMethod ExecutePhases(
     quit tSC
 }
 
+/// Incrementally sync changed files from disk into the namespace for a dev-mode module.
+/// Detects files changed since last load/sync, routes them to resource processors, and recompiles.
+ClassMethod Sync(moduleName As %String, ByRef params) As %Status
+{
+    set sc = $$$OK
+    try {
+        set verbose = $get(params("Verbose"), 0)
+        set processDeletes = $get(params("ProcessDeletes"), 0)
+        set runTests = $get(params("RunTests"), 0)
+
+        set module = ..NameOpen(moduleName, , .sc)
+        if '$isobject(module) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' not found.", moduleName)))
+        }
+        $$$ThrowOnError(sc)
+
+        if 'module.DeveloperMode {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' is not in development mode. Sync requires dev mode.", moduleName)))
+        }
+
+        set root = ##class(%File).NormalizeDirectory(module.Root)
+        if root = "" {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' has no root directory configured.", moduleName)))
+        }
+
+        // Step 1: Check if module.xml changed; reload manifest if so
+        set moduleXmlRelPath = ##class(%IPM.Storage.FileHash).NormalizePath("module.xml")
+        set moduleXmlPath = root _ "module.xml"
+        set moduleXmlChanged = ..SyncCheckModuleXml(.module, moduleXmlPath, moduleXmlRelPath)
+        set lifecycle = module.Lifecycle
+
+        // Step 2: Collect tracked paths and compute disk changes vs baseline
+        do lifecycle.GetTrackedPaths(.trackedPaths)
+
+        if '##class(%IPM.Storage.FileHash).HasBaseline(moduleName) {
+            // Self-heal: establish baseline for modules loaded before this feature
+            do ##class(%IPM.Storage.FileHash).StampModule(module, .trackedPaths)
+            write !, "[", moduleName, "] Baseline established. Run sync again to detect changes."
+            quit
+        }
+
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .trackedPaths, .modified, .deleted))
+
+        // Exclude module.xml from file routing (handled by SyncCheckModuleXml above)
+        kill modified(moduleXmlRelPath)
+        kill deleted(moduleXmlRelPath)
+
+        if '$data(modified) && ('$data(deleted) || 'processDeletes) {
+            if verbose {
+                write !, "[", moduleName, "] Nothing to sync."
+            }
+            if moduleXmlChanged {
+                do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
+                do ..SyncPrintModuleXmlWarning()
+            }
+            quit
+        }
+
+        // Step 3: Build reverse index (relPath -> owning resource + processor)
+        kill reverseIndex
+        do ..SyncBuildReverseIndex(module, .reverseIndex)
+        set orderedResourceList = module.GetOrderedResourceList()
+
+        // Step 4: Partition changes by resource, separating unsupported processors
+        kill syncByResource, unsupportedWarnings
+        do ..SyncRouteChanges(.modified, .deleted, .reverseIndex, processDeletes, .syncByResource, .unsupportedWarnings)
+
+        // Step 5: Dispatch OnSync to each processor; load unhandled compilable files
+        $$$ThrowOnError(..SyncDispatchProcessors(module, root, verbose, .syncByResource, .params, .loadItems))
+
+        // Step 6: Compile the full resource set with u-flag to pick up dependent recompiles
+        if loadItems > 0 || processDeletes {
+            $$$ThrowOnError(..SyncCompile(module, verbose, .params))
+        }
+
+        // Step 7: Delete server-side documents for removed files, then recompile
+        if processDeletes {
+            do ..SyncApplyDeletes(.deleted, .reverseIndex, .syncByResource, verbose)
+            $$$ThrowOnError(..SyncCompile(module, verbose, .params))
+        }
+
+        // Step 8: Run changed test-phase tests if -test flag is set
+        if runTests {
+            $$$ThrowOnError(..SyncRunTests(orderedResourceList, verbose, .params))
+        }
+
+        // Step 9: Commit new hashes on success (skipped on error so next sync re-detects)
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, processDeletes))
+        if moduleXmlChanged {
+            do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
+        }
+
+        set modCount = 0
+        set key = ""
+        for {
+            set key = $order(modified(key))
+            quit:key=""
+            set modCount = modCount + 1
+        }
+        set delCount = 0
+        if processDeletes {
+            set key = ""
+            for {
+                set key = $order(deleted(key))
+                quit:key=""
+                set delCount = delCount + 1
+            }
+        }
+        write !, "[", moduleName, "] Sync complete: ", modCount, " file(s) updated"
+        if delCount > 0 {
+            write ", ", delCount, " deleted"
+        }
+        write "."
+
+        if moduleXmlChanged {
+            do ..SyncPrintModuleXmlWarning()
+        }
+        do ..SyncPrintUnsupportedWarnings(.unsupportedWarnings)
+
+    } catch e {
+        set sc = e.AsStatus()
+        do $system.OBJ.DisplayError(sc)
+    }
+    quit sc
+}
+
+/// Check if module.xml changed and reload the manifest if so.
+/// Returns 1 if module.xml changed and was reloaded, 0 otherwise.
+/// On reload, replaces module with the freshly-opened instance.
+ClassMethod SyncCheckModuleXml(
+    ByRef module As %IPM.Storage.Module,
+    moduleXmlPath As %String,
+    moduleXmlRelPath As %String) As %Boolean
+{
+    if '##class(%File).Exists(moduleXmlPath) {
+        quit 0
+    }
+    set existing = ##class(%IPM.Storage.FileHash).ModulePathIndexOpen(module.Name, moduleXmlRelPath)
+    if '$isobject(existing) {
+        quit 0
+    }
+    set currentSize = ##class(%File).GetFileSize(moduleXmlPath)
+    set currentTimestamp = ##class(%IPM.Storage.FileHash).GetFileTimestamp(moduleXmlPath)
+    if (existing.FileSize = currentSize) && (existing.FileTimestamp = currentTimestamp) {
+        quit 0
+    }
+    set newHash = ##class(%File).SHA1Hash(moduleXmlPath, 1)
+    if (existing.Hash '= "") && (newHash = existing.Hash) {
+        quit 0
+    }
+    $$$ThrowOnError($system.OBJ.Load(moduleXmlPath, "-d"))
+    $$$ThrowOnError(module.%Reload())
+    set module = ..NameOpen(module.Name, , .openSC)
+    $$$ThrowOnError(openSC)
+    quit 1
+}
+
+/// Build a reverse index: normalizedRelPath -> resource name, Processor, Resource object.
+/// Used by SyncRouteChanges to map changed files back to their owning resource processors.
+ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, ByRef reverseIndex)
+{
+    set orderedResourceList = module.GetOrderedResourceList()
+    set key = ""
+    for {
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+
+        if '$isobject(resource.Processor) {
+            continue
+        }
+
+        kill childArr
+        set childSC = resource.ResolveChildren(.childArr)
+        if $$$ISERR(childSC) {
+            continue
+        }
+
+        set childName = ""
+        for {
+            set childName = $order(childArr(childName))
+            quit:childName=""
+
+            set relPath = $get(childArr(childName, "RelativePath"))
+            if relPath = "" {
+                set relPath = resource.Processor.OnItemRelativePath(childName)
+            }
+            if relPath = "" {
+                continue
+            }
+
+            set normalizedRelPath = ##class(%IPM.Storage.FileHash).NormalizePath(relPath)
+            set reverseIndex(normalizedRelPath) = resource.Name
+            set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
+            set reverseIndex(normalizedRelPath, "Resource") = resource
+        }
+    }
+}
+
+/// Partition modified and deleted paths into syncByResource (keyed by resource name) and
+/// unsupportedWarnings (for processors that don't support sync).
+ClassMethod SyncRouteChanges(
+    ByRef modified,
+    ByRef deleted,
+    ByRef reverseIndex,
+    processDeletes As %Boolean,
+    ByRef syncByResource,
+    ByRef unsupportedWarnings)
+{
+    set relPath = ""
+    for {
+        set relPath = $order(modified(relPath))
+        quit:relPath=""
+
+        if '$data(reverseIndex(relPath)) {
+            continue
+        }
+        set resName = reverseIndex(relPath)
+        set processor = reverseIndex(relPath, "Processor")
+        if 'processor.SupportsSync() {
+            set unsupportedWarnings(resName, relPath) = ""
+        } else {
+            set syncByResource(resName, "modified", relPath) = ""
+            set syncByResource(resName, "Processor") = processor
+            set syncByResource(resName, "Resource") = reverseIndex(relPath, "Resource")
+        }
+    }
+
+    if 'processDeletes {
+        quit
+    }
+    set relPath = ""
+    for {
+        set relPath = $order(deleted(relPath))
+        quit:relPath=""
+
+        if '$data(reverseIndex(relPath)) {
+            continue
+        }
+        set resName = reverseIndex(relPath)
+        set processor = reverseIndex(relPath, "Processor")
+        if 'processor.SupportsSync() {
+            set unsupportedWarnings(resName, relPath) = ""
+        } else {
+            set syncByResource(resName, "deleted", relPath) = ""
+            set syncByResource(resName, "Processor") = processor
+            set syncByResource(resName, "Resource") = reverseIndex(relPath, "Resource")
+        }
+    }
+}
+
+/// Call OnSync on each processor, then load any unhandled compilable files.
+/// Returns the number of files loaded (used to decide whether SyncCompile is needed).
+ClassMethod SyncDispatchProcessors(
+    module As %IPM.Storage.Module,
+    root As %String,
+    verbose As %Boolean,
+    ByRef syncByResource,
+    ByRef params,
+    Output loadItems As %Integer = 0) As %Status
+{
+    set sc = $$$OK
+    try {
+        set resName = ""
+        for {
+            set resName = $order(syncByResource(resName))
+            quit:resName=""
+
+            if '$data(syncByResource(resName, "Processor")) {
+                continue
+            }
+            set processor = syncByResource(resName, "Processor")
+
+            kill resModified, resDeleted
+            merge resModified = syncByResource(resName, "modified")
+            merge resDeleted = syncByResource(resName, "deleted")
+
+            set handled = 0
+            $$$ThrowOnError(processor.OnSync(.resModified, .resDeleted, .params, .handled))
+
+            if handled || 'processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
+                continue
+            }
+
+            // Default: load each changed file; SyncCompile will do a full compile with u-flag
+            set loadRelPath = ""
+            for {
+                set loadRelPath = $order(resModified(loadRelPath))
+                quit:loadRelPath=""
+
+                set fullPath = ##class(%File).NormalizeFilename(loadRelPath, root)
+                if ##class(%File).Exists(fullPath) {
+                    set loadFlags = $select(verbose:"d", 1:"-d")
+                    $$$ThrowOnError($system.OBJ.Load(fullPath, loadFlags _ "c"))
+                    set loadItems = loadItems + 1
+                }
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// Delete server-side documents for compilable deleted files.
+ClassMethod SyncApplyDeletes(
+    ByRef deleted,
+    ByRef reverseIndex,
+    ByRef syncByResource,
+    verbose As %Boolean)
+{
+    set relPath = ""
+    for {
+        set relPath = $order(deleted(relPath))
+        quit:relPath=""
+
+        if '$data(reverseIndex(relPath)) {
+            continue
+        }
+        set resName = reverseIndex(relPath)
+        if '$data(syncByResource(resName, "Processor")) {
+            continue
+        }
+        set processor = syncByResource(resName, "Processor")
+        if 'processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
+            continue
+        }
+        set docName = ..RelPathToDocName(relPath)
+        if docName '= "" {
+            set delFlags = $select(verbose:"d", 1:"-d")
+            do $system.OBJ.Delete(docName, delFlags)
+        }
+    }
+}
+
+/// Run test-phase tests for changed test case classes recorded in params("Sync","ChangedTestCases").
+ClassMethod SyncRunTests(
+    orderedResourceList As %ListOfObjects,
+    verbose As %Boolean,
+    ByRef params) As %Status
+{
+    set sc = $$$OK
+    try {
+        set className = ""
+        for {
+            set className = $order(params("Sync", "ChangedTestCases", className))
+            quit:className=""
+
+
+            set testKey = ""
+            for {
+                set testResource = orderedResourceList.GetNext(.testKey)
+                quit:testKey=""
+
+                if '$isobject(testResource.Processor) {
+                    continue
+                }
+                if 'testResource.Processor.%IsA("%IPM.ResourceProcessor.Test") {
+                    continue
+                }
+                if '$listfind(testResource.Processor.Phase, "test") {
+                    write:verbose !, "Skipping verify-scoped test: ", className, " (use 'verify' to run)"
+                    continue
+                }
+                kill testParams
+                merge testParams = params
+                set testParams("UnitTest", "Case") = className
+                set testParams("DeveloperMode") = 1
+                set handled = 0
+                $$$ThrowOnError(testResource.Processor.OnPhase("Test", .testParams, .handled))
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// Commit the current module.xml hash to the baseline.
+ClassMethod SyncCommitModuleXml(
+    module As %IPM.Storage.Module,
+    moduleXmlPath As %String,
+    moduleXmlRelPath As %String)
+{
+    kill moduleXmlMod, emptyDel
+    set moduleXmlMod(moduleXmlRelPath) = ##class(%File).SHA1Hash(moduleXmlPath, 1)
+    do ##class(%IPM.Storage.FileHash).CommitChanges(module, .moduleXmlMod, .emptyDel, 0)
+}
+
+ClassMethod SyncPrintModuleXmlWarning()
+{
+    write !
+    write !, "Warning: module.xml changed and was reloaded."
+    write !, "  Resources may have been added/removed. A full 'reload' may be needed"
+    write !, "  to fully apply manifest-level changes (mappings, dependencies, defaults)."
+}
+
+ClassMethod SyncPrintUnsupportedWarnings(ByRef unsupportedWarnings)
+{
+    set warnRes = ""
+    for {
+        set warnRes = $order(unsupportedWarnings(warnRes))
+        quit:warnRes=""
+
+        write !, "Warning: resource '", warnRes, "' does not support sync. Changed files:"
+        set warnPath = ""
+        for {
+            set warnPath = $order(unsupportedWarnings(warnRes, warnPath))
+            quit:warnPath=""
+            write !, "  ", warnPath
+        }
+        write !, "  Run a full 'reload' to apply these changes."
+    }
+}
+
+/// Compile all compilable resources in a module with the 'u' (skip-up-to-date) flag.
+ClassMethod SyncCompile(module As %IPM.Storage.Module, verbose As %Boolean = 0, ByRef params) As %Status
+{
+    set sc = $$$OK
+    try {
+        set orderedResourceList = module.GetOrderedResourceList()
+        kill compileArray
+
+        set key = ""
+        for {
+            set resource = orderedResourceList.GetNext(.key)
+            quit:key=""
+
+            if '$isobject(resource.Processor) {
+                continue
+            }
+            if 'resource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
+                continue
+            }
+            if 'resource.IsInScope("Compile") {
+                continue
+            }
+            if resource.Processor.CompileFromProject {
+                continue
+            }
+
+            kill oneResourceList
+            set oneResourceList(resource.Name) = ""
+            set resSC = resource.ResolveChildren(.oneResourceList)
+            if $$$ISERR(resSC) {
+                continue
+            }
+
+            set childKey = ""
+            for {
+                set childKey = $order(oneResourceList(childKey))
+                quit:childKey=""
+                set ext = $zconvert($piece(childKey, ".", *), "U")
+                if ext = "CLS" {
+                    set className = $piece(childKey, ".", 1, *-1)
+                    if '$$$comClassDefined(className) {
+                        continue
+                    }
+                }
+                set compileArray(childKey) = ""
+            }
+        }
+
+        if $data(compileArray) > 1 {
+            set flags = $select(verbose:"d", 1:"-d") _ "cku"
+            set sc = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.compileArray, .flags)
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// Convert a normalized relative path to an IRIS server document name.
+ClassMethod RelPathToDocName(relPath As %String) As %String
+{
+    set fileName = $piece(relPath, "/", *)
+    set ext = $zconvert($piece(fileName, ".", *), "U")
+    set baseName = $piece(fileName, ".", 1, *-1)
+
+    if ext = "CLS" {
+        // Convert path like src/cls/My/Package/Class.cls -> My.Package.Class.cls
+        set parts = $length(relPath, "/")
+        set className = ""
+        // Skip common source prefixes to get class package path
+        set startPiece = 1
+        for i = 1:1:parts-1 {
+            set piece = $piece(relPath, "/", i)
+            if $listfind($listbuild("src", "cls"), $zconvert(piece, "L")) {
+                set startPiece = i + 1
+            }
+        }
+        for i = startPiece:1:parts-1 {
+            set className = className _ $select(className="":"", 1:".") _ $piece(relPath, "/", i)
+        }
+        set className = className _ $select(className="":"", 1:".") _ baseName
+        quit className _ ".cls"
+    } elseif (ext = "MAC") || (ext = "INC") || (ext = "INT") {
+        quit baseName _ "." _ $zconvert(ext, "L")
+    }
+    quit ""
+}
+
 /// Uninstalls a named module (<var>pModuleName</var>).
 /// May optionally force installation (uninstalling even if required by other modules) if <var>pForce</var> is 1.
 /// May optionally recurse to also uninstall dependencies that are not required by other modules if <var>pRecurse</var> is 1.

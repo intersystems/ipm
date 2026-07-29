@@ -19,4 +19,12 @@ Property ExportFlags As %String(MAXLEN = "");
 /// Certain Deployed Resources cannot be compiled directly, but must be compiled from a studio project.
 Property CompileFromProject As %Boolean [ InitialExpression = 0 ];
 
+/// Compilable resources (classes, routines, includes) can be individually reloaded and
+/// recompiled by sync without a full lifecycle run, so they support sync by default.
+/// Non-compilable processors (FileCopy, CSP applications, etc.) keep the default of 0.
+Method SupportsSync() As %Boolean
+{
+    quit 1
+}
+
 }

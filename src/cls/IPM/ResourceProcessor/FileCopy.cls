@@ -184,6 +184,42 @@ Method DoCopy(
     quit tSC
 }
 
+/// Enumerate source files so sync can detect changes to FileCopy resources.
+/// Populates pResourceArray with RelativePath for each file under the source directory.
+Method OnResolveChildren(ByRef pResourceArray, pCheckModuleOwnership As %Boolean) As %Status
+{
+    set sc = $$$OK
+    try {
+        set sourceDir = ##class(%File).NormalizeDirectory(..GetSource())
+        set moduleRoot = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root)
+        if '##class(%File).DirectoryExists(sourceDir) {
+            quit
+        }
+
+        set rs = ##class(%SQL.Statement).%ExecDirect(,
+            "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
+            sourceDir, "*", "", 1)
+        if rs.%SQLCODE < 0 {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "FileSet query error: " _ rs.%Message))
+        }
+        while rs.%Next() {
+            if rs.%Get("Type") = "D" {
+                continue
+            }
+            set fullPath = rs.%Get("Name")
+            // Compute path relative to module root
+            set relPath = $extract(fullPath, $length(moduleRoot) + 1, *)
+            if relPath '= "" {
+                set pResourceArray(fullPath) = ""
+                set pResourceArray(fullPath, "RelativePath") = relPath
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
 Method OnExportItem(
 	pFullExportPath As %String,
 	pItemName As %String,
