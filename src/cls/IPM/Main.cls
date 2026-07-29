@@ -4074,7 +4074,7 @@ ClassMethod ShellScript(
 	pCommand As %String,
 	pOutputLogFile As %String = "",
 	pAppendToLog As %Boolean = 0,
-    pterminateOnError As %Boolean = 1) As %Status
+    pTerminateOnError As %Boolean = 1) As %Status
 {
     set tSC = $$$OK
     set tFileOpen = 0
@@ -4106,7 +4106,7 @@ ClassMethod ShellScript(
         close pOutputLogFile
     }
 
-    if (pterminateOnError && $$$ISERR(tSC)) {
+    if (pTerminateOnError && $$$ISERR(tSC)) {
         // Set ERRORLEVEL to 1
         do $system.Process.Terminate(,1)
     }
