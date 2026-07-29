@@ -4073,7 +4073,8 @@ ClassMethod History(ByRef pCommandInfo)
 ClassMethod ShellScript(
 	pCommand As %String,
 	pOutputLogFile As %String = "",
-	pAppendToLog As %Boolean = 0) As %Status
+	pAppendToLog As %Boolean = 0,
+    terminateOnError As %Boolean = 1) As %Status
 {
     set tSC = $$$OK
     set tFileOpen = 0
@@ -4103,6 +4104,11 @@ ClassMethod ShellScript(
     write !
     if tFileOpen {
         close pOutputLogFile
+    }
+
+    if (terminateOnError && $$$ISERR(tSC)) {
+        // Set ERRORLEVEL to 1
+        do $system.Process.Terminate(,1)
     }
 
     return tSC
