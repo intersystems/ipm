@@ -122,7 +122,21 @@ ClassMethod Report(
     write !!, border
     write !, "Sync Summary"
     write !, border
-    write !, "Modules checked:  ", checkedCount, "  (", $listtostring(orderedNames, ", "), ")"
+
+    // Write module name list, wrapping at border width with aligned continuation lines.
+    set linePrefix = "Modules checked:  " _ checkedCount _ "  ("
+    set contPrefix = $justify("", $length(linePrefix))
+    set nameLine = linePrefix
+    for i = 1:1:checkedCount {
+        set name = $list(orderedNames, i)
+        set sep = $select(i < checkedCount: ", ", 1: ")")
+        if ($length(nameLine) + $length(name) + $length(sep)) > $length(border) && (nameLine '= linePrefix) {
+            write !, nameLine
+            set nameLine = contPrefix
+        }
+        set nameLine = nameLine _ name _ sep
+    }
+    write !, nameLine
     write !, "Modules updated:  ", updatedCount
 
     set warningCount = 0, errorNames = ""
