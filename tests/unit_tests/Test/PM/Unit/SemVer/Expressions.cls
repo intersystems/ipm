@@ -58,6 +58,18 @@ Method TestPrerelease()
     do ..AssertNotSatisfied("1.0.0-1.m1","1.0.0")
     do ..AssertNotSatisfied("=1.0.0-1.m1","1.0.0")
 
+    // Prerelease identifiers containing hyphens must not be truncated at the second hyphen
+    do ..AssertSatisfied("1.0.0-alpha-1","1.0.0-alpha-1")
+    do ..AssertSatisfied("=1.0.0-alpha-1","1.0.0-alpha-1")
+    do ..AssertNotSatisfied("=1.0.0-alpha-1","1.0.0-alpha-2")
+    do ..AssertNotSatisfied("=1.0.0-alpha-1","1.0.0-alpha")
+    do ..AssertNotSatisfied("=1.0.0-alpha-1","1.0.0")
+    // Multiple hyphens and dot-separated segments with hyphens
+    do ..AssertSatisfied("=1.0.0-alpha-beta-gamma","1.0.0-alpha-beta-gamma")
+    do ..AssertNotSatisfied("=1.0.0-alpha-beta-gamma","1.0.0-alpha-beta")
+    do ..AssertSatisfied("=1.0.0-rc.1-final","1.0.0-rc.1-final")
+    do ..AssertNotSatisfied("=1.0.0-rc.1-final","1.0.0-rc.1")
+
     // Issue #557: snapshots/prereleases shouldn't be considered as a lower version number
     // Even though 1.5.0-beta.1 is technically within the 1.x range, it's a prerelease and should not be considered satisfiable.
     // Similarly 1.1.5-beta.1 does not satisify 1.1.x. See https://github.com/npm/node-semver?tab=readme-ov-file#prerelease-tags
