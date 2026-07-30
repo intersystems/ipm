@@ -18,10 +18,33 @@ Index ModuleNameIndex On ModuleName;
 
 ForeignKey ModuleNameFK(ModuleName) References %IPM.Storage.Module(Name) [ OnDelete = cascade ];
 
+/// Collect the deduplicated set of directories sync should walk for a module.
+/// Each sync-supporting resource processor declares its owned directory via GetSyncDirectory();
+/// this gathers them into scanDirs(relDir)="" and removes parent/child overlaps. Shared by
+/// StampModule and the sync pipeline so both walk exactly the same directory set.
+ClassMethod CollectScanDirs(module As %IPM.Storage.Module, Output scanDirs)
+{
+    kill scanDirs
+    set orderedResourceList = module.GetOrderedResourceList()
+    set key = ""
+    for {
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+        if '$isobject(resource.Processor) || 'resource.Processor.SupportsSync() {
+            continue
+        }
+        set syncDir = resource.Processor.GetSyncDirectory()
+        if syncDir '= "" {
+            set scanDirs(syncDir) = ""
+        }
+    }
+    do ..DeduplicateScanDirs(.scanDirs)
+}
+
 /// Stamp all tracked files for a module.
 /// Collects scan directories from each resource processor via GetSyncDirectory(), deduplicates,
-/// walks only those directories, then stamps compilable files present in the namespace.
-/// Also stamps module.xml from the module root.
+/// walks only those directories, then stamps every compilable file found there (no namespace
+/// check — see the note at the stamping loop below). Also stamps module.xml from the module root.
 ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
 {
     set sc = $$$OK
@@ -29,21 +52,7 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
         set root = ##class(%File).NormalizeDirectory(module.Root)
 
         // Collect and deduplicate scan directories from resource processors.
-        kill scanDirs
-        set orderedResourceList = module.GetOrderedResourceList()
-        set key = ""
-        for {
-            set resource = orderedResourceList.GetNext(.key)
-            quit:key=""
-            if '$isobject(resource.Processor) || 'resource.Processor.SupportsSync() {
-                continue
-            }
-            set syncDir = resource.Processor.GetSyncDirectory()
-            if syncDir '= "" {
-                set scanDirs(syncDir) = ""
-            }
-        }
-        do ..DeduplicateScanDirs(.scanDirs)
+        do ..CollectScanDirs(module, .scanDirs)
 
         // Walk each declared directory.
         kill allFiles, allHashes
@@ -143,15 +152,16 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
 }
 
 /// Compute which files changed on disk vs stored baseline.
-/// Pass 1: filter pre-walked BFS data for compilable files present in the namespace.
-/// Pass 2: check manifest-derived paths (from reverseIndex) for files not yet compiled
+/// Pass 1: compilable files present in the namespace, from the pre-walked file set.
+/// Pass 2: manifest-derived paths (from reverseIndex) for files not yet compiled
 /// or non-compilable tracked files.
 /// Pass 3: iterate stored rows to detect deletions.
 /// allFiles(relPath)=fullPath is the full pre-walked module root (all extensions).
 /// allHashes(relPath)=sha1hex are pre-computed hashes from the same walk.
-/// bfsFiles(relPath)=fullPath is the compilable subset (cls,inc,mac,int).
+/// module.xml is deliberately excluded from all three passes — it is owned by the pipeline's
+/// SyncCheckModuleXml/SyncCommitModuleXml, never routed as a normal file.
 /// Returns modified(relPath)=newHash and deleted(relPath)="" arrays.
-ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef manifestPaths, ByRef bfsFiles, ByRef allFiles, ByRef allHashes) As %Status
+ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef reverseIndex, ByRef allFiles, ByRef allHashes) As %Status
 {
     set sc = $$$OK
     kill modified, deleted
@@ -159,16 +169,11 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
         set moduleName = module.Name
         kill seen
 
-        // module.xml
-        set moduleXmlRel = "module.xml"
-        if $data(allHashes(moduleXmlRel)) {
-            do ..CompareOneFile(moduleName, moduleXmlRel, $get(allHashes(moduleXmlRel)), .modified, .seen)
-        }
-
-        // Pass 1: filter pre-walked compilable files by namespace presence.
+        // Pass 1: compilable files present in the namespace. RelPathToDocName returns "" for
+        // non-compilable extensions, so iterating allFiles and skipping empty docNames suffices.
         set relPath = ""
         for {
-            set relPath = $order(bfsFiles(relPath))
+            set relPath = $order(allFiles(relPath))
             quit:relPath=""
             set docName = ..RelPathToDocName(relPath)
             if docName = "" {
@@ -188,11 +193,12 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             do ..CompareOneFile(moduleName, relPath, $get(allHashes(relPath)), .modified, .seen)
         }
 
-        // Pass 2: check manifest-derived paths for files BFS missed (uncompiled new files,
-        // non-compilable tracked files).
+        // Pass 2: check manifest-derived paths for files Pass 1 missed (uncompiled new files,
+        // non-compilable tracked files). Top-level $order over reverseIndex yields relPaths only;
+        // the per-path "Processor"/"Resource" subnodes are children and are skipped.
         set relPath = ""
         for {
-            set relPath = $order(manifestPaths(relPath))
+            set relPath = $order(reverseIndex(relPath))
             quit:relPath=""
             if '$data(allFiles(relPath)) {
                 continue
@@ -200,12 +206,17 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             do ..CompareOneFile(moduleName, relPath, $get(allHashes(relPath)), .modified, .seen)
         }
 
-        // Pass 3: iterate all stored rows — file not in allFiles → deleted.
+        // Pass 3: iterate all stored rows — file not in allFiles → deleted. module.xml is skipped:
+        // it is always a stored row but is not part of the walked file set, so it would otherwise
+        // be misreported as deleted every sync.
         set result = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
             moduleName)
         while result.%Next() {
             set storedRelPath = result.%Get("RelativePath")
+            if storedRelPath = "module.xml" {
+                continue
+            }
             if '$data(allFiles(storedRelPath)) {
                 set deleted(storedRelPath) = ""
             }
@@ -217,6 +228,8 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
 }
 
 /// Compare a file's pre-computed hash against stored baseline. No filesystem I/O.
+/// Mutates the caller's by-ref arrays: sets modified(relPath)=newHash when the file is new or
+/// changed, and marks seen(relPath) so a later pass won't re-compare the same path.
 ClassMethod CompareOneFile(moduleName As %String, relPath As %String, newHash As %String, ByRef modified, ByRef seen) [ Private ]
 {
     if $data(seen(relPath)) {

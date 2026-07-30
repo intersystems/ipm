@@ -45,111 +45,61 @@ ClassMethod Run(
         if '##class(%IPM.Storage.FileHash).HasBaseline(moduleName) {
             // Self-heal: establish baseline for modules loaded before this feature
             $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(module))
-            write !, "[", moduleName, "] Baseline established. Run sync again to detect changes."
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Baseline established. Run sync again to detect changes.")
             quit
         }
 
-        // No StampModule call here after a manifest reload: StampModule would overwrite current
-        // hashes for ALL files (including ones the user just edited), causing ComputeChanges to
-        // see current-vs-current and report zero changes for co-edited files.
-        // Newly-declared resources are handled without a full stamp: SyncBuildReverseIndex
-        // (step 3) calls ResolveChildren, which adds their derived relPaths to reverseIndex →
-        // manifestPaths. ComputeChanges Pass 2 finds those paths with no baseline row and
-        // reports them as modified, so they are loaded in this same sync call.
+        // Deliberately no StampModule here after a manifest reload: it would overwrite every
+        // file's hash (including files the user just edited), so ComputeChanges would see
+        // current-vs-current and report no changes. Newly-declared resources still get picked up:
+        // SyncBuildReverseIndex adds their relPaths to reverseIndex, and ComputeChanges Pass 2
+        // reports any with no baseline row as modified.
 
         // Step 2: Collect scan directories from resource processors, then walk only those.
         // Each processor declares its owned directory via GetSyncDirectory(); sync never
         // touches files outside declared locations.
         set orderedResourceList = module.GetOrderedResourceList()
-        kill scanDirs
-        set rlKey = ""
-        for {
-            set rlResource = orderedResourceList.GetNext(.rlKey)
-            quit:rlKey=""
-            if '$isobject(rlResource.Processor) {
-                continue
-            }
-            if 'rlResource.Processor.SupportsSync() {
-                continue
-            }
-            set syncDir = rlResource.Processor.GetSyncDirectory()
-            if syncDir '= "" {
-                set scanDirs(syncDir) = ""
-            }
-        }
-        do ##class(%IPM.Storage.FileHash).DeduplicateScanDirs(.scanDirs)
+        do ##class(%IPM.Storage.FileHash).CollectScanDirs(module, .scanDirs)
 
         set walkStart = $zhorolog
-        kill allFiles, allHashes, bfsFiles
+        kill allFiles, allHashes
         $$$ThrowOnError(##class(%IPM.Storage.FileHash).WalkAndHashDirs(root, .scanDirs, .allFiles, .allHashes))
 
-        // module.xml is always tracked — add it to allFiles/allHashes explicitly.
-        if ##class(%File).Exists(root _ "module.xml") {
-            set allFiles("module.xml") = root _ "module.xml"
-            set allHashes("module.xml") = $$$lcase(##class(%File).SHA1Hash(root _ "module.xml", 1))
-        }
-
-        // Build compilable-only subset for ComputeChanges Pass 1; count total for verbose.
-        set relPath = "", fileCount = 0
-        for {
-            set relPath = $order(allFiles(relPath), 1, fullPath)
-            quit:relPath=""
-            set fileCount = fileCount + 1
-            set ext = $$$lcase($piece(relPath, ".", *))
-            if ",cls,inc,mac,int," [ (","_ext_",") {
-                set bfsFiles(relPath) = fullPath
-            }
-        }
         if verbose {
-            set dirCount = 0
-            set tmpDir = ""
-            for { set tmpDir = $order(scanDirs(tmpDir)) quit:tmpDir=""  set dirCount = dirCount + 1 }
-            write !, "[", moduleName, "] Scanned ", fileCount, " file(s) across ", dirCount, " director(ies) in ", $fnumber($zhorolog - walkStart, "", 2), "s"
+            set fileCount = ##class(%IPM.General.Sync.Output).CountNodes(.allFiles)
+            set dirCount = ##class(%IPM.General.Sync.Output).CountNodes(.scanDirs)
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Scanned "_fileCount_" file(s) across "_dirCount_" director(ies) in "_$fnumber($zhorolog - walkStart, "", 2)_"s")
         }
 
         // Step 3: Build reverse index (relPath -> owning resource + processor).
         kill reverseIndex, unsupportedResources
         do ..SyncBuildReverseIndex(module, orderedResourceList, .reverseIndex, .unsupportedResources, .allFiles)
 
-        // Collect manifest-derived paths from reverseIndex for ComputeChanges.
-        kill manifestPaths
-        set riCount = 0
-        set riKey = ""
-        for {
-            set riKey = $order(reverseIndex(riKey))
-            quit:riKey=""
-            set manifestPaths(riKey) = ""
-            set riCount = riCount + 1
-        }
         if verbose {
-            write !, "[", moduleName, "] Tracking ", riCount, " path(s) across ", orderedResourceList.Count(), " resource(s)"
+            // Top-level keys of reverseIndex are the tracked relPaths (subnodes are children).
+            set riCount = ##class(%IPM.General.Sync.Output).CountNodes(.reverseIndex)
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Tracking "_riCount_" path(s) across "_orderedResourceList.Count()_" resource(s)")
         }
 
-        // Step 4: Compute disk changes vs baseline
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .manifestPaths, .bfsFiles, .allFiles, .allHashes))
-
-        // Exclude module.xml from file routing (handled by SyncCheckModuleXml above)
-        kill modified(moduleXmlRelPath)
-        kill deleted(moduleXmlRelPath)
+        // Step 4: Compute disk changes vs baseline. module.xml is owned by SyncCheckModuleXml
+        // above and is deliberately excluded by ComputeChanges, so it never appears in
+        // modified/deleted here.
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes))
 
         // Falls through when only deletes exist and processDeletes=1
         if '$data(modified) && ('$data(deleted) || 'processDeletes) {
-            write !, "[", moduleName, "] Nothing to sync."
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Nothing to sync.")
             if '$data(modified) && $data(deleted) && 'processDeletes {
-                set delCount = 0
-                set key = ""
-                for { set key = $order(deleted(key)) quit:key=""  set delCount = delCount + 1 }
+                set delCount = ##class(%IPM.General.Sync.Output).CountNodes(.deleted)
                 write !, "  ", delCount, " deleted file(s) detected but not applied. Use -delete to remove from server."
                 do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, delCount _ " deleted file(s) detected but not applied; use -delete to remove from server.")
             }
+            // module.xml can change without producing any routed file change; commit its new hash
+            // here so the next sync doesn't re-detect it. PrintTail emits the reload warning.
             if moduleXmlChanged {
                 do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
-                do ..SyncPrintModuleXmlWarning(moduleName)
             }
-            if $data(unsupportedResources) {
-                do ..SyncPrintUnsupportedNote(moduleName, verbose, .unsupportedResources)
-            }
-            write !, "[", moduleName, "] Sync done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
+            do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources)
             quit
         }
 
@@ -162,14 +112,7 @@ ClassMethod Run(
 
         // Step 6: Dispatch OnSync to each processor; load unhandled compilable files
         if verbose {
-            set resCount = 0
-            set resName = ""
-            for {
-                set resName = $order(syncByResource(resName))
-                quit:resName=""
-                set resCount = resCount + 1
-            }
-            write !, "[", moduleName, "] Dispatching to ", resCount, " resource(s)"
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Dispatching to "_##class(%IPM.General.Sync.Output).CountNodes(.syncByResource)_" resource(s)")
         }
         $$$ThrowOnError(..SyncDispatchProcessors(module, root, verbose, .syncByResource, .params, .loadItems))
 
@@ -212,20 +155,9 @@ ClassMethod Run(
                 do ##class(%IPM.General.Sync.Summary).RecordFile(moduleName, key, "Deleted")
             }
         }
-        write !, "[", moduleName, "] Sync complete: ", modCount, " file(s) updated"
-        if delCount > 0 {
-            write ", ", delCount, " deleted"
-        }
-        write "."
+        do ##class(%IPM.General.Sync.Output).Log(moduleName, "Sync complete: "_modCount_" file(s) updated"_$select(delCount>0:", "_delCount_" deleted", 1:"")_".")
 
-        if moduleXmlChanged {
-            do ..SyncPrintModuleXmlWarning(moduleName)
-        }
-        if $data(unsupportedResources) {
-            do ..SyncPrintUnsupportedNote(moduleName, verbose, .unsupportedResources)
-        }
-
-        write !, "[", moduleName, "] Sync done in ", $fnumber($zhorolog - syncStart, "", 2), "s"
+        do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources)
 
         // File sync is committed and reported. Mark success before running tests so a fatal
         // test failure below is reported as a test failure, not a sync error, in the summary.
@@ -306,8 +238,8 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
             set docToResource(childName, "Processor") = resource.Processor
             set docToResource(childName, "Resource") = resource
 
-            // Newly-declared resources have no baseline row yet (StampModule skips uncompiled
-            // classes), so GetStoredPaths below won't find them. Map their relPath directly.
+            // A resource added since the last %Compile has no baseline row yet, so GetStoredPaths
+            // below won't find it. Map its relPath directly.
             set relPath = $get(childArr(childName, "RelativePath"))
             if relPath = "" {
                 set relPath = resource.Processor.OnItemRelativePath(childName)
@@ -560,38 +492,6 @@ ClassMethod SyncCommitModuleXml(
         // Non-fatal: the next sync will re-detect module.xml as changed and reload the manifest again.
         write !, "Warning: failed to record module.xml hash: ", $system.Status.GetOneErrorText(commitSC)
     }
-}
-
-ClassMethod SyncPrintModuleXmlWarning(moduleName As %String) [ Private ]
-{
-    write !
-    write !, "Warning: module.xml changed and was reloaded."
-    write !, "  Resources may have been added/removed. Run `reload ", moduleName, "` to fully apply"
-    write !, "  manifest-level changes (mappings, dependencies, defaults)."
-    do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, "module.xml changed and was reloaded; run `reload " _ moduleName _ "` to fully apply.")
-}
-
-ClassMethod SyncPrintUnsupportedNote(moduleName As %String, verbose As %Boolean, ByRef unsupportedResources) [ Private ]
-{
-    set count = 0
-    set names = ""
-    set resName = ""
-    for {
-        set resName = $order(unsupportedResources(resName))
-        quit:resName=""
-        set count = count + 1
-        if count <= 3 {
-            set names = names _ $select(names="":"", 1:", ") _ resName
-        }
-    }
-    if count > 3 {
-        set names = names _ ", ... (" _ (count - 3) _ " more)"
-    }
-    if verbose {
-        write !, "[", moduleName, "] ", count, " resource(s) skipped (no sync support): ", names
-        write !, "  Use `reload ", moduleName, "` to apply changes to those resources."
-    }
-    do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, count _ " resource(s) skipped (no sync support): " _ names _ ".")
 }
 
 /// Recompile all compilable resources in the module to catch dependents invalidated by
