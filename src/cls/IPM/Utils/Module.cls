@@ -1450,7 +1450,7 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
 
 /// Returns a $list of dev-mode module names ordered least-dependent-first: a module's
 /// dependencies appear before it. Only dependency edges among the dev-mode set are
-/// considered; unconnected modules keep their natural row order. Used by sync-all so each
+/// considered; unconnected modules keep their natural row order. Used by whole-namespace sync so each
 /// module recompiles against dependencies already synced in the same run.
 ClassMethod GetDevModeModulesInDependencyOrder() As %List
 {

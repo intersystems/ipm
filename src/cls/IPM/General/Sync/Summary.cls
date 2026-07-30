@@ -1,8 +1,8 @@
-/// Naked-sync summary accumulator. Main.Sync ("sync" with no module named) opens the summary with
+/// Whole-namespace-sync summary accumulator. Main.Sync ("sync" with no module named) opens the summary with
 /// Begin, runs its per-module loop, then prints with Report. While open, each module's %Sync
 /// records its own outcome into the process-private global ^||IPM.Sync.Summary so the reader can
 /// aggregate without threading data through ExecutePhases' by-ref params. Shape:
-///   ^||IPM.Sync.Summary("Active")                        = 1 while a sync-all is in progress
+///   ^||IPM.Sync.Summary("Active")                        = 1 while a whole-namespace sync is in progress
 ///   ^||IPM.Sync.Summary("Module",name,"File",relPath)    = "Updated" | "Deleted"
 ///   ^||IPM.Sync.Summary("Module",name,"SyncOK")          = 1 once file sync committed (pre-tests)
 ///   ^||IPM.Sync.Summary("Module",name,"TestsPassed")     = running count of passed test methods
@@ -93,7 +93,7 @@ ClassMethod AddTests(
     set ^||IPM.Sync.Summary("Module", moduleName, "TestsFailed") = $get(^||IPM.Sync.Summary("Module", moduleName, "TestsFailed"), 0) + failed
 }
 
-/// Print the bordered sync-all summary from the accumulated ^||IPM.Sync.Summary data.
+/// Print the bordered whole-namespace-sync summary from the accumulated ^||IPM.Sync.Summary data.
 /// orderedNames is the full dependency-ordered dev-mode module list (the "checked" set);
 /// failures is the $list of module names whose Sync phase returned an error status. A module in
 /// failures that still recorded SyncOK synced its files fine and only had a failing test — that

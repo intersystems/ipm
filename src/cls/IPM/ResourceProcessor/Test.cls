@@ -505,7 +505,7 @@ Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
         $$$ThrowOnError(sc)
 
         set suppressor = ""
-        // Tally this resource's per-method pass/fail into the naked-sync summary before
+        // Tally this resource's per-method pass/fail into the whole-namespace-sync summary before
         // ReportTestResults runs — at top level it consumes (kills) the result accumulator.
         do ..SyncSummaryTallyTests(..ResourceReference.Module.Name, phaseStartIndex)
         $$$ThrowOnError(..ReportTestResults(phaseStartIndex, verbose, .params))
@@ -517,9 +517,9 @@ Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
 }
 
 /// Count the test methods run since phaseStartIndex and forward their pass/fail tally to the
-/// naked-sync summary. A method counts as failed if it errored or has any failed assertion,
-/// mirroring how GetAllTestsStatus/OutputFailures classify a failure; otherwise it passed.
-/// No-op unless a sync-all is in progress (%IPM.General.Sync.Summary gates on that).
+/// whole-namespace-sync summary. A method counts as failed if it errored or has any failed
+/// assertion, mirroring how GetAllTestsStatus/OutputFailures classify a failure; otherwise passed.
+/// No-op unless a whole-namespace sync is in progress (%IPM.General.Sync.Summary gates on that).
 ClassMethod SyncSummaryTallyTests(
     moduleName As %String,
     phaseStartIndex As %Integer) [ Private ]
