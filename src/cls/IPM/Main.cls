@@ -120,7 +120,8 @@ This command is an alias for `module-action module-name test`
 
 <command name="package" dataPrefix="D">
 <description>
-This command is an alias for `module-action module-name package`
+This command is an alias for `module-action module-name package`.
+Packages the module according to its Packaging property, which defaults to source packaging (a .tgz of the module's source files). Equivalent to `package-source` unless the module specifies a different Packaging type.
 </description>
 <parameter name="module" required="true" description="Name of module on which to perform package actions" />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="the specified path to export package." />
@@ -146,7 +147,7 @@ Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, modu
 <parameter name="module" required="true" description="Name of module to package as database" />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
 <modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
-<modifier name="include-test-resources" dataAlias="IncludeTestResources" dataValue="1" description="Include test resources (Scope=test or Scope=verify) in the package. Excluded by default." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. For database packaging, this includes test resources (Scope=test or Scope=verify) in the package, which are excluded by default." />
 <modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Include Python wheels (from &lt;PythonWheel&gt; resources) in the database package. On by default." />
 <modifier name="no-export-python-deps" dataAlias="ExportPythonDependencies" dataValue="0" description="Exclude Python wheels from the database package." />
 <modifier name="db-name" dataAlias="DatabaseName" value="true" description="Name for the new temporary database. Auto-generated if omitted." />
@@ -187,7 +188,7 @@ Equivalent to running `package-database` followed by `publish`, but without need
 <parameter name="module" required="true" description="Name of module to package as database and publish" />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository to publish to (deployment must be enabled)" />
 <modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
-<modifier name="include-test-resources" dataAlias="IncludeTestResources" dataValue="1" description="Include test resources (Scope=test or Scope=verify) in the package. Excluded by default." />
+<modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. For database packaging, this includes test resources (Scope=test or Scope=verify) in the package, which are excluded by default." />
 <modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Include Python wheels in the database package." />
 <modifier name="no-export-python-deps" dataAlias="ExportPythonDependencies" dataValue="0" description="Exclude Python wheels from the database package." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />

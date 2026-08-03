@@ -271,6 +271,14 @@ Method IsInScope(
     quit tInScope
 }
 
+/// Returns true if the resource is test-scoped (Scope="test" or Scope="verify").
+/// Scope is constrained to ",test,verify", so any non-empty scope is a test scope.
+Method IsTestScoped() As %Boolean
+{
+    set tScopeLower = $zconvert(..Scope, "L")
+    quit (tScopeLower = "test") || (tScopeLower = "verify")
+}
+
 /// Returns an array of resources composing this resource, with the names as subscripts of <var>pResourceArray</var>.
 /// If <var>pCheckModuleOwnership</var> is 0 (the default is 1), for .PKG resources, all classes in the package will
 /// be included (even if they are actually part of another module).

@@ -1598,8 +1598,9 @@ Method %Publish(ByRef pParams) As %Status
             quit
         }
         set tModule.VersionString = ..Module.VersionString
-        // Use the lifecycle's PACKAGING parameter to determine the publish type, not the module's
-        // Packaging property which always reflects how the module was loaded, not how it is being published.
+        // Publish type comes from the running lifecycle, not the module's Packaging property.
+        // ..Module.Packaging records how the module was loaded (may be stale); the PACKAGING
+        // parameter is fixed per lifecycle class and reflects how it's being published now.
         if ($parameter($this, "PACKAGING") = "database") {
             set tModule.IPMPackaging = "database"
             set tModule.PlatformVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
