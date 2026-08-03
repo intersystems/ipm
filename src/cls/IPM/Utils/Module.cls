@@ -30,7 +30,7 @@ ClassMethod LoadQualifiedReference(
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog)
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog, tReference.IPMPackaging)
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -45,7 +45,8 @@ ClassMethod LoadModuleReference(
 	pPlatformVersion As %String,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pLog As %IPM.General.AbstractHistory = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "",
+	pIPMPackaging As %String = "") As %Status
 {
     // if install of module is already being logged, don't duplicate
     set prelogged = $case(pLog, "": 0, :1)
@@ -94,6 +95,7 @@ ClassMethod LoadModuleReference(
         set tModRef.VersionString = pVersion
         set tModRef.Deployed = pDeployed
         set tModRef.PlatformVersion = pPlatformVersion
+        set tModRef.IPMPackaging = pIPMPackaging
         if pDeployed {
             $$$ThrowOnError(tModRef.PlatformVersions.Insert(pPlatformVersion))
         }
@@ -1283,7 +1285,12 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule,, .params)
+        // For database packages, all dependencies are compiled into IRIS.DAT — skip LoadDependencies.
+        // Fetching deps from a registry would fail (code isn't installed yet before the DB swap).
+        // %Activate registers dependency metadata from deps/ directory after the swap.
+        if tModule.Packaging '= "database" {
+            do ..LoadDependencies(tModule,, .params)
+        }
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1363,7 +1370,7 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, .dependencyGraph)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, .dependencyGraph, , moduleReference.IPMPackaging)
         $$$ThrowOnError(sc)
     }
 

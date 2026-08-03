@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.10] - Unreleased
+
+### Added
+- #986: Database packaging: new `package-database` and `publish-database` commands create an IRIS.DAT-based package that installs via swapping of the routines database rather than compilation of source files. Pass `-dev` to include test resources (`Scope="test"` or `Scope="verify"`) in the package; they are excluded by default.
+
 ## [0.10.9] - Unreleased
 
 ### Added

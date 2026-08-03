@@ -554,6 +554,9 @@ ClassMethod ExecutePhases(
                 set tOnePhase = tNormalizedPhaseName
             }
             set tStart = $zhorolog
+            // "*" is a module-object refresh checkpoint, not a real phase.
+            // Reopens the module and lifecycle from storage to pick up changes
+            // made by earlier phases (e.g., module.xml edits during Reload).
             if tOnePhase="*" {
                 kill tModule,tLifecycle
                 set tModule = ..NameOpen(pModuleName,,.tSC)
@@ -1165,6 +1168,9 @@ Method ProcessSingleDependencyIterative(
         set searchCriteria.Name = pDep.Name
         set searchExprStr = searchExpr.ToResolvedString()
         set searchCriteria.VersionExpression = searchExprStr
+        // Dependencies are always resolved as source packages regardless of top-level -swap-db.
+        // A database-packaged module already includes its dependencies in the tgz.
+        set searchCriteria.Packaging = "source"
         if searchExprStr = "" {
             set searchExprStr = "*"
         }
@@ -1521,8 +1527,19 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
             if (..Packaging = "") {
                 set ..Packaging = tPackaging
             } elseif (..Packaging '= tPackaging) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
-                quit
+                // The lifecycle class is still the default but Packaging has been changed.
+                // Try to derive the correct class from the Packaging value.
+                set tDerived = $$$DefaultLifecyclePackageDot _ $case(..Packaging,
+                    "application":    "Application",
+                    "database":       "Database",
+                    "studio-project": "StudioProject",
+                    :                 "")
+                if (tDerived '= $$$DefaultLifecyclePackageDot) && $$$comClassDefined(tDerived) {
+                    set ..LifecycleClass = tDerived
+                } else {
+                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
+                    quit
+                }
             }
         } elseif (..LifecycleClass = "") && (..Packaging '= "") {
               set ..LifecycleClass = $case(..Packaging,"application": "Application", : "Module")
