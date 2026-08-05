@@ -426,45 +426,65 @@ Method TestSimplePackageAndInstall()
 }
 
 /// Test packaging and installing modules with dependencies
+/// Tests dependency packaging behaviour: both default flow and -use-current-db must
+/// produce a self-contained IRIS.DAT that includes transitive dependency code.
+///
+/// Isolation check: packaging dep-module alone must NOT include MainModule.App
+/// (main-with-deps is installed in the packaging NS but never compiled into dep-module's DB).
 Method TestPackageAndInstallWithDependencies()
 {
     set packagingNS = ..GetOrCreateSharedNS1()
 
-    // Switch to shared packaging namespace (dep-module and main-with-deps are pre-loaded)
     new $namespace
     set $namespace = packagingNS
 
+    // --- Part 1: dep-module (no deps) — isolation check ---
+    // main-with-deps depends on dep-module, but must not appear in dep-module's IRIS.DAT.
     set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged dependency module")
+    do $$$AssertStatusOK(sc, "Packaged dep-module")
 
+    set depPkg = ..PackageOutputDir _ "dep-module-1.0.0-database.tgz"
+
+    set installNS1 = "TESTDBDEPINST1"
+    set sc = ..CreateTestNamespace(installNS1)
+    do $$$AssertStatusOK(sc, "Created install NS for dep-module")
+    set $namespace = installNS1
+
+    set sc = ##class(%IPM.Main).Shell("load " _ depPkg _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Installed dep-module database package")
+
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "DepModule.Core present after dep-module install")
+    do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("MainModule.App"), "MainModule.App absent — unpackaged parent not compiled into dep-module's IRIS.DAT")
+    set result = ##class(DepModule.Core).GetVersion()
+    do $$$AssertEquals(result, "1.0.0", "DepModule.Core.GetVersion() works")
+
+    // --- Part 2: main-with-deps default flow — deps must be included ---
+    // The IRIS.DAT must be self-contained: dep code compiled in, UseDependency() callable.
+    set $namespace = packagingNS
     set sc = ##class(%IPM.Main).Shell("package-database main-with-deps -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged module with dependencies")
+    do $$$AssertStatusOK(sc, "Packaged main-with-deps (default flow)")
 
-    // Verify dependencies.xml is created correctly
-    set packageFile = ..PackageOutputDir _ "main-with-deps-1.0.0-database.tgz"
-    do $$$AssertTrue(##class(%File).Exists(packageFile), "Package file exists")
+    set mainPkg = ..PackageOutputDir _ "main-with-deps-1.0.0-database.tgz"
 
-    // Create installation namespace
-    set installNS = "TESTDBDEPINST"
-    set sc = ..CreateTestNamespace(installNS)
-    do $$$AssertStatusOK(sc, "Created installation namespace")
+    set installNS2 = "TESTDBDEPINST2"
+    set sc = ..CreateTestNamespace(installNS2)
+    do $$$AssertStatusOK(sc, "Created install NS for main-with-deps")
+    set $namespace = installNS2
 
-    set $namespace = installNS
+    set sc = ##class(%IPM.Main).Shell("load " _ mainPkg _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Installed main-with-deps")
 
-    // Install the module with dependencies
-    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
-    do $$$AssertStatusOK(sc, "Installed module with dependencies")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("MainModule.App"), "MainModule.App present after install")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "DepModule.Core present — transitive dep compiled into IRIS.DAT")
+    set depResult = ##class(MainModule.App).UseDependency()
+    do $$$AssertTrue(depResult [ "1.0.0", "UseDependency() works — dep code is callable")
 
-    // Verify main module classes exist
-    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("MainModule.App"), "MainModule.App class exists")
-
-    // Verify dependencies are tracked
+    // dep-module metadata also registered via deps/ manifest
     set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set sc = ##class(%IPM.Main).Shell("list")
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-    do $$$AssertStatusOK(sc, "List command executed")
-    do $$$AssertTrue(..FindStringInMultiDimArray("dep-module", .output), "Dependency appears in list")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .listOutput)
+    do $$$AssertTrue(..FindStringInMultiDimArray("dep-module", .listOutput), "dep-module appears in list (metadata from deps/)")
 }
 
 /// Smoke test: a module using every compiled resource type (class, include, generated class,
@@ -855,7 +875,7 @@ Method TestMixedPackaging()
 
 /// Tests all Python dependency packaging behaviour in one pass:
 /// - module-with-mixed-python (explicit PythonWheel + requirements.txt): both wheels present
-///   by default; both absent with -no-export-python-deps; lune installs correctly at runtime
+///   by default; both absent with -export-python-deps 0; lune installs correctly at runtime
 /// - module-with-requirements (requirements.txt only): wheel present by default; absent with flag
 /// Combining these avoids packaging module-with-mixed-python twice across separate test methods.
 Method TestPythonDependencyPackaging()
@@ -889,11 +909,11 @@ Method TestPythonDependencyPackaging()
     while rs.%Next() { set pycparserFound = 1 }
     do $$$AssertTrue(pycparserFound, "requirements.txt wheel (pycparser) included in default package")
 
-    // module-with-mixed-python: -no-export-python-deps
+    // module-with-mixed-python: -export-python-deps 0
     set noExportDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "noexport")
     do ##class(%Library.File).CreateDirectory(noExportDir)
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -no-export-python-deps -path " _ noExportDir)
-    do $$$AssertStatusOK(sc, "Packaged module-with-mixed-python with -no-export-python-deps")
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-mixed-python -export-python-deps 0 -path " _ noExportDir)
+    do $$$AssertStatusOK(sc, "Packaged module-with-mixed-python with -export-python-deps 0")
 
     set noExportPkg = noExportDir _ "module-with-mixed-python-1.0.0-database.tgz"
     set extractDir2 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-nowheel")
@@ -902,7 +922,7 @@ Method TestPythonDependencyPackaging()
     do $$$AssertStatusOK(sc, "Extracted no-export package")
 
     set wheelInNoExport = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir2)
-    do $$$AssertNotTrue(##class(%Library.File).Exists(wheelInNoExport), "Wheel excluded when -no-export-python-deps is set")
+    do $$$AssertNotTrue(##class(%Library.File).Exists(wheelInNoExport), "Wheel excluded when -export-python-deps 0 is set")
 
     // Runtime install: PythonWheel.OnPhase("Initialize") fires (no Database.cls override)
     set installNS = "TESTDBPYWHLINS"
@@ -939,11 +959,11 @@ Method TestPythonDependencyPackaging()
     set wheelPath = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir3)
     do $$$AssertTrue(##class(%Library.File).Exists(wheelPath), "Wheel from requirements.txt included in package")
 
-    // module-with-requirements: -no-export-python-deps
+    // module-with-requirements: -export-python-deps 0
     set noExportReqDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "noexport-reqtxt")
     do ##class(%Library.File).CreateDirectory(noExportReqDir)
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-requirements -no-export-python-deps -path " _ noExportReqDir)
-    do $$$AssertStatusOK(sc, "Packaged module-with-requirements with -no-export-python-deps")
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-requirements -export-python-deps 0 -path " _ noExportReqDir)
+    do $$$AssertStatusOK(sc, "Packaged module-with-requirements with -export-python-deps 0")
 
     set noExportReqPkg = noExportReqDir _ "module-with-requirements-1.0.0-database.tgz"
     set extractDir4 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-noreqtxt")
@@ -952,16 +972,17 @@ Method TestPythonDependencyPackaging()
     do $$$AssertStatusOK(sc, "Extracted no-export requirements package")
 
     set wheelPath2 = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir4)
-    do $$$AssertNotTrue(##class(%Library.File).Exists(wheelPath2), "Wheel excluded from requirements package when -no-export-python-deps is set")
+    do $$$AssertNotTrue(##class(%Library.File).Exists(wheelPath2), "Wheel excluded from requirements package when -export-python-deps 0 is set")
 
     // Cleanup: wheels downloaded by ExportPythonDependencies during packaging
     do ..DeletePattern(mixedModuleDir _ "wheels/", "pycparser*.whl")
     do ..DeletePath(reqModuleDir _ "wheels")
 }
 
-/// Test that pre-Activate invokes are skipped and post-Activate invokes run
-/// during database package install. Each invoke sets a global marker so we can
-/// verify whether it executed.
+/// Test invoke firing behavior during database package install.
+/// The DB swap happens inside %Reload, so all invokes from Reload.After onward run
+/// with the DB mounted. Both Compile.After and Activate.After should fire.
+/// Each invoke sets a global marker so we can verify whether it executed.
 Method TestInvokeBehaviorDuringDatabaseInstall()
 {
     set packagingNS = ..GetOrCreateSharedNS1()
@@ -991,10 +1012,8 @@ Method TestInvokeBehaviorDuringDatabaseInstall()
     set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed database package with invokes")
 
-    // Pre-Activate invoke (Compile.After) should have been skipped
-    do $$$AssertEquals($get(^InvokeTest("compile"), 0), 0, "Compile invoke skipped during database install")
-
-    // Post-Activate invoke (Activate.After) should have run
+    // Both Compile.After and Activate.After run — DB is mounted after %Reload completes
+    do $$$AssertEquals($get(^InvokeTest("compile")), 1, "Compile invoke ran during database install")
     do $$$AssertEquals($get(^InvokeTest("activate")), 1, "Activate invoke ran during database install")
 
     // Verify module classes are accessible (DB was mounted)
