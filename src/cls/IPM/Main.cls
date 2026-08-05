@@ -155,14 +155,14 @@ Creates a .tgz archive of module source files. Equivalent to the existing `packa
 
 <command name="package-database" dataPrefix="D">
 <description>
-Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), and dependencies.xml.
+Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), and a deps/ directory of dependency manifests.
+By default, creates a fresh empty database and loads this module's own resources plus all transitive dependency code into it, producing a self-contained IRIS.DAT. Use -use-current-db to package the namespace's entire routines database as-is, which includes all compiled code from all installed modules.
 </description>
 <parameter name="module" required="true" description="Name of module to package as database" />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
 <modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. For database packaging, this includes test resources (Scope=test or Scope=verify) in the package, which are excluded by default." />
-<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Include Python wheels (from &lt;PythonWheel&gt; resources) in the database package. On by default." />
-<modifier name="no-export-python-deps" dataAlias="ExportPythonDependencies" dataValue="0" description="Exclude Python wheels from the database package." />
+<modifier name="export-python-deps" value="true" valueList="0,1" dataAlias="ExportPythonDependencies" description="Controls whether Python wheels are included in the database package. Defaults to 1 (included). Pass 0 to exclude." />
 <modifier name="db-name" dataAlias="DatabaseName" value="true" description="Name for the new temporary database. Auto-generated if omitted." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
@@ -202,8 +202,7 @@ Equivalent to running `package-database` followed by `publish`, but without need
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository to publish to (deployment must be enabled)" />
 <modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. For database packaging, this includes test resources (Scope=test or Scope=verify) in the package, which are excluded by default." />
-<modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Include Python wheels in the database package." />
-<modifier name="no-export-python-deps" dataAlias="ExportPythonDependencies" dataValue="0" description="Exclude Python wheels from the database package." />
+<modifier name="export-python-deps" value="true" valueList="0,1" dataAlias="ExportPythonDependencies" description="Controls whether Python wheels are included in the database package. Defaults to 1 (included). Pass 0 to exclude." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
 

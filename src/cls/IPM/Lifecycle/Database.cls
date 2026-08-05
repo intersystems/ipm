@@ -2,7 +2,7 @@ Include %syPrompt
 
 /// Database packaging lifecycle. Packages a module as an IRIS.DAT file inside a .tgz.
 /// The .tgz contains IRIS.DAT, an enriched module.xml with SHA-256 checksum,
-/// and a dependencies.xml compiling all dependency manifests.
+/// and a deps/ directory containing one manifest per dependency.
 Class %IPM.Lifecycle.Database Extends %IPM.Lifecycle.Base
 {
 
@@ -20,10 +20,10 @@ Parameter PACKAGING As STRING [ Final ] = "database";
 /// 2. Create a temp IRIS.DAT and remap the namespace routines to it
 ///    (or use the current DB with -use-current-db)
 /// 3. Export Generated resources before remapping (they become inaccessible after dismount)
-/// 4. Load and compile module resources into the temp DB
+/// 4. Load and compile this module's resources plus all transitive dependencies into the temp DB
 /// 5. Restore the namespace to its original routines DB
 /// 6. Compute SHA-256 checksum of the IRIS.DAT
-/// 7. Assemble staging dir (IRIS.DAT + module.xml + dependencies.xml + non-compiled resources)
+/// 7. Assemble staging dir (IRIS.DAT + module.xml + deps/ manifests + non-compiled resources)
 ///    and create the .tgz archive
 ///
 /// On error during remap, a safety net restores the namespace.
@@ -53,20 +53,10 @@ Method %Package(ByRef params) As %Status
         do ..ValidateIPMNotInRoutinesDB()
         do ..ValidateRoutinesDatabaseNotMirrored(ns)
 
-        // Warn about <Invoke> elements that won't run during database install.
-        // The routines DB isn't mounted until %Activate completes, so invoke targets
-        // don't exist for phases before Activate.After.
-        // Custom phases are excluded — they're on-demand operations triggered after install,
-        // never part of the standard install phase chain.
-        // Build pre-Activate set from the canonical VALUELIST so this stays correct
-        // if the phase ordering ever changes. Skip "*" — it's an internal checkpoint
-        // in ExecutePhases, not a real invokable phase.
-        set preActivatePhases = ","
-        for i=2:1:$length($parameter("%IPM.DataType.PhaseName","VALUELIST"),",") {
-            set phase = $piece($parameter("%IPM.DataType.PhaseName","VALUELIST"),",",i)
-            quit:(phase = "Activate")
-            if phase '= "*" { set preActivatePhases = preActivatePhases _ phase _ "," }
-        }
+        // Warn about <Invoke> elements with Phase="Reload" When="Before" — these fire before
+        // %Reload runs the DB swap, so packaged classes don't exist yet and the invoke will fail.
+        // All other phases (Reload.After onward) run after the swap completes normally.
+        // Custom phases are excluded — they're on-demand operations, never part of standard install.
         set key = ""
         for {
             set invoke = ..Module.Invokes.GetNext(.key)
@@ -74,12 +64,10 @@ Method %Package(ByRef params) As %Status
             if invoke.CustomPhase '= "" {
                 continue
             }
-            set invokePhase = invoke.Phase
-            set invokeWhen = invoke.When
-            if (preActivatePhases [ (","_invokePhase_",")) || ((invokePhase = "Activate") && (invokeWhen = "Before")) {
-                write !, "WARNING: <Invoke Class="""_invoke.Class_""" Method="""_invoke.Method_""" Phase="""_invokePhase_""" When="""_invokeWhen_"""> will not run during database install."
-                write !, "  The routines DB is not mounted until Activate completes."
-                write !, "  For install-time setup, use Phase=""Activate"" When=""After"" or a later phase (Configure, ApplyUpdateSteps)."
+            if (invoke.Phase = "Reload") && (invoke.When = "Before") {
+                write !, "WARNING: <Invoke Class="""_invoke.Class_""" Method="""_invoke.Method_""" Phase=""Reload"" When=""Before""> will not run during database install."
+                write !, "  The DB swap runs inside %Reload — Reload.Before fires before the DB is mounted."
+                write !, "  Use Phase=""Reload"" When=""After"" or a later phase for install-time setup."
             }
         }
 
@@ -198,20 +186,62 @@ Method %Package(ByRef params) As %Status
 }
 
 /// Handles four contexts:
-/// - Install (Packaging=database and IRIS.DAT in root): skip source loading entirely.
+/// - Install (Packaging=database and IRIS.DAT in root): validate, prompt, swap DB, register
+///   dependency metadata, and seed update steps. All install work happens here so that
+///   %Validate, %Compile, and %Activate are clean no-ops — invokes fire naturally after
+///   the DB is mounted with no suppression mechanism needed.
 /// - Database packaging inside %Package (params("DatabasePackaging")=1):
 ///   load resources into temp DB, filtering test scope unless in dev mode.
 /// - Packaging phase chain with no RootDirectory (the Reload phase before Package): no-op.
 /// - Loading from a source directory (RootDirectory set): delegate to ##super.
 Method %Reload(ByRef params) As %Status
 {
-    // Install context: IRIS.DAT already in place — no source to reload.
-    // Also skip <Invoke> elements in all subsequent phases: they ran during packaging.
-    // The new IRIS.DAT isn't mounted until %Activate, so any invoke referencing packaged
-    // classes would fail with <CLASS DOES NOT EXIST>.
+    // Install context: validate, swap the DB, register metadata. All in one try/catch so
+    // any failure after the filesystem swap triggers an explicit rollback.
+    // Inject IsInstallContext into params NOW, while IRIS.DAT is still in ..Module.Root.
+    // PerformDatabaseSwap renames it out; downstream phases (%Validate, %Compile, %Activate)
+    // check params("IsInstallContext") so they don't need to re-examine the filesystem.
     if ..IsInstallContext() {
-        set params("SkipInvokes") = 1
-        quit $$$OK
+        set params("IsInstallContext") = 1
+        set sc = $$$OK
+        set dbDir = ""
+        set backupPath = ""
+        try {
+            if $get(params("DeveloperMode")) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Database packages cannot be installed in developer mode."))
+            }
+
+            set ns = $namespace
+            set packageDir = ..Module.Root
+
+            do ..ValidateBeforeSwap(packageDir)
+
+            if '$get(params("SwapDB")) {
+                do ..PromptForSwapConfirmation(ns)
+            }
+
+            do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
+            do ##class(%IPM.Lifecycle.Database).RegisterDependencyMetadata(packageDir)
+
+            // Seed all update steps as already-run on a fresh install so a subsequent 'update'
+            // only executes steps introduced after this version. Same logic as Module.cls:%Activate.
+            // Skipped when params("Update") is set — we're actually running an update, not a fresh install.
+            if '$get(params("Update")) {
+                $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1, $get(params("Verbose"))))
+            }
+
+            write !, "Database swap complete for namespace ", ns
+            write !, "  Backup: ", backupPath
+
+        } catch ex {
+            set sc = ex.AsStatus()
+            if dbDir '= "" {
+                write !, "ERROR — attempting rollback..."
+                do ..RollbackDatabaseSwap(dbDir, backupPath)
+                write !, "Rollback complete. Namespace restored."
+            }
+        }
+        quit sc
     }
 
     // Inside %Package.LoadResourcesIntoDatabase: load resources, filtering test scope.
@@ -222,33 +252,46 @@ Method %Reload(ByRef params) As %Status
     if $get(params("DatabasePackaging")) {
         set sc = $$$OK
         try {
-            set orderedResourceList = ..Module.GetOrderedResourceList()
-            set key = ""
+            // Load this module's own resources followed by all transitive dependencies.
+            // The resulting IRIS.DAT must be self-contained: dep code must be compiled in
+            // because at install time only IPM metadata is registered from deps/ manifests.
+            set modulesToLoad = ..GetDependencyModules(..Module)
+            do modulesToLoad.InsertAt(..Module, 1)
+
+            set mKey = ""
             for {
-                #dim resource As %IPM.Storage.ResourceReference
-                set resource = orderedResourceList.GetNext(.key)
-                quit:key=""
+                #dim loadModule As %IPM.Storage.Module
+                set loadModule = modulesToLoad.GetNext(.mKey)
+                quit:mKey=""
 
-                // Type A: regular resources with Scope="test" or Scope="verify" — skip unless in dev mode
-                if '$get(params("DeveloperMode")) && resource.IsTestScoped() {
-                    continue
-                }
+                set orderedResourceList = loadModule.GetOrderedResourceList()
+                set key = ""
+                for {
+                    #dim resource As %IPM.Storage.ResourceReference
+                    set resource = orderedResourceList.GetNext(.key)
+                    quit:key=""
 
-                // Type B: <UnitTest> parent resources have Scope="" and a Test processor.
-                // OnPhase("Reload") is a no-op for this processor; loading is done via LoadTestDirectory.
-                if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.Test") && ($extract(resource.Name, *) = "/") {
-                    if $get(params("DeveloperMode")) {
-                        set testDir = ##class(%Library.File).NormalizeDirectory(resource.Module.Root _ resource.Name)
-                        set format = resource.Processor.Format
-                        set loadSC = ##class(%IPM.Test.Manager).LoadTestDirectory(testDir, $get(params("Verbose")), , format)
-                        $$$ThrowOnError(loadSC)
+                    // Type A: regular resources with Scope="test" or Scope="verify" — skip unless in dev mode
+                    if '$get(params("DeveloperMode")) && resource.IsTestScoped() {
+                        continue
                     }
-                    continue
-                }
 
-                if $isobject(resource.Processor) {
-                    set reloadPhase = $select(resource.Scope '= "": resource.Scope, 1: "Reload")
-                    $$$ThrowOnError(resource.Processor.OnPhase(reloadPhase, .params))
+                    // Type B: <UnitTest> parent resources have Scope="" and a Test processor.
+                    // OnPhase("Reload") is a no-op for this processor; loading is done via LoadTestDirectory.
+                    if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.Test") && ($extract(resource.Name, *) = "/") {
+                        if $get(params("DeveloperMode")) {
+                            set testDir = ##class(%Library.File).NormalizeDirectory(resource.Module.Root _ resource.Name)
+                            set format = resource.Processor.Format
+                            set loadSC = ##class(%IPM.Test.Manager).LoadTestDirectory(testDir, $get(params("Verbose")), , format)
+                            $$$ThrowOnError(loadSC)
+                        }
+                        continue
+                    }
+
+                    if $isobject(resource.Processor) {
+                        set reloadPhase = $select(resource.Scope '= "": resource.Scope, 1: "Reload")
+                        $$$ThrowOnError(resource.Processor.OnPhase(reloadPhase, .params))
+                    }
                 }
             }
         } catch ex {
@@ -272,72 +315,58 @@ Method %Reload(ByRef params) As %Status
     quit ##super(.params)
 }
 
-/// During a database package install, there is no source to compile.
+/// During a database package install, there is no source to validate.
 /// In all other contexts, delegate to ##super.
-Method %Compile(ByRef pParams) As %Status
+Method %Validate(ByRef pParams) As %Status
 {
-    if ..IsInstallContext() {
+    if $get(pParams("IsInstallContext")) {
         quit $$$OK
     }
     quit ##super(.pParams)
 }
 
-/// For a database package install: validate package integrity (checksum, packaging type,
-/// conflict check), optionally prompt for user confirmation (skipped with -swap-db),
-/// swap the routines database, and register dependency metadata in IPM storage.
-/// Rejects developer mode. On failure after swap, rolls back to the backup IRIS.DAT.
-/// For all other contexts: delegate to ##super.
-Method %Activate(ByRef params) As %Status
+/// During a database package install, there is no source to compile.
+/// During database packaging, compile all transitive dependencies into the temp DB
+/// before this module's own resources — %Reload loaded the dependency source but
+/// Base.%Compile only handles this module's resources, so dependency code would
+/// otherwise never be compiled into the self-contained IRIS.DAT.
+/// In all other contexts, delegate to ##super.
+Method %Compile(ByRef pParams) As %Status
 {
-    if '..IsInstallContext() {
-        quit ##super(.params)
+    if $get(pParams("IsInstallContext")) {
+        quit $$$OK
     }
-
     set sc = $$$OK
-    set dbDir = ""
-    set backupPath = ""
     try {
-        if $get(params("DeveloperMode")) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Database packages cannot be installed in developer mode."))
+        if $get(pParams("DatabasePackaging")) {
+            // Compile each dependency via its own lifecycle (which compiles that module's
+            // resources). Definitions for all dependencies are already loaded by %Reload, so
+            // the class compiler resolves cross-module compile order regardless of iteration order.
+            set deps = ..GetDependencyModules(..Module)
+            set mKey = ""
+            for {
+                #dim depModule As %IPM.Storage.Module
+                set depModule = deps.GetNext(.mKey)
+                quit:mKey=""
+                $$$ThrowOnError(depModule.Lifecycle.%Compile(.pParams))
+            }
         }
-
-        set ns = $namespace
-        set packageDir = ..Module.Root
-
-        do ..ValidateBeforeSwap(packageDir)
-
-        if '$get(params("SwapDB")) {
-            do ..PromptForSwapConfirmation(ns)
-        }
-
-        do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
-        do ##class(%IPM.Lifecycle.Database).RegisterDependencyMetadata(packageDir)
-
-        // Allow <Invoke> elements to run for Activate.After and subsequent phases.
-        // The DB is now mounted so invoke targets exist. Pre-Activate invokes were
-        // skipped because the class wouldn't exist yet (SkipInvokes was set in %Reload).
-        // On swap failure, this line is not reached — invokes stay suppressed.
-        kill params("SkipInvokes")
-
-        // Seed all update steps as already-run on a fresh install so a subsequent 'update'
-        // only executes steps introduced after this version. Same logic as Module.cls:%Activate.
-        // Skipped when params("Update") is set — we're actually running an update, not a fresh install.
-        if '$get(params("Update")) {
-            $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1, $get(params("Verbose"))))
-        }
-
-        write !, "Database swap complete for namespace ", ns
-        write !, "  Backup: ", backupPath
-
+        // Compile this module's own resources.
+        set sc = ##super(.pParams)
     } catch ex {
         set sc = ex.AsStatus()
-        if dbDir '= "" {
-            write !, "ERROR — attempting rollback..."
-            do ..RollbackDatabaseSwap(dbDir, backupPath)
-            write !, "Rollback complete. Namespace restored."
-        }
     }
     quit sc
+}
+
+/// During a database package install, the DB swap and all setup already completed in %Reload.
+/// In all other contexts, delegate to ##super.
+Method %Activate(ByRef params) As %Status
+{
+    if $get(params("IsInstallContext")) {
+        quit $$$OK
+    }
+    quit ##super(.params)
 }
 
 // =====================================================================
@@ -564,7 +593,7 @@ ClassMethod ComputeSHA256Hex(filePath As %String) As %String
     quit hexHash
 }
 
-/// Moves (or copies) IRIS.DAT into stagingDir, writes module.xml and dependencies.xml,
+/// Moves (or copies) IRIS.DAT into stagingDir, writes module.xml and deps/ manifests,
 /// then calls Archive.Create to build the final .tgz. Returns path to .tgz.
 /// irisDAT: full path to the IRIS.DAT to package.
 /// stagingDir: temporary directory to assemble package contents into.
@@ -826,26 +855,19 @@ ClassMethod CompilePackagingTransform(checksumHex As %String, irisVersion As %St
 /// loadable directly with $system.OBJ.Load — no XML parsing required at install time.
 Method WriteDependencies(targetDir As %String)
 {
-    do ..CollectAllDependencies(..Module, .depMap)
-
     set depsDir = ##class(%Library.File).NormalizeDirectory(
         ##class(%Library.File).NormalizeFilename("deps", targetDir))
     if '##class(%Library.File).CreateDirectoryChain(depsDir) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create deps directory: " _ depsDir))
     }
 
-    set depName = ""
+    set deps = ..GetDependencyModules(..Module)
+    set key = ""
     for {
-        set depName = $order(depMap(depName))
-        quit:depName=""
+        set depModule = deps.GetNext(.key)
+        quit:key=""
 
-        if '##class(%IPM.Storage.Module).NameExists(depName) {
-            continue
-        }
-        set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
-        $$$ThrowOnError(sc)
-
-        set depFile = ##class(%Library.File).NormalizeFilename(depName _ ".xml", depsDir)
+        set depFile = ##class(%Library.File).NormalizeFilename(depModule.Name _ ".xml", depsDir)
         set fileStream = ##class(%Stream.FileCharacter).%New()
         $$$ThrowOnError(fileStream.LinkToFile(depFile))
         set exportStream = ##class(%Stream.TmpCharacter).%New()
@@ -875,6 +897,25 @@ ClassMethod CollectAllDependencies(
     }
 }
 
+/// Returns a %ListOfObjects of the module's transitive dependency modules, in name order,
+/// limited to those currently installed (NameExists). Used to load, compile, and export
+/// dependency code so a database package's IRIS.DAT is self-contained.
+ClassMethod GetDependencyModules(module As %IPM.Storage.Module) As %ListOfObjects
+{
+    do ..CollectAllDependencies(module, .depMap)
+    set deps = ##class(%ListOfObjects).%New()
+    set depName = ""
+    for {
+        set depName = $order(depMap(depName))
+        quit:depName=""
+        continue:'##class(%IPM.Storage.Module).NameExists(depName)
+        set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
+        $$$ThrowOnError(sc)
+        do deps.Insert(depModule)
+    }
+    quit deps
+}
+
 // =====================================================================
 // Install helpers
 // =====================================================================
@@ -890,7 +931,7 @@ Method IsInstallContext() As %Boolean [ Private ]
 
 /// Pre-install validation for a database swap.
 /// Checks: IRIS.DAT exists, module.xml declares database packaging,
-/// dependencies.xml present, SHA-256 checksum matches, no other database package
+/// deps/ directory present, SHA-256 checksum matches, no other database package
 /// already installed in this namespace, IPM is not in the target routines DB,
 /// and the target routines DB is not mirrored.
 /// Throws on any failure. Does not modify any state.
