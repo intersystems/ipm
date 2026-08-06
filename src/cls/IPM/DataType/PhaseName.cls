@@ -10,6 +10,6 @@ Parameter MAXLEN As INTEGER = 50;
 /// If a non-null value is present, then the attribute is restricted to values
 /// in the list, and the validation code simply checks to see if the value is in the list.
 /// Should be kept in sync with %IPM.Lifecycle.Base.Phases
-Parameter VALUELIST = ",Clean,Initialize,Reload,*,Validate,ExportData,Compile,Activate,Document,MakeDeployed,Test,Package,Verify,Publish,Configure,Unconfigure,ApplyUpdateSteps";
+Parameter VALUELIST = ",Clean,Initialize,Reload,*,Validate,ExportData,Compile,Activate,Document,MakeDeployed,Test,Package,Verify,Publish,Configure,Unconfigure,ApplyUpdateSteps,Sync";
 
 }

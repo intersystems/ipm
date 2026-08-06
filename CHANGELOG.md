@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1178: Add `-password-env` and `-token-env` modifiers to the `repo` command to read the password/token from a named environment variable (secure alternatives to `-password` and `-token`).
+- #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 
 ### Changed
 - #1186: Change %IPM.Main:ShellScript() to return a status.

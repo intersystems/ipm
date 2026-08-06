@@ -512,6 +512,31 @@ Method OnItemRelativePath(pItemName As %String) As %String
     quit $select(..ResourceReference.Preload:"preload/",1:"")_ tSourceRoot _ $select(directory=$char(0):"", 1:directory _ "/") _ $translate($piece(pItemName,".",1,*-1),..FilenameTranslateIdentifier,..FilenameTranslateAssociator)_tFileExtension
 }
 
+/// Returns the directory this resource owns on disk, relative to module root (no trailing slash).
+/// For directory-style resources (Name starts with "/"), the Name IS the directory.
+/// For normal doc resources, it's {SourcesRoot}/{Directory}.
+Method GetSyncDirectory() As %String
+{
+    if ..LoadAsDirectory {
+        set dir = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
+        if $extract(dir, *) = "/" {
+            set dir = $extract(dir, 1, *-1)
+        }
+    } else {
+        set sourcesRoot = ..ResourceReference.Module.SourcesRoot
+        set dir = ..Directory
+        if dir = "" {
+            quit ""
+        }
+        if sourcesRoot '= "" {
+            set dir = ##class(%IPM.Storage.FileHash).NormalizePath(sourcesRoot _ "/" _ dir)
+        } else {
+            set dir = ##class(%IPM.Storage.FileHash).NormalizePath(dir)
+        }
+    }
+    quit dir
+}
+
 Method GetSourceControlInfo(Output pInfo As %IPM.ExtensionBase.SourceControl.ResourceInfo) As %Status
 {
     set pInfo = ##class(%IPM.ExtensionBase.SourceControl.ResourceInfo).%New()

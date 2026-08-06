@@ -214,64 +214,80 @@ Method OnPhase(
             zkill ^UnitTestRoot
             $$$ThrowOnError(tSC)
 
-            set testIndex = $get(^||%UnitTest.Manager.AllResults($get(^||%UnitTest.Manager.AllResultsCount)))
-            if testIndex = "" {
-                set testIndex = $order(^UnitTest.Result(""),-1)
-            }
-            if $data(pParams("outputfile"), outputFile) {
-                set fileExtension = $zconvert($piece(outputFile,".",*),"L")
-                set outputClass = $case(fileExtension,
-                    "json":"%IPM.Test.JsonOutput",
-                    "yaml":"%IPM.Test.YamlOutput",
-                    "toon":"%IPM.Test.ToonOutput",
-                    "xml":"%IPM.Test.JUnitOutput",
-                    :"")
-                if outputClass = "" {
-                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported output-file extension '."_fileExtension_"'. Use .json, .yaml, .toon, or .xml."))
-                }
-                set outputDir = ##class(%File).GetDirectory(outputFile)
-                if outputDir '= "" {
-                    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
-                }
-                set tSC = $classmethod(outputClass,"ToFile",outputFile)
-                $$$ThrowOnError(tSC)
-            }
             set suppressor = ""
-
-            set outputFormat = $get(pParams("outputformat"))
-            if outputFormat = "" {
-                set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
-            }
-
-            write !!,"Test Results:"
-            if outputFormat '= "" {
-                set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
-                if '$$$defClassDefined(outputClass) {
-                    $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
-                }
-                set tSC = $classmethod(outputClass,"OutputToDevice",testIndex,tVerbose,1)
-                $$$ThrowOnError(tSC)
-            } else {
-                set tSC = ##class(%IPM.Test.Abstract).OutputToDevice(testIndex,tVerbose,0)
-                $$$ThrowOnError(tSC)
-            }
-            write !
-            // Detect and report unit test failures as an error from this phase.
-            // OutputFailures shows legacy red FAILED lines only when no format is active.
-            if $get(pParams("UnitTest","FailuresAreFatal"),1) {
-                if outputFormat = "" {
-                    do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
-                }
-                set tSC = ##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex)
-                $$$ThrowOnError(tSC)
-            }
-            write !
+            $$$ThrowOnError(..ReportTestResults(phaseStartIndex, tVerbose, .pParams))
         }
     } catch e {
         set tSC = e.AsStatus()
     }
     if $data(tOldUnitTestRoot,^UnitTestRoot) // Restore ^UnitTestRoot
     quit tSC
+}
+
+/// Shared result-reporting tail for OnPhase and OnSyncRunTests: resolves the test-run's log
+/// index, optionally exports full results to a file, then writes the "Test Results:" summary
+/// (format-specific output class, or the legacy default) and throws if FailuresAreFatal and
+/// any test in this phase failed. Callers must clear their own OutputSuppressor (if any)
+/// before calling — the file-export step is unaffected by device redirection, but the summary
+/// write below is not.
+ClassMethod ReportTestResults(
+    phaseStartIndex As %Integer,
+    verbose As %Boolean,
+    ByRef params) As %Status [ Private ]
+{
+    set sc = $$$OK
+    try {
+        set testIndex = $get(^||%UnitTest.Manager.AllResults($get(^||%UnitTest.Manager.AllResultsCount)))
+        if testIndex = "" {
+            set testIndex = $order(^UnitTest.Result(""),-1)
+        }
+        if $data(params("outputfile"), outputFile) {
+            set fileExtension = $zconvert($piece(outputFile,".",*),"L")
+            set outputClass = $case(fileExtension,
+                "json":"%IPM.Test.JsonOutput",
+                "yaml":"%IPM.Test.YamlOutput",
+                "toon":"%IPM.Test.ToonOutput",
+                "xml":"%IPM.Test.JUnitOutput",
+                :"")
+            if outputClass = "" {
+                $$$ThrowOnError($$$ERROR($$$GeneralError,"Unsupported output-file extension '."_fileExtension_"'. Use .json, .yaml, .toon, or .xml."))
+            }
+            set outputDir = ##class(%File).GetDirectory(outputFile)
+            if outputDir '= "" {
+                $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
+            }
+            $$$ThrowOnError($classmethod(outputClass,"ToFile",outputFile))
+        }
+
+        set outputFormat = $get(params("outputformat"))
+        if outputFormat = "" {
+            set outputFormat = ##class(%IPM.Repo.UniversalSettings).GetTestReportFormat()
+        }
+
+        write !!,"Test Results:"
+        if outputFormat '= "" {
+            set outputClass = "%IPM.Test."_$zconvert(outputFormat,"w")_"Output"
+            if '$$$defClassDefined(outputClass) {
+                $$$ThrowOnError($$$ERROR($$$GeneralError,"Unknown output format: "_outputFormat))
+            }
+            $$$ThrowOnError($classmethod(outputClass,"OutputToDevice",testIndex,verbose,1))
+        } else {
+            $$$ThrowOnError(##class(%IPM.Test.Abstract).OutputToDevice(testIndex,verbose,0))
+        }
+        write !
+        // Detect and report unit test failures as an error from this phase.
+        // OutputFailures shows legacy red FAILED lines only when no format is active.
+        if $get(params("UnitTest","FailuresAreFatal"),1) {
+            if outputFormat = "" {
+                do ##class(%IPM.Test.Manager).OutputFailures(phaseStartIndex)
+            }
+            $$$ThrowOnError(##class(%IPM.Test.Manager).GetAllTestsStatus(,phaseStartIndex))
+        }
+        write !
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 Method OnResolveChildren(ByRef pResourceArray) As %Status
@@ -357,6 +373,208 @@ Method OnExportItem(
 Method OnItemRelativePath(pItemName As %String) As %String
 {
     quit ..EmbeddedProcessor.OnItemRelativePath(pItemName)
+}
+
+Method SupportsSync() As %Boolean
+{
+    quit 1
+}
+
+/// The test directory (resource Name, e.g. "/tests/unit/") is the owned scan directory.
+/// Sync walks this directory directly so new test classes are detected before compilation.
+Method GetSyncDirectory() As %String
+{
+    quit ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
+}
+
+Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output handled As %Boolean = 0) As %Status
+{
+    set sc = $$$OK
+    set handled = 1
+    try {
+        set verbose = $get(params("Verbose"))
+        set unitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root _ ..ResourceReference.Name)
+
+        // Reload all test files in the directory, then compile so %Extends checks are valid below.
+        // New test classes may not yet be in ^oddDEF, so we can't limit to changed files here.
+        $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(unitTestDir, verbose, .loadedList, ..Format))
+        if ..Package '= "" {
+            $$$ThrowOnError($system.OBJ.CompilePackage(..Package, "ck"_$select(verbose:"d",1:"-d")))
+        } elseif ..Class '= "" {
+            $$$ThrowOnError($system.OBJ.Compile(..Class, "ck"_$select(verbose:"d",1:"-d")))
+        }
+
+        // Record changed TestCase subclasses for SyncRunTests.
+        // relPath is relative to module root (e.g. "tests/unit/SyncTest/Tests/Trivial.cls").
+        set resourceDir = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
+        set relPath = ""
+        for {
+            set relPath = $order(modifiedPaths(relPath))
+            quit:relPath=""
+            set className = ..RelPathToClassName(relPath, resourceDir)
+            if className '= "" && $$$comClassDefined(className)
+                && $classmethod(className, "%Extends", "%UnitTest.TestCase") {
+                set params("Sync", "ChangedTestCases", className) = ..ResourceReference.Name
+            }
+        }
+
+        // Delete server-side classes for removed test files. SyncApplyDeletes skips Test
+        // resources (not AbstractCompilable), so OnSync must own the delete for this type.
+        set relPath = ""
+        for {
+            set relPath = $order(deletedPaths(relPath))
+            quit:relPath=""
+            set className = ..RelPathToClassName(relPath, resourceDir)
+            if className '= "" && $$$comClassDefined(className) {
+                $$$ThrowOnError($system.OBJ.Delete(className, $select(verbose:"d",1:"-d")))
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// Called once per resource by SyncRunTests: runs every changed test-phase case belonging
+/// to this resource in a single RunTest invocation instead of one call per class.
+/// classInfo(className) = "" for each changed TestCase class in this resource.
+/// Assumes OnSync already loaded and compiled these classes earlier in the same sync() call,
+/// so no reload/recompile happens here — only testspec construction, RunTest, and reporting.
+Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
+{
+    set sc = $$$OK
+    try {
+        set verbose = $get(params("Verbose"), 0)
+        set unitTestDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root _ ..ResourceReference.Name)
+
+        // Initialize test result accumulator for this phase if not already initialized (i.e., we're at top level, not nested)
+        // Mirrors OnPhase's accumulator so multiple resources synced in one -test run share one result set.
+        if '$data(^||%UnitTest.Manager.AllResultsCount) {
+            kill ^||%UnitTest.Manager.AllResults
+            set ^||%UnitTest.Manager.AllResultsCount = 0
+        }
+        set phaseStartIndex = $get(^||%UnitTest.Manager.AllResultsCount, 0)
+
+        // Build one testspec covering every changed class in this resource. Classes sharing
+        // a subdirectory must join with ";" within ONE "dir:Class1;Class2" entry — repeating
+        // the same dirPart across separate comma-joined entries is invalid grammar (RunTest
+        // treats each comma-separated entry as its own testsuite scope; a second entry naming
+        // the same dir errors instead of adding to the first). Distinct subdirectories become
+        // separate comma-joined entries so unrelated sibling test classes elsewhere in the
+        // resource are not swept in. dirPart is derived from className (its inverse) rather
+        // than passed in, since a TestCase class name always mirrors its on-disk path.
+        kill byDir
+        set className = ""
+        for {
+            set className = $order(classInfo(className))
+            quit:className=""
+            set dirPart = $translate($piece(className, ".", 1, *-1), ".", "/")
+            set byDir(dirPart, className) = ""
+        }
+        set testSpec = ""
+        set dirPart = ""
+        for {
+            set dirPart = $order(byDir(dirPart))
+            quit:dirPart=""
+            set classList = ""
+            set className = ""
+            for {
+                set className = $order(byDir(dirPart, className))
+                quit:className=""
+                set classList = classList _ $select(classList="":"", 1: ";") _ className
+            }
+            set testSpec = testSpec _ $select(testSpec="":"", 1: ",") _ dirPart _ ":" _ classList
+        }
+
+        set explicitQuiet = ($data(params("Verbose")) && (params("Verbose") = 0))
+        if explicitQuiet {
+            set suppressor = ##class(%IPM.Utils.OutputSuppressor).%New()
+        }
+
+        set flags = $select(verbose:"/display=all",1:"/display=none")_"/nodelete/norecursive"
+
+        if $data(^UnitTestRoot,oldUnitTestRoot) // Stash ^UnitTestRoot
+        set ^UnitTestRoot = unitTestDir
+        set managerClass = $get(params("UnitTest","ManagerClass"),..ManagerClass)
+        if (managerClass = "") {
+            set managerClass = "%IPM.Test.Manager"
+        }
+        merge userParams = params("UnitTest","UserParam")
+        set sc = $classmethod(managerClass,"RunTest",testSpec,flags,.userParams)
+        zkill ^UnitTestRoot
+        $$$ThrowOnError(sc)
+
+        set suppressor = ""
+        // Tally this resource's per-method pass/fail into the whole-namespace-sync summary before
+        // ReportTestResults runs — at top level it consumes (kills) the result accumulator.
+        do ..SyncSummaryTallyTests(..ResourceReference.Module.Name, phaseStartIndex)
+        $$$ThrowOnError(..ReportTestResults(phaseStartIndex, verbose, .params))
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    if $data(oldUnitTestRoot,^UnitTestRoot) // Restore ^UnitTestRoot
+    quit sc
+}
+
+/// Count the test methods run since phaseStartIndex and forward their pass/fail tally to the
+/// whole-namespace-sync summary. A method counts as failed if it errored or has any failed
+/// assertion, mirroring how GetAllTestsStatus/OutputFailures classify a failure; otherwise passed.
+/// No-op unless a whole-namespace sync is in progress (%IPM.General.Sync.Summary gates on that).
+ClassMethod SyncSummaryTallyTests(
+    moduleName As %String,
+    phaseStartIndex As %Integer) [ Private ]
+{
+    set passed = 0, failed = 0
+    set testCount = $get(^||%UnitTest.Manager.AllResultsCount, 0)
+    for i = (phaseStartIndex + 1):1:testCount {
+        set logIndex = $get(^||%UnitTest.Manager.AllResults(i))
+        continue:logIndex=""
+        set tree = ##class(%IPM.Test.Abstract).BuildResultTree(logIndex)
+        set suiteIter = tree.suites.%GetIterator()
+        while suiteIter.%GetNext(, .suiteObj) {
+            set caseIter = suiteObj.cases.%GetIterator()
+            while caseIter.%GetNext(, .caseObj) {
+                set methodIter = caseObj.methods.%GetIterator()
+                while methodIter.%GetNext(, .methodObj) {
+                    set methodFailed = (methodObj.error '= "")
+                    set assertIter = methodObj.asserts.%GetIterator()
+                    while assertIter.%GetNext(, .assertObj) {
+                        if assertObj.status = "failed" {
+                            set methodFailed = 1
+                        }
+                    }
+                    if methodFailed {
+                        set failed = failed + 1
+                    } else {
+                        set passed = passed + 1
+                    }
+                }
+            }
+        }
+    }
+    do ##class(%IPM.General.Sync.Summary).AddTests(moduleName, passed, failed)
+}
+
+/// Convert a module-root-relative relPath to a class name within this test resource.
+/// e.g. "tests/unit/SyncTest/Tests/Trivial.cls" → "SyncTest.Tests.Trivial".
+/// Returns "" for non-.cls files or paths outside resourceDir.
+ClassMethod RelPathToClassName(relPath As %String, resourceDir As %String) As %String [ Private ]
+{
+    set packageRelPath = relPath
+    if $extract(packageRelPath, 1, $length(resourceDir)) = resourceDir {
+        set packageRelPath = $extract(packageRelPath, $length(resourceDir) + 1, *)
+    }
+    // Strip leading slash left after prefix removal (e.g. "/SyncTest/...")
+    if $extract(packageRelPath) = "/" {
+        set packageRelPath = $extract(packageRelPath, 2, *)
+    }
+    set fileName = $piece(packageRelPath, "/", *)
+    if $zconvert($piece(fileName, ".", *), "U") '= "CLS" {
+        quit ""
+    }
+    set baseName = $piece(fileName, ".", 1, *-1)
+    set dirPart = $piece(packageRelPath, "/", 1, *-1)
+    quit $select(dirPart '= "": $translate(dirPart, "/", ".") _ "." _ baseName, 1: baseName)
 }
 
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
