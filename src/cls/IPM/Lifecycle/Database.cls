@@ -22,9 +22,8 @@ Parameter PACKAGING As STRING [ Final ] = "database";
 /// 3. Export Generated resources before remapping (they become inaccessible after dismount)
 /// 4. Load and compile this module's resources plus all transitive dependencies into the temp DB
 /// 5. Restore the namespace to its original routines DB
-/// 6. Compute SHA-256 checksum of the IRIS.DAT
-/// 7. Assemble staging dir (IRIS.DAT + module.xml + deps/ manifests + non-compiled resources)
-///    and create the .tgz archive
+/// 6. Assemble staging dir (IRIS.DAT + module.xml with the staged IRIS.DAT's SHA-256 checksum
+///    + deps/ manifests + non-compiled resources) and create the .tgz archive
 ///
 /// On error during remap, a safety net restores the namespace.
 /// Temp files and directories are cleaned up in all paths.
@@ -102,8 +101,6 @@ Method %Package(ByRef params) As %Status
             // Import generated resources into the temp namespace
             if $listlength(generatedExports) > 0 {
                 write:verbose !, "Importing generated resources into temp database..."
-                new $namespace
-                set $namespace = ns
                 set ptr = 0
                 while $listnext(generatedExports, ptr, tempFile) {
                     $$$ThrowOnError($system.OBJ.Load(tempFile, "ck"))
@@ -118,11 +115,7 @@ Method %Package(ByRef params) As %Status
             set dbRemapped = 0
         }
 
-        // Compute SHA-256 checksum of the IRIS.DAT
-        write:verbose !, "Computing SHA-256 checksum..."
         set irisDAT = tempDBPath _ "IRIS.DAT"
-        set checksumHex = ..ComputeSHA256Hex(irisDAT)
-        write !, "  Checksum: ", checksumHex
 
         // Resolve requirements.txt into wheels and add <PythonWheel> resources to module.xml,
         // matching what Base.ExportPythonDependencies does for source packaging.
@@ -133,9 +126,8 @@ Method %Package(ByRef params) As %Status
         }
 
         // Assemble staging dir and create .tgz
-        set stagingDir = ##class(%Library.File).NormalizeDirectory(
-            ##class(%Library.File).TempFilename()) _ "stage/"
-        set packageFile = ..AssemblePackage(irisDAT, stagingDir, checksumHex, .params, 'useCurrentDB)
+        set stagingDir = ##class(%Library.File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory() _ "stage")
+        set packageFile = ..AssemblePackage(irisDAT, stagingDir, .params, 'useCurrentDB)
         set params("PackageFile") = packageFile
 
         // Store in Payload for the Publish phase
@@ -188,7 +180,7 @@ Method %Package(ByRef params) As %Status
 /// Handles four contexts:
 /// - Install (Packaging=database and IRIS.DAT in root): validate, prompt, swap DB, register
 ///   dependency metadata, and seed update steps. All install work happens here so that
-///   %Validate, %Compile, and %Activate are clean no-ops — invokes fire naturally after
+///   %Validate, %Compile, and %Activate are clean no-ops. Invokes fire naturally after
 ///   the DB is mounted with no suppression mechanism needed.
 /// - Database packaging inside %Package (params("DatabasePackaging")=1):
 ///   load resources into temp DB, filtering test scope unless in dev mode.
@@ -196,123 +188,130 @@ Method %Package(ByRef params) As %Status
 /// - Loading from a source directory (RootDirectory set): delegate to ##super.
 Method %Reload(ByRef params) As %Status
 {
-    // Install context: validate, swap the DB, register metadata. All in one try/catch so
-    // any failure after the filesystem swap triggers an explicit rollback.
-    // Inject IsInstallContext into params NOW, while IRIS.DAT is still in ..Module.Root.
-    // PerformDatabaseSwap renames it out; downstream phases (%Validate, %Compile, %Activate)
-    // check params("IsInstallContext") so they don't need to re-examine the filesystem.
     if ..IsInstallContext() {
-        set params("IsInstallContext") = 1
-        set sc = $$$OK
-        set dbDir = ""
-        set backupPath = ""
-        try {
-            if $get(params("DeveloperMode")) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError, "Database packages cannot be installed in developer mode."))
-            }
-
-            set ns = $namespace
-            set packageDir = ..Module.Root
-
-            do ..ValidateBeforeSwap(packageDir)
-
-            if '$get(params("SwapDB")) {
-                do ..PromptForSwapConfirmation(ns)
-            }
-
-            do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
-            do ##class(%IPM.Lifecycle.Database).RegisterDependencyMetadata(packageDir)
-
-            // Seed all update steps as already-run on a fresh install so a subsequent 'update'
-            // only executes steps introduced after this version. Same logic as Module.cls:%Activate.
-            // Skipped when params("Update") is set — we're actually running an update, not a fresh install.
-            if '$get(params("Update")) {
-                $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1, $get(params("Verbose"))))
-            }
-
-            write !, "Database swap complete for namespace ", ns
-            write !, "  Backup: ", backupPath
-
-        } catch ex {
-            set sc = ex.AsStatus()
-            if dbDir '= "" {
-                write !, "ERROR — attempting rollback..."
-                do ..RollbackDatabaseSwap(dbDir, backupPath)
-                write !, "Rollback complete. Namespace restored."
-            }
-        }
-        quit sc
+        quit ..DoDatabaseInstall(.params)
     }
-
-    // Inside %Package.LoadResourcesIntoDatabase: load resources, filtering test scope.
-    // Cannot delegate to ##super here: this branch loads resources into the temp DB directly
-    // and does not inherit Base.%Reload behavior (e.g., package/routine mappings from module.xml).
-    // Python requirements are handled separately in %Package via ExportPythonDependencies.
-    // If Base.%Reload gains new resource-loading logic, this branch must be updated to match.
     if $get(params("DatabasePackaging")) {
-        set sc = $$$OK
-        try {
-            // Load this module's own resources followed by all transitive dependencies.
-            // The resulting IRIS.DAT must be self-contained: dep code must be compiled in
-            // because at install time only IPM metadata is registered from deps/ manifests.
-            set modulesToLoad = ..GetDependencyModules(..Module)
-            do modulesToLoad.InsertAt(..Module, 1)
-
-            set mKey = ""
-            for {
-                #dim loadModule As %IPM.Storage.Module
-                set loadModule = modulesToLoad.GetNext(.mKey)
-                quit:mKey=""
-
-                set orderedResourceList = loadModule.GetOrderedResourceList()
-                set key = ""
-                for {
-                    #dim resource As %IPM.Storage.ResourceReference
-                    set resource = orderedResourceList.GetNext(.key)
-                    quit:key=""
-
-                    // Type A: regular resources with Scope="test" or Scope="verify" — skip unless in dev mode
-                    if '$get(params("DeveloperMode")) && resource.IsTestScoped() {
-                        continue
-                    }
-
-                    // Type B: <UnitTest> parent resources have Scope="" and a Test processor.
-                    // OnPhase("Reload") is a no-op for this processor; loading is done via LoadTestDirectory.
-                    if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.Test") && ($extract(resource.Name, *) = "/") {
-                        if $get(params("DeveloperMode")) {
-                            set testDir = ##class(%Library.File).NormalizeDirectory(resource.Module.Root _ resource.Name)
-                            set format = resource.Processor.Format
-                            set loadSC = ##class(%IPM.Test.Manager).LoadTestDirectory(testDir, $get(params("Verbose")), , format)
-                            $$$ThrowOnError(loadSC)
-                        }
-                        continue
-                    }
-
-                    if $isobject(resource.Processor) {
-                        set reloadPhase = $select(resource.Scope '= "": resource.Scope, 1: "Reload")
-                        $$$ThrowOnError(resource.Processor.OnPhase(reloadPhase, .params))
-                    }
-                }
-            }
-        } catch ex {
-            set sc = ex.AsStatus()
-        }
-        quit sc
+        quit ..LoadResourcesForPackaging(.params)
     }
-
     // Packaging phase chain on the source module (e.g. the Reload phase that precedes Package
-    // during `package-database <name>`): no source root to load from. %Package loads resources
+    // during `package-database <name>`) has no source root to load from. %Package loads resources
     // into the temp DB itself, so this phase is a no-op. We must NOT delegate to ##super here:
     // Base.%Reload treats DeveloperMode as a signal to load from ..Module.Root even when no
     // RootDirectory is passed, which would reload source into the current namespace and mutate
-    // it (^Sources, persisted DeveloperMode, Python requirements) mid-package.
+    // it mid-package.
     if '$data(params("RootDirectory")) {
         quit $$$OK
     }
-
-    // Loading a database-packaged module from a source directory (RootDirectory set): behaves
-    // like a normal source load — delegate to Base.
+    // Loading a database-packaged module from a source directory (RootDirectory set) behaves
+    // like a normal source load so delegate to Base.
     quit ##super(.params)
+}
+
+/// Install context: validate, swap the DB, register metadata. All in one try/catch so
+/// any failure after the filesystem swap triggers an explicit rollback.
+/// Inject IsInstallContext into params NOW, while IRIS.DAT is still in ..Module.Root.
+/// PerformDatabaseSwap renames it out; downstream phases (%Validate, %Compile, %Activate)
+/// check params("IsInstallContext") so they don't need to re-examine the filesystem.
+Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
+{
+    set params("IsInstallContext") = 1
+    set sc = $$$OK
+    set dbDir = ""
+    set backupPath = ""
+    try {
+        if $get(params("DeveloperMode")) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Database packages cannot be installed in developer mode."))
+        }
+
+        set ns = $namespace
+        set packageDir = ..Module.Root
+
+        do ..ValidateBeforeSwap(packageDir)
+
+        if '$get(params("SwapDB")) {
+            do ..PromptForSwapConfirmation(ns)
+        }
+
+        do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
+        do ##class(%IPM.Lifecycle.Database).RegisterDependencyMetadata(packageDir)
+
+        // Seed all update steps as already-run on a fresh install so a subsequent 'update'
+        // only executes steps introduced after this version. Same logic as Module.cls:%Activate.
+        // Skipped when params("Update") is set since we're actually running an update, not a fresh install.
+        if '$get(params("Update")) {
+            $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1, $get(params("Verbose"))))
+        }
+
+        write !, "Database swap complete for namespace ", ns
+        write !, "  Backup: ", backupPath
+
+    } catch ex {
+        set sc = ex.AsStatus()
+        if dbDir '= "" {
+            write !, "ERROR: attempting rollback..."
+            do ..RollbackDatabaseSwap(dbDir, backupPath)
+            write !, "Rollback attempted. Verify namespace state."
+        }
+    }
+    quit sc
+}
+
+/// Inside %Package.LoadResourcesIntoDatabase: load resources, filtering test scope.
+/// Cannot delegate to ##super here as this branch loads resources into the temp DB directly
+/// and does not inherit Base.%Reload behavior (e.g., package/routine mappings from module.xml).
+/// Python requirements are handled separately in %Package via ExportPythonDependencies.
+/// If Base.%Reload gains new resource-loading logic, this branch must be updated to match.
+Method LoadResourcesForPackaging(ByRef params) As %Status [ Private ]
+{
+    set sc = $$$OK
+    try {
+        // Load this module's own resources followed by all transitive dependencies.
+        // The resulting IRIS.DAT must be self-contained. Dependency code must be compiled in
+        // because at install time only IPM metadata is registered from deps/ manifests.
+        set modulesToLoad = ..GetDependencyModules(..Module)
+        do modulesToLoad.InsertAt(..Module, 1)
+
+        set mKey = ""
+        for {
+            #dim loadModule As %IPM.Storage.Module
+            set loadModule = modulesToLoad.GetNext(.mKey)
+            quit:mKey=""
+
+            set orderedResourceList = loadModule.GetOrderedResourceList()
+            set key = ""
+            for {
+                #dim resource As %IPM.Storage.ResourceReference
+                set resource = orderedResourceList.GetNext(.key)
+                quit:key=""
+
+                // Type A: regular resources with Scope="test" or Scope="verify" — skip unless in dev mode
+                if '$get(params("DeveloperMode")) && resource.IsTestScoped() {
+                    continue
+                }
+
+                // Type B: <UnitTest> parent resources have Scope="" and a Test processor.
+                // OnPhase("Reload") is a no-op for this processor; loading is done via LoadTestDirectory.
+                if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.Test") && ($extract(resource.Name, *) = "/") {
+                    if $get(params("DeveloperMode")) {
+                        set testDir = ##class(%Library.File).NormalizeDirectory(resource.Module.Root _ resource.Name)
+                        set format = resource.Processor.Format
+                        set loadSC = ##class(%IPM.Test.Manager).LoadTestDirectory(testDir, $get(params("Verbose")), , format)
+                        $$$ThrowOnError(loadSC)
+                    }
+                    continue
+                }
+
+                if $isobject(resource.Processor) {
+                    set reloadPhase = $select(resource.Scope '= "": resource.Scope, 1: "Reload")
+                    $$$ThrowOnError(resource.Processor.OnPhase(reloadPhase, .params))
+                }
+            }
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    quit sc
 }
 
 /// During a database package install, there is no source to validate.
@@ -327,7 +326,7 @@ Method %Validate(ByRef pParams) As %Status
 
 /// During a database package install, there is no source to compile.
 /// During database packaging, compile all transitive dependencies into the temp DB
-/// before this module's own resources — %Reload loaded the dependency source but
+/// before this module's own resources. %Reload loaded the dependency source but
 /// Base.%Compile only handles this module's resources, so dependency code would
 /// otherwise never be compiled into the self-contained IRIS.DAT.
 /// In all other contexts, delegate to ##super.
@@ -342,13 +341,17 @@ Method %Compile(ByRef pParams) As %Status
             // Compile each dependency via its own lifecycle (which compiles that module's
             // resources). Definitions for all dependencies are already loaded by %Reload, so
             // the class compiler resolves cross-module compile order regardless of iteration order.
+            // Strip DatabasePackaging from the params passed down so a Database-lifecycle dependency
+            // does not re-enter this branch and recurse; each dependency only compiles its own resources.
+            merge depParams = pParams
+            kill depParams("DatabasePackaging")
             set deps = ..GetDependencyModules(..Module)
             set mKey = ""
             for {
                 #dim depModule As %IPM.Storage.Module
                 set depModule = deps.GetNext(.mKey)
                 quit:mKey=""
-                $$$ThrowOnError(depModule.Lifecycle.%Compile(.pParams))
+                $$$ThrowOnError(depModule.Lifecycle.%Compile(.depParams))
             }
         }
         // Compile this module's own resources.
@@ -445,16 +448,16 @@ ClassMethod CreateTempDatabase(
 /// Before remapping the namespace routines DB, exports each Generated resource
 /// from the current (source) namespace to a temp XML file.
 /// Returns generatedExports as a $list of temp file paths to be imported later.
-/// Must be called before RemapRoutinesDB — once the old DB is dismounted, the
+/// Must be called before RemapRoutinesDB as once the old DB is dismounted, the
 /// compiled generated classes are no longer accessible.
 ///
 /// This export/import is the primary mechanism for Generated resources that have
-/// no in-lifecycle generator: classes produced by external tools or processes that
+/// no in-lifecycle generator, e.g. classes produced by external tools or processes that
 /// are pre-compiled in the source DB but not recreated during %Reload/%Compile.
 ///
-/// For resources that are regenerated during packaging (BPL/DTL compilation
-/// auto-generates their .1.cls subclass; <Invoke After Compile> explicitly creates
-/// a class via %Dictionary API), the import is redundant but harmless — the class
+/// For resources that are regenerated during packaging (e.g. BPL/DTL compilation
+/// auto-generates their .1.cls subclass or <Invoke After Compile> explicitly creates
+/// a class via %Dictionary API), the import is redundant but harmless since the class
 /// already exists in the temp DB by import time.
 /// ns: namespace containing the source DB with compiled Generated classes.
 /// includeTestResources: if 1, test- and verify-scoped resources are also exported.
@@ -583,28 +586,20 @@ ClassMethod ComputeSHA256Hex(filePath As %String) As %String
     set binHash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
     $$$ThrowOnError(sc)
 
-    set hexHash = ""
-    for i=1:1:$length(binHash) {
-        set byte = $ascii($extract(binHash, i))
-        set hex = $zhex(byte)
-        if $length(hex) = 1 { set hex = "0" _ hex }
-        set hexHash = hexHash _ $zconvert(hex, "L")
-    }
-    quit hexHash
+    // %xsd.hexBinary.LogicalToXSD returns uppercase hex; lowercase to match the on-disk convention.
+    quit $zconvert(##class(%xsd.hexBinary).LogicalToXSD(binHash), "L")
 }
 
 /// Moves (or copies) IRIS.DAT into stagingDir, writes module.xml and deps/ manifests,
 /// then calls Archive.Create to build the final .tgz. Returns path to .tgz.
 /// irisDAT: full path to the IRIS.DAT to package.
 /// stagingDir: temporary directory to assemble package contents into.
-/// checksumHex: SHA-256 hex string to embed in module.xml.
 /// params: packaging params (Path for output dir, DeveloperMode, ExportPythonDependencies, Verbose).
 /// moveFile: 1 (default) renames IRIS.DAT into staging to avoid copying multi-GB files;
 ///           0 copies instead — required for -use-current-db where irisDAT is the live routines DB.
 Method AssemblePackage(
 	irisDAT As %String,
 	stagingDir As %String,
-	checksumHex As %String,
 	ByRef params,
 	moveFile As %Boolean = 1) As %String
 {
@@ -613,17 +608,24 @@ Method AssemblePackage(
     }
 
     if moveFile {
-        // Move IRIS.DAT into staging — avoids copying potentially multi-GB files.
+        // Move IRIS.DAT into staging avoids copying potentially multi-GB files.
         // Safe because the temp DB is already dismounted before AssemblePackage runs.
         if '##class(%Library.File).Rename(irisDAT, stagingDir _ "IRIS.DAT") {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot move IRIS.DAT to staging dir"))
         }
     } else {
-        // -use-current-db: copy instead — irisDAT is the live routines DB, must not be moved
+        // -use-current-db: copy instead as irisDAT is the live routines DB and must not be moved
         if '##class(%Library.File).CopyFile(irisDAT, stagingDir _ "IRIS.DAT", 1, .result) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy IRIS.DAT: " _ result))
         }
     }
+
+    // Checksum the file actually in staging — the exact bytes shipped in the .tgz.
+    // Hashing here (not the source) closes a race where the live
+    // routines DB could change between hashing and copying.
+    write:$get(params("Verbose")) !, "Computing SHA-256 checksum..."
+    set checksumHex = ..ComputeSHA256Hex(stagingDir _ "IRIS.DAT")
+    write !, "  Checksum: ", checksumHex
 
     // Stage non-compiled resource files so processors can find them during install
     set includeTestResources = $get(params("DeveloperMode"), 0)
@@ -711,8 +713,8 @@ Method CopyNonCompiledResources(
             do ..StageFile(sourcePath, destPath)
 
         }
-        // Compiled resources (Class, Routine, Include, etc.) are handled via IRIS.DAT — no file staging needed.
-        // WebApplication is configuration-only — no file staging needed.
+        // Compiled resources (Class, Routine, Include, etc.) are handled via IRIS.DAT so no file staging needed.
+        // WebApplication is configuration-only so no file staging needed.
     }
 }
 
@@ -861,24 +863,23 @@ Method WriteDependencies(targetDir As %String)
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create deps directory: " _ depsDir))
     }
 
-    set deps = ..GetDependencyModules(..Module)
-    set key = ""
-    for {
-        set depModule = deps.GetNext(.key)
-        quit:key=""
-
-        set depFile = ##class(%Library.File).NormalizeFilename(depModule.Name _ ".xml", depsDir)
+    set depNames = ..GetDependencyNames(..Module)
+    set ptr = 0
+    while $listnext(depNames, ptr, depName) {
+        set depFile = ##class(%Library.File).NormalizeFilename(depName _ ".xml", depsDir)
         set fileStream = ##class(%Stream.FileCharacter).%New()
         $$$ThrowOnError(fileStream.LinkToFile(depFile))
         set exportStream = ##class(%Stream.TmpCharacter).%New()
-        $$$ThrowOnError($system.OBJ.ExportToStream(depModule.Name _ ".ZPM", .exportStream, "-d"))
+        $$$ThrowOnError($system.OBJ.ExportToStream(depName _ ".ZPM", .exportStream, "-d"))
         $$$ThrowOnError(exportStream.Rewind())
         $$$ThrowOnError(fileStream.CopyFrom(exportStream))
         $$$ThrowOnError(fileStream.%Save())
     }
 }
 
-/// Recursively collects all unique transitive dependency names into depMap(name) = "".
+/// Recursively collects all unique transitive dependencies into depMap(name).
+/// Value is the opened module oref for installed deps and "" for not-installed deps.
+/// The map entry is set before recursing so circular dependencies terminate.
 ClassMethod CollectAllDependencies(
 	module As %IPM.Storage.Module,
 	ByRef depMap)
@@ -888,12 +889,14 @@ ClassMethod CollectAllDependencies(
         if $data(depMap(depName)) {
             continue
         }
-        set depMap(depName) = ""
-        if ##class(%IPM.Storage.Module).NameExists(depName) {
-            set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
-            $$$ThrowOnError(sc)
-            do ..CollectAllDependencies(depModule, .depMap)
+        if '##class(%IPM.Storage.Module).NameExists(depName) {
+            set depMap(depName) = ""
+            continue
         }
+        set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
+        $$$ThrowOnError(sc)
+        set depMap(depName) = depModule
+        do ..CollectAllDependencies(depModule, .depMap)
     }
 }
 
@@ -906,14 +909,27 @@ ClassMethod GetDependencyModules(module As %IPM.Storage.Module) As %ListOfObject
     set deps = ##class(%ListOfObjects).%New()
     set depName = ""
     for {
-        set depName = $order(depMap(depName))
+        set depName = $order(depMap(depName), 1, depModule)
         quit:depName=""
-        continue:'##class(%IPM.Storage.Module).NameExists(depName)
-        set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
-        $$$ThrowOnError(sc)
+        continue:'$isobject(depModule)
         do deps.Insert(depModule)
     }
     quit deps
+}
+
+/// Returns the installed transitive dependency names in name order.
+ClassMethod GetDependencyNames(module As %IPM.Storage.Module) As %List
+{
+    do ..CollectAllDependencies(module, .depMap)
+    set names = ""
+    set depName = ""
+    for {
+        set depName = $order(depMap(depName), 1, depModule)
+        quit:depName=""
+        continue:'$isobject(depModule)
+        set names = names _ $listbuild(depName)
+    }
+    quit names
 }
 
 // =====================================================================
@@ -1016,6 +1032,8 @@ Method PromptForSwapConfirmation(ns As %String) [ Private ]
 /// Dismounts the current routines DB, renames IRIS.DAT to a timestamped backup,
 /// moves the packaged IRIS.DAT into place, and remounts.
 /// Sets dbDir and backupPath for use in rollback on failure.
+/// Note: the namespace's routines DB is dismounted during the swap; other processes actively
+/// using the namespace may be disrupted. The namespace should be idle before install.
 /// packageDir: extracted package directory containing the new IRIS.DAT to swap in.
 /// ns: namespace whose routines DB is being replaced.
 /// dbDir (output): filesystem directory of the routines DB, used by RollbackDatabaseSwap.
@@ -1039,7 +1057,6 @@ Method PerformDatabaseSwap(
 
     // Rename current IRIS.DAT to timestamped backup: IRIS_<dbname>_YYYYMMDDHHmmss.DAT.
     // Timestamp is second-resolution, so append a counter suffix if that name already exists
-    // (e.g. two swaps of the same DB within one second, as in a package upgrade).
     set h = $horolog
     set timestamp = $translate($zdate(h, 8), "-", "") _ $translate($ztime($piece(h, ",", 2), 2), ":", "")
     set backupBase = dbDir _ "IRIS_" _ routinesDBName _ "_" _ timestamp
@@ -1088,13 +1105,13 @@ ClassMethod RegisterDependencyMetadata(packageDir As %String)
     }
 }
 
-/// Best-effort rollback after a failed swap. Never throws — called from a catch block.
-/// Dismounts new DB, removes new IRIS.DAT if present, restores backup, remounts.
+/// Best-effort rollback after a failed swap. Called from a catch block and never throws.
+/// Dismounts new DB, removes new IRIS.DAT if present, restores backup, and remounts.
 /// dbDir: filesystem directory of the routines DB, as set by PerformDatabaseSwap.
 /// backupPath: full path of the timestamped backup, as set by PerformDatabaseSwap.
 Method RollbackDatabaseSwap(
 	dbDir As %String,
-	backupPath As %String) [ Private ]
+	backupPath As %String)
 {
     if dbDir = "" {
         quit
@@ -1108,14 +1125,16 @@ Method RollbackDatabaseSwap(
         write !, "Rollback warning — could not dismount database at ", dbDir
     }
 
-    set newDAT = dbDir _ "IRIS.DAT"
-    if ##class(%Library.File).Exists(newDAT) {
-        if '##class(%Library.File).Delete(newDAT) {
-            write !, "Rollback warning — could not delete new IRIS.DAT at ", newDAT
-        }
-    }
-
+    // Only touch dbDir/IRIS.DAT when a backup exists to restore. If no backup exists,
+    // the swap failed before the original was renamed out — the file still in place is
+    // the original routines DB and must not be deleted.
     if (backupPath '= "") && ##class(%Library.File).Exists(backupPath) {
+        set newDAT = dbDir _ "IRIS.DAT"
+        if ##class(%Library.File).Exists(newDAT) {
+            if '##class(%Library.File).Delete(newDAT) {
+                write !, "Rollback warning — could not delete swapped-in IRIS.DAT at ", newDAT
+            }
+        }
         if '##class(%Library.File).Rename(backupPath, dbDir _ "IRIS.DAT") {
             write !, "Rollback warning — could not restore backup from ", backupPath
             write !, "  Manual intervention required to restore IRIS.DAT."
@@ -1134,8 +1153,7 @@ Method RollbackDatabaseSwap(
 // =====================================================================
 
 /// Returns the normalized filesystem directory path for a database.
-/// Reads the registered Directory from Config.Databases when the database exists — a database
-/// can be mounted from any path, not just <ManagerDirectory>/<dbName>. Falls back to the
+/// Reads the registered Directory from Config.Databases when the database exists. Falls back to the
 /// conventional <ManagerDirectory>/<dbName> layout for databases not (yet) registered, which is
 /// where CreateTempDatabase places new databases.
 ClassMethod GetDatabaseDirectory(dbName As %String) As %String

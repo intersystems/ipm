@@ -1528,13 +1528,10 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
                 set ..Packaging = tPackaging
             } elseif (..Packaging '= tPackaging) {
                 // The lifecycle class is still the default but Packaging has been changed.
-                // Try to derive the correct class from the Packaging value.
-                set tDerived = $$$DefaultLifecyclePackageDot _ $case(..Packaging,
-                    "application":    "Application",
-                    "database":       "Database",
-                    "studio-project": "StudioProject",
-                    :                 "")
-                if (tDerived '= $$$DefaultLifecyclePackageDot) && $$$comClassDefined(tDerived) {
+                // Derive the correct class from the Packaging value via the canonical mapping.
+                set tSC = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(..Packaging, .tDerived)
+                quit:$$$ISERR(tSC)
+                if (tDerived '= "") && $$$comClassDefined(tDerived) {
                     set ..LifecycleClass = tDerived
                 } else {
                     set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
@@ -1542,7 +1539,11 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
                 }
             }
         } elseif (..LifecycleClass = "") && (..Packaging '= "") {
-              set ..LifecycleClass = $case(..Packaging,"application": "Application", : "Module")
+            // Derive lifecycle from packaging; fall back to the generic Module lifecycle
+            // for "module" and any packaging with no dedicated lifecycle class.
+            set tSC = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(..Packaging, .tDerived)
+            quit:$$$ISERR(tSC)
+            set ..LifecycleClass = $select(tDerived '= "": tDerived, 1: $$$DefaultLifecyclePackageDot _ "Module")
         } elseif (..Packaging = "") {
             // Default to "module"
             set ..Packaging = "module"
