@@ -296,7 +296,8 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
-<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="create-lockfile" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="from-lockfile" dataAlias="FromLockFile" dataValue="1" description="Load the module from the lock file present at the path." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -423,7 +424,8 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
-<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="create-lockfile" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="from-lockfile" dataAlias="FromLockFile" dataValue="1" description="Load the module from the lock file present at the path." />
 
 </command>
 
@@ -1096,8 +1098,8 @@ ClassMethod ShellInternal(
                 do ..ModuleVersion(.tCommandInfo)
             } elseif (tCommandInfo = "information") {
                 do ..Information(.tCommandInfo)
-			} elseif (tCommandInfo = "history") {
-				do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "history") {
+                do ..History(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -2394,36 +2396,40 @@ ClassMethod LoadInternal(
         }
     }
 
-    // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
-    // It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
+    if ($get(pCommandInfo("data", "FromLockFile"))) {
+        do ##class(%IPM.General.LockFile).InstallFromLockFile(tTargetDirectory, .tParams)
+    } else {
+        // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
+        // It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
 
-    // For tarball and URL sources, copy the extracted content to <ModuleRoot>/<name>/<version>/
-    // and clean up the temp extraction directory. Directory loads are left in-place so that
-    // live-edit workflows (mounted volumes, bootstrap) continue to work without re-loading.
-    if $get(tTempExtractionRoot) '= "" {
-        set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
-        if 'tFound {
-            $$$ThrowStatus($$$ERROR($$$GeneralError,"No Module element found in module.xml at "_tTargetDirectory))
+        // For tarball and URL sources, copy the extracted content to <ModuleRoot>/<name>/<version>/
+        // and clean up the temp extraction directory. Directory loads are left in-place so that
+        // live-edit workflows (mounted volumes, bootstrap) continue to work without re-loading.
+        if $get(tTempExtractionRoot) '= "" {
+            set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
+            if 'tFound {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"No Module element found in module.xml at "_tTargetDirectory))
+            }
+            set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
+                ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
+            if ##class(%File).DirectoryExists(tFinalDirectory) {
+                $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
+            }
+            $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
+            // Destination was just created empty above, so pDeleteFirst=0 is intentional.
+            // If CopyDir fails partway through, tFinalDirectory may be left in a partial state.
+            $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
+            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
+            set tTargetDirectory = tFinalDirectory
         }
-        set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
-            ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
-        if ##class(%File).DirectoryExists(tFinalDirectory) {
-            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
-        }
-        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
-        // Destination was just created empty above, so pDeleteFirst=0 is intentional.
-        // If CopyDir fails partway through, tFinalDirectory may be left in a partial state.
-        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
-        $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
-        set tTargetDirectory = tFinalDirectory
+
+        set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
+        set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
+        set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , pLog)
+        set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
+        $$$ThrowOnError(tSC)
     }
-
-    set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
-    set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , pLog)
-    set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
-    $$$ThrowOnError(tSC)
 }
 
 ClassMethod CheckModuleNamespace() As %Status
@@ -2530,12 +2536,11 @@ ClassMethod Install(
                         $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
                     }
                 }
-				$$$ThrowOnError(log.SetSource(tResult.ServerName))
-				$$$ThrowOnError(log.SetVersion(tResult.Version))
+                $$$ThrowOnError(log.SetSource(tResult.ServerName))
+                $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
-            set tPrefix = ""
             if (tModuleName '= "") {
                 if (tVersion '= "") {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
@@ -2549,10 +2554,10 @@ ClassMethod Install(
             }
         }
     } catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
-		throw ex
-	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+        $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        throw ex
+    }
+    $$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]

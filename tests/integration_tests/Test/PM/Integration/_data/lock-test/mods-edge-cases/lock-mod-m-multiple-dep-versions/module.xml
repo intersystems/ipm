@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Export generator="Cache" version="25">
-    <Document name="lock-mod-j-deps-misordered.ZPM">
+    <Document name="lock-mod-m-multiple-dep-versions.ZPM">
     <Module>
-      <Name>lock-mod-j-deps-misordered</Name>
+      <Name>lock-mod-m-multiple-dep-versions</Name>
       <Version>1.0.0</Version>
-      <Resource Name="LockModJ.PKG" />
+      <Resource Name="LockModM.PKG" />
       <Dependencies>
         <ModuleReference>
-          <Name>lock-mod-c-2-deps-0-transient</Name>
-          <Version>^1.0.0</Version>
+          <Name>lock-mod-h-multiple-versions</Name>
+          <Version>^2.0.0</Version>
         </ModuleReference>
       </Dependencies>
     </Module>

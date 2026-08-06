@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.10.8] - 2026-07-08
 
+### Added
+- #962: Adding zpm -from-lockfile flag to install/load from a lock file
+
 ### Fixed
 - #1192: Fix dependency resolution dropping incompatibilities and along with that fix a bug where
 semver Intersection would incorrectly pass if an exact version is compared against a range even with

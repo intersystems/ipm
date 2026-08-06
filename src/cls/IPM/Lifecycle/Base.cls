@@ -1344,6 +1344,7 @@ Method %Export(
             "changelog.md",
             "license",
             "requirements.txt",
+            "module-lock.json",
         )
         set tRes = ##class(%File).FileSetFunc(..Module.Root)
         while tRes.%Next() {
