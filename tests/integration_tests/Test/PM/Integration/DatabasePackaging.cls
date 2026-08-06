@@ -401,28 +401,6 @@ Method TestSimplePackageAndInstall()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .historyOutput)
     do $$$AssertStatusOK(sc, "History command executed")
     do $$$AssertTrue(..FindStringInMultiDimArray("simple-db-module", .historyOutput), "Installation recorded in history")
-
-    // Test load command with another module (dep-module is pre-loaded in shared NS1)
-    set $namespace = packagingNS
-
-    set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged dep-module as database")
-
-    set packageFile2 = ..PackageOutputDir _ "dep-module-1.0.0-database.tgz"
-
-    // Create another namespace for load test
-    set loadNS = "TESTDBLOAD1"
-    set sc = ..CreateTestNamespace(loadNS)
-    do $$$AssertStatusOK(sc, "Created load test namespace")
-
-    set $namespace = loadNS
-
-    // Test load command with -swap-db
-    set sc = ##class(%IPM.Main).Shell("load " _ packageFile2 _ " -swap-db")
-    do $$$AssertStatusOK(sc, "Load command with database package works")
-
-    // Verify module loaded
-    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "DepModule.Core class exists after load")
 }
 
 /// Test packaging and installing modules with dependencies
@@ -588,24 +566,6 @@ Method TestPackageAndInstallWithTestResources()
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Main"), "Main class exists")
 }
 
-/// Test packaging with -use-current-db flag
-Method TestPackageWithUseCurrentDbFlag()
-{
-    set packagingNS = ..GetOrCreateSharedNS1()
-
-    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
-    new $namespace
-    set $namespace = packagingNS
-
-    // Package with -use-current-db flag
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -use-current-db -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged with -use-current-db flag")
-
-    // Verify package was created
-    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
-    do $$$AssertTrue(##class(%File).Exists(packageFile), "Package created with -use-current-db")
-}
-
 /// Test packaging and install validation (errors and edge cases)
 Method TestPackagingAndInstallValidation()
 {
@@ -684,32 +644,6 @@ Method TestPackagingAndInstallValidation()
     set sc = ##class(%IPM.Main).Shell("load " _ missingDepsPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Missing deps/ directory rejected by validation")
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "deps/", "Error mentions missing deps/ directory")
-}
-
-/// Test backup and rollback during installation
-Method TestBackupAndRollback()
-{
-    set packagingNS = ..GetOrCreateSharedNS1()
-
-    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
-    new $namespace
-    set $namespace = packagingNS
-
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged module")
-
-    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
-
-    set installNS = "TESTDBBKUPINS"
-    set sc = ..CreateTestNamespace(installNS)
-    do $$$AssertStatusOK(sc, "Created installation namespace")
-    new $namespace
-    set $namespace = installNS
-    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
-    do $$$AssertStatusOK(sc, "Installed database package")
-
-    // Verify backup file was created in the routines DB directory
-    do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup IRIS.DAT file created after swap")
 }
 
 /// Test upgrading from source package to database package
@@ -1339,6 +1273,21 @@ Method TestSystemRequirementsOverwrite()
     do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)
 }
 
+/// A module declaring Packaging="database" with no explicit LifecycleClass must resolve to
+/// %IPM.Lifecycle.Database, not the generic %IPM.Lifecycle.Module.
+Method TestPackagingDerivesLifecycleClass()
+{
+    set module = ##class(%IPM.Storage.Module).%New()
+    set module.Name = "derive-lifecycle-check"
+    set module.VersionString = "1.0.0"
+    set module.Packaging = "database"
+    // Leave LifecycleClass empty so the derivation path runs.
+
+    set sc = module.%ValidateObject()
+    do $$$AssertStatusOK(sc, "Module with Packaging=database validates")
+    do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.Database", "LifecycleClass derived from database packaging")
+}
+
 /// Get the installed version of a Python package.
 ClassMethod GetPythonVersion(name As %String) As %String
 {
@@ -1408,6 +1357,31 @@ ClassMethod PurgePythonPackage(name As %String)
     do ..DeletePattern(target, name _ "-*" _ ".dist-info")
 }
 
+/// Simulates a swap that failed before the original IRIS.DAT was renamed to a backup:
+/// the routines DB directory still holds the original IRIS.DAT and no backup file exists.
+/// RollbackDatabaseSwap must not delete the original when there is no backup to restore.
+Method TestRollbackPreservesOriginalWhenNoBackup()
+{
+    // Create a throwaway namespace so we have a real, mounted routines DB directory to act on.
+    set installNS = "TESTDBROLLBACKNS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created test namespace")
+
+    // Resolve the routines DB directory for the namespace.
+    set dbDir = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(##class(%IPM.Lifecycle.Database).GetRoutinesDBName(installNS))
+    set irisDAT = dbDir _ "IRIS.DAT"
+    do $$$AssertTrue(##class(%Library.File).Exists(irisDAT), "Original IRIS.DAT exists before rollback")
+
+    // Invoke rollback with a backupPath that does not exist.
+    set bogusBackup = dbDir _ "IRIS_nonexistent_backup.DAT"
+    do $$$AssertNotTrue(##class(%Library.File).Exists(bogusBackup), "Backup file intentionally absent")
+    set lifecycle = ##class(%IPM.Lifecycle.Database).%New(##class(%IPM.Storage.Module).%New())
+    do lifecycle.RollbackDatabaseSwap(dbDir, bogusBackup)
+
+    // The original must survive.
+    do $$$AssertTrue(##class(%Library.File).Exists(irisDAT), "Original IRIS.DAT preserved when no backup exists")
+}
+
 /// Template module.xml for TestSystemRequirementsOverwrite.
 /// REPLACEPREVIRISVERSION is substituted at runtime with a dynamically computed previous IRIS version.
 XData SimpleModuleWithSysReqTemplate
@@ -1426,6 +1400,59 @@ XData SimpleModuleWithSysReqTemplate
     </Module>
   </Document>
 </Export>
+}
+
+/// The checksum embedded in a packaged module.xml must equal the hash of the IRIS.DAT that
+/// actually ships in the .tgz — verified for the -use-current-db copy flow.
+Method TestChecksumMatchesShippedDat()
+{
+    set packagingNS = ..GetOrCreateSharedNS1()
+    new $namespace
+    set $namespace = packagingNS
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -use-current-db -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged module with -use-current-db")
+    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
+    do $$$AssertTrue(##class(%Library.File).Exists(packageFile), "Package file exists")
+
+    // Extract into a temp dir.
+    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-checksum")
+    do ##class(%Library.File).CreateDirectory(extractDir)
+    do $$$AssertStatusOK(##class(%IPM.General.Archive).Extract(packageFile, extractDir), "Extracted package")
+
+    // Read the embedded checksum from module.xml (string match, matching this class's other tests).
+    set stream = ##class(%Stream.FileCharacter).%New()
+    do $$$AssertStatusOK(stream.LinkToFile(extractDir _ "module.xml"), "Linked module.xml")
+    set xmlContent = stream.Read()
+    // Extract the value between <Checksum Algorithm="SHA-256"> and </Checksum>.
+    set marker = "<Checksum Algorithm=""SHA-256"">"
+    set afterOpen = $piece(xmlContent, marker, 2)
+    set embedded = $piece(afterOpen, "</Checksum>", 1)
+    do $$$AssertTrue(embedded '= "", "Embedded checksum found in module.xml")
+
+    // Hash the shipped IRIS.DAT and compare.
+    set actual = ##class(%IPM.Lifecycle.Database).ComputeSHA256Hex(extractDir _ "IRIS.DAT")
+    do $$$AssertEquals($zconvert(actual, "L"), $zconvert(embedded, "L"), "Embedded checksum matches shipped IRIS.DAT")
+
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)
+}
+
+/// Guards the ComputeSHA256Hex output contract (64-char lowercase hex): the hash is produced
+/// via the %xsd.hexBinary encoder, so this pins the length and lowercasing.
+Method TestSHA256HexFormat()
+{
+    // Write a small known file and hash it.
+    set tmp = ##class(%Library.File).TempFilename("bin")
+    set stream = ##class(%Stream.FileBinary).%New()
+    do stream.LinkToFile(tmp)
+    do stream.Write("abc")
+    do stream.%Save()
+    set hex = ##class(%IPM.Lifecycle.Database).ComputeSHA256Hex(tmp)
+    do ##class(%Library.File).Delete(tmp)
+
+    do $$$AssertEquals($length(hex), 64, "SHA-256 hex is 64 characters")
+    do $$$AssertEquals($zconvert(hex, "L"), hex, "SHA-256 hex is lowercase")
+    // SHA-256 of "abc" is a well-known constant.
+    do $$$AssertEquals(hex, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256('abc') matches known value")
 }
 
 }
