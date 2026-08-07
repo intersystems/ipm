@@ -30,7 +30,7 @@ ClassMethod LoadQualifiedReference(
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog, tReference.IPMPackaging)
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, tReference.IPMPackaging, .pParams, .pDependencyGraph, pLog)
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -43,10 +43,10 @@ ClassMethod LoadModuleReference(
 	pVersion As %String,
 	pDeployed As %Boolean,
 	pPlatformVersion As %String,
+	pIPMPackaging As %String = "",
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pLog As %IPM.General.AbstractHistory = "",
-	pIPMPackaging As %String = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     // if install of module is already being logged, don't duplicate
     set prelogged = $case(pLog, "": 0, :1)
@@ -1177,6 +1177,17 @@ ClassMethod LoadNewModule(
         if moduleCurrent '= "" {
             set fromVersion = moduleCurrent.Version
             set fromVersionString = moduleCurrent.VersionString
+            if foundNewModuleObj && (newModuleObj.Packaging = "database") {
+                // Capture the currently installed version's flattened dependency set before the
+                // load below overwrites this module's stored manifest. The database install needs
+                // it to tell a dependency this package used to carry (its code came from the old
+                // IRIS.DAT and is about to be replaced) from an unrelated module the user
+                // installed themselves (whose code the swap would destroy). Flattened, so a
+                // dependency that merely moved to a different parent is not seen as dropped.
+                // A dependency with no installed record is omitted, which is harmless: with no
+                // record there is nothing to orphan and nothing to clean up.
+                set params("PreviousDependencies") = ##class(%IPM.Lifecycle.Database).GetDependencyNames(moduleCurrent)
+            }
         }
         if (fromVersion '= "") && (toVersion '= "") {
             if fromVersion.Follows(toVersion) {
@@ -1370,7 +1381,7 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, .dependencyGraph, , moduleReference.IPMPackaging)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, moduleReference.IPMPackaging, .pParams, .dependencyGraph)
         $$$ThrowOnError(sc)
     }
 

@@ -888,6 +888,112 @@ Method TestInstallRejectedWhenModulesWouldBeOrphaned()
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "dep-module's code came from the packaged IRIS.DAT")
 }
 
+/// Upgrading a database package whose dependency tree changed shape must not be blocked by the
+/// orphan check, and dependencies that no longer ship in the new IRIS.DAT must have their stale
+/// IPM metadata removed rather than left behind pointing at code that is gone.
+///
+/// deptree-parent v1 -> v2 exercises all four kinds of change at once. The comparison is between
+/// flattened dependency sets, so re-parenting is invisible to it:
+///
+///   v1: deptree-dropped -> deptree-leaf     v2: deptree-added  -> deptree-leaf
+///       deptree-stable 1.0.0                    deptree-stable 2.0.0 -> deptree-extra
+///
+///   deptree-dropped  in v1 only  -> dropped dependency, metadata must be cleaned up
+///   deptree-added    in v2 only  -> new direct dependency
+///   deptree-leaf     in both     -> re-parented transitive dependency, must survive untouched
+///   deptree-extra    in v2 only  -> new transitive dependency under an unchanged carrier
+///
+/// deptree-leaf and deptree-extra are deliberately reached through different parents than the
+/// added/dropped pair so that each feature is isolated: a bug that keys off direct dependencies
+/// rather than the flattened set fails on deptree-leaf, and one that ignores transitive additions
+/// fails on deptree-extra.
+Method TestUpdateWithChangedDependencyTree()
+{
+    // Resolve all module dirs before any namespace switch (^UnitTestRoot only in the original NS)
+    set leafDir = ..GetModuleDir("db-packaging", "deptree-leaf")
+    set extraDir = ..GetModuleDir("db-packaging", "deptree-extra")
+    set droppedDir = ..GetModuleDir("db-packaging", "deptree-dropped")
+    set addedDir = ..GetModuleDir("db-packaging", "deptree-added")
+    set stableV1Dir = ..GetModuleDir("db-packaging", "deptree-stable-v1")
+    set stableV2Dir = ..GetModuleDir("db-packaging", "deptree-stable-v2")
+    set parentV1Dir = ..GetModuleDir("db-packaging", "deptree-parent-v1")
+    set parentV2Dir = ..GetModuleDir("db-packaging", "deptree-parent-v2")
+
+    // A dedicated packaging NS rather than a shared one: this test loads two different versions
+    // of deptree-parent and deptree-stable, which would corrupt the shared namespaces' registries.
+    set packagingNS = "TESTDBDEPTREEPKG"
+    do $$$AssertStatusOK(..CreateTestNamespace(packagingNS), "Created packaging namespace")
+
+    new $namespace
+    set $namespace = packagingNS
+
+    // --- Package v1: deptree-dropped (-> deptree-leaf) and deptree-stable 1.0.0 ---
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ leafDir), "Loaded deptree-leaf")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ droppedDir), "Loaded deptree-dropped")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ stableV1Dir), "Loaded deptree-stable 1.0.0")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ parentV1Dir), "Loaded deptree-parent 1.0.0")
+
+    set sc = ##class(%IPM.Main).Shell("package-database deptree-parent -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged deptree-parent 1.0.0 as database")
+    set v1Package = ..PackageOutputDir _ "deptree-parent-1.0.0-database.tgz"
+    do $$$AssertTrue(##class(%Library.File).Exists(v1Package), "v1 database package exists")
+
+    // --- Reshape the tree in the packaging NS, then package v2 ---
+    // deptree-added and deptree-extra are new; deptree-stable gains the deptree-extra edge at 2.0.0.
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ extraDir), "Loaded deptree-extra")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ addedDir), "Loaded deptree-added")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("update deptree-stable -path " _ stableV2Dir), "Updated deptree-stable to 2.0.0")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("update deptree-parent -path " _ parentV2Dir), "Updated deptree-parent to 2.0.0")
+
+    set sc = ##class(%IPM.Main).Shell("package-database deptree-parent -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged deptree-parent 2.0.0 as database")
+    set v2Package = ..PackageOutputDir _ "deptree-parent-2.0.0-database.tgz"
+    do $$$AssertTrue(##class(%Library.File).Exists(v2Package), "v2 database package exists")
+
+    // --- Install v1 into a clean namespace ---
+    set installNS = "TESTDBDEPTREEINST"
+    do $$$AssertStatusOK(..CreateTestNamespace(installNS), "Created install namespace")
+    set $namespace = installNS
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ v1Package _ " -swap-db"), "Installed deptree-parent 1.0.0")
+
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Parent"), "Parent class present after v1 install")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Dropped"), "deptree-dropped code in v1 IRIS.DAT")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Leaf"), "deptree-leaf code in v1 IRIS.DAT")
+    do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("deptree-dropped"), "deptree-dropped metadata registered from v1 deps/")
+    do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("deptree-leaf"), "deptree-leaf metadata registered from v1 deps/")
+    do $$$AssertNotTrue(##class(%IPM.Storage.Module).NameExists("deptree-added"), "deptree-added absent before upgrade")
+    do $$$AssertNotTrue(##class(%IPM.Storage.Module).NameExists("deptree-extra"), "deptree-extra absent before upgrade")
+
+    // --- Upgrade to v2 ---
+    // Every module installed here arrived inside v1's IRIS.DAT, so none of them may trigger the
+    // orphan rejection — including deptree-dropped, which v2 no longer carries.
+    set sc = ##class(%IPM.Main).Shell("update deptree-parent -path " _ v2Package _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Upgrade not blocked by the orphan check despite the reshaped tree")
+
+    // Dropped dependency: code is gone from the new IRIS.DAT, so its metadata must go too
+    do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Dropped"), "deptree-dropped code absent from v2 IRIS.DAT")
+    do $$$AssertNotTrue(##class(%IPM.Storage.Module).NameExists("deptree-dropped"), "deptree-dropped metadata cleaned up — no record pointing at missing code")
+
+    // New direct dependency
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Added"), "deptree-added code in v2 IRIS.DAT")
+    do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("deptree-added"), "deptree-added metadata registered from v2 deps/")
+
+    // Re-parented transitive dependency: moved from deptree-dropped to deptree-added, must survive
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Leaf"), "deptree-leaf code still present after re-parenting")
+    do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("deptree-leaf"), "deptree-leaf metadata retained — re-parenting is not a drop")
+
+    // New transitive dependency under the unchanged carrier
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Extra"), "deptree-extra code in v2 IRIS.DAT")
+    do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("deptree-extra"), "deptree-extra metadata registered from v2 deps/")
+
+    // The unchanged carrier itself
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Stable"), "deptree-stable code present after upgrade")
+    do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("deptree-stable"), "deptree-stable metadata retained")
+
+    do $$$AssertTrue(..CountBackupFiles(installNS) > 1, "Second backup created — the DB was swapped again during the upgrade")
+}
+
 /// Tests all Python dependency packaging behaviour in one pass:
 /// - module-with-mixed-python (explicit PythonWheel + requirements.txt): both wheels present
 ///   by default; both absent with -export-python-deps 0; lune installs correctly at runtime

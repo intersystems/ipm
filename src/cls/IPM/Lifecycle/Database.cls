@@ -227,7 +227,7 @@ Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
         set ns = $namespace
         set packageDir = ..Module.Root
 
-        do ..ValidateBeforeSwap(packageDir)
+        do ..ValidateBeforeSwap(packageDir, .params, .staleModules)
 
         if '$get(params("SwapDB")) {
             do ..PromptForSwapConfirmation(ns)
@@ -235,6 +235,11 @@ Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
 
         do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
         do ##class(%IPM.Lifecycle.Database).RegisterDependencyMetadata(packageDir)
+
+        // Only once the swap and metadata registration have both succeeded: the code behind these
+        // modules is gone, so their records would otherwise linger in 'list' with nothing behind
+        // them. Doing this earlier would leave the metadata deleted if a rollback restored the code.
+        do ..RemoveStaleModuleMetadata(staleModules, $get(params("Verbose")))
 
         // Seed all update steps as already-run on a fresh install so a subsequent 'update'
         // only executes steps introduced after this version. Same logic as Module.cls:%Activate.
@@ -952,8 +957,15 @@ Method IsInstallContext() As %Boolean [ Private ]
 /// and the target routines DB is not mirrored.
 /// Throws on any failure. Does not modify any state.
 /// packageDir: extracted package directory containing IRIS.DAT and module.xml.
-Method ValidateBeforeSwap(packageDir As %String) [ Private ]
+/// params: install parameters, read for PreviousDependencies.
+/// staleModules (output): installed modules carried by the previous version of this package but
+/// absent from the incoming one. Their metadata is removed after the swap succeeds.
+Method ValidateBeforeSwap(
+	packageDir As %String,
+	ByRef params,
+	Output staleModules As %List) [ Private ]
 {
+    set staleModules = ""
     set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
     if '##class(%Library.File).Exists(irisDAT) {
         set msg = "Database package is missing IRIS.DAT in: " _ packageDir
@@ -1005,7 +1017,7 @@ Method ValidateBeforeSwap(packageDir As %String) [ Private ]
         $$$ThrowStatus($$$ERROR($$$GeneralError, "A database package ('" _ conflictRS.%Get("Name") _ "') is already installed in this namespace. Only one database package per namespace is allowed."))
     }
 
-    do ..ValidateNoOrphanedModules(depsDir)
+    do ..ValidateNoOrphanedModules(depsDir, $get(params("PreviousDependencies")), .staleModules)
 
     // Validate IPM is not in the target namespace's routines DB
     do ..ValidateIPMNotInRoutinesDB()
@@ -1019,9 +1031,29 @@ Method ValidateBeforeSwap(packageDir As %String) [ Private ]
 ///
 /// Modules packaged inside this database package, modules whose code is mapped in from another database,
 /// and modules with only non-code resources are exempt since the swap does not affect them.
-Method ValidateNoOrphanedModules(depsDir As %String) [ Private ]
+///
+/// A module the previous version of this package carried but the incoming one drops is also exempt:
+/// its code came from the outgoing IRIS.DAT rather than from the user, so the swap does not destroy
+/// anything the user installed. Such modules are returned in staleModules so the caller can remove
+/// their now-meaningless metadata once the swap has succeeded.
+/// depsDir: the incoming package's deps/ directory.
+/// previousDeps: flattened dependency names of the installed version, captured before its manifest
+/// was overwritten. Empty on a fresh install.
+/// staleModules (output): previously-carried modules absent from the incoming package.
+Method ValidateNoOrphanedModules(
+	depsDir As %String,
+	previousDeps As %List = "",
+	Output staleModules As %List) [ Private ]
 {
+    set staleModules = ""
     set packagedNames = ..GetPackagedDependencyNames(depsDir)
+
+    // Module names are stored as declared, so normalize the captured set for comparison.
+    set previousNames = ""
+    set ptr = 0
+    while $listnext(previousDeps, ptr, prevName) {
+        set previousNames = previousNames _ $listbuild($zconvert(prevName, "L"))
+    }
 
     set rs = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT Name FROM %IPM_Storage.ModuleItem WHERE Name != ?",
@@ -1034,6 +1066,12 @@ Method ValidateNoOrphanedModules(depsDir As %String) [ Private ]
     while rs.%Next() {
         set moduleName = rs.%Get("Name")
         if $listfind(packagedNames, $zconvert(moduleName, "L")) {
+            continue
+        }
+        // Carried by the outgoing version but not the incoming one: the swap replaces its code
+        // rather than orphaning it, so the record is stale and must be removed, not protected.
+        if $listfind(previousNames, $zconvert(moduleName, "L")) {
+            set staleModules = staleModules _ $listbuild(moduleName)
             continue
         }
         set installedModule = ##class(%IPM.Storage.Module).NameOpen(moduleName, , .sc)
@@ -1052,6 +1090,30 @@ Method ValidateNoOrphanedModules(depsDir As %String) [ Private ]
     set msg = msg _ ": " _ $listtostring(orphaned, ", ")
     set msg = msg _ ". Uninstall " _ $select(plural: "them", 1: "it") _ " first, or run 'uninstall -all -force' to clear the namespace."
     $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+}
+
+/// Deletes the IPM records of modules the previous version of this package carried but the
+/// incoming one does not. Their code left with the outgoing IRIS.DAT, so the records describe
+/// nothing and would otherwise show up in 'list' forever.
+///
+/// Deletes the record directly rather than going through Uninstall: the Clean phase deletes
+/// documents by resource name, which after the swap would delete same-named classes belonging
+/// to the newly installed package. There is also nothing left to clean — the code is already gone.
+/// staleModules: module names to remove.
+/// verbose: report each removal.
+ClassMethod RemoveStaleModuleMetadata(
+	staleModules As %List = "",
+	verbose As %Boolean = 0)
+{
+    set ptr = 0
+    while $listnext(staleModules, ptr, moduleName) {
+        continue:moduleName=""
+        if '##class(%IPM.Storage.Module).NameExists(moduleName, .moduleId) {
+            continue
+        }
+        $$$ThrowOnError(##class(%IPM.Storage.Module).%DeleteId(moduleId))
+        write:verbose !, "Removed stale metadata for dependency no longer in this package: ", moduleName
+    }
 }
 
 /// Returns the lowercased module names whose metadata this package carries in deps/,
