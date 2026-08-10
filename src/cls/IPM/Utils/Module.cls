@@ -279,9 +279,6 @@ ClassMethod LoadModuleFromDirectory(
 {
     set tSC = $$$OK
     try {
-        if $get(pParams("FromLockFile"), 0) && '$get(pParams("LockFileInstallStarted"), 0) {
-            do ##class(%IPM.General.LockFile).InstallFromLockFile(pDirectory, .pParams)
-        }
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         write:tVerbose !,"Loading from ",pDirectory,!
@@ -360,7 +357,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-///
+/// 
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -1009,7 +1006,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-///
+/// 
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1287,9 +1284,13 @@ ClassMethod LoadNewModule(
             set params("LockFileModule") = tModule.Name
         }
 
-        // If installing from a lock file, don't need to load dependencies since dependencies will be installed in order anyways
-        if ('$get(params("FromLockFile"), 0)) {
+        // If no "FromLockFile" param, load dependencies as normal
+        // If "FromLockFile" set to 1, then install dependencies from this module's lock file
+        //                             this sets "FromLockFile" to 0 so dependency modules don't try installing their lock files (just the base module)
+        if ('$data(params("FromLockFile"))) {
             do ..LoadDependencies(tModule,,.params)
+        } elseif $get(params("FromLockFile"), 0) {
+            do ##class(%IPM.General.LockFile).InstallDependenciesFromLockFile(pDirectory, .params)
         }
 
 

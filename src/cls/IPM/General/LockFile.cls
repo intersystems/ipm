@@ -116,7 +116,7 @@ ClassMethod GetRepo(repoName As %String) As %IPM.Repo.Definition [ Internal ]
     }
 }
 
-ClassMethod InstallFromLockFile(
+ClassMethod InstallDependenciesFromLockFile(
 	directory As %String,
 	ByRef params)
 {
@@ -133,18 +133,23 @@ ClassMethod InstallFromLockFile(
     set dependencies = lockFileJSON.%Get("dependencies", {})
 
     // Install repositories (if they don't already exist)
+    do ##class(%IPM.Repo.Definition).CollectServerTypes(.types)
     set repoIter = repositories.%GetIterator()
     while repoIter.%GetNext(.repoName, .repoVals) {
+        kill modifiers
         if ##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(repoName) {
             if (verbose) {
-                write !, "Repo: "_repoName_" already exists, skipping creating new one from lock file"
+                write !, "Repo: " _ repoName _ " already exists, skipping creating new one from lock file"
             }
             continue
         } elseif (verbose) {
-            write !, "Creating repo: "_repoName_" from lock file"
+            write !, "Creating repo: " _ repoName _ " from lock file"
         }
-        do ##class(%IPM.Repo.Definition).CollectServerTypes(.types)
-        set repoClass = types(repoVals.type)
+        try {
+            set repoClass = types(repoVals.type)
+        } catch {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Repo type ""%1"" not a valid value", repoVals.type)))
+        }
         set repoVals.name = repoName
         do $classmethod(repoClass, "LockFileValuesToModifiers", repoVals, .modifiers)
         $$$ThrowOnError($classmethod(repoClass,"Configure",0,.modifiers,.tData,repoClass))
@@ -163,10 +168,9 @@ ClassMethod InstallFromLockFile(
         // Call Install() on dependency modules but set flag "LockFileInstallStarted" so we don't try installing from the dependency module's lock file
         set commandInfo = "install"
         set commandInfo("data", "Verbose") = verbose
-        set commandInfo("parameters","module") = repository_"/"_depName
+        set commandInfo("parameters","module") = repository _ "/" _ depName
         set commandInfo("parameters", "version") = version
-        set commandInfo("data", "LockFileInstallStarted") = 1
-        set commandInfo("data","FromLockFile") = 1
+        set commandInfo("data","FromLockFile") = 0
 
         do ##class(%IPM.Main).Install(.commandInfo)
     }

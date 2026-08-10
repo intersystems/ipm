@@ -165,7 +165,8 @@ Method Test05AllRepositoryTypes()
         // Now that modules have been published to their respective repositories, run the test
         do ..AssertInstallCreatesLockFileAsExpected(..#ModuleG)
 
-        // Remove all repositories except lock-file-edge (where Module G comes from) to confirm all types get created correctly when installing from lock file
+        // Uninstall all modules and remove all repositories except lock-file-edge (where Module G comes from) to confirm all types get created correctly when installing from lock file
+        do ##class(%IPM.Main).Shell("uninstall -all")
         do ##class(%IPM.Main).Shell("repo -delete -name lock-file-base")
         do ##class(%IPM.Main).Shell("repo -delete -name "_remoteRepo)
         do ##class(%IPM.Main).Shell("repo -delete -name "_orasRepo)
@@ -178,7 +179,7 @@ Method Test05AllRepositoryTypes()
         do ##class(%IPM.Main).Shell("repo -delete -name "_orasRepo)
         do $$$AssertStatusOK(sc, "Removed "_orasRepo_" at the end of the test")
     } catch e {
-        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test05ModuleDependenciesAllRepositoryTypes.")
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test05AllRepositoryTypes.")
     }
 }
 
@@ -319,7 +320,7 @@ Method Test10LoadFromLockfile()
         do $$$AssertStatusOK(sc, "Successfully packaged " _ moduleName)
 
         set sc = ##class(%IPM.Main).Shell("uninstall -r " _ moduleName)
-        do $$$AssertStatusOK(sc, "Successfully packaged " _ moduleName _ " and dependencies prior to load")
+        do $$$AssertStatusOK(sc, "Successfully uninstalled " _ moduleName _ " and dependencies prior to load")
 
         set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-base")
         do $$$AssertStatusOK(sc, "Successfully removed repo lock-file-base prior to load")
@@ -328,6 +329,14 @@ Method Test10LoadFromLockfile()
 
         set sc = ##class(%IPM.Main).Shell("load -from-lockfile " _ packagePath _ ".tgz")
         do $$$AssertStatusOK(sc, "Successfully loaded packaged module from its lock file")
+        set sc = $$$OK
+        try {
+            do $classmethod("LockModK.Class1", "MethodA")
+
+        } catch e {
+            set sc = e.AsStatus()
+        }
+        do $$$AssertStatusOK(sc, "Called MethodA() to confirm " _ moduleName _ " and dependency classes loaded correctly")
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in Test10LoadFromLockfile.")
     }
@@ -345,7 +354,6 @@ Method Test11MultipleDependencyVersions()
         // First install without a lock file and confirm that the latest version of module H was chosen
         set sc = ##class(%IPM.Main).Shell("install " _ moduleName)
         do $$$AssertStatusOK(sc, "Successfully installed " _ moduleName _ " and dependencies using ""install""")
-        zpm "list-installed"
 
         // Confirm module H v2.1.0 was installed
         set modH = ##class(%IPM.Storage.Module).NameOpen(..#ModuleH)
@@ -357,7 +365,6 @@ Method Test11MultipleDependencyVersions()
         // Now install using module M's lock file
         set sc = ##class(%IPM.Main).Shell("install -from-lockfile " _ moduleName)
         do $$$AssertStatusOK(sc, "Successfully installed " _ moduleName _ " and dependencies using its lock file")
-        zpm "list-installed"
 
         // Confirm module H v2.0.0 was installed
         set modH = ##class(%IPM.Storage.Module).NameOpen(..#ModuleH)
@@ -381,8 +388,8 @@ Method ExecuteGenericLockFileTest(
     do ..AssertInstallCreatesLockFileAsExpected(moduleName)
 
     // Uninstall module to prepare to install from lock file
-    set sc = ##class(%IPM.Main).Shell("uninstall -r "_moduleName)
-    do $$$AssertStatusOK(sc, "Uninstalled "_moduleName)
+    set sc = ##class(%IPM.Main).Shell("uninstall -r " _ moduleName)
+    do $$$AssertStatusOK(sc, "Uninstalled " _ moduleName)
 
     // Install module from lock file
     do ..AssertInstallFromLockFileAsExpected(moduleName, className)
@@ -392,14 +399,14 @@ Method ExecuteGenericLockFileTest(
 Method AssertInstallCreatesLockFileAsExpected(moduleName As %String)
 {
     // Do an initial install of the module and create a lock file for it
-    set sc = ##class(%IPM.Main).Shell("install -create-lockfile "_moduleName)
-    do $$$AssertStatusOK(sc, "Able to install "_moduleName_" and create lock file for it")
+    set sc = ##class(%IPM.Main).Shell("install -create-lockfile " _ moduleName)
+    do $$$AssertStatusOK(sc, "Able to install " _ moduleName _ " and create lock file for it")
 
     // Compare the generated lock file with the expected one
     set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
     set lockFilePath = module.Root_..#LockFileName
-    set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir_moduleName_".json")
-    do $$$AssertTrue(areLockFilesEqual, "Lock file contents for "_moduleName_" match expected values")
+    set areLockFilesEqual = ..AreLockFilesEqual(lockFilePath, ..#ExpectedFilesDir _ moduleName _ ".json")
+    do $$$AssertTrue(areLockFilesEqual, "Lock file contents for " _ moduleName _ " match expected values")
 }
 
 /// Takes in the path to two lock files and compares their values
@@ -419,7 +426,7 @@ ClassMethod AreLockFilesEqual(
         return actualLockFileContents.%ToJSON() = expectedLockFileContents.%ToJSON()
     } catch (ex) {
         // Should error if we fail to open either the actual or expected file
-        return ex.AsStatus()
+        $$$ThrowOnError(ex.AsStatus())
     }
 }
 
@@ -436,13 +443,13 @@ Method AssertInstallFromLockFileAsExpected(
         if (className = "") {
             // Letter of the module is in the 10th place: "lock-mod-x-..."
             set packageLetter = $zconvert($extract(moduleName, 10), "u")
-            set className = "LockMod"_packageLetter_".Class1"
+            set className = "LockMod" _ packageLetter _ ".Class1"
         }
         do $classmethod(className, "MethodA")
     } catch (ex) {
         set sc = ex.AsStatus()
     }
-    do $$$AssertStatusOK(sc, "Called MethodA() to confirm "_moduleName_" and dependency classes loaded correctly")
+    do $$$AssertStatusOK(sc, "Called MethodA() to confirm " _ moduleName _ " and dependency classes loaded correctly")
 }
 
 }
