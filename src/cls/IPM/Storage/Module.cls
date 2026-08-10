@@ -1534,7 +1534,8 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
                 if (tDerived '= "") && $$$comClassDefined(tDerived) {
                     set ..LifecycleClass = tDerived
                 } else {
-                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
+                    // No lifecycle class claims this packaging value, so there is nothing to switch to.
+                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', which no lifecycle class implements. Lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
                     quit
                 }
             }
