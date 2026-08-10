@@ -513,23 +513,30 @@ Method OnItemRelativePath(pItemName As %String) As %String
 }
 
 /// Returns the directory this resource owns on disk, relative to module root (no trailing slash).
-/// For directory-style resources (Name starts with "/"), the Name IS the directory.
-/// For normal doc resources, it's {SourcesRoot}/{Directory}.
+/// Path-style resource names (starting with "/") are themselves the directory. Everything else
+/// resolves to {SourcesRoot}/{Directory}, or preload/{Directory} when preloaded: the preload tree
+/// is imported from {Root}/preload, a sibling of SourcesRoot rather than a directory beneath it.
+/// The path check is on the name, not LoadAsDirectory. Packages set that flag to load all their
+/// members, but a package name is not a path, so their directory still comes from Directory.
 Method GetSyncDirectory() As %String
 {
-    if ..LoadAsDirectory {
+    if $extract(..ResourceReference.Name) = "/" {
         set dir = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
         if $extract(dir, *) = "/" {
             set dir = $extract(dir, 1, *-1)
         }
     } else {
-        set sourcesRoot = ..ResourceReference.Module.SourcesRoot
         set dir = ..Directory
         if dir = "" {
             quit ""
         }
-        if sourcesRoot '= "" {
-            set dir = ##class(%IPM.Storage.FileHash).NormalizePath(sourcesRoot _ "/" _ dir)
+        if ..ResourceReference.Preload {
+            set prefix = "preload"
+        } else {
+            set prefix = ..ResourceReference.Module.SourcesRoot
+        }
+        if prefix '= "" {
+            set dir = ##class(%IPM.Storage.FileHash).NormalizePath(prefix _ "/" _ dir)
         } else {
             set dir = ##class(%IPM.Storage.FileHash).NormalizePath(dir)
         }

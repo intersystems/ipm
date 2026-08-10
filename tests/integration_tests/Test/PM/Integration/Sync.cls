@@ -190,7 +190,7 @@ Method TestUntrackedFileIgnored()
 
     do $$$AssertStatusOK(sc, "Sync ignores untracked files")
     do $$$AssertNotTrue(..FindInOutput(.output, "x.js"), "Untracked file not mentioned in sync output")
-    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).ModulePathIndexExists("sync-test", "node_modules/x.js"), "No FileHash row for untracked file")
+    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).ExistsByPath("sync-test", "node_modules/x.js"), "No FileHash row for untracked file")
 }
 
 /// A deleted file is left alone unless -delete is passed. With -delete, the corresponding
@@ -518,6 +518,126 @@ Method TestModuleXmlAndClassEditedTogether()
     do $$$AssertStatusOK(sc, "Sync after co-editing module.xml and a class succeeds")
     do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Sync reports changes (not 'Nothing to sync')")
     do $$$AssertTrue(..FindInOutput(.output, "SuperClass.cls"), "SuperClass.cls appears in sync output as updated")
+}
+
+/// A modified Preload resource is tracked, recompiled, and reported by sync.
+/// Preload files live under preload/ (a sibling of SourcesRoot, imported wholesale by the
+/// Initialize phase), so the sync directory a Preload resource declares must be prefixed with
+/// preload/ rather than rooted at SourcesRoot — otherwise the file is never walked and edits
+/// are silently dropped while sync reports "Nothing to sync".
+Method TestModifiedPreloadClassRecompiles()
+{
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).ExistsByPath("sync-test", "preload/cls/SyncBoot/Boot.cls"), "Preload file has a baseline row after load")
+    do $$$AssertEquals(##class(SyncBoot.Boot).GetValue(), "boot-original", "Preload class compiled at original value after load")
+
+    set filePath = ..TempDir _ "preload/cls/SyncBoot/Boot.cls"
+    do ..ReplaceInFile(filePath, """boot-original""", """boot-modified""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after preload class modification succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Reports sync complete (not 'Nothing to sync')")
+    do $$$AssertTrue(..FindInOutput(.output, "preload/cls/SyncBoot/Boot.cls"), "Preload file appears in sync output as updated")
+    do $$$AssertEquals(##class(SyncBoot.Boot).GetValue(), "boot-modified", "Preload class reflects the edited value after sync")
+}
+
+/// Syncing a changed Preload resource must warn that the bootstrap was not re-run. Preload files
+/// are imported and executed during the Initialize phase (installer classes, custom resource
+/// processors), so recompiling one does not re-run whatever bootstrapping it performs — the user
+/// needs to know a full reload may be required.
+Method TestPreloadChangeWarnsBootstrapNotRerun()
+{
+    set filePath = ..TempDir _ "preload/cls/SyncBoot/Boot.cls"
+    do ..ReplaceInFile(filePath, """boot-original""", """boot-warned""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after preload change succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "preload"), "Sync output mentions preload")
+    do $$$AssertTrue(..FindInOutput(.output, "Bootstrap"), "Warns that bootstrap was not re-run")
+}
+
+/// Editing a non-preload file must not produce the preload bootstrap warning — the warning is
+/// only meaningful when a preload file actually changed.
+Method TestNonPreloadChangeDoesNotWarn()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    do ..ReplaceInFile(filePath, """original""", """modified""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after non-preload change succeeds")
+    do $$$AssertNotTrue(..FindInOutput(.output, "Bootstrap"), "No bootstrap warning when no preload file changed")
+}
+
+/// A .PKG resource must contribute its own directory to the sync scan set. SyncPkg.PKG declares
+/// Directory="pkgcls", which no other resource in the fixture uses, so its members are only
+/// walked if GetSyncDirectory() resolves the package to {SourcesRoot}/{Directory}. A package that
+/// resolves to its own resource name instead yields a nonexistent directory, and its members are
+/// silently invisible to sync unless some sibling resource happens to declare the same directory.
+Method TestModifiedPackageMemberRecompiles()
+{
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).ExistsByPath("sync-test", "src/pkgcls/SyncPkg/Alone.cls"), "Package member has a baseline row after load")
+    do $$$AssertEquals(##class(SyncPkg.Alone).GetValue(), "pkg-original", "Package member compiled at original value after load")
+
+    set filePath = ..TempDir _ "src/pkgcls/SyncPkg/Alone.cls"
+    do ..ReplaceInFile(filePath, """pkg-original""", """pkg-modified""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after package member modification succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Reports sync complete (not 'Nothing to sync')")
+    do $$$AssertTrue(..FindInOutput(.output, "src/pkgcls/SyncPkg/Alone.cls"), "Package member appears in sync output as updated")
+    do $$$AssertEquals(##class(SyncPkg.Alone).GetValue(), "pkg-modified", "Package member reflects the edited value after sync")
+}
+
+/// A new class added to an existing .PKG resource's directory is picked up without a reload:
+/// the package owns the whole directory, so sync must load files that had no baseline row.
+Method TestNewPackageMemberIsPickedUp()
+{
+    set newDir = ..TempDir _ "src/pkgcls/SyncPkg/"
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(newDir _ "Added.cls"))
+    do stream.WriteLine("Class SyncPkg.Added")
+    do stream.WriteLine("{")
+    do stream.WriteLine("")
+    do stream.WriteLine("ClassMethod GetValue() As %String")
+    do stream.WriteLine("{")
+    do stream.WriteLine("    quit ""added""")
+    do stream.WriteLine("}")
+    do stream.WriteLine("")
+    do stream.WriteLine("}")
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after adding a package member succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "src/pkgcls/SyncPkg/Added.cls"), "New package member appears in sync output")
+    do $$$AssertTrue($$$comClassDefined("SyncPkg.Added"), "New package member compiled into the namespace")
+}
+
+/// Deleting a package member with -delete must remove the right server-side class. The fixture's
+/// package uses Directory="pkgcls", so the document name cannot be recovered from the path by
+/// prefix convention alone and has to come from the resource's own child resolution.
+Method TestDeletePackageMemberRemovesFromServer()
+{
+    do $$$AssertTrue($$$comClassDefined("SyncPkg.Alone"), "Package member exists before delete")
+    do ##class(%Library.File).Delete(..TempDir _ "src/pkgcls/SyncPkg/Alone.cls")
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -delete")
+    do $$$AssertStatusOK(sc, "Sync with -delete succeeds")
+    do $$$AssertNotTrue($$$comClassDefined("SyncPkg.Alone"), "Package member removed from server after -delete sync")
 }
 
 /// Returns the path to a fixture directory under _data/.

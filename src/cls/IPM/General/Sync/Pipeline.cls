@@ -99,7 +99,8 @@ ClassMethod Run(
             if moduleXmlChanged {
                 do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
             }
-            do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources)
+            // preloadResources is deliberately undefined: nothing was routed, so nothing to warn about.
+            do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources, .preloadResources)
             quit
         }
 
@@ -109,6 +110,7 @@ ClassMethod Run(
         if processDeletes {
             do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource)
         }
+        do ..SyncCollectPreloadResources(.syncByResource, .preloadResources)
 
         // Step 6: Dispatch OnSync to each processor; load unhandled compilable files
         if verbose {
@@ -157,7 +159,7 @@ ClassMethod Run(
         }
         do ##class(%IPM.General.Sync.Output).Log(moduleName, "Sync complete: "_modCount_" file(s) updated"_$select(delCount>0:", "_delCount_" deleted", 1:"")_".")
 
-        do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources)
+        do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources, .preloadResources)
 
         // File sync is committed and reported. Mark success before running tests so a fatal
         // test failure below is reported as a test failure, not a sync error, in the summary.
@@ -185,7 +187,8 @@ ClassMethod SyncCheckModuleXml(
     if '##class(%File).Exists(moduleXmlPath) {
         quit 0
     }
-    set existing = ##class(%IPM.Storage.FileHash).ModulePathIndexOpen(module.Name, moduleXmlRelPath)
+    set existing = ##class(%IPM.Storage.FileHash).OpenByPath(module.Name, moduleXmlRelPath, .openSC)
+    $$$ThrowOnError(openSC)
     if '$isobject(existing) {
         quit 0
     }
@@ -227,6 +230,11 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         kill childArr
         set childSC = resource.ResolveChildren(.childArr)
         if $$$ISERR(childSC) {
+            // Non-fatal: other resources can still sync. Warn rather than failing silently,
+            // since this resource's files end up untracked and its edits are dropped.
+            set errText = $system.Status.GetOneErrorText(childSC)
+            write !, "Warning: could not resolve contents of resource ", resource.Name, ": ", errText
+            do ##class(%IPM.General.Sync.Summary).AddWarning(module.Name, "Could not resolve contents of resource " _ resource.Name _ "; its files are not tracked by this sync: " _ errText)
             continue
         }
 
@@ -249,6 +257,10 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
                 set reverseIndex(normalizedRelPath) = resource.Name
                 set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
                 set reverseIndex(normalizedRelPath, "Resource") = resource
+                // Authoritative document name for this path. RelPathToDocName can only guess it
+                // from conventional prefix directories, so it is wrong for any resource with a
+                // custom Directory; SyncApplyDeletes prefers this value when present.
+                set reverseIndex(normalizedRelPath, "DocName") = childName
             }
         }
 
@@ -295,6 +307,27 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         set reverseIndex(relPath) = docToResource(docName)
         set reverseIndex(relPath, "Processor") = docToResource(docName, "Processor")
         set reverseIndex(relPath, "Resource") = docToResource(docName, "Resource")
+        set reverseIndex(relPath, "DocName") = docName
+    }
+}
+
+/// Collect the names of preloaded resources among a routed change set, so the caller can warn
+/// that syncing them recompiled the code without re-running the bootstrap it participates in.
+ClassMethod SyncCollectPreloadResources(
+    ByRef syncByResource,
+    Output preloadResources) [ Private ]
+{
+    kill preloadResources
+    set resName = ""
+    for {
+        set resName = $order(syncByResource(resName))
+        quit:resName=""
+        if '$data(syncByResource(resName, "Resource"), resource) {
+            continue
+        }
+        if $isobject(resource) && resource.Preload {
+            set preloadResources(resName) = ""
+        }
     }
 }
 
@@ -403,7 +436,10 @@ ClassMethod SyncApplyDeletes(
         if 'processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
             continue
         }
-        set docName = ##class(%IPM.Storage.FileHash).RelPathToDocName(relPath)
+        set docName = $get(reverseIndex(relPath, "DocName"))
+        if docName = "" {
+            set docName = ##class(%IPM.Storage.FileHash).RelPathToDocName(relPath)
+        }
         if docName '= "" {
             set delFlags = $select(verbose:"d", 1:"-d")
             set delSC = $system.OBJ.Delete(docName, delFlags)
@@ -526,6 +562,11 @@ ClassMethod SyncCompile(module As %IPM.Storage.Module, orderedResourceList As %L
             set oneResourceList(resource.Name) = ""
             set resSC = resource.ResolveChildren(.oneResourceList)
             if $$$ISERR(resSC) {
+                // Non-fatal: the rest of the module still compiles. Warn, since this resource's
+                // classes are left out of the compile set and may stay stale.
+                set errText = $system.Status.GetOneErrorText(resSC)
+                write !, "Warning: could not resolve contents of resource ", resource.Name, " for compilation: ", errText
+                do ##class(%IPM.General.Sync.Summary).AddWarning(module.Name, "Could not resolve contents of resource " _ resource.Name _ " for compilation; it was not recompiled: " _ errText)
                 continue
             }
 

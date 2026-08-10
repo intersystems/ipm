@@ -1,4 +1,4 @@
-Include (%IPM.Common, %occReference)
+Include (%IPM.Common, %occErrors, %occReference)
 
 Class %IPM.Storage.FileHash Extends %Persistent
 {
@@ -6,17 +6,63 @@ Class %IPM.Storage.FileHash Extends %Persistent
 Property ModuleName As %String(MAXLEN = 255) [ Required ];
 
 /// Path relative to the module root, normalized: forward slashes, no leading slash, no double slashes.
-/// Used as the lookup key in ModulePathIndex — callers must normalize via NormalizePath before querying.
-Property RelativePath As %String(MAXLEN = 512) [ Required ];
+/// Callers must normalize via NormalizePath before storing or looking up.
+Property RelativePath As %String(MAXLEN = "") [ Required ];
+
+/// SHA-1 of RelativePath (hex), maintained by RelativePathSet. Subscripting ModulePathIndex on
+/// this fixed-width value instead of the path itself keeps the index reference well inside the
+/// global subscript limit, which a long path plus a long module name can otherwise exceed.
+/// Hashing also makes the index case-sensitive, which the default SQLUPPER collation is not:
+/// paths differing only in case are distinct files on Linux and must not collide.
+Property PathHash As %String(MAXLEN = 40) [ Required ];
 
 /// SHA-1 content hash (hex).
 Property Hash As %String(MAXLEN = 64) [ Required ];
 
-Index ModulePathIndex On (ModuleName, RelativePath) [ Unique ];
+Index ModulePathIndex On (ModuleName, PathHash) [ Unique ];
 
 Index ModuleNameIndex On ModuleName;
 
 ForeignKey ModuleNameFK(ModuleName) References %IPM.Storage.Module(Name) [ OnDelete = cascade ];
+
+/// Keep PathHash in sync with the path so callers never set it themselves.
+Method RelativePathSet(value As %String) As %Status
+{
+    set i%RelativePath = value
+    set i%PathHash = ..HashPath(value)
+    quit $$$OK
+}
+
+/// SHA-1 of a relative path as 40 hex characters, for use as the ModulePathIndex subscript.
+/// Case-sensitive: the caller-supplied path is hashed verbatim.
+ClassMethod HashPath(relPath As %String) As %String
+{
+    quit ##class(%xsd.hexBinary).LogicalToXSD($system.Encryption.SHA1Hash(relPath))
+}
+
+/// Open the row for a module/path pair, hashing the path into the index subscript.
+/// Wraps ModulePathIndexOpen so callers keep passing relative paths.
+/// Returns "" with sc = $$$OK when no row exists yet: an unstamped file is the normal case for
+/// every caller, so only a genuine failure (e.g. a concurrency conflict) comes back as an error.
+ClassMethod OpenByPath(
+    moduleName As %String,
+    relPath As %String,
+    Output sc As %Status) As %IPM.Storage.FileHash
+{
+    set instance = ..ModulePathIndexOpen(moduleName, ..HashPath(relPath), , .sc)
+    if $$$ISERR(sc) && $system.Status.Equals(sc, $$$ERRORCODE($$$KeyValueNotFoundOpen)) {
+        set sc = $$$OK
+    }
+    quit instance
+}
+
+/// Returns 1 if a row exists for this module/path pair.
+ClassMethod ExistsByPath(
+    moduleName As %String,
+    relPath As %String) As %Boolean
+{
+    quit ..ModulePathIndexExists(moduleName, ..HashPath(relPath))
+}
 
 /// Collect the deduplicated set of directories sync should walk for a module.
 /// Each sync-supporting resource processor declares its owned directory via GetSyncDirectory();
@@ -101,7 +147,10 @@ ClassMethod StampOneFileWithHash(moduleName As %String, relPath As %String, hash
     if hash = "" {
         quit $$$ERROR($$$GeneralError, "Empty hash for: " _ relPath)
     }
-    set existing = ..ModulePathIndexOpen(moduleName, relPath, , .openSC)
+    set existing = ..OpenByPath(moduleName, relPath, .openSC)
+    if $$$ISERR(openSC) {
+        quit openSC
+    }
     if $isobject(existing) {
         set instance = existing
     } else {
@@ -119,6 +168,7 @@ ClassMethod StampOneFileWithHash(moduleName As %String, relPath As %String, hash
 ///   "src/cls/Foo/Bar.cls"  -> "Foo.Bar.CLS"
 ///   "src/SyncFlat/Flat.cls" -> "SyncFlat.Flat.CLS"
 ///   "src/inc/MyInc.inc"   -> "MyInc.INC"
+///   "preload/cls/Foo/Bar.cls" -> "Foo.Bar.CLS"
 ClassMethod RelPathToDocName(relPath As %String) As %String
 {
     set parts = $length(relPath, "/")
@@ -131,7 +181,7 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
     set startSeg = 1
     for i = 1:1:parts {
         set seg = $piece(relPath, "/", i)
-        if ",src,cls,inc,mac,int," [ (","_$$$lcase(seg)_",") {
+        if ",src,preload,cls,inc,mac,int," [ (","_$$$lcase(seg)_",") {
             set startSeg = i + 1
         } else {
             quit
@@ -240,8 +290,10 @@ ClassMethod CompareOneFile(moduleName As %String, relPath As %String, newHash As
         set modified(relPath) = ""
         quit
     }
-    set existing = ..ModulePathIndexOpen(moduleName, relPath, , .openSC)
-    if '$isobject(existing) {
+    // An open failure is reported as modified rather than skipped: re-syncing a file that was
+    // already current is harmless, whereas skipping it would silently drop a real edit.
+    set existing = ..OpenByPath(moduleName, relPath, .openSC)
+    if $$$ISERR(openSC) || '$isobject(existing) {
         set modified(relPath) = newHash
         quit
     }
@@ -260,7 +312,8 @@ ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef d
             set relPath = $order(modified(relPath), 1, newHash)
             quit:relPath=""
 
-            set existing = ..ModulePathIndexOpen(module.Name, relPath, , .openSC)
+            set existing = ..OpenByPath(module.Name, relPath, .openSC)
+            $$$ThrowOnError(openSC)
             if $isobject(existing) {
                 set instance = existing
             } else {
@@ -279,7 +332,8 @@ ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef d
                 set relPath = $order(deleted(relPath))
                 quit:relPath=""
 
-                set existing = ..ModulePathIndexOpen(module.Name, relPath, , .openSC)
+                set existing = ..OpenByPath(module.Name, relPath, .openSC)
+                $$$ThrowOnError(openSC)
                 if $isobject(existing) {
                     $$$ThrowOnError(existing.%DeleteId(existing.%Id()))
                 }
@@ -529,6 +583,9 @@ Storage Default
 </Value>
 <Value name="4">
 <Value>Hash</Value>
+</Value>
+<Value name="5">
+<Value>PathHash</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.FileHashD</DataLocation>

@@ -11,6 +11,10 @@
       <Resource Name="SyncTest.XmlClass.CLS" Format="XML" />
       <Resource Name="SyncTest.PKG" />
       <Resource Name="SyncTest.INC" />
+      <!-- Directory="pkgcls" keeps this package's only directory out of src/cls, so no other
+           resource incidentally contributes it to the sync scan set. -->
+      <Resource Name="SyncPkg.PKG" Directory="pkgcls" />
+      <Resource Name="SyncBoot.Boot.CLS" Preload="true" />
       <UnitTest Name="/tests/unit/" Package="SyncTest.Tests" Phase="test" />
       <UnitTest Name="/tests/unit2/" Package="SyncTest2.Tests" Phase="test" />
       <FileCopy Name="/static/" Target="${mgrDir}/../sync-test-static/" />
