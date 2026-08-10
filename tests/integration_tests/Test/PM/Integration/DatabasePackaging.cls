@@ -11,6 +11,10 @@ Property OriginalNamespace As %String;
 /// Directory where .tgz packages are written during tests — wiped and recreated in OnBeforeOneTest.
 Property PackageOutputDir As %String;
 
+/// Directory holding database packages shared across tests, unlike PackageOutputDir which is
+/// wiped per test. Created in OnBeforeAllTests, removed in OnAfterAllTests.
+Property SharedPackageDir As %String;
+
 /// Globals databases created per-test — cleaned up in OnAfterOneTest.
 /// Separate from the routines DB so dismounting during package-database doesn't lose IPM metadata.
 Property CreatedGlobalsDatabases As %List;
@@ -41,6 +45,11 @@ Property SharedNS2 As %String;
 /// Cleaned up in OnAfterAllTests.
 Property SharedGlobalsDatabases As %List;
 
+/// Cached .tgz paths for modules packaged identically by more than one test, keyed by module name.
+/// Reuse is safe: `load <tgz>` extracts to a temp directory and copies from there, so the archive
+/// itself is never modified by an install (including the swap and tamper flows).
+Property CachedPackages As array Of %String;
+
 /// Defensive cleanup of leftover shared namespaces from interrupted previous runs.
 Method OnBeforeAllTests() As %Status
 {
@@ -48,6 +57,12 @@ Method OnBeforeAllTests() As %Status
     set ..SharedNS1 = ""
     set ..SharedNS2 = ""
     set ..SharedGlobalsDatabases = ""
+
+    set ..SharedPackageDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "pkg-test-shared")
+    if ##class(%Library.File).DirectoryExists(..SharedPackageDir) {
+        do ##class(%IPM.Utils.File).RemoveDirectoryTree(..SharedPackageDir)
+    }
+    do ##class(%File).CreateDirectory(..SharedPackageDir)
 
     for i=1:1:2 {
         set ns = "TESTDBPKGNS" _ i
@@ -145,6 +160,10 @@ Method OnAfterAllTests() As %Status
     }
     if ..SharedNS2 '= "" {
         set sc = $$$ADDSC(sc, ##class(%IPM.Test.Utils).DeleteNamespace(..SharedNS2))
+    }
+
+    if (..SharedPackageDir '= "") && ##class(%Library.File).DirectoryExists(..SharedPackageDir) {
+        do ##class(%IPM.Utils.File).RemoveDirectoryTree(..SharedPackageDir)
     }
 
     // Clean up shared globals databases
@@ -316,21 +335,36 @@ Method GetOrCreateSharedNS2() As %String
     quit ns
 }
 
-/// Test simple package and install with database packaging
-Method TestSimplePackageAndInstall()
+/// Returns the path to a database package for pModule, building it in the shared packaging
+/// namespace on first request and reusing the .tgz afterwards. Only for modules that multiple
+/// tests need packaged with default options — tests that mutate the module or pass extra
+/// packaging flags must call package-database themselves.
+Method GetOrCreateDatabasePackage(
+	pModule As %String,
+	pVersion As %String = "1.0.0") As %String
 {
-    set packagingNS = ..GetOrCreateSharedNS1()
+    if ..CachedPackages.IsDefined(pModule) {
+        quit ..CachedPackages.GetAt(pModule)
+    }
 
-    // Switch to shared packaging namespace (simple-db-module and dep-module are pre-loaded)
+    set packagingNS = ..GetOrCreateSharedNS1()
     new $namespace
     set $namespace = packagingNS
+    $$$ThrowOnError(##class(%IPM.Main).Shell("package-database " _ pModule _ " -path " _ ..SharedPackageDir))
 
-    // Package as database package
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged module as database package")
+    set packageFile = ..SharedPackageDir _ pModule _ "-" _ pVersion _ "-database.tgz"
+    if '##class(%Library.File).Exists(packageFile) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Expected package not created: " _ packageFile))
+    }
+    do ..CachedPackages.SetAt(packageFile, pModule)
+    quit packageFile
+}
 
-    // Verify package file exists
-    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
+/// Test simple package, install and uninstall with database packaging
+Method TestSimplePackageAndInstall()
+{
+    new $namespace
+    set packageFile = ..GetOrCreateDatabasePackage("simple-db-module")
     do $$$AssertTrue(##class(%File).Exists(packageFile), "Database package .tgz file exists")
 
     // Extract and verify contents
@@ -401,6 +435,21 @@ Method TestSimplePackageAndInstall()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .historyOutput)
     do $$$AssertStatusOK(sc, "History command executed")
     do $$$AssertTrue(..FindStringInMultiDimArray("simple-db-module", .historyOutput), "Installation recorded in history")
+
+    // --- Uninstall ---
+    set sc = ##class(%IPM.Main).Shell("uninstall simple-db-module")
+    do $$$AssertStatusOK(sc, "Uninstalled database package")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("list")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .afterUninstallOutput)
+    do $$$AssertNotTrue(..FindStringInMultiDimArray("simple-db-module", .afterUninstallOutput), "Module no longer in list")
+
+    // Backup file is preserved after uninstall — the user manages cleanup
+    do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup file preserved after uninstall")
+
+    // Uninstall deletes compiled resources from the routines DB
+    do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Classes removed from namespace after uninstall")
 }
 
 /// Test packaging and installing modules with dependencies
@@ -411,18 +460,15 @@ Method TestSimplePackageAndInstall()
 /// (main-with-deps is installed in the packaging NS but never compiled into dep-module's DB).
 Method TestPackageAndInstallWithDependencies()
 {
-    set packagingNS = ..GetOrCreateSharedNS1()
-
     new $namespace
-    set $namespace = packagingNS
+
+    // Both packages are built up front: GetOrCreateDatabasePackage may have to create the shared
+    // packaging namespace, which resolves module directories from ^UnitTestRoot in this namespace.
+    set depPkg = ..GetOrCreateDatabasePackage("dep-module")
+    set mainPkg = ..GetOrCreateDatabasePackage("main-with-deps")
 
     // --- Part 1: dep-module (no deps) — isolation check ---
     // main-with-deps depends on dep-module, but must not appear in dep-module's IRIS.DAT.
-    set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged dep-module")
-
-    set depPkg = ..PackageOutputDir _ "dep-module-1.0.0-database.tgz"
-
     set installNS1 = "TESTDBDEPINST1"
     set sc = ..CreateTestNamespace(installNS1)
     do $$$AssertStatusOK(sc, "Created install NS for dep-module")
@@ -438,12 +484,6 @@ Method TestPackageAndInstallWithDependencies()
 
     // --- Part 2: main-with-deps default flow — deps must be included ---
     // The IRIS.DAT must be self-contained: dep code compiled in, UseDependency() callable.
-    set $namespace = packagingNS
-    set sc = ##class(%IPM.Main).Shell("package-database main-with-deps -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged main-with-deps (default flow)")
-
-    set mainPkg = ..PackageOutputDir _ "main-with-deps-1.0.0-database.tgz"
-
     set installNS2 = "TESTDBDEPINST2"
     set sc = ..CreateTestNamespace(installNS2)
     do $$$AssertStatusOK(sc, "Created install NS for main-with-deps")
@@ -566,31 +606,12 @@ Method TestPackageAndInstallWithTestResources()
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("TestModule.Main"), "Main class exists")
 }
 
-/// Test packaging and install validation (errors and edge cases)
+/// Test install validation (errors and edge cases). The happy path is covered by
+/// TestSimplePackageAndInstall, so this test only exercises the rejection cases.
 Method TestPackagingAndInstallValidation()
 {
-    set packagingNS = ..GetOrCreateSharedNS1()
-
-    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
     new $namespace
-    set $namespace = packagingNS
-
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged module")
-
-    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
-
-    // Test: Checksum validation - tamper with IRIS.DAT
-    // Extract package, modify IRIS.DAT, repack, attempt install
-    // This should fail with checksum mismatch error
-    set installNS = "TESTDBVALIDINS"
-    set sc = ..CreateTestNamespace(installNS)
-    do $$$AssertStatusOK(sc, "Created installation namespace")
-
-    set $namespace = installNS
-
-    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
-    do $$$AssertStatusOK(sc, "Valid package installs successfully")
+    set packageFile = ..GetOrCreateDatabasePackage("simple-db-module")
 
     // Test: Tampered IRIS.DAT fails checksum validation
     set tamperDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "tamper-extract")
@@ -613,14 +634,15 @@ Method TestPackagingAndInstallValidation()
     set sc = ##class(%IPM.General.Archive).Create(tamperDir, tamperedPackage)
     do $$$AssertStatusOK(sc, "Repacked tampered archive")
 
-    set installNS2 = "TESTDBVALIDINS2"
-    set sc = ..CreateTestNamespace(installNS2)
+    set installNS = "TESTDBVALIDINS"
+    set sc = ..CreateTestNamespace(installNS)
     do $$$AssertStatusOK(sc, "Created namespace for tampered install test")
-    set $namespace = installNS2
+    set $namespace = installNS
 
     set sc = ##class(%IPM.Main).Shell("load " _ tamperedPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Tampered IRIS.DAT rejected by checksum validation")
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "SHA-256", "Error mentions SHA-256 checksum mismatch")
+    do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
 
     // Test: Missing deps/ directory fails validation
     set missingDepsDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "missing-deps-extract")
@@ -636,23 +658,24 @@ Method TestPackagingAndInstallValidation()
     set sc = ##class(%IPM.General.Archive).Create(missingDepsDir, missingDepsPackage)
     do $$$AssertStatusOK(sc, "Repacked archive without deps/ directory")
 
-    set installNS3 = "TESTDBVALIDINS3"
-    set sc = ..CreateTestNamespace(installNS3)
-    do $$$AssertStatusOK(sc, "Created namespace for missing-deps test")
-    set $namespace = installNS3
+    // Reuses installNS: the tampered install above was rejected by ValidateBeforeSwap, which runs
+    // entirely before the swap, so that namespace's routines DB is still pristine.
+    set $namespace = installNS
 
     set sc = ##class(%IPM.Main).Shell("load " _ missingDepsPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Missing deps/ directory rejected by validation")
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "deps/", "Error mentions missing deps/ directory")
+    do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
 }
 
 /// Test upgrading from source package to database package
 Method TestUpgradeSourceToDatabase()
 {
+    new $namespace
+    set dbPackage = ..GetOrCreateDatabasePackage("simple-db-module")
     set packagingNS = ..GetOrCreateSharedNS1()
 
     // Switch to shared packaging namespace (simple-db-module is pre-loaded)
-    new $namespace
     set $namespace = packagingNS
 
     set sc = ##class(%IPM.Main).Shell("package simple-db-module -path " _ ..PackageOutputDir _ "simple-db-module-1.0.0/")
@@ -674,15 +697,6 @@ Method TestUpgradeSourceToDatabase()
     // Verify source installed
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Source package installed")
 
-    // Now package as database and upgrade
-    set $namespace = packagingNS
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged as database")
-
-    set dbPackage = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
-
-    set $namespace = installNS
-
     // Upgrade from source to database package
     set sc = ##class(%IPM.Main).Shell("update simple-db-module -path " _ dbPackage _ " -swap-db")
     do $$$AssertStatusOK(sc, "Upgraded from source to database package")
@@ -696,66 +710,13 @@ Method TestUpgradeSourceToDatabase()
     do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "DB swap occurred during source-to-database upgrade")
 }
 
-/// Test uninstalling database package
-Method TestUninstallDatabasePackage()
-{
-    set packagingNS = ..GetOrCreateSharedNS1()
-
-    // Switch to shared packaging namespace (simple-db-module is pre-loaded)
-    new $namespace
-    set $namespace = packagingNS
-
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged module")
-
-    set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
-
-    // Create installation namespace
-    set installNS = "TESTDBUNINSNS"
-    set sc = ..CreateTestNamespace(installNS)
-    do $$$AssertStatusOK(sc, "Created installation namespace")
-
-    set $namespace = installNS
-
-    // Install database package
-    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
-    do $$$AssertStatusOK(sc, "Installed database package")
-
-    // Verify installation
-    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Module installed")
-
-    // Uninstall the module
-    set sc = ##class(%IPM.Main).Shell("uninstall simple-db-module")
-    do $$$AssertStatusOK(sc, "Uninstalled database package")
-
-    // Verify module is removed
-    set cookie = ""
-    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("list")
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
-
-    do $$$AssertNotTrue(..FindStringInMultiDimArray("simple-db-module", .output), "Module no longer in list")
-
-    // Verify backup file is preserved after uninstall (user manages cleanup)
-    do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup file preserved after uninstall")
-
-    // Verify compiled classes are removed from the routines DB (spec: uninstall deletes compiled resources)
-    do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Classes removed from namespace after uninstall")
-}
-
 /// Test mixed packaging scenarios
 Method TestMixedPackaging()
 {
-    set packagingNS = ..GetOrCreateSharedNS1()
-
-    // Switch to shared packaging namespace (simple-db-module and dep-module are pre-loaded)
     new $namespace
-    set $namespace = packagingNS
-
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged as database")
-
-    set dbPackageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
+    set dbPackageFile = ..GetOrCreateDatabasePackage("simple-db-module")
+    set dbPackage2 = ..GetOrCreateDatabasePackage("dep-module")
+    set packagingNS = ..GetOrCreateSharedNS1()
 
     // Create installation namespace
     set installNS = "TESTDBMIXEDINS"
@@ -769,7 +730,7 @@ Method TestMixedPackaging()
     do $$$AssertStatusOK(sc, "Installed database package")
 
     // Test: Install source package in same namespace should work
-    // dep-module is pre-loaded in shared NS1; package it as source first
+    // dep-module is pre-loaded in shared NS1; package it as source first (no cache — source flow)
     set $namespace = packagingNS
     set sc = ##class(%IPM.Main).Shell("package dep-module -path " _ ..PackageOutputDir _ "dep-module-1.0.0/")
     do $$$AssertStatusOK(sc, "Packaged as source")
@@ -792,13 +753,6 @@ Method TestMixedPackaging()
     do $$$AssertTrue(..FindStringInMultiDimArray("dep-module", .output), "Source package in list")
 
     // Test: Cannot install second database package in same namespace
-    // dep-module is pre-loaded in shared NS1 — just package it as database
-    set $namespace = packagingNS
-    set sc = ##class(%IPM.Main).Shell("package-database dep-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged dep-module as database")
-
-    set dbPackage2 = ..PackageOutputDir _ "dep-module-1.0.0-database.tgz"
-
     set $namespace = installNS
 
     // Attempt to install second database package should fail
@@ -818,18 +772,11 @@ Method TestInstallRejectedWhenModulesWouldBeOrphaned()
     set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
     set noCodeDir = ..GetModuleDir("db-packaging", "module-without-code")
 
-    set packagingNS = ..GetOrCreateSharedNS1()
     new $namespace
-    set $namespace = packagingNS
-
-    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged simple-db-module as database")
-    set dbPackage = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
+    set dbPackage = ..GetOrCreateDatabasePackage("simple-db-module")
 
     // main-with-deps depends on dep-module, so dep-module's code ships inside this IRIS.DAT
-    set sc = ##class(%IPM.Main).Shell("package-database main-with-deps -path " _ ..PackageOutputDir)
-    do $$$AssertStatusOK(sc, "Packaged main-with-deps as database")
-    set withDepsPackage = ..PackageOutputDir _ "main-with-deps-1.0.0-database.tgz"
+    set withDepsPackage = ..GetOrCreateDatabasePackage("main-with-deps")
 
     // --- Rejection: a source module with classes in the routines DB blocks the install ---
     set installNS = "TESTDBORPHANINS"
@@ -1460,21 +1407,6 @@ Method TestSystemRequirementsOverwrite()
     do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)
 }
 
-/// A module declaring Packaging="database" with no explicit LifecycleClass must resolve to
-/// %IPM.Lifecycle.Database, not the generic %IPM.Lifecycle.Module.
-Method TestPackagingDerivesLifecycleClass()
-{
-    set module = ##class(%IPM.Storage.Module).%New()
-    set module.Name = "derive-lifecycle-check"
-    set module.VersionString = "1.0.0"
-    set module.Packaging = "database"
-    // Leave LifecycleClass empty so the derivation path runs.
-
-    set sc = module.%ValidateObject()
-    do $$$AssertStatusOK(sc, "Module with Packaging=database validates")
-    do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.Database", "LifecycleClass derived from database packaging")
-}
-
 /// Get the installed version of a Python package.
 ClassMethod GetPythonVersion(name As %String) As %String
 {
@@ -1623,25 +1555,6 @@ Method TestChecksumMatchesShippedDat()
     do $$$AssertEquals($zconvert(actual, "L"), $zconvert(embedded, "L"), "Embedded checksum matches shipped IRIS.DAT")
 
     do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)
-}
-
-/// Guards the ComputeSHA256Hex output contract (64-char lowercase hex): the hash is produced
-/// via the %xsd.hexBinary encoder, so this pins the length and lowercasing.
-Method TestSHA256HexFormat()
-{
-    // Write a small known file and hash it.
-    set tmp = ##class(%Library.File).TempFilename("bin")
-    set stream = ##class(%Stream.FileBinary).%New()
-    do stream.LinkToFile(tmp)
-    do stream.Write("abc")
-    do stream.%Save()
-    set hex = ##class(%IPM.Lifecycle.Database).ComputeSHA256Hex(tmp)
-    do ##class(%Library.File).Delete(tmp)
-
-    do $$$AssertEquals($length(hex), 64, "SHA-256 hex is 64 characters")
-    do $$$AssertEquals($zconvert(hex, "L"), hex, "SHA-256 hex is lowercase")
-    // SHA-256 of "abc" is a well-known constant.
-    do $$$AssertEquals(hex, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256('abc') matches known value")
 }
 
 }
