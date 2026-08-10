@@ -3,7 +3,10 @@ Include %sySecurity
 Class %IPM.Test.Utils
 {
 
-ClassMethod CreateNamespace(pNSName As %String) As %Status
+/// Only ensemble-enable the namespace when required.
+ClassMethod CreateNamespace(
+	pNSName As %String,
+	pEnableEnsemble As %Boolean = 0) As %Status
 {
     new $namespace
     set tSC = $$$OK
@@ -72,9 +75,11 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
         }
 
         // Ensemble-enable namespace
-        set tSC = ##class(%EnsembleMgr).EnableNamespace(pNSName)
-        if $$$ISERR(tSC) {
-            quit
+        if pEnableEnsemble {
+            set tSC = ##class(%EnsembleMgr).EnableNamespace(pNSName)
+            if $$$ISERR(tSC) {
+                quit
+            }
         }
 
         // Create default web application
@@ -128,6 +133,10 @@ ClassMethod DeleteNamespace(pNSName As %String) As %Status
         set tEnsTempDB = pNSName_##class(%Library.EnsembleMgr).#TEMPSUFFIX
         for tOtherDB = tSecondaryDB,tEnsTempDB {
             set tSC = $$$OK
+            // Absent unless the namespace was ensemble-enabled
+            if '##class(Config.Databases).Exists(tOtherDB) {
+                continue
+            }
             set tDB = ##class(Config.Databases).Open(tOtherDB,,.tSC)
             if $isobject(tDB) {
                 // Delete database
