@@ -1,5 +1,3 @@
-Include (%occErrors, %IPM.Common)
-
 /// The incremental-sync pipeline for a dev-mode module. %IPM.Lifecycle.Base's %Sync phase is a
 /// thin delegator to Run below; all the sync orchestration and its helpers live here so Base.cls
 /// stays a lifecycle hook surface rather than the sync implementation.
@@ -233,7 +231,7 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
             // Non-fatal: other resources can still sync. Warn rather than failing silently,
             // since this resource's files end up untracked and its edits are dropped.
             set errText = $system.Status.GetOneErrorText(childSC)
-            write !, "Warning: could not resolve contents of resource ", resource.Name, ": ", errText
+            write !, "WARNING: could not resolve contents of resource ", resource.Name, ": ", errText
             do ##class(%IPM.General.Sync.Summary).AddWarning(module.Name, "Could not resolve contents of resource " _ resource.Name _ "; its files are not tracked by this sync: " _ errText)
             continue
         }
@@ -448,7 +446,7 @@ ClassMethod SyncApplyDeletes(
             // unapplied and make the overall error harder to diagnose.
             if $$$ISERR(delSC) {
                 set errText = $system.Status.GetOneErrorText(delSC)
-                write !, "Warning: could not delete ", docName, ": ", errText
+                write !, "WARNING: could not delete ", docName, ": ", errText
                 do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, "Could not delete " _ docName _ ": " _ errText)
                 set sc = $$$ADDSC(sc, delSC)
             }
@@ -526,7 +524,7 @@ ClassMethod SyncCommitModuleXml(
     set commitSC = ##class(%IPM.Storage.FileHash).CommitChanges(module, .moduleXmlMod, .emptyDel, 0)
     if $$$ISERR(commitSC) {
         // Non-fatal: the next sync will re-detect module.xml as changed and reload the manifest again.
-        write !, "Warning: failed to record module.xml hash: ", $system.Status.GetOneErrorText(commitSC)
+        write !, "WARNING: failed to record module.xml hash: ", $system.Status.GetOneErrorText(commitSC)
     }
 }
 
@@ -565,7 +563,7 @@ ClassMethod SyncCompile(module As %IPM.Storage.Module, orderedResourceList As %L
                 // Non-fatal: the rest of the module still compiles. Warn, since this resource's
                 // classes are left out of the compile set and may stay stale.
                 set errText = $system.Status.GetOneErrorText(resSC)
-                write !, "Warning: could not resolve contents of resource ", resource.Name, " for compilation: ", errText
+                write !, "WARNING: could not resolve contents of resource ", resource.Name, " for compilation: ", errText
                 do ##class(%IPM.General.Sync.Summary).AddWarning(module.Name, "Could not resolve contents of resource " _ resource.Name _ " for compilation; it was not recompiled: " _ errText)
                 continue
             }

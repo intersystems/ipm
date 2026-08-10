@@ -52,7 +52,7 @@ ClassMethod PrintTail(
 ClassMethod PrintModuleXmlWarning(moduleName As %String) [ Internal ]
 {
     write !
-    write !, "Warning: module.xml changed and was reloaded."
+    write !, "WARNING: module.xml changed and was reloaded."
     write !, "  Resources may have been added/removed. Run `reload ", moduleName, "` to fully apply"
     write !, "  manifest-level changes (mappings, dependencies, defaults)."
     do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, "module.xml changed and was reloaded; run `reload " _ moduleName _ "` to fully apply.")
@@ -69,7 +69,7 @@ ClassMethod PrintPreloadWarning(moduleName As %String, ByRef preloadResources) [
         set names = names _ $select(names="":"", 1:", ") _ resName
     }
     write !
-    write !, "Warning: preload resource(s) changed and were synced: ", names
+    write !, "WARNING: preload resource(s) changed and were synced: ", names
     write !, "  Bootstrap was not re-run. Preload code (installer classes, custom resource"
     write !, "  processors) only takes effect during a lifecycle run, so run `reload ", moduleName, "`"
     write !, "  if the change affects module loading itself."

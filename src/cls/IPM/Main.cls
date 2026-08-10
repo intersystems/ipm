@@ -3111,7 +3111,7 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
         $$$ThrowOnError(tSC)
     }
     if $data(tErrorList) {
-        write !,"Warning: some errors occurred."
+        write !,"WARNING: some errors occurred."
         for i=1:1:tErrorList {
             set $listbuild(tServer,tModName,tVersion,tErrorSC) = tErrorList(i)
             set tServer = $case(tServer,"":" (installed)",:" @ "_tServer)

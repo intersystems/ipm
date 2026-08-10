@@ -68,7 +68,7 @@ Method %Clean(ByRef pParams) As %Status
 
                 if $listlength(orphanedModules) > 0 {
                     // Modules were orphaned - warn user but still clean up
-                    write !,"Warning: ",$listlength(orphanedModules)," module(s) orphaned:"
+                    write !,"WARNING: ",$listlength(orphanedModules)," module(s) orphaned:"
 
                     // List orphaned modules with versions
                     set ptr = 0

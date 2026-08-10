@@ -1,5 +1,3 @@
-Include (%IPM.Common, %occErrors, %occReference)
-
 Class %IPM.Storage.FileHash Extends %Persistent
 {
 
@@ -132,7 +130,7 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
             }
             set stampSC = ..StampOneFileWithHash(module.Name, relPath, hash)
             if $$$ISERR(stampSC) {
-                write !, "Warning: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
+                write !, "WARNING: could not stamp ", relPath, ": ", $system.Status.GetOneErrorText(stampSC)
             }
         }
     } catch e {

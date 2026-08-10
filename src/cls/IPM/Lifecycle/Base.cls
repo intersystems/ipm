@@ -1222,7 +1222,7 @@ Method %Compile(ByRef pParams) As %Status
             try {
                 $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(..Module))
             } catch stampEx {
-                write !, "Warning: sync baseline stamping failed: ", $system.Status.GetOneErrorText(stampEx.AsStatus())
+                write !, "WARNING: sync baseline stamping failed: ", $system.Status.GetOneErrorText(stampEx.AsStatus())
             }
         }
     } catch e {
