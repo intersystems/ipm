@@ -272,7 +272,6 @@ Method IsInScope(
 }
 
 /// Returns true if the resource is test-scoped (Scope="test" or Scope="verify").
-/// Scope is constrained to ",test,verify", so any non-empty scope is a test scope.
 Method IsTestScoped() As %Boolean
 {
     set tScopeLower = $zconvert(..Scope, "L")

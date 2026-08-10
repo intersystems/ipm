@@ -1256,7 +1256,7 @@ Method TestUpdateStepsWithDatabasePackaging()
     set $namespace = installNS
 
     // Install v1 database package.
-    // Database.cls:%Activate swaps the DB then seeds all update steps — Step001 must be
+    // Database.cls:%Reload swaps the DB then seeds all update steps — Step001 must be
     // seeded (not executed) because its work is already baked into the IRIS.DAT.
     set sc = ##class(%IPM.Main).Shell("load " _ v1Package _ " -swap-db")
     do $$$AssertStatusOK(sc, "Installed v1 database package")
@@ -1265,7 +1265,7 @@ Method TestUpdateStepsWithDatabasePackaging()
     do $$$AssertEquals($get(^DBPkgUpdateSteps("step002"), 0), 0, "Step002 absent in v1 — counter is 0")
 
     // Upgrade to v2 database package.
-    // Database.cls:%Activate swaps the DB (skips seeding — update path);
+    // Database.cls:%Reload swaps the DB (skips seeding — update path);
     // %ApplyUpdateSteps then runs HandleAllUpdateSteps: Step001 is already seeded so it is
     // skipped; Step002 is new and must run exactly once.
     set sc = ##class(%IPM.Main).Shell("update update-steps-module -path " _ v2Package _ " -swap-db")

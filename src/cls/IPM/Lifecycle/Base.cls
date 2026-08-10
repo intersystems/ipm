@@ -2139,6 +2139,9 @@ Method ExportSingleModule(
     }
 }
 
+/// Returns the lifecycle class whose Final PACKAGING parameter equals pPackaging.
+/// pBaseClass is "" when no class claims that value. This is a valid outcome, since packaging values are
+/// not constrained to those with a dedicated lifecycle class. Callers decide the fallback.
 ClassMethod GetBaseClassForPackaging(
 	pPackaging As %String,
 	Output pBaseClass As %Dictionary.Classname) As %Status [ Final ]
@@ -2157,8 +2160,6 @@ ClassMethod GetBaseClassForPackaging(
             set pBaseClass = tRes.%Get("BaseClass")
         }
         $$$ThrowOnError(tSC)
-
-        // TODO: Error if no results?
     } catch e {
         set pBaseClass = ""
         set tSC = e.AsStatus()
