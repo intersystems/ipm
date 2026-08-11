@@ -17,9 +17,9 @@ Parameter PACKAGING As STRING [ Final ] = "database";
 
 /// Entry point for database packaging. Orchestrates the full pipeline:
 /// 1. Validate IPM is externally mapped (not in routines DB) and routines DB is not mirrored
-/// 2. Create a temp IRIS.DAT and remap the namespace routines to it
-///    (or use the current DB with -use-current-db)
-/// 3. Export Generated resources before remapping (they become inaccessible after dismount)
+/// 2. Create a temp IRIS.DAT (or use the current DB with -use-current-db) and export Generated
+///    resources from the source namespace (they become inaccessible after dismount)
+/// 3. Remap the namespace routines to the temp DB
 /// 4. Load and compile this module's resources plus all transitive dependencies into the temp DB
 /// 5. Restore the namespace to its original routines DB
 /// 6. Assemble staging dir (IRIS.DAT + module.xml with the staged IRIS.DAT's SHA-256 checksum
@@ -236,9 +236,10 @@ Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
     } catch ex {
         set sc = ex.AsStatus()
         if dbDir '= "" {
-            write !, "ERROR: attempting rollback..."
+            write !, "ERROR: encountered an error: ", $system.Status.GetErrorText(sc)
+            write !, "Attempting to roll back system state..."
             do ..RollbackDatabaseSwap(dbDir, backupPath)
-            write !, "Rollback attempted. Verify namespace state."
+            write !, "Finished rollback attempt. Please verify whether namespace state is as expected prior to performing the DB swap."
         }
     }
     quit sc
@@ -417,7 +418,8 @@ ClassMethod CreateTempDatabase(
     }
 }
 
-/// Exports each Generated resource from the source namespace to a temp XML file for later import.
+/// Exports each Generated resource of this module and its transitive dependencies from the source
+/// namespace to a temp XML file for later import.
 /// Must run before RemapRoutinesDB: once the old DB is dismounted the compiled classes are gone.
 ///
 /// Carries Generated resources that no lifecycle phase recreates, e.g. classes built by external
@@ -432,27 +434,40 @@ Method ExportGeneratedResources(
 	Output generatedExports As %List) [ Private ]
 {
     set generatedExports = ""
-    set orderedList = ..Module.GetOrderedResourceList()
-    set tKey = ""
+
+    // Dependency resources are compiled into the same IRIS.DAT, so their Generated resources must
+    // be carried over as well.
+    set modules = ..GetDependencyModules(..Module)
+    do modules.InsertAt(..Module, 1)
+
+    set mKey = ""
     for {
-        #dim tResource As %IPM.Storage.ResourceReference
-        set tResource = orderedList.GetNext(.tKey)
-        quit:tKey=""
+        #dim module As %IPM.Storage.Module
+        set module = modules.GetNext(.mKey)
+        quit:mKey=""
 
-        if 'includeTestResources && tResource.IsTestScoped() {
-            continue
-        }
+        set orderedList = module.GetOrderedResourceList()
+        set tKey = ""
+        for {
+            #dim tResource As %IPM.Storage.ResourceReference
+            set tResource = orderedList.GetNext(.tKey)
+            quit:tKey=""
 
-        if 'tResource.Generated {
-            continue
-        }
+            if 'includeTestResources && tResource.IsTestScoped() {
+                continue
+            }
 
-        set tempFile = ##class(%Library.File).TempFilename("xml")
-        set exportSC = $system.OBJ.Export(tResource.Name, tempFile, "-d")
-        if $$$ISOK(exportSC) && (##class(%Library.File).GetFileSize(tempFile) > 0) {
-            set generatedExports = generatedExports _ $listbuild(tempFile)
-        } elseif ##class(%Library.File).Exists(tempFile) {
-            do ##class(%Library.File).Delete(tempFile)
+            if 'tResource.Generated {
+                continue
+            }
+
+            set tempFile = ##class(%Library.File).TempFilename("xml")
+            set exportSC = $system.OBJ.Export(tResource.Name, tempFile, "-d")
+            if $$$ISOK(exportSC) && (##class(%Library.File).GetFileSize(tempFile) > 0) {
+                set generatedExports = generatedExports _ $listbuild(tempFile)
+            } elseif ##class(%Library.File).Exists(tempFile) {
+                do ##class(%Library.File).Delete(tempFile)
+            }
         }
     }
 }
@@ -491,7 +506,7 @@ ClassMethod RestoreRoutinesDB(
 
     set dismountSC = ##class(SYS.Database).DismountDatabase(tempDBPath)
     if $$$ISERR(dismountSC) {
-        write !, "Warning: failed to dismount temp DB: ", $system.Status.GetErrorText(dismountSC)
+        write !, "WARNING: failed to dismount temp DB: ", $system.Status.GetErrorText(dismountSC)
     }
 
     // Remap namespace back to original DB
