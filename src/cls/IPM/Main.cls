@@ -200,6 +200,7 @@ Equivalent to running `package-database` followed by `publish`, but without need
 </description>
 <parameter name="module" required="true" description="Name of module to package as database and publish" />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository to publish to (deployment must be enabled)" />
+<modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
 <modifier name="use-current-db" dataAlias="UseCurrentDB" dataValue="1" description="Package the namespace's current routines DB instead of creating a fresh one." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. For database packaging, this includes test resources (Scope=test or Scope=verify) in the package, which are excluded by default." />
 <modifier name="export-python-deps" value="true" valueList="0,1" dataAlias="ExportPythonDependencies" description="Controls whether Python wheels are included in the database package. Defaults to 1 (included). Pass 0 to exclude." />
@@ -1144,19 +1145,13 @@ ClassMethod ShellInternal(
                 // Identical to "package": route to the Package phase using current lifecycle
                 set tCommandInfo = "package"
                 do ..RunOnePhase(.tCommandInfo)
-            } elseif (tCommandInfo = "package-database") {
+            } elseif (tCommandInfo = "package-database") || (tCommandInfo = "publish-database") {
                 // Fail fast before any work begins — same check as %IPM.Lifecycle.Database:%Package
                 do ##class(%IPM.Lifecycle.Database).ValidateIPMNotInRoutinesDB()
-                // Force the Database lifecycle class and route to the Package phase
+                // Force the Database lifecycle class; publish-database packages as part of publishing
+                set targetPhase = $select(tCommandInfo = "publish-database": "publish", 1: "package")
                 set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.Database"
-                set tCommandInfo = "package"
-                do ..RunOnePhase(.tCommandInfo)
-            } elseif (tCommandInfo = "publish-database") {
-                // Fail fast before any work begins — same check as %IPM.Lifecycle.Database:%Package
-                do ##class(%IPM.Lifecycle.Database).ValidateIPMNotInRoutinesDB()
-                // Force the Database lifecycle class and route to the Publish phase
-                set tCommandInfo("data","Lifecycle") = "%IPM.Lifecycle.Database"
-                set tCommandInfo = "publish"
+                set tCommandInfo = targetPhase
                 do ..RunOnePhase(.tCommandInfo)
             } elseif (tCommandInfo = "package-studio-project") {
                 // Force the StudioProject lifecycle class and route to the Package phase
@@ -2624,9 +2619,8 @@ ClassMethod Install(
 
         // If no source package found, check whether a database-only package exists and give a helpful error
         if (tResults.Count() = 0) && (tSearchCriteria.Packaging = "source") {
-            set checkCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-            set checkCriteria.Name = tSearchCriteria.Name
-            set checkCriteria.VersionExpression = tSearchCriteria.VersionExpression
+            // Clone so the probe differs only in packaging
+            set checkCriteria = tSearchCriteria.%ConstructClone()
             set checkCriteria.Packaging = "database"
             $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(checkCriteria,.fallbackResults))
             if (fallbackResults.Count() > 0) {

@@ -257,6 +257,19 @@ Method CreateTestNamespace(pNamespace As %String) As %Status
     return sc
 }
 
+/// Moves the namespace CreateTestNamespace just registered from per-test tracking to shared
+/// tracking, so OnAfterOneTest does not tear down a namespace later tests still need.
+/// Call immediately after CreateTestNamespace — it operates on the last entry of each list.
+Method PromoteLastCreatedToShared()
+{
+    set lastIdx = $listlength(..CreatedNamespaces)
+    set ..CreatedNamespaces = $list(..CreatedNamespaces, 1, lastIdx - 1)
+    set lastIdx = $listlength(..CreatedGlobalsDatabases)
+    set lastDB = $list(..CreatedGlobalsDatabases, lastIdx)
+    set ..CreatedGlobalsDatabases = $list(..CreatedGlobalsDatabases, 1, lastIdx - 1)
+    set ..SharedGlobalsDatabases = ..SharedGlobalsDatabases _ $listbuild(lastDB)
+}
+
 /// Returns the shared packaging namespace for core modules (generally compiled-resource tests).
 /// Creates TESTDBPKGNS1 on first call and loads all relevant modules; reuses on subsequent calls.
 /// GetModuleDir calls are made before any namespace switch since ^UnitTestRoot is only in origNS.
@@ -276,14 +289,7 @@ Method GetOrCreateSharedNS1() As %String
     set invokesDir = ..GetModuleDir("db-packaging", "module-with-invokes")
 
     $$$ThrowOnError(..CreateTestNamespace(ns))
-    // Move the shared NS from per-test tracking to shared tracking so OnAfterOneTest
-    // doesn't clean it up prematurely
-    set lastIdx = $listlength(..CreatedNamespaces)
-    set ..CreatedNamespaces = $list(..CreatedNamespaces, 1, lastIdx - 1)
-    set lastIdx = $listlength(..CreatedGlobalsDatabases)
-    set lastDB = $list(..CreatedGlobalsDatabases, lastIdx)
-    set ..CreatedGlobalsDatabases = $list(..CreatedGlobalsDatabases, 1, lastIdx - 1)
-    set ..SharedGlobalsDatabases = ..SharedGlobalsDatabases _ $listbuild(lastDB)
+    do ..PromoteLastCreatedToShared()
 
     new $namespace
     set $namespace = ns
@@ -318,13 +324,7 @@ Method GetOrCreateSharedNS2() As %String
     set mainResDir = ..GetModuleDir("db-packaging", "main-with-resource-deps")
 
     $$$ThrowOnError(..CreateTestNamespace(ns))
-    // Move the shared NS from per-test tracking to shared tracking
-    set lastIdx = $listlength(..CreatedNamespaces)
-    set ..CreatedNamespaces = $list(..CreatedNamespaces, 1, lastIdx - 1)
-    set lastIdx = $listlength(..CreatedGlobalsDatabases)
-    set lastDB = $list(..CreatedGlobalsDatabases, lastIdx)
-    set ..CreatedGlobalsDatabases = $list(..CreatedGlobalsDatabases, 1, lastIdx - 1)
-    set ..SharedGlobalsDatabases = ..SharedGlobalsDatabases _ $listbuild(lastDB)
+    do ..PromoteLastCreatedToShared()
 
     new $namespace
     set $namespace = ns
@@ -572,12 +572,17 @@ Method TestPackageAndInstallWithTestResources()
     new $namespace
     set $namespace = packagingNS
 
+    // Both packages have the same filename, so they go to separate directories — otherwise the
+    // second package overwrites the first and both installs below exercise the same .tgz.
+    set withTestsDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "with-tests")
+    set noTestsDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "no-tests")
+
     // Package WITH test resources
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -dev -path " _ ..PackageOutputDir)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -dev -path " _ withTestsDir)
     do $$$AssertStatusOK(sc, "Packaged with test resources")
 
     // Install and verify test resources are present
-    set packageFileWithTests = ..PackageOutputDir _ "module-with-tests-1.0.0-database.tgz"
+    set packageFileWithTests = withTestsDir _ "module-with-tests-1.0.0-database.tgz"
 
     set installNS1 = "TESTDBTESTINS1"
     set sc = ..CreateTestNamespace(installNS1)
@@ -592,10 +597,10 @@ Method TestPackageAndInstallWithTestResources()
 
     // Package WITHOUT test resources (default)
     set $namespace = packagingNS
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -path " _ ..PackageOutputDir)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -path " _ noTestsDir)
     do $$$AssertStatusOK(sc, "Packaged without test resources")
 
-    set packageFileNoTests = ..PackageOutputDir _ "module-with-tests-1.0.0-database.tgz"
+    set packageFileNoTests = noTestsDir _ "module-with-tests-1.0.0-database.tgz"
 
     set installNS2 = "TESTDBTESTINS2"
     set sc = ..CreateTestNamespace(installNS2)
@@ -669,6 +674,45 @@ Method TestPackagingAndInstallValidation()
     set sc = ##class(%IPM.Main).Shell("load " _ missingDepsPackage _ " -swap-db")
     do $$$AssertStatusNotOK(sc, "Missing deps/ directory rejected by validation")
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "deps/", "Error mentions missing deps/ directory")
+    do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
+
+    // Test: module.xml without a <Checksum> element fails validation.
+    // The other structural checks in ValidateBeforeSwap (missing IRIS.DAT, missing module.xml, a
+    // <Packaging> other than "database") cannot be reached through `load`: each one also makes
+    // IsInstallContext() false, so the install branch is never entered. They remain as
+    // defense-in-depth for direct %Reload callers and are not exercised here.
+    set noChecksumDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "no-checksum-extract")
+    do ##class(%Library.File).CreateDirectory(noChecksumDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, noChecksumDir)
+    do $$$AssertStatusOK(sc, "Extracted package for missing <Checksum> test")
+
+    set noChecksumXML = ##class(%Library.File).NormalizeFilename("module.xml", noChecksumDir)
+    set xmlStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(xmlStream.LinkToFile(noChecksumXML))
+    set moduleXML = ""
+    while 'xmlStream.AtEnd {
+        set moduleXML = moduleXML _ xmlStream.Read()
+    }
+    // Strip the whole element rather than blanking its text: an empty <Checksum> would fail the
+    // checksum comparison instead, which the tampering case above already covers.
+    set checksumStart = $find(moduleXML, "<Checksum") - $length("<Checksum")
+    do $$$AssertTrue(checksumStart > 0, "Packaged module.xml has a <Checksum> element to remove")
+    set checksumEnd = $find(moduleXML, "</Checksum>")
+    set moduleXML = $extract(moduleXML, 1, checksumStart - 1) _ $extract(moduleXML, checksumEnd, *)
+
+    $$$ThrowOnError(xmlStream.Clear())
+    $$$ThrowOnError(xmlStream.Write(moduleXML))
+    $$$ThrowOnError(xmlStream.%Save())
+
+    set noChecksumPackage = ..PackageOutputDir _ "simple-db-module-no-checksum.tgz"
+    set sc = ##class(%IPM.General.Archive).Create(noChecksumDir, noChecksumPackage)
+    do $$$AssertStatusOK(sc, "Repacked archive without <Checksum>")
+
+    set $namespace = installNS
+
+    set sc = ##class(%IPM.Main).Shell("load " _ noChecksumPackage _ " -swap-db")
+    do $$$AssertStatusNotOK(sc, "module.xml without <Checksum> rejected by validation")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "Checksum", "Error mentions the missing <Checksum> element")
     do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
 }
 
@@ -1416,12 +1460,17 @@ Method TestSystemRequirementsOverwrite()
 
     set readStream = ##class(%Stream.FileCharacter).%New()
     $$$ThrowOnError(readStream.LinkToFile(extractDir _ "module.xml"))
-    set pkgXML = readStream.Read()
+    // Read the whole file: a single Read() stops at the chunk size, and the negative assertion
+    // below would pass merely because the truncated text never reached the version element.
+    set pkgXML = ""
+    while 'readStream.AtEnd {
+        set pkgXML = pkgXML _ readStream.Read()
+    }
 
-    set tHasCurrentVersion = (pkgXML [ ("Version=""" _ currentIrisVersion _ """"))
-    set tLacksPrevVersion = '(pkgXML [ ("Version=""" _ prevIrisVersion _ """"))
-    do $$$AssertTrue(tHasCurrentVersion, "Packaged module.xml has current IRIS version in SystemRequirements")
-    do $$$AssertTrue(tLacksPrevVersion, "Packaged module.xml does not contain previous IRIS version")
+    set hasCurrentVersion = (pkgXML [ ("Version=""" _ currentIrisVersion _ """"))
+    set lacksPrevVersion = '(pkgXML [ ("Version=""" _ prevIrisVersion _ """"))
+    do $$$AssertTrue(hasCurrentVersion, "Packaged module.xml has current IRIS version in SystemRequirements")
+    do $$$AssertTrue(lacksPrevVersion, "Packaged module.xml does not contain previous IRIS version")
 
     // Cleanup
     do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)

@@ -1,19 +1,85 @@
 Class Test.PM.Unit.LifecycleDatabase Extends %UnitTest.TestCase
 {
 
-/// A module declaring Packaging="database" with no explicit LifecycleClass must resolve to
-/// %IPM.Lifecycle.Database, not the generic %IPM.Lifecycle.Module.
+/// Modules created outside of this test save modules to storage under fixed names; delete them
+/// unconditionally so a failed assert cannot leave rows behind for the next run.
+Method OnAfterOneTest(testName As %String) As %Status
+{
+    for name = "aa-root", "mm-mid", "zz-base" {
+        if ##class(%IPM.Storage.Module).NameExists(name) {
+            do ##class(%IPM.Storage.Module).NameDelete(name)
+        }
+    }
+    quit $$$OK
+}
+
+/// A module declaring Packaging="database" must resolve to %IPM.Lifecycle.Database, not the generic
+/// %IPM.Lifecycle.Module. Covers both derivation branches in %OnValidateObject: the default
+/// LifecycleClass being switched out, and an empty LifecycleClass being filled in.
 Method TestPackagingDerivesLifecycleClass()
 {
     set module = ##class(%IPM.Storage.Module).%New()
     set module.Name = "derive-lifecycle-check"
     set module.VersionString = "1.0.0"
     set module.Packaging = "database"
-    // Leave LifecycleClass empty so the derivation path runs.
 
-    set sc = module.%ValidateObject()
-    do $$$AssertStatusOK(sc, "Module with Packaging=database validates")
-    do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.Database", "LifecycleClass derived from database packaging")
+    // LifecycleClass has an InitialExpression of %IPM.Lifecycle.Module, so this leaves the default
+    // in place and validation must notice it disagrees with Packaging.
+    do $$$AssertStatusOK(module.%ValidateObject(), "Module with default LifecycleClass and Packaging=database validates")
+    do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.Database", "Default LifecycleClass replaced from database packaging")
+
+    // The other branch: nothing declared at all, so the class is derived rather than replaced.
+    set module.LifecycleClass = ""
+    do $$$AssertStatusOK(module.%ValidateObject(), "Module with empty LifecycleClass and Packaging=database validates")
+    do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.Database", "Empty LifecycleClass derived from database packaging")
+}
+
+/// IsPackagedManifest decides whether a directory is the remains of an already-swapped install,
+/// which %Reload refuses to load as source. Detection is the <Checksum> element, so a source
+/// manifest and a packaged one must be told apart on that alone.
+Method TestIsPackagedManifestDetection()
+{
+    // TempFilename creates the file it names, so derive a sibling directory from it and delete it.
+    set tempFile = ##class(%Library.File).TempFilename()
+    set dir = ##class(%Library.File).NormalizeDirectory(tempFile _ ".d")
+    do ##class(%Library.File).Delete(tempFile)
+    do $$$AssertTrue(##class(%Library.File).CreateDirectoryChain(dir), "Created temp directory")
+
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(dir), "Directory with no module.xml is not a packaged manifest")
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(""), "Empty directory path is not a packaged manifest")
+
+    set header = "<?xml version=""1.0""?>" _ $char(13, 10) _ "<Export generator=""IRIS"">" _ $char(13, 10) _
+        "<Document name=""pkg-check.ZPM""><Module><Name>pkg-check</Name><Version>1.0.0</Version>"
+
+    // A source manifest: same shape, no Checksum.
+    do ..WriteModuleXML(dir, header _ "</Module></Document></Export>")
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(dir), "Source manifest is not a packaged manifest")
+
+    // Not valid XML at all: reported by the source load path, not here.
+    do ..WriteModuleXML(dir, "<Export><Document")
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(dir), "Unparseable module.xml is not a packaged manifest")
+
+    do ..WriteModuleXML(dir, header _ "<Packaging>database</Packaging>" _
+        "<Checksum Algorithm=""SHA-256"">ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad</Checksum>" _
+        "</Module></Document></Export>")
+    do $$$AssertTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(dir), "Manifest with Checksum is a packaged manifest")
+
+    do ##class(%Library.File).RemoveDirectoryTree(dir)
+}
+
+/// Writes content to dir/module.xml, replacing any previous file.
+Method WriteModuleXML(
+	dir As %String,
+	content As %String)
+{
+    set path = ##class(%Library.File).NormalizeFilename("module.xml", dir)
+    // Delete rather than Clear: this is called repeatedly against the same path, and a fresh file
+    // is unambiguous about what the stream ends up containing.
+    do ##class(%Library.File).Delete(path)
+    set stream = ##class(%Stream.FileCharacter).%New()
+    do $$$AssertStatusOK(stream.LinkToFile(path), "Linked module.xml")
+    do $$$AssertStatusOK(stream.Write(content), "Wrote module.xml content")
+    do $$$AssertStatusOK(stream.%Save(), "Saved module.xml")
 }
 
 /// Guards the ComputeSHA256Hex output contract (64-char lowercase hex): the hash is produced
@@ -23,9 +89,9 @@ Method TestSHA256HexFormat()
     // Write a small known file and hash it.
     set tmp = ##class(%Library.File).TempFilename("bin")
     set stream = ##class(%Stream.FileBinary).%New()
-    do stream.LinkToFile(tmp)
-    do stream.Write("abc")
-    do stream.%Save()
+    do $$$AssertStatusOK(stream.LinkToFile(tmp), "Linked stream to temp file")
+    do $$$AssertStatusOK(stream.Write("abc"), "Wrote test content")
+    do $$$AssertStatusOK(stream.%Save(), "Saved temp file")
     set hex = ##class(%IPM.Lifecycle.Database).ComputeSHA256Hex(tmp)
     do ##class(%Library.File).Delete(tmp)
 
@@ -67,10 +133,6 @@ Method TestTopologicalDependencyOrder()
 
     set ordered = ##class(%IPM.Lifecycle.Database).GetTopologicalDependencyNames(root)
     do $$$AssertEquals($listtostring(ordered, ","), "zz-base,mm-mid", "Dependency precedes dependent")
-
-    do $$$AssertStatusOK(##class(%IPM.Storage.Module).NameDelete("aa-root"), "Deleted aa-root")
-    do $$$AssertStatusOK(##class(%IPM.Storage.Module).NameDelete("mm-mid"), "Deleted mm-mid")
-    do $$$AssertStatusOK(##class(%IPM.Storage.Module).NameDelete("zz-base"), "Deleted zz-base")
 }
 
 /// Every phase in the canonical install chain must be either run for dependencies or explicitly
