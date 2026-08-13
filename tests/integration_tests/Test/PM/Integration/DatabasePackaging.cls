@@ -974,6 +974,59 @@ Method TestPackageWithMixedPythonDeps()
     do ..DeletePattern(moduleDir _ "wheels/", "pycparser*.whl")
 }
 
+/// Test that pre-Activate invokes are skipped and post-Activate invokes run
+/// during database package install. Each invoke sets a global marker so we can
+/// verify whether it executed.
+Method TestInvokeBehaviorDuringDatabaseInstall()
+{
+    set testNS = "TESTDBINVOKE"
+    set sc = ..CreateTestNamespace(testNS)
+    do $$$AssertStatusOK(sc, "Created test namespace")
+
+    set moduleDir = ..GetModuleDir("db-packaging", "module-with-invokes")
+
+    new $namespace
+    set $namespace = testNS
+    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Loaded module with invokes")
+
+    // Both invokes ran during source load — verify markers exist
+    do $$$AssertEquals($get(^InvokeTest("compile")), 1, "Compile invoke ran during source load")
+    do $$$AssertEquals($get(^InvokeTest("activate")), 1, "Activate invoke ran during source load")
+    kill ^InvokeTest
+
+    // Package as database
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-invokes -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged module with invokes")
+
+    set packageFile = ..PackageOutputDir _ "module-with-invokes-1.0.0-database.tgz"
+
+    // Install in a fresh namespace
+    set installNS = "TESTDBINVKINS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created install namespace")
+    set $namespace = installNS
+
+    // Confirm markers don't exist before install
+    do $$$AssertEquals($get(^InvokeTest("compile"), 0), 0, "No compile marker before install")
+    do $$$AssertEquals($get(^InvokeTest("activate"), 0), 0, "No activate marker before install")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Installed database package with invokes")
+
+    // Pre-Activate invoke (Compile.After) should have been skipped
+    do $$$AssertEquals($get(^InvokeTest("compile"), 0), 0, "Compile invoke skipped during database install")
+
+    // Post-Activate invoke (Activate.After) should have run
+    do $$$AssertEquals($get(^InvokeTest("activate")), 1, "Activate invoke ran during database install")
+
+    // Verify module classes are accessible (DB was mounted)
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("InvokeModule.Main"), "InvokeModule.Main class exists")
+
+    // Cleanup
+    kill ^InvokeTest
+}
+
 /// Test that FileCopy resources are applied during database package install.
 /// FileCopy.OnBeforePhase("Activate") fires because resource processor hooks run at
 /// Module level (in Module.RunPhase), not inside the lifecycle method.
