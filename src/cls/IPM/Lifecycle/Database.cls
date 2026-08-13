@@ -1005,9 +1005,108 @@ Method ValidateBeforeSwap(packageDir As %String) [ Private ]
         $$$ThrowStatus($$$ERROR($$$GeneralError, "A database package ('" _ conflictRS.%Get("Name") _ "') is already installed in this namespace. Only one database package per namespace is allowed."))
     }
 
+    do ..ValidateNoOrphanedModules(depsDir)
+
     // Validate IPM is not in the target namespace's routines DB
     do ..ValidateIPMNotInRoutinesDB()
     do ..ValidateRoutinesDatabaseNotMirrored($namespace)
+}
+
+/// Rejects the install if any already-installed module has code in the namespace's routines
+/// database. The swap replaces that database wholesale, so such a module's classes and routines
+/// would disappear while its IPM metadata (which lives in the globals database, untouched by the
+/// swap) survives, leaving `list` reporting a module with nothing behind it.
+///
+/// Modules packaged inside this database package, modules whose code is mapped in from another database,
+/// and modules with only non-code resources are exempt since the swap does not affect them.
+Method ValidateNoOrphanedModules(depsDir As %String) [ Private ]
+{
+    set packagedNames = ..GetPackagedDependencyNames(depsDir)
+
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT Name FROM %IPM_Storage.ModuleItem WHERE Name != ?",
+        ..Module.Name)
+    if rs.%SQLCODE < 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing installed modules: " _ rs.%Message))
+    }
+
+    set orphaned = ""
+    while rs.%Next() {
+        set moduleName = rs.%Get("Name")
+        if $listfind(packagedNames, $zconvert(moduleName, "L")) {
+            continue
+        }
+        set installedModule = ##class(%IPM.Storage.Module).NameOpen(moduleName, , .sc)
+        $$$ThrowOnError(sc)
+        if ..HasCodeInLocalRoutinesDB(installedModule) {
+            set orphaned = orphaned _ $listbuild(moduleName)
+        }
+    }
+    if orphaned = "" {
+        quit
+    }
+
+    set plural = ($listlength(orphaned) > 1)
+    set msg = "Installing this database package would replace the routines database for namespace " _ $namespace
+    set msg = msg _ ", destroying the code of " _ $select(plural: "these already-installed modules", 1: "this already-installed module")
+    set msg = msg _ ": " _ $listtostring(orphaned, ", ")
+    set msg = msg _ ". Uninstall " _ $select(plural: "them", 1: "it") _ " first, or run 'uninstall -all -force' to clear the namespace."
+    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+}
+
+/// Returns the lowercased module names whose metadata this package carries in deps/,
+/// one manifest file (<name>.xml) per transitive dependency as written by WriteDependencies.
+/// depsDir: the package's deps/ directory. Must exist.
+ClassMethod GetPackagedDependencyNames(depsDir As %String) As %List
+{
+    set names = ""
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT ItemName FROM %Library.File_FileSet(?, ?, ?, ?)",
+        depsDir, "*.xml", "", 0)
+    if rs.%SQLCODE < 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing deps: " _ rs.%Message))
+    }
+    while rs.%Next() {
+        set itemName = rs.%Get("ItemName")
+        continue:itemName=""
+        set names = names _ $listbuild($zconvert($piece(itemName, ".", 1, *-1), "L"))
+    }
+    quit names
+}
+
+/// Returns 1 if any of the module's code resources resolve to a document that exists in the
+/// current namespace's local routines database, rather than being mapped in from elsewhere.
+/// Only class, package, routine, and include resources are examined — other resource types
+/// (FileCopy, WebApplication, CPF, PythonWheel, globals) do not live in the routines database.
+ClassMethod HasCodeInLocalRoutinesDB(module As %IPM.Storage.Module) As %Boolean
+{
+    set found = 0
+    set orderedResourceList = module.GetOrderedResourceList()
+    set key = ""
+    for {
+        #dim resource As %IPM.Storage.ResourceReference
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+
+        if '$listfind($listbuild("CLS", "PKG", "MAC", "INT", "INC"), $zconvert($piece(resource.Name, ".", *), "U")) {
+            continue
+        }
+
+        kill children
+        $$$ThrowOnError(resource.ResolveChildren(.children))
+        set docName = ""
+        for {
+            set docName = $order(children(docName))
+            quit:docName=""
+            continue:'##class(%Library.RoutineMgr).Exists(docName)
+            if '##class(%Library.RoutineMgr).IsMapped(docName) {
+                set found = 1
+                quit
+            }
+        }
+        quit:found
+    }
+    quit found
 }
 
 /// Shows the namespace and current DB path, then prompts for y/N confirmation.

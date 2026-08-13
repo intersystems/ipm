@@ -1404,9 +1404,11 @@ Method ExportPythonDependencies(
     $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
     set wheelsDir = ##class(%File).NormalizeDirectory("wheels", module.Root)
     if '##class(%File).DirectoryExists(wheelsDir) {
-        // ExportPythonDependencies called on base module + dependencies so don't want to error if one of
-        // the modules doesn't have a wheels directory since that might actually be the case for the module
-        write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        // A module without Python requirements legitimately has no wheels directory, so this is only worth warning about
+        // when requirements.txt exists but the download produced nothing.
+        if ##class(%File).Exists(##class(%File).NormalizeFilename("requirements.txt", root)) {
+            write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        }
         quit
     }
     set stmt = ##class(%SQL.Statement).%New()
