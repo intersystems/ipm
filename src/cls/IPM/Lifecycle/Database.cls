@@ -51,23 +51,8 @@ Method %Package(ByRef params) As %Status
         do ..ValidateIPMNotInRoutinesDB()
         do ..ValidateRoutinesDatabaseNotMirrored(ns)
 
-        // Warn about <Invoke> elements with Phase="Reload" When="Before" — these fire before
-        // %Reload runs the DB swap, so packaged classes don't exist yet and the invoke will fail.
-        // All other phases (Reload.After onward) run after the swap completes normally.
-        // Custom phases are excluded — they're on-demand operations, never part of standard install.
-        set key = ""
-        for {
-            set invoke = ..Module.Invokes.GetNext(.key)
-            quit:(key = "")
-            if invoke.CustomPhase '= "" {
-                continue
-            }
-            if (invoke.Phase = "Reload") && (invoke.When = "Before") {
-                write !, "WARNING: <Invoke Class="""_invoke.Class_""" Method="""_invoke.Method_""" Phase=""Reload"" When=""Before""> will not run during database install."
-                write !, "  The DB swap runs inside %Reload — Reload.Before fires before the DB is mounted."
-                write !, "  Use Phase=""Reload"" When=""After"" or a later phase for install-time setup."
-            }
-        }
+        do ..WarnUnrunnableInvokes()
+        do ..WarnMappingsNotApplied()
 
         if useCurrentDB {
             set curDBName = ..GetRoutinesDBName(ns)
@@ -188,15 +173,18 @@ Method %Reload(ByRef params) As %Status
     quit ##super(.params)
 }
 
-/// Validate, swap the DB, register metadata. Any failure after the filesystem swap triggers
-/// an explicit rollback. Injects IsInstallContext into params before the swap so downstream
-/// phases can check it without re-examining the filesystem.
+/// Validate, swap the DB, register metadata, and run post-swap steps.
+/// Injects IsInstallContext into params before the swap so downstream phases can check it without
+/// re-examining the filesystem. Rollback is performed only on swap-mechanics failures; post-swap
+/// failures are reported forward because the swap is the state to keep.
 Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
 {
     set params("IsInstallContext") = 1
     set sc = $$$OK
     set dbDir = ""
     set backupPath = ""
+    set swapCompleted = 0
+    set staleModules = ""
     try {
         if $get(params("DeveloperMode")) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Database packages cannot be installed in developer mode."))
@@ -216,7 +204,16 @@ Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
         do ..UnconfigureStaleModules(staleModules, .params)
 
         do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
+        // Past this point the swap is the state to keep, not to undo: a rollback would discard a
+        // good swap and could not reverse the side effects of the steps that follow.
+        set swapCompleted = 1
+
         do ##class(%IPM.Lifecycle.Database).RegisterDependencyMetadata(packageDir)
+
+        // Dependencies get their phases here rather than in a chain of their own: at this point the
+        // swap has landed, so their compiled code is mounted and their staged files are reachable.
+        do ..ApplyDependencyResources(packageDir, .params, .depInitClasses)
+        do ..ReassertRootInitializeResources(.depInitClasses, .params)
 
         // Only once the swap and metadata registration have both succeeded: the code behind these
         // modules is gone, so their records would otherwise linger in 'list' with nothing behind
@@ -235,11 +232,19 @@ Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
 
     } catch ex {
         set sc = ex.AsStatus()
-        if dbDir '= "" {
+        if swapCompleted {
+            do ..ReportPostSwapFailure(sc, $get(ns, $namespace), backupPath)
+        } elseif dbDir '= "" {
             write !, "ERROR: encountered an error: ", $system.Status.GetErrorText(sc)
             write !, "Attempting to roll back system state..."
             do ..RollbackDatabaseSwap(dbDir, backupPath)
             write !, "Finished rollback attempt. Please verify whether namespace state is as expected prior to performing the DB swap."
+            if staleModules '= "" {
+                write !, "WARNING: the rollback restored the previous IRIS.DAT, but it cannot restore what was already"
+                write !, "  unconfigured before the swap. These modules had their web applications, copied files and"
+                write !, "  installer-class effects removed and are now only partially installed: ", $listtostring(staleModules, ", ")
+                write !, "  Reinstall them to return the namespace to a working state."
+            }
         }
     }
     quit sc
@@ -362,6 +367,82 @@ Method %Activate(ByRef params) As %Status
 // =====================================================================
 // Packaging helpers
 // =====================================================================
+
+/// Warns that <Mapping> elements are not applied by a database install.
+/// Mappings are applied by Base.%Reload, which this path does not run. Applying them here instead
+/// deadlocks against a <CPF> merge: the config locks Config.Map* takes are held until the install's
+/// transaction commits, and the merge shells out to 'iris merge', which cannot wait that out.
+/// Source installs are unaffected — they merge at Initialize, before mappings apply at Reload.
+Method WarnMappingsNotApplied()
+{
+    set modules = ..GetDependencyModules(..Module)
+    do modules.InsertAt(..Module, 1)
+
+    set mKey = ""
+    for {
+        #dim module As %IPM.Storage.Module
+        set module = modules.GetNext(.mKey)
+        quit:mKey=""
+        continue:'module.Mappings.Count()
+
+        set isRoot = (module.Name = ..Module.Name)
+        write !, "WARNING: ", module.Mappings.Count(), " <Mapping> element(s) in "
+        write $select(isRoot: "this module", 1: "dependency '" _ module.Name _ "'")
+        write " will not be applied during database install."
+        write !, "  Globals, packages and routines these map from another database will resolve locally instead."
+        write !, "  Apply them manually after install, or install this module from source."
+    }
+}
+
+/// Warns about <Invoke> elements that no phase of a database install will reach.
+/// Root: the DB swap runs inside %Reload, so Reload.Before fires before the DB is mounted.
+/// Dependencies: phases in GetDependencyExcludedPhases never run for them, so an invoke on one of
+/// those phases is unreachable in both When positions.
+/// Custom phases are excluded — they are on-demand operations, never part of a standard install.
+Method WarnUnrunnableInvokes()
+{
+    set modules = ..GetDependencyModules(..Module)
+    do modules.InsertAt(..Module, 1)
+
+    set mKey = ""
+    for {
+        #dim module As %IPM.Storage.Module
+        set module = modules.GetNext(.mKey)
+        quit:mKey=""
+
+        set isRoot = (module.Name = ..Module.Name)
+        set key = ""
+        for {
+            #dim invoke As %IPM.Storage.InvokeReference
+            set invoke = module.Invokes.GetNext(.key)
+            quit:(key = "")
+            if invoke.CustomPhase '= "" {
+                continue
+            }
+
+            set unreachable = 0
+            if isRoot {
+                set unreachable = (invoke.Phase = "Reload") && (invoke.When = "Before")
+            } else {
+                // Same source of truth as the dependency pass, so the two cannot drift apart.
+                set unreachable = $listfind(..GetDependencyExcludedPhases(), invoke.Phase) > 0
+            }
+            if 'unreachable {
+                continue
+            }
+
+            write !, "WARNING: <Invoke Class="""_invoke.Class_""" Method="""_invoke.Method_""" Phase="""_invoke.Phase_""" When="""_invoke.When_""">"
+            write " in ", $select(isRoot: "this module", 1: "dependency '" _ module.Name _ "'"), " will not run during database install."
+            if isRoot {
+                write !, "  The DB swap runs inside %Reload. Reload.Before fires before the DB is mounted."
+                write !, "  Use Phase=""Reload"" When=""After"" or a later phase for install-time setup."
+            } else {
+                write !, "  Dependencies run ", $listtostring(..GetDependencyInstallPhases(), ", "), " after the swap; their code is already compiled into IRIS.DAT."
+                write !, "  Use one of those phases for install-time setup in a dependency."
+            }
+        }
+    }
+}
 
 /// Throws if IPM classes are in the local routines database. IPM must be mapped so it survives the swap.
 ClassMethod ValidateIPMNotInRoutinesDB()
@@ -593,6 +674,10 @@ Method AssemblePackage(
     set includeTestResources = $get(params("DeveloperMode"), 0)
     set exportPythonDeps = $get(params("ExportPythonDependencies"), 1)
     do ..CopyNonCompiledResources(stagingDir, includeTestResources, exportPythonDeps)
+    kill depWheels
+    if exportPythonDeps {
+        do ..StageDependencyWheels(stagingDir, .params, .depWheels)
+    }
 
     // Bare "<major>.<minor>" is an exact-match semver expression, not a floor, so the package will
     // only install on the IRIS version that built it.
@@ -605,7 +690,7 @@ Method AssemblePackage(
         write !, "WARNING: Overwriting existing SystemRequirements Version '", existingVersion, "' with '", irisVersion, "'"
     }
     do ..WritePackageModuleXML(stagingDir, checksumHex, irisVersion)
-    do ..WriteDependencies(stagingDir)
+    do ..WriteDependencies(stagingDir, .depWheels)
 
     set outputDir = $get(params("Path"))
     if outputDir = "" {
@@ -631,14 +716,53 @@ Method AssemblePackage(
     quit packageFile
 }
 
-/// Copies non-compiled resource files (FileCopy, PythonWheel, CPF) into stagingDir.
+/// Returns the staging subdirectory holding one dependency's non-compiled files.
+/// Becomes that dependency's Root during the install-time dependency pass.
+ClassMethod GetDependencyStagingDir(
+	stagingDir As %String,
+	depName As %String) As %String
+{
+    quit ##class(%Library.File).NormalizeDirectory(stagingDir _ "deps-files/" _ depName)
+}
+
+/// Copies non-compiled resource files (FileCopy, PythonWheel, CPF) for this module and each
+/// transitive dependency into stagingDir. Dependency files go under deps-files/<depname>/ so the
+/// install-time dependency pass can point that dependency's Root at them.
+/// The per-dependency directory is created even when empty: install always sets Root to it, and a
+/// Root pointing at a nonexistent directory would resolve paths on the packaging machine instead.
 /// WebApplication is configuration-only and has no file to stage.
 Method CopyNonCompiledResources(
 	stagingDir As %String,
 	includeTestResources As %Boolean,
 	exportPythonDeps As %Boolean = 1)
 {
-    set orderedResourceList = ..Module.GetOrderedResourceList()
+    do ..StageModuleResources(..Module, stagingDir, includeTestResources, exportPythonDeps)
+
+    set deps = ..GetDependencyModules(..Module)
+    set mKey = ""
+    for {
+        #dim depModule As %IPM.Storage.Module
+        set depModule = deps.GetNext(.mKey)
+        quit:mKey=""
+
+        set depDir = ..GetDependencyStagingDir(stagingDir, depModule.Name)
+        set result = ""
+        if '##class(%Library.File).CreateDirectoryChain(depDir, .result) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create dependency staging dir: " _ depDir _ " - " _ result))
+        }
+        do ..StageModuleResources(depModule, depDir, includeTestResources, exportPythonDeps)
+    }
+}
+
+/// Stages one module's non-compiled resource files into targetDir, mirroring the relative layout
+/// the resource processors expect under a module root.
+Method StageModuleResources(
+	module As %IPM.Storage.Module,
+	targetDir As %String,
+	includeTestResources As %Boolean,
+	exportPythonDeps As %Boolean = 1)
+{
+    set orderedResourceList = module.GetOrderedResourceList()
     set key = ""
     for {
         #dim resource As %IPM.Storage.ResourceReference
@@ -656,27 +780,96 @@ Method CopyNonCompiledResources(
 
         if resource.Processor.%IsA("%IPM.ResourceProcessor.FileCopy") {
             set name = resource.Processor.Name
-            set sourcePath = ##class(%Library.File).NormalizeFilename(name, ..Module.Root)
-            set destPath = ##class(%Library.File).NormalizeFilename(name, stagingDir)
+            set sourcePath = ##class(%Library.File).NormalizeFilename(name, module.Root)
+            set destPath = ##class(%Library.File).NormalizeFilename(name, targetDir)
             do ..StageResourceFile(resource.Name, sourcePath, destPath)
 
         } elseif exportPythonDeps && resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") {
             set wheelDir = resource.Processor.Directory
             set wheelName = resource.Processor.Name
-            set sourcePath = ##class(%Library.File).NormalizeFilename(wheelName, ##class(%Library.File).NormalizeDirectory(..Module.Root _ wheelDir))
-            set destPath = ##class(%Library.File).NormalizeDirectory(stagingDir _ wheelDir) _ wheelName
+            set sourcePath = ##class(%Library.File).NormalizeFilename(wheelName, ##class(%Library.File).NormalizeDirectory(module.Root _ wheelDir))
+            set destPath = ##class(%Library.File).NormalizeDirectory(targetDir _ wheelDir) _ wheelName
             do ..StageResourceFile(resource.Name, sourcePath, destPath)
 
         } elseif resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") {
             set cpfName = resource.Processor.Name
             set cpfSubdir = resource.Processor.Directory
-            set sourcePath = ##class(%Library.File).NormalizeFilename(cpfName, ##class(%Library.File).NormalizeDirectory(..Module.Root _ ..Module.SourcesRoot _ "/" _ cpfSubdir))
-            set destPath = ##class(%Library.File).NormalizeDirectory(stagingDir _ ..Module.SourcesRoot _ "/" _ cpfSubdir) _ cpfName
+            set sourcePath = ##class(%Library.File).NormalizeFilename(cpfName, ##class(%Library.File).NormalizeDirectory(module.Root _ module.SourcesRoot _ "/" _ cpfSubdir))
+            set destPath = ##class(%Library.File).NormalizeDirectory(targetDir _ module.SourcesRoot _ "/" _ cpfSubdir) _ cpfName
             do ..StageResourceFile(resource.Name, sourcePath, destPath)
 
         }
         // Compiled resources (Class, Routine, Include, etc.) are handled via IRIS.DAT so no file staging needed.
         // WebApplication is configuration-only so no file staging needed.
+    }
+}
+
+/// Downloads each dependency's requirements.txt wheels and stages them under
+/// deps-files/<depname>/wheels/. Returns depWheels(depName, wheelName) = "" for each wheel that is
+/// not already an explicit <PythonWheel> resource; WriteDependencies injects those into the
+/// dependency's exported manifest so the install-time dependency pass installs them.
+/// Injecting into the export rather than the installed .ZPM keeps the packaging machine unmodified.
+Method StageDependencyWheels(
+	stagingDir As %String,
+	ByRef params,
+	Output depWheels) [ Private ]
+{
+    kill depWheels
+
+    set deps = ..GetDependencyModules(..Module)
+    set mKey = ""
+    for {
+        #dim depModule As %IPM.Storage.Module
+        set depModule = deps.GetNext(.mKey)
+        quit:mKey=""
+
+        set depRoot = ##class(%Library.File).NormalizeDirectory("", depModule.Root)
+        if '##class(%Library.File).Exists(##class(%Library.File).NormalizeFilename("requirements.txt", depRoot)) {
+            continue
+        }
+
+        $$$ThrowOnError(..InstallOrDownloadPythonRequirements(depRoot, .params, 1))
+
+        set wheelsDir = ##class(%Library.File).NormalizeDirectory("wheels", depRoot)
+        if '##class(%Library.File).DirectoryExists(wheelsDir) {
+            write !, "WARNING: No wheels directory for dependency '", depModule.Name, "': ", wheelsDir, " not found"
+            continue
+        }
+
+        // Wheels already declared as <PythonWheel> are staged by StageModuleResources; injecting
+        // them again would give the dependency two resources for one file.
+        kill declared
+        set declaredList = depModule.GetOrderedResourceList()
+        set rKey = ""
+        for {
+            #dim depResource As %IPM.Storage.ResourceReference
+            set depResource = declaredList.GetNext(.rKey)
+            quit:rKey=""
+            set declared($zconvert(depResource.Name, "L")) = ""
+        }
+
+        set destWheelDir = ##class(%Library.File).NormalizeDirectory(..GetDependencyStagingDir(stagingDir, depModule.Name) _ "wheels")
+
+        set rs = ##class(%SQL.Statement).%ExecDirect(,
+            "SELECT ItemName FROM %Library.File_FileSet(?, ?, ?, ?)",
+            wheelsDir, "*.whl", "", 0)
+        if rs.%SQLCODE < 0 {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing wheels for dependency '" _ depModule.Name _ "': " _ rs.%Message))
+        }
+        set sc = $$$OK
+        while rs.%Next(.sc) {
+            $$$ThrowOnError(sc)
+            set wheelName = rs.%Get("ItemName")
+            continue:wheelName=""
+            do ..StageResourceFile(
+                depModule.Name _ "/" _ wheelName,
+                ##class(%Library.File).NormalizeFilename(wheelName, wheelsDir),
+                destWheelDir _ wheelName)
+            if '$data(declared($zconvert(wheelName, "L"))) {
+                set depWheels(depModule.Name, wheelName) = ""
+            }
+        }
+        $$$ThrowOnError(sc)
     }
 }
 
@@ -827,7 +1020,11 @@ ClassMethod CompilePackagingTransform(checksumHex As %String, irisVersion As %St
 
 /// Writes each dependency's IPM metadata to deps/<name>.xml as a standalone IRIS export,
 /// loadable at install time with $system.OBJ.Load.
-Method WriteDependencies(targetDir As %String)
+/// depWheels(depName, wheelName) entries are injected as <PythonWheel> elements into that
+/// dependency's exported manifest.
+Method WriteDependencies(
+	targetDir As %String,
+	ByRef depWheels)
 {
     set depsDir = ##class(%Library.File).NormalizeDirectory(
         ##class(%Library.File).NormalizeFilename("deps", targetDir))
@@ -843,6 +1040,17 @@ Method WriteDependencies(targetDir As %String)
         $$$ThrowOnError(fileStream.LinkToFile(depFile))
         set exportStream = ##class(%Stream.TmpCharacter).%New()
         $$$ThrowOnError($system.OBJ.ExportToStream(depName _ ".ZPM", .exportStream, "-d"))
+
+        set wheelName = ""
+        for {
+            set wheelName = $order(depWheels(depName, wheelName))
+            quit:wheelName=""
+            $$$ThrowOnError(exportStream.Rewind())
+            set transform = ##class(%IPM.StudioDocument.Module).CompileAppendWheelUnderModuleXSLT(wheelName)
+            $$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(exportStream, transform, .injected))
+            set exportStream = injected
+        }
+
         $$$ThrowOnError(exportStream.Rewind())
         $$$ThrowOnError(fileStream.CopyFrom(exportStream))
         $$$ThrowOnError(fileStream.%Save())
@@ -895,6 +1103,41 @@ ClassMethod GetDependencyNames(module As %IPM.Storage.Module) As %List
         set names = names _ $listbuild(deps.GetAt(i).Name)
     }
     quit names
+}
+
+/// Returns installed transitive dependency names with dependencies before dependents.
+/// Unlike GetDependencyNames (name order), this ordering is required when running lifecycle phases:
+/// a dependency's phase may rely on a deeper dependency's files already being in place.
+/// Resolves entirely from locally registered metadata — no repository access.
+ClassMethod GetTopologicalDependencyNames(module As %IPM.Storage.Module) As %List
+{
+    kill visited
+    set ordered = ""
+    do ..VisitDependencies(module, .visited, .ordered)
+    quit ordered
+}
+
+/// Depth-first post-order helper for GetTopologicalDependencyNames.
+/// Marks each module visited before recursing so dependency cycles terminate.
+ClassMethod VisitDependencies(
+	module As %IPM.Storage.Module,
+	ByRef visited,
+	ByRef ordered) [ Private ]
+{
+    for i=1:1:module.Dependencies.Count() {
+        set depName = module.Dependencies.GetAt(i).Name
+        if $data(visited($zconvert(depName, "L"))) {
+            continue
+        }
+        set visited($zconvert(depName, "L")) = ""
+        if '##class(%IPM.Storage.Module).NameExists(depName) {
+            continue
+        }
+        set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
+        $$$ThrowOnError(sc)
+        do ..VisitDependencies(depModule, .visited, .ordered)
+        set ordered = ordered _ $listbuild(depModule.Name)
+    }
 }
 
 // =====================================================================
@@ -1222,6 +1465,183 @@ ClassMethod RegisterDependencyMetadata(packageDir As %String)
     }
     while rs.%Next() {
         $$$ThrowOnError($system.OBJ.Load(rs.%Get("Name"), "ck"))
+    }
+}
+
+/// Phases a dependency must not run during a database install, with the reason for each.
+/// Reload: no source ships for a dependency, and Base.%Reload early-exits without a root.
+/// Compile: the code is already compiled into IRIS.DAT.
+/// "*": the module-refresh checkpoint, meaningful only for the module being installed.
+/// Edit here — not in GetDependencyInstallPhases — when this judgment changes.
+ClassMethod GetDependencyExcludedPhases() As %List
+{
+    quit $listbuild("Reload", "Compile", "*")
+}
+
+/// Derives the phases each dependency runs from the canonical install chain, minus the exclusions.
+/// Derived rather than hardcoded so a phase added to GetCompletePhasesForOne is not silently
+/// skipped for dependencies; TestDependencyPhasesCoverCanonicalChain fails if a new canonical phase
+/// is neither run nor explicitly excluded.
+ClassMethod GetDependencyInstallPhases(isUpdate As %Boolean = 0) As %List
+{
+    // Mirrors the entry point the install itself picks (%IPM.Utils.Module:LoadNewModule).
+    set entryPhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
+    set canonical = ##class(%IPM.Lifecycle.Base).GetCompletePhasesForOne(entryPhase)
+    set excluded = ..GetDependencyExcludedPhases()
+
+    set phases = ""
+    set ptr = 0
+    while $listnext(canonical, ptr, onePhase) {
+        continue:onePhase=""
+        continue:$listfind(excluded, onePhase)
+        set phases = phases _ $listbuild(onePhase)
+    }
+    quit phases
+}
+
+/// Runs each transitive dependency's install phases after the swap, so dependency-owned
+/// non-compiled resources (FileCopy, CPF, PythonWheel, WebApplication) and <Invoke> elements are
+/// applied rather than silently dropped.
+/// Topological order: a dependency's phases may rely on a deeper dependency's files.
+/// Each dependency's Root points at its deps-files/<name>/ staging directory inside the package.
+/// depInitClasses (output): processor class names a dependency used at Initialize. The root's
+/// Initialize already ran before the swap, so ReassertRootInitializeResources uses this to
+/// re-apply only the affected root resources.
+Method ApplyDependencyResources(
+	packageDir As %String,
+	ByRef params,
+	Output depInitClasses) [ Private ]
+{
+    kill depInitClasses
+
+    set depNames = ..GetTopologicalDependencyNames(..Module)
+    if depNames = "" {
+        quit
+    }
+
+    set verbose = $get(params("Verbose"))
+    set isUpdate = $get(params("Update"), 0)
+    set depPhases = ..GetDependencyInstallPhases(isUpdate)
+    set ptr = 0
+    while $listnext(depNames, ptr, depName) {
+        continue:depName=""
+        if '##class(%IPM.Storage.Module).NameExists(depName) {
+            continue
+        }
+
+        set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
+        $$$ThrowOnError(sc)
+        do ..CollectInitializePhaseClasses(depModule, .depInitClasses)
+
+        write:verbose !, "Applying resources for dependency ", depName
+
+        // Only Verbose, cmd and Update carry over: the root's remaining install params (install
+        // context, root directory, swap flag, previous dependency set) describe the incoming
+        // package. Update decides whether Activate seeds update steps or ApplyUpdateSteps runs them.
+        kill depParams
+        set depParams("Verbose") = verbose
+        set depParams("cmd") = $get(params("cmd"))
+        set depParams("Update") = isUpdate
+        set depParams("RootDirectory") = ..GetDependencyStagingDir(packageDir, depName)
+
+        set phasePtr = 0
+        while $listnext(depPhases, phasePtr, depPhase) {
+            // isComplete = 0: expanding the chain again would reintroduce the excluded phases.
+            set sc = ##class(%IPM.Storage.Module).ExecutePhases(depName, $listbuild(depPhase), 0, .depParams)
+            if $$$ISERR(sc) {
+                write !, "ERROR: dependency '", depName, "' failed during ", depPhase, ": ", $system.Status.GetErrorText(sc)
+                $$$ThrowStatus(sc)
+            }
+        }
+    }
+}
+
+/// Re-applies the root module's Initialize-phase resources after the dependency pass.
+/// The root's Initialize completed before the swap, so a dependency's Initialize resources land
+/// afterwards and take precedence. Re-asserting restores the root's intended precedence.
+/// Scoped to processor classes a dependency actually used at Initialize: with no dependency CPF or
+/// wheel there is nothing to correct, and a CPF merge costs a subprocess call. Both affected
+/// processors are safe to repeat — a merge applies file values, a present wheel is a no-op.
+Method ReassertRootInitializeResources(
+	ByRef depInitClasses,
+	ByRef params) [ Private ]
+{
+    if '$data(depInitClasses) {
+        quit
+    }
+
+    kill rootInitClasses
+    do ..CollectInitializePhaseClasses(..Module, .rootInitClasses)
+
+    set orderedResourceList = ..Module.GetOrderedResourceList()
+    set key = ""
+    for {
+        #dim resource As %IPM.Storage.ResourceReference
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+        continue:'$isobject(resource.Processor)
+
+        do resource.Processor.SetParams(.params)
+
+        if resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") && $data(depInitClasses("%IPM.ResourceProcessor.CPF")) && $data(rootInitClasses("%IPM.ResourceProcessor.CPF")) {
+            if (resource.Processor.CustomPhase '= "") || (resource.Processor.Phase '= "Initialize") {
+                continue
+            }
+            write !, "Re-applying CPF merge '", resource.Name, "' — a dependency merged a CPF after this module's Initialize phase."
+            if resource.Processor.When = "After" {
+                $$$ThrowOnError(resource.Processor.OnAfterPhase("Initialize", .params))
+            } else {
+                $$$ThrowOnError(resource.Processor.OnBeforePhase("Initialize", .params))
+            }
+
+        } elseif resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") && $data(depInitClasses("%IPM.ResourceProcessor.PythonWheel")) {
+            write !, "Re-installing Python wheel '", resource.Name, "' — a dependency installed a wheel after this module's Initialize phase."
+            set handled = 0
+            $$$ThrowOnError(resource.Processor.OnPhase("Initialize", .params, .handled))
+        }
+    }
+}
+
+/// Records the processor class of each resource that acts during the Initialize phase.
+/// CPF is phase-configurable, so only count it when it actually targets Initialize.
+ClassMethod CollectInitializePhaseClasses(
+	module As %IPM.Storage.Module,
+	ByRef initClasses)
+{
+    set orderedResourceList = module.GetOrderedResourceList()
+    set key = ""
+    for {
+        #dim resource As %IPM.Storage.ResourceReference
+        set resource = orderedResourceList.GetNext(.key)
+        quit:key=""
+        continue:'$isobject(resource.Processor)
+
+        if resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") {
+            set initClasses("%IPM.ResourceProcessor.PythonWheel") = ""
+        } elseif resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") {
+            if (resource.Processor.CustomPhase = "") && (resource.Processor.Phase = "Initialize") {
+                set initClasses("%IPM.ResourceProcessor.CPF") = ""
+            }
+        }
+    }
+}
+
+/// Reports a failure that happened after the swap already succeeded, without rolling back.
+/// A rollback here would discard a working swap and could not reverse what the post-swap steps
+/// already did (dependency CPF merges, installed wheels, copied files), leaving old code paired
+/// with new configuration. These failures are normally fixable forward and the install re-run.
+Method ReportPostSwapFailure(
+	sc As %Status,
+	ns As %String,
+	backupPath As %String) [ Private ]
+{
+    write !, "ERROR: the database swap succeeded but a later step failed: ", $system.Status.GetErrorText(sc)
+    write !, "  Namespace ", ns, " is running on the newly installed IRIS.DAT — this was NOT rolled back."
+    write !, "  Rolling back would discard a successful swap and could not undo the side effects of the steps"
+    write !, "  that already ran (dependency CPF merges, installed Python wheels, copied files)."
+    write !, "  Fix the reported problem and re-run the install to retry the remaining steps."
+    if backupPath '= "" {
+        write !, "  To revert manually instead, restore the previous database from: ", backupPath
     }
 }
 

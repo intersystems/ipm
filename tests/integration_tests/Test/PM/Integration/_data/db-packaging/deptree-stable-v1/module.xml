@@ -7,6 +7,8 @@
       <Packaging>module</Packaging>
       <SourcesRoot>src</SourcesRoot>
       <Resource Name="DepTree.Stable.CLS" />
+      <Resource Name="DepTree.StableSteps.PKG" />
+      <UpdatePackage>DepTree.StableSteps</UpdatePackage>
     </Module>
   </Document>
 </Export>
