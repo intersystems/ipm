@@ -13,6 +13,8 @@
         </ModuleReference>
       </Dependencies>
       <Resource Name="DepTree.Stable.CLS" />
+      <Resource Name="DepTree.StableSteps.PKG" />
+      <UpdatePackage>DepTree.StableSteps</UpdatePackage>
     </Module>
   </Document>
 </Export>
