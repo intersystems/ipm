@@ -38,7 +38,7 @@ Property SharedNS1 As %String;
 /// Note: Each module loaded here must use a distinct PythonWheel filename — IPM disallows
 /// two modules in the same namespace from claiming the same wheel. If adding a module with a
 /// PythonWheel or requirements.txt, ensure it uses a wheel not already claimed by another
-/// module in this namespace (e.g. lune, colorama, pycparser, packaging are already taken).
+/// module in this namespace (e.g. lune, colorama, pycparser, packaging, six are already taken).
 Property SharedNS2 As %String;
 
 /// Globals databases for shared namespaces — tracked separately since they outlive individual tests.
@@ -314,6 +314,8 @@ Method GetOrCreateSharedNS2() As %String
     set reqsDir = ..GetModuleDir("db-packaging", "module-with-requirements")
     set mixPyDir = ..GetModuleDir("db-packaging", "module-with-mixed-python")
     set nonCmpDir = ..GetModuleDir("db-packaging", "module-with-non-compiled-resources")
+    set depResDir = ..GetModuleDir("db-packaging", "dep-with-resources")
+    set mainResDir = ..GetModuleDir("db-packaging", "main-with-resource-deps")
 
     $$$ThrowOnError(..CreateTestNamespace(ns))
     // Move the shared NS from per-test tracking to shared tracking
@@ -330,6 +332,8 @@ Method GetOrCreateSharedNS2() As %String
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ reqsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ mixPyDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ nonCmpDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ depResDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ mainResDir))
 
     set ..SharedNS2 = ns
     quit ns
@@ -854,6 +858,9 @@ Method TestInstallRejectedWhenModulesWouldBeOrphaned()
 /// added/dropped pair so that each feature is isolated: a bug that keys off direct dependencies
 /// rather than the flattened set fails on deptree-leaf, and one that ignores transitive additions
 /// fails on deptree-extra.
+///
+/// deptree-stable also carries an <UpdatePackage>, so the version bump doubles as coverage that a
+/// dependency's own update steps are seeded on install and run on upgrade.
 Method TestUpdateWithChangedDependencyTree()
 {
     // Resolve all module dirs before any namespace switch (^UnitTestRoot only in the original NS)
@@ -902,7 +909,12 @@ Method TestUpdateWithChangedDependencyTree()
     do $$$AssertStatusOK(..CreateTestNamespace(installNS), "Created install namespace")
     set $namespace = installNS
 
+    kill ^DBPkgDepTreeSteps
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ v1Package _ " -swap-db"), "Installed deptree-parent 1.0.0")
+
+    // deptree-stable's own update steps: seeded, not run, on a fresh install — its v1 work is
+    // already baked into the IRIS.DAT, same as for the root module.
+    do $$$AssertEquals($get(^DBPkgDepTreeSteps("step001"), 0), 0, "Dependency Step001 seeded, not run, during v1 install")
 
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Parent"), "Parent class present after v1 install")
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Dropped"), "deptree-dropped code in v1 IRIS.DAT")
@@ -938,7 +950,15 @@ Method TestUpdateWithChangedDependencyTree()
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Stable"), "deptree-stable code present after upgrade")
     do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("deptree-stable"), "deptree-stable metadata retained")
 
+    // A dependency's own update steps run during a database upgrade, matching a source upgrade:
+    // deptree-stable went 1.0.0 -> 2.0.0, so its new Step002 must run while the seeded Step001
+    // stays skipped. Without ApplyUpdateSteps in the dependency phase list both counters stay 0.
+    do $$$AssertEquals($get(^DBPkgDepTreeSteps("step002"), 0), 1, "Dependency Step002 ran exactly once during the database upgrade")
+    do $$$AssertEquals($get(^DBPkgDepTreeSteps("step001"), 0), 0, "Dependency Step001 still skipped — seeded at v1 install")
+
     do $$$AssertTrue(..CountBackupFiles(installNS) > 1, "Second backup created — the DB was swapped again during the upgrade")
+
+    kill ^DBPkgDepTreeSteps
 }
 
 /// Tests all Python dependency packaging behaviour in one pass:
@@ -1555,6 +1575,109 @@ Method TestChecksumMatchesShippedDat()
     do $$$AssertEquals($zconvert(actual, "L"), $zconvert(embedded, "L"), "Embedded checksum matches shipped IRIS.DAT")
 
     do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)
+}
+
+/// A dependency's non-compiled and config-only resources must be applied during a database
+/// install, not silently dropped: FileCopy, CPF, requirements.txt wheels, Generated resources and
+/// <Invoke> elements all belong to the dependency, whose lifecycle phases run after the swap.
+///
+/// Also pins Initialize-phase precedence. Both modules merge a CPF touching the same setting; the
+/// dependency's merge happens after the root's Initialize has already passed, so the root
+/// re-asserts its own merge afterwards and its value must be the one that survives.
+Method TestDependencyResourcesAppliedDuringInstall()
+{
+    set packagingNS = ..GetOrCreateSharedNS2()
+
+    new $namespace
+    set $namespace = packagingNS
+
+    set sc = ##class(%IPM.Main).Shell("package-database main-with-resource-deps -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged main-with-resource-deps as database")
+
+    set packageFile = ..PackageOutputDir _ "main-with-resource-deps-1.0.0-database.tgz"
+    do $$$AssertTrue(##class(%Library.File).Exists(packageFile), "Database package .tgz exists")
+
+    // --- Package contents: dependency files must be staged under deps-files/<depname>/ ---
+    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "dep-staging-check")
+    do ##class(%Library.File).CreateDirectory(extractDir)
+    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
+    do $$$AssertStatusOK(sc, "Extracted package for staging check")
+
+    set depStageDir = ##class(%IPM.Lifecycle.Database).GetDependencyStagingDir(extractDir, "dep-with-resources")
+    do $$$AssertTrue(##class(%Library.File).Exists(##class(%Library.File).NormalizeFilename("dep-data.txt", depStageDir)), "Dependency FileCopy source staged under deps-files/")
+    do $$$AssertTrue(##class(%Library.File).Exists(##class(%Library.File).NormalizeFilename("src/cpf/dep.cpf", depStageDir)), "Dependency CPF staged under deps-files/")
+
+    // Dependency requirements.txt wheels are staged and declared in the dependency's manifest,
+    // never in the packaging machine's installed .ZPM.
+    set wheelRS = ##class(%SQL.Statement).%ExecDirect(, "SELECT ItemName FROM %Library.File_FileSet(?, ?, ?, ?)", ##class(%Library.File).NormalizeDirectory("wheels", depStageDir), "six*.whl", "", 0)
+    do $$$AssertEquals(wheelRS.%SQLCODE, 0, "Listed staged dependency wheels")
+    do $$$AssertTrue(wheelRS.%Next(), "Dependency requirements.txt wheel (six) staged under deps-files/")
+
+    set depManifest = ##class(%Library.File).NormalizeFilename("dep-with-resources.xml", ##class(%Library.File).NormalizeDirectory("deps", extractDir))
+    set manifestStream = ##class(%Stream.FileCharacter).%New()
+    do $$$AssertStatusOK(manifestStream.LinkToFile(depManifest), "Opened dependency manifest")
+    set manifestText = ""
+    while 'manifestStream.AtEnd {
+        set manifestText = manifestText _ manifestStream.Read(16000)
+    }
+    do $$$AssertTrue(manifestText [ "PythonWheel", "Dependency manifest declares an injected <PythonWheel>")
+
+    // --- Clear pre-existing side effects so the install is what creates them ---
+    set mgrDir = ##class(%Library.File).ManagerDirectory()
+    set parentDir = ##class(%Library.File).ParentDirectoryName(mgrDir)
+    set depCopyTarget = ##class(%Library.File).NormalizeFilename("dep-res-data.txt", parentDir)
+    set mainCopyTarget = ##class(%Library.File).NormalizeFilename("main-res-data.txt", parentDir)
+    do ..DeletePath(depCopyTarget)
+    do ..DeletePath(mainCopyTarget)
+    do $$$AssertNotTrue(##class(%Library.File).Exists(depCopyTarget), "Dependency FileCopy target absent before install")
+
+    // --- Install ---
+    set installNS = "TESTDBDEPRESINS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created install namespace")
+    set $namespace = installNS
+
+    kill ^DBPkgDepInvoked
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Installed main-with-resource-deps database package")
+
+    // Compiled code for both modules, and the dependency's Generated resource, come from IRIS.DAT
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("MainRes.App"), "MainRes.App present")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepRes.Core"), "DepRes.Core present")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepRes.Generated"), "Dependency Generated resource present")
+    do $$$AssertEquals(##class(DepRes.Generated).GetGeneratedValue(), "Dependency generated value", "Dependency Generated class works")
+
+    // Dependency non-compiled resources applied by the post-swap dependency pass
+    do $$$AssertTrue(##class(%Library.File).Exists(depCopyTarget), "Dependency FileCopy applied during install")
+    do $$$AssertTrue(##class(%Library.File).Exists(mainCopyTarget), "Root FileCopy applied during install")
+
+    // Dependency <Invoke> at Activate.After ran exactly once
+    do $$$AssertEquals($get(^DBPkgDepInvoked, 0), 1, "Dependency <Invoke> ran exactly once during install")
+
+    // Root CPF value wins: the dependency merged after the root's Initialize, so the root
+    // re-asserted its own merge afterwards.
+    do ..AssertGlobals8KB(170000, "Root CPF value survives — re-asserted after the dependency merge")
+
+    kill ^DBPkgDepInvoked
+    do ..DeletePath(depCopyTarget)
+    do ..DeletePath(mainCopyTarget)
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)
+}
+
+/// Asserts the [config] globals 8KB-buffer setting both CPF fixtures target.
+/// Read-back property name matches Test.PM.Integration.CPFMerge:45.
+/// A CPF merge is instance-wide, not namespace-scoped, so this test leaves globals8kb at the
+/// root fixture's value for whatever runs next. Test.PM.Integration.CPFMerge asserts its own
+/// value after its own merge, so it is unaffected by run order — but any new test that reads
+/// globals8kb without merging first must not assume the instance default.
+Method AssertGlobals8KB(
+	expected As %Integer,
+	message As %String)
+{
+    new $namespace
+    set $namespace = "%SYS"
+    do $$$AssertStatusOK(##class(Config.config).Get(.props), "Read [config] section")
+    do $$$AssertEquals(props("globals8kb"), expected, message)
 }
 
 }
