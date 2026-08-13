@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
+- #986: Database packaging: new `package-database` and `publish-database` commands create an IRIS.DAT-based package that installs via swapping of the routines database rather than compilation of source files. Pass `-dev` to include test resources (`Scope="test"` or `Scope="verify"`) in the package; they are excluded by default.
 
 ## [0.10.9] - 2026-08-05
 
@@ -24,9 +25,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1212: Fix improper parsing of module versions with dashes in the pre-release string
 
 ## [0.10.8] - 2026-07-08
-
-### Added
-- #986: Database packaging: new `package-database` and `publish-database` commands create an IRIS.DAT-based package that installs via swapping of the routines database rather than compilation of source files.
 
 ### Fixed
 - #1192: Fix dependency resolution dropping incompatibilities and along with that fix a bug where

@@ -531,7 +531,7 @@ Method TestPackageAndInstallWithTestResources()
     set $namespace = packagingNS
 
     // Package WITH test resources
-    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -include-test-resources -path " _ ..PackageOutputDir)
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-tests -dev -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged with test resources")
 
     // Install and verify test resources are present
