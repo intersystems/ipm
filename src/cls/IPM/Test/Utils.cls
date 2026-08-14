@@ -76,13 +76,13 @@ ClassMethod CreateNamespace(
 
         // Ensemble-enable namespace
         if pEnableEnsemble {
-            set tSC = ##class(%EnsembleMgr).EnableNamespace(pNSName)
+            // pFromInstall=1 (4th arg) suppresses HS-specific global mappings that would otherwise
+            // point ^IRIS.Msg and its subscripts at HSLIB (read-only) on IRIS for Health.
+            set tSC = ##class(%EnsembleMgr).EnableNamespace(pNSName,,,1)
             if $$$ISERR(tSC) {
                 quit
             }
             // Map ^IRIS.Msg to the namespace's own database so LOC compilation can write message domains.
-            // On IRIS for Health, EnableNamespace maps these globals to HSLIB (read-only), so we must
-            // override the mapping unconditionally rather than skip if one already exists.
             set tMsgProps("Database") = pNSName
             for tMsgGlobal = "IRIS.Msg", "IRIS.MsgNames" {
                 if ##class(Config.MapGlobals).Exists(pNSName, tMsgGlobal) {
@@ -90,9 +90,7 @@ ClassMethod CreateNamespace(
                 } else {
                     set tSC = ##class(Config.MapGlobals).Create(pNSName, tMsgGlobal, .tMsgProps)
                 }
-                if $$$ISERR(tSC) {
-                    quit
-                }
+                if $$$ISERR(tSC) { quit }
             }
             if $$$ISERR(tSC) {
                 quit
