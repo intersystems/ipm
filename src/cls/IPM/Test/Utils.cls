@@ -81,28 +81,28 @@ ClassMethod CreateNamespace(
                 quit
             }
             // Map ^IRIS.Msg to the namespace's own database so LOC compilation can write message domains.
+            // On IRIS for Health, EnableNamespace maps these globals to HSLIB (read-only), so we must
+            // override the mapping unconditionally rather than skip if one already exists.
             set tMsgProps("Database") = pNSName
-            set tMsgMapped = 0
             for tMsgGlobal = "IRIS.Msg", "IRIS.MsgNames" {
-                if '##class(Config.MapGlobals).Exists(pNSName, tMsgGlobal) {
+                if ##class(Config.MapGlobals).Exists(pNSName, tMsgGlobal) {
+                    set tSC = ##class(Config.MapGlobals).Modify(pNSName, tMsgGlobal, .tMsgProps)
+                } else {
                     set tSC = ##class(Config.MapGlobals).Create(pNSName, tMsgGlobal, .tMsgProps)
-                    if $$$ISERR(tSC) {
-                        quit
-                    }
-                    set tMsgMapped = 1
+                }
+                if $$$ISERR(tSC) {
+                    quit
                 }
             }
             if $$$ISERR(tSC) {
                 quit
             }
-            if tMsgMapped {
-                set tSC = ##class(Config.CPF).Write()
-                if $$$ISERR(tSC) { quit }
-                set tSC = ##class(Config.Map).MoveToActive()
-                if $$$ISERR(tSC) { quit }
-                set tSC = ##class(Config.Namespaces).Load(pNSName)
-                if $$$ISERR(tSC) { quit }
-            }
+            set tSC = ##class(Config.CPF).Write()
+            if $$$ISERR(tSC) { quit }
+            set tSC = ##class(Config.Map).MoveToActive()
+            if $$$ISERR(tSC) { quit }
+            set tSC = ##class(Config.Namespaces).Load(pNSName)
+            if $$$ISERR(tSC) { quit }
         }
 
         // Create default web application
