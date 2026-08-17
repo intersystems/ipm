@@ -91,6 +91,48 @@ Method TestNormalizePath()
     do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("src/cls/Foo.cls"), "src/cls/Foo.cls", "Already-normalized path unchanged")
 }
 
+/// A module with <SourcesRoot>.</SourcesRoot> composes every resource path as SourcesRoot_"/"_Directory,
+/// so paths reach normalization as "./cls/Foo.cls" while the directory walk and the stored baseline key
+/// the same file as "cls/Foo.cls". Both spellings have to collapse to one, or the sync reverse index
+/// never matches a changed path and edits under such a resource are silently dropped.
+Method TestNormalizePathDotSegments()
+{
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("./cls/Foo.cls"), "cls/Foo.cls", "Leading ./ stripped (SourcesRoot='.')")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath(".\cls\Foo.cls"), "cls/Foo.cls", "Leading .\ stripped after slash translation")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath(".//cls/Foo.cls"), "cls/Foo.cls", "Leading ./ with doubled slash")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("././cls/Foo.cls"), "cls/Foo.cls", "Repeated leading ./ (SourcesRoot='./.')")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("src/./cls/Foo.cls"), "src/cls/Foo.cls", "Interior ./ segment dropped")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("/./cls/Foo.cls"), "cls/Foo.cls", "Leading /./ collapsed")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("./cls/"), "cls/", "Trailing slash preserved (GetSyncDirectory prefix scans)")
+    // SourcesRoot="." with no Directory reduces to the module root itself, not a file.
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("."), "", "Bare '.' is the module root, not a path")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("./"), "", "'./' is the module root, not a path")
+    // ".." is not a path this pipeline should ever see and is deliberately left alone rather than
+    // resolved, so a stray one stays visibly wrong instead of silently escaping the module root.
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("../cls/Foo.cls"), "../cls/Foo.cls", "Parent-dir segments are not resolved")
+    // A dot inside a name is not a "." segment.
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("cls/.hidden/Foo.cls"), "cls/.hidden/Foo.cls", "Dot-prefixed directory name preserved")
+}
+
+/// Document names reach the sync pipeline from two sources that disagree on extension case:
+/// RelPathToDocName yields "Foo.Bar.CLS" while a resource's ResolveChildren yields "Foo.Bar.cls".
+/// CanonicalDocName is what lets one be used to look up the other.
+Method TestCanonicalDocName()
+{
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).CanonicalDocName("Foo.Bar.cls"), "Foo.Bar.CLS", "Lowercase extension upper-cased")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).CanonicalDocName("Foo.Bar.CLS"), "Foo.Bar.CLS", "Already-canonical name unchanged")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).CanonicalDocName("Foo.Bar.Cls"), "Foo.Bar.CLS", "Mixed-case extension upper-cased")
+    // The two producers of document names must land on the same subscript.
+    set fromResolveChildren = ##class(%IPM.Storage.FileHash).CanonicalDocName("SyncTest.SuperClass.cls")
+    set fromRelPath = ##class(%IPM.Storage.FileHash).CanonicalDocName(##class(%IPM.Storage.FileHash).RelPathToDocName("src/cls/SyncTest/SuperClass.cls"))
+    do $$$AssertEquals(fromResolveChildren, fromRelPath, "ResolveChildren-style and path-derived names canonicalize to the same key")
+    // Package/name casing is significant and must survive untouched; only the extension is folded.
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).CanonicalDocName("foo.bAr.cls"), "foo.bAr.CLS", "Only the extension is case-folded")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).CanonicalDocName("MyRoutine.mac"), "MyRoutine.MAC", "Routine extension upper-cased")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).CanonicalDocName("NoExtension"), "NoExtension", "Name with no extension unchanged")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).CanonicalDocName(""), "", "Empty name unchanged")
+}
+
 Method TestRelPathToDocName()
 {
     // Standard layouts

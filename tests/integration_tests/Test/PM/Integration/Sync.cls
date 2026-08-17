@@ -426,6 +426,64 @@ Method TestSyncAllProcessesDependenciesFirst()
     do ##class(%Library.File).RemoveDirectoryTree(depRoot)
 }
 
+/// A module whose <SourcesRoot> is "." keeps its sources at the module root rather than under
+/// src/. Resource paths are composed as SourcesRoot_"/"_Directory, so they arrive at the sync
+/// pipeline as "./cls/SyncDotRoot/Top.cls" while the directory walk and the hash baseline key the
+/// same file as "cls/SyncDotRoot/Top.cls". NormalizePath has to collapse both spellings to one.
+///
+/// The bug this guards against: it didn't, so no changed path ever matched the reverse index,
+/// nothing was dispatched to a processor, and yet the pipeline still printed "Updated:" and
+/// committed the new hashes — every edit in such a module was dropped, reported as a success, and
+/// never retried. The assertions therefore check the server, not the output: a green sync report
+/// was exactly the symptom.
+Method TestSyncWithDotSourcesRoot()
+{
+    set srcDir = ..GetModuleDir("sync-dot-root")
+    set workDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-dot-root-work-" _ $job)
+
+    try {
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(workDir))
+        do $$$AssertTrue(##class(%Library.File).CopyDir(srcDir, workDir, 1), "Copied sync-dot-root fixture")
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workDir _ " -dev"))
+
+        do $$$AssertTrue($$$comClassDefined("SyncDotRoot.Top"), "Fixture class loaded")
+        do $$$AssertEquals($classmethod("SyncDotRoot.Top", "Version"), "dot-original", "Fixture class starts at its original value")
+
+        // The baseline keys the file without the "./" prefix; the reverse index must agree.
+        kill paths
+        do ##class(%IPM.Storage.FileHash).GetStoredPaths("sync-dot-root", .paths)
+        do $$$AssertTrue($data(paths("cls/SyncDotRoot/Top.cls")), "Baseline path has no './' prefix")
+        do $$$AssertNotTrue($data(paths("./cls/SyncDotRoot/Top.cls")), "Baseline does not also contain a './'-prefixed duplicate")
+
+        do ..ReplaceInFile(workDir _ "cls/SyncDotRoot/Top.cls", """dot-original""", """dot-modified""")
+
+        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+        set sc = ##class(%IPM.Main).Shell("sync sync-dot-root -verbose")
+        do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+        do $$$AssertStatusOK(sc, "Sync of a '.'-SourcesRoot module succeeds")
+        do $$$AssertTrue(..FindInOutput(.output, "Updated: cls/SyncDotRoot/Top.cls"), "Reports the changed file as updated")
+        do $$$AssertNotTrue(..FindInOutput(.output, "no resource owns"), "Changed file routed to a resource")
+
+        // Ground truth: the edit is live in the namespace, not merely reported.
+        do $$$AssertEquals($classmethod("SyncDotRoot.Top", "Version"), "dot-modified", "Edit is compiled and live on the server")
+
+        // A second sync finds nothing, confirming the hash was committed for the path that
+        // actually synced (and not left stale by the routing fix).
+        kill output2
+        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+        set sc2 = ##class(%IPM.Main).Shell("sync sync-dot-root")
+        do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+        do $$$AssertStatusOK(sc2, "Second sync succeeds")
+        do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Second sync finds no further changes")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "No unexpected exception during '.'-SourcesRoot sync")
+    }
+
+    do ##class(%IPM.Main).Shell("uninstall sync-dot-root")
+    do ##class(%Library.File).RemoveDirectoryTree(workDir)
+}
+
 /// Sync fails with an error when given a module name that isn't installed.
 Method TestSyncModuleNotFound()
 {

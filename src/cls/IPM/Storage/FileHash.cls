@@ -370,17 +370,56 @@ ClassMethod GetStoredPaths(moduleName As %String, Output paths)
     }
 }
 
-/// Normalize a relative path: forward slashes, collapse //, strip leading slash.
+/// Normalize a relative path: forward slashes, collapse //, drop "." segments, strip leading slash.
+///
+/// The "." segments are load-bearing, not cosmetic. A module with <SourcesRoot>.</SourcesRoot> composes
+/// every resource path as SourcesRoot_"/"_Directory (see %IPM.ResourceProcessor.Default.Document and
+/// .Package OnItemRelativePath / GetSyncDirectory), so its paths arrive here as "./cls/Foo/Bar.cls" while
+/// the directory walk and the stored baseline key the same file as "cls/Foo/Bar.cls". Both forms have to
+/// collapse to one, or the sync reverse index never matches a changed path and every edit under such a
+/// resource is silently dropped.
 ClassMethod NormalizePath(path As %String) As %String
 {
     set path = $translate(path, "\", "/")
     while path [ "//" {
         set path = $replace(path, "//", "/")
     }
+    while path [ "/./" {
+        set path = $replace(path, "/./", "/")
+    }
     while $extract(path) = "/" {
         set path = $extract(path, 2, *)
     }
+    // A leading "./" survives the loop above (it has no slash in front of it), and repeats when
+    // SourcesRoot is something like "./." — so strip until none is left.
+    while $extract(path, 1, 2) = "./" {
+        set path = $extract(path, 3, *)
+    }
+    // SourcesRoot="." with no Directory reduces the whole path to "."; that is the module root, not
+    // a file, so it normalizes to the empty relative path.
+    if path = "." {
+        set path = ""
+    }
     quit path
+}
+
+/// Canonical form of a server document name for use as an array subscript: the name as given, with
+/// the extension upper-cased.
+///
+/// Document names reach the sync pipeline from two sources that disagree on case:
+/// <method>RelPathToDocName</method> produces "Foo.Bar.CLS", while a resource's ResolveChildren
+/// yields the Studio-style "Foo.Bar.cls". An exact-match subscript lookup between the two always
+/// misses, so both sides route through this method.
+ClassMethod CanonicalDocName(docName As %String) As %String
+{
+    if docName = "" {
+        quit ""
+    }
+    set ext = $piece(docName, ".", *)
+    if ext = docName {
+        quit docName
+    }
+    quit $piece(docName, ".", 1, *-1) _ "." _ $$$UPPER(ext)
 }
 
 /// Walk each directory in scanDirs(relDir)="" under moduleRoot and hash all files.

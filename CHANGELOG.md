@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 
+### Fixed
+- #1222: Fix `sync` silently dropping every change in a module whose `<SourcesRoot>` is `.` — resource paths arrived as `./cls/Foo.cls` while the file walk and the hash baseline keyed the same file as `cls/Foo.cls`, so nothing routed to a processor, yet the new hashes were committed and the files reported as `Updated:`. Changed files that route to no resource are now warned about and left uncommitted, so the next sync retries them.
+
 ## [0.10.9] - 2026-08-05
 
 ### Added

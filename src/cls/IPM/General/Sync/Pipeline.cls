@@ -103,11 +103,16 @@ ClassMethod Run(
         }
 
         // Step 5: Partition changes by owning resource
-        kill syncByResource
-        do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource)
+        kill syncByResource, unrouted
+        do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource, .unrouted)
         if processDeletes {
-            do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource)
+            do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource, .unrouted)
         }
+        // A changed file that maps to no resource cannot be synced. Drop it from modified/deleted
+        // before step 9 so its hash is not committed and it is re-detected next sync, and say so
+        // out loud: silently committing the new hash makes the dropped edit permanent while
+        // reporting success.
+        do ..SyncReportUnroutedPaths(moduleName, .unrouted, .modified, .deleted)
         do ..SyncCollectPreloadResources(.syncByResource, .preloadResources)
 
         // Step 6: Dispatch OnSync to each processor; load unhandled compilable files
@@ -240,9 +245,13 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         for {
             set childName = $order(childArr(childName))
             quit:childName=""
-            set docToResource(childName) = resource.Name
-            set docToResource(childName, "Processor") = resource.Processor
-            set docToResource(childName, "Resource") = resource
+            // Keyed canonically: the storedPaths fallback below looks these up with a name from
+            // RelPathToDocName ("Foo.Bar.CLS"), while ResolveChildren yields "Foo.Bar.cls".
+            set canonicalChildName = ##class(%IPM.Storage.FileHash).CanonicalDocName(childName)
+            set docToResource(canonicalChildName) = resource.Name
+            set docToResource(canonicalChildName, "Processor") = resource.Processor
+            set docToResource(canonicalChildName, "Resource") = resource
+            set docToResource(canonicalChildName, "DocName") = childName
 
             // A resource added since the last %Compile has no baseline row yet, so GetStoredPaths
             // below won't find it. Map its relPath directly.
@@ -298,14 +307,21 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         if docName = "" {
             continue
         }
-        if '$data(docToResource(docName)) {
+        // Canonicalize rather than trusting RelPathToDocName's casing to line up with the keys
+        // set above: docToResource is keyed by CanonicalDocName, and an exact-match subscript
+        // lookup that differs only in extension case silently misses.
+        set canonicalDocName = ##class(%IPM.Storage.FileHash).CanonicalDocName(docName)
+        if '$data(docToResource(canonicalDocName)) {
             continue
         }
 
-        set reverseIndex(relPath) = docToResource(docName)
-        set reverseIndex(relPath, "Processor") = docToResource(docName, "Processor")
-        set reverseIndex(relPath, "Resource") = docToResource(docName, "Resource")
-        set reverseIndex(relPath, "DocName") = docName
+        set reverseIndex(relPath) = docToResource(canonicalDocName)
+        set reverseIndex(relPath, "Processor") = docToResource(canonicalDocName, "Processor")
+        set reverseIndex(relPath, "Resource") = docToResource(canonicalDocName, "Resource")
+        // Prefer the resource's own spelling of the document name over the one derived from the
+        // path: SyncApplyDeletes passes this straight to the server, and the derived form differs
+        // in extension case.
+        set reverseIndex(relPath, "DocName") = $get(docToResource(canonicalDocName, "DocName"), docName)
     }
 }
 
@@ -335,7 +351,8 @@ ClassMethod SyncRoutePathSet(
     ByRef paths,
     ByRef reverseIndex,
     category As %String,
-    ByRef syncByResource) [ Private ]
+    ByRef syncByResource,
+    ByRef unrouted) [ Private ]
 {
     set relPath = ""
     for {
@@ -343,12 +360,46 @@ ClassMethod SyncRoutePathSet(
         quit:relPath=""
 
         if '$data(reverseIndex(relPath)) {
+            // Not an error here, but not nothing either: the caller reports these and withholds
+            // their hashes so the change isn't lost. Accumulated across both calls.
+            set unrouted(category, relPath) = ""
             continue
         }
         set resName = reverseIndex(relPath)
         set syncByResource(resName, category, relPath) = ""
         set syncByResource(resName, "Processor") = reverseIndex(relPath, "Processor")
         set syncByResource(resName, "Resource") = reverseIndex(relPath, "Resource")
+    }
+}
+
+/// Report changed files that routed to no resource and remove them from the change sets, so their
+/// hashes are not committed in step 9 and the next sync detects them again.
+ClassMethod SyncReportUnroutedPaths(
+    moduleName As %String,
+    ByRef unrouted,
+    ByRef modified,
+    ByRef deleted) [ Private ]
+{
+    set count = 0
+    set category = ""
+    for {
+        set category = $order(unrouted(category))
+        quit:category=""
+        set relPath = ""
+        for {
+            set relPath = $order(unrouted(category, relPath))
+            quit:relPath=""
+            set count = count + 1
+            write !, "WARNING: no resource owns ", relPath, "; change not synced."
+            if category = "modified" {
+                kill modified(relPath)
+            } else {
+                kill deleted(relPath)
+            }
+        }
+    }
+    if count > 0 {
+        do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, count _ " changed file(s) matched no resource and were not synced; they will be re-detected on the next sync.")
     }
 }
 
