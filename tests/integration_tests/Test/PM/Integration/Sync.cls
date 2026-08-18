@@ -343,6 +343,44 @@ Method TestSyncTestFlagOnlyRunsOwningResource()
     do $$$AssertNotTrue(..FindInOutput(.output, "SyncTest2.Tests.Trivial2"), "Unrelated test in tests/unit2 was not run")
 }
 
+/// Several <UnitTest> resources may share one directory and differ only by Package — a common
+/// layout when one test tree holds suites for several packages. A changed test class must run
+/// exactly once, in the resource whose Package covers it, not once per resource sharing the
+/// directory (six such resources ran the same test six times before this was fixed).
+Method TestSyncTestFlagRunsOnceWhenResourcesShareDirectory()
+{
+    // A second UnitTest resource over the same directory, covering a different package.
+    set extraDir = ##class(%File).NormalizeDirectory(..TempDir _ "tests/unit/SyncTest/More")
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(extraDir))
+    set extraContent = "Class SyncTest.More.Extra Extends %UnitTest.TestCase" _ $char(10) _ "{" _ $char(10)
+    set extraContent = extraContent _ "Method TestExtraPasses()" _ $char(10) _ "{" _ $char(10)
+    set extraContent = extraContent _ "    do $$$AssertTrue(1, ""Extra always passes."")" _ $char(10) _ "}" _ $char(10) _ "}" _ $char(10)
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(extraDir _ "Extra.cls"))
+    $$$ThrowOnError(stream.Write(extraContent))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    set unitResource = "<UnitTest Name=""/tests/unit/"" Package=""SyncTest.Tests"" Phase=""test"" />"
+    do ..ReplaceInFile(..TempDir _ "module.xml", unitResource,
+        unitResource _ $char(10) _ "      <UnitTest Name=""/tests/unit/"" Package=""SyncTest.More"" Phase=""test"" />")
+
+    // Reload so both resources are registered and the new class is in the baseline, leaving the
+    // edit below as the only change this sync detects.
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ ..TempDir _ " -dev"))
+
+    do ..ReplaceInFile(..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls", "This test always passes.", "This test always passes (modified).")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with RunTests succeeds when two resources share a test directory")
+    do $$$AssertEquals(..CountInOutput(.output, "SyncTest.Tests.Trivial begins"), 1, "Changed test ran exactly once, not once per resource sharing the directory")
+    do $$$AssertEquals(..CountInOutput(.output, "Test Results:"), 1, "One test run, so one Test Results block")
+    do $$$AssertNotTrue(..FindInOutput(.output, "SyncTest.More.Extra begins"), "Unchanged test in the other package's resource was not run")
+}
+
 /// Running sync with no module name syncs every module currently in development mode.
 Method TestSyncAllDevModeModules()
 {
@@ -819,6 +857,22 @@ ClassMethod FindInOutput(ByRef output, searchString As %String) As %Boolean
         }
     }
     return 0
+}
+
+/// Number of captured output lines containing searchString. Used where the count matters, not
+/// just presence — e.g. asserting a test ran exactly once.
+ClassMethod CountInOutput(ByRef output, searchString As %String) As %Integer
+{
+    set count = 0
+    set sub = ""
+    for {
+        set sub = $order(output(sub), 1, line)
+        quit:sub=""
+        if line [ searchString {
+            set count = count + 1
+        }
+    }
+    return count
 }
 
 /// Returns the 1-based line index of the first captured output line containing searchString,

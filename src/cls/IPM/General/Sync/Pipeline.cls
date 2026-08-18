@@ -529,8 +529,8 @@ ClassMethod SyncApplyDeletes(
 }
 
 /// Run test-phase tests for changed test case classes recorded in params("Sync","ChangedTestCases").
-/// Groups changed classes by owning resource first, then dispatches one batched RunTest call
-/// per resource (via OnSyncRunTests) instead of one call per class — avoids N separate
+/// Resolves each changed class to exactly one owning resource first, then dispatches one batched
+/// RunTest call per resource (via OnSyncRunTests) instead of one call per class — avoids N separate
 /// reload/compile/run cycles when several test classes in the same resource changed together.
 ClassMethod SyncRunTests(
     orderedResourceList As %ListOfObjects,
@@ -539,16 +539,10 @@ ClassMethod SyncRunTests(
 {
     set sc = $$$OK
     try {
-        // Step 1: group changed classes by owning resource: byResource(resourceName, className) = ""
-        kill byResource
-        set className = ""
-        for {
-            set className = $order(params("Sync", "ChangedTestCases", className), 1, owningResource)
-            quit:className=""
-            set byResource(owningResource, className) = ""
-        }
-
-        // Step 2: one OnSyncRunTests call per resource
+        // Step 1: index the module's test resources by position, and by the resource Name that
+        // OnSync recorded against each changed class.
+        kill testResources, byName
+        set resCount = 0
         set testKey = ""
         for {
             set testResource = orderedResourceList.GetNext(.testKey)
@@ -560,13 +554,53 @@ ClassMethod SyncRunTests(
             if 'testResource.Processor.%IsA("%IPM.ResourceProcessor.Test") {
                 continue
             }
-            if '$data(byResource(testResource.Name)) {
+            set resCount = resCount + 1
+            set testResources(resCount) = testResource
+            set byName(testResource.Name, resCount) = ""
+        }
+
+        // Step 2: assign each changed class to exactly one resource:
+        // byResource(resourceIndex, className) = "".
+        // Several UnitTest resources may point at the same directory and differ only by Package, so
+        // the Name recorded by OnSync can match more than one of them — dispatching to every match
+        // runs the same test class once per resource sharing the directory. Prefer the resource
+        // whose Package/Class covers the class; fall back to the first resource with that Name when
+        // none does (e.g. a class outside every declared package), so it still runs somewhere
+        // rather than being silently dropped.
+        kill byResource
+        set className = ""
+        for {
+            set className = $order(params("Sync", "ChangedTestCases", className), 1, owningResource)
+            quit:className=""
+            set target = ""
+            set idx = ""
+            for {
+                set idx = $order(byName(owningResource, idx))
+                quit:idx=""
+                if testResources(idx).Processor.OwnsClassName(className) {
+                    set target = idx
+                    quit
+                }
+            }
+            if target = "" {
+                set target = $order(byName(owningResource, ""))
+            }
+            if target = "" {
                 continue
             }
+            set byResource(target, className) = ""
+        }
+
+        // Step 3: one OnSyncRunTests call per resource
+        for idx = 1:1:resCount {
+            if '$data(byResource(idx)) {
+                continue
+            }
+            set testResource = testResources(idx)
             if '$listfind(testResource.Processor.Phase, "test") {
                 set skipClassName = ""
                 for {
-                    set skipClassName = $order(byResource(testResource.Name, skipClassName))
+                    set skipClassName = $order(byResource(idx, skipClassName))
                     quit:skipClassName=""
                     write:verbose !, "Skipping verify-scoped test: ", skipClassName, " (use 'verify' to run)"
                     do ##class(%IPM.General.Sync.Summary).AddSkipped(testResource.Module.Name, skipClassName)
@@ -574,7 +608,7 @@ ClassMethod SyncRunTests(
                 continue
             }
             kill classInfo
-            merge classInfo = byResource(testResource.Name)
+            merge classInfo = byResource(idx)
             kill testParams
             merge testParams = params
             set testParams("DeveloperMode") = 1
