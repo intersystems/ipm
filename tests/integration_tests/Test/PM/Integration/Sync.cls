@@ -557,6 +557,89 @@ Method TestFailedCompileRetries()
     do $$$AssertStatusOK(sc, "Sync succeeds after fixing syntax error (retry works)")
 }
 
+/// Fixing a broken file by reverting it — rather than editing it into some third state — must
+/// still be detected and reloaded (issue #1224).
+///
+/// The bug this guards against: a failed sync commits no hashes, so the baseline still holds the
+/// pre-break content. Restoring exactly that content makes the hash comparison find no change, and
+/// sync reported "Nothing to sync" while the namespace kept whatever the failed load left behind.
+/// TestFailedCompileRetries above doesn't catch this because it fixes the class by writing new
+/// content, whose hash differs from the baseline either way — so this test restores the original
+/// bytes and asserts the hash really did return to the baselined value.
+Method TestRevertAfterFailedSyncReloads()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    // Kept in the module root, which sync never walks — only declared resource directories are.
+    set backupPath = ..TempDir _ "SuperClass.cls.pristine"
+    do $$$AssertTrue(##class(%File).CopyFile(filePath, backupPath), "Saved the pristine class file for a byte-exact revert")
+
+    set baselineRow = ##class(%IPM.Storage.FileHash).OpenByPath("sync-test", "src/cls/SyncTest/SuperClass.cls")
+    do $$$AssertTrue($isobject(baselineRow), "Class file has a baseline row after load")
+    set baselineHash = baselineRow.Hash
+
+    // Break the class the way the issue describes: an extra closing brace.
+    set brokenContent = "Class SyncTest.SuperClass" _ $char(10) _ "{" _ $char(10) _ $char(10)
+        _ "ClassMethod GetValue() As %String" _ $char(10) _ "{" _ $char(10)
+        _ "    quit ""original""" _ $char(10) _ "}" _ $char(10) _ $char(10) _ "}" _ $char(10) _ "}" _ $char(10)
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(filePath))
+    $$$ThrowOnError(stream.Write(brokenContent))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    do $$$AssertStatusNotOK(##class(%IPM.Main).Shell("sync sync-test"), "Sync of the broken class fails")
+
+    // Fix it by reverting, not by editing further: the file is byte-identical to the baseline again.
+    do $$$AssertTrue(##class(%File).CopyFile(backupPath, filePath, 1), "Reverted the class file to its pristine bytes")
+    do $$$AssertEquals($$$lcase(##class(%File).SHA1Hash(filePath, 1)), baselineHash, "Reverted file hashes back to the baselined value (the case this test exists for)")
+    do $$$AssertTrue(##class(%File).Delete(backupPath), "Removed the backup copy")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after the revert succeeds")
+    do $$$AssertNotTrue(..FindInOutput(.output, "Nothing to sync"), "Reverted file is not dismissed as unchanged")
+    do $$$AssertTrue(..FindInOutput(.output, "Updated: src/cls/SyncTest/SuperClass.cls"), "Reverted file is reported as updated")
+
+    // Ground truth: the class is compiled and live again, not left as the failed sync left it.
+    do $$$AssertTrue($$$comClassDefined("SyncTest.SuperClass"), "Class is defined after the retry")
+    do $$$AssertEquals($classmethod("SyncTest.SuperClass", "GetValue"), "original", "Reverted class is compiled and live on the server")
+
+    // The retry state is spent once committed — sync must not report the same file forever.
+    kill output2
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+    set sc2 = ##class(%IPM.Main).Shell("sync sync-test")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+    do $$$AssertStatusOK(sc2, "Third sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Retried file is not re-reported once its sync committed")
+}
+
+/// A failing test under -test must not flag the files this sync already committed. Tests run after
+/// the file sync is committed and reported, so a test failure says nothing about whether the files
+/// landed — flagging them for retry would re-load and re-compile clean files on every later sync.
+Method TestFailedTestDoesNotFlagSyncedFiles()
+{
+    set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ..ReplaceInFile(filePath, "$$$AssertTrue(1,", "$$$AssertTrue(0,")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusNotOK(sc, "Sync reports failure when a changed test fails")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "The file sync itself completed and was committed before the tests ran")
+
+    // The test class synced fine; only the test it contains failed. Nothing to redo.
+    kill output2
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+    set sc2 = ##class(%IPM.Main).Shell("sync sync-test")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+    do $$$AssertStatusOK(sc2, "Second sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Committed files are not retried because a test failed")
+    do $$$AssertNotTrue(..FindInOutput(.output2, "Retrying"), "No retry is reported for files that synced successfully")
+}
+
 /// Editing module.xml and a source class in the same operation must sync BOTH changes.
 /// The StampModule call in the moduleXmlChanged branch must not clobber existing baseline
 /// rows for files edited at the same time — if it does, the class change is lost silently.

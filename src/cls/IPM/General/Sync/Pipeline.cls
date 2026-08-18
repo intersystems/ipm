@@ -82,7 +82,10 @@ ClassMethod Run(
         // Step 4: Compute disk changes vs baseline. module.xml is owned by SyncCheckModuleXml
         // above and is deliberately excluded by ComputeChanges, so it never appears in
         // modified/deleted here.
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes))
+        // retried is the subset of modified that a previous sync failed on and that ComputeChanges
+        // forced back in regardless of its hash — reported below, but otherwise handled as normal
+        // modifications from here on.
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried))
 
         // Falls through when only deletes exist and processDeletes=1
         if '$data(modified) && ('$data(deleted) || 'processDeletes) {
@@ -100,6 +103,10 @@ ClassMethod Run(
             // preloadResources is deliberately undefined: nothing was routed, so nothing to warn about.
             do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources, .preloadResources)
             quit
+        }
+
+        if $data(retried) {
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Retrying "_##class(%IPM.General.Sync.Output).CountNodes(.retried)_" file(s) from a previous failed sync.")
         }
 
         // Step 5: Partition changes by owning resource
@@ -136,6 +143,10 @@ ClassMethod Run(
         // Done before running tests below so a test failure doesn't prevent the file-sync
         // outcome from being committed and reported — file sync and test results are independent.
         $$$ThrowOnError(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, processDeletes))
+        // Past this point the change set is recorded as synced, so the error handler below must not
+        // flag it for retry: anything that fails from here on (a failing test in step 10) says
+        // nothing about whether the files landed.
+        set committed = 1
         if moduleXmlChanged {
             do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
         }
@@ -175,6 +186,17 @@ ClassMethod Run(
 
     } catch e {
         set sc = e.AsStatus()
+        // Step 9 never ran, so no hash was committed and the baseline still describes the last
+        // successfully-synced content — while the namespace holds whatever this attempt left behind.
+        // Fixing the file by reverting it would hash back to the baseline and go unnoticed, so flag
+        // what was being applied and let the next sync force it through (issue #1224).
+        // Reported as a warning, never thrown: it must not replace the error that got us here.
+        if '$get(committed, 0), $data(modified) || $data(deleted) {
+            set markSC = ##class(%IPM.Storage.FileHash).MarkFailed(module, .modified, .deleted, $get(processDeletes, 0))
+            if $$$ISERR(markSC) {
+                write !, "WARNING: could not flag the failed sync's files for retry: ", $system.Status.GetOneErrorText(markSC)
+            }
+        }
     }
     quit sc
 }

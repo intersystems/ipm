@@ -82,6 +82,57 @@ Method TestCaseDistinctPathsCoexist()
     do $$$AssertNotEquals(upper.%Id(), lower.%Id(), "Case-distinct paths are separate rows")
 }
 
+/// A sync that errors leaves the namespace out of step with the baseline, so the paths it tried to
+/// load are marked failed and forced into the next sync's change set. Without this, reverting a
+/// broken file to its previously-baselined content makes its hash match again and the next sync
+/// reports "Nothing to sync." while the namespace still holds the broken code (issue #1224).
+Method TestFailedSyncRetriesRevertedFile()
+{
+    set relPath = "src/cls/SyncRetry/Reverted.cls"
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).StampOneFileWithHash(..ModuleName, relPath, "h1"), "Baselined the file at its original hash")
+
+    set module = ##class(%IPM.Storage.Module).NameOpen(..ModuleName)
+    // The file is back to its baselined content, as if the breaking edit had been reverted.
+    kill allFiles, allHashes, reverseIndex
+    set allFiles(relPath) = "/tmp/" _ relPath
+    set allHashes(relPath) = "h1"
+
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried), "ComputeChanges succeeded for a file matching its baseline")
+    do $$$AssertNotTrue($data(modified(relPath)), "Content matching the baseline is not reported as modified")
+    do $$$AssertNotTrue($data(retried(relPath)), "Nothing is retried when no sync has failed")
+
+    // Simulate the failed sync: the path was in the change set when the pipeline errored.
+    kill failedMod, failedDel
+    set failedMod(relPath) = "h2"
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).MarkFailed(module, .failedMod, .failedDel, 0), "Marking the failed path succeeded")
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).OpenByPath(..ModuleName, relPath).SyncFailed, "The failed path is flagged")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).OpenByPath(..ModuleName, relPath).Hash, "h1", "Marking a failure leaves the baseline hash alone")
+
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried), "ComputeChanges succeeded after the failure was marked")
+    do $$$AssertEquals($get(modified(relPath)), "h1", "A previously-failed path is modified even though its hash is unchanged")
+    do $$$AssertTrue($data(retried(relPath)), "The forced path is reported as a retry")
+    do $$$AssertNotTrue($data(deleted(relPath)), "A retried path that still exists on disk is not reported as deleted")
+
+    // A successful sync commits the hash and ends the retry state.
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, 0), "Committing the retried change succeeded")
+    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).OpenByPath(..ModuleName, relPath).SyncFailed, "A committed path is no longer flagged")
+
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried), "ComputeChanges succeeded after the retry was committed")
+    do $$$AssertNotTrue($data(modified(relPath)), "The path is no longer reported once its retry has been committed")
+}
+
+/// MarkFailed is called from the pipeline's error handler, where a path in the change set may have
+/// no baseline row yet (a brand-new file that failed to load). Those need no marker — a missing row
+/// already reads as modified — and must not cause the error handler itself to fail.
+Method TestMarkFailedIgnoresUnbaselinedPath()
+{
+    set module = ##class(%IPM.Storage.Module).NameOpen(..ModuleName)
+    kill failedMod, failedDel
+    set failedMod("src/cls/SyncRetry/NeverStamped.cls") = "h9"
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).MarkFailed(module, .failedMod, .failedDel, 0), "Marking a path with no baseline row succeeds")
+    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).ExistsByPath(..ModuleName, "src/cls/SyncRetry/NeverStamped.cls"), "No baseline row is invented for an unstamped path")
+}
+
 Method TestNormalizePath()
 {
     do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("src\cls\Foo\Bar.cls"), "src/cls/Foo/Bar.cls", "Backslashes -> forward slashes")
