@@ -24,6 +24,13 @@ Property Hash As %String(MAXLEN = 64) [ Required ];
 /// before this property existed read as "", which is correctly falsy.
 Property SyncFailed As %Boolean [ InitialExpression = 0 ];
 
+/// Set when a sync applied this path but did not run its tests — a plain <code>sync</code> over a
+/// file owned by a test resource that runs in the "test" phase. The sync commits the new hash, so
+/// change detection would never look at that file again and the edit would stay untested; this flag
+/// keeps it in the change set until a sync with -test runs its tests. Rows written before this
+/// property existed read as "", which is correctly falsy.
+Property TestPending As %Boolean [ InitialExpression = 0 ];
+
 Index ModulePathIndex On (ModuleName, PathHash) [ Unique ];
 
 Index ModuleNameIndex On ModuleName;
@@ -211,17 +218,20 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
 /// Pass 2: manifest-derived paths (from reverseIndex) for files not yet compiled
 /// or non-compilable tracked files.
 /// Pass 3: rows flagged by a previous failed sync, forced in regardless of their hash.
-/// Pass 4: iterate stored rows to detect deletions.
+/// Pass 4: rows synced by an earlier sync that did not run their tests, forced in when this sync
+/// will run tests (runTests) so those tests finally run.
+/// Pass 5: iterate stored rows to detect deletions.
 /// allFiles(relPath)=fullPath is the full pre-walked module root (all extensions).
 /// allHashes(relPath)=sha1hex are pre-computed hashes from the same walk.
 /// module.xml is deliberately excluded from every pass — it is owned by the pipeline's
 /// SyncCheckModuleXml/SyncCommitModuleXml, never routed as a normal file.
-/// Returns modified(relPath)=newHash and deleted(relPath)="" arrays, plus retried(relPath)=""
-/// for the subset of modified that Pass 3 forced in (for the caller's reporting only).
-ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef reverseIndex, ByRef allFiles, ByRef allHashes, Output retried) As %Status
+/// Returns modified(relPath)=newHash and deleted(relPath)="" arrays, plus retried(relPath)="" and
+/// testPending(relPath)="" for the subsets of modified that Pass 3 and Pass 4 forced in (for the
+/// caller's reporting only).
+ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef reverseIndex, ByRef allFiles, ByRef allHashes, Output retried, runTests As %Boolean = 0, Output testPending) As %Status
 {
     set sc = $$$OK
-    kill modified, deleted, retried
+    kill modified, deleted, retried, testPending
     try {
         set moduleName = module.Name
         kill seen
@@ -286,7 +296,31 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             set retried(failedRelPath) = ""
         }
 
-        // Pass 4: iterate all stored rows — file not in allFiles → deleted. module.xml is skipped:
+        // Pass 4: rows an earlier sync applied without running their tests. Their hashes are
+        // committed, so no pass above reports them and the tests for that edit would never run.
+        // Only forced in when this sync runs tests — otherwise every plain sync would re-report the
+        // same files forever without ever clearing the flag.
+        if runTests {
+            set result = ##class(%SQL.Statement).%ExecDirect(,
+                "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ? AND TestPending = 1",
+                moduleName)
+            while result.%Next() {
+                set pendingRelPath = result.%Get("RelativePath")
+                if pendingRelPath = "module.xml" {
+                    continue
+                }
+                if '$data(allFiles(pendingRelPath)) {
+                    continue
+                }
+                if $data(modified(pendingRelPath)) {
+                    continue
+                }
+                set modified(pendingRelPath) = $get(allHashes(pendingRelPath))
+                set testPending(pendingRelPath) = ""
+            }
+        }
+
+        // Pass 5: iterate all stored rows — file not in allFiles → deleted. module.xml is skipped:
         // it is always a stored row but is not part of the walked file set, so it would otherwise
         // be misreported as deleted every sync.
         set result = ##class(%SQL.Statement).%ExecDirect(,
@@ -333,7 +367,9 @@ ClassMethod CompareOneFile(moduleName As %String, relPath As %String, newHash As
 }
 
 /// After a successful sync, commit new hashes for modified files and optionally remove deleted rows.
-ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef deleted, processDeletes As %Boolean = 0) As %Status
+/// clearTestPending is set by a sync that ran tests: every path it committed has had its tests run,
+/// so any pending-test flag from an earlier sync without -test is spent (see the TestPending property).
+ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef deleted, processDeletes As %Boolean = 0, clearTestPending As %Boolean = 0) As %Status
 {
     set sc = $$$OK
     try {
@@ -355,6 +391,9 @@ ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef d
             set instance.Hash = newHash
             // This path is now synced, so any retry flag from an earlier failed attempt is spent.
             set instance.SyncFailed = 0
+            if clearTestPending {
+                set instance.TestPending = 0
+            }
             $$$ThrowOnError(instance.%Save())
         }
 
@@ -420,6 +459,42 @@ ClassMethod MarkPathSetFailed(
             continue
         }
         set existing.SyncFailed = 1
+        set saveSC = existing.%Save()
+        if $$$ISERR(saveSC) {
+            set sc = $$$ADDSC(sc, saveSC)
+        }
+    }
+    quit sc
+}
+
+/// Flag paths a sync applied without running their tests, so the next sync with -test forces them
+/// back into the change set even though their content matches the baseline (see the TestPending
+/// property). Called after CommitChanges, which creates a row for everything it committed, so a
+/// path with no row here was never synced and needs no flag.
+/// Failures are returned rather than thrown: the files themselves are synced and reported by then,
+/// and losing the marker is a missed test run, not a failed sync.
+ClassMethod MarkTestPending(
+    moduleName As %String,
+    ByRef paths) As %Status
+{
+    set sc = $$$OK
+    set relPath = ""
+    for {
+        set relPath = $order(paths(relPath))
+        quit:relPath=""
+
+        set existing = ..OpenByPath(moduleName, relPath, .openSC)
+        if $$$ISERR(openSC) {
+            set sc = $$$ADDSC(sc, openSC)
+            continue
+        }
+        if '$isobject(existing) {
+            continue
+        }
+        if existing.TestPending {
+            continue
+        }
+        set existing.TestPending = 1
         set saveSC = existing.%Save()
         if $$$ISERR(saveSC) {
             set sc = $$$ADDSC(sc, saveSC)
@@ -711,6 +786,9 @@ Storage Default
 </Value>
 <Value name="6">
 <Value>SyncFailed</Value>
+</Value>
+<Value name="7">
+<Value>TestPending</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.FileHashD</DataLocation>

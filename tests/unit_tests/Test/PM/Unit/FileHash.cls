@@ -133,6 +133,46 @@ Method TestMarkFailedIgnoresUnbaselinedPath()
     do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).ExistsByPath(..ModuleName, "src/cls/SyncRetry/NeverStamped.cls"), "No baseline row is invented for an unstamped path")
 }
 
+/// A sync without -test commits the changed test file's hash, so no later change detection would
+/// ever look at that file again and the edit would stay untested. The pending-test flag forces it
+/// into the next sync that runs tests, and only that sync clears it.
+Method TestPendingTestsRunOnNextTestSync()
+{
+    set relPath = "tests/unit/PendingTest/Case.cls"
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).StampOneFileWithHash(..ModuleName, relPath, "h1"), "Baselined the test file as a sync without -test would")
+
+    set module = ##class(%IPM.Storage.Module).NameOpen(..ModuleName)
+    kill allFiles, allHashes, reverseIndex
+    set allFiles(relPath) = "/tmp/" _ relPath
+    set allHashes(relPath) = "h1"
+
+    kill pendingPaths
+    set pendingPaths(relPath) = ""
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).MarkTestPending(..ModuleName, .pendingPaths), "Flagging the synced-but-untested path succeeded")
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).OpenByPath(..ModuleName, relPath).TestPending, "The path is flagged as pending tests")
+    do $$$AssertEquals(##class(%IPM.Storage.FileHash).OpenByPath(..ModuleName, relPath).Hash, "h1", "Flagging leaves the baseline hash alone")
+
+    // Another sync without -test must not force it in, or every plain sync would re-report the same
+    // file forever without ever being able to clear the flag.
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried, 0, .testPending), "ComputeChanges succeeded without runTests")
+    do $$$AssertNotTrue($data(modified(relPath)), "A pending path is not forced into a sync that runs no tests")
+    do $$$AssertNotTrue($data(testPending(relPath)), "Nothing is reported as pending when tests are not running")
+
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried, 1, .testPending), "ComputeChanges succeeded with runTests")
+    do $$$AssertEquals($get(modified(relPath)), "h1", "A pending path is modified even though its content is unchanged")
+    do $$$AssertTrue($data(testPending(relPath)), "The forced path is reported as a deferred test run")
+
+    // A commit from a sync that still ran no tests must leave the file pending.
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, 0, 0), "Committing without clearing succeeded")
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).OpenByPath(..ModuleName, relPath).TestPending, "A commit that ran no tests leaves the path pending")
+
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, 0, 1), "Committing after running tests succeeded")
+    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).OpenByPath(..ModuleName, relPath).TestPending, "Running the tests clears the pending flag")
+
+    do $$$AssertStatusOK(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried, 1, .testPending), "ComputeChanges succeeded after the deferred run was committed")
+    do $$$AssertNotTrue($data(modified(relPath)), "The path is no longer forced once its tests have run")
+}
+
 Method TestNormalizePath()
 {
     do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("src\cls\Foo\Bar.cls"), "src/cls/Foo/Bar.cls", "Backslashes -> forward slashes")

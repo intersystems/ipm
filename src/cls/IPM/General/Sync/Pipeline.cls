@@ -84,8 +84,9 @@ ClassMethod Run(
         // modified/deleted here.
         // retried is the subset of modified that a previous sync failed on and that ComputeChanges
         // forced back in regardless of its hash — reported below, but otherwise handled as normal
-        // modifications from here on.
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried))
+        // modifications from here on. testPending is the same idea for files an earlier sync applied
+        // without running their tests, and is only populated when this sync runs tests.
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried, runTests, .testPending))
 
         // Falls through when only deletes exist and processDeletes=1
         if '$data(modified) && ('$data(deleted) || 'processDeletes) {
@@ -107,6 +108,10 @@ ClassMethod Run(
 
         if $data(retried) {
             do ##class(%IPM.General.Sync.Output).Log(moduleName, "Retrying "_##class(%IPM.General.Sync.Output).CountNodes(.retried)_" file(s) from a previous failed sync.")
+        }
+
+        if $data(testPending) {
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Running tests for "_##class(%IPM.General.Sync.Output).CountNodes(.testPending)_" file(s) synced earlier without -test.")
         }
 
         // Step 5: Partition changes by owning resource
@@ -142,11 +147,25 @@ ClassMethod Run(
         // Step 9: Commit new hashes on success (skipped on error so next sync re-detects).
         // Done before running tests below so a test failure doesn't prevent the file-sync
         // outcome from being committed and reported — file sync and test results are independent.
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, processDeletes))
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, processDeletes, runTests))
         // Past this point the change set is recorded as synced, so the error handler below must not
         // flag it for retry: anything that fails from here on (a failing test in step 10) says
         // nothing about whether the files landed.
         set committed = 1
+
+        // Committing the hashes above means change detection will never look at these files again,
+        // so a sync that is not running tests would leave the edits it just applied untested with no
+        // way back. Flag the test-owned ones instead: the next sync with -test forces them through
+        // and runs their tests (see FileHash's TestPending property).
+        if 'runTests {
+            do ..SyncCollectTestPaths(.modified, .reverseIndex, .testPaths)
+            if $data(testPaths) {
+                set markSC = ##class(%IPM.Storage.FileHash).MarkTestPending(moduleName, .testPaths)
+                if $$$ISERR(markSC) {
+                    write !, "WARNING: could not flag synced test file(s) to be tested by the next sync -test: ", $system.Status.GetOneErrorText(markSC)
+                }
+            }
+        }
         if moduleXmlChanged {
             do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
         }
@@ -172,6 +191,12 @@ ClassMethod Run(
             }
         }
         do ##class(%IPM.General.Sync.Output).Log(moduleName, "Sync complete: "_modCount_" file(s) updated"_$select(delCount>0:", "_delCount_" deleted", 1:"")_".")
+
+        // Say so out loud rather than only recording the flag: "I edited a test and synced, and
+        // nothing ran" is exactly the confusion this is here to prevent.
+        if 'runTests, $data(testPaths) {
+            write !, "  ", ##class(%IPM.General.Sync.Output).CountNodes(.testPaths), " test file(s) synced without running tests; they will run on the next sync with -test."
+        }
 
         do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources, .preloadResources)
 
@@ -364,6 +389,33 @@ ClassMethod SyncCollectPreloadResources(
         if $isobject(resource) && resource.Preload {
             set preloadResources(resName) = ""
         }
+    }
+}
+
+/// Collect the changed paths whose owning resource is a test resource that runs in the "test" phase,
+/// so a sync that isn't running tests can flag them as pending (see FileHash's TestPending property).
+/// Restricted to "test"-phase resources on purpose: a verify-only resource's tests are never run by
+/// sync -test, so flagging its files would force them into every subsequent sync and never clear.
+ClassMethod SyncCollectTestPaths(
+    ByRef modified,
+    ByRef reverseIndex,
+    Output testPaths) [ Private ]
+{
+    kill testPaths
+    set relPath = ""
+    for {
+        set relPath = $order(modified(relPath))
+        quit:relPath=""
+        if '$data(reverseIndex(relPath, "Processor"), processor) {
+            continue
+        }
+        if '$isobject(processor) || 'processor.%IsA("%IPM.ResourceProcessor.Test") {
+            continue
+        }
+        if '$listfind(processor.Phase, "test") {
+            continue
+        }
+        set testPaths(relPath) = ""
     }
 }
 

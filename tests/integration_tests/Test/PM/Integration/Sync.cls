@@ -283,6 +283,39 @@ Method TestSyncTestFlag()
     do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "Changed test class actually ran, not just compiled")
 }
 
+/// A sync without -test commits the changed test file's hash, so nothing would ever bring that edit
+/// back for testing. Sync flags it instead: the next sync with -test runs its tests even though the
+/// file has not changed since, and then stops re-running it.
+Method TestSyncWithoutTestFlagRunsTestsOnNextTestSync()
+{
+    do ..ReplaceInFile(..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls", "This test always passes.", "This test always passes (modified).")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "Sync without -test succeeds")
+    do $$$AssertNotTrue(..FindInOutput(.output, "Test Results"), "No tests run without -test")
+    do $$$AssertTrue(..FindInOutput(.output, "will run on the next sync with -test"), "Sync says the test file it synced has not been tested yet")
+
+    // No second edit: the flag alone has to bring the file back so its tests finally run.
+    kill output
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "Sync with -test succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "synced earlier without -test"), "Sync reports it is running tests deferred by the earlier sync")
+    do $$$AssertEquals(..CountInOutput(.output, "SyncTest.Tests.Trivial begins"), 1, "The deferred test ran exactly once")
+
+    // Flag spent: the file must go quiet again rather than re-run on every later sync.
+    kill output
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "A third sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Nothing to sync"), "Once its tests have run, the file is no longer forced into the change set")
+    do $$$AssertNotTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "The test does not re-run on every subsequent sync")
+}
+
 /// Editing an existing test class and adding a brand-new test class in the same resource,
 /// in the same sync call, batches both changed classes into a single RunTest invocation
 /// (one "Test Results:" block) rather than one call per class — and both tests still run.
