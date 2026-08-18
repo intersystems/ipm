@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
+- #536: Improve filesystem repository cache building through performance improvements, better staleness checking based on mtime, and new `-rebuild-cache` flag for `repo` command to manually rebuild the entire cache
 
 ### Changed
 - Minimum supported Python version is now 3.9
@@ -87,7 +88,6 @@ modules are.
 
 ### Added
 - #1024: Added flag -export-python-deps to publish command
-- #536: When installing from a file system repos, if the cached version of the module is stale (the modification time of the `module.xml` is different than when it was cached), pull again from disk. Also add `-rebuild-cache` flag for the `repo` command has been to rebuild the file system repo's entire cache.
 
 ### Fixed
 - #996: Ensure COS commands execute in exec under a dedicated, isolated context
