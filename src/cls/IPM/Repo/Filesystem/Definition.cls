@@ -85,8 +85,15 @@ ClassMethod OnConfigure(
             set pInstance.Depth = tDepth
         }
 
-        // Build cache without auto-detect - user specifies depth explicitly or it defaults to 0 (unlimited)
-        $$$ThrowOnError(pInstance.BuildCache(1,1,0))
+        // No depth auto-detect: the user's -depth, or the default of 0 (unlimited), is left alone.
+        if ##class(%File).DirectoryExists(pInstance.Root) {
+            $$$ThrowOnError(pInstance.BuildCache(1,1,0))
+        } else {
+            // Still configure the repository, since the root may be a share that mounts later, but
+            // warn that nothing resolves from it until the cache is built. Configure() does the save.
+            set tMessage = "Root '"_pInstance.Root_"' does not exist. No modules will resolve from this repository until it does and the cache is rebuilt."
+            do ##class(%IPM.General.LogManager).Warning(tMessage,1)
+        }
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -118,31 +125,6 @@ Trigger RootChanged [ Event = UPDATE, Foreach = row/object ]
     }
 }
 
-/// When Depth property changes, cache needs full rebuild
-/// (different depth means different set of files included)
-Trigger DepthChanged [ Event = UPDATE, Foreach = row/object ]
-{
-    new oldDepth, newDepth
-    if ({Depth*C}) {
-        set oldDepth = {Depth*O}
-        set newDepth = {Depth}
-
-        // Skip if we're already in the middle of BuildCache (e.g., auto-detecting depth)
-        // This prevents infinite recursion when BuildCache sets the depth.
-        // Contract: BuildCache holds this guard across every %Save() it performs, because each of
-        // those saves re-fires this trigger. Clearing the guard any earlier makes it recurse.
-        if $get(^||IPMBuildingCache) {
-            quit
-        }
-
-        // Depth changed - rebuild cache
-        set oref = ..%Open({ID})
-        if $isobject(oref) {
-            do oref.BuildCache(1, 0)  // Full rebuild, non-verbose
-        }
-    }
-}
-
 /// Build the cache of modules found in the filesystem repository.
 /// pPurge - if 1, deletes existing cache entries before rebuilding
 Method BuildCache(
@@ -153,12 +135,6 @@ Method BuildCache(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
 
-    // Set flag to prevent DepthChanged trigger from recursively calling BuildCache.
-    // The prior value is captured and restored rather than cleared outright, so a nested call can
-    // never release an outer caller's guard.
-    set tPriorGuard = $get(^||IPMBuildingCache)
-    set ^||IPMBuildingCache = 1
-
     try {
         set tLogManager = ##class(%IPM.General.LogManager).%Get(.tSC)
         $$$ThrowOnError(tSC)
@@ -167,19 +143,30 @@ Method BuildCache(
         set tXSLTProvider = ##class(%IPM.Repo.XSLTProvider).%Get(.tSC)
         $$$ThrowOnError(tSC)
 
+        // Refuse to rebuild against a root we cannot see. The walk would report no files, every
+        // existing entry would look deleted, and the repository would be silently emptied. An
+        // unmounted share or an interrupted source control sync looks exactly like this.
+        if '##class(%File).DirectoryExists(..Root) {
+            set tSC = $$$ERROR($$$GeneralError,"Filesystem repository root does not exist: "_..Root)
+            quit
+        }
+
         tstart
 
-        // Track visited cache entries (for cleanup of stale entries)
-        kill tVisitedIds
-
-        if (pPurge) && (..%Id() '= "") {
+        // Serialize against other rebuilds of this repository. Two concurrent rebuilds each compute
+        // their own visited set, so whichever finished last would delete the other's new entries.
+        // A repository with no ID yet is not visible to any other process.
+        if (..%Id() '= "") {
             set tLockManager = ##class(%IPM.Utils.LockManager).%New()
             $$$ThrowOnError(tLockManager.LockClassId($classname(),..%Id()))
-            #dim tResult As %SQL.StatementResult
-            set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %IPM_Repo_Filesystem.Cache where Root = ?",..Root)
-            if (tResult.%SQLCODE < 0) {
-                set tSC = $$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message)
-                quit
+
+            if (pPurge) {
+                #dim tResult As %SQL.StatementResult
+                set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %IPM_Repo_Filesystem.Cache where Root = ?",..Root)
+                if (tResult.%SQLCODE < 0) {
+                    set tSC = $$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message)
+                    quit
+                }
             }
         }
 
@@ -188,6 +175,10 @@ Method BuildCache(
         if $$$ISERR(tSC) {
             quit
         }
+
+        // Read the rows already cached for this root up front, so an unchanged module.xml costs one
+        // hash comparison instead of an object instantiation.
+        $$$ThrowOnError(..LoadExistingEntries(.tExisting))
 
         // Scan root directory recursively, up to ..Depth levels down, for module.xml files,
         // hashing each one so unchanged manifests can be skipped without re-parsing.
@@ -199,14 +190,14 @@ Method BuildCache(
 
         if (pAutoDetectDepth) && (tMaxDepth > 0) {
             set ..Depth = tMaxDepth
-            // This save re-fires the UPDATE triggers, DepthChanged among them; the
-            // ^||IPMBuildingCache guard set above is the only thing stopping it from re-entering
-            // BuildCache here.
             set tSC = ..%Save()
             if $$$ISERR(tSC) {
                 quit
             }
         }
+
+        // Track visited cache entries (for cleanup of stale entries)
+        kill tVisitedIds
 
         // Ensure that we're looking at valid MODULE documents (as opposed to classes named Module, which the package manager has!)
         set tAggSC = $$$OK
@@ -218,7 +209,7 @@ Method BuildCache(
             // Keys are relative to the root and always end in "module.xml"; dropping that and the
             // separator before it leaves the module's subdirectory ("" for a module.xml in the root).
             set tSubDirectory = $extract(tRelPath,1,*-$length("module.xml")-1)
-            set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,$get(tHashList(tRelPath)),.tName,.tVersionString,.tCacheId))
+            set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,$get(tHashList(tRelPath)),.tName,.tVersionString,.tCacheId,.tExisting))
 
             // Track this cache entry as visited (still exists on filesystem)
             if tCacheId '= "" {
@@ -237,7 +228,6 @@ Method BuildCache(
 
         // set cache rebuild timestamp using UTC
         set ..CacheLastRebuilt = $zdatetime($ztimestamp,3)
-        // As above: this save re-fires DepthChanged, which the guard suppresses.
         $$$ThrowOnError(..%Save())
         tcommit
     } catch e {
@@ -245,10 +235,38 @@ Method BuildCache(
     }
     while ($tlevel > tInitTLevel) { trollback 1 }
 
-    // Done building cache, so restore whatever the guard was before this call
-    set ^||IPMBuildingCache = tPriorGuard
-
     quit tSC
+}
+
+/// Read the cache rows already stored for this root, keyed by SubDirectoryHash so a long subdirectory
+/// cannot overflow a local array subscript.
+/// <var>existing</var>(hash) = $listbuild(id, contentHash, name, versionString)
+Method LoadExistingEntries(Output existing) As %Status [ Private ]
+{
+    set sc = $$$OK
+    kill existing
+    try {
+        #dim result As %SQL.StatementResult
+        set result = ##class(%SQL.Statement).%ExecDirect(,"SELECT ID, SubDirectory, SubDirectoryHash, ContentHash, Name, VersionString FROM %IPM_Repo_Filesystem.Cache WHERE Root = ?",..Root)
+        if (result.%SQLCODE < 0) {
+            $$$ThrowStatus($$$ERROR($$$SQLCode,result.%SQLCODE,result.%Message))
+        }
+        while result.%Next(.fetchSC) {
+            $$$ThrowOnError(fetchSC)
+            set hash = result.%Get("SubDirectoryHash")
+            // Rows written before SubDirectoryHash existed have an empty stored value. Compute it
+            // from SubDirectory so the preload finds them correctly. The index self-heals on first
+            // save of a changed row; a pPurge=1 rebuild cleans up orphaned index entries entirely.
+            if hash = "" {
+                set hash = ##class(%IPM.Repo.Filesystem.Cache).PathHash(result.%Get("SubDirectory"))
+            }
+            set existing(hash) = $listbuild(result.%Get("ID"),result.%Get("ContentHash"),result.%Get("Name"),result.%Get("VersionString"))
+        }
+        $$$ThrowOnError(fetchSC)
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 /// Parse a module.xml file and return parsed metadata
@@ -278,9 +296,10 @@ ClassMethod ParseModuleFile(
 
 /// Refresh a cache entry by re-parsing its module.xml file.
 /// Called when the content hash indicates the file has changed since it was last cached.
-/// Updates cache entry in-place with new metadata and content hash.
-/// NOTE: Sets ManifestLoaded=0 to defer full manifest parsing until needed.
-/// The manifest will be loaded on-demand when GetModuleManifest() is called.
+/// Updates cache entry in-place with new metadata and content hash, deferring the full manifest until
+/// GetModuleManifest() asks for it.
+/// A re-parse can change Name and VersionString. Callers must re-check that the entry still describes
+/// the module they looked it up by, as RootNameVersionOpenValidated does.
 ClassMethod RefreshCacheEntry(
 	cacheObj As %IPM.Repo.Filesystem.Cache,
 	filePath As %String,
@@ -296,7 +315,7 @@ ClassMethod RefreshCacheEntry(
     // Drop the manifest along with the flag, so a reader that trusts the stream over ManifestLoaded
     // can't get superseded bytes.
     do cacheObj.Manifest.Clear()
-    set cacheObj.ManifestLoaded = 0  // Defer manifest parsing - will load on first GetModuleManifest() call
+    set cacheObj.ManifestLoaded = 0
     set cacheObj.LastModified = $zdatetime($ztimestamp, 3)
 
     set sc = cacheObj.%Save()
@@ -309,13 +328,16 @@ ClassMethod RefreshCacheEntry(
 /// Adds a module to the cache.
 /// pContentHash is the SHA-1 of pModuleFileName as computed by the directory walk; an entry whose
 /// stored hash still matches is reused as-is, without re-parsing or re-validating the manifest.
+/// pExisting is the array from <method>LoadExistingEntries</method> and is required: without it an
+/// already-cached directory takes the insert path and fails the CacheItemIndex unique key.
 Method AddCacheItem(
 	pModuleFileName As %String,
 	pSubDirectory As %String,
 	pContentHash As %String,
 	Output pName As %String,
 	Output pVersionString As %String,
-	Output pCacheId As %String = "") As %Status
+	Output pCacheId As %String = "",
+	ByRef pExisting) As %Status
 {
     set tSC = $$$OK
     set pName = ""
@@ -328,18 +350,20 @@ Method AddCacheItem(
             set pContentHash = $$$lcase(##class(%File).SHA1Hash(pModuleFileName, 1))
         }
 
-        if ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
-            set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
-            $$$ThrowOnError(tSC)
+        set tRow = $get(pExisting(##class(%IPM.Repo.Filesystem.Cache).PathHash(pSubDirectory)))
+        if (tRow '= "") {
+            set $listbuild(tRowId,tRowHash,tRowName,tRowVersion) = tRow
 
-            // Check if we can skip parsing entirely (content unchanged and previously validated)
-            if (tCacheItem.ContentHash = pContentHash) {
-                // File unchanged - reuse cached values without parsing or updating
-                set pName = tCacheItem.Name
-                set pVersionString = tCacheItem.VersionString
-                set pCacheId = tCacheItem.%Id()
+            if (tRowHash = pContentHash) {
+                // File unchanged, so reuse the cached values without opening the object or parsing.
+                set pName = tRowName
+                set pVersionString = tRowVersion
+                set pCacheId = tRowId
                 return $$$OK
             }
+
+            set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).%OpenId(tRowId,,.tSC)
+            $$$ThrowOnError(tSC)
         } else {
             // New cache entry - need to create, parse and validate
             set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).%New()
@@ -352,8 +376,16 @@ Method AddCacheItem(
             do ..ParseModuleFile(pModuleFileName, .pName, .pVersionString)
         } catch ex {
             // Wasn't a valid file or failed to parse. Log as warning and continue
-            set tSC = ex.AsStatus()
-            do ##class(%IPM.General.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$system.Status.GetErrorText(tSC),1)
+            do ##class(%IPM.General.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$system.Status.GetErrorText(ex.AsStatus()),1)
+
+            // Report an already-cached entry as still present. The file exists, it is only momentarily
+            // unparseable, say mid-save or with unresolved merge markers. Leaving it out of the
+            // caller's visited set would have CleanupStaleEntries evict a healthy entry.
+            if (tRow '= "") {
+                set pName = tRowName
+                set pVersionString = tRowVersion
+                set pCacheId = tRowId
+            }
             return $$$OK
         }
 
@@ -361,7 +393,9 @@ Method AddCacheItem(
         set tCacheItem.Name = pName
         set tCacheItem.VersionString = pVersionString
         set tCacheItem.ContentHash = pContentHash
-        set tCacheItem.ManifestLoaded = 0  // Defer manifest parsing - will load on first GetModuleManifest() call
+        // Drop the manifest along with the flag, as in RefreshCacheEntry.
+        do tCacheItem.Manifest.Clear()
+        set tCacheItem.ManifestLoaded = 0
         set tCacheItem.LastModified = $zdatetime($ztimestamp,3)
         set tSaveSC = tCacheItem.%Save()
         if $$$ISERR(tSaveSC) {
@@ -456,6 +490,7 @@ ClassMethod GetModuleStreamFromFile(
 	pMetadataOnly As %Boolean = 0) As %Status
 {
     set tSC = $$$OK
+    set pStream = ""
     set pName = ""
     set pVersion = ""
     try {
@@ -464,28 +499,30 @@ ClassMethod GetModuleStreamFromFile(
         set tSC = tSourceStream.LinkToFile(pFilename)
         $$$ThrowOnError(tSC)
 
-        // Copy to in-memory stream for reuse (avoid file I/O on rewind)
-        set tMemoryStream = ##class(%Stream.GlobalCharacter).%New()
-        set tSC = tMemoryStream.CopyFrom(tSourceStream)
-        $$$ThrowOnError(tSC)
-        do tMemoryStream.Rewind()
-
         set tMetaStream = ##class(%Stream.GlobalCharacter).%New()
 
         // Extract <Module> section of document (skip if metadata-only)
         if 'pMetadataOnly {
+            // Two transforms mean two passes, so buffer the source in memory to avoid re-reading the
+            // file. A metadata-only call makes one pass and reads the file directly.
+            set tInputStream = ##class(%Stream.GlobalCharacter).%New()
+            set tSC = tInputStream.CopyFrom(tSourceStream)
+            $$$ThrowOnError(tSC)
+            do tInputStream.Rewind()
+
             set pStream = ##class(%Stream.GlobalCharacter).%New()
             set tCompiledTransform = ##class(%IPM.Repo.XSLTProvider).GetCompiledTransformForXData($classname(),"ModuleDocumentTransform")
-            set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tMemoryStream,tCompiledTransform,.pStream)
+            set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tInputStream,tCompiledTransform,.pStream)
             $$$ThrowOnError(tSC)
 
-            // Rewind in-memory stream for next transform
-            do tMemoryStream.Rewind()
+            do tInputStream.Rewind()
+        } else {
+            set tInputStream = tSourceStream
         }
 
         // Extract Name and Version
         set tCompiledTransform = ##class(%IPM.Repo.XSLTProvider).GetCompiledTransformForXData($classname(),"MetadataExtractionTransform")
-        set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tMemoryStream,tCompiledTransform,.tMetaStream)
+        set tSC = ##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(tInputStream,tCompiledTransform,.tMetaStream)
         $$$ThrowOnError(tSC)
 
         set tMetaStream.LineTerminator = $select($$$isWINDOWS:$char(13,10),$$$isUNIX:$char(10))

@@ -41,6 +41,8 @@ Method %Clean(ByRef pParams) As %Status
                 kill ^IPM.Repo.DefinitionD
                 kill ^IPM.Repo.DefinitionI
                 kill ^IPM.Repo.Filesystem.CacheD
+                kill ^IPM.Repo.Filesystem.CacheI
+                kill ^IPM.Repo.Filesystem.CacheS
                 kill ^IPM.General.SettingsD
                 kill ^IPM.UpdateStep.AnyMemberD
                 kill ^IPM.UpdateStep.PrimaryOnlyD

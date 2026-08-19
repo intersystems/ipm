@@ -5,13 +5,19 @@ Class %IPM.Repo.Filesystem.Cache Extends (%Persistent, %IPM.General.ModuleInfo)
 
 Parameter DEFAULTGLOBAL = "^IPM.Repo.Filesystem.Cache";
 
-Index CacheItemIndex On (Root, SubDirectory) [ Data = LastModified, Unique ];
+/// Uniqueness constraint only: one cache entry per directory under a given root.
+Index CacheItemIndex On (Root, SubDirectoryHash) [ Unique ];
 
 Property Root As %String(MAXLEN = 260) [ Required ];
 
 ForeignKey RootFK(Root) References %IPM.Repo.Filesystem.Definition(RootIndex) [ OnDelete = cascade ];
 
-Property SubDirectory As %String(MAXLEN = 260);
+Property SubDirectory As %String(MAXLEN = "");
+
+/// SHA-1 of SubDirectory as uppercase hex, giving the unique index a fixed 40-character subscript.
+/// SubDirectory itself cannot be one: a path can exceed the combined subscript budget, and %String's
+/// SQLUPPER collation reports "mods/Foo" and "mods/foo" as the same key when they are two directories.
+Property SubDirectoryHash As %String(MAXLEN = 40) [ Required, SqlComputeCode = {set {*} = ##class(%IPM.Repo.Filesystem.Cache).PathHash({SubDirectory})}, SqlComputed, SqlComputeOnChange = (%%INSERT, %%UPDATE, SubDirectory) ];
 
 Property LastModified As %TimeStamp [ Required ];
 
@@ -35,6 +41,11 @@ Index SemVer On (Name, Version) As %IPM.General.SemanticVersion.Index;
 Property SemVer As %String(MAXLEN = 512) [ SqlComputeCode = {set {*} = ##class(%IPM.Repo.Filesystem.Cache).SemVerNode({Name},{Version})}, SqlComputed, SqlComputeOnChange = (%%INSERT, %%UPDATE) ];
 
 Index RootNameVersion On (Root, Name, VersionString) [ Unique ];
+
+ClassMethod PathHash(subDirectory As %String) As %String [ CodeMode = expression ]
+{
+##class(%xsd.hexBinary).LogicalToXSD($system.Encryption.SHA1Hash(subDirectory))
+}
 
 ClassMethod %OnBeforeBuildIndices(ByRef indexlist As %String(MAXLEN="") = "") As %Status [ Private, ServerOnly = 1 ]
 {
@@ -148,10 +159,11 @@ ClassMethod RootNameVersionOpenValidated(
         set dirPath = ##class(%File).NormalizeFilename(cacheObj.SubDirectory, cacheObj.Root)
         set filePath = ##class(%File).NormalizeFilename("module.xml", dirPath)
         if '##class(%File).Exists(filePath) {
-            // File deleted from filesystem - invalidate cache
-            set status = $$$ERROR($$$GeneralError, "module.xml not found in " _ dirPath)
-            do cacheObj.%DeleteId(cacheObj.%Id())
+            // Report it but leave the row alone. The absence may be transient, such as a source
+            // control sync in flight or an unmounted share. Pruning belongs to CleanupStaleEntries,
+            // which only runs after a full walk has established the file is really gone.
             set cacheObj = ""
+            set status = $$$ERROR($$$GeneralError, "module.xml not found in " _ dirPath)
             quit
         }
 
@@ -161,6 +173,17 @@ ClassMethod RootNameVersionOpenValidated(
         set currentHash = $$$lcase(##class(%File).SHA1Hash(filePath, 1))
         if (cacheObj.ContentHash '= currentHash) {
             do ##class(%IPM.Repo.Filesystem.Definition).RefreshCacheEntry(cacheObj, filePath, currentHash)
+
+            // The re-parse can change Name or Version, so the entry may no longer be the module that
+            // was asked for. Returning it would install something other than what the caller resolved.
+            // Re-check through the index rather than comparing properties, so the same key semantics
+            // apply on both sides of the comparison as on the original lookup.
+            if '..RootNameVersionExists(root, name, versionString, .stillId) || (stillId '= cacheObj.%Id()) {
+                set message = filePath_" now describes "_cacheObj.Name_" "_cacheObj.VersionString_", not "_name_" "_versionString
+                set cacheObj = ""
+                set status = $$$ERROR($$$GeneralError, message)
+                quit
+            }
         }
     } catch ex {
         set status = ex.AsStatus()
@@ -226,6 +249,9 @@ Storage Default
 </Value>
 <Value name="18">
 <Value>ManifestLoaded</Value>
+</Value>
+<Value name="19">
+<Value>SubDirectoryHash</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.Filesystem.CacheD</DataLocation>

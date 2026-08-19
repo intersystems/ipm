@@ -47,7 +47,7 @@ Method OnAfterOneTest() As %Status
 }
 
 /// Test that cache is built correctly when repo is created
-Method Test01CacheBuiltCorrectly()
+Method TestCacheBuiltCorrectly()
 {
     // Get the repo definition
     set repoDef = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen(..#REPONAME,,.sc)
@@ -80,7 +80,7 @@ Method Test01CacheBuiltCorrectly()
 }
 
 /// Test lazy loading - manifests are not fully loaded until accessed
-Method Test02LazyLoadingVerification()
+Method TestLazyLoadingVerification()
 {
     // Rebuild cache to ensure clean state with ManifestLoaded=0
     set sc = ##class(%IPM.Main).Shell("repo -n "_..#REPONAME_" -rebuild-cache")
@@ -117,24 +117,22 @@ Method Test02LazyLoadingVerification()
 }
 
 /// Test manual cache rebuild with -rebuild-cache command
-Method Test03RebuildCache()
+Method TestManualCacheRebuild()
 {
-    // Get initial cache rebuild timestamp
+    // Set a known stale timestamp so we can verify the rebuild updates it without sleeping
     set repoDef = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen(..#REPONAME,,.sc)
     do $$$AssertStatusOK(sc,"Opened repo definition")
-    set initialTimestamp = repoDef.CacheLastRebuilt
-
-    // Wait a second to ensure timestamp difference
-    hang 1
+    set repoDef.CacheLastRebuilt = "1970-01-01 00:00:00"
+    $$$ThrowOnError(repoDef.%Save())
 
     // Rebuild cache using command
     set sc = ##class(%IPM.Main).Shell("repo -n "_..#REPONAME_" -rebuild-cache")
     do $$$AssertStatusOK(sc,"Cache rebuild command executed successfully")
 
-    // Verify timestamp was updated
+    // Verify timestamp was updated from the stale value
     set repoDefAfter = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen(..#REPONAME,,.sc)
     do $$$AssertStatusOK(sc,"Opened repo definition after rebuild")
-    do $$$AssertNotEquals(repoDefAfter.CacheLastRebuilt,initialTimestamp,"CacheLastRebuilt timestamp was updated")
+    do $$$AssertNotEquals(repoDefAfter.CacheLastRebuilt,"1970-01-01 00:00:00","CacheLastRebuilt timestamp was updated")
 
     // Verify cache entries still exist
     set cacheA = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-a","1.0.0",,.sc)
@@ -167,7 +165,6 @@ Method WriteFile(
         set file = ##class(%Stream.FileCharacter).%New()
         $$$ThrowOnError(file.LinkToFile(path))
         do file.Clear()
-        $$$ThrowOnError(file.LinkToFile(path))
         do file.Write(content)
         $$$ThrowOnError(file.%Save())
     } catch e {
@@ -178,7 +175,7 @@ Method WriteFile(
 
 /// Test cache freshness detection via ContentHash tracking: an edited module.xml gets a different
 /// hash, so the next validated open re-parses the entry.
-Method Test04CacheFreshnessDetection()
+Method TestCacheFreshnessDetection()
 {
     // Get the original cache entry
     set cacheA = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-a","1.0.0",,.sc)
@@ -190,31 +187,128 @@ Method Test04CacheFreshnessDetection()
     set originalContent = ..ReadFile(moduleFile)
     do $$$AssertNotEquals(originalContent,"","Read the original module.xml content")
 
-    // Change the content, not just the timestamp: content hashing only reacts to real edits.
-    set modifiedContent = $replace(originalContent,"<Packaging>module</Packaging>","<Packaging>module</Packaging>"_$char(10)_"      <Description>freshness probe</Description>")
-    do $$$AssertNotEquals(modifiedContent,originalContent,"Prepared modified module.xml content")
-    do $$$AssertStatusOK(..WriteFile(moduleFile,modifiedContent),"Rewrote module.xml with changed content")
+    // Later tests share this git-tracked fixture, so the assertions run inside a try and the restore
+    // below happens whether they pass, fail, or throw.
+    try {
+        // Change the content, not just the timestamp: content hashing only reacts to real edits.
+        set modifiedContent = $replace(originalContent,"<Packaging>module</Packaging>","<Packaging>module</Packaging>"_$char(10)_"      <Description>freshness probe</Description>")
+        do $$$AssertNotEquals(modifiedContent,originalContent,"Prepared modified module.xml content")
+        do $$$AssertStatusOK(..WriteFile(moduleFile,modifiedContent),"Rewrote module.xml with changed content")
 
-    // Access the cache entry via validated open (this checks ContentHash)
-    set cacheARefreshed = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-a","1.0.0",,.sc)
-    do $$$AssertStatusOK(sc,"Cache entry was refreshed based on ContentHash")
-    do $$$AssertNotEquals(cacheARefreshed.ContentHash,originalHash,"ContentHash was updated after the content changed")
-    do $$$AssertEquals(cacheARefreshed.ManifestLoaded,0,"Changed manifest is flagged for reparse")
+        // Access the cache entry via validated open (this checks ContentHash)
+        set cacheARefreshed = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-a","1.0.0",,.sc)
+        do $$$AssertStatusOK(sc,"Cache entry was refreshed based on ContentHash")
+        do $$$AssertNotEquals(cacheARefreshed.ContentHash,originalHash,"ContentHash was updated after the content changed")
+        do $$$AssertEquals(cacheARefreshed.ManifestLoaded,0,"Changed manifest is flagged for reparse")
 
-    // Verify we can still install the module
-    set sc = ##class(%IPM.Main).Shell("install module-a 1.0.0")
-    do $$$AssertStatusOK(sc,"Successfully installed module after cache refresh")
+        // Verify we can still install the module
+        do $$$AssertStatusOK(##class(%IPM.Main).Shell("install module-a 1.0.0"),"Successfully installed module after cache refresh")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"No error while testing cache freshness")
+    }
 
-    // Later tests share this fixture directory, so put the file back and let the cache pick the
-    // original content up again.
     do $$$AssertStatusOK(..WriteFile(moduleFile,originalContent),"Restored the original module.xml")
     set cacheARestored = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-a","1.0.0",,.sc)
     do $$$AssertStatusOK(sc,"Reopened the cache entry after restoring the fixture")
-    do $$$AssertEquals(cacheARestored.ContentHash,originalHash,"ContentHash returned to its original value")
+    do $$$AssertTrue($isobject(cacheARestored),"Got a cache entry back after restoring the fixture")
+    if $isobject(cacheARestored) {
+        do $$$AssertEquals(cacheARestored.ContentHash,originalHash,"ContentHash returned to its original value")
+    }
+}
+
+/// A module.xml that cannot be parsed must not cost the module its cache entry. The file is still
+/// present, so nothing has been deleted and the stale-entry cleanup has no business evicting it.
+Method TestUnparseableFileKeepsCacheEntry()
+{
+    set repoDef = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen(..#REPONAME,,.sc)
+    do $$$AssertStatusOK(sc,"Opened repo definition")
+
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",##class(%File).NormalizeFilename("module-a/1.0.0",..RepoPath))
+    set originalContent = ..ReadFile(moduleFile)
+
+    try {
+        do $$$AssertStatusOK(..WriteFile(moduleFile,"<Export><Document name=""module-a.ZPM""><Module>"),"Wrote a truncated module.xml")
+
+        // purge=0 is the path an install takes, and the only one that runs stale-entry cleanup.
+        do $$$AssertStatusOK(repoDef.BuildCache(0,0),"Rebuilt cache over the unparseable file")
+
+        set cacheA = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-a","1.0.0",,.sc)
+        do $$$AssertTrue($isobject(cacheA),"module-a 1.0.0 survived a rebuild over an unparseable module.xml")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"No error while testing an unparseable module.xml")
+    }
+
+    do $$$AssertStatusOK(..WriteFile(moduleFile,originalContent),"Restored the original module.xml")
+    do $$$AssertStatusOK(repoDef.BuildCache(1,0),"Purged and rebuilt the cache after restoring the fixture")
+}
+
+/// Editing <Version> in place changes which module the cache entry describes. Resolving the old
+/// version has to fail rather than quietly hand back the new one.
+Method TestVersionBumpInPlaceDoesNotReturnWrongModule()
+{
+    set repoDef = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen(..#REPONAME,,.sc)
+    do $$$AssertStatusOK(sc,"Opened repo definition")
+
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",##class(%File).NormalizeFilename("module-a/1.0.0",..RepoPath))
+    set originalContent = ..ReadFile(moduleFile)
+
+    try {
+        set bumpedContent = $replace(originalContent,"<Version>1.0.0</Version>","<Version>1.1.0</Version>")
+        do $$$AssertNotEquals(bumpedContent,originalContent,"Prepared a version-bumped module.xml")
+        do $$$AssertStatusOK(..WriteFile(moduleFile,bumpedContent),"Wrote the version-bumped module.xml")
+
+        set stale = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-a","1.0.0",,.sc)
+        do $$$AssertStatusNotOK(sc,"Resolving 1.0.0 fails once the file on disk describes 1.1.0")
+        do $$$AssertTrue('$isobject(stale),"No cache entry is handed back for the version that is gone")
+
+        set bumped = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-a","1.1.0",,.sc)
+        do $$$AssertTrue($isobject(bumped),"The refreshed entry describes module-a 1.1.0")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"No error while testing an in-place version bump")
+    }
+
+    do $$$AssertStatusOK(..WriteFile(moduleFile,originalContent),"Restored the original module.xml")
+    do $$$AssertStatusOK(repoDef.BuildCache(1,0),"Purged and rebuilt the cache after restoring the fixture")
+}
+
+/// A root that has gone missing must fail the rebuild rather than empty the cache. An unmounted share
+/// should not look like a repository whose modules were all deleted.
+Method TestMissingRootDoesNotEmptyCache()
+{
+    set tempRoot = ##class(%IPM.Utils.File).CreateTempDirectory()
+
+    try {
+        set moduleDir = ##class(%File).NormalizeFilename("module-b/3.0.0",tempRoot)
+        do $$$AssertStatusOK(##class(%IPM.Utils.File).CreateDirectoryChain(moduleDir),"Created a module directory under a temporary root")
+
+        set xdata = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||ModuleB300",,.sc)
+        do $$$AssertStatusOK(sc,"Opened XData block")
+        set file = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(file.LinkToFile(##class(%File).NormalizeFilename("module.xml",moduleDir)))
+        $$$ThrowOnError(file.CopyFrom(xdata.Data))
+        $$$ThrowOnError(file.%Save())
+
+        do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -n fs-missing-root -fs -path "_tempRoot),"Created a repo over the temporary root")
+
+        set repoDef = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen("fs-missing-root",,.sc)
+        do $$$AssertStatusOK(sc,"Opened the temporary repo definition")
+        do $$$AssertTrue(##class(%IPM.Repo.Filesystem.Cache).RootNameVersionExists(repoDef.Root,"module-b","3.0.0"),"module-b 3.0.0 is cached while the root exists")
+
+        do $$$AssertTrue(##class(%File).RemoveDirectoryTree(tempRoot),"Removed the temporary root")
+
+        do $$$AssertStatusNotOK(repoDef.BuildCache(0,0),"Rebuilding against a missing root reports an error")
+        do $$$AssertTrue(##class(%IPM.Repo.Filesystem.Cache).RootNameVersionExists(repoDef.Root,"module-b","3.0.0"),"The cache entry survived a rebuild against a missing root")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"No error while testing a missing root")
+    }
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete -name fs-missing-root"),"Cleaned up the temporary repo")
+    // Already removed by the test body on the happy path; this covers an early failure.
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(tempRoot)
 }
 
 /// Test adding a new version to the filesystem and auto-discovery on install
-Method Test05AddNewVersion()
+Method TestAutoDiscoverNewVersion()
 {
     // Create new directory for module-b 3.0.0
     set newVersionDir = ##class(%File).NormalizeFilename("module-b/3.0.0",..RepoPath)
@@ -250,25 +344,43 @@ Method Test05AddNewVersion()
     set cacheB3After = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-b","3.0.0",,.sc)
     do $$$AssertStatusOK(sc,"Cache entry for module-b 3.0.0 exists after install")
     do $$$AssertTrue($isobject(cacheB3After),"module-b 3.0.0 found in cache after auto-rebuild")
+
+    // Clean up created directory so it doesn't affect other tests
+    do ##class(%File).RemoveDirectoryTree(newVersionDir)
 }
 
-/// Test deleting a version and verifying stale entry cleanup
-Method Test06DeleteVersionStaleCleanup()
+/// Test that a stale cache entry is removed when its directory is deleted and cache is rebuilt.
+Method TestStaleEntryCleanup()
 {
-    // Verify module-b 3.0.0 exists in cache (from previous test)
-    set cacheB3 = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-b","3.0.0",,.sc)
-    do $$$AssertTrue($isobject(cacheB3),"module-b 3.0.0 exists before deletion")
+    // Create a temporary module-b 3.0.0 directory with a valid module.xml
+    set newVersionDir = ##class(%File).NormalizeFilename("module-b/3.0.0",..RepoPath)
+    set created = ##class(%File).CreateDirectory(newVersionDir)
+    do $$$AssertTrue(created,"Created directory for module-b 3.0.0")
 
-    // Delete the directory
-    set versionDir = ##class(%File).NormalizeFilename("module-b/3.0.0",..RepoPath)
-    set deleted = ##class(%File).RemoveDirectoryTree(versionDir)
+    set xdata = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||ModuleB300",,.sc)
+    do $$$AssertStatusOK(sc,"Opened XData block")
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",newVersionDir)
+    set file = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(file.LinkToFile(moduleFile))
+    do file.CopyFrom(xdata.Data)
+    $$$ThrowOnError(file.%Save())
+
+    // Rebuild cache to pick up the new directory
+    set sc = ##class(%IPM.Main).Shell("repo -n "_..#REPONAME_" -rebuild-cache")
+    do $$$AssertStatusOK(sc,"Rebuilt cache to populate module-b 3.0.0 entry")
+
+    set cacheB3 = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-b","3.0.0",,.sc)
+    do $$$AssertTrue($isobject(cacheB3),"module-b 3.0.0 exists in cache before deletion")
+
+    // Delete the directory to create a stale cache entry
+    set deleted = ##class(%File).RemoveDirectoryTree(newVersionDir)
     do $$$AssertTrue(deleted,"Deleted module-b 3.0.0 directory")
 
-    // Rebuild cache to trigger cleanup
+    // Rebuild cache to trigger stale entry cleanup
     set sc = ##class(%IPM.Main).Shell("repo -n "_..#REPONAME_" -rebuild-cache")
     do $$$AssertStatusOK(sc,"Rebuilt cache after deletion")
 
-    // Verify cache entry was removed
+    // Verify stale entry was removed
     set cacheB3After = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-b","3.0.0",,.sc)
     do $$$AssertTrue('$isobject(cacheB3After),"module-b 3.0.0 removed from cache after deletion")
 
@@ -278,7 +390,7 @@ Method Test06DeleteVersionStaleCleanup()
 }
 
 /// Test depth specification - create repo with depth and verify it only scans to that depth
-Method Test07DepthSpecification()
+Method TestDepthSpecification()
 {
     // Test structure:
     // fs-cache-test-depth/module-shallow/1.0.0/module.xml (2 levels deep)
@@ -329,7 +441,7 @@ Method Test07DepthSpecification()
 
 /// A touch that leaves the content identical must not invalidate the cache entry: this is the
 /// difference between content hashing and the mtime tracking it replaced.
-Method Test08TouchDoesNotReparse()
+Method TestTouchDoesNotReparse()
 {
     set moduleFile = ##class(%File).NormalizeFilename("module.xml",##class(%File).NormalizeFilename("module-a/1.0.0",..RepoPath))
 

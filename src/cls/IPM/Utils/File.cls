@@ -2,6 +2,9 @@
 Class %IPM.Utils.File
 {
 
+/// Ceiling on how far <method>WalkDirectoriesSQL</method> will descend, well past any real source tree.
+Parameter MAXWALKDEPTH = 64;
+
 /// Create this directory and all the parent directories if they do not exist. This differs from
 /// <method>CreateDirectory</method> as that method only creates one new directory where as
 /// this will create the entire chain of directories. Returns true if it succeeds and false otherwise.
@@ -275,7 +278,8 @@ ClassMethod NormalizePath(path As %String) As %String
 /// <var>relativeTo</var> is the root that result keys are made relative to.
 /// <var>maxDepth</var> limits how far below each walked directory to descend; 0 is unlimited.
 /// A file exactly <var>maxDepth</var> levels down is kept; anything deeper is not visited.
-/// <var>filenameFilter</var>, when non-empty, keeps only files with exactly that name (e.g. "module.xml").
+/// <var>filenameFilter</var>, when non-empty, keeps only files with that name (e.g. "module.xml"),
+/// compared case-insensitively on Windows and case-sensitively elsewhere, matching the filesystem.
 /// <var>files</var>(relPath) = fullPath, and <var>hashes</var>(relPath) = lowercase SHA-1 hex
 /// (empty when <var>computeHashes</var> is 0). Keys are normalized: forward slashes, no leading slash.
 /// <var>maxDepthFound</var> reports the greatest depth at which a kept file was found, for depth auto-detection.
@@ -318,7 +322,11 @@ ClassMethod WalkDirectories(
             quit
         }
 
-        // Python unavailable - fall back to a SQL-driven breadth-first walk, one directory at a time.
+        // Fall back to a SQL-driven breadth-first walk, one directory at a time.
+        // Warn, because the fallback is far slower and otherwise indistinguishable from a slow disk.
+        set warning = "Python directory walk failed, falling back to a slower SQL walk: "_$system.Status.GetOneErrorText(pythonSC)
+        do ##class(%IPM.General.LogManager).Warning(warning,1)
+
         kill files, hashes
         set maxDepthFound = 0
         for i = 1:1:dirCount {
@@ -378,6 +386,11 @@ max_depth = int(maxDepth)
 compute_hashes = int(computeHashes)
 root_len = len(relativeTo.rstrip(os.sep)) + 1
 
+# Windows filenames are case-insensitive, so "Module.xml" must match a "module.xml" filter there.
+# Elsewhere those are two distinct files, so the comparison stays exact.
+fold_case = os.name == 'nt'
+name_filter = filenameFilter.lower() if fold_case else filenameFilter
+
 file_list = []
 max_depth_found = 0
 
@@ -396,7 +409,7 @@ for d in dirs:
             dirnames[:] = []
 
         for fname in filenames:
-            if filenameFilter and fname != filenameFilter:
+            if name_filter and (fname.lower() if fold_case else fname) != name_filter:
                 continue
             full_path = os.path.join(dirpath, fname)
             rel_path = full_path[root_len:].replace('\\', '/')
@@ -445,6 +458,10 @@ ClassMethod WalkDirectoriesSQL(
 {
     set sc = $$$OK
     try {
+        // Windows matches filenames case-insensitively; other platforms do not. See WalkDirectories.
+        set foldCase = $$$isWINDOWS
+        set nameFilter = $select(foldCase:$$$lcase(filenameFilter),1:filenameFilter)
+
         set walkHead = 1, walkTail = 1
         set walkQueue(1) = ##class(%Library.File).NormalizeDirectory(dir)
         set walkQueue(1,"depth") = 0
@@ -453,6 +470,13 @@ ClassMethod WalkDirectoriesSQL(
             set walkDir = walkQueue(walkHead)
             set walkDepth = walkQueue(walkHead,"depth")
             set walkHead = walkHead + 1
+
+            // FileSet cannot tell a symlink from a directory, so an unlimited walk through a symlink
+            // loop would descend forever, each pass yielding a longer but distinct path. The ceiling is
+            // set far above any real source tree, so a legitimate walk never reaches it.
+            if (walkDepth > ..#MAXWALKDEPTH) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Directory walk exceeded "_..#MAXWALKDEPTH_" levels below "_dir_"; check for a symbolic link cycle"))
+            }
 
             set rs = ##class(%SQL.Statement).%ExecDirect(,
                 "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
@@ -474,8 +498,11 @@ ClassMethod WalkDirectoriesSQL(
                     set walkQueue(walkTail,"depth") = walkDepth + 1
                     continue
                 }
-                if (filenameFilter '= "") && (##class(%Library.File).GetFilename(entryPath) '= filenameFilter) {
-                    continue
+                if (nameFilter '= "") {
+                    set entryName = ##class(%Library.File).GetFilename(entryPath)
+                    if $select(foldCase:$$$lcase(entryName),1:entryName) '= nameFilter {
+                        continue
+                    }
                 }
                 set relPath = ..NormalizePath($extract(entryPath, $length(relativeTo) + 1, *))
                 if (relPath = "") {
