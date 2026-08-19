@@ -6,6 +6,9 @@ Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleInfo";
 
 Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
 
+/// Registry packaging type: "source" or "database".
+Property IPMPackaging As %String(%JSONFIELDNAME = "ipm_packaging", VALUELIST = ",source,database") [ InitialExpression = "source" ];
+
 Storage Default
 {
 <Data name="ModuleInfoState">
@@ -41,6 +44,9 @@ Storage Default
 </Value>
 <Value name="11">
 <Value>DisplayName</Value>
+</Value>
+<Value name="12">
+<Value>IPMPackaging</Value>
 </Value>
 </Data>
 <State>ModuleInfoState</State>

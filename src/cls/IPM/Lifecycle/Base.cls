@@ -1408,9 +1408,11 @@ Method ExportPythonDependencies(
     $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
     set wheelsDir = ##class(%File).NormalizeDirectory("wheels", module.Root)
     if '##class(%File).DirectoryExists(wheelsDir) {
-        // ExportPythonDependencies called on base module + dependencies so don't want to error if one of
-        // the modules doesn't have a wheels directory since that might actually be the case for the module
-        write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        // A module without Python requirements legitimately has no wheels directory, so this is only worth warning about
+        // when requirements.txt exists but the download produced nothing.
+        if ##class(%File).Exists(##class(%File).NormalizeFilename("requirements.txt", root)) {
+            write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        }
         quit
     }
     set stmt = ##class(%SQL.Statement).%New()
@@ -1624,7 +1626,13 @@ Method %Publish(ByRef pParams) As %Status
             quit
         }
         set tModule.VersionString = ..Module.VersionString
-        if (..Module.Deployed) {
+        // Publish type comes from the running lifecycle, not the module's Packaging property.
+        // ..Module.Packaging records how the module was loaded (may be stale); the PACKAGING
+        // parameter is fixed per lifecycle class and reflects how it's being published now.
+        if ($parameter($this, "PACKAGING") = "database") {
+            set tModule.IPMPackaging = "database"
+            set tModule.PlatformVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
+        } elseif (..Module.Deployed) {
             set tModule.Deployed = 1
             if $isobject(..Module.SystemRequirements) {
                 set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
@@ -2131,6 +2139,9 @@ Method ExportSingleModule(
     }
 }
 
+/// Returns the lifecycle class whose Final PACKAGING parameter equals pPackaging.
+/// pBaseClass is "" when no class claims that value. This is a valid outcome, since packaging values are
+/// not constrained to those with a dedicated lifecycle class. Callers decide the fallback.
 ClassMethod GetBaseClassForPackaging(
 	pPackaging As %String,
 	Output pBaseClass As %Dictionary.Classname) As %Status [ Final ]
@@ -2149,8 +2160,6 @@ ClassMethod GetBaseClassForPackaging(
             set pBaseClass = tRes.%Get("BaseClass")
         }
         $$$ThrowOnError(tSC)
-
-        // TODO: Error if no results?
     } catch e {
         set pBaseClass = ""
         set tSC = e.AsStatus()
