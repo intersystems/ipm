@@ -1351,6 +1351,10 @@ Method %Export(
 
             do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
 
+            // Validate the deployed project once, now that all its items have been added
+            // (%IPM.ResourceProcessor.Default.Document skips the per-item check for this reason).
+            $$$ThrowOnError(tDeployedProject.Check())
+
             // Export the deployed project for this module to the target directory, if it's non-empty
             if tDeployedProject.Items.Count() > 0 {
                 // Intentionally not calling .%Save() on the project; we don't want to persist it.
