@@ -145,42 +145,72 @@ Method Test03RebuildCache()
     do $$$AssertStatusOK(sc,"Successfully installed module-b after cache rebuild")
 }
 
-/// Test cache freshness detection via FileMTime tracking
+/// Read a file's full contents as a string. Throws if the file can't be opened.
+Method ReadFile(path As %String) As %String [ Private ]
+{
+    set file = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(file.LinkToFile(path))
+    set content = ""
+    while 'file.AtEnd {
+        set content = content_file.Read()
+    }
+    quit content
+}
+
+/// Replace a file's contents.
+Method WriteFile(
+	path As %String,
+	content As %String) As %Status [ Private ]
+{
+    set sc = $$$OK
+    try {
+        set file = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(file.LinkToFile(path))
+        do file.Clear()
+        $$$ThrowOnError(file.LinkToFile(path))
+        do file.Write(content)
+        $$$ThrowOnError(file.%Save())
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// Test cache freshness detection via ContentHash tracking: an edited module.xml gets a different
+/// hash, so the next validated open re-parses the entry.
 Method Test04CacheFreshnessDetection()
 {
     // Get the original cache entry
     set cacheA = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-a","1.0.0",,.sc)
     do $$$AssertStatusOK(sc,"Opened original cache entry")
-    set originalMTime = cacheA.FileMTime
-    do $$$AssertNotEquals(originalMTime,"","Original FileMTime is set")
+    set originalHash = cacheA.ContentHash
+    do $$$AssertNotEquals(originalHash,"","Original ContentHash is set")
 
-    // Modify the module.xml file by rewriting it (updating mtime)
     set moduleFile = ##class(%File).NormalizeFilename("module.xml",##class(%File).NormalizeFilename("module-a/1.0.0",..RepoPath))
+    set originalContent = ..ReadFile(moduleFile)
+    do $$$AssertNotEquals(originalContent,"","Read the original module.xml content")
 
-    // Read and rewrite the file to update its modification time
-    set file = ##class(%Stream.FileCharacter).%New()
-    set sc = file.LinkToFile(moduleFile)
-    do $$$AssertStatusOK(sc,"Linked to module file")
-    set content = ""
-    while 'file.AtEnd {
-        set content = content_file.Read()
-    }
-    do file.Clear()
-    set sc = file.LinkToFile(moduleFile)
-    do file.Write(content)
-    set sc = file.%Save()
-    do $$$AssertStatusOK(sc,"Updated module file mtime")
+    // Change the content, not just the timestamp: content hashing only reacts to real edits.
+    set modifiedContent = $replace(originalContent,"<Packaging>module</Packaging>","<Packaging>module</Packaging>"_$char(10)_"      <Description>freshness probe</Description>")
+    do $$$AssertNotEquals(modifiedContent,originalContent,"Prepared modified module.xml content")
+    do $$$AssertStatusOK(..WriteFile(moduleFile,modifiedContent),"Rewrote module.xml with changed content")
 
-    // Access the cache entry via validated open (this checks FileMTime)
+    // Access the cache entry via validated open (this checks ContentHash)
     set cacheARefreshed = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-a","1.0.0",,.sc)
-    do $$$AssertStatusOK(sc,"Cache entry was refreshed based on FileMTime")
-
-    // Verify FileMTime was updated
-    do $$$AssertNotEquals(cacheARefreshed.FileMTime,originalMTime,"FileMTime was updated after file modification")
+    do $$$AssertStatusOK(sc,"Cache entry was refreshed based on ContentHash")
+    do $$$AssertNotEquals(cacheARefreshed.ContentHash,originalHash,"ContentHash was updated after the content changed")
+    do $$$AssertEquals(cacheARefreshed.ManifestLoaded,0,"Changed manifest is flagged for reparse")
 
     // Verify we can still install the module
     set sc = ##class(%IPM.Main).Shell("install module-a 1.0.0")
     do $$$AssertStatusOK(sc,"Successfully installed module after cache refresh")
+
+    // Later tests share this fixture directory, so put the file back and let the cache pick the
+    // original content up again.
+    do $$$AssertStatusOK(..WriteFile(moduleFile,originalContent),"Restored the original module.xml")
+    set cacheARestored = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-a","1.0.0",,.sc)
+    do $$$AssertStatusOK(sc,"Reopened the cache entry after restoring the fixture")
+    do $$$AssertEquals(cacheARestored.ContentHash,originalHash,"ContentHash returned to its original value")
 }
 
 /// Test adding a new version to the filesystem and auto-discovery on install
@@ -295,6 +325,36 @@ Method Test07DepthSpecification()
     // Clean up
     set sc = ##class(%IPM.Main).Shell("repo -delete -name fs-cache-unlimited")
     do $$$AssertStatusOK(sc,"Cleaned up unlimited depth test repo")
+}
+
+/// A touch that leaves the content identical must not invalidate the cache entry: this is the
+/// difference between content hashing and the mtime tracking it replaced.
+Method Test08TouchDoesNotReparse()
+{
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",##class(%File).NormalizeFilename("module-a/1.0.0",..RepoPath))
+
+    // Load the manifest first, so there is a set ManifestLoaded flag to watch survive the touch.
+    set repoDef = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen(..#REPONAME,,.sc)
+    do $$$AssertStatusOK(sc,"Opened repo definition")
+    set packageService = repoDef.GetPackageService()
+    set moduleInfo = ##class(%IPM.Storage.ModuleInfo).%New()
+    set moduleInfo.Name = "module-a"
+    set moduleInfo.VersionString = "1.0.0"
+    do $$$AssertTrue($isobject(packageService.GetModuleManifest(moduleInfo)),"Got module manifest")
+
+    set cacheBefore = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-a","1.0.0",,.sc)
+    do $$$AssertStatusOK(sc,"Opened cache entry before the touch")
+    do $$$AssertEquals(cacheBefore.ManifestLoaded,1,"Manifest is loaded before the touch")
+    set hashBefore = cacheBefore.ContentHash
+
+    // Rewrite byte-identical content: this bumps the file's mtime but not its content hash.
+    set content = ..ReadFile(moduleFile)
+    do $$$AssertStatusOK(..WriteFile(moduleFile,content),"Rewrote module.xml with identical content")
+
+    set cacheAfter = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-a","1.0.0",,.sc)
+    do $$$AssertStatusOK(sc,"Validated open succeeded after the touch")
+    do $$$AssertEquals(cacheAfter.ContentHash,hashBefore,"ContentHash is unchanged by a touch")
+    do $$$AssertEquals(cacheAfter.ManifestLoaded,1,"Touch did not discard the loaded manifest")
 }
 
 }

@@ -241,6 +241,259 @@ ClassMethod Exists(
     return 0
 }
 
+/// Normalize a relative path: forward slashes, collapse //, drop "." segments, strip leading slash.
+///
+/// Dot collapsing is what makes <SourcesRoot>.</SourcesRoot> work. Such a module composes resource
+/// paths as SourcesRoot_"/"_Directory, so a file arrives as "./cls/Foo.cls" while the directory walk
+/// keys it as "cls/Foo.cls". Both forms reduce to one here so the sync reverse index matches.
+ClassMethod NormalizePath(path As %String) As %String
+{
+    set path = $translate(path, "\", "/")
+    while path [ "//" {
+        set path = $replace(path, "//", "/")
+    }
+    while path [ "/./" {
+        set path = $replace(path, "/./", "/")
+    }
+    while $extract(path) = "/" {
+        set path = $extract(path, 2, *)
+    }
+    // A leading "./" has no slash in front of it, so the loop above misses it. Repeats for "./.".
+    while $extract(path, 1, 2) = "./" {
+        set path = $extract(path, 3, *)
+    }
+    // A bare "." is the module root, not a file.
+    if path = "." {
+        set path = ""
+    }
+    quit path
+}
+
+/// Walk one or more directories and report the files found, optionally with content hashes.
+/// Shared by sync's change detection and the filesystem repository cache scan.
+/// <var>dirs</var>(n) = absolute directory to walk; callers pass only directories that exist.
+/// <var>relativeTo</var> is the root that result keys are made relative to.
+/// <var>maxDepth</var> limits how far below each walked directory to descend; 0 is unlimited.
+/// A file exactly <var>maxDepth</var> levels down is kept; anything deeper is not visited.
+/// <var>filenameFilter</var>, when non-empty, keeps only files with exactly that name (e.g. "module.xml").
+/// <var>files</var>(relPath) = fullPath, and <var>hashes</var>(relPath) = lowercase SHA-1 hex
+/// (empty when <var>computeHashes</var> is 0). Keys are normalized: forward slashes, no leading slash.
+/// <var>maxDepthFound</var> reports the greatest depth at which a kept file was found, for depth auto-detection.
+/// Directories named .git, __pycache__ or node_modules are never descended into.
+ClassMethod WalkDirectories(
+	ByRef dirs,
+	relativeTo As %String,
+	maxDepth As %Integer = 0,
+	filenameFilter As %String = "",
+	computeHashes As %Boolean = 1,
+	Output files,
+	Output hashes,
+	Output maxDepthFound As %Integer) As %Status
+{
+    set sc = $$$OK
+    kill files, hashes
+    set maxDepthFound = 0
+    try {
+        set relativeTo = ##class(%Library.File).NormalizeDirectory(relativeTo)
+
+        set dirCount = 0
+        set key = ""
+        for {
+            set key = $order(dirs(key),1,dir)
+            quit:key=""
+            set dirCount = dirCount + 1
+            set dirList(dirCount) = ##class(%Library.File).NormalizeDirectory(dir)
+        }
+        quit:dirCount=0
+
+        // A single Python call across all directories avoids per-directory interpreter overhead.
+        set dirsJson = "["
+        for i = 1:1:dirCount {
+            set dirsJson = dirsJson _ $select(i>1:",",1:"") _ """" _ $replace(dirList(i), "\", "\\") _ """"
+        }
+        set dirsJson = dirsJson _ "]"
+
+        set pythonSC = ..WalkDirectoriesPython(dirsJson, relativeTo, maxDepth, filenameFilter, computeHashes, .files, .hashes, .maxDepthFound)
+        if $$$ISOK(pythonSC) {
+            quit
+        }
+
+        // Python unavailable - fall back to a SQL-driven breadth-first walk, one directory at a time.
+        kill files, hashes
+        set maxDepthFound = 0
+        for i = 1:1:dirCount {
+            $$$ThrowOnError(..WalkDirectoriesSQL(dirList(i), relativeTo, maxDepth, filenameFilter, computeHashes, .files, .hashes, .maxDepthFound))
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+ClassMethod WalkDirectoriesPython(
+	dirsJson As %String,
+	relativeTo As %String,
+	maxDepth As %Integer,
+	filenameFilter As %String,
+	computeHashes As %Boolean,
+	Output files,
+	Output hashes,
+	Output maxDepthFound As %Integer) As %Status [ Private ]
+{
+    set sc = $$$OK
+    try {
+        set result = ##class(%DynamicObject).%FromJSON(..WalkDirectoriesPythonImpl(dirsJson, relativeTo, maxDepth, filenameFilter, computeHashes))
+        set maxDepthFound = result.maxDepth
+        set entries = result.files
+        for i = 0:1:(entries.%Size() - 1) {
+            set entry = entries.%Get(i)
+            set relPath = entry.%Get("rel")
+            set files(relPath) = entry.%Get("full")
+            set hashes(relPath) = entry.%Get("hash")
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// os.walk() is C-based and far faster than a SQL FileSet walk; hashing runs on a thread pool
+/// because SHA-1 releases the GIL, so threads overlap I/O wait.
+ClassMethod WalkDirectoriesPythonImpl(
+	dirsJson As %String,
+	relativeTo As %String,
+	maxDepth As %Integer,
+	filenameFilter As %String,
+	computeHashes As %Boolean) As %String [ Language = python, Private ]
+{
+import os
+import json
+import hashlib
+import concurrent.futures
+
+SKIP_DIRS = {'.git', '__pycache__', 'node_modules'}
+
+dirs = json.loads(dirsJson)
+max_depth = int(maxDepth)
+compute_hashes = int(computeHashes)
+root_len = len(relativeTo.rstrip(os.sep)) + 1
+
+file_list = []
+max_depth_found = 0
+
+for d in dirs:
+    dir_len = len(d.rstrip(os.sep))
+    for dirpath, dirnames, filenames in os.walk(d):
+        dirnames[:] = [x for x in dirnames if x not in SKIP_DIRS]
+
+        # Depth of dirpath below the walked directory; 0 for the directory itself. Recomputed each
+        # iteration because os.walk() yields absolute paths rather than incremental navigation.
+        rel_dir = dirpath[dir_len:].lstrip(os.sep)
+        current_depth = rel_dir.count(os.sep) + 1 if rel_dir else 0
+
+        # Stop descending once the cap is reached; files at exactly the cap are still kept.
+        if max_depth > 0 and current_depth >= max_depth:
+            dirnames[:] = []
+
+        for fname in filenames:
+            if filenameFilter and fname != filenameFilter:
+                continue
+            full_path = os.path.join(dirpath, fname)
+            rel_path = full_path[root_len:].replace('\\', '/')
+            if not rel_path:
+                continue
+            file_list.append((rel_path, full_path))
+            if current_depth > max_depth_found:
+                max_depth_found = current_depth
+
+def hash_file(full_path):
+    try:
+        h = hashlib.sha1()
+        with open(full_path, 'rb') as f:
+            while chunk := f.read(65536):
+                h.update(chunk)
+        return h.hexdigest()
+    except (OSError, PermissionError):
+        return ""
+
+if compute_hashes:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=24) as executor:
+        hash_results = list(executor.map(hash_file, [f for _, f in file_list]))
+else:
+    hash_results = [""] * len(file_list)
+
+return json.dumps({
+    "maxDepth": max_depth_found,
+    "files": [
+        {"rel": rel, "full": full, "hash": h}
+        for (rel, full), h in zip(file_list, hash_results)
+    ]
+})
+}
+
+/// Breadth-first walk of a single directory using %Library.File_FileSet, for use when embedded
+/// Python is unavailable. Adds to the caller's files/hashes/maxDepthFound rather than resetting them.
+ClassMethod WalkDirectoriesSQL(
+	dir As %String,
+	relativeTo As %String,
+	maxDepth As %Integer,
+	filenameFilter As %String,
+	computeHashes As %Boolean,
+	ByRef files,
+	ByRef hashes,
+	ByRef maxDepthFound As %Integer) As %Status [ Private ]
+{
+    set sc = $$$OK
+    try {
+        set walkHead = 1, walkTail = 1
+        set walkQueue(1) = ##class(%Library.File).NormalizeDirectory(dir)
+        set walkQueue(1,"depth") = 0
+        for {
+            quit:walkHead>walkTail
+            set walkDir = walkQueue(walkHead)
+            set walkDepth = walkQueue(walkHead,"depth")
+            set walkHead = walkHead + 1
+
+            set rs = ##class(%SQL.Statement).%ExecDirect(,
+                "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
+                walkDir, "*", "", 0)
+            if rs.%SQLCODE < 0 {
+                $$$ThrowStatus($$$ERROR($$$SQLCode,rs.%SQLCODE,rs.%Message))
+            }
+            while rs.%Next() {
+                set entryPath = rs.%Get("Name")
+                if rs.%Get("Type") = "D" {
+                    if (maxDepth > 0) && ((walkDepth + 1) > maxDepth) {
+                        continue
+                    }
+                    if ",.git,__pycache__,node_modules," [ (","_##class(%Library.File).GetFilename(entryPath)_",") {
+                        continue
+                    }
+                    set walkTail = walkTail + 1
+                    set walkQueue(walkTail) = ##class(%Library.File).NormalizeDirectory(entryPath)
+                    set walkQueue(walkTail,"depth") = walkDepth + 1
+                    continue
+                }
+                if (filenameFilter '= "") && (##class(%Library.File).GetFilename(entryPath) '= filenameFilter) {
+                    continue
+                }
+                set relPath = ..NormalizePath($extract(entryPath, $length(relativeTo) + 1, *))
+                if (relPath = "") {
+                    continue
+                }
+                set files(relPath) = entryPath
+                set hashes(relPath) = $select(computeHashes:$$$lcase(##class(%Library.File).SHA1Hash(entryPath, 1)),1:"")
+                if (walkDepth > maxDepthFound) {
+                    set maxDepthFound = walkDepth
+                }
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
 /// Creates a new temporary directory and returns its normalized path.
 /// baseDirectory optionally specifies the parent; defaults to the OS temp directory.
 /// $zu(140,17) returns a negative integer error code on failure (e.g., -28 = no space left on device).

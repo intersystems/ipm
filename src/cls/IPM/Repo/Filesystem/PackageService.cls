@@ -31,14 +31,11 @@ Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream
     // Lazy load manifest if not already populated (ManifestLoaded=0)
     // This defers expensive XML parsing until manifest is actually needed
     if 'module.ManifestLoaded {
-        set defObj = ##class(%IPM.Repo.Filesystem.Definition).RootIndexOpen(module.Root, , .status)
-        $$$ThrowOnError(status)
-
         // Reconstruct file path
         set dirPath = ##class(%File).NormalizeFilename(module.SubDirectory, module.Root)
         set filePath = ##class(%File).NormalizeFilename("module.xml", dirPath)
 
-        set status = defObj.LoadManifestForCacheEntry(module, filePath)
+        set status = ##class(%IPM.Repo.Filesystem.Definition).LoadManifestForCacheEntry(module, filePath)
         $$$ThrowOnError(status)
     }
 

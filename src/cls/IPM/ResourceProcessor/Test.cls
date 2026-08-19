@@ -384,7 +384,7 @@ Method SupportsSync() As %Boolean
 /// Sync walks this directory directly so new test classes are detected before compilation.
 Method GetSyncDirectory() As %String
 {
-    quit ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
+    quit ##class(%IPM.Utils.File).NormalizePath(..ResourceReference.Name)
 }
 
 /// Returns 1 if <var>className</var> falls within this resource's declared Package (or is its
@@ -424,7 +424,7 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
 
         // Record changed TestCase subclasses for SyncRunTests.
         // relPath is relative to module root (e.g. "tests/unit/SyncTest/Tests/Trivial.cls").
-        set resourceDir = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
+        set resourceDir = ##class(%IPM.Utils.File).NormalizePath(..ResourceReference.Name)
         set relPath = ""
         for {
             set relPath = $order(modifiedPaths(relPath))

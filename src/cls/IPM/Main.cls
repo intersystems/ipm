@@ -2196,6 +2196,9 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
     } elseif $$$HasModifier(pCommandInfo,"rebuild-cache") {
         // Validate repository exists and is filesystem type
         set repoName = $$$GetModifier(pCommandInfo,"name")
+        if (repoName = "") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"-rebuild-cache requires -name <repo>"))
+        }
         set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(repoName,,.sc)
         $$$ThrowOnError(sc)
 
@@ -2205,11 +2208,14 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
 
         // Rebuild cache with purge
         write !,"Rebuilding cache for repository: ",repoName
-        set start = $zhorolog
+        // $ztimestamp rather than $zhorolog: the latter resets at midnight, making the delta negative.
+        set start = $ztimestamp
         set sc = serverDef.BuildCache(1, 1)  // purge=1, verbose=1
         $$$ThrowOnError(sc)
 
-        write !,"Cache rebuilt successfully in ", $zhorolog-start, " seconds."
+        set end = $ztimestamp
+        set elapsed = (($piece(end,",",1) - $piece(start,",",1)) * 86400) + ($piece(end,",",2) - $piece(start,",",2))
+        write !,"Cache rebuilt successfully in ", $fnumber(elapsed,"",2), " seconds."
     } else {
         set tName = $$$GetModifier(pCommandInfo,"name")
         set tType = $listget(serverClassList)
@@ -2315,7 +2321,7 @@ ClassMethod ShowModulesForRepository(
     // If filesystem repo, show last cache rebuild time and command to rebuild it since there's no auto full cache rebuild mechanism (other than reconfiguring the repo entirely)
     set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pRepoName,,.tSC)
     $$$ThrowOnError(tSC)
-    if server.%IsA("%IPM.Repo.Filesystem.Definition") {
+    if server.%IsA("%IPM.Repo.Filesystem.Definition") && (server.CacheLastRebuilt '= "") {
         write !,"Last full cache rebuild for '", pRepoName, "' was on ", server.CacheLastRebuilt, " (UTC). If needed, run 'repo -n "_pRepoName_" -rebuild-cache' to refresh the cache.",!
     }
 }
@@ -2534,6 +2540,17 @@ ClassMethod CheckModuleNamespace() As %Status
     quit $$$OK
 }
 
+/// Rebuild one filesystem repository's cache ahead of a dependency search.
+/// Best effort: a failure is reported but does not fail the install, since the existing cache is
+/// still usable, it just might not list modules added since the last rebuild.
+ClassMethod RebuildFilesystemRepoCache(pRepoDef As %IPM.Repo.Filesystem.Definition) [ Internal, Private ]
+{
+    set tSC = pRepoDef.BuildCache(0, 0)  // purge=0, verbose=0
+    if $$$ISERR(tSC) {
+        write !,"WARNING: could not rebuild cache for filesystem repository '",pRepoDef.Name,"': ",$system.Status.GetOneErrorText(tSC)
+    }
+}
+
 ClassMethod Install(
 	ByRef pCommandInfo,
 	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
@@ -2569,27 +2586,31 @@ ClassMethod Install(
 
         // Rebuild cache for filesystem repositories before searching
         // This ensures newly added modules are discovered
-        write !,"Rebuilding cache(s) for filesystem repo(s)..."
         if (tRegistry '= "") {
             // Specific repository requested - only rebuild that one if it's filesystem
             set tRepoDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
             if $$$ISOK(tSC) && $isobject(tRepoDef) && tRepoDef.%IsA("%IPM.Repo.Filesystem.Definition") {
-                do tRepoDef.BuildCache(0, 0)  // purge=0, verbose=0
+                write !,"Rebuilding cache(s) for filesystem repo(s)..."
+                do ..RebuildFilesystemRepoCache(tRepoDef)
             }
         } else {
             // No specific repo - rebuild all enabled filesystem repos
-            &sql(DECLARE fsRepoCursor CURSOR FOR
-                 SELECT ID INTO :tRepoId FROM %IPM_Repo_Filesystem.Definition WHERE Enabled = 1)
-            &sql(OPEN fsRepoCursor)
-            &sql(FETCH fsRepoCursor)
-            while (SQLCODE = 0) {
-                set tFsRepo = ##class(%IPM.Repo.Filesystem.Definition).%OpenId(tRepoId,,.tSC)
-                if $$$ISOK(tSC) && $isobject(tFsRepo) {
-                    do tFsRepo.BuildCache(0, 0)  // purge=0, verbose=0
+            set tFsRepoResult = ##class(%SQL.Statement).%ExecDirect(,"SELECT ID FROM %IPM_Repo_Filesystem.Definition WHERE Enabled = 1")
+            $$$ThrowSQLIfError(tFsRepoResult.%SQLCODE,tFsRepoResult.%Message)
+            set tAnnounced = 0
+            while tFsRepoResult.%Next(.tFetchSC) {
+                $$$ThrowOnError(tFetchSC)
+                if 'tAnnounced {
+                    // Only announced once a filesystem repo actually exists to rebuild.
+                    write !,"Rebuilding cache(s) for filesystem repo(s)..."
+                    set tAnnounced = 1
                 }
-                &sql(FETCH fsRepoCursor)
+                set tFsRepo = ##class(%IPM.Repo.Filesystem.Definition).%OpenId(tFsRepoResult.%Get("ID"),,.tOpenSC)
+                if $$$ISOK(tOpenSC) && $isobject(tFsRepo) {
+                    do ..RebuildFilesystemRepoCache(tFsRepo)
+                }
             }
-            &sql(CLOSE fsRepoCursor)
+            $$$ThrowOnError(tFetchSC)
         }
 
         set tVersion = $get(pCommandInfo("parameters","version"))

@@ -128,7 +128,9 @@ Trigger DepthChanged [ Event = UPDATE, Foreach = row/object ]
         set newDepth = {Depth}
 
         // Skip if we're already in the middle of BuildCache (e.g., auto-detecting depth)
-        // This prevents infinite recursion when BuildCache sets the depth
+        // This prevents infinite recursion when BuildCache sets the depth.
+        // Contract: BuildCache holds this guard across every %Save() it performs, because each of
+        // those saves re-fires this trigger. Clearing the guard any earlier makes it recurse.
         if $get(^||IPMBuildingCache) {
             quit
         }
@@ -151,7 +153,10 @@ Method BuildCache(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
 
-    // Set flag to prevent DepthChanged trigger from recursively calling BuildCache
+    // Set flag to prevent DepthChanged trigger from recursively calling BuildCache.
+    // The prior value is captured and restored rather than cleared outright, so a nested call can
+    // never release an outer caller's guard.
+    set tPriorGuard = $get(^||IPMBuildingCache)
     set ^||IPMBuildingCache = 1
 
     try {
@@ -184,19 +189,19 @@ Method BuildCache(
             quit
         }
 
-        // Scan root directory recursively, up to ..Depth levels down, for module.xml files.
-        // Try Python scanner first (much faster), fall back to SQL-based scanner if unavailable
-        set tSC = ..ScanDirectoryPython(..Root,.tFilenameList,..Depth,$select(pVerbose>1:1,1:0),.tMaxDepth)
-        if $$$ISERR(tSC) {
-            write:pVerbose !,"Python scanner not available, using SQL-based scanner. ", $system.Status.GetErrorText(tSC)
-            set tSC = ..ScanDirectory(..Root,.tFilenameList,,..Depth,$select(pVerbose>1:1,1:0),.tMaxDepth)
-        }
+        // Scan root directory recursively, up to ..Depth levels down, for module.xml files,
+        // hashing each one so unchanged manifests can be skipped without re-parsing.
+        set tDirList(1) = ..Root
+        set tSC = ##class(%IPM.Utils.File).WalkDirectories(.tDirList,..Root,..Depth,"module.xml",1,.tFilenameList,.tHashList,.tMaxDepth)
         if $$$ISERR(tSC) {
             quit
         }
 
         if (pAutoDetectDepth) && (tMaxDepth > 0) {
             set ..Depth = tMaxDepth
+            // This save re-fires the UPDATE triggers, DepthChanged among them; the
+            // ^||IPMBuildingCache guard set above is the only thing stopping it from re-entering
+            // BuildCache here.
             set tSC = ..%Save()
             if $$$ISERR(tSC) {
                 quit
@@ -205,13 +210,15 @@ Method BuildCache(
 
         // Ensure that we're looking at valid MODULE documents (as opposed to classes named Module, which the package manager has!)
         set tAggSC = $$$OK
-        set tKey = ""
+        set tRelPath = ""
         for {
-            set tKey = $order(tFilenameList(tKey),1,tFile)
-            quit:(tKey="")
+            set tRelPath = $order(tFilenameList(tRelPath),1,tFile)
+            quit:(tRelPath="")
 
-            set tSubDirectory = tFilenameList(tKey,"sub")
-            set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,.tName,.tVersionString,.tCacheId))
+            // Keys are relative to the root and always end in "module.xml"; dropping that and the
+            // separator before it leaves the module's subdirectory ("" for a module.xml in the root).
+            set tSubDirectory = $extract(tRelPath,1,*-$length("module.xml")-1)
+            set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,$get(tHashList(tRelPath)),.tName,.tVersionString,.tCacheId))
 
             // Track this cache entry as visited (still exists on filesystem)
             if tCacheId '= "" {
@@ -230,6 +237,7 @@ Method BuildCache(
 
         // set cache rebuild timestamp using UTC
         set ..CacheLastRebuilt = $zdatetime($ztimestamp,3)
+        // As above: this save re-fires DepthChanged, which the guard suppresses.
         $$$ThrowOnError(..%Save())
         tcommit
     } catch e {
@@ -237,16 +245,15 @@ Method BuildCache(
     }
     while ($tlevel > tInitTLevel) { trollback 1 }
 
-    // Done building cache so clear the flag
-    set ^||IPMBuildingCache = 0
+    // Done building cache, so restore whatever the guard was before this call
+    set ^||IPMBuildingCache = tPriorGuard
 
     quit tSC
 }
 
 /// Parse a module.xml file and return parsed metadata
-Method ParseModuleFile(
+ClassMethod ParseModuleFile(
 	filePath As %String,
-	root As %String,
 	Output name As %String,
 	Output versionString As %String)
 {
@@ -270,23 +277,25 @@ Method ParseModuleFile(
 }
 
 /// Refresh a cache entry by re-parsing its module.xml file.
-/// Called when FileMTime indicates the file has changed since last cache.
-/// Updates cache entry in-place with new metadata and mtime.
+/// Called when the content hash indicates the file has changed since it was last cached.
+/// Updates cache entry in-place with new metadata and content hash.
 /// NOTE: Sets ManifestLoaded=0 to defer full manifest parsing until needed.
 /// The manifest will be loaded on-demand when GetModuleManifest() is called.
-Method RefreshCacheEntry(
+ClassMethod RefreshCacheEntry(
 	cacheObj As %IPM.Repo.Filesystem.Cache,
 	filePath As %String,
-	newMTime As %TimeStamp)
+	newHash As %String)
 {
     // Parse the module file (metadata only, re-validate since file changed)
-    kill stream, name, versionString
-    do ..ParseModuleFile(filePath, cacheObj.Root, .name, .versionString)
+    do ..ParseModuleFile(filePath, .name, .versionString)
 
     // Update the cache entry
     set cacheObj.Name = name
     set cacheObj.VersionString = versionString
-    set cacheObj.FileMTime = newMTime
+    set cacheObj.ContentHash = newHash
+    // Drop the manifest along with the flag, so a reader that trusts the stream over ManifestLoaded
+    // can't get superseded bytes.
+    do cacheObj.Manifest.Clear()
     set cacheObj.ManifestLoaded = 0  // Defer manifest parsing - will load on first GetModuleManifest() call
     set cacheObj.LastModified = $zdatetime($ztimestamp, 3)
 
@@ -298,9 +307,12 @@ Method RefreshCacheEntry(
 }
 
 /// Adds a module to the cache.
+/// pContentHash is the SHA-1 of pModuleFileName as computed by the directory walk; an entry whose
+/// stored hash still matches is reused as-is, without re-parsing or re-validating the manifest.
 Method AddCacheItem(
 	pModuleFileName As %String,
 	pSubDirectory As %String,
+	pContentHash As %String,
 	Output pName As %String,
 	Output pVersionString As %String,
 	Output pCacheId As %String = "") As %Status
@@ -310,15 +322,18 @@ Method AddCacheItem(
     set pVersionString = ""
     set pCacheId = ""
     try {
-        // Check if cache entry exists
-        set tCurrentMTime = $zdatetime(##class(%Library.File).GetFileDateModified(pModuleFileName), 3)
+        // The walk reports an empty hash for a file it could not read. Hash it here rather than
+        // treating the module as changed on every rebuild.
+        if (pContentHash = "") {
+            set pContentHash = $$$lcase(##class(%File).SHA1Hash(pModuleFileName, 1))
+        }
 
         if ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexExists(..Root,pSubDirectory) {
             set tCacheItem = ##class(%IPM.Repo.Filesystem.Cache).CacheItemIndexOpen(..Root,pSubDirectory,,.tSC)
             $$$ThrowOnError(tSC)
 
-            // Check if we can skip parsing entirely (file unchanged and previously validated)
-            if (tCacheItem.FileMTime = tCurrentMTime) {
+            // Check if we can skip parsing entirely (content unchanged and previously validated)
+            if (tCacheItem.ContentHash = pContentHash) {
                 // File unchanged - reuse cached values without parsing or updating
                 set pName = tCacheItem.Name
                 set pVersionString = tCacheItem.VersionString
@@ -334,7 +349,7 @@ Method AddCacheItem(
 
         // Parse the module file (metadata only, validate since file is new or changed)
         try {
-            do ..ParseModuleFile(pModuleFileName, ..Root, .pName, .pVersionString)
+            do ..ParseModuleFile(pModuleFileName, .pName, .pVersionString)
         } catch ex {
             // Wasn't a valid file or failed to parse. Log as warning and continue
             set tSC = ex.AsStatus()
@@ -345,7 +360,7 @@ Method AddCacheItem(
         // Update cache item
         set tCacheItem.Name = pName
         set tCacheItem.VersionString = pVersionString
-        set tCacheItem.FileMTime = tCurrentMTime
+        set tCacheItem.ContentHash = pContentHash
         set tCacheItem.ManifestLoaded = 0  // Defer manifest parsing - will load on first GetModuleManifest() call
         set tCacheItem.LastModified = $zdatetime($ztimestamp,3)
         set tSaveSC = tCacheItem.%Save()
@@ -409,17 +424,16 @@ Method CleanupStaleEntries(
 /// This is called only when the manifest is actually needed (e.g., for module installation).
 /// Extracts the full <Module> XML section and stores it in the Manifest stream.
 /// Sets ManifestLoaded=1 to prevent redundant parsing on subsequent accesses.
-/// 
+///
 /// Performance: Skipping manifest load during cache build provides 30-50% speedup
 /// for operations that only need metadata (list, search, version resolution).
-Method LoadManifestForCacheEntry(
+ClassMethod LoadManifestForCacheEntry(
 	cacheObj As %IPM.Repo.Filesystem.Cache,
 	filePath As %String) As %Status
 {
     set sc = $$$OK
     try {
         // Extract full manifest using GetModuleStreamFromFile (not metadata-only)
-        kill stream, name, version
         $$$ThrowOnError(..GetModuleStreamFromFile(filePath, .stream, .name, .version, 0))
 
         // Update cache entry with manifest
@@ -434,7 +448,7 @@ Method LoadManifestForCacheEntry(
     quit sc
 }
 
-Method GetModuleStreamFromFile(
+ClassMethod GetModuleStreamFromFile(
 	pFilename As %String,
 	Output pStream As %Stream.GlobalCharacter,
 	Output pName As %String,
@@ -512,158 +526,6 @@ XData MetadataExtractionTransform
   <xsl:value-of select="Version" />
  </xsl:template>
 </xsl:stylesheet>
-}
-
-/// Fast directory scanning using embedded Python - returns dynamic object with results
-/// Uses Python's os.walk() which is C-based and highly optimized
-ClassMethod ScanDirectoryPythonImpl(
-	root As %String,
-	depth As %Integer = 0,
-	verbose As %Boolean = 0) As %DynamicObject [ Language = python ]
-{
-import os
-import iris
-
-# Track results and max depth
-results = []
-max_depth = 0
-
-try:
-    for dirpath, dirnames, filenames in os.walk(root):
-        # Calculate current depth before processing
-        # Must compute each iteration because os.walk() provides absolute paths, not incremental navigation
-        # We derive depth by: removing root prefix, stripping separators, then counting remaining separators + 1
-        if dirpath == root or dirpath == root.rstrip(os.sep):
-            current_depth = 0
-        else:
-            current_depth = dirpath[len(root):].lstrip(os.sep).count(os.sep) + 1
-
-        # Depth limiting - stop descending if we've reached the limit
-        if depth > 0 and current_depth >= depth:
-            dirnames.clear()  # Don't descend further
-
-        if 'module.xml' in filenames:
-            # Skip if this directory exceeds the depth limit
-            if depth > 0 and current_depth > depth:
-                continue
-
-            full_path = os.path.join(dirpath, 'module.xml')
-
-            # Calculate relative directory from root
-            if dirpath == root or dirpath == root.rstrip(os.sep):
-                rel_dir = ''
-            else:
-                rel_dir = os.path.relpath(dirpath, root)
-                # Convert backslashes to forward slashes for consistency
-                rel_dir = rel_dir.replace('\\', '/')
-
-            # Track max depth
-            if rel_dir:
-                file_depth = rel_dir.count('/') + 1
-                if file_depth > max_depth:
-                    max_depth = file_depth
-
-            # Store result as dict
-            results.append({'fullPath': full_path, 'relDir': rel_dir})
-
-            if verbose:
-                print(f"Found file: {full_path}")
-
-    # Return plain dict
-    return {
-        'results': results,
-        'maxDepth': max_depth
-    }
-
-except Exception as e:
-    error_msg = f"Error scanning directory with Python: {str(e)}"
-    print(error_msg)
-    raise
-}
-
-/// Wrapper method that calls Python scanner and converts results to ObjectScript array
-ClassMethod ScanDirectoryPython(
-	root As %String,
-	ByRef filenameList,
-	depth As %Integer = 0,
-	verbose As %Boolean = 0,
-	Output maxDepth As %Integer = 0) As %Status
-{
-    set sc = $$$OK
-    try {
-        // Normalize root path
-        set root = ##class(%File).NormalizeDirectory(root)
-
-        // Call Python implementation
-        set result = ..ScanDirectoryPythonImpl(root, depth, verbose)
-
-        // Extract results and max depth from Python dict
-        set resultsList = result."__getitem__"("results")
-        set maxDepth = result."__getitem__"("maxDepth")
-
-        // Convert Python list to ObjectScript array
-        set filenameList = 0
-        set listLen = resultsList."__len__"()
-        for idx = 0:1:(listLen-1) {
-            set item = resultsList."__getitem__"(idx)
-            set fullPath = item."__getitem__"("fullPath")
-            set relDir = item."__getitem__"("relDir")
-
-            set filenameList($increment(filenameList)) = fullPath
-            set filenameList(filenameList, "sub") = relDir
-        }
-    } catch e {
-        set sc = e.AsStatus()
-    }
-    quit sc
-}
-
-ClassMethod ScanDirectory(
-	pRoot As %String,
-	ByRef pFilenameList,
-	pSub As %String = "",
-	pDepth As %Integer = "",
-	pVerbose As %Boolean = 0,
-	Output pMaxDepth As %Integer = 0) As %Status [ Internal ]
-{
-    set tSC = $$$OK
-    try {
-        set pRoot = ##class(%File).NormalizeDirectory(pRoot)
-        set tDirArray($increment(tDirArray)) = ""
-
-        set i = 0
-        do {
-            set i = i + 1
-            if (pDepth > 0) && ($length(tDirArray(i),"/") > pDepth) {
-                continue
-            }
-
-            set tStmt = ##class(%SQL.Statement).%New()
-            set tSC = tStmt.%PrepareClassQuery("%Library.File","FileSet")
-            if $$$ISERR(tSC) {
-                quit
-            }
-
-            set tFullDir = ##class(%File).NormalizeDirectory(pRoot_tDirArray(i))
-            set tRes = tStmt.%Execute(tFullDir,"module.xml",,1)
-            while tRes.%Next() {
-                if (tRes.%Get("Type") = "D") {
-                    write:pVerbose !,"Scanning directory: ",tRes.%Get("ItemName")
-                    set tDirArray($increment(tDirArray)) = tDirArray(i)_$case(tDirArray(i),"":"",:"/")_tRes.%Get("ItemName")
-                } else {
-                    write:pVerbose !,"Found file: ",tRes.%Get("Name")
-                    set pFilenameList($increment(pFilenameList)) = tRes.%Get("Name")
-                    set pFilenameList(pFilenameList,"sub") = tDirArray(i)
-                    if (pDepth > pMaxDepth) {
-                        set pMaxDepth = $length(tDirArray(i),"/")
-                    }
-                }
-            }
-        } while (i < tDirArray)
-    } catch e {
-        set tSC = e.AsStatus()
-    }
-    quit tSC
 }
 
 XData LockFileMapping

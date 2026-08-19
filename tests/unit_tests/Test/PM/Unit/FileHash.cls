@@ -175,11 +175,72 @@ Method TestPendingTestsRunOnNextTestSync()
 
 Method TestNormalizePath()
 {
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("src\cls\Foo\Bar.cls"), "src/cls/Foo/Bar.cls", "Backslashes -> forward slashes")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("src//cls///Foo.cls"), "src/cls/Foo.cls", "Consecutive slashes collapsed")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("/src/cls/Foo.cls"), "src/cls/Foo.cls", "Leading slash stripped")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("//src/Foo.cls"), "src/Foo.cls", "Multiple leading slashes stripped")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("src/cls/Foo.cls"), "src/cls/Foo.cls", "Already-normalized path unchanged")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("src\cls\Foo\Bar.cls"), "src/cls/Foo/Bar.cls", "Backslashes -> forward slashes")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("src//cls///Foo.cls"), "src/cls/Foo.cls", "Consecutive slashes collapsed")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("/src/cls/Foo.cls"), "src/cls/Foo.cls", "Leading slash stripped")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("//src/Foo.cls"), "src/Foo.cls", "Multiple leading slashes stripped")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("src/cls/Foo.cls"), "src/cls/Foo.cls", "Already-normalized path unchanged")
+}
+
+/// Write <var>content</var> to a new file, creating its directory if needed.
+Method WriteFileAt(
+	path As %String,
+	content As %String) [ Private ]
+{
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(##class(%File).GetDirectory(path)))
+    set file = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(file.LinkToFile(path))
+    do file.Write(content)
+    $$$ThrowOnError(file.%Save())
+}
+
+/// %IPM.Utils.File:WalkDirectories backs both sync's change detection and the filesystem
+/// repository cache scan, so depth capping, the filename filter and the skipped directories all
+/// have callers depending on them.
+Method TestWalkDirectories()
+{
+    set root = ##class(%IPM.Utils.File).CreateTempDirectory()
+    try {
+        // module.xml in the root and in a/ share content, so they must also share a hash.
+        do ..WriteFileAt(root_"module.xml", "<Module><Name>same</Name></Module>")
+        do ..WriteFileAt(root_"a/module.xml", "<Module><Name>same</Name></Module>")
+        do ..WriteFileAt(root_"a/notes.txt", "not a manifest")
+        do ..WriteFileAt(root_"a/b/module.xml", "<Module><Name>deep</Name></Module>")
+        do ..WriteFileAt(root_".git/module.xml", "<Module><Name>vcs</Name></Module>")
+
+        set dirs(1) = root
+
+        // Unlimited depth, filtered to module.xml
+        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 0, "module.xml", 1, .files, .hashes, .maxDepth), "Walked the tree filtering on module.xml")
+        do $$$AssertTrue($data(files("module.xml")), "Found module.xml in the root")
+        do $$$AssertTrue($data(files("a/module.xml")), "Found module.xml one level down")
+        do $$$AssertTrue($data(files("a/b/module.xml")), "Found module.xml two levels down")
+        do $$$AssertTrue('$data(files(".git/module.xml")), ".git was not descended into")
+        do $$$AssertTrue('$data(files("a/notes.txt")), "Filename filter excluded notes.txt")
+        do $$$AssertEquals(maxDepth, 2, "Deepest kept file reported at depth 2")
+
+        do $$$AssertEquals($length(hashes("module.xml")), 40, "Hash is 40 hex characters")
+        do $$$AssertEquals($zconvert(hashes("module.xml"), "L"), hashes("module.xml"), "Hash is lowercase hex")
+        do $$$AssertEquals(hashes("a/module.xml"), hashes("module.xml"), "Identical content hashes identically")
+        do $$$AssertNotEquals(hashes("a/b/module.xml"), hashes("module.xml"), "Different content hashes differently")
+
+        // Depth cap: a file exactly at the cap is kept, anything below is never visited.
+        kill files, hashes
+        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 1, "module.xml", 1, .files, .hashes, .maxDepth), "Walked the tree with depth capped at 1")
+        do $$$AssertTrue($data(files("module.xml")), "Root module.xml still found at depth 1")
+        do $$$AssertTrue($data(files("a/module.xml")), "File exactly at the depth cap is kept")
+        do $$$AssertTrue('$data(files("a/b/module.xml")), "File below the depth cap is not visited")
+        do $$$AssertEquals(maxDepth, 1, "Deepest kept file reported at depth 1")
+
+        // No filter and no hashing: every file, empty hashes.
+        kill files, hashes
+        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 0, "", 0, .files, .hashes, .maxDepth), "Walked the tree unfiltered without hashing")
+        do $$$AssertTrue($data(files("a/notes.txt")), "Empty filter keeps non-manifest files")
+        do $$$AssertEquals(hashes("a/notes.txt"), "", "Hashing off leaves hashes empty")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "No error while walking directories")
+    }
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(root)
 }
 
 /// A module with <SourcesRoot>.</SourcesRoot> composes every resource path as SourcesRoot_"/"_Directory,
@@ -188,21 +249,21 @@ Method TestNormalizePath()
 /// never matches a changed path and edits under such a resource are silently dropped.
 Method TestNormalizePathDotSegments()
 {
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("./cls/Foo.cls"), "cls/Foo.cls", "Leading ./ stripped (SourcesRoot='.')")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath(".\cls\Foo.cls"), "cls/Foo.cls", "Leading .\ stripped after slash translation")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath(".//cls/Foo.cls"), "cls/Foo.cls", "Leading ./ with doubled slash")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("././cls/Foo.cls"), "cls/Foo.cls", "Repeated leading ./ (SourcesRoot='./.')")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("src/./cls/Foo.cls"), "src/cls/Foo.cls", "Interior ./ segment dropped")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("/./cls/Foo.cls"), "cls/Foo.cls", "Leading /./ collapsed")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("./cls/"), "cls/", "Trailing slash preserved (GetSyncDirectory prefix scans)")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("./cls/Foo.cls"), "cls/Foo.cls", "Leading ./ stripped (SourcesRoot='.')")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath(".\cls\Foo.cls"), "cls/Foo.cls", "Leading .\ stripped after slash translation")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath(".//cls/Foo.cls"), "cls/Foo.cls", "Leading ./ with doubled slash")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("././cls/Foo.cls"), "cls/Foo.cls", "Repeated leading ./ (SourcesRoot='./.')")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("src/./cls/Foo.cls"), "src/cls/Foo.cls", "Interior ./ segment dropped")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("/./cls/Foo.cls"), "cls/Foo.cls", "Leading /./ collapsed")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("./cls/"), "cls/", "Trailing slash preserved (GetSyncDirectory prefix scans)")
     // SourcesRoot="." with no Directory reduces to the module root itself, not a file.
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("."), "", "Bare '.' is the module root, not a path")
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("./"), "", "'./' is the module root, not a path")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("."), "", "Bare '.' is the module root, not a path")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("./"), "", "'./' is the module root, not a path")
     // ".." is not a path this pipeline should ever see and is deliberately left alone rather than
     // resolved, so a stray one stays visibly wrong instead of silently escaping the module root.
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("../cls/Foo.cls"), "../cls/Foo.cls", "Parent-dir segments are not resolved")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("../cls/Foo.cls"), "../cls/Foo.cls", "Parent-dir segments are not resolved")
     // A dot inside a name is not a "." segment.
-    do $$$AssertEquals(##class(%IPM.Storage.FileHash).NormalizePath("cls/.hidden/Foo.cls"), "cls/.hidden/Foo.cls", "Dot-prefixed directory name preserved")
+    do $$$AssertEquals(##class(%IPM.Utils.File).NormalizePath("cls/.hidden/Foo.cls"), "cls/.hidden/Foo.cls", "Dot-prefixed directory name preserved")
 }
 
 /// Document names reach the sync pipeline from two sources that disagree on extension case:
