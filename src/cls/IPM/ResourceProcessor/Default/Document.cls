@@ -290,7 +290,9 @@ Method OnExportDeployedItem(
             if tVerbose {
                 write !, $$$FormatText("Adding deployed item '%1' to project '%2'", pItemName, deployedProject.Name)
             }
-            $$$ThrowOnError(##class(%IPM.Storage.Module).AddItemToProject(deployedProject, pItemName))
+            // Skip the per-item project check; the caller checks the project once after all
+            // deployed items have been added.
+            $$$ThrowOnError(##class(%IPM.Storage.Module).AddItemToProject(deployedProject, pItemName, 0))
             set pItemHandled = 1
         }
     } catch e {

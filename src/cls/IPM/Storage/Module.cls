@@ -1748,9 +1748,12 @@ Method GetStudioProject(
                 }
 
                 // Add object code for deployed items, since source is unavailable.
-                $$$ThrowOnError(..AddItemToProject(pProject,tChildResourceKey))
+                // Skip the per-item project check; it validates the whole project each time. One
+                // check after all items are added covers the same ground far more cheaply.
+                $$$ThrowOnError(..AddItemToProject(pProject,tChildResourceKey,0))
             }
         }
+        $$$ThrowOnError(pProject.Check())
         $$$ThrowOnError(pProject.%Save())
     } catch e {
         set tSC = e.AsStatus()
@@ -1758,9 +1761,15 @@ Method GetStudioProject(
     quit tSC
 }
 
+/// Adds <var>pResourceName</var> to <var>tProject</var>.
+/// <var>pCheck</var> controls whether the project is validated after the item is added.
+/// <method>Check</method> validates every item in the project, so calling it once per added item is
+/// quadratic in the number of items; callers adding many items in a loop should pass 0 and call
+/// <method>Check</method> once after the loop instead.
 ClassMethod AddItemToProject(
 	tProject As %Studio.Project,
-	pResourceName As %String) As %Status [ Internal ]
+	pResourceName As %String,
+	pCheck As %Boolean = 1) As %Status [ Internal ]
 {
     set tSC = $$$OK
     try {
@@ -1771,7 +1780,9 @@ ClassMethod AddItemToProject(
         } else {
             do tProject.AddItem(pResourceName)
         }
-        $$$ThrowOnError(tProject.Check())
+        if pCheck {
+            $$$ThrowOnError(tProject.Check())
+        }
     } catch e {
         set tSC = e.AsStatus()
     }
