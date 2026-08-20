@@ -82,10 +82,10 @@ ClassMethod Run(
         // Step 4: Compute disk changes vs baseline. module.xml is owned by SyncCheckModuleXml
         // above and is deliberately excluded by ComputeChanges, so it never appears in
         // modified/deleted here.
-        // retried is the subset of modified that a previous sync failed on and that ComputeChanges
-        // forced back in regardless of its hash — reported below, but otherwise handled as normal
-        // modifications from here on. testPending is the same idea for files an earlier sync applied
-        // without running their tests, and is only populated when this sync runs tests.
+        // retried is the subset of modified that ComputeChanges forced back in after a previous
+        // failed sync; testPending is the same for files an earlier sync applied without running
+        // their tests, and is only populated when this sync runs tests. Both are reported below and
+        // otherwise handled as normal modifications from here on.
         $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried, runTests, .testPending))
 
         // Falls through when only deletes exist and processDeletes=1
@@ -120,10 +120,9 @@ ClassMethod Run(
         if processDeletes {
             do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource, .unrouted)
         }
-        // A changed file that maps to no resource cannot be synced. Drop it from modified/deleted
-        // before step 9 so its hash is not committed and it is re-detected next sync, and say so
-        // out loud: silently committing the new hash makes the dropped edit permanent while
-        // reporting success.
+        // A changed file that maps to no resource cannot be synced. Report it and drop it from
+        // modified/deleted before step 9, so its hash is not committed and the next sync detects it
+        // again rather than reporting success over a permanently dropped edit.
         do ..SyncReportUnroutedPaths(moduleName, .unrouted, .modified, .deleted)
         do ..SyncCollectPreloadResources(.syncByResource, .preloadResources)
 
@@ -153,10 +152,9 @@ ClassMethod Run(
         // nothing about whether the files landed.
         set committed = 1
 
-        // Committing the hashes above means change detection will never look at these files again,
-        // so a sync that is not running tests would leave the edits it just applied untested with no
-        // way back. Flag the test-owned ones instead: the next sync with -test forces them through
-        // and runs their tests (see FileHash's TestPending property).
+        // The hashes are committed, so flag the test-owned paths to keep them in the change set:
+        // the next sync with -test forces them through and runs their tests (see FileHash's
+        // TestPending property).
         if 'runTests {
             do ..SyncCollectTestPaths(.modified, .reverseIndex, .testPaths)
             if $data(testPaths) {
@@ -192,8 +190,8 @@ ClassMethod Run(
         }
         do ##class(%IPM.General.Sync.Output).Log(moduleName, "Sync complete: "_modCount_" file(s) updated"_$select(delCount>0:", "_delCount_" deleted", 1:"")_".")
 
-        // Say so out loud rather than only recording the flag: "I edited a test and synced, and
-        // nothing ran" is exactly the confusion this is here to prevent.
+        // Report the deferral, not just record it: "I edited a test and synced, and nothing ran" is
+        // exactly the confusion this is here to prevent.
         if 'runTests, $data(testPaths) {
             write !, "  ", ##class(%IPM.General.Sync.Output).CountNodes(.testPaths), " test file(s) synced without running tests; they will run on the next sync with -test."
         }
@@ -214,7 +212,7 @@ ClassMethod Run(
         // Step 9 never ran, so no hash was committed and the baseline still describes the last
         // successfully-synced content — while the namespace holds whatever this attempt left behind.
         // Fixing the file by reverting it would hash back to the baseline and go unnoticed, so flag
-        // what was being applied and let the next sync force it through (issue #1224).
+        // what was being applied and let the next sync force it through.
         // Reported as a warning, never thrown: it must not replace the error that got us here.
         if '$get(committed, 0), $data(modified) || $data(deleted) {
             set markSC = ##class(%IPM.Storage.FileHash).MarkFailed(module, .modified, .deleted, $get(processDeletes, 0))
@@ -354,9 +352,8 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         if docName = "" {
             continue
         }
-        // Canonicalize rather than trusting RelPathToDocName's casing to line up with the keys
-        // set above: docToResource is keyed by CanonicalDocName, and an exact-match subscript
-        // lookup that differs only in extension case silently misses.
+        // docToResource is keyed by CanonicalDocName, and an exact-match subscript lookup that
+        // differs only in extension case silently misses, so canonicalize before looking up.
         set canonicalDocName = ##class(%IPM.Storage.FileHash).CanonicalDocName(docName)
         if '$data(docToResource(canonicalDocName)) {
             continue
@@ -394,8 +391,8 @@ ClassMethod SyncCollectPreloadResources(
 
 /// Collect the changed paths whose owning resource is a test resource that runs in the "test" phase,
 /// so a sync that isn't running tests can flag them as pending (see FileHash's TestPending property).
-/// Restricted to "test"-phase resources on purpose: a verify-only resource's tests are never run by
-/// sync -test, so flagging its files would force them into every subsequent sync and never clear.
+/// Restricted to "test"-phase resources, the only ones sync -test runs: a verify-only resource's
+/// files would stay flagged forever.
 ClassMethod SyncCollectTestPaths(
     ByRef modified,
     ByRef reverseIndex,
@@ -434,8 +431,8 @@ ClassMethod SyncRoutePathSet(
         quit:relPath=""
 
         if '$data(reverseIndex(relPath)) {
-            // Not an error here, but not nothing either: the caller reports these and withholds
-            // their hashes so the change isn't lost. Accumulated across both calls.
+            // The caller reports these and withholds their hashes so the change isn't lost.
+            // Accumulated across both calls.
             set unrouted(category, relPath) = ""
             continue
         }
@@ -614,11 +611,10 @@ ClassMethod SyncRunTests(
         // Step 2: assign each changed class to exactly one resource:
         // byResource(resourceIndex, className) = "".
         // Several UnitTest resources may point at the same directory and differ only by Package, so
-        // the Name recorded by OnSync can match more than one of them — dispatching to every match
-        // runs the same test class once per resource sharing the directory. Prefer the resource
-        // whose Package/Class covers the class; fall back to the first resource with that Name when
-        // none does (e.g. a class outside every declared package), so it still runs somewhere
-        // rather than being silently dropped.
+        // the Name recorded by OnSync can match more than one of them, and dispatching to every
+        // match would run the class once per sharing resource. Prefer the resource whose
+        // Package/Class covers the class; fall back to the first resource with that Name (e.g. for a
+        // class outside every declared package) so it still runs somewhere.
         kill byResource
         set className = ""
         for {

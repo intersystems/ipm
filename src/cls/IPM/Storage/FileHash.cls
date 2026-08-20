@@ -19,16 +19,13 @@ Property Hash As %String(MAXLEN = 64) [ Required ];
 
 /// Set when a sync tried to apply this path and failed. A failed sync commits no hashes, so Hash
 /// still describes the last successfully-synced content while the namespace holds whatever the
-/// failed attempt left behind. Reverting the file to that content would otherwise make it invisible
-/// to change detection; this flag keeps it in the change set until a sync commits it. Rows written
-/// before this property existed read as "", which is correctly falsy.
+/// failed attempt left behind. This flag keeps the path in the change set until a sync commits it,
+/// so reverting the file to the baseline content doesn't make it invisible to change detection.
 Property SyncFailed As %Boolean [ InitialExpression = 0 ];
 
 /// Set when a sync applied this path but did not run its tests — a plain <code>sync</code> over a
-/// file owned by a test resource that runs in the "test" phase. The sync commits the new hash, so
-/// change detection would never look at that file again and the edit would stay untested; this flag
-/// keeps it in the change set until a sync with -test runs its tests. Rows written before this
-/// property existed read as "", which is correctly falsy.
+/// file owned by a test resource that runs in the "test" phase. The new hash is committed, so this
+/// flag keeps the path in the change set until a sync with -test runs its tests.
 Property TestPending As %Boolean [ InitialExpression = 0 ];
 
 Index ModulePathIndex On (ModuleName, PathHash) [ Unique ];
@@ -273,11 +270,10 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             do ..CompareOneFile(moduleName, relPath, $get(allHashes(relPath)), .modified, .seen)
         }
 
-        // Pass 3: rows a previous sync failed on. That sync committed no hash, so the content it
-        // tried to apply is not in the baseline — and if the user fixed the file by reverting it to
-        // the baselined content, the comparison above sees no change while the namespace still
-        // holds whatever the failed attempt left behind. Force these in until a sync commits them.
-        // Paths gone from disk are left to the delete pass below.
+        // Pass 3: rows a previous sync failed on. Their baseline hash is still the last
+        // successfully-synced content, so a file reverted to that content compares as unchanged
+        // above while the namespace holds whatever the failed attempt left behind. Force these in
+        // until a sync commits them; paths gone from disk are left to the delete pass below.
         set result = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ? AND SyncFailed = 1",
             moduleName)
@@ -297,9 +293,8 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
         }
 
         // Pass 4: rows an earlier sync applied without running their tests. Their hashes are
-        // committed, so no pass above reports them and the tests for that edit would never run.
-        // Only forced in when this sync runs tests — otherwise every plain sync would re-report the
-        // same files forever without ever clearing the flag.
+        // committed, so no pass above reports them. Forced in only when this sync runs tests, since
+        // only then does the flag get cleared.
         if runTests {
             set result = ##class(%SQL.Statement).%ExecDirect(,
                 "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ? AND TestPending = 1",
@@ -320,9 +315,8 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             }
         }
 
-        // Pass 5: iterate all stored rows — file not in allFiles → deleted. module.xml is skipped:
-        // it is always a stored row but is not part of the walked file set, so it would otherwise
-        // be misreported as deleted every sync.
+        // Pass 5: iterate all stored rows — file not in allFiles → deleted. module.xml is always a
+        // stored row but is not part of the walked file set, so it is skipped.
         set result = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
             moduleName)
@@ -532,12 +526,11 @@ ClassMethod GetStoredPaths(moduleName As %String, Output paths)
 
 /// Normalize a relative path: forward slashes, collapse //, drop "." segments, strip leading slash.
 ///
-/// The "." segments are load-bearing, not cosmetic. A module with <SourcesRoot>.</SourcesRoot> composes
+/// Collapsing "." segments is what makes <SourcesRoot>.</SourcesRoot> work: such a module composes
 /// every resource path as SourcesRoot_"/"_Directory (see %IPM.ResourceProcessor.Default.Document and
-/// .Package OnItemRelativePath / GetSyncDirectory), so its paths arrive here as "./cls/Foo/Bar.cls" while
-/// the directory walk and the stored baseline key the same file as "cls/Foo/Bar.cls". Both forms have to
-/// collapse to one, or the sync reverse index never matches a changed path and every edit under such a
-/// resource is silently dropped.
+/// .Package OnItemRelativePath / GetSyncDirectory), so its paths arrive here as "./cls/Foo/Bar.cls"
+/// while the directory walk and the stored baseline key the same file as "cls/Foo/Bar.cls". Both
+/// forms reduce to one here so the sync reverse index matches changed paths under such a resource.
 ClassMethod NormalizePath(path As %String) As %String
 {
     set path = $translate(path, "\", "/")
