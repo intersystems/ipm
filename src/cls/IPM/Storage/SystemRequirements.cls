@@ -27,6 +27,8 @@ Property IPMVersion As %String(MAXLEN = 256, XMLPROJECTION = "ATTRIBUTE");
 
 Property PythonVersion As %String(MAXLEN = 256, XMLPROJECTION = "ATTRIBUTE");
 
+Property SYSNamespace As %Boolean(XMLPROJECTION = "ATTRIBUTE");
+
 Method CheckRequirements() As %Status
 {
     set tSC = $$$OK
@@ -35,6 +37,7 @@ Method CheckRequirements() As %Status
     set tSC = $system.Status.AppendStatus(tSC,..CheckHealth())
     set tSC = $system.Status.AppendStatus(tSC,..CheckIPMVersion())
     set tSC = $system.Status.AppendStatus(tSC,..CheckPythonVersion())
+    set tSC = $system.Status.AppendStatus(tSC,..CheckSYSNamespace())
     return tSC
 }
 
@@ -127,6 +130,14 @@ ClassMethod IsInteroperabilityEnabled() As %Boolean
   return ##class(%EnsembleMgr).IsEnsembleNamespace($namespace) && ##class(%EnsembleMgr).validateNamespace($namespace, 1)
 }
 
+Method CheckSYSNamespace() As %Status
+{
+    if ..SYSNamespace && ($namespace'="%SYS") {
+        return $$$ERROR($$$GeneralError, "The module requires the %SYS namespace. Current namespace is "_$namespace)
+    }
+    return $$$OK
+}
+
 Storage Default
 {
 <Data name="SystemRequirementsDefaultData">
@@ -153,6 +164,9 @@ Storage Default
 </Value>
 <Value name="8">
 <Value>PythonVersion</Value>
+</Value>
+<Value name="9">
+<Value>SYSNamespace</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.SystemRequirementsD</DataLocation>
