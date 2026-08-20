@@ -54,8 +54,15 @@ EOF
 - One class per `.cls` file; keep class path aligned with package.
 - Methods (including tests): PascalCase; avoid underscores.
 - Indentation: 4 spaces or tabs consistently; align `Try/Catch`/`While` blocks.
-- Use `///` for concise class/method docs; prefer code examples over prose.
 - Methods should throw errors instead of returning %Status unless overriding a method that requires returning %Status.
+
+## Comments & Documentation
+- Use `///` for class/method docs; prefer code examples over prose.
+- Describe what the code does now and why. Do not narrate what it used to do, what it does *not* do, or what would go wrong without the change — that belongs in the commit message or PR description.
+- Omit issue and PR numbers. They are clutter once merged, especially for fixes within an unreleased feature.
+- Omit backward-compatibility notes for unreleased features (e.g. how rows written before a new property was added would read).
+- Write the shortest comment that still carries the non-obvious reason. If the code already says it, do not repeat it.
+- Re-read and cut every comment you added before opening a PR. Default to fewer, shorter comments.
 
 ## Testing Guidelines
 - Place unit tests under `/tests/unit_tests/Test/PM/Unit/`.
