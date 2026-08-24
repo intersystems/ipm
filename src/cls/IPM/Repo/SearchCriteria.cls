@@ -25,6 +25,9 @@ Property Keywords As list Of %String;
 /// empty: resolving dependencies
 Property AllVersions As %Boolean;
 
+/// When true, do not filter deployed modules by the current IRIS platform version
+Property IgnorePlatformFilter As %Boolean;
+
 Method KeywordsSet(%value) As %Status
 {
     if $isobject(%value) {

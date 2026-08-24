@@ -870,7 +870,7 @@ ClassMethod GetAvailableModuleNamesClose(ByRef qHandle As %Binary) As %Status [ 
 
 Query GetModuleList(
 	pServer As %String,
-	pShowAllVersions As %Boolean) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,Origin:%String,AllVersions:%String") [ SqlProc ]
+	pShowAllVersions As %Boolean) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,Origin:%String,AllVersions:%String,Deployed:%Boolean,PlatformVersions:%String") [ SqlProc ]
 {
 }
 
@@ -903,9 +903,13 @@ ClassMethod GetModuleListExecute(
                 write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
             }
             if $isobject(tList) {
+                set platformVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
                 for i=1:1:tList.Count() {
                     set tMod = tList.GetAt(i)
-                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+                    if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
+                        continue
+                    }
+                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.Deployed, tMod.FormatPlatformVersions())
                 }
             }
         }
@@ -1391,7 +1395,9 @@ ClassMethod ConstructInvertedDependencyGraph(
             quit
         }
         // Invert dependency graph, subscripts (<module>, <depends on>)
-        set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3)
+        #; Repository and version, then the deployed flag and platform version, which
+        #; the installer needs to locate the artifact built for this platform
+        set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3) _ $list(data, 6, 7)
         set dependentKey = ""
         for {
             set dependentKey = $order(pDependencyGraph(moduleName, dependentKey))
@@ -1425,12 +1431,14 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
 
         // If it has no remaining dependencies
         if $data(pInvertedDependencyGraph(moduleName)) < 10 {
-            set $listbuild(repositoryName, versionString) = $get(pInvertedDependencyGraph(moduleName))
+            set $listbuild(repositoryName, versionString, deployed, platformVersion) = $get(pInvertedDependencyGraph(moduleName))
             // Create qualified module reference to add to list
             set moduleReference = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
             set moduleReference.Name = moduleName
             set moduleReference.VersionString = versionString
             set moduleReference.ServerName = repositoryName
+            set moduleReference.Deployed = deployed
+            set moduleReference.PlatformVersion = platformVersion
             $$$ThrowOnError(orderedDependencyList.Insert(moduleReference))
             // Remove node from graph
             kill pInvertedDependencyGraph(moduleName)

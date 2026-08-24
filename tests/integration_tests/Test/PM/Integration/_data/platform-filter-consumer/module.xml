@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="platform-filter-consumer.ZPM">
+    <Module>
+      <Name>platform-filter-consumer</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <Resource Name="PlatformFilterConsumer.App.CLS"/>
+      <Dependencies>
+        <ModuleReference>
+          <Name>platform-filter-test</Name>
+          <!-- Deliberately satisfied by both published versions (1.0.0 and 2.0.0) so that
+               the platform filter is the only thing that can decide which one is chosen.
+               A caret range such as ^1.0.0 would exclude 2.0.0 on semver grounds alone. -->
+          <Version>>=1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

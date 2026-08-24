@@ -2261,7 +2261,7 @@ ClassMethod ShowModulesForRepository(
     } elseif pSearchString'="" {
         set where=" WHERE name = ?"
     }
-    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
+    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions,Deployed,PlatformVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
     if (pSearchString = "") {
         set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
     } else {
@@ -2279,6 +2279,9 @@ ClassMethod ShowModulesForRepository(
         set list = list + 1
         set list(list) = $listbuild(name, tRes.Version)
         set list(list, "Origin") = tRes.Origin
+        if tRes.Deployed && (tRes.PlatformVersions '= "") {
+            set list(list, "PlatformVersions") = tRes.PlatformVersions
+        }
         if pShowDesc {
             set list(list, "Description") = tRes.Description
         }
@@ -2587,18 +2590,28 @@ ClassMethod Install(
                     set tParams("cmd") = "install"
                     set tParams("Install") = 1
                 }
-                if tResult.Deployed {
-                    set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
-                    set tResult.PlatformVersion = platformVersion
-                    if ('tResult.PlatformVersions.Find(platformVersion)) {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
-                    }
-                }
 				$$$ThrowOnError(log.SetSource(tResult.ServerName))
 				$$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
+            // Zero results may mean the module was filtered out for being deployed for other
+            // platforms only, which deserves a better message than "not found". Search again
+            // without the filter to tell the two cases apart.
+            set diagCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+            set diagCriteria.Name = $$$lcase(tModuleName)
+            set diagCriteria.VersionExpression = tVersion
+            set diagCriteria.Registry = tRegistry
+            set diagCriteria.IgnorePlatformFilter = 1
+            set diagSC = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(diagCriteria, .diagResults)
+            if $$$ISOK(diagSC) && $isobject(diagResults) && (diagResults.Count() > 0) {
+                set diagResult = diagResults.GetAt(1)
+                if diagResult.Deployed && (diagResult.PlatformVersions.Count() > 0) {
+                    set platformVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
+                    set msg = "'" _ tModuleName _ "' " _ diagResult.VersionString _ " is not available for platform " _ platformVersion _ ". Available platforms: " _ diagResult.FormatPlatformVersions() _ ". Run 'search " _ tModuleName _ " -versions' to see all versions."
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+                }
+            }
             set tPrefix = ""
             if (tModuleName '= "") {
                 if (tVersion '= "") {
@@ -4225,6 +4238,7 @@ ClassMethod DisplayModules(
         $listbuild("Author.Person", $$$Yellow, "Author"),
         $listbuild("Origin", $$$Default),
         $listbuild("AllVersions", $$$Default, "Versions"),
+        $listbuild("PlatformVersions", $$$Default, "Platforms"),
         $listbuild("Repository", $$$Default),
         $listbuild("Installed In", $$$Default)
     )

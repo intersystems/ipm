@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="platform-filter-test.ZPM">
+    <Module>
+      <Name>platform-filter-test</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <Resource Name="PlatformFilterTest.Main.CLS" Deploy="true"/>
+      <Resource Name="PlatformFilterTest.Public.CLS"/>
+    </Module>
+  </Document>
+</Export>
