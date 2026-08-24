@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Export generator="Cache" version="25">
+<Export generator="IRIS" version="26">
   <Document name="platform-filter-test.ZPM">
     <Module>
       <Name>platform-filter-test</Name>
       <Version>2.0.0</Version>
       <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
       <Resource Name="PlatformFilterTest.Main.CLS" Deploy="true"/>
       <Resource Name="PlatformFilterTest.Public.CLS"/>
     </Module>
