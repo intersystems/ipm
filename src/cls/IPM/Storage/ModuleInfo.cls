@@ -1,10 +1,33 @@
-/// Just a Serial Object of ModuleInfo so that it can be persisted in other objects.
+/// Serializable representation of a module available in a repository, including platform compatibility information for deployed modules.
+/// Can be embedded in other persistent objects.
 Class %IPM.Storage.ModuleInfo Extends (%SerialObject, %IPM.General.ModuleInfo) [ StorageStrategy = "" ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleInfo";
 
 Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
+
+/// Returns true if this module is installable on the given platform.
+/// Non-deployed modules and deployed modules with no platform list are always compatible.
+/// Deployed modules with a platform list are compatible only if platformVersion appears in the list.
+Method IsCompatibleWithPlatform(platformVersion As %String) As %Boolean
+{
+    if '..Deployed || (..PlatformVersions.Count() = 0) {
+        return 1
+    }
+    return ..PlatformVersions.Find(platformVersion) > 0
+}
+
+/// Returns PlatformVersions as a comma-separated string, e.g. "2024.1, 2025.1".
+/// Returns "" when the list is empty.
+Method FormatPlatformVersions() As %String
+{
+    set result = ""
+    for i=1:1:..PlatformVersions.Count() {
+        set result = result _ $select(i > 1: ", ", 1: "") _ ..PlatformVersions.GetAt(i)
+    }
+    return result
+}
 
 Storage Default
 {

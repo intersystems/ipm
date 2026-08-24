@@ -151,10 +151,7 @@ Method GetModule(
 	pModuleReference As %IPM.Storage.ModuleInfo,
 	Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-    set tag = $$$Semver2Tag(pModuleReference.VersionString)
-    if (pModuleReference.Deployed) {
-        set tag = tag _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
-    }
+    set tag = ..TagForReference(pModuleReference)
     set status = ..Pull(..Location, pModuleReference.Name, tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
     $$$ThrowOnError(status)
     #; module is pulled as a .tgz file
@@ -164,8 +161,28 @@ Method GetModule(
 
 Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
 {
-    set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
-    return ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    set name = pModuleReference.Name _ ":" _ ..TagForReference(pModuleReference)
+    #; GetModuleXML returns a string, but callers expect a stream per %IPM.Repo.IPackageService
+    set moduleXML = ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    if (moduleXML = "") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No manifest found for '" _ name _ "' in registry " _ ..Location))
+    }
+    set stream = ##class(%Stream.GlobalCharacter).%New()
+    $$$ThrowOnError(stream.Write(moduleXML))
+    do stream.Rewind()
+    return stream
+}
+
+/// Returns the registry tag holding the artifact for the given module reference.
+/// A deployed module is tagged with a platform version suffix, since one version of it
+/// is built separately for each supported platform.
+ClassMethod TagForReference(moduleReference As %IPM.Storage.ModuleInfo) As %String [ Private ]
+{
+    set tag = $$$Semver2Tag(moduleReference.VersionString)
+    if moduleReference.Deployed {
+        set tag = tag _ $$$OrasTagPlatformSeparator _ moduleReference.PlatformVersion
+    }
+    return tag
 }
 
 Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean

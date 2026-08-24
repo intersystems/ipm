@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
+- #1158: Installing deployed code modules will automatically filter for the current IRIS version
 
 ### Changed
 - Minimum supported Python version is now 3.9
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1137: Python packages are now staged and copied into `mgr/python` rather than installed there directly, so they inherit that directory's permissions. On Windows this keeps them readable to non-elevated processes, which had failed with a `PermissionError` when using ORAS registries. Reinstalling IPM repairs an affected instance.
 - #1227: IPM commands no longer exit the shell with "IPM has been uninstalled from this namespace" after IPM is uninstalled and reinstalled in the same process
 - #1228: `uninstall zpm` now prompts to remove IPM metadata even when no other module is installed, so downgrading IPM does not require installing an unrelated module first
+- #987: Fixed issue where installing dependencies with ORAS would fail due to failure to properly get the manifest
 
 ## [0.10.9] - 2026-08-05
 

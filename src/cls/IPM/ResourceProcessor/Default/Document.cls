@@ -184,6 +184,13 @@ Method OnPhase(
                                     write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
                                 }
                                 set ..CompileFromProject = 1
+                                // Mark deployed so %Compile skips source compilation for
+                                // Deploy=true resources. Persisted because the * phase reopens
+                                // the module from the database before Compile runs.
+                                if '..ResourceReference.Module.Deployed {
+                                    set ..ResourceReference.Module.Deployed = 1
+                                    $$$ThrowOnError(..ResourceReference.Module.%Save())
+                                }
                                 if '$data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
                                     set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
                                     if $$$ISERR(sc) {

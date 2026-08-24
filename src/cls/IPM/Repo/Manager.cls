@@ -66,6 +66,7 @@ Method SearchRepositoriesForModule(
             set tSC = $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
             quit
         }
+        set currentPlatform = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
         while (tRes.%Next(.tSC)) {
             if $$$ISERR(tSC) {
                 quit
@@ -101,6 +102,14 @@ Method SearchRepositoriesForModule(
             set tServerResults = tClient.ListModules(tClientCriteria)
             for i=1:1:tServerResults.Count() {
                 set item = tServerResults.GetAt(i)
+                if 'pSearchCriteria.IgnorePlatformFilter && 'item.IsCompatibleWithPlatform(currentPlatform) {
+                    continue
+                }
+                #; Record which platform's artifact this result refers to; callers need it to build
+                #; the tag. Skipped when the list is empty, as for repositories without platforms.
+                if item.Deployed && (item.PlatformVersion = "") && (item.PlatformVersions.Find(currentPlatform) > 0) {
+                    set item.PlatformVersion = currentPlatform
+                }
                 #; Sorting versions
                 set versions(+item.Version.Major, +item.Version.Minor, +item.Version.Patch, " "_item.Version.Patch_"_"_item.Version.Prerelease, repoID, tServer.Name) = item
             }
