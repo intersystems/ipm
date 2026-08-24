@@ -1,33 +1,25 @@
-Include %IPM.Common
-
 /// Integration tests for deployed module platform filtering against a real ORAS (zot) registry.
-/// Requires the zot registry service to be running at the URL in the OrasURL parameter.
-///
-/// Tests:
-///   1. A module published for the current platform is visible in list-modules and installs successfully.
-///   2. A module published only for an incompatible platform (9999.1) is hidden from list-modules.
-///   3. Installing an incompatible-platform-only module gives a helpful error naming the available platforms.
-///   4. With 1.0.0 published for the current platform and 2.0.0 for an incompatible one, an
-///      unconstrained install resolves 1.0.0 rather than the newer 2.0.0.
-///   5. A dependent whose version range spans both published versions resolves the compatible one.
-///   6. A dependent pinned to the incompatible version fails to resolve.
 Class Test.PM.Integration.OrasDeployedPlatformFilter Extends Test.PM.Integration.Base
 {
 
-Parameter ModuleFolder = "platform-filter-test";
+/// Fixture directory under _data holding every module these tests use. The folder
+/// parameters below are relative to it.
+Parameter FixtureRoot = "platform-filter";
+
+Parameter ModuleFolder = "test/v1";
 
 /// Same module name as ModuleFolder, but version 2.0.0.
-Parameter ModuleFolderV2 = "platform-filter-test-v2";
+Parameter ModuleFolderV2 = "test/v2";
 
 Parameter ModuleName = "platform-filter-test";
 
 /// Depends on ModuleName at ">=1.0.0", which both published versions satisfy.
-Parameter ConsumerFolder = "platform-filter-consumer";
+Parameter ConsumerFolder = "consumer/range";
 
 Parameter ConsumerName = "platform-filter-consumer";
 
 /// Depends on ModuleName at "^2.0.0", which only the incompatible version satisfies.
-Parameter PinnedConsumerFolder = "platform-filter-consumer-pinned";
+Parameter PinnedConsumerFolder = "consumer/pinned";
 
 Parameter PinnedConsumerName = "platform-filter-consumer-pinned";
 
@@ -37,26 +29,36 @@ Parameter IncompatiblePlatform = "9999.1";
 /// Oras registry URL. Uses the docker-compose service name by default.
 Parameter OrasURL = "http://oras:5000";
 
-/// Teardown runs here rather than at the end of each test so that it still happens when a
-/// test errors out partway through. Leftover published tags are the dangerous kind of
-/// leakage: a stale current-platform tag would make the "hidden from list" tests fail.
+/// Point the namespace at the local zot registry once. Every test publishes to it and
+/// unpublishes in OnAfterOneTest, so no test needs its own registry setup.
+Method OnBeforeAllTests() As %Status
+{
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"), "Cleared repos")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -name oras -o -url " _ ..#OrasURL _ " -publish 1"), "Configured ORAS registry")
+    return $$$OK
+}
+
+Method OnAfterAllTests() As %Status
+{
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"), "Cleared repos")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -reset-defaults"), "Reset repos to defaults")
+    return $$$OK
+}
+
 Method OnAfterOneTest(testName As %String) As %Status
 {
     do ##class(%IPM.Main).Shell("uninstall " _ ..#ConsumerName)
     do ##class(%IPM.Main).Shell("uninstall " _ ..#PinnedConsumerName)
     do ##class(%IPM.Main).Shell("uninstall " _ ..#ModuleName)
-    // Must run before the registry is reset, while the oras repo still exists
     do ##class(%IPM.Main).Shell("unpublish oras/" _ ..#ModuleName _ " all -force")
-    do ..DeleteTgz($$$FileTempDir _ ..#ModuleFolder)
-    do ..DeleteTgz($$$FileTempDir _ ..#ModuleFolderV2)
-    do ..RestoreDefaultRegistry()
+    do ..DeleteTgz(..TgzPath(..#ModuleFolder))
+    do ..DeleteTgz(..TgzPath(..#ModuleFolderV2))
     return $$$OK
 }
 
 /// A module published for the current platform is both visible and installable.
 Method TestCompatiblePlatformVisibleAndInstallable()
 {
-    do ..SetupOrasRegistry()
     do ..LoadAndPackage()
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish " _ ..#ModuleName _ " -v -only"), "Published for current platform")
 
@@ -71,7 +73,6 @@ Method TestCompatiblePlatformVisibleAndInstallable()
 /// A module available only for an incompatible platform is filtered out of repository listings.
 Method TestIncompatiblePlatformHiddenFromList()
 {
-    do ..SetupOrasRegistry()
     set tgzPath = ..LoadAndPackage()
     do $$$AssertStatusOK(..PublishWithPlatform(tgzPath, ..#IncompatiblePlatform), "Published for incompatible platform")
 
@@ -84,7 +85,6 @@ Method TestIncompatiblePlatformInstallError()
 {
     set currentPlatform = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
 
-    do ..SetupOrasRegistry()
     set tgzPath = ..LoadAndPackage()
     do $$$AssertStatusOK(..PublishWithPlatform(tgzPath, ..#IncompatiblePlatform), "Published for incompatible platform")
 
@@ -115,9 +115,7 @@ Method TestDependencyResolvesToCompatibleVersion()
 {
     do ..PublishBothVersions()
 
-    // PublishBothVersions leaves platform-filter-test uninstalled. That matters: an
-    // installed 1.0.0 would already satisfy ">=1.0.0" and the registry would never be searched.
-    set consumerDir = ..GetModuleDir(..#ConsumerFolder)
+    set consumerDir = ..FixtureDir(..#ConsumerFolder)
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v -nodev " _ consumerDir), "Loaded consumer from " _ consumerDir)
     do $$$AssertEquals(..InstalledVersion(..#ModuleName), "1.0.0", "Dependency resolved to compatible 1.0.0")
 }
@@ -128,10 +126,10 @@ Method TestDependencyPinnedToIncompatibleVersionFails()
 {
     do ..PublishBothVersions()
 
-    set consumerDir = ..GetModuleDir(..#PinnedConsumerFolder)
+    set consumerDir = ..FixtureDir(..#PinnedConsumerFolder)
     set loadSC = ##class(%IPM.Main).Shell("load -v -nodev " _ consumerDir)
     do $$$AssertStatusNotOK(loadSC, "Load fails when the only satisfying version is platform-incompatible")
-    // Check the specific message, not just that something failed: an unrelated error
+    // Check the specific message, not just that something failed. An unrelated error
     // would otherwise let this test pass without resolution ever being exercised
     set errText = $system.Status.GetErrorText(loadSC)
     do $$$AssertTrue(errText [ "Could not find satisfactory version", "Failed for lack of a satisfying version")
@@ -143,29 +141,47 @@ Method TestDependencyPinnedToIncompatibleVersionFails()
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// Absolute path to a fixture directory, given its path relative to FixtureRoot.
+/// The relative path is split on "/" so each segment becomes its own path component.
+ClassMethod FixtureDir(relativePath As %String) As %String
+{
+    set segmentCount = $length(relativePath, "/")
+    set subfolders = 1 + segmentCount
+    set subfolders(1) = ..#FixtureRoot
+    for i = 1:1:segmentCount {
+        set subfolders(i + 1) = $piece(relativePath, "/", i)
+    }
+    return ..GetModuleDir(subfolders...)
+}
+
+/// Path a fixture is packaged to, without the .tgz extension. The fixture's relative
+/// path is flattened into the filename so every version gets its own tarball directly
+/// under the temp directory, and teardown can find it from the folder parameter alone.
+ClassMethod TgzPath(moduleFolder As %String) As %String
+{
+    return $$$FileTempDir _ ..#FixtureRoot _ "-" _ $translate(moduleFolder, "/", "-")
+}
+
 /// Load a module fixture from _data, package it, and return the path to the .tgz without
-/// the extension. The .tgz is named after the fixture folder so teardown can find it.
+/// the extension.
 Method LoadAndPackage(moduleFolder As %String = "") As %String
 {
     if (moduleFolder = "") {
         set moduleFolder = ..#ModuleFolder
     }
     // -nodev is required: the deploy branch of the Reload phase is skipped in developer mode
-    set folder = ..GetModuleDir(moduleFolder)
+    set folder = ..FixtureDir(moduleFolder)
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v -nodev " _ folder), "Loaded module from " _ folder)
 
-    set tgzPath = $$$FileTempDir _ moduleFolder
+    set tgzPath = ..TgzPath(moduleFolder)
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("package " _ ..#ModuleName _ " -only -v -path " _ tgzPath), "Packaged module to " _ tgzPath)
     return tgzPath
 }
 
 /// Publish platform-filter-test twice: 1.0.0 for the current platform and 2.0.0 for an
-/// incompatible one. Leaves the module uninstalled so that later resolution has to go
-/// to the registry, and leaves the oras registry configured.
+/// incompatible one.
 Method PublishBothVersions()
 {
-    do ..SetupOrasRegistry()
-
     // 1.0.0 for the current platform, via the real publish command. The MakeDeployed phase
     // stamps SystemRequirements with this IRIS version during packaging; publish tags with it.
     do ..LoadAndPackage(..#ModuleFolder)
@@ -177,13 +193,6 @@ Method PublishBothVersions()
     set v2Tgz = ..LoadAndPackage(..#ModuleFolderV2)
     do $$$AssertStatusOK(..PublishWithPlatform(v2Tgz, ..#IncompatiblePlatform), "Published 2.0.0 for incompatible platform")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall " _ ..#ModuleName), "Uninstalled 2.0.0 after publishing")
-}
-
-/// Point the current namespace at the local zot registry, ready for publishing.
-Method SetupOrasRegistry()
-{
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"), "Cleared repos")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -name oras -o -url " _ ..#OrasURL _ " -publish 1"), "Configured ORAS registry")
 }
 
 /// Publish the packaged module with an explicit platform version tag by calling
@@ -256,12 +265,6 @@ ClassMethod DeleteTgz(tgzPath As %String)
     if ##class(%File).Exists(tgzPath _ ".tgz") {
         do ##class(%File).Delete(tgzPath _ ".tgz")
     }
-}
-
-Method RestoreDefaultRegistry()
-{
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"), "Cleared repos")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -reset-defaults"), "Reset repos to defaults")
 }
 
 }
