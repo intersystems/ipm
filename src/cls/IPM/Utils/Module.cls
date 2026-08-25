@@ -870,7 +870,7 @@ ClassMethod GetAvailableModuleNamesClose(ByRef qHandle As %Binary) As %Status [ 
 
 Query GetModuleList(
 	pServer As %String,
-	pShowAllVersions As %Boolean) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,Origin:%String,AllVersions:%String,Deployed:%Boolean,PlatformVersions:%String") [ SqlProc ]
+	pShowAllVersions As %Boolean) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,Origin:%String,AllVersions:%String,PlatformVersions:%String") [ SqlProc ]
 {
 }
 
@@ -903,13 +903,13 @@ ClassMethod GetModuleListExecute(
                 write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
             }
             if $isobject(tList) {
-                set platformVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
+                set platformVersion = $$$CurrentPlatformVersion
                 for i=1:1:tList.Count() {
                     set tMod = tList.GetAt(i)
                     if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
                         continue
                     }
-                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.Deployed, tMod.FormatPlatformVersions())
+                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
                 }
             }
         }
@@ -1395,8 +1395,8 @@ ClassMethod ConstructInvertedDependencyGraph(
             quit
         }
         // Invert dependency graph, subscripts (<module>, <depends on>)
-        #; Repository and version, then the deployed flag and platform version, which
-        #; the installer needs to locate the artifact built for this platform
+        #; Repository, version, deployed flag and platform version. See BuildDependencyGraph
+        #; for the full node layout.
         set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3) _ $list(data, 6, 7)
         set dependentKey = ""
         for {

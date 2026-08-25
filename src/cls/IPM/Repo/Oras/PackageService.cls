@@ -169,7 +169,7 @@ Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream
     }
     set stream = ##class(%Stream.GlobalCharacter).%New()
     $$$ThrowOnError(stream.Write(moduleXML))
-    do stream.Rewind()
+    $$$ThrowOnError(stream.Rewind())
     return stream
 }
 
@@ -180,6 +180,9 @@ ClassMethod TagForReference(moduleReference As %IPM.Storage.ModuleInfo) As %Stri
 {
     set tag = $$$Semver2Tag(moduleReference.VersionString)
     if moduleReference.Deployed {
+        if (moduleReference.PlatformVersion = "") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot locate deployed module '" _ moduleReference.Name _ "' " _ moduleReference.VersionString _ " without a platform version."))
+        }
         set tag = tag _ $$$OrasTagPlatformSeparator _ moduleReference.PlatformVersion
     }
     return tag
@@ -230,10 +233,10 @@ ClassMethod AggregatePlatformVersions(
     return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
-/// Reorders versionsList so that versions with an artifact for currentPlatform
-/// come first, each group keeping the newest-first order it arrived in. A caller that reports only
-/// the first version therefore reports the newest installable one, and falls back to the newest
-/// version overall when the module has no artifact for this platform at all.
+/// Reorders versionsList so that versions with an artifact for currentPlatform come first, each
+/// group keeping the newest-first order it arrived in. A caller that reports only the first version
+/// therefore reports the newest installable one, falling back to the newest version overall when
+/// the module has no artifact for this platform at all.
 ClassMethod PreferCompatibleVersions(
 	versionsList As %List,
 	ByRef aggregatedPlatformVersion,
@@ -264,12 +267,10 @@ Method ListModulesFromTagString(
 {
     set allTagsString = ..GetAllTags(..Location, name, "", client)
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
-    // AllVersions is a tri-state; only the empty state reports every version, and it filters by
-    // platform later, so leave its order alone. The other two report a single version, which
-    // should be one this platform can actually install.
+    // The tri-states of AllVersions that report a single version should report one this platform
+    // can actually install. The empty state reports every version, so its order doesn't matter.
     if (searchCriteria.AllVersions '= "") && 'searchCriteria.IgnorePlatformFilter {
-        set currentPlatform = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
-        set allVersionsList = ..PreferCompatibleVersions(allVersionsList, .aggregatedPlatformVersion, currentPlatform)
+        set allVersionsList = ..PreferCompatibleVersions(allVersionsList, .aggregatedPlatformVersion, $$$CurrentPlatformVersion)
     }
     set pointer = 0
     while $listnext(allVersionsList,pointer,moduleVersion) {
@@ -347,8 +348,8 @@ Method ListModulesFromTagString(
         set tModRef.Repository = artifactMetadata.ImageSource
         set tModRef.Description = artifactMetadata.ImageDescription
         set tModRef.Deployed = artifactMetadata.IPMDeployed
-        // These platforms belong to this one version, so they would contradict AllVersions below,
-        // which lists every version's tag with its own platform suffix.
+        // Skipped for AllVersions, which reports a single entry standing in for every version;
+        // these platforms belong to just one of them.
         if (artifactMetadata.IPMDeployed '= "") && 'searchCriteria.AllVersions {
             set pvPtr = 0
             while $listnext(platformVersions, pvPtr, pv) {

@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 /// Integration tests for deployed module platform filtering against a real ORAS (zot) registry.
 Class Test.PM.Integration.OrasDeployedPlatformFilter Extends Test.PM.Integration.Base
 {
@@ -62,7 +64,9 @@ Method TestCompatiblePlatformVisibleAndInstallable()
     do ..LoadAndPackage()
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish " _ ..#ModuleName _ " -v -only"), "Published for current platform")
 
-    do $$$AssertTrue(..ModuleVisibleInList(..#ModuleName), "Compatible module is visible in list-modules")
+    do $$$AssertTrue(..ModuleVisibleInList(..#ModuleName), "Compatible module is resolvable")
+    do $$$AssertTrue(..QueryListedModule(..#ModuleName, .platforms), "Compatible module is listed by list-modules")
+    do $$$AssertEquals(platforms, $$$CurrentPlatformVersion, "list-modules reports the platform it was published for")
 
     // Uninstall the locally loaded copy first, so the install really comes from the registry
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall " _ ..#ModuleName), "Uninstalled before reinstall")
@@ -76,7 +80,8 @@ Method TestIncompatiblePlatformHiddenFromList()
     set tgzPath = ..LoadAndPackage()
     do $$$AssertStatusOK(..PublishWithPlatform(tgzPath, ..#IncompatiblePlatform), "Published for incompatible platform")
 
-    do $$$AssertNotTrue(..ModuleVisibleInList(..#ModuleName), "Incompatible module is hidden from list-modules")
+    do $$$AssertNotTrue(..ModuleVisibleInList(..#ModuleName), "Incompatible module is not resolvable")
+    do $$$AssertNotTrue(..QueryListedModule(..#ModuleName), "Incompatible module is hidden from list-modules")
 }
 
 /// Installing a module available only for an incompatible platform reports the platforms it
@@ -106,6 +111,9 @@ Method TestPlatformFilterPicksLowerCompatibleVersion()
     // match, so 2.0.0 would win here if the platform filter did not exclude it.
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("install " _ ..#ModuleName), "Installed with no version constraint")
     do $$$AssertEquals(..InstalledVersion(..#ModuleName), "1.0.0", "Resolved compatible 1.0.0 rather than incompatible 2.0.0")
+    // The version reported by the module's own code, so this also proves the 1.0.0 payload
+    // was installed rather than just the 1.0.0 manifest
+    do $$$AssertEquals($classmethod("PlatformFilterTest.Public", "Version"), "1.0.0", "1.0.0 sources were installed")
 }
 
 /// A dependent whose range (">=1.0.0") is satisfied by both published versions must get the
@@ -118,6 +126,7 @@ Method TestDependencyResolvesToCompatibleVersion()
     set consumerDir = ..FixtureDir(..#ConsumerFolder)
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v -nodev " _ consumerDir), "Loaded consumer from " _ consumerDir)
     do $$$AssertEquals(..InstalledVersion(..#ModuleName), "1.0.0", "Dependency resolved to compatible 1.0.0")
+    do $$$AssertEquals($classmethod("PlatformFilterTest.Public", "Version"), "1.0.0", "1.0.0 sources were installed")
 }
 
 /// A dependent pinned to "^2.0.0" can only be satisfied by the incompatible version,
@@ -237,8 +246,8 @@ Method PublishWithPlatform(
     return sc
 }
 
-/// Returns true if the named module appears in repo -list-modules for oras.
-/// Queries the search criteria API directly rather than parsing terminal output.
+/// Returns true if any configured repository offers the named module. Queries the resolution
+/// API directly rather than parsing the terminal output of repo -list-modules.
 ClassMethod ModuleVisibleInList(moduleName As %String) As %Boolean
 {
     set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
@@ -248,6 +257,23 @@ ClassMethod ModuleVisibleInList(moduleName As %String) As %Boolean
         return 0
     }
     return results.Count() > 0
+}
+
+/// Returns true if the named module is offered by the oras repository according to the query
+/// that backs repo -list-modules, setting platformVersions to the platforms it reports.
+ClassMethod QueryListedModule(
+    moduleName As %String,
+    Output platformVersions As %String) As %Boolean
+{
+    set platformVersions = ""
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT PlatformVersions FROM %IPM_Utils.Module_GetModuleList(?,?) WHERE Name = ?",
+        "oras", 0, moduleName)
+    if 'rs.%Next() {
+        return 0
+    }
+    set platformVersions = rs.%Get("PlatformVersions")
+    return 1
 }
 
 /// Version of the named module as currently installed, or "" if it is not installed.
