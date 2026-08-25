@@ -154,7 +154,7 @@ ClassMethod InstallORASIfMissing()
             }
         }
     } else {
-        write !!,"WARNING: Flexible Python Runtime is not configured on this instance with a valid Python version (>=3.10). Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
+        write !!,"WARNING: Flexible Python Runtime is not configured on this instance with a valid Python version (>=3.9). Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
     }
     quit $$$OK
 }
@@ -170,8 +170,10 @@ ClassMethod ValidatePythonRuntime() As %Boolean
 {
     try {
         set version = ..PythonMajorMinorVersion()
-        if (+version < 3.10) {
-            write !!,"WARNING: Python version "_version_" is not supported. IPM requires Python 3.10 or higher.",!
+        set major = +$piece(version, ".", 1)
+        set minor = +$piece(version, ".", 2)
+        if (major < 3) || ((major = 3) && (minor < 9)) {
+            write !!,"WARNING: Python version "_version_" is not supported. IPM requires Python 3.9 or higher.",!
             return 0
         }
     } catch e {
