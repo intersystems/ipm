@@ -2261,7 +2261,7 @@ ClassMethod ShowModulesForRepository(
     } elseif pSearchString'="" {
         set where=" WHERE name = ?"
     }
-    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions,Deployed,PlatformVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
+    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions,PlatformVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
     if (pSearchString = "") {
         set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
     } else {
@@ -2279,9 +2279,7 @@ ClassMethod ShowModulesForRepository(
         set list = list + 1
         set list(list) = $listbuild(name, tRes.Version)
         set list(list, "Origin") = tRes.Origin
-        if tRes.Deployed && (tRes.PlatformVersions '= "") {
-            set list(list, "PlatformVersions") = tRes.PlatformVersions
-        }
+        set list(list, "PlatformVersions") = tRes.PlatformVersions
         if pShowDesc {
             set list(list, "Description") = tRes.Description
         }
@@ -2598,18 +2596,17 @@ ClassMethod Install(
             // Zero results may mean the module was filtered out for being deployed for other
             // platforms only, which deserves a better message than "not found". Search again
             // without the filter to tell the two cases apart.
-            set diagCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-            set diagCriteria.Name = $$$lcase(tModuleName)
-            set diagCriteria.VersionExpression = tVersion
-            set diagCriteria.Registry = tRegistry
-            set diagCriteria.IgnorePlatformFilter = 1
-            set diagSC = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(diagCriteria, .diagResults)
-            if $$$ISOK(diagSC) && $isobject(diagResults) && (diagResults.Count() > 0) {
-                set diagResult = diagResults.GetAt(1)
-                if diagResult.Deployed && (diagResult.PlatformVersions.Count() > 0) {
-                    set platformVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
-                    set msg = "'" _ tModuleName _ "' " _ diagResult.VersionString _ " is not available for platform " _ platformVersion _ ". Available platforms: " _ diagResult.FormatPlatformVersions() _ ". Run 'search " _ tModuleName _ " -versions' to see all versions."
-                    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+            if (tModuleName '= "") {
+                set diagCriteria = tSearchCriteria.%ConstructClone(1)
+                set diagCriteria.IgnorePlatformFilter = 1
+                set diagSC = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(diagCriteria, .diagResults)
+                if $$$ISOK(diagSC) && $isobject(diagResults) && (diagResults.Count() > 0) {
+                    set diagResult = diagResults.GetAt(1)
+                    set availablePlatforms = diagResult.FormatPlatformVersions()
+                    if diagResult.Deployed && (availablePlatforms '= "") {
+                        set msg = "'" _ tModuleName _ "' " _ diagResult.VersionString _ " is not available for platform " _ $$$CurrentPlatformVersion _ ". Available platforms: " _ availablePlatforms _ ". Run 'search " _ tModuleName _ " -versions' to see all versions."
+                        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
+                    }
                 }
             }
             set tPrefix = ""

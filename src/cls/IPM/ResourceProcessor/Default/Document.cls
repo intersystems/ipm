@@ -184,9 +184,9 @@ Method OnPhase(
                                     write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
                                 }
                                 set ..CompileFromProject = 1
-                                // Mark deployed so %Compile skips source compilation for
-                                // Deploy=true resources. Persisted because the * phase reopens
-                                // the module from the database before Compile runs.
+                                // Mark deployed so Compile skips source compilation of Deploy=true
+                                // resources. Persisted because the module is reopened from the
+                                // database between here and Compile.
                                 if '..ResourceReference.Module.Deployed {
                                     set ..ResourceReference.Module.Deployed = 1
                                     $$$ThrowOnError(..ResourceReference.Module.%Save())

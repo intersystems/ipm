@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.Repo.Manager Extends %IPM.General.Singleton
 {
 
@@ -66,7 +68,7 @@ Method SearchRepositoriesForModule(
             set tSC = $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
             quit
         }
-        set currentPlatform = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
+        set currentPlatform = $$$CurrentPlatformVersion
         while (tRes.%Next(.tSC)) {
             if $$$ISERR(tSC) {
                 quit
@@ -106,8 +108,9 @@ Method SearchRepositoriesForModule(
                     continue
                 }
                 #; Record which platform's artifact this result refers to; callers need it to build
-                #; the tag. Skipped when the list is empty, as for repositories without platforms.
-                if item.Deployed && (item.PlatformVersion = "") && (item.PlatformVersions.Find(currentPlatform) > 0) {
+                #; the tag. Left empty for repositories that don't report platforms, and for the
+                #; incompatible results that only survive the filter above when it is off.
+                if item.Deployed && (item.PlatformVersions.Find(currentPlatform) > 0) {
                     set item.PlatformVersion = currentPlatform
                 }
                 #; Sorting versions

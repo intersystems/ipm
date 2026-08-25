@@ -1713,8 +1713,8 @@ Method %Document(ByRef pParams) As %Status
             set tSC = ..Module.BuildDependencyGraph(.tDependencyGraph)
             $$$ThrowOnError(tSC)
 
-            // tDependencyGraph format:
-            // tDependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
+            // tDependencyGraph format: see %IPM.Storage.Module:BuildDependencyGraph for the node
+            // layout. Only <depth> and <server> are used here.
             // tDependencyGraph(<module name>,<dependent module name>_" "_<version string>) = <required version expression>
             // <server> being empty means it's already installed.
             // All these modules need to already be installed.
@@ -1867,8 +1867,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
             if '$isobject(..Module.SystemRequirements) {
                 set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
             }
-            set tSystemVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
-            set ..Module.SystemRequirements.VersionString = tSystemVersion
+            set ..Module.SystemRequirements.VersionString = $$$CurrentPlatformVersion
             $$$ThrowOnError(..Module.%Save())
             if $data(tDeployClassArray) {
                 if (tVerbose) {

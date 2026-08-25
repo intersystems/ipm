@@ -1,5 +1,5 @@
-/// Serializable representation of a module available in a repository, including platform compatibility information for deployed modules.
-/// Can be embedded in other persistent objects.
+/// Just a Serial Object of ModuleInfo so that it can be persisted in other objects.
+/// Adds the platform compatibility information repositories report for deployed modules.
 Class %IPM.Storage.ModuleInfo Extends (%SerialObject, %IPM.General.ModuleInfo) [ StorageStrategy = "" ]
 {
 
@@ -7,24 +7,30 @@ Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleInfo";
 
 Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
 
-/// Returns true if this module is installable on the given platform.
-/// Non-deployed modules and deployed modules with no platform list are always compatible.
-/// Deployed modules with a platform list are compatible only if platformVersion appears in the list.
+/// Returns true if this module is installable on the given platform. Only a deployed module
+/// with a non-empty platform list restricts anything; an empty entry in that list means the
+/// artifact is not platform-specific, so it is compatible with everything.
 Method IsCompatibleWithPlatform(platformVersion As %String) As %Boolean
 {
-    if '..Deployed || (..PlatformVersions.Count() = 0) {
+    set platformVersions = ..PlatformVersionList()
+    if '..Deployed || (platformVersions = "") {
         return 1
     }
-    return ..PlatformVersions.Find(platformVersion) > 0
+    return ($listfind(platformVersions, "") > 0) || ($listfind(platformVersions, platformVersion) > 0)
 }
 
-/// Returns PlatformVersions as a comma-separated string, e.g. "2024.1, 2025.1".
-/// Returns "" when the list is empty.
+/// Returns PlatformVersions as a comma-separated string, e.g. "2024.1, 2025.1", or "" if empty.
 Method FormatPlatformVersions() As %String
+{
+    return $listtostring(..PlatformVersionList(), ", ")
+}
+
+/// Returns PlatformVersions as a $list, so it can be inspected with $listfind/$listtostring.
+Method PlatformVersionList() As %List [ Private ]
 {
     set result = ""
     for i=1:1:..PlatformVersions.Count() {
-        set result = result _ $select(i > 1: ", ", 1: "") _ ..PlatformVersions.GetAt(i)
+        set result = result _ $listbuild(..PlatformVersions.GetAt(i))
     }
     return result
 }
