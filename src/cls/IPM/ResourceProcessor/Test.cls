@@ -387,6 +387,24 @@ Method GetSyncDirectory() As %String
     quit ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
 }
 
+/// Returns 1 if <var>className</var> falls within this resource's declared Package (or is its
+/// declared Class). Several UnitTest resources can point at one directory and differ only by
+/// Package, so the directory alone does not identify which resource owns a test class; sync uses
+/// this to run each changed class in exactly one resource.
+Method OwnsClassName(className As %String) As %Boolean
+{
+    if className = "" {
+        quit 0
+    }
+    if ..Class '= "" {
+        quit (className = ..Class)
+    }
+    if ..Package = "" {
+        quit 0
+    }
+    quit (className = ..Package) || ($extract(className, 1, $length(..Package) + 1) = (..Package _ "."))
+}
+
 Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output handled As %Boolean = 0) As %Status
 {
     set sc = $$$OK
@@ -412,8 +430,19 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
             set relPath = $order(modifiedPaths(relPath))
             quit:relPath=""
             set className = ..RelPathToClassName(relPath, resourceDir)
-            if className '= "" && $$$comClassDefined(className)
-                && $classmethod(className, "%Extends", "%UnitTest.TestCase") {
+            if className = "" {
+                continue
+            }
+            // Several UnitTest resources can share one directory and differ only by Package, so a
+            // changed file routed to this resource may belong to a sibling's package: loaded by
+            // LoadTestDirectory above, but outside the compile. Compile it here so it is usable in
+            // the namespace and visible to the TestCase check below, guarded on the class definition
+            // existing so a file whose class name doesn't match its path is skipped rather than
+            // failing the sync on a phantom class name.
+            if '$$$comClassDefined(className) && $$$defClassDefined(className) {
+                $$$ThrowOnError($system.OBJ.Compile(className, "ck"_$select(verbose:"d",1:"-d")))
+            }
+            if $$$comClassDefined(className) && $classmethod(className, "%Extends", "%UnitTest.TestCase") {
                 set params("Sync", "ChangedTestCases", className) = ..ResourceReference.Name
             }
         }
@@ -438,8 +467,8 @@ Method OnSync(ByRef modifiedPaths, ByRef deletedPaths, ByRef params, Output hand
 /// Called once per resource by SyncRunTests: runs every changed test-phase case belonging
 /// to this resource in a single RunTest invocation instead of one call per class.
 /// classInfo(className) = "" for each changed TestCase class in this resource.
-/// Assumes OnSync already loaded and compiled these classes earlier in the same sync() call,
-/// so no reload/recompile happens here — only testspec construction, RunTest, and reporting.
+/// Assumes OnSync already loaded and compiled these classes earlier in the same sync() call, so
+/// this only builds the testspec, runs the tests, and reports.
 Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
 {
     set sc = $$$OK
@@ -455,14 +484,13 @@ Method OnSyncRunTests(ByRef classInfo, ByRef params) As %Status
         }
         set phaseStartIndex = $get(^||%UnitTest.Manager.AllResultsCount, 0)
 
-        // Build one testspec covering every changed class in this resource. Classes sharing
-        // a subdirectory must join with ";" within ONE "dir:Class1;Class2" entry — repeating
-        // the same dirPart across separate comma-joined entries is invalid grammar (RunTest
-        // treats each comma-separated entry as its own testsuite scope; a second entry naming
-        // the same dir errors instead of adding to the first). Distinct subdirectories become
-        // separate comma-joined entries so unrelated sibling test classes elsewhere in the
-        // resource are not swept in. dirPart is derived from className (its inverse) rather
-        // than passed in, since a TestCase class name always mirrors its on-disk path.
+        // Build one testspec covering every changed class in this resource. Classes sharing a
+        // subdirectory must join with ";" within ONE "dir:Class1;Class2" entry: RunTest treats each
+        // comma-separated entry as its own testsuite scope, so a second entry naming the same dir
+        // errors instead of adding to the first. Distinct subdirectories become separate
+        // comma-joined entries so unrelated sibling test classes elsewhere in the resource are not
+        // swept in. dirPart is derived from className, since a TestCase class name always mirrors
+        // its on-disk path.
         kill byDir
         set className = ""
         for {
