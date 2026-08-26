@@ -2553,7 +2553,7 @@ ClassMethod Install(
         set tSearchCriteria.Name = $$$lcase(tModuleName)
         set tSearchCriteria.VersionExpression = tVersion
         set tSearchCriteria.Keywords = tKeywords
-        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults,,.tPlatformFiltered))
 
         if (tResults.Count() > 0) {
             set tResult = ""
@@ -2593,21 +2593,15 @@ ClassMethod Install(
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
-            // Zero results may mean the module was filtered out for being deployed for other
-            // platforms only, which deserves a better message than "not found". Search again
-            // without the filter to tell the two cases apart.
-            if (tModuleName '= "") {
-                set diagCriteria = tSearchCriteria.%ConstructClone(1)
-                set diagCriteria.IgnorePlatformFilter = 1
-                set diagSC = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(diagCriteria, .diagResults)
-                if $$$ISOK(diagSC) && $isobject(diagResults) && (diagResults.Count() > 0) {
-                    set diagResult = diagResults.GetAt(1)
-                    set availablePlatforms = diagResult.FormatPlatformVersions()
-                    if diagResult.Deployed && (availablePlatforms '= "") {
-                        set msg = "'" _ tModuleName _ "' " _ diagResult.VersionString _ " is not available for platform " _ $$$CurrentPlatformVersion _ ". Available platforms: " _ availablePlatforms _ ". Run 'search " _ tModuleName _ " -versions' to see all versions."
-                        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-                    }
-                }
+            // The module may have matched but been excluded for being deployed for other platforms
+            // only, which deserves a better message than "not found".
+            // Only a deployed module with platforms that don't include this one is ever filtered,
+            // so there is always something to report here.
+            if $isobject(tPlatformFiltered) && (tPlatformFiltered.Count() > 0) {
+                #dim tFiltered As %IPM.Storage.ModuleInfo
+                set tFiltered = tPlatformFiltered.GetAt(1)
+                set tMsg = "'" _ tFiltered.Name _ "' " _ tFiltered.VersionString _ " is not available for platform " _ $$$CurrentPlatformVersion _ ". Available platforms: " _ tFiltered.FormatPlatformVersions() _ ". Run 'search " _ tFiltered.Name _ " -versions' to see all versions."
+                $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
             }
             set tPrefix = ""
             if (tModuleName '= "") {

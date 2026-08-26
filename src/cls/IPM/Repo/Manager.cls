@@ -49,13 +49,18 @@ Method CheckServiceCache(
 }
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
+/// pPlatformFilteredResults receives the deployed results that matched the criteria but were excluded
+/// for having no artifact for this platform, so callers can distinguish "no such module" from
+/// "not built for this platform" without searching again.
 Method SearchRepositoriesForModule(
 	pSearchCriteria As %IPM.Repo.SearchCriteria,
 	Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%IPM.Storage.QualifiedModuleInfo"),
-	pForceRemoteRepo As %Boolean = 0) As %Status
+	pForceRemoteRepo As %Boolean = 0,
+	Output pPlatformFilteredResults As %Library.ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")) As %Status
 {
     set tSC = $$$OK
     set pResults = ##class(%Library.ListOfObjects).%New()
+    set pPlatformFilteredResults = ##class(%Library.ListOfObjects).%New()
     try {
         set registry = pSearchCriteria.Registry
         set pSearchCriteria.Name = $$$lcase(pSearchCriteria.Name)
@@ -104,12 +109,13 @@ Method SearchRepositoriesForModule(
             set tServerResults = tClient.ListModules(tClientCriteria)
             for i=1:1:tServerResults.Count() {
                 set item = tServerResults.GetAt(i)
-                if 'pSearchCriteria.IgnorePlatformFilter && 'item.IsCompatibleWithPlatform(currentPlatform) {
+                if 'item.IsCompatibleWithPlatform(currentPlatform) {
+                    do pPlatformFilteredResults.Insert(item)
                     continue
                 }
                 #; Record which platform's artifact this result refers to; callers need it to build
-                #; the tag. Left empty for repositories that don't report platforms, and for the
-                #; incompatible results that only survive the filter above when it is off.
+                #; the tag. Left empty for repositories that don't report platforms, and for
+                #; artifacts that aren't platform-specific at all.
                 if item.Deployed && (item.PlatformVersions.Find(currentPlatform) > 0) {
                     set item.PlatformVersion = currentPlatform
                 }

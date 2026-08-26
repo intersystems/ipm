@@ -4,17 +4,20 @@ Class %IPM.Repo.Utils
 {
 
 /// Returns a list of all resolved module references matching the search criteria from configured repositories.
+/// See %IPM.Repo.Manager:SearchRepositoriesForModule for pPlatformFilteredResults.
 ClassMethod SearchRepositoriesForModule(
 	pSearchCriteria As %IPM.Repo.SearchCriteria,
 	Output pResults As %Library.ListOfObjects(ELEMENTTYPE="%IPM.Storage.QualifiedModuleInfo"),
-	pForceRemoteRepo As %Boolean = 0) As %Status
+	pForceRemoteRepo As %Boolean = 0,
+	Output pPlatformFilteredResults As %Library.ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")) As %Status
 {
     set tSC = $$$OK
-    set pResults = $$$NULLOREF
+    set pResults = ""
+    set pPlatformFilteredResults = ""
     try {
         set tManager = ##class(%IPM.Repo.Manager).%Get(.tSC)
         $$$ThrowOnError(tSC)
-        set tSC = tManager.SearchRepositoriesForModule(pSearchCriteria,.pResults)
+        set tSC = tManager.SearchRepositoriesForModule(pSearchCriteria,.pResults,,.pPlatformFilteredResults)
     } catch e {
         set tSC = e.AsStatus()
     }

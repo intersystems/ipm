@@ -1120,6 +1120,7 @@ Method %Compile(ByRef pParams) As %Status
 
                     // Just copy the first level of subscripts (resource names), not all the gory details.
                     set tOneResourceKey = ""
+                    set tAnyToCompile = 0
                     for {
                         set tOneResourceKey = $order(tOneResourceList(tOneResourceKey))
                         quit:(tOneResourceKey="")
@@ -1127,6 +1128,14 @@ Method %Compile(ByRef pParams) As %Status
                             continue
                         }
                         set tCompileFlagMap(tFlags,tResource.Name,tOneResourceKey) = ""
+                        set tAnyToCompile = 1
+                    }
+
+                    // Everything under this resource is already deployed, so no compile pass will
+                    // ever claim it. Leaving it in tCompilableMap would stall the loop below, which
+                    // only clears resources it compiles.
+                    if 'tAnyToCompile {
+                        kill tCompilableMap(tResource.Name)
                     }
                 }
             }
@@ -1201,8 +1210,9 @@ Method %Compile(ByRef pParams) As %Status
                 }
             }
 
-            // Cycle detection
-            if ('tCompiledSomething && '..HasDeployedResources) {
+            // Cycle detection. Anything not compilable has already been removed above, so a
+            // resource still waiting its turn here is waiting on itself.
+            if 'tCompiledSomething {
                 set tFailedResources = ""
                 set tResource = ""
                 for {
