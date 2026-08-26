@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Minimum supported Python version is now 3.9
+- #1158: `search` and `install` no longer list deployed modules that were not built for the current IRIS platform. Use `search <module> -versions` to see all versions and their supported platforms.
 
 ### Fixed
 - Performance: Studio project creation on package load in dev mode is now 80% faster.

@@ -2598,8 +2598,17 @@ ClassMethod Install(
             // Only a deployed module with platforms that don't include this one is ever filtered,
             // so there is always something to report here.
             if $isobject(tPlatformFiltered) && (tPlatformFiltered.Count() > 0) {
+                // Report the newest filtered version: the one an unversioned install resolves to.
+                // A pinned install filters only its own version, so this names that version too.
                 #dim tFiltered As %IPM.Storage.ModuleInfo
+                #dim tCandidate As %IPM.Storage.ModuleInfo
                 set tFiltered = tPlatformFiltered.GetAt(1)
+                for tIdx = 2:1:tPlatformFiltered.Count() {
+                    set tCandidate = tPlatformFiltered.GetAt(tIdx)
+                    if tCandidate.Version.Follows(tFiltered.Version) {
+                        set tFiltered = tCandidate
+                    }
+                }
                 set tMsg = "'" _ tFiltered.Name _ "' " _ tFiltered.VersionString _ " is not available for platform " _ $$$CurrentPlatformVersion _ ". Available platforms: " _ tFiltered.FormatPlatformVersions() _ ". Run 'search " _ tFiltered.Name _ " -versions' to see all versions."
                 $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
             }
