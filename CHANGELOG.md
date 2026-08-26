@@ -5,7 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.8] - Unreleased
+## [0.10.10] - Unreleased
+
+### Added
+- #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
+- #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
+
+### Changed
+- Minimum supported Python version is now 3.9
+
+### Fixed
+- Performance: Studio project creation on package load in dev mode is now 80% faster.
+- #994: Prevent crash in `zn` command when target namespace lacks IPM mappings
+
+## [0.10.9] - 2026-08-05
+
+### Added
+- #1178: Add `-password-env` and `-token-env` modifiers to the `repo` command to read the password/token from a named environment variable (secure alternatives to `-password` and `-token`).
+
+### Changed
+- #1186: Change %IPM.Main:ShellScript() to return a status.
+
+### Fixed
+- #1207: Zero-byte files are now supported in IPM modules
+- #1209: Fix IPM installer failing on certain environments with (partially) installed older IPM versions
+- #1212: Fix improper parsing of module versions with dashes in the pre-release string
+
+## [0.10.8] - 2026-07-08
 
 ### Added
 - #962: Adding zpm -from-lockfile flag to install/load from a lock file

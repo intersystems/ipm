@@ -1,0 +1,24 @@
+ // Create the REGISTRY namespace and its database. The community image ships
+ // without IPM and does not auto-create namespaces, so mirror the steps IPM's
+ // own %IPM.Test.Utils.CreateNamespace uses (that class isn't available yet).
+ set path = ##class(%File).ManagerDirectory() _ "registry"
+ do ##class(%File).CreateDirectory(path)
+ do ##class(SYS.Database).CreateDatabase(path)
+ kill dbprops set dbprops("Directory") = path, dbprops("MountRequired") = 1
+ do ##class(Config.Databases).Create("REGISTRY",.dbprops)
+ kill nsprops
+ set nsprops("Globals") = "REGISTRY", nsprops("Routines") = "REGISTRY"
+ set nsprops("Library") = "IRISLIB", nsprops("TempGlobals") = "IRISTEMP"
+ set nsprops("SysGlobals") = "IRISSYS", nsprops("SysRoutines") = "IRISSYS"
+ do ##class(Config.Namespaces).Create("REGISTRY",.nsprops)
+ // Install IPM from source into REGISTRY, add the community repo, install zpm-registry
+ zn "REGISTRY"
+ do $System.OBJ.Load("/home/irisowner/zpm/preload/cls/IPM/Installer.cls","ck")
+ do ##class(IPM.Installer).setup("/home/irisowner/zpm/",3)
+ do ##class(%IPM.Main).Shell("repo -r -name registry -url https://pm.community.intersystems.com/")
+ do ##class(%IPM.Main).Shell("install zpm-registry")
+ // Give the registry client user (admin/SYS, per docker-compose.yml) a known password
+ zn "%SYS"
+ kill userprops set userprops("Password") = "SYS"
+ do ##class(Security.Users).Modify("admin",.userprops)
+ halt

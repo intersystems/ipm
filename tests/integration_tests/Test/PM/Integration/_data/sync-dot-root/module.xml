@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Export generator="IRIS" version="26">
+  <Document name="sync-dot-root.ZPM">
+    <Module>
+      <Name>sync-dot-root</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <!-- SourcesRoot="." (sources at the module root, not under src/) is the point of this
+           fixture: every resource path is composed as SourcesRoot_"/"_Directory, so paths reach
+           the sync pipeline as "./cls/..." while the file walk and hash baseline produce
+           "cls/...". See TestSyncWithDotSourcesRoot. -->
+      <SourcesRoot>.</SourcesRoot>
+      <Resource Name="SyncDotRoot.PKG" />
+      <Resource Name="SyncDotRoot.INC" />
+    </Module>
+  </Document>
+</Export>

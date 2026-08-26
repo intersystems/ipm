@@ -183,6 +183,7 @@ ClassMethod GetCompletePhasesForOne(pOnePhase As %String) As %List
         "applyupdatesteps": $listbuild("Initialize","Reload","*","Validate","Compile","Activate","ApplyUpdateSteps"),
         "configure":        $listbuild("Configure"),
         "unconfigure":      $listbuild("Unconfigure"),
+        "sync":             $listbuild("Sync"),
         :                   ""
     )
 }
@@ -209,6 +210,7 @@ ClassMethod MatchSinglePhase(pOnePhase As %String) As %String
         "configure":        "Configure",
         "unconfigure":      "Unconfigure",
         "applyupdatesteps": "ApplyUpdateSteps",
+        "sync":             "Sync",
         :                   pOnePhase // return the phase as-is if it's a custom phase name
     )
 }
@@ -568,6 +570,15 @@ Method %Unconfigure(ByRef pParams) As %Status
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Incrementally sync changed files from disk into the namespace for a dev-mode module.
+/// Thin lifecycle hook: ExecutePhases dispatches phases via $method on the lifecycle instance,
+/// so this must be an instance method here. The sync orchestration itself lives in
+/// %IPM.General.Sync.Pipeline.
+Method %Sync(ByRef params) As %Status
+{
+    return ##class(%IPM.General.Sync.Pipeline).Run(..Module, .params)
 }
 
 Method %Initialize(ByRef pParams) As %Status
@@ -1203,6 +1214,17 @@ Method %Compile(ByRef pParams) As %Status
                 $$$ThrowStatus(tSC)
             }
         }
+
+        // Stamp file baselines for sync change detection (dev mode only).
+        // Non-fatal: stamping failure must not break a normal compile cycle.
+        // Done after compile so test classes are in ^oddDEF and pass the namespace filter in StampModule.
+        if tDevMode {
+            try {
+                $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(..Module))
+            } catch stampEx {
+                write !, "WARNING: sync baseline stamping failed: ", $system.Status.GetOneErrorText(stampEx.AsStatus())
+            }
+        }
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -1328,6 +1350,10 @@ Method %Export(
             set tParams($$$DeployedProjectIndex) = tDeployedProject
 
             do ..ExportSingleModule(.tSingleModuleArray, pTargetDirectory, .pDependencyGraph, .tParams, tVerbose)
+
+            // Validate the deployed project once, now that all its items have been added
+            // (%IPM.ResourceProcessor.Default.Document skips the per-item check for this reason).
+            $$$ThrowOnError(tDeployedProject.Check())
 
             // Export the deployed project for this module to the target directory, if it's non-empty
             if tDeployedProject.Items.Count() > 0 {

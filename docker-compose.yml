@@ -15,16 +15,15 @@ services:
       - -a
       - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
   registry:
-    image: intersystemsdc/iris-community:preview
+    build:
+      context: .
+      dockerfile: tests/registry/Dockerfile
     restart: always
     ports:
       - 52775:52773
-    environment:
-      - IRISPASSWORD=SYS
-      - IRISUSERNAME=admin
-      - IRISNAMESPACE=REGISTRY
-    volumes:
-      - ./scripts/setup-registry.sh:/docker-entrypoint-initdb.d/setup-registry.sh
+    command:
+      - -a
+      - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
   sandbox:
     build: ./tests/sandbox/
     restart: always

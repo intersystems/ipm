@@ -58,7 +58,7 @@ ClassMethod FromString(
     set pComparator.Minor = $piece(pExpr,".",2)
     set tEnd = $piece(pExpr,".",3,*)
     set pComparator.Patch = $piece($piece(tEnd,"-"),"+") // Before -prerelease and/or +build
-    set pComparator.Prerelease = $piece($piece(tEnd,"-",2),"+") // After - and possibly before +build
+    set pComparator.Prerelease = $piece($piece(tEnd,"-",2,*),"+") // After - and possibly before +build
     set pComparator.Build = $piece(tEnd,"+",2)
 
     set tSC = pComparator.%ValidateObject()

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="zero-byte-file.ZPM">
+    <Module>
+      <Name>zero-byte-file</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <FileCopy Name="/src/" Target="${mgrDir}../zero-byte-file/"/>
+    </Module>
+  </Document>
+</Export>

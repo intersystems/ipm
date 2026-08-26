@@ -154,7 +154,7 @@ ClassMethod InstallORASIfMissing()
             }
         }
     } else {
-        write !!,"WARNING: Flexible Python Runtime is not configured on this instance with a valid Python version (>=3.10). Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
+        write !!,"WARNING: Flexible Python Runtime is not configured on this instance with a valid Python version (>=3.9). Not all IPM features will be available. If you wish to use ORAS registries, configure Flexible Python Runtime and then reinstall IPM.",!
     }
     quit $$$OK
 }
@@ -170,8 +170,10 @@ ClassMethod ValidatePythonRuntime() As %Boolean
 {
     try {
         set version = ..PythonMajorMinorVersion()
-        if (+version < 3.10) {
-            write !!,"WARNING: Python version "_version_" is not supported. IPM requires Python 3.10 or higher.",!
+        set major = +$piece(version, ".", 1)
+        set minor = +$piece(version, ".", 2)
+        if (major < 3) || ((major = 3) && (minor < 9)) {
+            write !!,"WARNING: Python version "_version_" is not supported. IPM requires Python 3.9 or higher.",!
             return 0
         }
     } catch e {
@@ -456,22 +458,30 @@ ClassMethod CleanupOldMappings() As %Status
 
         // These mappings were suggested as a temporary workaround for IRIS 2023.x,
         // but whose underlying issues have been resolved in 2024.1 and later.
-        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(BEGIN):(""%ZP"")","IRISLIB")
-        if $$$ISERR(status) {
-            set sc = $$$ADDSC(sc, status)
-        }
-        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""%ZP""):(""A"")","IRISSYS")
-        if $$$ISERR(status) {
-            set sc = $$$ADDSC(sc, status)
-        }
-        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
-        if $$$ISERR(status) {
-            set sc = $$$ADDSC(sc, status)
-        }
-        set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument",namespace)
-        if $$$ISERR(status) {
-            // this mapping deletion will fail if there are still sub-mappings present
-            // so we can ignore errors here
+        // %IPM.Utils.Module ships in the src payload imported later in this manifest, so
+        // on some upgrade paths the class/method may not yet exist when this runs. Tolerate
+        // that with a try/catch rather than reordering, since cleanup must precede the import.
+        try {
+            set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(BEGIN):(""%ZP"")","IRISLIB")
+            if $$$ISERR(status) {
+                set sc = $$$ADDSC(sc, status)
+            }
+            set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""%ZP""):(""A"")","IRISSYS")
+            if $$$ISERR(status) {
+                set sc = $$$ADDSC(sc, status)
+            }
+            set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument:(""Ens""):(""Ent"")","ENSLIB")
+            if $$$ISERR(status) {
+                set sc = $$$ADDSC(sc, status)
+            }
+            set status = ##class(%IPM.Utils.Module).RemoveGlobalMapping($namespace,"oddStudioDocument",namespace)
+            if $$$ISERR(status) {
+                // this mapping deletion will fail if there are still sub-mappings present
+                // so we can ignore errors here
+            }
+        } catch e {
+            // %IPM.Utils.Module (or RemoveGlobalMapping) not available yet on this upgrade path; skip
+            write !,"WARNING: CleanupOldMappings caught exception in ",namespace,": ",e.DisplayString()
         }
     }
 

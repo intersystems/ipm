@@ -104,6 +104,19 @@ This command is an alias for `module-action module-name reload`
 <parameter name="module" required="true" description="Name of module on which to perform reload action" />
 </command>
 
+<command name="sync" dataPrefix="D">
+<summary>Incrementally syncs changed files from disk into the namespace.</summary>
+<description>
+Detects files changed on disk since the last load/sync for development-mode modules,
+routes each to its resource processor, and recompiles only what is stale.
+If no module is specified, syncs all modules in development mode.
+</description>
+<parameter name="module" description="Name of module to sync (optional; if omitted, syncs all dev-mode modules)" />
+<modifier name="delete" dataAlias="ProcessDeletes" dataValue="1" description="Also process deleted files (remove server documents and recompile dependents)." />
+<modifier name="test" aliases="t" dataAlias="RunTests" dataValue="1" description="After sync, run test-phase unit tests that were added or modified." />
+<modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output." />
+</command>
+
 <command name="compile">
 <description>
 This command is an alias for `module-action module-name compile`
@@ -1098,8 +1111,10 @@ ClassMethod ShellInternal(
                 do ..ModuleVersion(.tCommandInfo)
             } elseif (tCommandInfo = "information") {
                 do ..Information(.tCommandInfo)
-            } elseif (tCommandInfo = "history") {
-                do ..History(.tCommandInfo)
+			} elseif (tCommandInfo = "history") {
+				do ..History(.tCommandInfo)
+            } elseif (tCommandInfo = "sync") {
+                do ..Sync(.tCommandInfo)
             }
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
@@ -1153,7 +1168,11 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
     set name = $translate($get(pCommandInfo("parameters","name"),"*"),$char(34))
     if (name'["*") {
         try {
-            set $namespace = name
+            if '..IsIPMEnabled(name) {
+                write $$$FormattedLine($$$Red,"IPM is not enabled in the "_name_" namespace.")
+            } else {
+                set $namespace = name
+            }
         } catch ex {
             $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to switch to namespace: " _ name))
         }
@@ -1176,9 +1195,14 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
         do ##class(%Library.Prompt).GetString(prompt, .value)
         quit:value=""
         try {
-            set $namespace = $select($data(list(value), ns): $listget(ns), 1: value)
+            set selectedNamespace = $select($data(list(value), ns): $listget(ns), 1: value)
+            if '..IsIPMEnabled(selectedNamespace) {
+                write $$$FormattedLine($$$Red," IPM is not enabled for the selected "_selectedNamespace_" namespace."),!
+                continue
+            }
+            set $namespace = selectedNamespace
         } catch e {
-            write $char(13),*27,"[K",*27,"[A"
+            write $$$FormattedLine($$$Red," "_e.AsSystemError()),!
             continue
         }
         quit
@@ -2312,6 +2336,46 @@ ClassMethod LoadFromRepo(
     quit tDirectoryName
 }
 
+ClassMethod Sync(ByRef commandInfo) [ Private ]
+{
+    set moduleName = $get(commandInfo("parameters", "module"))
+    merge params = commandInfo("data")
+
+    if moduleName '= "" {
+        $$$ThrowOnError(##class(%IPM.Storage.Module).ExecutePhases(moduleName, $listbuild("Sync"), 1, .params))
+    } else {
+        // Sync all dev-mode modules in dependency order (least dependent first) so each module
+        // recompiles against dependencies that have already been synced this run.
+        set orderedNames = ##class(%IPM.Utils.Module).GetDevModeModulesInDependencyOrder()
+        set found = $listlength(orderedNames)
+        set failures = ""
+        if 'found {
+            write !, "No modules in development mode."
+        } else {
+            // Turn on per-module summary recording for the duration of the loop, then print the
+            // aggregated bordered summary. Kept in a try/finally so a mid-loop error still clears
+            // the process-private accumulator.
+            do ##class(%IPM.General.Sync.Summary).Begin()
+            try {
+                for i = 1:1:found {
+                    set name = $list(orderedNames, i)
+                    set syncSC = ##class(%IPM.Storage.Module).ExecutePhases(name, $listbuild("Sync"), 1, .params)
+                    if $$$ISERR(syncSC) {
+                        set failures = failures _ $listbuild(name)
+                        do $system.OBJ.DisplayError(syncSC)
+                    }
+                }
+                do ##class(%IPM.General.Sync.Summary).Report(orderedNames, failures)
+            } catch e {
+                do ##class(%IPM.General.Sync.Summary).End()
+                throw e
+            }
+            do ##class(%IPM.General.Sync.Summary).End()
+        }
+    }
+}
+
+
 ClassMethod Load(
 	ByRef pCommandInfo,
 	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
@@ -3059,7 +3123,7 @@ ClassMethod ListDependents(ByRef pCommandInfo) [ Private ]
         $$$ThrowOnError(tSC)
     }
     if $data(tErrorList) {
-        write !,"Warning: some errors occurred."
+        write !,"WARNING: some errors occurred."
         for i=1:1:tErrorList {
             set $listbuild(tServer,tModName,tVersion,tErrorSC) = tErrorList(i)
             set tServer = $case(tServer,"":" (installed)",:" @ "_tServer)
@@ -4076,7 +4140,8 @@ ClassMethod History(ByRef pCommandInfo)
 ClassMethod ShellScript(
 	pCommand As %String,
 	pOutputLogFile As %String = "",
-	pAppendToLog As %Boolean = 0)
+	pAppendToLog As %Boolean = 0,
+    pTerminateOnError As %Boolean = 1) As %Status
 {
     set tSC = $$$OK
     set tFileOpen = 0
@@ -4108,10 +4173,12 @@ ClassMethod ShellScript(
         close pOutputLogFile
     }
 
-    if $$$ISERR(tSC) {
+    if (pTerminateOnError && $$$ISERR(tSC)) {
         // Set ERRORLEVEL to 1
         do $system.Process.Terminate(,1)
     }
+
+    return tSC
 }
 
 ClassMethod DisplayModules(
@@ -4140,7 +4207,8 @@ ClassMethod DisplayModules(
             if pNumbered {
                 write $justify(i, numbersWidth - 2), ". "
             }
-            write $$$FormattedLinePadRight($$$Magenta, tNS _ "> ", nsWidth)
+            set ipmStatus=$select('..IsIPMEnabled(tNS):"(IPM not enabled)",1:"")
+            write $$$FormattedLinePadRight($$$Magenta, tNS _ "> "_ipmStatus, nsWidth)
             set tPrefix = $justify("", numbersWidth) _ tNS
             kill tModulesList
             merge tModulesList = pList(i, "modules")
@@ -4217,6 +4285,13 @@ ClassMethod DisplayModules(
             }
         }
     }
+}
+
+ClassMethod IsIPMEnabled(pNamespace As %String = {$namespace}) As %Boolean
+{
+    new $namespace
+    set $namespace = pNamespace
+    return $system.CLS.IsMthd("%IPM.Main", "Shell")
 }
 
 ClassMethod GetUpstreamPackageVersions(Output list)

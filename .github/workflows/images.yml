@@ -30,7 +30,7 @@ jobs:
             for tag in $tags
             do
               # Skip those with expired licenses
-              if [ "$tag" = "2023.3" -o "$tag" = "2023.2" -o "$tag" = "2024.3" -o "$tag" = "2025.1" ];
+              if [ "$tag" = "2023.3" -o "$tag" = "2023.2" -o "$tag" = "2024.3" -o "$tag" = "2025.1" -o "$tag" = "2025.2" ];
                 then
                   continue
               fi

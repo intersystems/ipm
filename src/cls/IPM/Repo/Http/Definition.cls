@@ -41,7 +41,9 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 <modifier name="username" aliases="user" value="true" description="For HTTP(s) repositories, specifies the username to use when connecting." />
 <modifier name="password" aliases="pass" value="true" description="For HTTP(s) repositories, specifies the password to use when connecting." />
 <modifier name="password-stdin" aliases="pass-stdin" description="For HTTP(s) repositories, specifies the password to use when connecting, but prompt user in secret input terminal mode." />
+<modifier name="password-env" aliases="pass-env" value="true" description="For HTTP(s) repositories, reads the password from the named environment variable." />
 <modifier name="token" value="true" description="For HTTP(s) repositories, specifies the key to use when connecting." />
+<modifier name="token-env" value="true" description="For HTTP(s) repositories, reads the token from the named environment variable." />
 <modifier name="token-auth-method" value="true" description="Enum of { basic, bearer, apiKey }. Defaults to apiKey. If set to 'basic', token will be included as 'Authorization: Basic &lt;token&gt;'. If set to 'bearer', token will be included as 'Authorization: Bearer &lt;token&gt;'. If set to 'apiKey', token will be included as 'apiKey: &lt;token&gt;'" />
 <modifier name="sslconfig" aliases="ssl" value="true" description="For HTTP(s) repositories, specifies the SSL configuration name to use when connecting." />
 </group>
@@ -52,9 +54,9 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 /// This callback method is invoked by the <METHOD>%Save</METHOD> method to
 /// provide notification that the object is being saved. It is called before
 /// any data is written to disk.
-/// 
+///
 /// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
-/// 
+///
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {
@@ -66,7 +68,7 @@ Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 
 /// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to
 /// provide notification that the current object is being validated.
-/// 
+///
 /// <P>If this method returns an error then <METHOD>%ValidateObject</METHOD> will fail.
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {

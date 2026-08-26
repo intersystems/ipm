@@ -1,0 +1,944 @@
+Class Test.PM.Integration.Sync Extends %UnitTest.TestCase
+{
+
+Property TempDir As %String;
+
+// Native-filesystem copy of the fixture, made once. _data/sync-test/ lives on the repo's
+// bind mount (slow for the many small-file copies OnAfterOneTest does between every test),
+// so each restore copies from here instead of re-reading the mount every time.
+Property PristineDir As %String;
+
+Method OnBeforeAllTests() As %Status
+{
+    set sourceDir = ..GetModuleDir("sync-test")
+
+    set ..PristineDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-test-pristine-" _ $job)
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..PristineDir))
+    if '##class(%Library.File).CopyDir(sourceDir, ..PristineDir, 1) {
+        quit $$$ERROR($$$GeneralError, "Failed to copy sync-test fixture to pristine directory")
+    }
+
+    set ..TempDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-test-" _ $job)
+    quit $$$OK
+}
+
+// Load a clean copy of the fixture in dev mode before each test to stamp a baseline.
+// Uninstalling first handles version-change tests (e.g. TestModuleXmlChangedWarning bumps version).
+Method OnBeforeOneTest(testName As %String) As %Status
+{
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..TempDir))
+    if '##class(%Library.File).CopyDir(..PristineDir, ..TempDir, 1) {
+        quit $$$ERROR($$$GeneralError, "Failed to restore sync-test fixture before test: " _ testName)
+    }
+    quit ##class(%IPM.Main).Shell("load " _ ..TempDir _ " -dev")
+}
+
+Method OnAfterOneTest(testName As %String) As %Status
+{
+    // Shell never throws; ignore the returned status since uninstall may fail if the test
+    // left the module in a broken state — that's expected.
+    do ##class(%IPM.Main).Shell("uninstall sync-test")
+    do ##class(%Library.File).RemoveDirectoryTree(..TempDir)
+    quit $$$OK
+}
+
+Method OnAfterAllTests() As %Status
+{
+    do ##class(%IPM.Main).Shell("uninstall sync-test")
+    if ..TempDir '= "" {
+        do ##class(%Library.File).RemoveDirectoryTree(..TempDir)
+    }
+    if ..PristineDir '= "" {
+        do ##class(%Library.File).RemoveDirectoryTree(..PristineDir)
+    }
+    quit $$$OK
+}
+
+/// GetStoredPaths returns paths that were stamped by StampModule.
+Method TestGetStoredPathsReturnsStampedPaths()
+{
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "Baseline exists after load")
+
+    kill paths
+    do ##class(%IPM.Storage.FileHash).GetStoredPaths("sync-test", .paths)
+
+    do $$$AssertTrue($data(paths("module.xml")), "module.xml in stored paths")
+    do $$$AssertTrue($data(paths("src/cls/SyncTest/SuperClass.cls")), "SuperClass.cls in stored paths")
+    do $$$AssertTrue($data(paths("src/inc/SyncTest.inc")), "SyncTest.inc in stored paths")
+}
+
+
+/// Sync with no files changed on disk since the last load/sync reports nothing to do.
+Method TestNoChangeIsNoOp()
+{
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "Baseline rows exist after load")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with no changes succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Nothing to sync"), "Reports nothing to sync")
+}
+
+/// Simulates a module installed before this feature existed (zero FileHash baseline rows).
+/// The first sync call must self-heal by stamping a baseline rather than failing or reporting
+/// every tracked file as changed; only a second sync call (after a real edit) detects changes.
+Method TestMigrationFromNoBaseline()
+{
+    set deleteRS = ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM %IPM_Storage.FileHash WHERE ModuleName = ?", "sync-test")
+    do $$$AssertTrue(deleteRS.%SQLCODE >= 0, "Deleted existing baseline rows to simulate a pre-sync-feature module")
+    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "No baseline rows remain")
+
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    do ..ReplaceInFile(filePath, """original""", """modified""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "First sync after baseline loss succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Baseline established"), "First sync self-heals by establishing a baseline")
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "Baseline rows now exist")
+
+    // The edit made before the self-heal is captured in the new baseline (not retroactively
+    // detected), so a second sync with no further changes reports nothing to do.
+    kill output2
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+    set sc2 = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+    do $$$AssertStatusOK(sc2, "Second sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Second sync finds no changes (baseline already reflects the modified file)")
+
+    // A genuinely new edit after the baseline is established is detected normally.
+    do ..ReplaceInFile(filePath, """modified""", """modified again""")
+    kill output3
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie3)
+    set sc3 = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie3, .output3)
+    do $$$AssertStatusOK(sc3, "Third sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output3, "Sync complete"), "Third sync detects the post-baseline edit normally")
+}
+
+/// A modified class file is detected and recompiled by sync.
+Method TestModifiedClassRecompiles()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    do ..ReplaceInFile(filePath, """original""", """modified""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after class modification succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Reports sync complete")
+}
+
+/// A modified XML-format class file is detected and recompiled by sync.
+/// Verifies that Format="XML" resources participate in the sync pipeline identically
+/// to UDL resources, and that the reloaded class reflects the edited content.
+Method TestModifiedXmlClassRecompiles()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/XmlClass.xml"
+    do ..ReplaceInFile(filePath, """xml-original""", """xml-modified""")
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
+    do $$$AssertStatusOK(sc, "Sync after XML class modification succeeds")
+    do $$$AssertEquals(##class(SyncTest.XmlClass).GetValue(), "xml-modified", "Class reflects updated value after XML sync")
+}
+
+/// Editing a superclass recompiles its subclasses via the u-flag, even though the
+/// subclass's own file on disk never changed.
+Method TestSuperclassEditRecompilesSubclass()
+{
+    // Add property to SuperClass — SubClass recompiles via u-flag
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    do ..ReplaceInFile(filePath, "Property BaseValue", "Property NewProp As %String;" _ $char(10) _ $char(10) _ "Property BaseValue")
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
+    do $$$AssertStatusOK(sc, "Sync after superclass edit succeeds (subclass recompiles via u-flag)")
+}
+
+/// Editing an include file recompiles classes that include it, even though those class files
+/// on disk are unchanged. SyncTest.Consumer includes SyncTest.INC and calls $$$SyncTestValue.
+Method TestIncludeEditRecompilesConsumer()
+{
+    set incPath = ..TempDir _ "src/inc/SyncTest.inc"
+    do ..ReplaceInFile(incPath, """original-include""", """modified-include""")
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
+    do $$$AssertStatusOK(sc, "Sync after include edit succeeds")
+    do $$$AssertEquals(##class(SyncTest.Consumer).GetMacroValue(), "modified-include", "Consumer reflects updated macro value after include sync")
+}
+
+/// A file outside every tracked resource directory (e.g. under node_modules/) is ignored
+/// by sync and never given a baseline row — sync only walks declared resource directories,
+/// so files in undeclared locations are never seen.
+Method TestUntrackedFileIgnored()
+{
+    set junkDir = ..TempDir _ "node_modules/"
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(junkDir))
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(junkDir _ "x.js"))
+    $$$ThrowOnError(stream.Write("junk"))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync ignores untracked files")
+    do $$$AssertNotTrue(..FindInOutput(.output, "x.js"), "Untracked file not mentioned in sync output")
+    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).ExistsByPath("sync-test", "node_modules/x.js"), "No FileHash row for untracked file")
+}
+
+/// A deleted file is left alone unless -delete is passed. With -delete, the corresponding
+/// server-side class is removed.
+Method TestDeleteSkippedByDefault()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/Deletable.cls"
+    do ##class(%Library.File).Delete(filePath)
+
+    // Without -delete: class still present
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
+    do $$$AssertStatusOK(sc, "Sync without -delete succeeds")
+    do $$$AssertTrue($$$comClassDefined("SyncTest.Deletable"), "Deletable class still exists without -delete flag")
+
+    // With -delete: class is removed from server
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -delete")
+    do $$$AssertStatusOK(sc, "Sync with -delete succeeds")
+    do $$$AssertNotTrue($$$comClassDefined("SyncTest.Deletable"), "Deletable class removed after -delete sync")
+}
+
+/// Deleting a test class file with -delete must remove the server-side class.
+/// Without this, the %UnitTest.TestCase subclass persists with no on-disk source and no
+/// hash record — permanently invisible to future syncs.
+Method TestDeleteTestClassRemovesFromServer()
+{
+    set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ##class(%Library.File).Delete(filePath)
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -delete")
+    do $$$AssertStatusOK(sc, "Sync with -delete on a deleted test class succeeds")
+    do $$$AssertNotTrue($$$comClassDefined("SyncTest.Tests.Trivial"), "Deleted test class removed from server after -delete sync")
+}
+
+/// Deleting a superclass (with -delete) leaves its subclass referencing a now-missing class.
+/// The post-delete recompile pass (SyncApplyDeletes + SyncCompile) must still run and surface
+/// this as a compile error, rather than silently leaving the subclass in a stale-but-compiled state.
+Method TestDeleteRecompilesDependents()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    do ##class(%Library.File).Delete(filePath)
+
+    do $$$AssertTrue($$$comClassDefined("SyncTest.SubClass"), "SubClass still compiled before delete sync")
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -delete")
+
+    do $$$AssertStatusNotOK(sc, "Sync with -delete fails: SubClass now references a deleted superclass")
+    do $$$AssertNotTrue($$$comClassDefined("SyncTest.SuperClass"), "SuperClass was removed from the server")
+}
+
+/// A changed module.xml is detected and its manifest reloaded, with a warning that a full
+/// reload may still be needed to apply manifest-level changes (mappings, dependencies, etc.).
+Method TestModuleXmlChangedWarning()
+{
+    set filePath = ..TempDir _ "module.xml"
+    do ..ReplaceInFile(filePath, "<Version>1.0.0</Version>", "<Version>1.0.1</Version>")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after module.xml change succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "module.xml changed"), "Warning about module.xml change is shown")
+}
+
+
+/// Without -test, a changed test-phase class is loaded but not executed. With -test, it is
+/// executed and its results are shown.
+Method TestSyncTestFlag()
+{
+    set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ..ReplaceInFile(filePath, "This test always passes.", "This test always passes (modified).")
+
+    // Without RunTests: loads the changed test but does not execute it
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "Sync without RunTests loads but does not run tests")
+    do $$$AssertNotTrue(..FindInOutput(.output, "Test Results"), "No test results without RunTests flag")
+
+    // Modify again so the file shows as changed on the next sync
+    do ..ReplaceInFile(filePath, "(modified).", "(modified again).")
+
+    // With RunTests: executes the changed test-phase test class
+    kill output
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "Sync with RunTests runs changed tests")
+    do $$$AssertTrue(..FindInOutput(.output, "Test Results"), "Test results shown with RunTests flag")
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "Changed test class actually ran, not just compiled")
+}
+
+/// A sync without -test commits the changed test file's hash, so nothing would ever bring that edit
+/// back for testing. Sync flags it instead: the next sync with -test runs its tests even though the
+/// file has not changed since, and then stops re-running it.
+Method TestSyncWithoutTestFlagRunsTestsOnNextTestSync()
+{
+    do ..ReplaceInFile(..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls", "This test always passes.", "This test always passes (modified).")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "Sync without -test succeeds")
+    do $$$AssertNotTrue(..FindInOutput(.output, "Test Results"), "No tests run without -test")
+    do $$$AssertTrue(..FindInOutput(.output, "will run on the next sync with -test"), "Sync says the test file it synced has not been tested yet")
+
+    // No second edit: the flag alone has to bring the file back so its tests finally run.
+    kill output
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "Sync with -test succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "synced earlier without -test"), "Sync reports it is running tests deferred by the earlier sync")
+    do $$$AssertEquals(..CountInOutput(.output, "SyncTest.Tests.Trivial begins"), 1, "The deferred test ran exactly once")
+
+    // Flag spent: the file must go quiet again rather than re-run on every later sync.
+    kill output
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "A third sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Nothing to sync"), "Once its tests have run, the file is no longer forced into the change set")
+    do $$$AssertNotTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "The test does not re-run on every subsequent sync")
+}
+
+/// Editing an existing test class and adding a brand-new test class in the same resource,
+/// in the same sync call, batches both changed classes into a single RunTest invocation
+/// (one "Test Results:" block) rather than one call per class — and both tests still run.
+Method TestSyncTestFlagBatchesMultipleChangedClasses()
+{
+    set existingFilePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ..ReplaceInFile(existingFilePath, "This test always passes.", "This test always passes (modified).")
+
+    set newFilePath = ..TempDir _ "tests/unit/SyncTest/Tests/BatchedNew.cls"
+    set newClassContent = "Class SyncTest.Tests.BatchedNew Extends %UnitTest.TestCase" _ $char(10) _ "{" _ $char(10)
+    set newClassContent = newClassContent _ "Method TestBatchedNewPasses()" _ $char(10) _ "{" _ $char(10)
+    set newClassContent = newClassContent _ "    do $$$AssertTrue(1, ""BatchedNew always passes."")" _ $char(10) _ "}" _ $char(10) _ "}" _ $char(10)
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(newFilePath))
+    $$$ThrowOnError(stream.Write(newClassContent))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with two changed classes in one resource succeeds")
+    // "ClassName begins ..." / "ClassName passed" only appear when the test runner actually
+    // executes that class — unlike a bare class-name substring, which also matches the
+    // "Loading file .../Trivial.cls" and "Compiling class SyncTest.Tests.Trivial" lines
+    // that show up regardless of whether the test itself ran.
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "Modified existing class actually ran, not just compiled")
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.BatchedNew begins"), "New class in the same resource actually ran, not just compiled")
+
+    set testResultsCount = 0
+    set lineKey = ""
+    for {
+        set lineKey = $order(output(lineKey), 1, line)
+        quit:lineKey=""
+        if line [ "Test Results:" {
+            set testResultsCount = testResultsCount + 1
+        }
+    }
+    do $$$AssertEquals(testResultsCount, 1, "Both changed classes ran in a single batched Test Results block, not one per class")
+}
+
+
+/// With two UnitTest resources present, a changed test class in one resource's directory
+/// must only be dispatched through that owning resource — not through every Test processor
+/// in the module (which would waste a reload+compile+RunTest cycle per extra resource).
+Method TestSyncTestFlagOnlyRunsOwningResource()
+{
+    set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ..ReplaceInFile(filePath, "This test always passes.", "This test always passes (modified).")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with RunTests succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "SyncTest.Tests.Trivial begins"), "Changed test in tests/unit actually ran, not just compiled")
+    do $$$AssertNotTrue(..FindInOutput(.output, "SyncTest2.Tests.Trivial2"), "Unrelated test in tests/unit2 was not run")
+}
+
+/// Several <UnitTest> resources may share one directory and differ only by Package — a common
+/// layout when one test tree holds suites for several packages. A changed test class must run
+/// exactly once, in the resource whose Package covers it, not once per resource sharing the
+/// directory (six such resources ran the same test six times before this was fixed).
+Method TestSyncTestFlagRunsOnceWhenResourcesShareDirectory()
+{
+    // A second UnitTest resource over the same directory, covering a different package.
+    set extraDir = ##class(%File).NormalizeDirectory(..TempDir _ "tests/unit/SyncTest/More")
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(extraDir))
+    set extraContent = "Class SyncTest.More.Extra Extends %UnitTest.TestCase" _ $char(10) _ "{" _ $char(10)
+    set extraContent = extraContent _ "Method TestExtraPasses()" _ $char(10) _ "{" _ $char(10)
+    set extraContent = extraContent _ "    do $$$AssertTrue(1, ""Extra always passes."")" _ $char(10) _ "}" _ $char(10) _ "}" _ $char(10)
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(extraDir _ "Extra.cls"))
+    $$$ThrowOnError(stream.Write(extraContent))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    set unitResource = "<UnitTest Name=""/tests/unit/"" Package=""SyncTest.Tests"" Phase=""test"" />"
+    do ..ReplaceInFile(..TempDir _ "module.xml", unitResource,
+        unitResource _ $char(10) _ "      <UnitTest Name=""/tests/unit/"" Package=""SyncTest.More"" Phase=""test"" />")
+
+    // Reload so both resources are registered and the new class is in the baseline, leaving the
+    // edit below as the only change this sync detects.
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ ..TempDir _ " -dev"))
+
+    do ..ReplaceInFile(..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls", "This test always passes.", "This test always passes (modified).")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with RunTests succeeds when two resources share a test directory")
+    do $$$AssertEquals(..CountInOutput(.output, "SyncTest.Tests.Trivial begins"), 1, "Changed test ran exactly once, not once per resource sharing the directory")
+    do $$$AssertEquals(..CountInOutput(.output, "Test Results:"), 1, "One test run, so one Test Results block")
+    do $$$AssertNotTrue(..FindInOutput(.output, "SyncTest.More.Extra begins"), "Unchanged test in the other package's resource was not run")
+}
+
+/// Running sync with no module name syncs every module currently in development mode.
+Method TestSyncAllDevModeModules()
+{
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync with no module name (sync-all) succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "[sync-test] Nothing to sync"), "sync-test specifically reports nothing to sync (no changes since baseline)")
+}
+
+/// Naked `sync` (no module name) must process modules most-dependent last: a dependency is
+/// synced before the module that depends on it. This matters because sync recompiles each
+/// module's changed files against the currently-installed version of its dependencies — if a
+/// dependent is synced before its dependency, it recompiles against stale code.
+///
+/// The bug this guards against: Main.Sync selects dev-mode modules with no ORDER BY, so it
+/// iterates in row-ID (first-install) order. A clean install is coincidentally in dependency
+/// order (the installer forces deps-first), so the divergence only appears once a dependency
+/// edge is added between two already-installed modules. This test reproduces that: install
+/// a, b, c standalone (row IDs a < b < c), then add edges a->b->c so dependency order (c, b, a)
+/// is the reverse of row order. Reloading to register the edges preserves row IDs.
+Method TestSyncAllProcessesDependenciesFirst()
+{
+    // Fixture source dirs (resolve before any work — GetModuleDir needs ^UnitTestRoot).
+    set srcA = ..GetModuleDir("sync-dep", "a")
+    set srcB = ..GetModuleDir("sync-dep", "b")
+    set srcC = ..GetModuleDir("sync-dep", "c")
+
+    set depRoot = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-dep-work-" _ $job)
+    set workA = ##class(%File).NormalizeDirectory(depRoot _ "a")
+    set workB = ##class(%File).NormalizeDirectory(depRoot _ "b")
+    set workC = ##class(%File).NormalizeDirectory(depRoot _ "c")
+
+    try {
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(depRoot))
+        do $$$AssertTrue(##class(%Library.File).CopyDir(srcA, workA, 1), "Copied sync-dep-a fixture")
+        do $$$AssertTrue(##class(%Library.File).CopyDir(srcB, workB, 1), "Copied sync-dep-b fixture")
+        do $$$AssertTrue(##class(%Library.File).CopyDir(srcC, workC, 1), "Copied sync-dep-c fixture")
+
+        // Install standalone (no deps yet) in a, b, c order so row IDs are a < b < c.
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workA _ " -dev"))
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workB _ " -dev"))
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workC _ " -dev"))
+
+        // Add dependency edges: a depends on b, b depends on c. Dependency order is now c, b, a
+        // (the reverse of row order). Reloading registers the edges without changing row IDs.
+        do ..AddDependency(workA _ "module.xml", "SyncDepA.Top.CLS", "sync-dep-b")
+        do ..AddDependency(workB _ "module.xml", "SyncDepB.Middle.CLS", "sync-dep-c")
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workA _ " -dev"))
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workB _ " -dev"))
+
+        // Modify a file in every module so each one actually syncs (and prints its marker).
+        do ..ReplaceInFile(workA _ "src/cls/SyncDepA/Top.cls", """a-original""", """a-modified""")
+        do ..ReplaceInFile(workB _ "src/cls/SyncDepB/Middle.cls", """b-original""", """b-modified""")
+        do ..ReplaceInFile(workC _ "src/cls/SyncDepC/Base.cls", """c-original""", """c-modified""")
+
+        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+        set sc = ##class(%IPM.Main).Shell("sync")
+        do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+        do $$$AssertStatusOK(sc, "Naked sync succeeds")
+
+        set idxA = ..FirstLineContaining(.output, "sync-dep-a")
+        set idxB = ..FirstLineContaining(.output, "sync-dep-b")
+        set idxC = ..FirstLineContaining(.output, "sync-dep-c")
+        do $$$AssertTrue(idxA > 0, "sync-dep-a appears in output")
+        do $$$AssertTrue(idxB > 0, "sync-dep-b appears in output")
+        do $$$AssertTrue(idxC > 0, "sync-dep-c appears in output")
+
+        // c (least dependent) before b before a (most dependent).
+        do $$$AssertTrue(idxC < idxB, "Dependency sync-dep-c is processed before sync-dep-b")
+        do $$$AssertTrue(idxB < idxA, "Dependency sync-dep-b is processed before sync-dep-a")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "No unexpected exception during dependency-order sync")
+    }
+
+    // Cleanup: uninstall dependent-first (a needs b needs c) and remove the work tree.
+    do ##class(%IPM.Main).Shell("uninstall sync-dep-a")
+    do ##class(%IPM.Main).Shell("uninstall sync-dep-b")
+    do ##class(%IPM.Main).Shell("uninstall sync-dep-c")
+    do ##class(%Library.File).RemoveDirectoryTree(depRoot)
+}
+
+/// A module whose <SourcesRoot> is "." keeps its sources at the module root rather than under
+/// src/. Resource paths are composed as SourcesRoot_"/"_Directory, so they arrive at the sync
+/// pipeline as "./cls/SyncDotRoot/Top.cls" while the directory walk and the hash baseline key the
+/// same file as "cls/SyncDotRoot/Top.cls". NormalizePath has to collapse both spellings to one.
+///
+/// The bug this guards against: it didn't, so no changed path ever matched the reverse index,
+/// nothing was dispatched to a processor, and yet the pipeline still printed "Updated:" and
+/// committed the new hashes — every edit in such a module was dropped, reported as a success, and
+/// never retried. The assertions therefore check the server, not the output: a green sync report
+/// was exactly the symptom.
+Method TestSyncWithDotSourcesRoot()
+{
+    set srcDir = ..GetModuleDir("sync-dot-root")
+    set workDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "sync-dot-root-work-" _ $job)
+
+    try {
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(workDir))
+        do $$$AssertTrue(##class(%Library.File).CopyDir(srcDir, workDir, 1), "Copied sync-dot-root fixture")
+        $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ workDir _ " -dev"))
+
+        do $$$AssertTrue($$$comClassDefined("SyncDotRoot.Top"), "Fixture class loaded")
+        do $$$AssertEquals($classmethod("SyncDotRoot.Top", "Version"), "dot-original", "Fixture class starts at its original value")
+
+        // The baseline keys the file without the "./" prefix; the reverse index must agree.
+        kill paths
+        do ##class(%IPM.Storage.FileHash).GetStoredPaths("sync-dot-root", .paths)
+        do $$$AssertTrue($data(paths("cls/SyncDotRoot/Top.cls")), "Baseline path has no './' prefix")
+        do $$$AssertNotTrue($data(paths("./cls/SyncDotRoot/Top.cls")), "Baseline does not also contain a './'-prefixed duplicate")
+
+        do ..ReplaceInFile(workDir _ "cls/SyncDotRoot/Top.cls", """dot-original""", """dot-modified""")
+
+        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+        set sc = ##class(%IPM.Main).Shell("sync sync-dot-root -verbose")
+        do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+        do $$$AssertStatusOK(sc, "Sync of a '.'-SourcesRoot module succeeds")
+        do $$$AssertTrue(..FindInOutput(.output, "Updated: cls/SyncDotRoot/Top.cls"), "Reports the changed file as updated")
+        do $$$AssertNotTrue(..FindInOutput(.output, "no resource owns"), "Changed file routed to a resource")
+
+        // Ground truth: the edit is live in the namespace, not merely reported.
+        do $$$AssertEquals($classmethod("SyncDotRoot.Top", "Version"), "dot-modified", "Edit is compiled and live on the server")
+
+        // A second sync finds nothing, confirming the hash was committed for the path that
+        // actually synced (and not left stale by the routing fix).
+        kill output2
+        do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+        set sc2 = ##class(%IPM.Main).Shell("sync sync-dot-root")
+        do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+        do $$$AssertStatusOK(sc2, "Second sync succeeds")
+        do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Second sync finds no further changes")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "No unexpected exception during '.'-SourcesRoot sync")
+    }
+
+    do ##class(%IPM.Main).Shell("uninstall sync-dot-root")
+    do ##class(%Library.File).RemoveDirectoryTree(workDir)
+}
+
+/// Sync fails with an error when given a module name that isn't installed.
+Method TestSyncModuleNotFound()
+{
+    set sc = ##class(%IPM.Main).Shell("sync this-module-does-not-exist")
+    do $$$AssertStatusNotOK(sc, "Sync fails for a module that doesn't exist")
+}
+
+/// Sync fails with an error when the target module is not in development mode.
+Method TestSyncNonDevModeModule()
+{
+    // Reload without -dev so the installed module is not in development mode.
+    // OnAfterOneTest uninstalls, and OnBeforeOneTest will reinstall -dev for the next test.
+    do ##class(%IPM.Main).Shell("uninstall sync-test")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ ..TempDir))
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
+    do $$$AssertStatusNotOK(sc, "Sync fails for a module not in development mode")
+}
+
+/// module.xml adds a brand-new <Resource> in the same edit that changes the version.
+/// After SyncCheckModuleXml reloads the manifest, the newly-declared resource's files
+/// must be tracked and picked up in that same sync call (not require a separate 'reload').
+Method TestModuleXmlAddsResourcePicksUpNewFile()
+{
+    set clsFilePath = ..TempDir _ "src/cls/SyncTest/AddedByManifest.cls"
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(clsFilePath))
+    $$$ThrowOnError(stream.Write("Class SyncTest.AddedByManifest" _ $char(10) _ "{" _ $char(10) _ "}" _ $char(10)))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    set moduleXmlPath = ..TempDir _ "module.xml"
+    do ..ReplaceInFile(moduleXmlPath, "<Version>1.0.0</Version>", "<Version>1.0.1</Version>")
+    do ..ReplaceInFile(moduleXmlPath, "<Resource Name=""SyncTest.Consumer.CLS"" />", "<Resource Name=""SyncTest.Consumer.CLS"" />" _ $char(10) _ "      <Resource Name=""SyncTest.AddedByManifest.CLS"" />")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after module.xml adds a resource succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "module.xml changed"), "Warning about module.xml change is shown")
+    do $$$AssertTrue($$$comClassDefined("SyncTest.AddedByManifest"), "Newly-declared resource's class was loaded and compiled in the same sync call")
+}
+
+/// A sync that fails to compile leaves its baseline uncommitted, so the same file is
+/// re-detected as changed and retried on the next sync once the error is fixed.
+Method TestFailedCompileRetries()
+{
+    // Introduce a syntax error
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(filePath))
+    $$$ThrowOnError(stream.Write("Class SyncTest.SuperClass { INVALID SYNTAX HERE }"))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
+    do $$$AssertStatusNotOK(sc, "Sync fails with syntax error")
+
+    // Fix and retry — CommitChanges was skipped on failure, so file is still detected as changed
+    set fixContent = "Class SyncTest.SuperClass" _ $char(10) _ "{" _ $char(10) _ $char(10)
+        _ "ClassMethod GetValue() As %String" _ $char(10) _ "{" _ $char(10)
+        _ "    quit ""fixed""" _ $char(10) _ "}" _ $char(10) _ $char(10) _ "}" _ $char(10)
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(filePath))
+    $$$ThrowOnError(stream.Write(fixContent))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test")
+    do $$$AssertStatusOK(sc, "Sync succeeds after fixing syntax error (retry works)")
+}
+
+/// Fixing a broken file by reverting it — rather than editing it into some third state — must
+/// still be detected and reloaded (issue #1224).
+///
+/// The bug this guards against: a failed sync commits no hashes, so the baseline still holds the
+/// pre-break content. Restoring exactly that content makes the hash comparison find no change, and
+/// sync reported "Nothing to sync" while the namespace kept whatever the failed load left behind.
+/// TestFailedCompileRetries above doesn't catch this because it fixes the class by writing new
+/// content, whose hash differs from the baseline either way — so this test restores the original
+/// bytes and asserts the hash really did return to the baselined value.
+Method TestRevertAfterFailedSyncReloads()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    // Kept in the module root, which sync never walks — only declared resource directories are.
+    set backupPath = ..TempDir _ "SuperClass.cls.pristine"
+    do $$$AssertTrue(##class(%File).CopyFile(filePath, backupPath), "Saved the pristine class file for a byte-exact revert")
+
+    set baselineRow = ##class(%IPM.Storage.FileHash).OpenByPath("sync-test", "src/cls/SyncTest/SuperClass.cls")
+    do $$$AssertTrue($isobject(baselineRow), "Class file has a baseline row after load")
+    set baselineHash = baselineRow.Hash
+
+    // Break the class the way the issue describes: an extra closing brace.
+    set brokenContent = "Class SyncTest.SuperClass" _ $char(10) _ "{" _ $char(10) _ $char(10)
+        _ "ClassMethod GetValue() As %String" _ $char(10) _ "{" _ $char(10)
+        _ "    quit ""original""" _ $char(10) _ "}" _ $char(10) _ $char(10) _ "}" _ $char(10) _ "}" _ $char(10)
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(filePath))
+    $$$ThrowOnError(stream.Write(brokenContent))
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    do $$$AssertStatusNotOK(##class(%IPM.Main).Shell("sync sync-test"), "Sync of the broken class fails")
+
+    // Fix it by reverting, not by editing further: the file is byte-identical to the baseline again.
+    do $$$AssertTrue(##class(%File).CopyFile(backupPath, filePath, 1), "Reverted the class file to its pristine bytes")
+    do $$$AssertEquals($$$lcase(##class(%File).SHA1Hash(filePath, 1)), baselineHash, "Reverted file hashes back to the baselined value (the case this test exists for)")
+    do $$$AssertTrue(##class(%File).Delete(backupPath), "Removed the backup copy")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after the revert succeeds")
+    do $$$AssertNotTrue(..FindInOutput(.output, "Nothing to sync"), "Reverted file is not dismissed as unchanged")
+    do $$$AssertTrue(..FindInOutput(.output, "Updated: src/cls/SyncTest/SuperClass.cls"), "Reverted file is reported as updated")
+
+    // Ground truth: the class is compiled and live again, not left as the failed sync left it.
+    do $$$AssertTrue($$$comClassDefined("SyncTest.SuperClass"), "Class is defined after the retry")
+    do $$$AssertEquals($classmethod("SyncTest.SuperClass", "GetValue"), "original", "Reverted class is compiled and live on the server")
+
+    // The retry state is spent once committed — sync must not report the same file forever.
+    kill output2
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+    set sc2 = ##class(%IPM.Main).Shell("sync sync-test")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+    do $$$AssertStatusOK(sc2, "Third sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Retried file is not re-reported once its sync committed")
+}
+
+/// A failing test under -test must not flag the files this sync already committed. Tests run after
+/// the file sync is committed and reported, so a test failure says nothing about whether the files
+/// landed — flagging them for retry would re-load and re-compile clean files on every later sync.
+Method TestFailedTestDoesNotFlagSyncedFiles()
+{
+    set filePath = ..TempDir _ "tests/unit/SyncTest/Tests/Trivial.cls"
+    do ..ReplaceInFile(filePath, "$$$AssertTrue(1,", "$$$AssertTrue(0,")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -test")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusNotOK(sc, "Sync reports failure when a changed test fails")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "The file sync itself completed and was committed before the tests ran")
+
+    // The test class synced fine; only the test it contains failed. Nothing to redo.
+    kill output2
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+    set sc2 = ##class(%IPM.Main).Shell("sync sync-test")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+    do $$$AssertStatusOK(sc2, "Second sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output2, "Nothing to sync"), "Committed files are not retried because a test failed")
+    do $$$AssertNotTrue(..FindInOutput(.output2, "Retrying"), "No retry is reported for files that synced successfully")
+}
+
+/// Editing module.xml and a source class in the same operation must sync BOTH changes.
+/// The StampModule call in the moduleXmlChanged branch must not clobber existing baseline
+/// rows for files edited at the same time — if it does, the class change is lost silently.
+Method TestModuleXmlAndClassEditedTogether()
+{
+    set moduleXmlPath = ..TempDir _ "module.xml"
+    set clsPath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+
+    // Edit both files before running sync
+    do ..ReplaceInFile(moduleXmlPath, "<Version>1.0.0</Version>", "<Version>1.0.1</Version>")
+    do ..ReplaceInFile(clsPath, """original""", """modified-with-xml""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after co-editing module.xml and a class succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Sync reports changes (not 'Nothing to sync')")
+    do $$$AssertTrue(..FindInOutput(.output, "SuperClass.cls"), "SuperClass.cls appears in sync output as updated")
+}
+
+/// A modified Preload resource is tracked, recompiled, and reported by sync.
+/// Preload files live under preload/ (a sibling of SourcesRoot, imported wholesale by the
+/// Initialize phase), so the sync directory a Preload resource declares must be prefixed with
+/// preload/ rather than rooted at SourcesRoot — otherwise the file is never walked and edits
+/// are silently dropped while sync reports "Nothing to sync".
+Method TestModifiedPreloadClassRecompiles()
+{
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).ExistsByPath("sync-test", "preload/cls/SyncBoot/Boot.cls"), "Preload file has a baseline row after load")
+    do $$$AssertEquals(##class(SyncBoot.Boot).GetValue(), "boot-original", "Preload class compiled at original value after load")
+
+    set filePath = ..TempDir _ "preload/cls/SyncBoot/Boot.cls"
+    do ..ReplaceInFile(filePath, """boot-original""", """boot-modified""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after preload class modification succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Reports sync complete (not 'Nothing to sync')")
+    do $$$AssertTrue(..FindInOutput(.output, "preload/cls/SyncBoot/Boot.cls"), "Preload file appears in sync output as updated")
+    do $$$AssertEquals(##class(SyncBoot.Boot).GetValue(), "boot-modified", "Preload class reflects the edited value after sync")
+}
+
+/// Syncing a changed Preload resource must warn that the bootstrap was not re-run. Preload files
+/// are imported and executed during the Initialize phase (installer classes, custom resource
+/// processors), so recompiling one does not re-run whatever bootstrapping it performs — the user
+/// needs to know a full reload may be required.
+Method TestPreloadChangeWarnsBootstrapNotRerun()
+{
+    set filePath = ..TempDir _ "preload/cls/SyncBoot/Boot.cls"
+    do ..ReplaceInFile(filePath, """boot-original""", """boot-warned""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after preload change succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "preload"), "Sync output mentions preload")
+    do $$$AssertTrue(..FindInOutput(.output, "Bootstrap"), "Warns that bootstrap was not re-run")
+}
+
+/// Editing a non-preload file must not produce the preload bootstrap warning — the warning is
+/// only meaningful when a preload file actually changed.
+Method TestNonPreloadChangeDoesNotWarn()
+{
+    set filePath = ..TempDir _ "src/cls/SyncTest/SuperClass.cls"
+    do ..ReplaceInFile(filePath, """original""", """modified""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after non-preload change succeeds")
+    do $$$AssertNotTrue(..FindInOutput(.output, "Bootstrap"), "No bootstrap warning when no preload file changed")
+}
+
+/// A .PKG resource must contribute its own directory to the sync scan set. SyncPkg.PKG declares
+/// Directory="pkgcls", which no other resource in the fixture uses, so its members are only
+/// walked if GetSyncDirectory() resolves the package to {SourcesRoot}/{Directory}. A package that
+/// resolves to its own resource name instead yields a nonexistent directory, and its members are
+/// silently invisible to sync unless some sibling resource happens to declare the same directory.
+Method TestModifiedPackageMemberRecompiles()
+{
+    do $$$AssertTrue(##class(%IPM.Storage.FileHash).ExistsByPath("sync-test", "src/pkgcls/SyncPkg/Alone.cls"), "Package member has a baseline row after load")
+    do $$$AssertEquals(##class(SyncPkg.Alone).GetValue(), "pkg-original", "Package member compiled at original value after load")
+
+    set filePath = ..TempDir _ "src/pkgcls/SyncPkg/Alone.cls"
+    do ..ReplaceInFile(filePath, """pkg-original""", """pkg-modified""")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after package member modification succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Sync complete"), "Reports sync complete (not 'Nothing to sync')")
+    do $$$AssertTrue(..FindInOutput(.output, "src/pkgcls/SyncPkg/Alone.cls"), "Package member appears in sync output as updated")
+    do $$$AssertEquals(##class(SyncPkg.Alone).GetValue(), "pkg-modified", "Package member reflects the edited value after sync")
+}
+
+/// A new class added to an existing .PKG resource's directory is picked up without a reload:
+/// the package owns the whole directory, so sync must load files that had no baseline row.
+Method TestNewPackageMemberIsPickedUp()
+{
+    set newDir = ..TempDir _ "src/pkgcls/SyncPkg/"
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(newDir _ "Added.cls"))
+    do stream.WriteLine("Class SyncPkg.Added")
+    do stream.WriteLine("{")
+    do stream.WriteLine("")
+    do stream.WriteLine("ClassMethod GetValue() As %String")
+    do stream.WriteLine("{")
+    do stream.WriteLine("    quit ""added""")
+    do stream.WriteLine("}")
+    do stream.WriteLine("")
+    do stream.WriteLine("}")
+    $$$ThrowOnError(stream.%Save())
+    set stream = ""
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+
+    do $$$AssertStatusOK(sc, "Sync after adding a package member succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "src/pkgcls/SyncPkg/Added.cls"), "New package member appears in sync output")
+    do $$$AssertTrue($$$comClassDefined("SyncPkg.Added"), "New package member compiled into the namespace")
+}
+
+/// Deleting a package member with -delete must remove the right server-side class. The fixture's
+/// package uses Directory="pkgcls", so the document name cannot be recovered from the path by
+/// prefix convention alone and has to come from the resource's own child resolution.
+Method TestDeletePackageMemberRemovesFromServer()
+{
+    do $$$AssertTrue($$$comClassDefined("SyncPkg.Alone"), "Package member exists before delete")
+    do ##class(%Library.File).Delete(..TempDir _ "src/pkgcls/SyncPkg/Alone.cls")
+
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -delete")
+    do $$$AssertStatusOK(sc, "Sync with -delete succeeds")
+    do $$$AssertNotTrue($$$comClassDefined("SyncPkg.Alone"), "Package member removed from server after -delete sync")
+}
+
+/// Returns the path to a fixture directory under _data/.
+/// Matches the convention from Test.PM.Integration.Base.GetModuleDir.
+ClassMethod GetModuleDir(subfolders... As %String) As %String
+{
+    set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+    set testRoot = ##class(%File).GetDirectory(testRoot)
+    set moduleDir = ##class(%File).Construct(testRoot, "_data", subfolders...)
+    quit ##class(%File).NormalizeDirectory(moduleDir)
+}
+
+/// Read a file, replace oldStr with newStr, write back.
+ClassMethod ReplaceInFile(filePath As %String, oldStr As %String, newStr As %String)
+{
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(filePath))
+    set content = ""
+    while 'stream.AtEnd {
+        set content = content _ stream.ReadLine() _ $char(10)
+    }
+    set stream = ""
+    set content = $replace(content, oldStr, newStr)
+    set writeStream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(writeStream.LinkToFile(filePath))
+    $$$ThrowOnError(writeStream.Write(content))
+    $$$ThrowOnError(writeStream.%Save())
+}
+
+ClassMethod FindInOutput(ByRef output, searchString As %String) As %Boolean
+{
+    set sub = ""
+    for {
+        set sub = $order(output(sub), 1, line)
+        quit:sub=""
+        if line [ searchString {
+            return 1
+        }
+    }
+    return 0
+}
+
+/// Number of captured output lines containing searchString. Used where the count matters, not
+/// just presence — e.g. asserting a test ran exactly once.
+ClassMethod CountInOutput(ByRef output, searchString As %String) As %Integer
+{
+    set count = 0
+    set sub = ""
+    for {
+        set sub = $order(output(sub), 1, line)
+        quit:sub=""
+        if line [ searchString {
+            set count = count + 1
+        }
+    }
+    return count
+}
+
+/// Returns the 1-based line index of the first captured output line containing searchString,
+/// or 0 if not found. Used to assert relative ordering of per-module output in sync-all.
+ClassMethod FirstLineContaining(ByRef output, searchString As %String) As %Integer
+{
+    set sub = ""
+    for {
+        set sub = $order(output(sub), 1, line)
+        quit:sub=""
+        if line [ searchString {
+            return sub
+        }
+    }
+    return 0
+}
+
+/// Rewrites a module.xml to insert a single-dependency <Dependencies> block after the given
+/// <Resource> line. Assumes the resource line is present and no <Dependencies> block exists yet.
+ClassMethod AddDependency(
+    moduleXmlPath As %String,
+    afterResource As %String,
+    dependencyName As %String)
+{
+    set resourceLine = "<Resource Name=""" _ afterResource _ """ />"
+    set depBlock = resourceLine _ $char(10)
+        _ "      <Dependencies>" _ $char(10)
+        _ "        <ModuleReference>" _ $char(10)
+        _ "          <Name>" _ dependencyName _ "</Name>" _ $char(10)
+        _ "          <Version>1.0.0</Version>" _ $char(10)
+        _ "        </ModuleReference>" _ $char(10)
+        _ "      </Dependencies>"
+    do ..ReplaceInFile(moduleXmlPath, resourceLine, depBlock)
+}
+
+}
