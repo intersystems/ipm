@@ -309,7 +309,8 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;." />
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
-<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="create-lockfile" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="from-lockfile" dataAlias="FromLockFile" dataValue="1" description="Load the module from the lock file present at the path." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -436,7 +437,8 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="extra-pip-flags" dataAlias="ExtraPipFlags" value="true" description="Extra flags to pass to pip when installing python dependencies. Surround the flags (and values) with quotes if spaces are present. Default flags are &quot;--target &lt;target&gt; --python-version &lt;pyversion&gt; --only-binary=:all:&quot;."/>
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
-<modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="create-lockfile" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="from-lockfile" dataAlias="FromLockFile" dataValue="1" description="Load the module from the lock file present at the path." />
 
 </command>
 
@@ -2458,9 +2460,9 @@ ClassMethod LoadInternal(
         }
     }
 
+    set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
     // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
     // It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
-    set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
 
     // For tarball and URL sources, copy the extracted content to <ModuleRoot>/<name>/<version>/
     // and clean up the temp extraction directory. Directory loads are left in-place so that
@@ -2594,12 +2596,11 @@ ClassMethod Install(
                         $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
                     }
                 }
-				$$$ThrowOnError(log.SetSource(tResult.ServerName))
-				$$$ThrowOnError(log.SetVersion(tResult.Version))
+                $$$ThrowOnError(log.SetSource(tResult.ServerName))
+                $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
-            set tPrefix = ""
             if (tModuleName '= "") {
                 if (tVersion '= "") {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, tModuleName_" "_tVersion_" not found in any repository."))
@@ -2613,10 +2614,10 @@ ClassMethod Install(
             }
         }
     } catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
-		throw ex
-	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+        $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        throw ex
+    }
+    $$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
@@ -2967,7 +2968,9 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 /// append "-d" for descending (e.g. "n-d", "d-d", "v-d"). Default: ascending by name.
 /// List entries are $listbuild(label, versionString, externalName, developerMode, root, lastUpdated)
 /// where label may be "ExternalName (internalName)" (e.g. "IPM (zpm)").
-ClassMethod SortList(ByRef list, sortModeRaw As %String) [ Internal ]
+ClassMethod SortList(
+	ByRef list,
+	sortModeRaw As %String) [ Internal ]
 {
     set newlist = ""
     set ipmEntry = ""

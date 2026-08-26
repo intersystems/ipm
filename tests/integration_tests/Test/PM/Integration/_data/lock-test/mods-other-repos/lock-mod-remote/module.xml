@@ -5,6 +5,12 @@
       <Name>lock-mod-remote</Name>
       <Version>1.0.0</Version>
       <Resource Name="LockModRemote.PKG" />
+      <Dependencies>
+        <ModuleReference>
+          <Name>lock-mod-e-1-dep-0-transient</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
     </Module>
   </Document>
 </Export>
