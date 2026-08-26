@@ -7,16 +7,15 @@ Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleInfo";
 
 Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
 
-/// Returns true if this module is installable on the given platform. Only a deployed module
-/// with a non-empty platform list restricts anything; an empty entry in that list means the
-/// artifact is not platform-specific, so it is compatible with everything.
+/// Returns true if this module is installable on the given platform. Non-deployed modules are not
+/// platform-specific and always match. A deployed module is built and tagged per platform, so it is
+/// only installable when this platform is among the platforms it reports.
 Method IsCompatibleWithPlatform(platformVersion As %String) As %Boolean
 {
-    set platformVersions = ..PlatformVersionList()
-    if '..Deployed || (platformVersions = "") {
+    if '..Deployed {
         return 1
     }
-    return ($listfind(platformVersions, "") > 0) || ($listfind(platformVersions, platformVersion) > 0)
+    return $listfind(..PlatformVersionList(), platformVersion) > 0
 }
 
 /// Returns PlatformVersions as a comma-separated string, e.g. "2024.1, 2025.1", or "" if empty.

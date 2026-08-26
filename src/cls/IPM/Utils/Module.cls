@@ -630,13 +630,20 @@ ClassMethod BuildAllDependencyGraphs(
                     #dim tModRef As %IPM.Storage.ModuleInfo
                     set tModRef = tList.GetAt(i)
 
-                    // Retrieve module manifest
-                    set tManifest = tPackageService.GetModuleManifest(tModRef)
+                    // Retrieve module manifest. A missing or unreadable manifest for one module must
+                    // not abort discovery across every repository, so record it and move on.
+                    try {
+                        set tManifest = tPackageService.GetModuleManifest(tModRef)
+                    } catch manifestEx {
+                        set pErrorList($increment(pErrorList)) = $listbuild(tRepoName,tModRef.Name,tModRef.VersionString,manifestEx.AsStatus())
+                        continue
+                    }
 
                     set tReader = ##class(%XML.Reader).%New()
                     set tSC = tReader.OpenStream(tManifest)
                     if $$$ISERR(tSC) {
-                        quit
+                        set pErrorList($increment(pErrorList)) = $listbuild(tRepoName,tModRef.Name,tModRef.VersionString,tSC)
+                        continue
                     }
                     do tReader.Correlate("Module","%IPM.Storage.Module")
                     do tReader.Next(.tModule,.tCorrSC)
