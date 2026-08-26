@@ -113,13 +113,13 @@ Method SearchRepositoriesForModule(
                     do pPlatformFilteredResults.Insert(item)
                     continue
                 }
-                #; Record which platform's artifact this result refers to; callers need it to build
-                #; the tag. Left empty for repositories that don't report platforms, and for
-                #; artifacts that aren't platform-specific at all.
+                // Record which platform's artifact this result refers to; callers need it to build
+                // the tag. Left empty for repositories that don't report platforms, and for
+                // artifacts that aren't platform-specific at all.
                 if item.Deployed && (item.PlatformVersions.Find(currentPlatform) > 0) {
                     set item.PlatformVersion = currentPlatform
                 }
-                #; Sorting versions
+                // Sorting versions
                 set versions(+item.Version.Major, +item.Version.Minor, +item.Version.Patch, " "_item.Version.Patch_"_"_item.Version.Prerelease, repoID, tServer.Name) = item
             }
         }

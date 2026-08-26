@@ -162,7 +162,7 @@ Method GetModule(
 Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
 {
     set name = pModuleReference.Name _ ":" _ ..TagForReference(pModuleReference)
-    #; GetModuleXML returns a string, but callers expect a stream per %IPM.Repo.IPackageService
+    // GetModuleXML returns a string, but callers expect a stream per %IPM.Repo.IPackageService
     set moduleXML = ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
     if (moduleXML = "") {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "No manifest found for '" _ name _ "' in registry " _ ..Location))
