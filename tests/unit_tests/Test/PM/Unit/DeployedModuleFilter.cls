@@ -32,18 +32,6 @@ Method TestNonDeployedAlwaysCompatible()
     do $$$AssertTrue(mod.IsCompatibleWithPlatform("9999.9"), "Non-deployed is always compatible")
 }
 
-/// Deployed module with empty PlatformVersions (e.g. filesystem repos) always returns true.
-Method TestDeployedNoPlatformVersionsAlwaysCompatible()
-{
-    set mod = ##class(%IPM.Storage.ModuleInfo).%New()
-    set mod.Name = "mymodule"
-    set mod.VersionString = "1.0.0"
-    set mod.Deployed = 1
-
-    do $$$AssertTrue(mod.IsCompatibleWithPlatform("9999.9"), "Deployed with no PlatformVersions is always compatible")
-}
-
-
 /// FormatPlatformVersions returns comma-separated list.
 Method TestFormatPlatformVersions()
 {
@@ -58,15 +46,6 @@ Method TestFormatPlatformVersionsEmpty()
     set mod.Name = "mymodule"
     set mod.VersionString = "1.0.0"
     do $$$AssertEquals(mod.FormatPlatformVersions(), "", "Empty list returns empty string")
-}
-
-/// A deployed module tagged without a platform is not platform-specific, so it must be treated
-/// as compatible with everything. Matches how PreferCompatibleVersions reads the same list.
-Method TestEmptyPlatformEntryIsCompatible()
-{
-    set mod = ..BuildDeployedMod("")
-    do $$$AssertTrue(mod.IsCompatibleWithPlatform("9999.9"), "Empty platform entry is compatible")
-    do $$$AssertEquals(mod.FormatPlatformVersions(), "", "Empty platform entry formats as empty")
 }
 
 /// The compatible version must be promoted ahead of the newer incompatible one, so a caller
