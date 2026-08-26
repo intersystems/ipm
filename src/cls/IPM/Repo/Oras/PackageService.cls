@@ -269,7 +269,7 @@ Method ListModulesFromTagString(
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
     // The tri-states of AllVersions that report a single version should report one this platform
     // can actually install. The empty state reports every version, so its order doesn't matter.
-    if (searchCriteria.AllVersions '= "") && 'searchCriteria.IgnorePlatformFilter {
+    if (searchCriteria.AllVersions '= "") {
         set allVersionsList = ..PreferCompatibleVersions(allVersionsList, .aggregatedPlatformVersion, $$$CurrentPlatformVersion)
     }
     set pointer = 0

@@ -88,7 +88,7 @@ Method TestIncompatiblePlatformHiddenFromList()
 /// is actually available for, rather than a bare "not found".
 Method TestIncompatiblePlatformInstallError()
 {
-    set currentPlatform = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
+    set currentPlatform = $$$CurrentPlatformVersion
 
     set tgzPath = ..LoadAndPackage()
     do $$$AssertStatusOK(..PublishWithPlatform(tgzPath, ..#IncompatiblePlatform), "Published for incompatible platform")
@@ -144,6 +144,25 @@ Method TestDependencyPinnedToIncompatibleVersionFails()
     do $$$AssertTrue(errText [ "Could not find satisfactory version", "Failed for lack of a satisfying version")
     do $$$AssertTrue(errText [ ..#ModuleName, "Error names the unresolvable dependency")
     do $$$AssertEquals(..InstalledVersion(..#ModuleName), "", "Incompatible 2.0.0 was not installed as a fallback")
+}
+
+/// Packaging twice in a row must succeed. The first pass persists Module.Deployed = 1, which the
+/// Compile phase of the second pass reads to skip Deploy="true" resources. Those resources used to
+/// stay behind in the compile-order map, which reported them as an unresolvable compile order.
+Method TestRepackageWithDeployedFlagPersisted()
+{
+    set tgzPath = ..LoadAndPackage()
+
+    set module = ##class(%IPM.Storage.Module).NameOpen(..#ModuleName,, .sc)
+    do $$$AssertStatusOK(sc, "Reopened module after packaging")
+    do $$$AssertTrue(module.Deployed, "Packaging marked the module deployed")
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("package " _ ..#ModuleName _ " -only -v -path " _ tgzPath), "Repackaged with Deployed already set")
+
+    // Skipping compilation is the intent here, not a side effect: the second pass has no sources to
+    // recompile from, because a bare package does not re-import them. The deployed class from the
+    // first pass has to survive it.
+    do $$$AssertEquals($classmethod("PlatformFilterTest.Main", "Hello"), "Hello from PlatformFilterTest.Main", "Deployed class still works after repackaging")
 }
 
 // ---------------------------------------------------------------------------
