@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
+- #1081: Implement `locate-resource` command for resource-to-module mapping
 
 ### Changed
 - Minimum supported Python version is now 3.9
