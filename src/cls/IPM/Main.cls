@@ -2261,7 +2261,7 @@ ClassMethod ShowModulesForRepository(
     } elseif pSearchString'="" {
         set where=" WHERE name = ?"
     }
-    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
+    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions,PlatformVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
     if (pSearchString = "") {
         set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
     } else {
@@ -2279,6 +2279,7 @@ ClassMethod ShowModulesForRepository(
         set list = list + 1
         set list(list) = $listbuild(name, tRes.Version)
         set list(list, "Origin") = tRes.Origin
+        set list(list, "PlatformVersions") = tRes.PlatformVersions
         if pShowDesc {
             set list(list, "Description") = tRes.Description
         }
@@ -2552,7 +2553,7 @@ ClassMethod Install(
         set tSearchCriteria.Name = $$$lcase(tModuleName)
         set tSearchCriteria.VersionExpression = tVersion
         set tSearchCriteria.Keywords = tKeywords
-        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults,,.tPlatformFiltered))
 
         if (tResults.Count() > 0) {
             set tResult = ""
@@ -2587,18 +2588,30 @@ ClassMethod Install(
                     set tParams("cmd") = "install"
                     set tParams("Install") = 1
                 }
-                if tResult.Deployed {
-                    set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
-                    set tResult.PlatformVersion = platformVersion
-                    if ('tResult.PlatformVersions.Find(platformVersion)) {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
-                    }
-                }
 				$$$ThrowOnError(log.SetSource(tResult.ServerName))
 				$$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
+            // The module may have matched but been excluded for being deployed for other platforms
+            // only, which deserves a better message than "not found".
+            // Only a deployed module with platforms that don't include this one is ever filtered,
+            // so there is always something to report here.
+            if $isobject(tPlatformFiltered) && (tPlatformFiltered.Count() > 0) {
+                // Report the newest filtered version: the one an unversioned install resolves to.
+                // A pinned install filters only its own version, so this names that version too.
+                #dim tFiltered As %IPM.Storage.ModuleInfo
+                #dim tCandidate As %IPM.Storage.ModuleInfo
+                set tFiltered = tPlatformFiltered.GetAt(1)
+                for tIdx = 2:1:tPlatformFiltered.Count() {
+                    set tCandidate = tPlatformFiltered.GetAt(tIdx)
+                    if tCandidate.Version.Follows(tFiltered.Version) {
+                        set tFiltered = tCandidate
+                    }
+                }
+                set tMsg = "'" _ tFiltered.Name _ "' " _ tFiltered.VersionString _ " is not available for platform " _ $$$CurrentPlatformVersion _ ". Available platforms: " _ tFiltered.FormatPlatformVersions() _ ". Run 'search " _ tFiltered.Name _ " -versions' to see all versions."
+                $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
+            }
             set tPrefix = ""
             if (tModuleName '= "") {
                 if (tVersion '= "") {
@@ -4225,6 +4238,7 @@ ClassMethod DisplayModules(
         $listbuild("Author.Person", $$$Yellow, "Author"),
         $listbuild("Origin", $$$Default),
         $listbuild("AllVersions", $$$Default, "Versions"),
+        $listbuild("PlatformVersions", $$$Default, "Platforms"),
         $listbuild("Repository", $$$Default),
         $listbuild("Installed In", $$$Default)
     )

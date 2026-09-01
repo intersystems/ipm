@@ -102,7 +102,7 @@ Method GetModule(
     set deployed = pModuleReference.Deployed
 
     if deployed {
-        set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
+        set platformVersion = $$$CurrentPlatformVersion
     }
 
     set tSC = tRequest.Get($$$URLENCODE(tRequest.Location _ "packages/" _ name _ "/" _ version _ $select(deployed: "/" _ platformVersion, 1: "")))
