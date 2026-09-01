@@ -143,10 +143,13 @@ Method TestManualCacheRebuild()
     do $$$AssertStatusOK(sc,"Successfully installed module-b after cache rebuild")
 }
 
-/// Read a file's full contents as a string. Throws if the file can't be opened.
+/// Read a file's raw bytes. Throws if the file can't be opened.
+/// Binary rather than character: these tests hash the file, so a read/write round trip has to
+/// reproduce the original bytes exactly. A character stream rewrites CRLF as LF, and the fixtures
+/// check out with CRLF wherever git's autocrlf applies.
 Method ReadFile(path As %String) As %String [ Private ]
 {
-    set file = ##class(%Stream.FileCharacter).%New()
+    set file = ##class(%Stream.FileBinary).%New()
     $$$ThrowOnError(file.LinkToFile(path))
     set content = ""
     while 'file.AtEnd {
@@ -155,14 +158,14 @@ Method ReadFile(path As %String) As %String [ Private ]
     quit content
 }
 
-/// Replace a file's contents.
+/// Replace a file's contents with the given bytes. See ReadFile for why this is binary.
 Method WriteFile(
 	path As %String,
 	content As %String) As %Status [ Private ]
 {
     set sc = $$$OK
     try {
-        set file = ##class(%Stream.FileCharacter).%New()
+        set file = ##class(%Stream.FileBinary).%New()
         $$$ThrowOnError(file.LinkToFile(path))
         do file.Clear()
         do file.Write(content)
