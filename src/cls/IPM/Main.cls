@@ -2318,11 +2318,14 @@ ClassMethod ShowModulesForRepository(
     write !
     do ..DisplayModules(.list)
 
-    // If filesystem repo, show last cache rebuild time and command to rebuild it since there's no auto full cache rebuild mechanism (other than reconfiguring the repo entirely)
+    // pRepoName reaches here straight from -name, so it need not be a repository that exists.
+    if '##class(%IPM.Repo.Definition).ServerDefinitionKeyExists(pRepoName) {
+        quit
+    }
     set server = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pRepoName,,.tSC)
     $$$ThrowOnError(tSC)
     if server.%IsA("%IPM.Repo.Filesystem.Definition") && (server.CacheLastRebuilt '= "") {
-        write !,"Last full cache rebuild for '", pRepoName, "' was on ", server.CacheLastRebuilt, " (UTC). If needed, run 'repo -n "_pRepoName_" -rebuild-cache' to refresh the cache.",!
+        write !,"Last cache rebuild for '", pRepoName, "' was on ", server.CacheLastRebuilt, " (UTC). If needed, run 'repo -n "_pRepoName_" -rebuild-cache' to refresh the cache.",!
     }
 }
 
@@ -2541,13 +2544,25 @@ ClassMethod CheckModuleNamespace() As %Status
 }
 
 /// Rebuild one filesystem repository's cache ahead of a dependency search.
-/// Best effort: a failure is reported but does not fail the install, since the existing cache is
-/// still usable, it just might not list modules added since the last rebuild.
-ClassMethod RebuildFilesystemRepoCache(pRepoDef As %IPM.Repo.Filesystem.Definition) [ Internal, Private ]
+/// Best effort: a failure warns rather than failing the install, since the existing cache is still
+/// usable, it just might not list modules added since the last rebuild.
+/// Announcement is written once, only when there is a repository to rebuild.
+ClassMethod RebuildFilesystemRepoCache(
+	repoDef As %IPM.Repo.Filesystem.Definition,
+	ByRef announced As %Boolean = 0) [ Internal, Private ]
 {
-    set tSC = pRepoDef.BuildCache(0, 0)  // purge=0, verbose=0
-    if $$$ISERR(tSC) {
-        write !,"WARNING: could not rebuild cache for filesystem repository '",pRepoDef.Name,"': ",$system.Status.GetOneErrorText(tSC)
+    // A root that is not currently mounted is skipped rather than reported: BuildCache refuses it,
+    // and an install has no business failing or warning over an unrelated repository.
+    if 'repoDef.GetPackageService().IsAvailable() {
+        quit
+    }
+    if 'announced {
+        write !,"Rebuilding cache(s) for filesystem repo(s)..."
+        set announced = 1
+    }
+    set sc = repoDef.BuildCache(0, 0)  // purge=0, verbose=0
+    if $$$ISERR(sc) {
+        do ##class(%IPM.General.LogManager).Warning("Could not rebuild cache for filesystem repository '"_repoDef.Name_"': "_$system.Status.GetOneErrorText(sc),1)
     }
 }
 
@@ -2584,31 +2599,25 @@ ClassMethod Install(
             $$$ThrowStatus($$$ERROR($$$GeneralError, "No repositories are configured and enabled in this namespace."))
         }
 
-        // Rebuild cache for filesystem repositories before searching
-        // This ensures newly added modules are discovered
+        // Rebuild the filesystem repository caches before searching, so modules added since the last
+        // rebuild are discoverable.
+        set announced = 0
         if (tRegistry '= "") {
-            // Specific repository requested - only rebuild that one if it's filesystem
             set tRepoDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
-            if $$$ISOK(tSC) && $isobject(tRepoDef) && tRepoDef.%IsA("%IPM.Repo.Filesystem.Definition") {
-                write !,"Rebuilding cache(s) for filesystem repo(s)..."
-                do ..RebuildFilesystemRepoCache(tRepoDef)
+            if $$$ISERR(tSC) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("No repository with name '%1' exists in this namespace.",tRegistry)))
+            }
+            if tRepoDef.%IsA("%IPM.Repo.Filesystem.Definition") {
+                do ..RebuildFilesystemRepoCache(tRepoDef,.announced)
             }
         } else {
-            // No specific repo - rebuild all enabled filesystem repos
             set tFsRepoResult = ##class(%SQL.Statement).%ExecDirect(,"SELECT ID FROM %IPM_Repo_Filesystem.Definition WHERE Enabled = 1")
             $$$ThrowSQLIfError(tFsRepoResult.%SQLCODE,tFsRepoResult.%Message)
-            set tAnnounced = 0
             while tFsRepoResult.%Next(.tFetchSC) {
                 $$$ThrowOnError(tFetchSC)
-                if 'tAnnounced {
-                    // Only announced once a filesystem repo actually exists to rebuild.
-                    write !,"Rebuilding cache(s) for filesystem repo(s)..."
-                    set tAnnounced = 1
-                }
                 set tFsRepo = ##class(%IPM.Repo.Filesystem.Definition).%OpenId(tFsRepoResult.%Get("ID"),,.tOpenSC)
-                if $$$ISOK(tOpenSC) && $isobject(tFsRepo) {
-                    do ..RebuildFilesystemRepoCache(tFsRepo)
-                }
+                $$$ThrowOnError(tOpenSC)
+                do ..RebuildFilesystemRepoCache(tFsRepo,.announced)
             }
             $$$ThrowOnError(tFetchSC)
         }

@@ -211,13 +211,12 @@ Method TestWalkDirectories()
         set dirs(1) = root
 
         // Unlimited depth, filtered to module.xml
-        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 0, "module.xml", 1, .files, .hashes, .maxDepth), "Walked the tree filtering on module.xml")
+        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 0, "module.xml", 1, .files, .hashes), "Walked the tree filtering on module.xml")
         do $$$AssertTrue($data(files("module.xml")), "Found module.xml in the root")
         do $$$AssertTrue($data(files("a/module.xml")), "Found module.xml one level down")
         do $$$AssertTrue($data(files("a/b/module.xml")), "Found module.xml two levels down")
         do $$$AssertTrue('$data(files(".git/module.xml")), ".git was not descended into")
         do $$$AssertTrue('$data(files("a/notes.txt")), "Filename filter excluded notes.txt")
-        do $$$AssertEquals(maxDepth, 2, "Deepest kept file reported at depth 2")
 
         do $$$AssertEquals($length(hashes("module.xml")), 40, "Hash is 40 hex characters")
         do $$$AssertEquals($zconvert(hashes("module.xml"), "L"), hashes("module.xml"), "Hash is lowercase hex")
@@ -226,15 +225,14 @@ Method TestWalkDirectories()
 
         // Depth cap: a file exactly at the cap is kept, anything below is never visited.
         kill files, hashes
-        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 1, "module.xml", 1, .files, .hashes, .maxDepth), "Walked the tree with depth capped at 1")
+        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 1, "module.xml", 1, .files, .hashes), "Walked the tree with depth capped at 1")
         do $$$AssertTrue($data(files("module.xml")), "Root module.xml still found at depth 1")
         do $$$AssertTrue($data(files("a/module.xml")), "File exactly at the depth cap is kept")
         do $$$AssertTrue('$data(files("a/b/module.xml")), "File below the depth cap is not visited")
-        do $$$AssertEquals(maxDepth, 1, "Deepest kept file reported at depth 1")
 
         // No filter and no hashing: every file, empty hashes.
         kill files, hashes
-        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 0, "", 0, .files, .hashes, .maxDepth), "Walked the tree unfiltered without hashing")
+        do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs, root, 0, "", 0, .files, .hashes), "Walked the tree unfiltered without hashing")
         do $$$AssertTrue($data(files("a/notes.txt")), "Empty filter keeps non-manifest files")
         do $$$AssertEquals(hashes("a/notes.txt"), "", "Hashing off leaves hashes empty")
     } catch e {

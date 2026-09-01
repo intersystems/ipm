@@ -27,7 +27,7 @@ Method Create(useFirst As %Boolean) [ Internal, Private ]
     // Make sure this is the first/last repo to be found by SQL query in %IPM.Repo.Manager:SearchRepositoriesForModule
     set ..Repo.OverriddenSortOrder = $select(useFirst:-1000 ,1:1000)
 
-    $$$ThrowOnError(..Repo.BuildCache(1,1,1))
+    $$$ThrowOnError(..Repo.BuildCache(1,1))
 }
 
 ClassMethod SkipCreate(location As %String) As %Boolean [ Internal ]

@@ -3,12 +3,17 @@ Class Test.PM.Integration.FilesystemRepo Extends Test.PM.Integration.Base
 
 Parameter REPONAME = "fs-cache-test";
 
+/// Working copy of the _data/fs-cache-test fixture. Several tests edit module.xml in place, so they
+/// run against a copy rather than the git-tracked fixture on the bind mount.
 Property RepoPath As %String;
+
+/// Native-filesystem copy of the fixture, made once, and the source every restore copies from.
+Property PristineDir As %String;
 
 XData ModuleB300
 {
 <?xml version="1.0" encoding="UTF-8"?>
-<Export generator="Cache" version="25">
+<Export generator="IRIS" version="26">
   <Document name="module-b.ZPM">
     <Module>
       <Name>module-b</Name>
@@ -21,10 +26,16 @@ XData ModuleB300
 
 Method OnBeforeAllTests() As %Status
 {
-    // Set up the repo path - use GetModuleDir utility
-    set ..RepoPath = ..GetModuleDir("fs-cache-test")
+    set ..PristineDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory()_"fs-cache-test-pristine-"_$job)
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..PristineDir))
+    if '##class(%File).CopyDir(..GetModuleDir("fs-cache-test"),..PristineDir,1) {
+        quit $$$ERROR($$$GeneralError,"Failed to copy the fs-cache-test fixture to the pristine directory")
+    }
 
-    // Create filesystem repo pointing to test data
+    // The repo definition stores Root, so this path has to stay the same for every test.
+    set ..RepoPath = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory()_"fs-cache-test-"_$job)
+    $$$ThrowOnError(..RestoreFixture())
+
     set sc = ##class(%IPM.Main).Shell("repo -n "_..#REPONAME_" -fs -path "_..RepoPath)
     do $$$AssertStatusOK(sc,"Created fs-cache-test repo successfully.")
     quit sc
@@ -35,15 +46,36 @@ Method OnAfterAllTests() As %Status
     // Remove test repository
     set sc = ##class(%IPM.Main).Shell("repo -delete -name "_..#REPONAME)
     do $$$AssertStatusOK(sc,"Deleted fs-cache-test repo successfully.")
+    do ##class(%File).RemoveDirectoryTree(..RepoPath)
+    do ##class(%File).RemoveDirectoryTree(..PristineDir)
     quit sc
 }
 
-Method OnAfterOneTest() As %Status
+Method OnAfterOneTest(testName As %String) As %Status
 {
     // Uninstall all modules after each test for clean state
     set sc = ##class(%IPM.Main).Shell("uninstall -all")
     do $$$AssertStatusOK(sc,"Uninstalled all modules after test.")
+
+    // Tests that edit or add module.xml files leave the working copy dirty, so it is rebuilt from
+    // the pristine copy and the cache purged to match.
+    do $$$AssertStatusOK(..RestoreFixture(),"Restored the fixture after "_testName)
+    set repoDef = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen(..#REPONAME,,.openSC)
+    if $$$ISOK(openSC) {
+        do $$$AssertStatusOK(repoDef.BuildCache(1,0),"Purged and rebuilt the cache after "_testName)
+    }
     quit sc
+}
+
+/// Replace the working copy of the fixture with a fresh copy of the pristine one.
+Method RestoreFixture() As %Status [ Private ]
+{
+    do ##class(%File).RemoveDirectoryTree(..RepoPath)
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(..RepoPath))
+    if '##class(%File).CopyDir(..PristineDir,..RepoPath,1) {
+        quit $$$ERROR($$$GeneralError,"Failed to restore the fs-cache-test fixture")
+    }
+    quit $$$OK
 }
 
 /// Test that cache is built correctly when repo is created
@@ -190,8 +222,6 @@ Method TestCacheFreshnessDetection()
     set originalContent = ..ReadFile(moduleFile)
     do $$$AssertNotEquals(originalContent,"","Read the original module.xml content")
 
-    // Later tests share this git-tracked fixture, so the assertions run inside a try and the restore
-    // below happens whether they pass, fail, or throw.
     try {
         // Change the content, not just the timestamp: content hashing only reacts to real edits.
         set modifiedContent = $replace(originalContent,"<Packaging>module</Packaging>","<Packaging>module</Packaging>"_$char(10)_"      <Description>freshness probe</Description>")
@@ -209,14 +239,6 @@ Method TestCacheFreshnessDetection()
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"No error while testing cache freshness")
     }
-
-    do $$$AssertStatusOK(..WriteFile(moduleFile,originalContent),"Restored the original module.xml")
-    set cacheARestored = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-a","1.0.0",,.sc)
-    do $$$AssertStatusOK(sc,"Reopened the cache entry after restoring the fixture")
-    do $$$AssertTrue($isobject(cacheARestored),"Got a cache entry back after restoring the fixture")
-    if $isobject(cacheARestored) {
-        do $$$AssertEquals(cacheARestored.ContentHash,originalHash,"ContentHash returned to its original value")
-    }
 }
 
 /// A module.xml that cannot be parsed must not cost the module its cache entry. The file is still
@@ -227,7 +249,6 @@ Method TestUnparseableFileKeepsCacheEntry()
     do $$$AssertStatusOK(sc,"Opened repo definition")
 
     set moduleFile = ##class(%File).NormalizeFilename("module.xml",##class(%File).NormalizeFilename("module-a/1.0.0",..RepoPath))
-    set originalContent = ..ReadFile(moduleFile)
 
     try {
         do $$$AssertStatusOK(..WriteFile(moduleFile,"<Export><Document name=""module-a.ZPM""><Module>"),"Wrote a truncated module.xml")
@@ -240,18 +261,12 @@ Method TestUnparseableFileKeepsCacheEntry()
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"No error while testing an unparseable module.xml")
     }
-
-    do $$$AssertStatusOK(..WriteFile(moduleFile,originalContent),"Restored the original module.xml")
-    do $$$AssertStatusOK(repoDef.BuildCache(1,0),"Purged and rebuilt the cache after restoring the fixture")
 }
 
 /// Editing <Version> in place changes which module the cache entry describes. Resolving the old
 /// version has to fail rather than quietly hand back the new one.
 Method TestVersionBumpInPlaceDoesNotReturnWrongModule()
 {
-    set repoDef = ##class(%IPM.Repo.Filesystem.Definition).ServerDefinitionKeyOpen(..#REPONAME,,.sc)
-    do $$$AssertStatusOK(sc,"Opened repo definition")
-
     set moduleFile = ##class(%File).NormalizeFilename("module.xml",##class(%File).NormalizeFilename("module-a/1.0.0",..RepoPath))
     set originalContent = ..ReadFile(moduleFile)
 
@@ -269,9 +284,50 @@ Method TestVersionBumpInPlaceDoesNotReturnWrongModule()
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"No error while testing an in-place version bump")
     }
+}
 
-    do $$$AssertStatusOK(..WriteFile(moduleFile,originalContent),"Restored the original module.xml")
-    do $$$AssertStatusOK(repoDef.BuildCache(1,0),"Purged and rebuilt the cache after restoring the fixture")
+/// The SQL walk only runs when embedded Python is unavailable, so it needs its own coverage. It has
+/// to agree with the Python walk that built this repo's cache, since either one can serve a rebuild.
+Method TestSQLWalkMatchesPythonWalk()
+{
+    do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectoriesSQL(..RepoPath,..RepoPath,0,"module.xml",1,.sqlFiles,.sqlHashes),"SQL walk succeeded")
+
+    set dirs(1) = ..RepoPath
+    do $$$AssertStatusOK(##class(%IPM.Utils.File).WalkDirectories(.dirs,..RepoPath,0,"module.xml",1,.pyFiles,.pyHashes),"Python walk succeeded")
+
+    for relPath = "module-a/1.0.0/module.xml","module-b/1.0.0/module.xml","module-b/2.0.0/module.xml" {
+        do $$$AssertTrue($data(sqlFiles(relPath)),"SQL walk found "_relPath)
+        do $$$AssertEquals($get(pyFiles(relPath)),$get(sqlFiles(relPath)),"Both walkers resolved "_relPath_" to the same full path")
+        do $$$AssertEquals($get(pyHashes(relPath)),$get(sqlHashes(relPath)),"Both walkers hashed "_relPath_" identically")
+    }
+
+    // The cache was built by the Python walk, so its stored hash is the answer the SQL walk has to reach.
+    set cacheA = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-a","1.0.0",,.sc)
+    do $$$AssertStatusOK(sc,"Opened the cache entry for module-a 1.0.0")
+    do $$$AssertEquals($get(sqlHashes("module-a/1.0.0/module.xml")),cacheA.ContentHash,"SQL walk reproduced the cached ContentHash")
+}
+
+/// Two directories under one root claiming the same Name and Version collide on the RootNameVersion
+/// index. The re-parse cannot be saved, so the lookup has to fail rather than return the unsaved row.
+Method TestDuplicateNameVersionFailsValidatedOpen()
+{
+    set moduleFile = ##class(%File).NormalizeFilename("module.xml",##class(%File).NormalizeFilename("module-b/2.0.0",..RepoPath))
+    set originalContent = ..ReadFile(moduleFile)
+
+    try {
+        set duplicateContent = $replace(originalContent,"<Version>2.0.0</Version>","<Version>1.0.0</Version>")
+        do $$$AssertNotEquals(duplicateContent,originalContent,"Prepared a module.xml duplicating module-b 1.0.0")
+        do $$$AssertStatusOK(..WriteFile(moduleFile,duplicateContent),"Wrote the duplicate module.xml")
+
+        set duplicate = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..RepoPath,"module-b","2.0.0",,.sc)
+        do $$$AssertStatusNotOK(sc,"Resolving 2.0.0 fails once its directory duplicates 1.0.0")
+        do $$$AssertTrue('$isobject(duplicate),"No cache entry is handed back for the duplicate")
+
+        // The entry the duplicate collided with is untouched.
+        do $$$AssertTrue(##class(%IPM.Repo.Filesystem.Cache).RootNameVersionExists(..RepoPath,"module-b","1.0.0"),"module-b 1.0.0 is still cached")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"No error while testing a duplicated Name and Version")
+    }
 }
 
 /// A root that has gone missing must fail the rebuild rather than empty the cache. An unmounted share
@@ -347,9 +403,6 @@ Method TestAutoDiscoverNewVersion()
     set cacheB3After = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..RepoPath,"module-b","3.0.0",,.sc)
     do $$$AssertStatusOK(sc,"Cache entry for module-b 3.0.0 exists after install")
     do $$$AssertTrue($isobject(cacheB3After),"module-b 3.0.0 found in cache after auto-rebuild")
-
-    // Clean up created directory so it doesn't affect other tests
-    do ##class(%File).RemoveDirectoryTree(newVersionDir)
 }
 
 /// Test that a stale cache entry is removed when its directory is deleted and cache is rebuilt.

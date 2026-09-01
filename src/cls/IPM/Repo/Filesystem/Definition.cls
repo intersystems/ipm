@@ -85,9 +85,8 @@ ClassMethod OnConfigure(
             set pInstance.Depth = tDepth
         }
 
-        // No depth auto-detect: the user's -depth, or the default of 0 (unlimited), is left alone.
         if ##class(%File).DirectoryExists(pInstance.Root) {
-            $$$ThrowOnError(pInstance.BuildCache(1,1,0))
+            $$$ThrowOnError(pInstance.BuildCache(1,1))
         } else {
             // Still configure the repository, since the root may be a share that mounts later, but
             // warn that nothing resolves from it until the cache is built. Configure() does the save.
@@ -126,11 +125,10 @@ Trigger RootChanged [ Event = UPDATE, Foreach = row/object ]
 }
 
 /// Build the cache of modules found in the filesystem repository.
-/// pPurge - if 1, deletes existing cache entries before rebuilding
+/// pPurge - if 1, re-parses every manifest instead of skipping the ones whose content is unchanged
 Method BuildCache(
 	pPurge As %Boolean = 0,
-	pVerbose As %Integer = 0,
-	pAutoDetectDepth As %Boolean = 0) As %Status
+	pVerbose As %Integer = 0) As %Status
 {
     set tSC = $$$OK
     set tInitTLevel = $tlevel
@@ -161,8 +159,10 @@ Method BuildCache(
             $$$ThrowOnError(tLockManager.LockClassId($classname(),..%Id()))
 
             if (pPurge) {
+                // Blank the hashes rather than deleting the rows: every entry then mismatches and is
+                // re-parsed in place, so a concurrent reader never sees an emptied repository.
                 #dim tResult As %SQL.StatementResult
-                set tResult = ##class(%SQL.Statement).%ExecDirect(,"delete from %IPM_Repo_Filesystem.Cache where Root = ?",..Root)
+                set tResult = ##class(%SQL.Statement).%ExecDirect(,"update %IPM_Repo_Filesystem.Cache set ContentHash = '' where Root = ?",..Root)
                 if (tResult.%SQLCODE < 0) {
                     set tSC = $$$ERROR($$$SQLCode,tResult.%SQLCODE,tResult.%Message)
                     quit
@@ -183,17 +183,9 @@ Method BuildCache(
         // Scan root directory recursively, up to ..Depth levels down, for module.xml files,
         // hashing each one so unchanged manifests can be skipped without re-parsing.
         set tDirList(1) = ..Root
-        set tSC = ##class(%IPM.Utils.File).WalkDirectories(.tDirList,..Root,..Depth,"module.xml",1,.tFilenameList,.tHashList,.tMaxDepth)
+        set tSC = ##class(%IPM.Utils.File).WalkDirectories(.tDirList,..Root,..Depth,"module.xml",1,.tFilenameList,.tHashList)
         if $$$ISERR(tSC) {
             quit
-        }
-
-        if (pAutoDetectDepth) && (tMaxDepth > 0) {
-            set ..Depth = tMaxDepth
-            set tSC = ..%Save()
-            if $$$ISERR(tSC) {
-                quit
-            }
         }
 
         // Track visited cache entries (for cleanup of stale entries)
@@ -221,10 +213,8 @@ Method BuildCache(
         $$$ThrowOnError(tAggSC)
 
         // Cleanup stale entries (files deleted from filesystem)
-        if 'pPurge {
-            set tSC = ..CleanupStaleEntries(.tVisitedIds, pVerbose)
-            $$$ThrowOnError(tSC)
-        }
+        set tSC = ..CleanupStaleEntries(.tVisitedIds, pVerbose)
+        $$$ThrowOnError(tSC)
 
         // set cache rebuild timestamp using UTC
         set ..CacheLastRebuilt = $zdatetime($ztimestamp,3)
@@ -254,9 +244,8 @@ Method LoadExistingEntries(Output existing) As %Status [ Private ]
         while result.%Next(.fetchSC) {
             $$$ThrowOnError(fetchSC)
             set hash = result.%Get("SubDirectoryHash")
-            // Rows written before SubDirectoryHash existed have an empty stored value. Compute it
-            // from SubDirectory so the preload finds them correctly. The index self-heals on first
-            // save of a changed row; a pPurge=1 rebuild cleans up orphaned index entries entirely.
+            // Rows carried over from a release without SubDirectoryHash have an empty stored value.
+            // Compute it from SubDirectory so the preload finds them correctly.
             if hash = "" {
                 set hash = ##class(%IPM.Repo.Filesystem.Cache).PathHash(result.%Get("SubDirectory"))
             }
@@ -296,14 +285,15 @@ ClassMethod ParseModuleFile(
 
 /// Refresh a cache entry by re-parsing its module.xml file.
 /// Called when the content hash indicates the file has changed since it was last cached.
-/// Updates cache entry in-place with new metadata and content hash, deferring the full manifest until
+/// Re-parses filePath into cacheObj and saves it, deferring the full manifest until
 /// GetModuleManifest() asks for it.
 /// A re-parse can change Name and VersionString. Callers must re-check that the entry still describes
 /// the module they looked it up by, as RootNameVersionOpenValidated does.
+/// Returns 0 if the re-parsed Name and Version already belong to another entry under this root.
 ClassMethod RefreshCacheEntry(
 	cacheObj As %IPM.Repo.Filesystem.Cache,
 	filePath As %String,
-	newHash As %String)
+	newHash As %String) As %Boolean
 {
     // Parse the module file (metadata only, re-validate since file changed)
     do ..ParseModuleFile(filePath, .name, .versionString)
@@ -320,9 +310,12 @@ ClassMethod RefreshCacheEntry(
 
     set sc = cacheObj.%Save()
     if $$$ISERR(sc) {
-        set sc = cacheObj.HandleSaveError(sc)
-        $$$ThrowOnError(sc)
+        // A duplicate Name and Version means another directory already claims this module, which
+        // HandleSaveError reports as a warning; anything else is a real failure and throws.
+        $$$ThrowOnError(cacheObj.HandleSaveError(sc))
+        return 0
     }
+    return 1
 }
 
 /// Adds a module to the cache.
@@ -348,6 +341,11 @@ Method AddCacheItem(
         // treating the module as changed on every rebuild.
         if (pContentHash = "") {
             set pContentHash = $$$lcase(##class(%File).SHA1Hash(pModuleFileName, 1))
+            // Still empty means unreadable. An empty hash matches the empty hash of a previous failed
+            // attempt, so the entry would look unchanged and be served indefinitely without this.
+            if (pContentHash = "") {
+                do ##class(%IPM.General.LogManager).Warning("Could not read "_pModuleFileName_"; keeping the cached entry for it.",1)
+            }
         }
 
         set tRow = $get(pExisting(##class(%IPM.Repo.Filesystem.Cache).PathHash(pSubDirectory)))
@@ -423,25 +421,36 @@ Method CleanupStaleEntries(
         $$$ThrowOnError(sc)
 
         set result = stmt.%Execute(..Root)
-        set deletedCount = 0
+        if (result.%SQLCODE < 0) {
+            set sc = $$$ERROR($$$SQLCode,result.%SQLCODE,result.%Message)
+            quit
+        }
 
-        while result.%Next() {
+        // Collect before deleting, so no row is removed from under the open cursor.
+        set stale = 0
+        while result.%Next(.fetchSC) {
+            $$$ThrowOnError(fetchSC)
             set cacheId = result.%Get("ID")
-
-            // If not visited during scan, delete it (file was removed)
             if '$data(visitedIds(cacheId)) {
-                set name = result.%Get("Name")
-                set version = result.%Get("VersionString")
-                set subDir = result.%Get("SubDirectory")
+                set stale($increment(stale)) = $listbuild(cacheId,result.%Get("Name"),result.%Get("VersionString"),result.%Get("SubDirectory"))
+            }
+        }
+        $$$ThrowOnError(fetchSC)
 
-                write:verbose !,"Removing stale cache entry: ",name," ",version," (file deleted from ",..Root,subDir,")"
+        set deletedCount = 0
+        for i = 1:1:stale {
+            set cacheId = $listget(stale(i),1)
+            set name = $listget(stale(i),2)
+            set version = $listget(stale(i),3)
+            set subDir = $listget(stale(i),4)
 
-                set delSC = ##class(%IPM.Repo.Filesystem.Cache).%DeleteId(cacheId)
-                if $$$ISERR(delSC) {
-                    set sc = $$$ADDSC(sc, delSC)
-                } else {
-                    set deletedCount = deletedCount + 1
-                }
+            write:verbose !,"Removing stale cache entry: ",name," ",version," (file deleted from ",..Root,subDir,")"
+
+            set delSC = ##class(%IPM.Repo.Filesystem.Cache).%DeleteId(cacheId)
+            if $$$ISERR(delSC) {
+                set sc = $$$ADDSC(sc, delSC)
+            } else {
+                set deletedCount = deletedCount + 1
             }
         }
 
@@ -454,13 +463,9 @@ Method CleanupStaleEntries(
     quit sc
 }
 
-/// Load the full manifest for a cache entry on-demand (lazy loading optimization).
-/// This is called only when the manifest is actually needed (e.g., for module installation).
-/// Extracts the full <Module> XML section and stores it in the Manifest stream.
-/// Sets ManifestLoaded=1 to prevent redundant parsing on subsequent accesses.
-///
-/// Performance: Skipping manifest load during cache build provides 30-50% speedup
-/// for operations that only need metadata (list, search, version resolution).
+/// Extracts the full <Module> XML section into the Manifest stream and sets ManifestLoaded.
+/// Deferred until a caller actually needs the manifest, so list, search and version resolution
+/// never pay for it.
 ClassMethod LoadManifestForCacheEntry(
 	cacheObj As %IPM.Repo.Filesystem.Cache,
 	filePath As %String) As %Status

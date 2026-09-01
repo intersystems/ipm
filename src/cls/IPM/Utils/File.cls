@@ -282,8 +282,9 @@ ClassMethod NormalizePath(path As %String) As %String
 /// compared case-insensitively on Windows and case-sensitively elsewhere, matching the filesystem.
 /// <var>files</var>(relPath) = fullPath, and <var>hashes</var>(relPath) = lowercase SHA-1 hex
 /// (empty when <var>computeHashes</var> is 0). Keys are normalized: forward slashes, no leading slash.
-/// <var>maxDepthFound</var> reports the greatest depth at which a kept file was found, for depth auto-detection.
 /// Directories named .git, __pycache__ or node_modules are never descended into.
+/// Symlinked directories are skipped by the embedded Python walk but followed by the SQL fallback,
+/// since no %Library.File API distinguishes a symlink from a directory.
 ClassMethod WalkDirectories(
 	ByRef dirs,
 	relativeTo As %String,
@@ -291,12 +292,10 @@ ClassMethod WalkDirectories(
 	filenameFilter As %String = "",
 	computeHashes As %Boolean = 1,
 	Output files,
-	Output hashes,
-	Output maxDepthFound As %Integer) As %Status
+	Output hashes) As %Status
 {
     set sc = $$$OK
     kill files, hashes
-    set maxDepthFound = 0
     try {
         set relativeTo = ##class(%Library.File).NormalizeDirectory(relativeTo)
 
@@ -317,20 +316,19 @@ ClassMethod WalkDirectories(
         }
         set dirsJson = dirsJson _ "]"
 
-        set pythonSC = ..WalkDirectoriesPython(dirsJson, relativeTo, maxDepth, filenameFilter, computeHashes, .files, .hashes, .maxDepthFound)
+        set pythonSC = ..WalkDirectoriesPython(dirsJson, relativeTo, maxDepth, filenameFilter, computeHashes, .files, .hashes)
         if $$$ISOK(pythonSC) {
             quit
         }
 
         // Fall back to a SQL-driven breadth-first walk, one directory at a time.
         // Warn, because the fallback is far slower and otherwise indistinguishable from a slow disk.
-        set warning = "Python directory walk failed, falling back to a slower SQL walk: "_$system.Status.GetOneErrorText(pythonSC)
+        set warning = "Falling back to a slower SQL directory walk. The embedded Python walk of "_relativeTo_" could not be completed or read back: "_$system.Status.GetOneErrorText(pythonSC)
         do ##class(%IPM.General.LogManager).Warning(warning,1)
 
         kill files, hashes
-        set maxDepthFound = 0
         for i = 1:1:dirCount {
-            $$$ThrowOnError(..WalkDirectoriesSQL(dirList(i), relativeTo, maxDepth, filenameFilter, computeHashes, .files, .hashes, .maxDepthFound))
+            $$$ThrowOnError(..WalkDirectoriesSQL(dirList(i), relativeTo, maxDepth, filenameFilter, computeHashes, .files, .hashes))
         }
     } catch e {
         set sc = e.AsStatus()
@@ -345,19 +343,33 @@ ClassMethod WalkDirectoriesPython(
 	filenameFilter As %String,
 	computeHashes As %Boolean,
 	Output files,
-	Output hashes,
-	Output maxDepthFound As %Integer) As %Status [ Private ]
+	Output hashes) As %Status [ Private ]
 {
     set sc = $$$OK
     try {
-        set result = ##class(%DynamicObject).%FromJSON(..WalkDirectoriesPythonImpl(dirsJson, relativeTo, maxDepth, filenameFilter, computeHashes))
-        set maxDepthFound = result.maxDepth
-        set entries = result.files
-        for i = 0:1:(entries.%Size() - 1) {
-            set entry = entries.%Get(i)
+        // One JSON object per line in a stream rather than one JSON document in a string. A single
+        // string caps out around 3.6MB, which a large source tree exceeds.
+        set outputStream = ##class(%Stream.GlobalCharacter).%New()
+        // Python writes "\n"; the default terminator is CRLF, which would make ReadLine() return the
+        // whole stream as a single line.
+        set outputStream.LineTerminator = $char(10)
+        set expected = ..WalkDirectoriesPythonImpl(dirsJson, relativeTo, maxDepth, filenameFilter, computeHashes, outputStream)
+
+        do outputStream.Rewind()
+        set parsed = 0
+        while 'outputStream.AtEnd {
+            set line = outputStream.ReadLine()
+            continue:line=""
+            set entry = ##class(%DynamicObject).%FromJSON(line)
             set relPath = entry.%Get("rel")
             set files(relPath) = entry.%Get("full")
             set hashes(relPath) = entry.%Get("hash")
+            set parsed = parsed + 1
+        }
+        // Python cannot check the %Status of its stream writes, so verify the count instead. A short
+        // stream returns an error, which sends the caller to the SQL walk rather than a partial list.
+        if (parsed '= expected) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"Python directory walk found "_expected_" files but only "_parsed_" were readable from the stream"))
         }
     } catch e {
         set sc = e.AsStatus()
@@ -367,12 +379,14 @@ ClassMethod WalkDirectoriesPython(
 
 /// os.walk() is C-based and far faster than a SQL FileSet walk; hashing runs on a thread pool
 /// because SHA-1 releases the GIL, so threads overlap I/O wait.
+/// Writes one JSON object per line to outputStream and returns how many were written.
 ClassMethod WalkDirectoriesPythonImpl(
 	dirsJson As %String,
 	relativeTo As %String,
 	maxDepth As %Integer,
 	filenameFilter As %String,
-	computeHashes As %Boolean) As %String [ Language = python, Private ]
+	computeHashes As %Boolean,
+	outputStream As %Stream.GlobalCharacter) As %Integer [ Language = python, Private ]
 {
 import os
 import json
@@ -392,7 +406,6 @@ fold_case = os.name == 'nt'
 name_filter = filenameFilter.lower() if fold_case else filenameFilter
 
 file_list = []
-max_depth_found = 0
 
 for d in dirs:
     dir_len = len(d.rstrip(os.sep))
@@ -416,8 +429,6 @@ for d in dirs:
             if not rel_path:
                 continue
             file_list.append((rel_path, full_path))
-            if current_depth > max_depth_found:
-                max_depth_found = current_depth
 
 def hash_file(full_path):
     try:
@@ -435,17 +446,26 @@ if compute_hashes:
 else:
     hash_results = [""] * len(file_list)
 
-return json.dumps({
-    "maxDepth": max_depth_found,
-    "files": [
-        {"rel": rel, "full": full, "hash": h}
-        for (rel, full), h in zip(file_list, hash_results)
-    ]
-})
+# Buffer into ~1MB chunks: one Write() per file would cross into IRIS more times than the walk
+# itself costs. json.dumps() escapes newlines, so a record can never span lines.
+buffer = []
+buffer_len = 0
+for (rel, full), h in zip(file_list, hash_results):
+    record = json.dumps({"rel": rel, "full": full, "hash": h})
+    buffer.append(record)
+    buffer_len += len(record) + 1
+    if buffer_len >= 1000000:
+        outputStream.Write("\n".join(buffer) + "\n")
+        buffer = []
+        buffer_len = 0
+if buffer:
+    outputStream.Write("\n".join(buffer) + "\n")
+
+return len(file_list)
 }
 
 /// Breadth-first walk of a single directory using %Library.File_FileSet, for use when embedded
-/// Python is unavailable. Adds to the caller's files/hashes/maxDepthFound rather than resetting them.
+/// Python is unavailable. Adds to the caller's files/hashes rather than resetting them.
 ClassMethod WalkDirectoriesSQL(
 	dir As %String,
 	relativeTo As %String,
@@ -453,8 +473,7 @@ ClassMethod WalkDirectoriesSQL(
 	filenameFilter As %String,
 	computeHashes As %Boolean,
 	ByRef files,
-	ByRef hashes,
-	ByRef maxDepthFound As %Integer) As %Status [ Private ]
+	ByRef hashes) As %Status [ Internal ]
 {
     set sc = $$$OK
     try {
@@ -478,9 +497,10 @@ ClassMethod WalkDirectoriesSQL(
                 $$$ThrowStatus($$$ERROR($$$GeneralError,"Directory walk exceeded "_..#MAXWALKDEPTH_" levels below "_dir_"; check for a symbolic link cycle"))
             }
 
+            // The 4th argument is includedirs. Without it there are no Type = "D" rows to descend into.
             set rs = ##class(%SQL.Statement).%ExecDirect(,
                 "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
-                walkDir, "*", "", 0)
+                walkDir, "*", "", 1)
             if rs.%SQLCODE < 0 {
                 $$$ThrowStatus($$$ERROR($$$SQLCode,rs.%SQLCODE,rs.%Message))
             }
@@ -510,9 +530,6 @@ ClassMethod WalkDirectoriesSQL(
                 }
                 set files(relPath) = entryPath
                 set hashes(relPath) = $select(computeHashes:$$$lcase(##class(%Library.File).SHA1Hash(entryPath, 1)),1:"")
-                if (walkDepth > maxDepthFound) {
-                    set maxDepthFound = walkDepth
-                }
             }
         }
     } catch e {

@@ -49,6 +49,15 @@ ClassMethod PathHash(subDirectory As %String) As %String [ CodeMode = expression
 
 ClassMethod %OnBeforeBuildIndices(ByRef indexlist As %String(MAXLEN="") = "") As %Status [ Private, ServerOnly = 1 ]
 {
+    if (indexlist [ "CacheItemIndex") || (indexlist = "") {
+        // CacheItemIndex is unique on SubDirectoryHash, so rows carried over from a release that
+        // predates that property would all index under the same empty value. A cache row is derived
+        // data. Drop them and let the next build re-parse the manifests.
+        set tRes = ##class(%SQL.Statement).%ExecDirect(,"delete from %IPM_Repo_Filesystem.Cache where SubDirectoryHash is null or SubDirectoryHash = ''")
+        if tRes.%SQLCODE < 0 {
+            quit $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
+        }
+    }
     if (indexlist [ "SemVer") || (indexlist = "") {
         // Force recomputation of SemVer property if index needs to be rebuilt (i.e., because structure has changed)
         set tRes = ##class(%SQL.Statement).%ExecDirect(,"update %IPM_Repo_Filesystem.Cache set SemVer = ''")
@@ -167,12 +176,16 @@ ClassMethod RootNameVersionOpenValidated(
             quit
         }
 
-        // Compare the cached content hash with the file on disk. An entry written before
-        // ContentHash existed holds an empty value, so this comparison also upgrades old rows on
-        // their first validated open.
         set currentHash = $$$lcase(##class(%File).SHA1Hash(filePath, 1))
         if (cacheObj.ContentHash '= currentHash) {
-            do ##class(%IPM.Repo.Filesystem.Definition).RefreshCacheEntry(cacheObj, filePath, currentHash)
+            // An unsaved row still holds the old Name and Version, so the index re-check below would
+            // pass on stale data.
+            if '##class(%IPM.Repo.Filesystem.Definition).RefreshCacheEntry(cacheObj, filePath, currentHash) {
+                set message = filePath_" now describes a module already cached under "_root
+                set cacheObj = ""
+                set status = $$$ERROR($$$GeneralError, message)
+                quit
+            }
 
             // The re-parse can change Name or Version, so the entry may no longer be the module that
             // was asked for. Returning it would install something other than what the caller resolved.
