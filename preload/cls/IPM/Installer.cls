@@ -29,6 +29,7 @@ XData PM [ XMLNamespace = INSTALLER ]
   </Configuration>
   <Invoke Class="IPM.Installer" Method="CleanupOldMappings"/>
   <Import File="${SRCDIR}" Recurse="1"/>
+  <Invoke Class="IPM.Installer" Method="ForceCompileEvenInSYS" />
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/>
@@ -40,6 +41,13 @@ XData PM [ XMLNamespace = INSTALLER ]
 </Namespace>
 
 </Manifest>
+}
+
+ClassMethod ForceCompileEvenInSYS()
+{
+    $$$RemoveClsTempNodes
+    do $system.OBJ.CompilePackage("%IPM","ckf")
+    $$$AddClsTempNodes
 }
 
 XData MapOnly [ XMLNamespace = INSTALLER ]
@@ -93,16 +101,6 @@ ClassMethod Map(
     do %code.WriteLine(" Set pVars(""CURNSGlobalDB"")=$Get(properties(""Globals""))")
     do %code.WriteLine(" If ##class(Config.MapPackages).Exists(prevNS,""%IPM"") && ##class(Config.MapRoutines).Exists(prevNS,""%IPM.*"") { Quit $$$OK }")
     quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "MapOnly")
-}
-
-ClassMethod AsyncSetup(Args...)
-{
-    try {
-        set tSC = ..setup(Args...)
-    } catch ex {
-        set tSC = ex.AsStatus()
-    }
-    do $system.Event.Signal($zparent, tSC)
 }
 
 ClassMethod ZPMInit(
@@ -214,31 +212,10 @@ ClassMethod EndCompile(qstruct) As %Status
     write !,"Installing ZPM"
 
     set ts = $zhorolog
-    set logFile=##class(%File).TempFilename()
-    job ..AsyncSetup(tModDir, 3):(:::logFile):0
-    if '$test {
-        quit $$$ERROR($$$GeneralError, "Job did not start")
-    }
-
-    #; Wait setup
-    set child=$zchild
-    set tSC = $$$OK
-    do {
-        hang 1
-        set $listbuild(res, tSC) = $system.Event.WaitMsg("", 10)
-        quit:res=1
-    } while $data(^$job(child))
-
-    set fs=##class(%Stream.FileCharacter).%New()
-    set fs.Filename=logFile
-    while 'fs.AtEnd {
-        write !,fs.ReadLine()
-    }
-    if ##class(%File).Delete(logFile)
-
+    set sc = ..setup(tModDir, 3)
     write !,"Time spent ",$zhorolog - ts
 
-    quit tSC
+    quit sc
 }
 
 /// Check currently installed version, if any

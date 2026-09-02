@@ -1,11 +1,8 @@
 {
     "objectscript.conn": {
         "active": true,
-        "docker-compose": {
-            "service": "iris"
-        },
-        "username": "_system",
-        "password": "SYS",
+        "host": "localhost",
+        "server": "docker-iris",
         "ns": "USER"
     },
     // Non-default export settings needed so Testing Manager extension can find sources when doing coverage runs
@@ -28,5 +25,17 @@
     "editor.detectIndentation": false,
     "editor.insertSpaces": true,
     "editor.formatOnSave": true,
-    "files.trimTrailingWhitespace": true
+    "files.trimTrailingWhitespace": true,
+    "intersystems.servers": {
+        "docker-iris": {
+            "webServer": {
+                "scheme": "http",
+                "host": "localhost",
+                "port": 52774,
+                "pathPrefix": ""
+            },
+            "username": "_SYSTEM",
+            "password": "SYS"
+        }
+    }
 }

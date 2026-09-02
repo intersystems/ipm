@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Performance: Studio project creation on package load in dev mode is now 80% faster.
 - #994: Prevent crash in `zn` command when target namespace lacks IPM mappings
+- #1215: installer is synchronous rather than jobbed for simplified logging/debugging
 
 ## [0.10.9] - 2026-08-05
 
