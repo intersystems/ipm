@@ -1,10 +1,12 @@
-r"""Note: 
+r"""Note:
 This is a pure python implementation of the rpds-py library implemented using Rust here https://github.com/crate-py/rpds
 This should be placed somewhere under <iris-root>/lib/python, so that when users decide to install the real rpds-py library, it will override this one.
 """
 
-from collections.abc import Mapping, Iterable, Iterator, Set
-from typing import Any, Generic, TypeVar
+from __future__ import annotations
+
+from collections.abc import Iterator, Set
+from typing import Any, Generic, Iterable, Mapping, TypeVar
 
 _T = TypeVar("_T")
 _KT_co = TypeVar("_KT_co", covariant=True)

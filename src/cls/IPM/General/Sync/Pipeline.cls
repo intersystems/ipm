@@ -82,7 +82,11 @@ ClassMethod Run(
         // Step 4: Compute disk changes vs baseline. module.xml is owned by SyncCheckModuleXml
         // above and is deliberately excluded by ComputeChanges, so it never appears in
         // modified/deleted here.
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes))
+        // retried is the subset of modified that ComputeChanges forced back in after a previous
+        // failed sync; testPending is the same for files an earlier sync applied without running
+        // their tests, and is only populated when this sync runs tests. Both are reported below and
+        // otherwise handled as normal modifications from here on.
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).ComputeChanges(module, .modified, .deleted, .reverseIndex, .allFiles, .allHashes, .retried, runTests, .testPending))
 
         // Falls through when only deletes exist and processDeletes=1
         if '$data(modified) && ('$data(deleted) || 'processDeletes) {
@@ -102,12 +106,24 @@ ClassMethod Run(
             quit
         }
 
-        // Step 5: Partition changes by owning resource
-        kill syncByResource
-        do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource)
-        if processDeletes {
-            do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource)
+        if $data(retried) {
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Retrying "_##class(%IPM.General.Sync.Output).CountNodes(.retried)_" file(s) from a previous failed sync.")
         }
+
+        if $data(testPending) {
+            do ##class(%IPM.General.Sync.Output).Log(moduleName, "Running tests for "_##class(%IPM.General.Sync.Output).CountNodes(.testPending)_" file(s) synced earlier without -test.")
+        }
+
+        // Step 5: Partition changes by owning resource
+        kill syncByResource, unrouted
+        do ..SyncRoutePathSet(.modified, .reverseIndex, "modified", .syncByResource, .unrouted)
+        if processDeletes {
+            do ..SyncRoutePathSet(.deleted, .reverseIndex, "deleted", .syncByResource, .unrouted)
+        }
+        // A changed file that maps to no resource cannot be synced. Report it and drop it from
+        // modified/deleted before step 9, so its hash is not committed and the next sync detects it
+        // again rather than reporting success over a permanently dropped edit.
+        do ..SyncReportUnroutedPaths(moduleName, .unrouted, .modified, .deleted)
         do ..SyncCollectPreloadResources(.syncByResource, .preloadResources)
 
         // Step 6: Dispatch OnSync to each processor; load unhandled compilable files
@@ -130,7 +146,24 @@ ClassMethod Run(
         // Step 9: Commit new hashes on success (skipped on error so next sync re-detects).
         // Done before running tests below so a test failure doesn't prevent the file-sync
         // outcome from being committed and reported — file sync and test results are independent.
-        $$$ThrowOnError(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, processDeletes))
+        $$$ThrowOnError(##class(%IPM.Storage.FileHash).CommitChanges(module, .modified, .deleted, processDeletes, runTests))
+        // Past this point the change set is recorded as synced, so the error handler below must not
+        // flag it for retry: anything that fails from here on (a failing test in step 10) says
+        // nothing about whether the files landed.
+        set committed = 1
+
+        // The hashes are committed, so flag the test-owned paths to keep them in the change set:
+        // the next sync with -test forces them through and runs their tests (see FileHash's
+        // TestPending property).
+        if 'runTests {
+            do ..SyncCollectTestPaths(.modified, .reverseIndex, .testPaths)
+            if $data(testPaths) {
+                set markSC = ##class(%IPM.Storage.FileHash).MarkTestPending(moduleName, .testPaths)
+                if $$$ISERR(markSC) {
+                    write !, "WARNING: could not flag synced test file(s) to be tested by the next sync -test: ", $system.Status.GetOneErrorText(markSC)
+                }
+            }
+        }
         if moduleXmlChanged {
             do ..SyncCommitModuleXml(module, moduleXmlPath, moduleXmlRelPath)
         }
@@ -157,6 +190,12 @@ ClassMethod Run(
         }
         do ##class(%IPM.General.Sync.Output).Log(moduleName, "Sync complete: "_modCount_" file(s) updated"_$select(delCount>0:", "_delCount_" deleted", 1:"")_".")
 
+        // Report the deferral, not just record it: "I edited a test and synced, and nothing ran" is
+        // exactly the confusion this is here to prevent.
+        if 'runTests, $data(testPaths) {
+            write !, "  ", ##class(%IPM.General.Sync.Output).CountNodes(.testPaths), " test file(s) synced without running tests; they will run on the next sync with -test."
+        }
+
         do ##class(%IPM.General.Sync.Output).PrintTail(moduleName, verbose, moduleXmlChanged, syncStart, .unsupportedResources, .preloadResources)
 
         // File sync is committed and reported. Mark success before running tests so a fatal
@@ -170,6 +209,17 @@ ClassMethod Run(
 
     } catch e {
         set sc = e.AsStatus()
+        // Step 9 never ran, so no hash was committed and the baseline still describes the last
+        // successfully-synced content — while the namespace holds whatever this attempt left behind.
+        // Fixing the file by reverting it would hash back to the baseline and go unnoticed, so flag
+        // what was being applied and let the next sync force it through.
+        // Reported as a warning, never thrown: it must not replace the error that got us here.
+        if '$get(committed, 0), $data(modified) || $data(deleted) {
+            set markSC = ##class(%IPM.Storage.FileHash).MarkFailed(module, .modified, .deleted, $get(processDeletes, 0))
+            if $$$ISERR(markSC) {
+                write !, "WARNING: could not flag the failed sync's files for retry: ", $system.Status.GetOneErrorText(markSC)
+            }
+        }
     }
     quit sc
 }
@@ -240,9 +290,13 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         for {
             set childName = $order(childArr(childName))
             quit:childName=""
-            set docToResource(childName) = resource.Name
-            set docToResource(childName, "Processor") = resource.Processor
-            set docToResource(childName, "Resource") = resource
+            // Keyed canonically: the storedPaths fallback below looks these up with a name from
+            // RelPathToDocName ("Foo.Bar.CLS"), while ResolveChildren yields "Foo.Bar.cls".
+            set canonicalChildName = ##class(%IPM.Storage.FileHash).CanonicalDocName(childName)
+            set docToResource(canonicalChildName) = resource.Name
+            set docToResource(canonicalChildName, "Processor") = resource.Processor
+            set docToResource(canonicalChildName, "Resource") = resource
+            set docToResource(canonicalChildName, "DocName") = childName
 
             // A resource added since the last %Compile has no baseline row yet, so GetStoredPaths
             // below won't find it. Map its relPath directly.
@@ -298,14 +352,20 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         if docName = "" {
             continue
         }
-        if '$data(docToResource(docName)) {
+        // docToResource is keyed by CanonicalDocName, and an exact-match subscript lookup that
+        // differs only in extension case silently misses, so canonicalize before looking up.
+        set canonicalDocName = ##class(%IPM.Storage.FileHash).CanonicalDocName(docName)
+        if '$data(docToResource(canonicalDocName)) {
             continue
         }
 
-        set reverseIndex(relPath) = docToResource(docName)
-        set reverseIndex(relPath, "Processor") = docToResource(docName, "Processor")
-        set reverseIndex(relPath, "Resource") = docToResource(docName, "Resource")
-        set reverseIndex(relPath, "DocName") = docName
+        set reverseIndex(relPath) = docToResource(canonicalDocName)
+        set reverseIndex(relPath, "Processor") = docToResource(canonicalDocName, "Processor")
+        set reverseIndex(relPath, "Resource") = docToResource(canonicalDocName, "Resource")
+        // Prefer the resource's own spelling of the document name over the one derived from the
+        // path: SyncApplyDeletes passes this straight to the server, and the derived form differs
+        // in extension case.
+        set reverseIndex(relPath, "DocName") = $get(docToResource(canonicalDocName, "DocName"), docName)
     }
 }
 
@@ -329,13 +389,41 @@ ClassMethod SyncCollectPreloadResources(
     }
 }
 
+/// Collect the changed paths whose owning resource is a test resource that runs in the "test" phase,
+/// so a sync that isn't running tests can flag them as pending (see FileHash's TestPending property).
+/// Restricted to "test"-phase resources, the only ones sync -test runs: a verify-only resource's
+/// files would stay flagged forever.
+ClassMethod SyncCollectTestPaths(
+    ByRef modified,
+    ByRef reverseIndex,
+    Output testPaths) [ Private ]
+{
+    kill testPaths
+    set relPath = ""
+    for {
+        set relPath = $order(modified(relPath))
+        quit:relPath=""
+        if '$data(reverseIndex(relPath, "Processor"), processor) {
+            continue
+        }
+        if '$isobject(processor) || 'processor.%IsA("%IPM.ResourceProcessor.Test") {
+            continue
+        }
+        if '$listfind(processor.Phase, "test") {
+            continue
+        }
+        set testPaths(relPath) = ""
+    }
+}
+
 /// Route a set of changed paths to their owning resources, categorized by type (modified/deleted).
 /// Only sync-supporting resources appear in reverseIndex, so no filtering needed here.
 ClassMethod SyncRoutePathSet(
     ByRef paths,
     ByRef reverseIndex,
     category As %String,
-    ByRef syncByResource) [ Private ]
+    ByRef syncByResource,
+    ByRef unrouted) [ Private ]
 {
     set relPath = ""
     for {
@@ -343,12 +431,46 @@ ClassMethod SyncRoutePathSet(
         quit:relPath=""
 
         if '$data(reverseIndex(relPath)) {
+            // The caller reports these and withholds their hashes so the change isn't lost.
+            // Accumulated across both calls.
+            set unrouted(category, relPath) = ""
             continue
         }
         set resName = reverseIndex(relPath)
         set syncByResource(resName, category, relPath) = ""
         set syncByResource(resName, "Processor") = reverseIndex(relPath, "Processor")
         set syncByResource(resName, "Resource") = reverseIndex(relPath, "Resource")
+    }
+}
+
+/// Report changed files that routed to no resource and remove them from the change sets, so their
+/// hashes are not committed in step 9 and the next sync detects them again.
+ClassMethod SyncReportUnroutedPaths(
+    moduleName As %String,
+    ByRef unrouted,
+    ByRef modified,
+    ByRef deleted) [ Private ]
+{
+    set count = 0
+    set category = ""
+    for {
+        set category = $order(unrouted(category))
+        quit:category=""
+        set relPath = ""
+        for {
+            set relPath = $order(unrouted(category, relPath))
+            quit:relPath=""
+            set count = count + 1
+            write !, "WARNING: no resource owns ", relPath, "; change not synced."
+            if category = "modified" {
+                kill modified(relPath)
+            } else {
+                kill deleted(relPath)
+            }
+        }
+    }
+    if count > 0 {
+        do ##class(%IPM.General.Sync.Summary).AddWarning(moduleName, count _ " changed file(s) matched no resource and were not synced; they will be re-detected on the next sync.")
     }
 }
 
@@ -456,8 +578,8 @@ ClassMethod SyncApplyDeletes(
 }
 
 /// Run test-phase tests for changed test case classes recorded in params("Sync","ChangedTestCases").
-/// Groups changed classes by owning resource first, then dispatches one batched RunTest call
-/// per resource (via OnSyncRunTests) instead of one call per class — avoids N separate
+/// Resolves each changed class to exactly one owning resource first, then dispatches one batched
+/// RunTest call per resource (via OnSyncRunTests) instead of one call per class — avoids N separate
 /// reload/compile/run cycles when several test classes in the same resource changed together.
 ClassMethod SyncRunTests(
     orderedResourceList As %ListOfObjects,
@@ -466,16 +588,10 @@ ClassMethod SyncRunTests(
 {
     set sc = $$$OK
     try {
-        // Step 1: group changed classes by owning resource: byResource(resourceName, className) = ""
-        kill byResource
-        set className = ""
-        for {
-            set className = $order(params("Sync", "ChangedTestCases", className), 1, owningResource)
-            quit:className=""
-            set byResource(owningResource, className) = ""
-        }
-
-        // Step 2: one OnSyncRunTests call per resource
+        // Step 1: index the module's test resources by position, and by the resource Name that
+        // OnSync recorded against each changed class.
+        kill testResources, byName
+        set resCount = 0
         set testKey = ""
         for {
             set testResource = orderedResourceList.GetNext(.testKey)
@@ -487,13 +603,52 @@ ClassMethod SyncRunTests(
             if 'testResource.Processor.%IsA("%IPM.ResourceProcessor.Test") {
                 continue
             }
-            if '$data(byResource(testResource.Name)) {
+            set resCount = resCount + 1
+            set testResources(resCount) = testResource
+            set byName(testResource.Name, resCount) = ""
+        }
+
+        // Step 2: assign each changed class to exactly one resource:
+        // byResource(resourceIndex, className) = "".
+        // Several UnitTest resources may point at the same directory and differ only by Package, so
+        // the Name recorded by OnSync can match more than one of them, and dispatching to every
+        // match would run the class once per sharing resource. Prefer the resource whose
+        // Package/Class covers the class; fall back to the first resource with that Name (e.g. for a
+        // class outside every declared package) so it still runs somewhere.
+        kill byResource
+        set className = ""
+        for {
+            set className = $order(params("Sync", "ChangedTestCases", className), 1, owningResource)
+            quit:className=""
+            set target = ""
+            set idx = ""
+            for {
+                set idx = $order(byName(owningResource, idx))
+                quit:idx=""
+                if testResources(idx).Processor.OwnsClassName(className) {
+                    set target = idx
+                    quit
+                }
+            }
+            if target = "" {
+                set target = $order(byName(owningResource, ""))
+            }
+            if target = "" {
                 continue
             }
+            set byResource(target, className) = ""
+        }
+
+        // Step 3: one OnSyncRunTests call per resource
+        for idx = 1:1:resCount {
+            if '$data(byResource(idx)) {
+                continue
+            }
+            set testResource = testResources(idx)
             if '$listfind(testResource.Processor.Phase, "test") {
                 set skipClassName = ""
                 for {
-                    set skipClassName = $order(byResource(testResource.Name, skipClassName))
+                    set skipClassName = $order(byResource(idx, skipClassName))
                     quit:skipClassName=""
                     write:verbose !, "Skipping verify-scoped test: ", skipClassName, " (use 'verify' to run)"
                     do ##class(%IPM.General.Sync.Summary).AddSkipped(testResource.Module.Name, skipClassName)
@@ -501,7 +656,7 @@ ClassMethod SyncRunTests(
                 continue
             }
             kill classInfo
-            merge classInfo = byResource(testResource.Name)
+            merge classInfo = byResource(idx)
             kill testParams
             merge testParams = params
             set testParams("DeveloperMode") = 1

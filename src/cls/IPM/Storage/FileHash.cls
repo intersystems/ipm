@@ -17,6 +17,17 @@ Property PathHash As %String(MAXLEN = 40) [ Required ];
 /// SHA-1 content hash (hex).
 Property Hash As %String(MAXLEN = 64) [ Required ];
 
+/// Set when a sync tried to apply this path and failed. A failed sync commits no hashes, so Hash
+/// still describes the last successfully-synced content while the namespace holds whatever the
+/// failed attempt left behind. This flag keeps the path in the change set until a sync commits it,
+/// so reverting the file to the baseline content doesn't make it invisible to change detection.
+Property SyncFailed As %Boolean [ InitialExpression = 0 ];
+
+/// Set when a sync applied this path but did not run its tests — a plain <code>sync</code> over a
+/// file owned by a test resource that runs in the "test" phase. The new hash is committed, so this
+/// flag keeps the path in the change set until a sync with -test runs its tests.
+Property TestPending As %Boolean [ InitialExpression = 0 ];
+
 Index ModulePathIndex On (ModuleName, PathHash) [ Unique ];
 
 Index ModuleNameIndex On ModuleName;
@@ -203,16 +214,21 @@ ClassMethod RelPathToDocName(relPath As %String) As %String
 /// Pass 1: compilable files present in the namespace, from the pre-walked file set.
 /// Pass 2: manifest-derived paths (from reverseIndex) for files not yet compiled
 /// or non-compilable tracked files.
-/// Pass 3: iterate stored rows to detect deletions.
+/// Pass 3: rows flagged by a previous failed sync, forced in regardless of their hash.
+/// Pass 4: rows synced by an earlier sync that did not run their tests, forced in when this sync
+/// will run tests (runTests) so those tests finally run.
+/// Pass 5: iterate stored rows to detect deletions.
 /// allFiles(relPath)=fullPath is the full pre-walked module root (all extensions).
 /// allHashes(relPath)=sha1hex are pre-computed hashes from the same walk.
-/// module.xml is deliberately excluded from all three passes — it is owned by the pipeline's
+/// module.xml is deliberately excluded from every pass — it is owned by the pipeline's
 /// SyncCheckModuleXml/SyncCommitModuleXml, never routed as a normal file.
-/// Returns modified(relPath)=newHash and deleted(relPath)="" arrays.
-ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef reverseIndex, ByRef allFiles, ByRef allHashes) As %Status
+/// Returns modified(relPath)=newHash and deleted(relPath)="" arrays, plus retried(relPath)="" and
+/// testPending(relPath)="" for the subsets of modified that Pass 3 and Pass 4 forced in (for the
+/// caller's reporting only).
+ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Output deleted, ByRef reverseIndex, ByRef allFiles, ByRef allHashes, Output retried, runTests As %Boolean = 0, Output testPending) As %Status
 {
     set sc = $$$OK
-    kill modified, deleted
+    kill modified, deleted, retried, testPending
     try {
         set moduleName = module.Name
         kill seen
@@ -254,9 +270,53 @@ ClassMethod ComputeChanges(module As %IPM.Storage.Module, Output modified, Outpu
             do ..CompareOneFile(moduleName, relPath, $get(allHashes(relPath)), .modified, .seen)
         }
 
-        // Pass 3: iterate all stored rows — file not in allFiles → deleted. module.xml is skipped:
-        // it is always a stored row but is not part of the walked file set, so it would otherwise
-        // be misreported as deleted every sync.
+        // Pass 3: rows a previous sync failed on. Their baseline hash is still the last
+        // successfully-synced content, so a file reverted to that content compares as unchanged
+        // above while the namespace holds whatever the failed attempt left behind. Force these in
+        // until a sync commits them; paths gone from disk are left to the delete pass below.
+        set result = ##class(%SQL.Statement).%ExecDirect(,
+            "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ? AND SyncFailed = 1",
+            moduleName)
+        while result.%Next() {
+            set failedRelPath = result.%Get("RelativePath")
+            if failedRelPath = "module.xml" {
+                continue
+            }
+            if '$data(allFiles(failedRelPath)) {
+                continue
+            }
+            if $data(modified(failedRelPath)) {
+                continue
+            }
+            set modified(failedRelPath) = $get(allHashes(failedRelPath))
+            set retried(failedRelPath) = ""
+        }
+
+        // Pass 4: rows an earlier sync applied without running their tests. Their hashes are
+        // committed, so no pass above reports them. Forced in only when this sync runs tests, since
+        // only then does the flag get cleared.
+        if runTests {
+            set result = ##class(%SQL.Statement).%ExecDirect(,
+                "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ? AND TestPending = 1",
+                moduleName)
+            while result.%Next() {
+                set pendingRelPath = result.%Get("RelativePath")
+                if pendingRelPath = "module.xml" {
+                    continue
+                }
+                if '$data(allFiles(pendingRelPath)) {
+                    continue
+                }
+                if $data(modified(pendingRelPath)) {
+                    continue
+                }
+                set modified(pendingRelPath) = $get(allHashes(pendingRelPath))
+                set testPending(pendingRelPath) = ""
+            }
+        }
+
+        // Pass 5: iterate all stored rows — file not in allFiles → deleted. module.xml is always a
+        // stored row but is not part of the walked file set, so it is skipped.
         set result = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT RelativePath FROM %IPM_Storage.FileHash WHERE ModuleName = ?",
             moduleName)
@@ -301,7 +361,9 @@ ClassMethod CompareOneFile(moduleName As %String, relPath As %String, newHash As
 }
 
 /// After a successful sync, commit new hashes for modified files and optionally remove deleted rows.
-ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef deleted, processDeletes As %Boolean = 0) As %Status
+/// clearTestPending is set by a sync that ran tests: every path it committed has had its tests run,
+/// so any pending-test flag from an earlier sync without -test is spent (see the TestPending property).
+ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef deleted, processDeletes As %Boolean = 0, clearTestPending As %Boolean = 0) As %Status
 {
     set sc = $$$OK
     try {
@@ -321,6 +383,11 @@ ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef d
             }
 
             set instance.Hash = newHash
+            // This path is now synced, so any retry flag from an earlier failed attempt is spent.
+            set instance.SyncFailed = 0
+            if clearTestPending {
+                set instance.TestPending = 0
+            }
             $$$ThrowOnError(instance.%Save())
         }
 
@@ -339,6 +406,93 @@ ClassMethod CommitChanges(module As %IPM.Storage.Module, ByRef modified, ByRef d
         }
     } catch e {
         set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// After a failed sync, flag the paths it was applying so the next sync forces them through again
+/// even if their content now matches the baseline (see the SyncFailed property).
+/// Paths with no baseline row need no flag: an absent row already reads as modified.
+/// deleted is only flagged when processDeletes is set — otherwise the deletions were never
+/// attempted, and an absent file is re-detected by ComputeChanges' delete pass anyway.
+/// Called from an error handler, so failures here are returned for the caller to warn about rather
+/// than thrown: they must not replace the error that caused the sync to fail.
+ClassMethod MarkFailed(
+    module As %IPM.Storage.Module,
+    ByRef modified,
+    ByRef deleted,
+    processDeletes As %Boolean = 0) As %Status
+{
+    set sc = ..MarkPathSetFailed(module.Name, .modified)
+    if processDeletes {
+        set sc = $$$ADDSC(sc, ..MarkPathSetFailed(module.Name, .deleted))
+    }
+    quit sc
+}
+
+/// Set SyncFailed on every baselined path in one change-set array. See MarkFailed.
+ClassMethod MarkPathSetFailed(
+    moduleName As %String,
+    ByRef paths) As %Status [ Private ]
+{
+    set sc = $$$OK
+    set relPath = ""
+    for {
+        set relPath = $order(paths(relPath))
+        quit:relPath=""
+
+        set existing = ..OpenByPath(moduleName, relPath, .openSC)
+        if $$$ISERR(openSC) {
+            set sc = $$$ADDSC(sc, openSC)
+            continue
+        }
+        if '$isobject(existing) {
+            continue
+        }
+        if existing.SyncFailed {
+            continue
+        }
+        set existing.SyncFailed = 1
+        set saveSC = existing.%Save()
+        if $$$ISERR(saveSC) {
+            set sc = $$$ADDSC(sc, saveSC)
+        }
+    }
+    quit sc
+}
+
+/// Flag paths a sync applied without running their tests, so the next sync with -test forces them
+/// back into the change set even though their content matches the baseline (see the TestPending
+/// property). Called after CommitChanges, which creates a row for everything it committed, so a
+/// path with no row here was never synced and needs no flag.
+/// Failures are returned rather than thrown: the files themselves are synced and reported by then,
+/// and losing the marker is a missed test run, not a failed sync.
+ClassMethod MarkTestPending(
+    moduleName As %String,
+    ByRef paths) As %Status
+{
+    set sc = $$$OK
+    set relPath = ""
+    for {
+        set relPath = $order(paths(relPath))
+        quit:relPath=""
+
+        set existing = ..OpenByPath(moduleName, relPath, .openSC)
+        if $$$ISERR(openSC) {
+            set sc = $$$ADDSC(sc, openSC)
+            continue
+        }
+        if '$isobject(existing) {
+            continue
+        }
+        if existing.TestPending {
+            continue
+        }
+        set existing.TestPending = 1
+        set saveSC = existing.%Save()
+        if $$$ISERR(saveSC) {
+            set sc = $$$ADDSC(sc, saveSC)
+        }
     }
     quit sc
 }
@@ -370,17 +524,55 @@ ClassMethod GetStoredPaths(moduleName As %String, Output paths)
     }
 }
 
-/// Normalize a relative path: forward slashes, collapse //, strip leading slash.
+/// Normalize a relative path: forward slashes, collapse //, drop "." segments, strip leading slash.
+///
+/// Collapsing "." segments is what makes <SourcesRoot>.</SourcesRoot> work: such a module composes
+/// every resource path as SourcesRoot_"/"_Directory (see %IPM.ResourceProcessor.Default.Document and
+/// .Package OnItemRelativePath / GetSyncDirectory), so its paths arrive here as "./cls/Foo/Bar.cls"
+/// while the directory walk and the stored baseline key the same file as "cls/Foo/Bar.cls". Both
+/// forms reduce to one here so the sync reverse index matches changed paths under such a resource.
 ClassMethod NormalizePath(path As %String) As %String
 {
     set path = $translate(path, "\", "/")
     while path [ "//" {
         set path = $replace(path, "//", "/")
     }
+    while path [ "/./" {
+        set path = $replace(path, "/./", "/")
+    }
     while $extract(path) = "/" {
         set path = $extract(path, 2, *)
     }
+    // A leading "./" survives the loop above (it has no slash in front of it), and repeats when
+    // SourcesRoot is something like "./." — so strip until none is left.
+    while $extract(path, 1, 2) = "./" {
+        set path = $extract(path, 3, *)
+    }
+    // SourcesRoot="." with no Directory reduces the whole path to "."; that is the module root, not
+    // a file, so it normalizes to the empty relative path.
+    if path = "." {
+        set path = ""
+    }
     quit path
+}
+
+/// Canonical form of a server document name for use as an array subscript: the name as given, with
+/// the extension upper-cased.
+///
+/// Document names reach the sync pipeline from two sources that disagree on case:
+/// <method>RelPathToDocName</method> produces "Foo.Bar.CLS", while a resource's ResolveChildren
+/// yields the Studio-style "Foo.Bar.cls". An exact-match subscript lookup between the two always
+/// misses, so both sides route through this method.
+ClassMethod CanonicalDocName(docName As %String) As %String
+{
+    if docName = "" {
+        quit ""
+    }
+    set ext = $piece(docName, ".", *)
+    if ext = docName {
+        quit docName
+    }
+    quit $piece(docName, ".", 1, *-1) _ "." _ $$$UPPER(ext)
 }
 
 /// Walk each directory in scanDirs(relDir)="" under moduleRoot and hash all files.
@@ -584,6 +776,12 @@ Storage Default
 </Value>
 <Value name="5">
 <Value>PathHash</Value>
+</Value>
+<Value name="6">
+<Value>SyncFailed</Value>
+</Value>
+<Value name="7">
+<Value>TestPending</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Storage.FileHashD</DataLocation>
