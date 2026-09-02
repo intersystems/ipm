@@ -29,6 +29,7 @@ XData PM [ XMLNamespace = INSTALLER ]
   </Configuration>
   <Invoke Class="IPM.Installer" Method="CleanupOldMappings"/>
   <Import File="${SRCDIR}" Recurse="1"/>
+  <Invoke Class="IPM.Installer" Method="ForceCompileEvenInSYS" />
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/>
@@ -40,6 +41,13 @@ XData PM [ XMLNamespace = INSTALLER ]
 </Namespace>
 
 </Manifest>
+}
+
+ClassMethod ForceCompileEvenInSYS()
+{
+    $$$RemoveClsTempNodes
+    do $system.OBJ.CompilePackage("%IPM","ckf")
+    $$$AddClsTempNodes
 }
 
 XData MapOnly [ XMLNamespace = INSTALLER ]
