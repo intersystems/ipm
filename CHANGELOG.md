@@ -10,9 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
+- #536: Improve filesystem repository cache through performance improvements, smart auto-cache rebuilding on install, and new `-rebuild-cache` flag for `repo` command to manually rebuild the entire cache.
 
 ### Changed
 - Minimum supported Python version is now 3.9
+- #536: An explicit `-depth` on a filesystem repository is no longer overwritten during the initial scan, so a module added at a level within the configured depth is still discovered.
 
 ### Fixed
 - Performance: Studio project creation on package load in dev mode is now 80% faster.

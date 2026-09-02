@@ -4,7 +4,7 @@ Class %IPM.Storage.FileHash Extends %Persistent
 Property ModuleName As %String(MAXLEN = 255) [ Required ];
 
 /// Path relative to the module root, normalized: forward slashes, no leading slash, no double slashes.
-/// Callers must normalize via NormalizePath before storing or looking up.
+/// Callers must normalize via %IPM.Utils.File:NormalizePath before storing or looking up.
 Property RelativePath As %String(MAXLEN = "") [ Required ];
 
 /// SHA-1 of RelativePath (hex), maintained by RelativePathSet. Subscripting ModulePathIndex on
@@ -524,38 +524,6 @@ ClassMethod GetStoredPaths(moduleName As %String, Output paths)
     }
 }
 
-/// Normalize a relative path: forward slashes, collapse //, drop "." segments, strip leading slash.
-///
-/// Collapsing "." segments is what makes <SourcesRoot>.</SourcesRoot> work: such a module composes
-/// every resource path as SourcesRoot_"/"_Directory (see %IPM.ResourceProcessor.Default.Document and
-/// .Package OnItemRelativePath / GetSyncDirectory), so its paths arrive here as "./cls/Foo/Bar.cls"
-/// while the directory walk and the stored baseline key the same file as "cls/Foo/Bar.cls". Both
-/// forms reduce to one here so the sync reverse index matches changed paths under such a resource.
-ClassMethod NormalizePath(path As %String) As %String
-{
-    set path = $translate(path, "\", "/")
-    while path [ "//" {
-        set path = $replace(path, "//", "/")
-    }
-    while path [ "/./" {
-        set path = $replace(path, "/./", "/")
-    }
-    while $extract(path) = "/" {
-        set path = $extract(path, 2, *)
-    }
-    // A leading "./" survives the loop above (it has no slash in front of it), and repeats when
-    // SourcesRoot is something like "./." — so strip until none is left.
-    while $extract(path, 1, 2) = "./" {
-        set path = $extract(path, 3, *)
-    }
-    // SourcesRoot="." with no Directory reduces the whole path to "."; that is the module root, not
-    // a file, so it normalizes to the empty relative path.
-    if path = "." {
-        set path = ""
-    }
-    quit path
-}
-
 /// Canonical form of a server document name for use as an array subscript: the name as given, with
 /// the extension upper-cased.
 ///
@@ -576,8 +544,9 @@ ClassMethod CanonicalDocName(docName As %String) As %String
 }
 
 /// Walk each directory in scanDirs(relDir)="" under moduleRoot and hash all files.
-/// Returns files(relPath)=fullPath and hashes(relPath)=sha1hex (lowercase).
-/// Uses a single Python os.walk call across all directories for speed; falls back to SQL BFS.
+/// Returns files(relPath)=fullPath and hashes(relPath)=sha1hex (lowercase), keyed relative to
+/// moduleRoot. Resolves the module-relative scan dirs to absolute existing directories and defers
+/// the walk itself to %IPM.Utils.File, which the filesystem repository cache scan shares.
 ClassMethod WalkAndHashDirs(moduleRoot As %String, ByRef scanDirs, Output files, Output hashes) As %Status
 {
     set sc = $$$OK
@@ -586,7 +555,6 @@ ClassMethod WalkAndHashDirs(moduleRoot As %String, ByRef scanDirs, Output files,
         set moduleRoot = ##class(%File).NormalizeDirectory(moduleRoot)
 
         // Collect existing absolute directories to walk.
-        kill absDirList
         set dirCount = 0
         set relDir = ""
         for {
@@ -600,25 +568,8 @@ ClassMethod WalkAndHashDirs(moduleRoot As %String, ByRef scanDirs, Output files,
         }
         quit:dirCount=0
 
-        // Single Python call across all directories — avoids per-dir interpreter overhead.
-        set dirsJson = "["
-        for i = 1:1:dirCount {
-            if i > 1 { set dirsJson = dirsJson _ "," }
-            set dirsJson = dirsJson _ """" _ $replace(absDirList(i), "\", "\\") _ """"
-        }
-        set dirsJson = dirsJson _ "]"
-
-        set walkSC = ..WalkAndHashFilesPython(dirsJson, moduleRoot, .files, .hashes)
-        if $$$ISERR(walkSC) {
-            // SQL fallback: walk each directory individually.
-            kill files, hashes
-            for i = 1:1:dirCount {
-                kill dirFiles, dirHashes
-                $$$ThrowOnError(..WalkAndHashFilesSQL(absDirList(i), moduleRoot, .dirFiles, .dirHashes))
-                merge files = dirFiles
-                merge hashes = dirHashes
-            }
-        }
+        // No depth cap and no filename filter: sync tracks every file under a declared directory.
+        set sc = ##class(%IPM.Utils.File).WalkDirectories(.absDirList, moduleRoot, 0, "", 1, .files, .hashes)
     } catch e {
         set sc = e.AsStatus()
     }
@@ -639,7 +590,7 @@ ClassMethod DeduplicateScanDirs(ByRef scanDirs)
         for {
             set keptDir = $order(kept(keptDir))
             quit:keptDir=""
-            set keptPrefix = ..NormalizePath(keptDir _ "/")
+            set keptPrefix = ##class(%IPM.Utils.File).NormalizePath(keptDir _ "/")
             if $extract(relDir, 1, $length(keptPrefix)) = keptPrefix {
                 set covered = 1
                 quit
@@ -651,112 +602,6 @@ ClassMethod DeduplicateScanDirs(ByRef scanDirs)
     }
     kill scanDirs
     merge scanDirs = kept
-}
-
-ClassMethod WalkAndHashFilesPython(dirsJson As %String, relativeToRoot As %String, Output files, Output hashes) As %Status [ Private ]
-{
-    set sc = $$$OK
-    try {
-        set relativeToRoot = ##class(%File).NormalizeDirectory(relativeToRoot)
-        set jsonStr = ..WalkAndHashFilesPythonImpl(dirsJson, relativeToRoot)
-        set result = ##class(%DynamicArray).%FromJSON(jsonStr)
-        set count = result.%Size()
-        for i = 0:1:(count - 1) {
-            set entry = result.%Get(i)
-            set relPath = entry.%Get("rel")
-            set files(relPath) = entry.%Get("full")
-            set hashes(relPath) = entry.%Get("hash")
-        }
-    } catch e {
-        set sc = e.AsStatus()
-    }
-    quit sc
-}
-
-ClassMethod WalkAndHashFilesPythonImpl(dirsJson As %String, relativeToRoot As %String) As %String [ Language = python ]
-{
-import os
-import json
-import hashlib
-import concurrent.futures
-
-SKIP_DIRS = {'.git', '__pycache__', 'node_modules'}
-
-dirs = json.loads(dirsJson)
-root_len = len(relativeToRoot.rstrip(os.sep)) + 1
-
-# Walk all directories, collecting all files.
-file_list = []
-for d in dirs:
-    for dirpath, dirnames, filenames in os.walk(d):
-        dirnames[:] = [x for x in dirnames if x not in SKIP_DIRS]
-        for fname in filenames:
-            full_path = os.path.join(dirpath, fname)
-            rel_path = full_path[root_len:].replace('\\', '/')
-            if rel_path:
-                file_list.append((rel_path, full_path))
-
-def hash_file(full_path):
-    try:
-        h = hashlib.sha1()
-        with open(full_path, 'rb') as f:
-            while chunk := f.read(65536):
-                h.update(chunk)
-        return h.hexdigest()
-    except (OSError, PermissionError):
-        return ""
-
-# Hash all files in parallel — SHA1 releases the GIL, so threads overlap I/O wait.
-with concurrent.futures.ThreadPoolExecutor(max_workers=24) as executor:
-    hash_results = list(executor.map(hash_file, [f for _, f in file_list]))
-
-return json.dumps([
-    {"rel": rel, "full": full, "hash": h}
-    for (rel, full), h in zip(file_list, hash_results)
-])
-}
-
-/// SQL-based BFS fallback that walks and hashes without Python.
-ClassMethod WalkAndHashFilesSQL(dir As %String, relativeToRoot As %String, Output files, Output hashes) As %Status [ Private ]
-{
-    set sc = $$$OK
-    try {
-        set dir = ##class(%File).NormalizeDirectory(dir)
-        set relativeToRoot = ##class(%File).NormalizeDirectory(relativeToRoot)
-        kill walkQueue
-        set walkHead = 1, walkTail = 1
-        set walkQueue(walkTail) = dir
-        for {
-            quit:(walkHead > walkTail)
-            set walkDir = walkQueue(walkHead)
-            set walkHead = walkHead + 1
-
-            set rs = ##class(%SQL.Statement).%ExecDirect(,
-                "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
-                walkDir, "*", "", 0)
-            while rs.%Next() {
-                set entryType = rs.%Get("Type")
-                set entryPath = rs.%Get("Name")
-                if entryType = "D" {
-                    set childDirName = ##class(%File).GetFilename(entryPath)
-                    if ",.git,__pycache__,node_modules," [ (","_childDirName_",") {
-                        continue
-                    }
-                    set walkTail = walkTail + 1
-                    set walkQueue(walkTail) = ##class(%File).NormalizeDirectory(entryPath)
-                    continue
-                }
-                set relPath = ..NormalizePath($extract(entryPath, $length(relativeToRoot) + 1, *))
-                if relPath '= "" {
-                    set files(relPath) = entryPath
-                    set hashes(relPath) = $$$lcase(##class(%File).SHA1Hash(entryPath, 1))
-                }
-            }
-        }
-    } catch e {
-        set sc = e.AsStatus()
-    }
-    quit sc
 }
 
 Storage Default

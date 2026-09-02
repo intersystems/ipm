@@ -523,7 +523,7 @@ Method OnItemRelativePath(pItemName As %String) As %String
 Method GetSyncDirectory() As %String
 {
     if $extract(..ResourceReference.Name) = "/" {
-        set dir = ##class(%IPM.Storage.FileHash).NormalizePath(..ResourceReference.Name)
+        set dir = ##class(%IPM.Utils.File).NormalizePath(..ResourceReference.Name)
         if $extract(dir, *) = "/" {
             set dir = $extract(dir, 1, *-1)
         }
@@ -538,9 +538,9 @@ Method GetSyncDirectory() As %String
             set prefix = ..ResourceReference.Module.SourcesRoot
         }
         if prefix '= "" {
-            set dir = ##class(%IPM.Storage.FileHash).NormalizePath(prefix _ "/" _ dir)
+            set dir = ##class(%IPM.Utils.File).NormalizePath(prefix _ "/" _ dir)
         } else {
-            set dir = ##class(%IPM.Storage.FileHash).NormalizePath(dir)
+            set dir = ##class(%IPM.Utils.File).NormalizePath(dir)
         }
     }
     quit dir
