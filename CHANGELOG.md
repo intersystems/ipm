@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Minimum supported Python version is now 3.9
-- #536: Configuring a filesystem repository no longer pins its search depth to the deepest `module.xml` found. Without `-depth` the search stays unlimited, so a module added at a new depth is still discovered.
+- #536: An explicit `-depth` on a filesystem repository is no longer overwritten during the initial scan, so a module added at a level within the configured depth is still discovered.
 
 ### Fixed
 - Performance: Studio project creation on package load in dev mode is now 80% faster.
