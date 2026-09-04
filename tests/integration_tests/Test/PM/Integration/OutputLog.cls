@@ -12,12 +12,22 @@ Property SavedLogDir As %String;
 
 Property SavedAutoLog As %String;
 
+/// Path of a tee this suite inherited, e.g. when the shell running the tests has AutoLog on.
+Property InheritedLogPath As %String;
+
 Method OnBeforeOneTest(testname As %String) As %Status
 {
     set ..TempDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "ipm-test-outputlog-" _ $job)
     do ##class(%File).CreateDirectoryChain(..TempDir)
     set ..SavedLogDir = ##class(%IPM.Repo.UniversalSettings).GetValue(##class(%IPM.Repo.UniversalSettings).#LogDirectory)
     set ..SavedAutoLog = ##class(%IPM.Repo.UniversalSettings).GetValue(##class(%IPM.Repo.UniversalSettings).#AutoLog)
+    // These tests start and stop tees of their own, so an inherited one is set aside and
+    // put back afterwards. %UnitTest.Manager snapshots the device redirect flag and fails
+    // the case if it does not match at the end.
+    set ..InheritedLogPath = ##class(%IPM.General.OutputLog).GetActivePath()
+    if ..InheritedLogPath '= "" {
+        do ##class(%IPM.General.OutputLog).Stop()
+    }
     return $$$OK
 }
 
@@ -44,6 +54,9 @@ Method OnAfterOneTest(testname As %String) As %Status
         do ##class(%IPM.Repo.UniversalSettings).ResetToDefault(##class(%IPM.Repo.UniversalSettings).#AutoLog)
     }
     do ##class(%File).RemoveDirectoryTree(..TempDir)
+    if ..InheritedLogPath '= "" {
+        do ##class(%IPM.General.OutputLog).Start(..InheritedLogPath, 1)
+    }
     return $$$OK
 }
 
@@ -51,6 +64,9 @@ ClassMethod ReadFile(path As %String) As %String
 {
     set s = ##class(%Stream.FileCharacter).%New()
     do s.LinkToFile(path)
+    // Match the /IOTABLE="UTF8" the log device is opened with, so multi-byte
+    // characters read back as single characters rather than raw bytes.
+    set s.TranslateTable = "UTF8"
     return s.Read(s.Size)
 }
 
@@ -85,13 +101,14 @@ Method TestTeeEquivalence()
     set rawFile = ..ReadFile(logPath)
     do $$$AssertTrue(rawFile '= "", "File copy non-empty")
 
-    // Build ANSI-stripped capture string
+    // Strip ANSI before control characters: $zstrip would remove the ESC and leave the
+    // printable tail of each sequence, which the file copy does not have.
     set strippedCapture = ""
     set i = ""
     for {
         set i = $order(captured(i), 1, line)
         quit:i=""
-        set strippedCapture = strippedCapture _ $zstrip(line,"*C")
+        set strippedCapture = strippedCapture _ $zstrip(##class(%IPM.General.OutputLog).StripAnsi(line),"*C")
     }
     do $$$AssertTrue(strippedCapture '= "", "Device output captured")
 
@@ -236,6 +253,33 @@ Method TestAutoLogValidation()
     do $$$AssertStatusOK(sc, "AutoLog=1 accepted")
     set sc = ##class(%IPM.Repo.UniversalSettings).UpdateOne(##class(%IPM.Repo.UniversalSettings).#AutoLog, "0")
     do $$$AssertStatusOK(sc, "AutoLog=0 accepted")
+}
+
+/// -log-file covers one command and leaves an AutoLog session running afterwards.
+Method TestLogFileRestoresAutoLog()
+{
+    $$$ThrowOnError(##class(%IPM.Repo.UniversalSettings).UpdateOne(##class(%IPM.Repo.UniversalSettings).#LogDirectory, ..TempDir))
+    $$$ThrowOnError(##class(%IPM.Repo.UniversalSettings).UpdateOne(##class(%IPM.Repo.UniversalSettings).#AutoLog, "1"))
+    do ##class(%IPM.General.OutputLog).ClearAutoLog()
+    $$$ThrowOnError(##class(%IPM.General.OutputLog).StartAutoLog())
+    set autoPath = ##class(%IPM.General.OutputLog).GetActivePath()
+    do $$$AssertNotEquals(autoPath, "", "AutoLog tee started")
+
+    set oneOff = ..TempDir _ "oneoff.log"
+    do ##class(%IPM.Main).Shell("version -log-file " _ oneOff)
+    do $$$AssertEquals(##class(%IPM.General.OutputLog).GetActivePath(), autoPath, "AutoLog tee resumed after the -log-file command")
+    do $$$AssertTrue(##class(%File).Exists(oneOff), "-log-file wrote its own file")
+    do $$$AssertTrue(..ReadFile(oneOff) [ "-log-file", "One-off log holds the -log-file command header")
+
+    // A later command must land in the AutoLog transcript, and that transcript must not
+    // hold the -log-file command, which was teed elsewhere. The tee also captures the
+    // assertion lines %UnitTest writes to the device, so count command headers rather
+    // than searching for command text.
+    do ##class(%IPM.Main).Shell("version")
+    do ##class(%IPM.General.OutputLog).Stop()
+    set autoContent = ..ReadFile(autoPath)
+    do $$$AssertEquals($length(autoContent, "--- [") - 1, 1, "AutoLog transcript holds one command header")
+    do $$$AssertTrue(autoContent [ "] version ---", "AutoLog transcript header is the later plain command")
 }
 
 /// Zero-cost path: without -log-file and AutoLog off, OutputLog stays inactive.

@@ -1032,6 +1032,10 @@ ClassMethod ShellInternal(
 
     for {
         kill $$$DeprecationWarned
+        // Set before the try because RestoreLogAfterCommand() runs after it on every path,
+        // including the ones that leave the try early, such as an empty command line.
+        set tCommandLogPath = ""
+        set tDisplacedLogPath = ""
         try {
             // Have intro message just for first entrance to shell
             // Ensure not displayed if its just one command
@@ -1065,17 +1069,19 @@ ClassMethod ShellInternal(
 			new $$$ZPMCommandToLog
 			set $$$ZPMCommandToLog = tCommand
 
-            // Handle -log-file modifier: start or redirect the session tee
+            // Handle -log-file modifier: tee this one command to the given file
             set tLogFile = $get(tCommandInfo("modifiers","log-file"))
             if tLogFile '= "" {
                 if ##class(%File).GetDirectory(tLogFile) = "" {
                     set tLogFile = ##class(%IPM.Repo.UniversalSettings).GetLogDirectory() _ tLogFile
                 }
                 if tLogFile '= ##class(%IPM.General.OutputLog).GetActivePath() {
+                    // Set aside a tee that is already running, from AutoLog or an outer
+                    // shell, and put it back when the command finishes.
+                    set tDisplacedLogPath = ##class(%IPM.General.OutputLog).GetActivePath()
                     do ##class(%IPM.General.OutputLog).Stop()
                     $$$ThrowOnError(##class(%IPM.General.OutputLog).Start(tLogFile))
-                    // Stop the log only if this frame started it, so that nested shells don't cut off the outer command's log.
-                    set tOwnsLog = 1
+                    set tCommandLogPath = tLogFile
                 }
             }
             if ##class(%IPM.General.OutputLog).IsActive() {
@@ -1083,6 +1089,7 @@ ClassMethod ShellInternal(
             }
 
             if (tCommandInfo = "quit") {
+                do ..RestoreLogAfterCommand(tCommandLogPath, tDisplacedLogPath)
                 if tOwnsLog {
                     do ##class(%IPM.General.OutputLog).Stop()
                 }
@@ -1153,6 +1160,7 @@ ClassMethod ShellInternal(
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
+                do ..RestoreLogAfterCommand(tCommandLogPath, tDisplacedLogPath)
                 if tOwnsLog {
                     do ##class(%IPM.General.OutputLog).Stop()
                 }
@@ -1160,10 +1168,12 @@ ClassMethod ShellInternal(
             }
             do ..DisplayError(pException.AsStatus())
         }
+        do ..RestoreLogAfterCommand(tCommandLogPath, tDisplacedLogPath)
 
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
             write !,!,$$$FormattedLine($$$Yellow, "IPM has been uninstalled from this namespace. Exiting shell..."),!
+            do ..RestoreLogAfterCommand(tCommandLogPath, tDisplacedLogPath)
             if tOwnsLog {
                 do ##class(%IPM.General.OutputLog).Stop()
             }
@@ -1178,6 +1188,27 @@ ClassMethod ShellInternal(
     }
     if tOwnsLog {
         do ##class(%IPM.General.OutputLog).Stop()
+    }
+}
+
+/// Ends the tee a `-log-file` command started and reopens the one it displaced, so the
+/// modifier covers a single command and an AutoLog session outlives it.
+ClassMethod RestoreLogAfterCommand(
+	commandLogPath As %String,
+	displacedLogPath As %String) [ Internal, Private ]
+{
+    if (commandLogPath = "") && (displacedLogPath = "") {
+        return
+    }
+    if (commandLogPath '= ""), ##class(%IPM.General.OutputLog).GetActivePath() = commandLogPath {
+        do ##class(%IPM.General.OutputLog).Stop()
+    }
+    // Also reached when Start() threw, leaving the displaced tee stopped but not replaced.
+    if (displacedLogPath '= ""), '##class(%IPM.General.OutputLog).IsActive() {
+        set sc = ##class(%IPM.General.OutputLog).Start(displacedLogPath, 1)
+        if $$$ISERR(sc) {
+            write !,$$$FormattedLine($$$Yellow,"WARNING: could not resume logging to "_displacedLogPath_": "),$system.Status.GetOneStatusText(sc),!
+        }
     }
 }
 

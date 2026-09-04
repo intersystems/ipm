@@ -9,10 +9,12 @@ ClassMethod Start(path As %String, append As %Boolean = 1) As %Status [ Procedur
 {
     new sc,dir
     #dim sc As %Status = $$$OK
+    // Checked outside the try because the catch below tears down ^||%IPM.log, which on
+    // this path belongs to the tee that is already running.
+    if $data(^||%IPM.log("active")) {
+        quit $$$ERROR($$$GeneralError,"OutputLog already active")
+    }
     try {
-        if $data(^||%IPM.log("active")) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError,"OutputLog already active"))
-        }
         set dir = ##class(%File).GetDirectory(path)
         if (dir '= "") && ('##class(%File).DirectoryExists(dir)) {
             $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(dir))
@@ -59,59 +61,83 @@ ClassMethod Start(path As %String, append As %Boolean = 1) As %Status [ Procedur
     }
     quit sc
 
-    // Echo s to the prior redirect chain (if any) or to the raw device.
-out(s) [rd] public {
-    new rd
-    if ^||%IPM.log("prior") '= "" {
+    // Echo s to the prior redirect chain (if any) or to the raw device. Every state read
+    // goes through $get and detach() covers the missing case: an error raised inside a
+    // redirect entry point is reported by writing, which re-enters here until <FRAMESTACK>.
+out(s) [rd,rt] public {
+    new rd,rt
+    set rt=$get(^||%IPM.log("routine"))
+    if rt="" { do detach(s) quit }
+    if $get(^||%IPM.log("prior")) '= "" {
         use $io::("^"_^||%IPM.log("prior"))
         do $zutil(82,12,1)
         write s
-        use $io::("^"_^||%IPM.log("routine"))
+        use $io::("^"_rt)
         do $zutil(82,12,1)
     } else {
         set rd=$zutil(82,12,0)
-        use ^||%IPM.log("device")
+        use $get(^||%IPM.log("device"))
         write s
-        use $io::("^"_^||%IPM.log("routine"))
+        use $io::("^"_rt)
         do $zutil(82,12,rd)
     }
   }
-rstr(sz,to) [rt] public {
-    new rt set vr="rt"
+    // Redirection still points here but the tee state is gone, so there is nothing left to
+    // forward through. Uninstall and write straight to the device.
+detach(s) public {
+    do $zutil(82,12,0)
+    use $io::("")
+    write s
+  }
+    // Reinstall this routine as the handler and restore rd. With the state gone there is
+    // no name to reinstall, so leave redirection off rather than `use $io::("^")`.
+reattach(rd) [rt] public {
+    new rt
+    set rt=$get(^||%IPM.log("routine"))
+    if rt="" {
+        do $zutil(82,12,0)
+        use $io::("")
+        quit
+    }
+    use $io::("^"_rt)
+    do $zutil(82,12,rd)
+  }
+rstr(sz,to) [rt,rd,vr] public {
+    new rt,rd,vr set vr="rt"
     set rd=$zutil(82,12,0)
-    use ^||%IPM.log("device")
+    use $get(^||%IPM.log("device"))
     set:$data(sz) vr=vr_"#"_sz set:$data(to) vr=vr_":"_to
     read @vr
     do:$data(to) $zutil(96,4,$test)
-    use $io::("^"_^||%IPM.log("routine"))
-    do $zutil(82,12,rd)
+    do reattach(rd)
     quit rt
   }
-rchr(to) [rc] public {
-    new rc set vr="rc#1"
+rchr(to) [rc,rd,vr] public {
+    new rc,rd,vr set vr="rc#1"
     set rd=$zutil(82,12,0)
-    use ^||%IPM.log("device")
+    use $get(^||%IPM.log("device"))
     set:$data(to) vr=vr_":"_to
     read @vr
-    use $io::("^"_^||%IPM.log("routine"))
-    do $zutil(82,12,rd)
+    do reattach(rd)
     quit rc
   }
     // Echo `write !` or `write #` so a terminal gets CR+LF and a prior redirect chain
     // gets its own wnl()/wff() entry point.
-outctl(c) [rd] public {
-    new rd
-    if ^||%IPM.log("prior") '= "" {
+outctl(c) [rd,rt] public {
+    new rd,rt
+    set rt=$get(^||%IPM.log("routine"))
+    if rt="" { do detach($select(c="!":$char(13,10),1:$char(12))) quit }
+    if $get(^||%IPM.log("prior")) '= "" {
         use $io::("^"_^||%IPM.log("prior"))
         do $zutil(82,12,1)
         if c="!" { write ! } else { write # }
-        use $io::("^"_^||%IPM.log("routine"))
+        use $io::("^"_rt)
         do $zutil(82,12,1)
     } else {
         set rd=$zutil(82,12,0)
-        use ^||%IPM.log("device")
+        use $get(^||%IPM.log("device"))
         if c="!" { write ! } else { write # }
-        use $io::("^"_^||%IPM.log("routine"))
+        use $io::("^"_rt)
         do $zutil(82,12,rd)
     }
   }
@@ -119,6 +145,8 @@ outctl(c) [rd] public {
     // $x is restored last because out() issues `use`, which zeroes it.
 buf(s) [clean] public {
     new clean
+    // Without this the nodes below would resurrect a half-populated tee after Stop().
+    if '$data(^||%IPM.log("active")) { quit }
     set clean=$replace(##class(%IPM.General.OutputLog).StripAnsi(s),$char(13),"")
     set ^||%IPM.log("buf")=$get(^||%IPM.log("buf"))_clean
     // A payload can carry its own newlines, so count only what follows the last one.
@@ -130,6 +158,7 @@ buf(s) [clean] public {
     set $x=^||%IPM.log("col")
   }
 flush(tail) public {
+    if '$data(^||%IPM.log("active")) { set $x=0 quit }
     set ^||%IPM.log("buf")=$get(^||%IPM.log("buf"))_tail
     do ##class(%IPM.General.OutputLog).FlushBuffer()
     set ^||%IPM.log("col")=0
@@ -205,7 +234,14 @@ ClassMethod FlushBuffer()
         // the tee degrades to terminal-only output.
         set ^||%IPM.log("path") = ""
     }
-    use principal::("^"_$get(^||%IPM.log("routine")))
+    set routine = $get(^||%IPM.log("routine"))
+    if routine = "" {
+        // No handler name left to reinstall, so leave redirection off instead of
+        // installing "^", which would fault on the next write.
+        use principal::("")
+        return
+    }
+    use principal::("^"_routine)
     do $zutil(82,12,redirect)
 }
 
@@ -275,6 +311,14 @@ ClassMethod Stop() As %Status
             return $$$OK
         }
         do ..FlushBuffer()
+        // Another handler was installed after this tee, so it sits on top of the chain and
+        // restoring our prior would drop it. Release the file and leave the chain alone;
+        // the entry points fall through to the device once the state is gone.
+        if $zutil(82,12), $zutil(96,12) '= $get(^||%IPM.log("routine")) {
+            if logPath '= "" { close logPath }
+            kill ^||%IPM.log
+            return $$$OK
+        }
         set prior = $get(^||%IPM.log("prior"))
         if prior '= "" {
             use $io::("^"_prior)
