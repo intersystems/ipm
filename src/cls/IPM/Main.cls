@@ -1014,22 +1014,19 @@ ClassMethod ShellInternal(
     }
     set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
     set tInShell = 0
+    // Commands run nested shells (e.g. `test` runs `config set`), and only the frame that
+    // started a tee may stop it, or the inner shell would cut off the outer command's log.
+    set tOwnsLog = 0
 
-    // Start AutoLog session if configured and no log already active
-    if '##class(%IPM.General.OutputLog).IsActive() && ##class(%IPM.Repo.UniversalSettings).GetAutoLog() {
-        set tAutoLogDir = ##class(%IPM.Repo.UniversalSettings).GetLogDirectory()
-        set h = $horolog
-        set tAutoLogTs = $zdate(h,3) _ "-" _ $translate($ztime($piece(h,",",2)),":")
-        set tAutoLogStem = "ipm-" _ tAutoLogTs _ "-" _ $job
-        set tAutoLogPath = tAutoLogDir _ tAutoLogStem _ ".log"
-        set tAutoLogSuffix = 0
-        while ##class(%File).Exists(tAutoLogPath) {
-            set tAutoLogSuffix = tAutoLogSuffix + 1
-            set tAutoLogPath = tAutoLogDir _ tAutoLogStem _ "-" _ tAutoLogSuffix _ ".log"
-        }
-        set tAutoLogSC = ##class(%IPM.General.OutputLog).Start(tAutoLogPath, 0)
+    // AutoLog and LogDirectory are read once here, so logging stays put for the whole
+    // session; changing either from the prompt applies to the next shell, and
+    // UpdateOne() says so. Use -log-file to log a single command in this session.
+    if '##class(%IPM.General.OutputLog).IsActive(), ##class(%IPM.Repo.UniversalSettings).GetAutoLog() {
+        set tAutoLogSC = ##class(%IPM.General.OutputLog).StartAutoLog()
         if $$$ISERR(tAutoLogSC) {
             write !,$$$FormattedLine($$$Yellow,"WARNING: AutoLog failed: "),$system.Status.GetOneStatusText(tAutoLogSC),!
+        } else {
+            set tOwnsLog = 1
         }
     }
 
@@ -1077,6 +1074,8 @@ ClassMethod ShellInternal(
                 if tLogFile '= ##class(%IPM.General.OutputLog).GetActivePath() {
                     do ##class(%IPM.General.OutputLog).Stop()
                     $$$ThrowOnError(##class(%IPM.General.OutputLog).Start(tLogFile))
+                    // Stop the log only if this frame started it, so that nested shells don't cut off the outer command's log.
+                    set tOwnsLog = 1
                 }
             }
             if ##class(%IPM.General.OutputLog).IsActive() {
@@ -1084,7 +1083,9 @@ ClassMethod ShellInternal(
             }
 
             if (tCommandInfo = "quit") {
-                do ##class(%IPM.General.OutputLog).Stop()
+                if tOwnsLog {
+                    do ##class(%IPM.General.OutputLog).Stop()
+                }
                 return
             } elseif (tCommandInfo = "help") {
                 do ..%Help(.tCommandInfo)
@@ -1152,7 +1153,9 @@ ClassMethod ShellInternal(
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
-                do ##class(%IPM.General.OutputLog).Stop()
+                if tOwnsLog {
+                    do ##class(%IPM.General.OutputLog).Stop()
+                }
                 return
             }
             do ..DisplayError(pException.AsStatus())
@@ -1161,7 +1164,9 @@ ClassMethod ShellInternal(
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
             write !,!,$$$FormattedLine($$$Yellow, "IPM has been uninstalled from this namespace. Exiting shell..."),!
-            do ##class(%IPM.General.OutputLog).Stop()
+            if tOwnsLog {
+                do ##class(%IPM.General.OutputLog).Stop()
+            }
             return
         }
 
@@ -1171,7 +1176,9 @@ ClassMethod ShellInternal(
         }
         write !
     }
-    do ##class(%IPM.General.OutputLog).Stop()
+    if tOwnsLog {
+        do ##class(%IPM.General.OutputLog).Stop()
+    }
 }
 
 /// Warn for deprecated parameters/modifiers

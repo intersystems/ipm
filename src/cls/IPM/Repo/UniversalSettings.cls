@@ -1,3 +1,5 @@
+Include %IPM.Formatting
+
 /// IPM settings are placed in ^IPM.settings global in %SYS namespace
 /// Use this class to set or get settings
 ///
@@ -50,8 +52,13 @@ Parameter TestReportFormat = "TestReportFormat";
 
 Parameter ModuleRoot = "ModuleRoot";
 
+/// Directory holding `-log-file` logs given as a bare filename, AutoLog session logs,
+/// and CPF merge logs.
 Parameter LogDirectory = "LogDirectory";
 
+/// Possible values: "", 0, 1
+/// When 1, every shell session is logged to a file under <parameter>LogDirectory</parameter>.
+/// Read once when the shell starts, so a change applies to the next shell session.
 Parameter AutoLog = "AutoLog";
 
 Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot,LogDirectory,AutoLog";
@@ -155,6 +162,7 @@ ClassMethod UpdateOne(
         }
         if $$$ISOK(sc) {
             write !,"Key """_key_""" succesfully updated",!
+            do ..WarnLoggingUnchanged(key, value)
         } else {
             write !,$system.Status.GetErrorText(sc),!
         }
@@ -163,6 +171,29 @@ ClassMethod UpdateOne(
         write !,$system.Status.GetErrorText(sc),!
     }
     return sc
+}
+
+/// Warns that a new AutoLog or LogDirectory value will not change how the running shell
+/// logs, since both are read once when the shell starts. Silent when the new value
+/// matches what the session is already doing.
+ClassMethod WarnLoggingUnchanged(
+	key As %String,
+	value As %String) [ Internal, Private ]
+{
+    set active = ##class(%IPM.General.OutputLog).IsActive()
+    if key = ..#AutoLog {
+        if +value = active {
+            return
+        }
+    } elseif key = ..#LogDirectory {
+        if 'active && '..GetAutoLog() {
+            return
+        }
+    } else {
+        return
+    }
+    write !,$$$FormattedLine($$$Yellow,"This takes effect in your next IPM shell session; logging for the current one is unchanged."),!
+    write "Use the -log-file modifier to log a single command in this session.",!
 }
 
 /// Gets value from global array

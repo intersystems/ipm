@@ -25,6 +25,8 @@ Method OnAfterOneTest(testname As %String) As %Status
 {
     // Clean up any leaked OutputLog state
     do ##class(%IPM.General.OutputLog).Stop()
+    // The AutoLog path is deliberately per-process, so it must be cleared between tests
+    do ##class(%IPM.General.OutputLog).ClearAutoLog()
     // Clean up any leaked BeginCaptureOutput state
     if $data(^||%capture) {
         set junk = ""
@@ -111,7 +113,7 @@ Method TestTeeEquivalence()
     }
 }
 
-/// ANSI stripping: log file must not contain ESC character.
+/// ANSI stripping: log file must not contain ESC or the printable tail of a CSI sequence.
 Method TestANSIStripping()
 {
     set logPath = ..TempDir _ "ansi.log"
@@ -119,8 +121,22 @@ Method TestANSIStripping()
     do $$$AssertStatusOK(sc, "version succeeded")
     if ##class(%File).Exists(logPath) {
         set content = ..ReadFile(logPath)
-        do $$$AssertTrue(content '[ $char(27), "No ANSI escape codes in log file")
+        do $$$AssertTrue(content '[ $char(27), "No ESC character in log file")
+        do $$$AssertTrue(content '[ "[0m", "No CSI reset residue in log file")
+        do $$$AssertTrue(content '[ "[39m", "No CSI color residue in log file")
     }
+}
+
+/// Column tracking: `write ?n` indentation and non-ASCII bullets survive into the log.
+Method TestIndentationAndEncoding()
+{
+    set logPath = ..TempDir _ "indent.log"
+    set sc = ##class(%IPM.Main).Shell("help help -log-file " _ logPath)
+    do $$$AssertStatusOK(sc, "help help succeeded")
+    set content = ..ReadFile(logPath)
+    do $$$AssertTrue(content [ ($char(10) _ "    " _ $char(9632)), "?n indentation present before bullet")
+    do $$$AssertTrue(content [ $char(9632), "Black square preserved (UTF8 translate table)")
+    do $$$AssertTrue(content [ $char(9675), "Bullet point preserved (UTF8 translate table)")
 }
 
 /// Append mode: second invocation grows the file.
@@ -174,10 +190,39 @@ Method TestAutoLog()
     do $$$AssertStatusOK(sc, "version under AutoLog succeeded")
     // ipm-*.log file should exist in TempDir
     set found = 0
-    set rs = ##class(%ResultSet).%New("%File:FileSet")
-    do rs.Execute(..TempDir, "ipm-*.log")
-    while rs.Next() { set found = found + 1 }
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT Name FROM %Library.File_FileSet(?, ?)",
+        ..TempDir, "ipm-*.log")
+    while rs.%Next() { set found = found + 1 }
     do $$$AssertTrue(found >= 1, "AutoLog created ipm-*.log file")
+}
+
+/// AutoLog: separate commands in one process share a single log file.
+Method TestAutoLogSharedFile()
+{
+    set sc = ##class(%IPM.Repo.UniversalSettings).UpdateOne(##class(%IPM.Repo.UniversalSettings).#LogDirectory, ..TempDir)
+    $$$ThrowOnError(sc)
+    set sc = ##class(%IPM.Repo.UniversalSettings).UpdateOne(##class(%IPM.Repo.UniversalSettings).#AutoLog, "1")
+    $$$ThrowOnError(sc)
+    for i = 1:1:3 {
+        set sc = ##class(%IPM.Main).Shell("version")
+        do $$$AssertStatusOK(sc, "version " _ i _ " under AutoLog succeeded")
+        do ##class(%IPM.General.OutputLog).Stop()
+    }
+    set found = 0
+    set path = ""
+    set rs = ##class(%SQL.Statement).%ExecDirect(,
+        "SELECT Name FROM %Library.File_FileSet(?, ?)",
+        ..TempDir, "ipm-*.log")
+    while rs.%Next() {
+        set found = found + 1
+        set path = rs.Name
+    }
+    do $$$AssertEquals(found, 1, "Three commands wrote one AutoLog file")
+    if found = 1 {
+        set content = ..ReadFile(path)
+        do $$$AssertEquals($length(content, "--- [") - 1, 3, "Log holds three command headers")
+    }
 }
 
 /// Config validation: AutoLog rejects non-boolean.

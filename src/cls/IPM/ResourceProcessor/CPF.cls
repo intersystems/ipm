@@ -142,17 +142,20 @@ ClassMethod MergeCPF(
     set flags = "/SHELL/LOGCMD/STDOUT="""_logPath_"""/STDERR="""_logPath_""""
     set status = $zf(-100, flags, "iris", .args)
 
-    write !, "CPF merge log: ", logPath, !
-    if verbose && ##class(%File).Exists(logPath) {
-        set logStream = ##class(%Stream.FileCharacter).%New()
-        do logStream.LinkToFile(logPath)
-        while 'logStream.AtEnd {
-            write logStream.ReadLine(), !
+    if verbose {
+        write !, "CPF merge log: ", logPath, !
+        if ##class(%File).Exists(logPath) {
+            set logStream = ##class(%Stream.FileCharacter).%New()
+            do logStream.LinkToFile(logPath)
+            while 'logStream.AtEnd {
+                write logStream.ReadLine(), !
+            }
         }
     }
 
     if status '= 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error merging CPF file. $zf(-100) exited with "_status))
+        set msg = "Error merging CPF file. $zf(-100) exited with "_status_". See "_logPath
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
     }
 }
 
