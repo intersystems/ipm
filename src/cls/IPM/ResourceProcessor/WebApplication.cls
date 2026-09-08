@@ -1,4 +1,4 @@
-Include (%sySecurity, %occErrors, %occReference)
+Include (%sySecurity, %occErrors, %occReference, %IPM.Common)
 
 Class %IPM.ResourceProcessor.WebApplication Extends (%IPM.ResourceProcessor.Abstract, %XML.Adaptor) [ PropertyClass = %IPM.ResourceProcessor.PropertyParameters ]
 {
@@ -108,58 +108,64 @@ Method OnBeforePhase(
 Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
 {
     new $namespace
+    $$$SuspendRedirection(redirect)
     set $namespace = "%SYS"
+    try {
+        merge properties = ..SecurityProperties
 
-    merge properties = ..SecurityProperties
-
-    if ##class(Security.Applications).Exists(..Name) {
-        write:pVerbose !,"Updating Web Application ",..Name
-        set sc = ##class(Security.Applications).Get(..Name,.oldProperties)
-        $$$ThrowOnError(sc)
-
-        kill changes
-        set key = ""
-        for {
-            set key = $order(properties(key),1,value)
-            quit:(key="")
-            set oldValue = $get(oldProperties(key))
-            if (value '= oldValue) {
-                if (value = "") {
-                    set value = "[missing]"
-                }
-                if (oldValue = "") {
-                    set oldValue = "[missing]"
-                }
-                set changes($increment(changes)) = key_": "_oldValue_" -> "_value
-            }
-        }
-
-        if $data(changes) {
-            if (pVerbose) {
-                for i=1:1:$get(changes) {
-                    write !,changes(i)
-                }
-            }
-            set sc = ##class(Security.Applications).Modify(..Name,.properties)
+        if ##class(Security.Applications).Exists(..Name) {
+            write:pVerbose !,"Updating Web Application ",..Name
+            set sc = ##class(Security.Applications).Get(..Name,.oldProperties)
             $$$ThrowOnError(sc)
-            write:pVerbose !,"Done."
-        } else {
-            write:pVerbose !,"No changes detected or made."
-        }
-    } else {
-        write:pVerbose !,"Creating Web Application ",..Name
-        set sc = ##class(Security.Applications).Create(..Name,.properties)
-        if (pVerbose) {
+
+            kill changes
             set key = ""
             for {
-                set key = $order(properties(key),1,tValue)
-                quit:key=""
-                write !,key,": ",tValue
+                set key = $order(properties(key),1,value)
+                quit:(key="")
+                set oldValue = $get(oldProperties(key))
+                if (value '= oldValue) {
+                    if (value = "") {
+                        set value = "[missing]"
+                    }
+                    if (oldValue = "") {
+                        set oldValue = "[missing]"
+                    }
+                    set changes($increment(changes)) = key_": "_oldValue_" -> "_value
+                }
             }
+
+            if $data(changes) {
+                if (pVerbose) {
+                    for i=1:1:$get(changes) {
+                        write !,changes(i)
+                    }
+                }
+                set sc = ##class(Security.Applications).Modify(..Name,.properties)
+                $$$ThrowOnError(sc)
+                write:pVerbose !,"Done."
+            } else {
+                write:pVerbose !,"No changes detected or made."
+            }
+        } else {
+            write:pVerbose !,"Creating Web Application ",..Name
+            set sc = ##class(Security.Applications).Create(..Name,.properties)
+            if (pVerbose) {
+                set key = ""
+                for {
+                    set key = $order(properties(key),1,tValue)
+                    quit:key=""
+                    write !,key,": ",tValue
+                }
+            }
+            $$$ThrowOnError(sc)
+            write:pVerbose !,"Done."
         }
-        $$$ThrowOnError(sc)
-        write:pVerbose !,"Done."
+    } catch ex {
+        $$$RestoreRedirection(redirect)
+        throw ex
     }
+    $$$RestoreRedirection(redirect)
 }
 
 /// This removes an existing CSP application

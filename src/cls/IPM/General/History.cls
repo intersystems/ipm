@@ -201,31 +201,40 @@ ClassMethod DeleteHistoryGlobally(
 	verbose As %Boolean = 0) As %Integer
 {
     set originalNS = $namespace
+    // Suspended for the whole walk: each namespace visited below may hold the %IPM package
+    // without the %IPM.* routine mapping the redirect handler needs.
     new $namespace
+    $$$SuspendRedirection(redirect)
     set $namespace = "%SYS"
-    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
-    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
     set count = 0
-    while rs.%Next() {
-        set ns = rs.%Get("Nsp")
-        set $namespace = ns
-        if ##class(%Dictionary.ClassDefinition).%Exists($listbuild("%IPM.General.History")) {
-            // Use try/catch to handle permission errors in locked-down namespaces
-            try {
-                set subcount = ..DeleteHistory(.filter)
-                set count = count + subcount
-                if verbose {
-                    write !, "Deleted " _ subcount _ " record(s) from " _ ns, !
-                }
-            } catch ex {
-                // Ignore permission errors in locked namespaces
-                if verbose {
-                    write !, "Skipped " _ ns _ " (no permission): " _ ex.DisplayString(), !
+    try {
+        set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT DISTINCT Nsp FROM %SYS.Namespace_List()")
+        $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+        while rs.%Next() {
+            set ns = rs.%Get("Nsp")
+            set $namespace = ns
+            if ##class(%Dictionary.ClassDefinition).%Exists($listbuild("%IPM.General.History")) {
+                // Use try/catch to handle permission errors in locked-down namespaces
+                try {
+                    set subcount = ..DeleteHistory(.filter)
+                    set count = count + subcount
+                    if verbose {
+                        write !, "Deleted " _ subcount _ " record(s) from " _ ns, !
+                    }
+                } catch ex {
+                    // Ignore permission errors in locked namespaces
+                    if verbose {
+                        write !, "Skipped " _ ns _ " (no permission): " _ ex.DisplayString(), !
+                    }
                 }
             }
         }
+    } catch outerEx {
+        $$$RestoreRedirection(redirect)
+        throw outerEx
     }
     set $namespace = originalNS
+    $$$RestoreRedirection(redirect)
     quit count
 }
 
