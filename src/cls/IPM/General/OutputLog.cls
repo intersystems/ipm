@@ -224,6 +224,9 @@ ClassMethod FlushBuffer()
     // Redirection is process-wide, so it must be off while writing to the log device or
     // the write is captured and recurses.
     set principal = $io
+    // The installed handler is not necessarily this tee: BeginCaptureOutput() and friends
+    // layer on top of it, and reinstalling ourselves would take their writes.
+    set handler = $select($zutil(82,12): $zutil(96,12), 1: "")
     set redirect = $zutil(82,12,0)
     try {
         use logPath
@@ -234,14 +237,11 @@ ClassMethod FlushBuffer()
         // the tee degrades to terminal-only output.
         set ^||%IPM.log("path") = ""
     }
-    set routine = $get(^||%IPM.log("routine"))
-    if routine = "" {
-        // No handler name left to reinstall, so leave redirection off instead of
-        // installing "^", which would fault on the next write.
+    if handler = "" {
         use principal::("")
         return
     }
-    use principal::("^"_routine)
+    use principal::("^"_handler)
     do $zutil(82,12,redirect)
 }
 
@@ -263,7 +263,7 @@ ClassMethod WriteCommandHeader(command As %String, namespace As %String)
 
 /// Starts a tee to this process's AutoLog file. The path is chosen on first use and
 /// reused (in append mode) for the rest of the process, so the many commands a single
-/// process may run - a test run drives dozens - all land in one transcript.
+/// process may run (a test run drives dozens) all land in one transcript.
 ClassMethod StartAutoLog() As %Status
 {
     if $get(^||%IPM.autolog("failed")) {
@@ -298,6 +298,27 @@ ClassMethod StartAutoLog() As %Status
 ClassMethod ClearAutoLog() [ Internal ]
 {
     kill ^||%IPM.autolog
+}
+
+/// Reinstalls this tee if it is active but interception has been switched off, which is
+/// what an excursion that suspended redirection and did not restore it leaves behind.
+/// Called at command boundaries so a missed $$$RestoreRedirection costs one command's output
+/// rather than the rest of the session. Must be called from a namespace with the %IPM.*
+/// routine mapping, since `use` names the handler routine.
+ClassMethod Resume()
+{
+    if '$data(^||%IPM.log("active")) {
+        return
+    }
+    if $zutil(82,12) {
+        return
+    }
+    set routine = $get(^||%IPM.log("routine"))
+    if routine = "" {
+        return
+    }
+    use $io::("^"_routine)
+    do $zutil(82,12,1)
 }
 
 /// Stops the active tee, flushing and closing the log file.

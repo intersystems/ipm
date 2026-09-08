@@ -109,7 +109,7 @@ ClassMethod ResetToDefault(key As %String) As %Status
         // Computed directly rather than read from storage — older IPM versions did not seed this default node
         set defaultValue = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
     } elseif key = ..#LogDirectory {
-        // Computed directly rather than read from storage — older IPM versions did not seed this default node
+        // Derived from the instance data directory rather than stored
         set defaultValue = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/logs/")
     } elseif key = ..#AutoLog {
         // No factory default; empty string means AutoLog is disabled

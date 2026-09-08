@@ -1852,6 +1852,7 @@ ClassMethod PerformBatchActivation(
         }
 
         new $namespace
+        $$$SuspendRedirection(redirect)
         set $namespace = "%SYS"
         $$$ThrowOnError(##class(Config.CPF).Write())
         $$$ThrowOnError(##class(Config.Map).MoveToActive())
@@ -1875,6 +1876,7 @@ ClassMethod PerformBatchActivation(
     } catch ex {
         set sc = ex.AsStatus()
     }
+    $$$RestoreRedirection(redirect)
 
     while ($tlevel > initTLevel) {
         trollback 1

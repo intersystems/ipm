@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 /// This class contains inheritence hacks to override final methods in %Studio.* methods
 /// And provides utilities to work with extension classes and namespace-specific source control classes
 Class %IPM.ExtensionBase.CompositeMethodOverrides
@@ -180,6 +182,7 @@ Method GetMenuExtension(
             if (tSourceNamespace '= ..Namespace) {
                 set tMenuName = $piece(pMenuID,",")
                 try {
+                    $$$SuspendRedirection(redirect)
                     set $namespace = tSourceNamespace
                     if '$data(tCache.MenuMap(tSourceNamespace,tMenuName),tPresent) {
                         set tOtherNSExtension = ..GetCurrentNamespaceExtension()
@@ -198,7 +201,9 @@ Method GetMenuExtension(
                         }
                         $$$ThrowOnError(tSC)
                     } elseif (tPresent) {
-                        // Intentionally stays in tSourceNamespace
+                        // Intentionally stays in tSourceNamespace, which has an IPM source
+                        // control extension configured and so can resolve the redirect handler.
+                        $$$RestoreRedirection(redirect)
                         return ..GetCurrentNamespaceExtension()
                     }
                 } catch e {
@@ -206,6 +211,7 @@ Method GetMenuExtension(
                     write !,"Error checking Studio extension menu item in ",tSourceNamespace,": ",$system.Status.GetErrorText(tSC)
                 }
                 set $namespace = ..Namespace
+                $$$RestoreRedirection(redirect)
             }
         }
     }

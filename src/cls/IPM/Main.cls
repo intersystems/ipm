@@ -1197,6 +1197,7 @@ ClassMethod RestoreLogAfterCommand(
 	commandLogPath As %String,
 	displacedLogPath As %String) [ Internal, Private ]
 {
+    do ##class(%IPM.General.OutputLog).Resume()
     if (commandLogPath = "") && (displacedLogPath = "") {
         return
     }
@@ -1245,9 +1246,14 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
             if '..IsIPMEnabled(name) {
                 write $$$FormattedLine($$$Red,"IPM is not enabled in the "_name_" namespace.")
             } else {
+                // IsIPMEnabled() vouched for the destination, so redirection is restored as
+                // soon as the switch lands and output from here on still reaches the log.
+                $$$SuspendRedirection(redirect)
                 set $namespace = name
+                $$$RestoreRedirection(redirect)
             }
         } catch ex {
+            $$$RestoreRedirection(redirect)
             $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to switch to namespace: " _ name))
         }
         quit
@@ -1274,8 +1280,13 @@ ClassMethod Namespace(ByRef pCommandInfo) [ Internal ]
                 write $$$FormattedLine($$$Red," IPM is not enabled for the selected "_selectedNamespace_" namespace."),!
                 continue
             }
+            $$$SuspendRedirection(redirect)
             set $namespace = selectedNamespace
+            $$$RestoreRedirection(redirect)
         } catch e {
+            // A failed switch leaves the caller's namespace in place, so the write below is
+            // safe once interception is back on.
+            $$$RestoreRedirection(redirect)
             write $$$FormattedLine($$$Red," "_e.AsSystemError()),!
             continue
         }
@@ -1601,7 +1612,8 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
 ClassMethod GetDefaultCommandRegistry()
 {
     new $namespace
-    set $namespace="%SYS"
+    $$$SuspendRedirection(redirect)
+    set $namespace = "%SYS"
     set Status=##Class(Config.Startup).Get(.Properties)
     if Status {
         set ServerPort="http://"_$zutil(110)_":"_$get(Properties("WebServerPort"),52773)
@@ -1610,6 +1622,7 @@ ClassMethod GetDefaultCommandRegistry()
         write !,"Switch to the current registry:",!,"   repo -r -n registry -url "_ServerPort_"/registry/ -user ""_system"" -pass ""SYS""",!
 
     }
+    $$$RestoreRedirection(redirect)
 }
 
 /// Get Version Module
@@ -2175,9 +2188,14 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
         set tSourceNamespace = $$$GetModifier(pCommandInfo,"copy-from")
         set tOldNamespace = $namespace
         new $namespace
+        // tSourceNamespace is an arbitrary namespace, so the suspension stays in force until
+        // the switch back below.
+        $$$SuspendRedirection(redirect)
         try {
             set $namespace = tSourceNamespace
         } catch e {
+            // The switch failed, so tOldNamespace is still current and the write is safe.
+            $$$RestoreRedirection(redirect)
             if (e.Name = "<NAMESPACE>") {
                 write !,"Invalid namespace: ",tSourceNamespace
                 return
@@ -2212,6 +2230,7 @@ ClassMethod Repository(ByRef pCommandInfo) [ Internal ]
         }
 
         set $namespace = tOldNamespace
+        $$$RestoreRedirection(redirect)
         for tIndex=1:1:$get(tRepositories) {
             // Deep clone in case there are ever other referenced objects that need to be carried across.
             // This is not relevant for any current repository types, but is most likely to be correct in
@@ -3548,7 +3567,13 @@ ZPM(pArgs...)
         write !, "Error getting namespace list. SQLCODE =", rs.%SQLCODE
         write !, "IPM is not enabled in namespace ", currentNs, "."
     } else {
+        // The loop leaves $namespace on whichever namespace it last visited, and that outlives
+        // the loop because `new $namespace` restores only at method exit, so every write from
+        // here to the end of the method needs redirection suspended. Spelled out rather than
+        // using $$$SuspendRedirection because this body is emitted into %ZLANGC00.mac, which
+        // compiles without IPM's include file.
         new $namespace
+        set redirect = $zutil(82,12,0)
         set found = 0
         while rs.%Next() {
             set $namespace = $zstrip(rs.%Get("Nsp"), "<>WC")
@@ -3576,6 +3601,7 @@ ZPM(pArgs...)
         write ! // Add a newline before halting
         halt
     }
+    do:$data(redirect) $zutil(82,12,redirect)
     // The $$$ERROR macro is not available for use in language extension
     return $system.Status.Error(5001, "IPM is not enabled in this namespace.")
  }
@@ -3665,13 +3691,14 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
         while $listnext(namespaces,pointer,namespace) {
             set namespace = $zstrip(namespace, "<>WC")
             set $namespace = namespace
-            if ..IPMInstalled() {
+            set installed = ..IPMInstalled()
+            set $namespace = initNamespace
+            if installed {
                 if 'quiet || preview {
                     write !,"Skipping IPM mapping of "_namespace_" - IPM already installed."
                 }
                 continue
             }
-            set $namespace = initNamespace
             if preview {
                 write !,"Would add IPM mappings to "_namespace
                 continue
@@ -3702,13 +3729,14 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
                 }
                 // If repository are already present, also skip repo mapping avoid override
                 set $namespace = namespace
-                if $data(^IPM.Repo.DefinitionD) \ 2 {
+                set reposPresent = $data(^IPM.Repo.DefinitionD) \ 2
+                set $namespace = initNamespace
+                if reposPresent {
                     if 'quiet || preview {
                         write !,"Skipping repository mapping of "_namespace_" - IPM repositories found."
                     }
                     continue
                 }
-                set $namespace = initNamespace
                 if preview {
                     write !,"Would add IPM repository mappings to "_namespace
                     continue
@@ -3903,6 +3931,9 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
             // Retrieve module installer manifest
             set manifest = packageService.GetModuleInstallerManifest(ipmRef)
             set currentNS = ""
+            // The namespaces below are the ones IPM is missing from, so nothing there can
+            // resolve the redirect handler, including the loader's own output.
+            $$$SuspendRedirection(redirect)
             while 1 {
                 set currentNS = $order(targetNamespaces(currentNS))
                 if currentNS = "" {
@@ -3916,6 +3947,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
                 do $system.OBJ.LoadStream(manifest, loadFlag)
                 write !, "IPM enabled for namespace "_currentNS
             }
+            set $namespace = initNamespace
+            $$$RestoreRedirection(redirect)
         } else {
             $$$ThrowOnError($$$ERROR($$$GeneralError,"Failed to get a valid registry server in order to download the IPM manifest."))
         }
@@ -3925,6 +3958,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
         set enabledNSList = ""
         set problematicList = ""
         set tOverallSC = $$$OK
+        // As above: IPM is absent from these namespaces until the load below succeeds.
+        $$$SuspendRedirection(redirect)
         while (currentNS '="") {
             set $namespace = currentNS
             if preview {
@@ -3941,6 +3976,8 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
             set currentNS = $order(targetNamespaces(currentNS))
             set tOverallSC = $$$ADDSC(tOverallSC,tSC)
         }
+        set $namespace = initNamespace
+        $$$RestoreRedirection(redirect)
         if 'preview {
             write !, "IPM enabled for namespace(s) "_$listtostring(enabledNSList)
             if $$$ISERR(tOverallSC) {

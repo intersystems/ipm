@@ -138,8 +138,11 @@ ClassMethod MergeCPF(
     set args($increment(args)) = ##class(%SYS.System).GetInstanceName()
     set args($increment(args)) = file
 
-    // Bind STDOUT and STDERR to logPath so merge output is captured
-    set flags = "/SHELL/LOGCMD/STDOUT="""_logPath_"""/STDERR="""_logPath_""""
+    // Bind STDOUT and STDERR to logPath so merge output is captured. STDIN is bound to the
+    // null device as well: the merge needs no input, and left unbound it tries to open the
+    // parent's terminal as its principal device and logs a failure to do so.
+    set nullDevice = $select($$$isWINDOWS: "NUL", 1: "/dev/null")
+    set flags = "/SHELL/LOGCMD/STDIN="""_nullDevice_"""/STDOUT="""_logPath_"""/STDERR="""_logPath_""""
     set status = $zf(-100, flags, "iris", .args)
 
     if verbose {

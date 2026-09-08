@@ -93,3 +93,21 @@ ROUTINE %IPM.Common [Type=INC]
 #; Locking for module update framework
 #Define LockUpdateModule(%name) lock +^IPM.UpdateLock(%name):3
 #Define UnlockUpdateModule(%name) lock -^IPM.UpdateLock(%name)
+
+#; Suspends output redirection around a namespace excursion that produces output.
+#; The redirect handler is a routine name that re-resolves in the current namespace on
+#; every write, so a write from a namespace lacking the %IPM.* routine mapping (%SYS, or a
+#; namespace IPM is not installed in) raises <NOROUTINE>. Covers writes from system APIs
+#; handed $io as well as IPM's own. Output produced while suspended reaches the terminal but
+#; not an active log file.
+#; Macros, not methods: the restore runs while still in the target namespace, where a
+#; ##class(%IPM...) call is itself unresolvable.
+#; %flag holds the prior interception state. Pass it to $$$RestoreRedirection on every path
+#; out, error paths included, or logging stays off for the rest of the command.
+#; Only the first suspend records the state, so suspending once per iteration of a loop cannot
+#; overwrite the saved flag with the 0 that a second $zutil(82,12,0) returns.
+#Define SuspendRedirection(%flag) set:'$data(%flag) %flag = $zutil(82,12,0)
+#; No-op when %flag is undefined: redirection was never suspended, so there is nothing to
+#; restore and forcing interception off would stop an active log. Clearing %flag lets a method
+#; bracket several excursions in turn, each pair capturing the state afresh.
+#Define RestoreRedirection(%flag) do:$data(%flag) $zutil(82,12,%flag) kill %flag
