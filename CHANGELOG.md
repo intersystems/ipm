@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Performance: Studio project creation on package load in dev mode is now 80% faster.
 - #994: Prevent crash in `zn` command when target namespace lacks IPM mappings
+- #1227: IPM commands no longer exit the shell with "IPM has been uninstalled from this namespace" after IPM is uninstalled and reinstalled in the same process
+- #1228: `uninstall zpm` now prompts to remove IPM metadata even when no other module is installed, so downgrading IPM does not require installing an unrelated module first
 
 ## [0.10.9] - 2026-08-05
 
