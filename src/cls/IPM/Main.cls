@@ -2668,22 +2668,23 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
             set rs = ##class(%SQL.Statement).%ExecDirect(,
                 "SELECT Name, VersionString FROM %IPM_Storage.ModuleItem WHERE Name != ?",
                 $$$IPMModuleName)
+            $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+
             set hasModules = 0
-            while rs.%Next() {
+            while rs.%Next(.sc) {
                 if 'hasModules {
                     write !,"The following modules are currently installed:"
                     set hasModules = 1
                 }
                 write !,"  - ",rs.Name," (",rs.VersionString,")"
             }
+            $$$ThrowOnError(sc)
             write:hasModules !
 
             if 'tForce {
-                // Dialog: Ask about full cleanup (downgrade scenario)
-                write !,"Do you want to fully remove all modules and IPM metadata (except history log)?"
-                write !,"This is required for downgrading IPM. [y/N]: "
-                read fullCleanupResponse
-                set tParams("Clean","FullCleanup") = $case($zconvert(fullCleanupResponse,"L"),"y":1,"yes":1,:0)
+                set tFullCleanup = 0
+                do ##class(%Library.Prompt).GetYesNo("Do you want to fully remove all modules and IPM metadata (except history log)? This is required for downgrading IPM.", .tFullCleanup)
+                set tParams("Clean","FullCleanup") = tFullCleanup
             }
 
             if $get(tParams("Clean","FullCleanup")) {
