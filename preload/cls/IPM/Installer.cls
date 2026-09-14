@@ -139,11 +139,11 @@ ClassMethod MapIfLegacy()
 ClassMethod InstallORASIfMissing()
 {
     if ..ValidatePythonRuntime() {
-        set installed = 1
         try {
             set installed = ..ORASInstalled()
         } catch e {
-            // Leave installed as 1, since a wheel install cannot succeed while the packages are unreadable
+            // A wheel install cannot succeed while the packages are unreadable, so report rather than reinstall
+            set installed = 1
             write !!,"WARNING: Unable to check whether the ORAS Python components are installed. Not all IPM features will be available. "_e.DisplayString(),!
         }
         if 'installed {

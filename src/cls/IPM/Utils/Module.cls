@@ -2430,77 +2430,125 @@ ClassMethod RunCommand(
     quit tSC
 }
 
-/// Runs <code>pip install</code> into a staging directory, then copies the result into <var>pTarget</var>.
-/// <var>pPipArgs</var> is the argument $list following the pip caller; <code>-t &lt;staging&gt;</code> is appended to it.
-/// Any top-level entry of <var>pTarget</var> named like one pip staged is deleted before the copy.
+/// Runs <code>pip install</code> into a staging directory, then copies the result into <var>target</var>.
+/// <var>pipArgs</var> is the argument $list following the pip caller; <code>-t &lt;staging&gt;</code> is appended to it.
+/// With <var>replaceExisting</var>, a top-level entry of <var>target</var> named like one pip staged is
+/// deleted before the copy; otherwise the staged entry is dropped and the installed one kept.
 ClassMethod StagedPipInstall(
-	pPipArgs As %List,
-	pTarget As %String,
-	pQuiet As %Boolean = 0,
-	pVerbose As %Boolean = 0,
-	pCwd As %String = "",
-	ByRef pParams) As %Status
+	pipArgs As %List,
+	target As %String,
+	quiet As %Boolean = 0,
+	verbose As %Boolean = 0,
+	cwd As %String = "",
+	replaceExisting As %Boolean = 1,
+	ByRef params) As %Status
 {
-    set staging = ##class(%IPM.Utils.File).CreateTempDirectory()
+    set staging = ""
     set sc = $$$OK
     try {
-        // Drop empty arguments: $listfromstring("") of an unset flag string yields one, and pip reads it as a requirement
+        set staging = ##class(%IPM.Utils.File).CreateTempDirectory()
+
+        // A trailing or repeated space in a flag string yields an empty argument, which pip rejects as a requirement
         set args = ""
-        for i = 1:1:$listlength(pPipArgs) {
-            set arg = $listget(pPipArgs, i)
-            if (arg '= "") {
-                set args = args _ $listbuild(arg)
-            }
+        for i = 1:1:$listlength(pipArgs) {
+            set arg = $listget(pipArgs, i)
+            set:arg'="" args = args _ $listbuild(arg)
         }
-        set command = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.pParams) _ args _ $listbuild("-t", staging)
-        if pVerbose {
+
+        set command = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.params) _ args _ $listbuild("-t", staging)
+        if verbose {
             write !,"Running "
             zwrite command
         }
-        if pQuiet {
+        if quiet {
             // Redirect pip stdout/stderr to a sink stream so subprocess output doesn't bypass device suppression
             set pipOutput = ##class(%Stream.TmpCharacter).%New()
-            $$$ThrowOnError(..RunCommand(pCwd, command, .pipOutput, .pipOutput))
+            set runStatus = ..RunCommand(cwd, command, .pipOutput, .pipOutput)
+            if $$$ISERR(runStatus) {
+                // pip's own diagnostics are what explains a failed install, so let them through the suppression
+                do pipOutput.Rewind()
+                while 'pipOutput.AtEnd {
+                    write !,pipOutput.ReadLine()
+                }
+                $$$ThrowStatus(runStatus)
+            }
         } else {
-            $$$ThrowOnError(..RunCommand(pCwd, command))
+            $$$ThrowOnError(..RunCommand(cwd, command))
         }
 
-        do ..RemoveStagedEntriesFromTarget(staging, pTarget)
+        do ..ResolveStagedEntries(staging, target, replaceExisting)
 
         // Copying rather than moving lets the entries inherit the permissions of the target instead of the staging directory's
-        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(staging, pTarget, 0, pVerbose))
+        set copyStatus = ##class(%IPM.Utils.File).CopyDir(staging, target, 0, verbose)
+        if $$$ISERR(copyStatus) {
+            set copyError = $$$ERROR($$$GeneralError, $$$FormatText("Error copying staged Python packages into %1. Any package being replaced may be left partially installed.", target))
+            $$$ThrowStatus($$$EMBEDSC(copyError, copyStatus))
+        }
     } catch ex {
         set sc = ex.AsStatus()
     }
-    set cleanupSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(staging)
-    if $$$ISERR(cleanupSC) {
-        set sc = $$$ADDSC(sc, cleanupSC)
+
+    if (staging '= "") {
+        set cleanupStatus = ##class(%IPM.Utils.File).RemoveDirectoryTree(staging)
+        if $$$ISERR(cleanupStatus) {
+            set sc = $$$ADDSC(sc, cleanupStatus)
+        }
     }
     quit sc
 }
 
-/// Deletes each entry of <var>pTarget</var> whose name matches a top-level entry of <var>pStaging</var>.
-ClassMethod RemoveStagedEntriesFromTarget(
-	pStaging As %String,
-	pTarget As %String) [ Internal ]
+/// Deletes the losing side of each name shared by a top-level entry of <var>staging</var> and one of
+/// <var>target</var>, leaving the copy out of <var>staging</var> with no collision to resolve.
+ClassMethod ResolveStagedEntries(
+	staging As %String,
+	target As %String,
+	replaceExisting As %Boolean = 1) [ Internal ]
 {
-    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)", pStaging, "*", "", 1)
+    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)", staging, "*", "", 1)
     if rs.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing " _ pStaging _ ": " _ rs.%Message))
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing " _ staging _ ": " _ rs.%Message))
     }
     while rs.%Next() {
-        set existing = ##class(%File).Construct(pTarget, ##class(%File).GetFilename(rs.%Get("Name")))
-        if (rs.%Get("Type") = "D") {
-            if ##class(%File).DirectoryExists(existing) {
-                $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(existing))
-            }
+        set stagedEntry = rs.%Get("Name")
+        set name = ##class(%File).GetFilename(stagedEntry)
+        // An empty name would resolve to the target itself, and deleting that takes every package with it
+        continue:(name = "")
+        continue:..IsSharedPipEntry(name)
+
+        set installedEntry = ##class(%File).Construct(target, name)
+        if '##class(%File).DirectoryExists(installedEntry), '##class(%File).Exists(installedEntry) {
+            continue
+        }
+        if replaceExisting {
+            do ..RemoveFileOrDirectory(installedEntry)
         } else {
-            if ##class(%File).Exists(existing) {
-                if '##class(%File).Delete(existing, .osErr) {
-                    set errMsg = "Error deleting " _ existing _ ": " _ $zutil(209, osErr)
-                    $$$ThrowStatus($$$ERROR($$$GeneralError, errMsg))
-                }
-            }
+            write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: '%1' is already installed in %2. Keeping the installed one.", name, target)),!
+            do ..RemoveFileOrDirectory(stagedEntry)
+        }
+    }
+}
+
+/// Whether <var>name</var> is a top-level entry <code>pip install -t</code> creates for its own
+/// bookkeeping rather than for one distribution. Every wheel carrying a console script writes into
+/// the same <code>bin</code>, so these are merged instead of replaced.
+ClassMethod IsSharedPipEntry(name As %String) As %Boolean [ Internal ]
+{
+    quit $listfind($listbuild("bin", "scripts", "__pycache__"), $zconvert(name, "L")) > 0
+}
+
+/// Deletes <var>path</var>, whether it names a file or a directory tree. A symlink to a directory is
+/// followed, so the tree it points at is what gets deleted.
+ClassMethod RemoveFileOrDirectory(path As %String) [ Internal ]
+{
+    if ##class(%File).DirectoryExists(path) {
+        $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(path))
+        // RemoveDirectoryTree can report success with the directory still there, and a surviving directory keeps its permissions
+        if ##class(%File).DirectoryExists(path) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Error removing directory " _ path))
+        }
+    } elseif ##class(%File).Exists(path) {
+        if '##class(%File).Delete(path, .osErr) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Error deleting " _ path _ ": " _ $zutil(209, osErr)))
         }
     }
 }

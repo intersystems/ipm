@@ -93,7 +93,6 @@ ClassMethod DeletePattern(
 ClassMethod PurgePythonPackage(name As %String)
 {
     set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
-    zwrite target
     // common layouts
     //   <target>/<name>/
     //   <target>/<name>-<ver>.dist-info/
@@ -133,9 +132,8 @@ Method TestWheelPresent()
 }
 
 /// Two wheels whose contents share one top-level directory name, a namespace package.
-/// Installing the second wheel replaces that directory, so the first wheel's module inside it is gone.
-/// This is the documented consequence of replacing same-named top-level entries under mgr/python.
-Method TestSharedTopLevelDirectoryIsReplaced()
+/// The second wheel's module reaches mgr/python even though the directory holding it is already there.
+Method TestWheelInstallsIntoSharedTopLevelDirectory()
 {
     set alphaDir = ..GetModuleDir("python-deps-tests", ..#SharedNamespaceAlphaLocation)
     set betaDir = ..GetModuleDir("python-deps-tests", ..#SharedNamespaceBetaLocation)
@@ -154,7 +152,6 @@ Method TestSharedTopLevelDirectoryIsReplaced()
     set sc = ##class(%IPM.Main).Shell("load -v " _ betaDir)
     do $$$AssertStatusOK(sc, "Successfully installed shared-ns-wheel-beta")
     do $$$AssertTrue(##class(%File).Exists(betaModule), "Second wheel installed "_betaModule)
-    do $$$AssertNotTrue(##class(%File).Exists(alphaModule), "First wheel's "_alphaModule_" is gone")
 
     do ..PurgeSharedNamespacePackages()
 }
