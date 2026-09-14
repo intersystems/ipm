@@ -21,6 +21,8 @@ Method Log(
     if '$listfind($listfromstring(..#logLevels), level) {
         do ..Log("Log has incorrect logLevel "_level_". Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message, "ERROR")
     }
+
+    // TODO: Add the message to the LogFile(s) going in that instance in the same namespace
 }
 
 Method Flush(pThreshold As %Integer = {..Threshold})
