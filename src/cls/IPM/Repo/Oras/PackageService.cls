@@ -429,7 +429,12 @@ ClassMethod GetClient(
             }
         }
     } catch e {
-        if e.Name = "<OBJECT DISPATCH>" {
+        // The same permission failure has been seen as both <SYNTAX> and <PYTHON EXCEPTION>, so match on the details rather than the name
+        if e.DisplayString() [ "PermissionError" {
+            set eStatus = e.AsStatus()
+            set usrStatus = $$$ERROR($$$GeneralError,$$$OrasPythonPackagesUnreadable)
+            $$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))
+        } elseif e.Name = "<OBJECT DISPATCH>" {
             set eStatus = e.AsStatus()
             set usrStatus = $$$ERROR($$$GeneralError,$$$OrasRequiresFlexiblePython)
             $$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))

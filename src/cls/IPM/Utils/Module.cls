@@ -2430,6 +2430,81 @@ ClassMethod RunCommand(
     quit tSC
 }
 
+/// Runs <code>pip install</code> into a staging directory, then copies the result into <var>pTarget</var>.
+/// <var>pPipArgs</var> is the argument $list following the pip caller; <code>-t &lt;staging&gt;</code> is appended to it.
+/// Any top-level entry of <var>pTarget</var> named like one pip staged is deleted before the copy.
+ClassMethod StagedPipInstall(
+	pPipArgs As %List,
+	pTarget As %String,
+	pQuiet As %Boolean = 0,
+	pVerbose As %Boolean = 0,
+	pCwd As %String = "",
+	ByRef pParams) As %Status
+{
+    set staging = ##class(%IPM.Utils.File).CreateTempDirectory()
+    set sc = $$$OK
+    try {
+        // Drop empty arguments: $listfromstring("") of an unset flag string yields one, and pip reads it as a requirement
+        set args = ""
+        for i = 1:1:$listlength(pPipArgs) {
+            set arg = $listget(pPipArgs, i)
+            if (arg '= "") {
+                set args = args _ $listbuild(arg)
+            }
+        }
+        set command = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.pParams) _ args _ $listbuild("-t", staging)
+        if pVerbose {
+            write !,"Running "
+            zwrite command
+        }
+        if pQuiet {
+            // Redirect pip stdout/stderr to a sink stream so subprocess output doesn't bypass device suppression
+            set pipOutput = ##class(%Stream.TmpCharacter).%New()
+            $$$ThrowOnError(..RunCommand(pCwd, command, .pipOutput, .pipOutput))
+        } else {
+            $$$ThrowOnError(..RunCommand(pCwd, command))
+        }
+
+        do ..RemoveStagedEntriesFromTarget(staging, pTarget)
+
+        // Copying rather than moving lets the entries inherit the permissions of the target instead of the staging directory's
+        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(staging, pTarget, 0, pVerbose))
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    set cleanupSC = ##class(%IPM.Utils.File).RemoveDirectoryTree(staging)
+    if $$$ISERR(cleanupSC) {
+        set sc = $$$ADDSC(sc, cleanupSC)
+    }
+    quit sc
+}
+
+/// Deletes each entry of <var>pTarget</var> whose name matches a top-level entry of <var>pStaging</var>.
+ClassMethod RemoveStagedEntriesFromTarget(
+	pStaging As %String,
+	pTarget As %String) [ Internal ]
+{
+    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)", pStaging, "*", "", 1)
+    if rs.%SQLCODE < 0 {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing " _ pStaging _ ": " _ rs.%Message))
+    }
+    while rs.%Next() {
+        set existing = ##class(%File).Construct(pTarget, ##class(%File).GetFilename(rs.%Get("Name")))
+        if (rs.%Get("Type") = "D") {
+            if ##class(%File).DirectoryExists(existing) {
+                $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(existing))
+            }
+        } else {
+            if ##class(%File).Exists(existing) {
+                if '##class(%File).Delete(existing, .osErr) {
+                    set errMsg = "Error deleting " _ existing _ ": " _ $zutil(209, osErr)
+                    $$$ThrowStatus($$$ERROR($$$GeneralError, errMsg))
+                }
+            }
+        }
+    }
+}
+
 ClassMethod GetFilename4Output(
 	pOutput As %Stream.Object,
 	Output pAsTemporary = 0) As %String

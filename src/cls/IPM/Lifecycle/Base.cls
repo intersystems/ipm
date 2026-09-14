@@ -789,14 +789,8 @@ Method InstallOrDownloadPythonRequirements(
             set processType = "requirements.txt"
             do ..Log(processType _ " START")
             write:tVerbose !
-            set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
-            if tVerbose {
-                write !, "Running "
-                zwrite command
-            } else {
-                set stdout = ""
-            }
-            set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
+            set pipArgs = $listbuild("install", "-r", "requirements.txt", "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+            set tSC = ##class(%IPM.Utils.Module).StagedPipInstall(pipArgs, target, 'tVerbose, tVerbose, pRoot, .pParams)
             $$$ThrowOnError(tSC)
         }
         do ..Log(processType _ " SUCCESS")
