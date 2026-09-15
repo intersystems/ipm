@@ -10,13 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
+- #1158: Installing deployed code modules will automatically filter for the current IRIS version
 
 ### Changed
 - Minimum supported Python version is now 3.9
+- #1158: `search` and `install` no longer list deployed modules that were not built for the current IRIS platform. Use `search <module> -versions` to see all versions and their supported platforms.
 
 ### Fixed
 - Performance: Studio project creation on package load in dev mode is now 80% faster.
 - #994: Prevent crash in `zn` command when target namespace lacks IPM mappings
+- #987: Fixed issue where installing dependencies with ORAS would fail due to failure to properly get the manifest
 
 ## [0.10.9] - 2026-08-05
 

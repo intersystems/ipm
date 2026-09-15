@@ -1120,6 +1120,7 @@ Method %Compile(ByRef pParams) As %Status
 
                     // Just copy the first level of subscripts (resource names), not all the gory details.
                     set tOneResourceKey = ""
+                    set tAnyToCompile = 0
                     for {
                         set tOneResourceKey = $order(tOneResourceList(tOneResourceKey))
                         quit:(tOneResourceKey="")
@@ -1127,6 +1128,14 @@ Method %Compile(ByRef pParams) As %Status
                             continue
                         }
                         set tCompileFlagMap(tFlags,tResource.Name,tOneResourceKey) = ""
+                        set tAnyToCompile = 1
+                    }
+
+                    // Everything under this resource is already deployed, so no compile pass will
+                    // ever claim it. Leaving it in tCompilableMap would stall the loop below, which
+                    // only clears resources it compiles.
+                    if 'tAnyToCompile {
+                        kill tCompilableMap(tResource.Name)
                     }
                 }
             }
@@ -1201,8 +1210,9 @@ Method %Compile(ByRef pParams) As %Status
                 }
             }
 
-            // Cycle detection
-            if ('tCompiledSomething && '..HasDeployedResources) {
+            // Cycle detection. Anything not compilable has already been removed above, so a
+            // resource still waiting its turn here is waiting on itself.
+            if 'tCompiledSomething {
                 set tFailedResources = ""
                 set tResource = ""
                 for {
@@ -1713,8 +1723,8 @@ Method %Document(ByRef pParams) As %Status
             set tSC = ..Module.BuildDependencyGraph(.tDependencyGraph)
             $$$ThrowOnError(tSC)
 
-            // tDependencyGraph format:
-            // tDependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
+            // tDependencyGraph format: see %IPM.Storage.Module:BuildDependencyGraph for the node
+            // layout. Only <depth> and <server> are used here.
             // tDependencyGraph(<module name>,<dependent module name>_" "_<version string>) = <required version expression>
             // <server> being empty means it's already installed.
             // All these modules need to already be installed.
@@ -1867,8 +1877,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
             if '$isobject(..Module.SystemRequirements) {
                 set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
             }
-            set tSystemVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
-            set ..Module.SystemRequirements.VersionString = tSystemVersion
+            set ..Module.SystemRequirements.VersionString = $$$CurrentPlatformVersion
             $$$ThrowOnError(..Module.%Save())
             if $data(tDeployClassArray) {
                 if (tVerbose) {
