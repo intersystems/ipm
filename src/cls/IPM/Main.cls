@@ -2611,7 +2611,7 @@ ClassMethod Install(
                         set tFiltered = tCandidate
                     }
                 }
-                set tMsg = "'" _ tFiltered.Name _ "' " _ tFiltered.VersionString _ " is not available for platform " _ $$$CurrentPlatformVersion _ ". Available platforms: " _ tFiltered.FormatPlatformVersions() _ ". Run 'search " _ tFiltered.Name _ " -versions' to see all versions."
+                set tMsg = "'" _ tFiltered.Name _ "' " _ tFiltered.VersionString _ " is not available for platform version " _ $$$CurrentPlatformVersion _ ". Available platform versions: " _ tFiltered.FormatPlatformVersions() _ ". Run 'search " _ tFiltered.Name _ " -versions' to see all versions."
                 $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
             }
             set tPrefix = ""
