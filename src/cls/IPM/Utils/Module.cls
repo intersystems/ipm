@@ -2505,10 +2505,9 @@ ClassMethod ResolveStagedEntries(
 	replaceExisting As %Boolean = 1) [ Internal ]
 {
     set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)", staging, "*", "", 1)
-    if rs.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing " _ staging _ ": " _ rs.%Message))
-    }
-    while rs.%Next() {
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    while rs.%Next(.sc) {
+        $$$ThrowOnError(sc)
         set stagedEntry = rs.%Get("Name")
         set name = ##class(%File).GetFilename(stagedEntry)
         // An empty name would resolve to the target itself, and deleting that takes every package with it

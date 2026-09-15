@@ -430,9 +430,9 @@ ClassMethod GetClient(
         }
     } catch e {
         // The same permission failure has been seen as both <SYNTAX> and <PYTHON EXCEPTION>, so match on the details rather than the name
-        // The path is reported however it reached sys.path, so compare case and separators loosely
-        set details = $translate($zconvert(e.DisplayString(), "L"), "\", "/")
-        set pythonDir = $translate($zconvert(##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory()), "L"), "\", "/")
+        // Python reports the path as it appeared in sys.path, whose case can differ from the manager directory's
+        set details = $zconvert(e.DisplayString(), "L")
+        set pythonDir = $zconvert(##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory()), "L")
         if (details [ "permissionerror") && (details [ pythonDir) {
             set eStatus = e.AsStatus()
             set usrStatus = $$$ERROR($$$GeneralError,$$$OrasPythonPackagesUnreadable)
