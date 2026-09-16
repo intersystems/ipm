@@ -47,6 +47,15 @@ Property SharedNS2 As %String;
 /// Cleaned up in OnAfterAllTests.
 Property SharedGlobalsDatabases As %List;
 
+/// Directory this fixture puts a test-created database in, by the convention CreateTestNamespace
+/// uses when it makes one. Deliberately not a Config.Databases lookup: cleanup paths run when the
+/// entry is already gone, or was never created because a previous run died early.
+/// Not named Test* — %UnitTest.TestCase would run it as a test case.
+ClassMethod FixtureDatabaseDirectory(dbName As %String) As %String
+{
+    quit ##class(%Library.File).NormalizeDirectory(##class(%Library.File).ManagerDirectory() _ dbName)
+}
+
 /// Cached .tgz paths for modules packaged identically by more than one test, keyed by module name.
 /// Reuse is safe: `load <tgz>` extracts to a temp directory and copies from there, so the archive
 /// itself is never modified by an install (including the swap and tamper flows).
@@ -70,7 +79,7 @@ Method OnBeforeAllTests() As %Status
         set ns = "TESTDBPKGNS" _ i
         set globalsDB = ns _ "G"
         do ##class(%IPM.Test.Utils).DeleteNamespace(ns)
-        set dbPath = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(globalsDB)
+        set dbPath = ..FixtureDatabaseDirectory(globalsDB)
         try {
             new $namespace
             set $namespace = "%SYS"
@@ -180,7 +189,7 @@ Method OnAfterAllTests() As %Status
     for i=1:1:$listlength(..SharedGlobalsDatabases) {
         set dbName = $listget(..SharedGlobalsDatabases, i)
         if dbName '= "" {
-            set dbPath = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(dbName)
+            set dbPath = ..FixtureDatabaseDirectory(dbName)
             try {
                 new $namespace
                 set $namespace = "%SYS"
@@ -217,13 +226,12 @@ Method CreateTestNamespace(pNamespace As %String) As %Status
     // Create a dedicated globals database so dismounting the routines DB
     // during packaging or swap doesn't lose IPM metadata (^IPM.Storage.*)
     set globalsDBName = pNamespace _ "G"
+    // Resolved before the %SYS switch below, which cannot dispatch to this class.
+    set globalsPath = ..FixtureDatabaseDirectory(globalsDBName)
     set sc = $$$OK
     try {
         new $namespace
         set $namespace = "%SYS"
-
-        set globalsPath = ##class(%Library.File).NormalizeDirectory(
-            ##class(%Library.File).ManagerDirectory() _ globalsDBName)
 
         // Clean up any leftover state from a previous test run
         // Check both directory existence and DB registration independently
@@ -411,7 +419,7 @@ Method TestSimplePackageAndInstall()
     // The <Checksum> must be the checksum of the IRIS.DAT that actually shipped, not of whatever was
     // hashed before the copy.
     set extractedDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", extractDir)
-    do $$$AssertEquals($zconvert(##class(%IPM.Lifecycle.Database).ComputeSHA256Hex(extractedDAT), "L"), $zconvert(manifestChecksum, "L"), "module.xml <Checksum> matches the shipped IRIS.DAT")
+    do $$$AssertEquals($zconvert(##class(%IPM.Utils.File).ComputeSHA256Hex(extractedDAT), "L"), $zconvert(manifestChecksum, "L"), "module.xml <Checksum> matches the shipped IRIS.DAT")
 
     // SystemRequirements Version should be auto-populated with the current IRIS version
     set currentIrisVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
@@ -652,7 +660,7 @@ Method TestPackagingAndInstallValidation()
     // Test: module.xml without a <Checksum> element fails validation.
     // The other structural checks in ValidateBeforeSwap (missing IRIS.DAT, missing module.xml, a
     // <Packaging> other than "database") cannot be reached through `load`: each one also makes
-    // IsInstallContext() false, so the install branch is never entered. They remain as
+    // IsDatabaseInstall() false, so the install branch is never entered. They remain as
     // defense-in-depth for direct %Reload callers and are not exercised here.
     set noChecksumDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "no-checksum-extract")
     do ##class(%Library.File).CreateDirectory(noChecksumDir)
@@ -1512,8 +1520,8 @@ ClassMethod DeletePattern(
 /// of the wildcard, so the DB directory's own subdirectories (e.g. stream) would be counted.
 Method CountBackupFiles(ns As %String) As %Integer
 {
-    set routinesDBName = ##class(%IPM.Lifecycle.Database).GetRoutinesDBName(ns)
-    set dbDir = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(routinesDBName)
+    set routinesDBName = ##class(%IPM.Utils.Module).GetRoutineDatabase(ns)
+    set dbDir = ##class(%IPM.Utils.Module).GetDatabaseDirectory(routinesDBName)
     set rs = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT COUNT(*) AS fileCount FROM %Library.File_FileSet(?, ?, ?, ?)",
         dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", "", 0)
@@ -1602,7 +1610,7 @@ Method TestRollbackPreservesOriginalWhenNoBackup()
     do $$$AssertStatusOK(sc, "Created test namespace")
 
     // Resolve the routines DB directory for the namespace.
-    set dbDir = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(##class(%IPM.Lifecycle.Database).GetRoutinesDBName(installNS))
+    set dbDir = ##class(%IPM.Utils.Module).GetRoutineDatabaseDir(installNS)
     set irisDAT = dbDir _ "IRIS.DAT"
     do $$$AssertTrue(##class(%Library.File).Exists(irisDAT), "Original IRIS.DAT exists before rollback")
 
@@ -1758,8 +1766,7 @@ Method TestSnapshotDismountsCopiesAndRemounts()
     set stagingDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "snap-dismount")
     do $$$AssertTrue(##class(%Library.File).CreateDirectoryChain(stagingDir), "Created staging dir")
 
-    set dbDir = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(
-        ##class(%IPM.Lifecycle.Database).GetRoutinesDBName(snapNS))
+    set dbDir = ##class(%IPM.Utils.Module).GetRoutineDatabaseDir(snapNS)
     set srcDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", dbDir)
 
     // Called from inside snapNS, as %Package does, so the database being dismounted is the one on

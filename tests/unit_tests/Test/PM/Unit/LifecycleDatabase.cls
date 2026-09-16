@@ -34,10 +34,10 @@ Method TestPackagingDerivesLifecycleClass()
     do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.Database", "Empty LifecycleClass derived from database packaging")
 }
 
-/// IsPackagedManifest decides whether a directory is the remains of an already-swapped install,
-/// which %Reload refuses to load as source. Detection is the <Checksum> element, so a source
-/// manifest and a packaged one must be told apart on that alone.
-Method TestIsPackagedManifestDetection()
+/// IsDatabasePackagedManifest decides whether a directory is the remains of an already-swapped
+/// install, which %Reload refuses to load as source. Detection is the <Checksum> element, so a
+/// source manifest and a database-packaged one must be told apart on that alone.
+Method TestIsDatabasePackagedManifestDetection()
 {
     // TempFilename creates the file it names, so derive a sibling directory from it and delete it.
     set tempFile = ##class(%Library.File).TempFilename()
@@ -45,24 +45,24 @@ Method TestIsPackagedManifestDetection()
     do ##class(%Library.File).Delete(tempFile)
     do $$$AssertTrue(##class(%Library.File).CreateDirectoryChain(dir), "Created temp directory")
 
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(dir), "Directory with no module.xml is not a packaged manifest")
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(""), "Empty directory path is not a packaged manifest")
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Directory with no module.xml is not a database-packaged manifest")
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(""), "Empty directory path is not a database-packaged manifest")
 
     set header = "<?xml version=""1.0""?>" _ $char(13, 10) _ "<Export generator=""IRIS"">" _ $char(13, 10) _
         "<Document name=""pkg-check.ZPM""><Module><Name>pkg-check</Name><Version>1.0.0</Version>"
 
     // A source manifest: same shape, no Checksum.
     do ..WriteModuleXML(dir, header _ "</Module></Document></Export>")
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(dir), "Source manifest is not a packaged manifest")
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Source manifest is not a database-packaged manifest")
 
     // Not valid XML at all: reported by the source load path, not here.
     do ..WriteModuleXML(dir, "<Export><Document")
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(dir), "Unparseable module.xml is not a packaged manifest")
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Unparseable module.xml is not a database-packaged manifest")
 
     do ..WriteModuleXML(dir, header _ "<Packaging>database</Packaging>" _
         "<Checksum Algorithm=""SHA-256"">ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad</Checksum>" _
         "</Module></Document></Export>")
-    do $$$AssertTrue(##class(%IPM.Lifecycle.Database).IsPackagedManifest(dir), "Manifest with Checksum is a packaged manifest")
+    do $$$AssertTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Manifest with Checksum is a database-packaged manifest")
 
     do ##class(%Library.File).RemoveDirectoryTree(dir)
 }
@@ -92,7 +92,7 @@ Method TestSHA256HexFormat()
     do $$$AssertStatusOK(stream.LinkToFile(tmp), "Linked stream to temp file")
     do $$$AssertStatusOK(stream.Write("abc"), "Wrote test content")
     do $$$AssertStatusOK(stream.%Save(), "Saved temp file")
-    set hex = ##class(%IPM.Lifecycle.Database).ComputeSHA256Hex(tmp)
+    set hex = ##class(%IPM.Utils.File).ComputeSHA256Hex(tmp)
     do ##class(%Library.File).Delete(tmp)
 
     do $$$AssertEquals($length(hex), 64, "SHA-256 hex is 64 characters")
@@ -131,7 +131,7 @@ Method TestTopologicalDependencyOrder()
     do root.Dependencies.Insert(rootDep)
     do $$$AssertStatusOK(root.%Save(), "Saved aa-root")
 
-    set ordered = ##class(%IPM.Lifecycle.Database).GetTopologicalDependencyNames(root)
+    set ordered = root.GetTopologicalDependencyNames()
     do $$$AssertEquals($listtostring(ordered, ","), "zz-base,mm-mid", "Dependency precedes dependent")
 }
 

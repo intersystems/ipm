@@ -1180,7 +1180,7 @@ ClassMethod LoadNewModule(
                 // dependency that merely moved to a different parent is not seen as dropped.
                 // A dependency with no installed record is omitted, which is harmless: with no
                 // record there is nothing to orphan and nothing to clean up.
-                set params("PreviousDependencies") = ##class(%IPM.Lifecycle.Database).GetDependencyNames(moduleCurrent)
+                set params("PreviousDependencies") = moduleCurrent.GetDependencyNames()
             }
         }
         if (fromVersion '= "") && (toVersion '= "") {
@@ -1794,39 +1794,42 @@ ClassMethod CreateAllNamespace() As %Status
     return tSC
 }
 
+/// Returns the Config.Databases key for a namespace's routines database.
 ClassMethod GetRoutineDatabase(pNamespace As %String) As %String
 {
     new $namespace
     set $namespace="%SYS"
-    quit ##class(Config.Namespaces).Open(pNamespace).Routines
+    $$$ThrowOnError(##class(Config.Namespaces).Get(pNamespace, .nsProps))
+    quit $get(nsProps("Routines"))
 }
 
+/// Returns the Config.Databases key for a namespace's globals database.
 ClassMethod GetGlobalDatabase(pNamespace As %String) As %String
 {
     new $namespace
     set $namespace="%SYS"
-    quit ##class(Config.Namespaces).Open(pNamespace).Globals
+    $$$ThrowOnError(##class(Config.Namespaces).Get(pNamespace, .nsProps))
+    quit $get(nsProps("Globals"))
 }
 
 ClassMethod GetRoutineDatabaseDir(pNamespace As %String) As %String
 {
-    new $namespace
-    set $namespace="%SYS"
     quit ..GetDatabaseDirectory(..GetRoutineDatabase(pNamespace))
 }
 
 ClassMethod GetGlobalDatabaseDir(pNamespace As %String) As %String
 {
-    new $namespace
-    set $namespace="%SYS"
     quit ..GetDatabaseDirectory(..GetGlobalDatabase(pNamespace))
 }
 
+/// Returns the normalized directory path of a registered database. Callers that need the
+/// conventional path of a database that may not be registered must build it themselves.
 ClassMethod GetDatabaseDirectory(pDatabase As %String) As %String
 {
     new $namespace
     set $namespace="%SYS"
-    quit ##class(Config.Databases).Open(pDatabase).Directory
+    $$$ThrowOnError(##class(Config.Databases).Get(pDatabase, .dbProps))
+    quit ##class(%Library.File).NormalizeDirectory($get(dbProps("Directory")))
 }
 
 ClassMethod ActivateMappings(pNamespace = {$namespace}) As %Status [ Internal ]

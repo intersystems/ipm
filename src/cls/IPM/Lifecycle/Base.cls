@@ -2139,6 +2139,15 @@ Method ExportSingleModule(
     }
 }
 
+/// Returns this module followed by its installed transitive dependencies.
+/// The root comes first because every caller needs its resources considered before its dependencies'.
+Method GetSelfAndDependencyModules() As %ListOfObjects [ Private ]
+{
+    set modules = ..Module.GetDependencyModules()
+    do modules.InsertAt(..Module, 1)
+    quit modules
+}
+
 /// Returns the lifecycle class whose Final PACKAGING parameter equals pPackaging.
 /// pBaseClass is "" when no class claims that value. This is a valid outcome, since packaging values are
 /// not constrained to those with a dedicated lifecycle class. Callers decide the fallback.

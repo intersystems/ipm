@@ -253,4 +253,17 @@ ClassMethod CreateTempDirectory(baseDirectory As %String = "") As %String
     return ##class(%File).NormalizeDirectory(dir)
 }
 
+/// Computes the SHA-256 hash of a file and returns it as a lowercase hex string (64 chars).
+ClassMethod ComputeSHA256Hex(filePath As %String) As %String
+{
+    set stream = ##class(%Stream.FileBinary).%New()
+    $$$ThrowOnError(stream.LinkToFile(filePath))
+
+    set binHash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
+    $$$ThrowOnError(sc)
+
+    // %xsd.hexBinary.LogicalToXSD returns uppercase hex; lowercase to match the on-disk convention.
+    quit $zconvert(##class(%xsd.hexBinary).LogicalToXSD(binHash), "L")
+}
+
 }
