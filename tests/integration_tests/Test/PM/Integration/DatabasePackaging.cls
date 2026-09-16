@@ -326,7 +326,6 @@ Method GetOrCreateSharedNS2() As %String
     set ns = "TESTDBPKGNS2"
 
     // Resolve all module dirs before switching namespace (^UnitTestRoot only in original NS)
-    set allResDir = ..GetModuleDir("db-packaging", "module-with-all-resources")
     set reqsDir = ..GetModuleDir("db-packaging", "module-with-requirements")
     set mixPyDir = ..GetModuleDir("db-packaging", "module-with-mixed-python")
     set nonCmpDir = ..GetModuleDir("db-packaging", "module-with-non-compiled-resources")
@@ -338,7 +337,6 @@ Method GetOrCreateSharedNS2() As %String
 
     new $namespace
     set $namespace = ns
-    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ allResDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ reqsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ mixPyDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ nonCmpDir))
@@ -1527,75 +1525,59 @@ Method CountBackupFiles(ns As %String) As %Integer
 }
 
 /// Runs package-database for module in the current namespace and returns everything it wrote.
-/// Device redirection is how the warnings are made assertable, since %IPM writes them straight out
-/// with no logger to intercept.
 Method CapturePackageOutput(
 	module As %String,
 	Output status As %Status) As %String
 {
-    set tmpFile = ##class(%Library.File).TempFilename("txt")
-    set io = $io
-    open tmpFile:("WNS"):5
-    use tmpFile
-
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set exception = ""
     try {
         set status = ##class(%IPM.Main).Shell("package-database " _ module _ " -path " _ ..PackageOutputDir)
     } catch ex {
         set exception = ex
     }
-
-    use io
-    close tmpFile
-
-    set stream = ##class(%Stream.FileCharacter).%New()
-    do stream.LinkToFile(tmpFile)
-    set output = ""
-    while 'stream.AtEnd {
-        set output = output _ stream.Read(32000)
-    }
-    do stream.%Close()
-    do ##class(%Library.File).Delete(tmpFile)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .lines)
 
     if exception '= "" {
         throw exception
     }
 
-    quit output
+    quit ..JoinLines(.lines)
 }
 
-/// Runs WarnRoutinesDatabaseIsGlobalsDatabase against a namespace and returns what it wrote.
-ClassMethod CaptureGlobalsWarning(namespace As %String) As %String
+/// Runs one of %IPM.Lifecycle.Database's warning methods against a namespace and returns what it
+/// wrote, so the packaging-side and install-side warnings can each be asserted on directly.
+ClassMethod CaptureDatabaseWarning(
+	warningMethod As %String,
+	namespace As %String) As %String
 {
-    set tmpFile = ##class(%Library.File).TempFilename("txt")
-    set io = $io
-    open tmpFile:("WNS"):5
-    use tmpFile
-
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set exception = ""
     try {
-        do ##class(%IPM.Lifecycle.Database).WarnRoutinesDatabaseIsGlobalsDatabase(namespace)
+        do $classmethod("%IPM.Lifecycle.Database", warningMethod, namespace)
     } catch ex {
         set exception = ex
     }
-
-    use io
-    close tmpFile
-
-    set stream = ##class(%Stream.FileCharacter).%New()
-    do stream.LinkToFile(tmpFile)
-    set output = ""
-    while 'stream.AtEnd {
-        set output = output _ stream.Read(32000)
-    }
-    do stream.%Close()
-    do ##class(%Library.File).Delete(tmpFile)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .lines)
 
     if exception '= "" {
         throw exception
     }
 
-    quit output
+    quit ..JoinLines(.lines)
+}
+
+/// Joins captured output lines into one string so assertions can match a warning by substring.
+ClassMethod JoinLines(ByRef lines) As %String
+{
+    set text = ""
+    set key = ""
+    for {
+        set key = $order(lines(key))
+        quit:key=""
+        set text = text _ lines(key) _ $char(10)
+    }
+    quit text
 }
 
 /// Removes all installed files of a Python package from the shared pip target directory.
@@ -1780,8 +1762,8 @@ Method TestSnapshotDismountsCopiesAndRemounts()
         ##class(%IPM.Lifecycle.Database).GetRoutinesDBName(snapNS))
     set srcDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", dbDir)
 
-    // SYS.Database is invisible outside %SYS, so the snapshot switches there itself.
-    set $namespace = ..OriginalNamespace
+    // Called from inside snapNS, as %Package does, so the database being dismounted is the one on
+    // this process's namespace stack.
     do ##class(%IPM.Lifecycle.Database).SnapshotRoutinesDatabase(snapNS, stagingDir)
 
     set staged = ##class(%Library.File).NormalizeFilename("IRIS.DAT", stagingDir)
@@ -1793,25 +1775,45 @@ Method TestSnapshotDismountsCopiesAndRemounts()
     do $$$AssertTrue(..StagedDATContains(staged, "SimpleModule.Main"), "Staged IRIS.DAT holds code loaded just before the snapshot")
 
     // Reading a class out of the namespace proves the remount succeeded.
-    set $namespace = snapNS
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Routines database remounted and readable")
+}
+
+/// A failed copy still remounts the routines database. Leaving a namespace's code database dismounted
+/// is worse than any packaging error, so the remount cannot be conditional on the copy succeeding.
+/// A staging directory that does not exist is enough to fail the copy: NormalizeFilename returns ""
+/// for a destination whose directory is absent, and CopyFile cannot write to an empty path.
+Method TestFailedCopyStillRemounts()
+{
+    set failNS = "TESTDBSNAPCOPYFAIL"
+    do $$$AssertStatusOK(..CreateTestNamespace(failNS), "Created snapshot namespace")
+    set simpleDir = ..GetModuleDir("db-packaging", "simple-module")
+
+    new $namespace
+    set $namespace = failNS
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ simpleDir), "Loaded simple-db-module")
+
+    set missingDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(..PackageOutputDir, "no-such-staging-dir"))
+    set caught = ""
+    try {
+        do ##class(%IPM.Lifecycle.Database).SnapshotRoutinesDatabase(failNS, missingDir)
+    } catch ex {
+        set caught = ex
+    }
+    do $$$AssertNotEquals(caught, "", "Snapshot reports the failed copy rather than succeeding silently")
+
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Routines database remounted after the failed copy")
 }
 
 /// Reports whether a staged IRIS.DAT holds needle anywhere in its blocks. A class name appears
 /// verbatim in the database's global subscripts, so this is enough to tell a complete copy from one
 /// missing the blocks that were still buffered.
-///
-/// IRIS refuses %Stream.FileBinary on any path named IRIS.DAT, hence the copy under another name.
 /// Chunks overlap by the needle's length so a match spanning a chunk boundary is not missed.
 Method StagedDATContains(
 	datFile As %String,
 	needle As %String) As %Boolean
 {
-    set readable = ##class(%Library.File).TempFilename("dat")
-    do $$$AssertTrue(##class(%Library.File).CopyFile(datFile, readable, 1), "Copied the staged IRIS.DAT to a readable name")
-
     set stream = ##class(%Stream.FileBinary).%New()
-    do $$$AssertStatusOK(stream.LinkToFile(readable), "Opened the staged IRIS.DAT copy")
+    do $$$AssertStatusOK(stream.LinkToFile(datFile), "Opened the staged IRIS.DAT")
 
     set found = 0
     set tail = ""
@@ -1824,9 +1826,6 @@ Method StagedDATContains(
         set tail = $extract(chunk, *-($length(needle) - 1), *)
     }
 
-    // Release the file before deleting it.
-    set stream = ""
-    do ..DeletePath(readable)
     quit found
 }
 
@@ -1846,7 +1845,7 @@ Method TestRootCodeMissingStopsPackaging()
     // one namespace and packaged from another leaves behind.
     do $$$AssertStatusOK($system.OBJ.Delete("SimpleModule.Main.CLS,SimpleModule.Utils.CLS", "-d"), "Deleted the module's classes")
 
-    set output = ..CapturePackageOutput("simple-db-module", .sc)
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
     do $$$AssertTrue($$$ISERR(sc), "Packaging fails when root module's declared classes are missing")
     set errorText = $system.Status.GetErrorText(sc)
     do $$$AssertTrue(errorText [ "SimpleModule.Main", "Compile phase error names the missing class")
@@ -1947,9 +1946,10 @@ Method TestWarnsAboutTestClassesWithoutIncludeTests()
     do $$$AssertNotTrue(output [ "TestModule.Main.CLS", "Did not report a non-test class")
 }
 
-/// A namespace whose routines and globals are the same database is warned about, since the swap
-/// replaces its globals along with IPM's own registry. Asserted against the warning method rather
-/// than a real install, which would wreck the registry the assertions depend on.
+/// A namespace whose routines and globals are the same database is warned about on both sides: the
+/// swap replaces its globals along with IPM's own registry, and the snapshot ships them.
+/// Asserted against the warning methods rather than a real install or package, which would wreck the
+/// registry the assertions depend on.
 Method TestWarnsWhenRoutinesDatabaseIsGlobalsDatabase()
 {
     // %IPM.Test.Utils.CreateNamespace leaves Routines = Globals = <NS>. CreateTestNamespace is the
@@ -1958,13 +1958,16 @@ Method TestWarnsWhenRoutinesDatabaseIsGlobalsDatabase()
     do $$$AssertStatusOK(##class(%IPM.Test.Utils).CreateNamespace(sameNS), "Created namespace with one database")
     set ..CreatedNamespaces = ..CreatedNamespaces _ $listbuild(sameNS)
 
-    set output = ..CaptureGlobalsWarning(sameNS)
-    do $$$AssertTrue(output [ "for routines and globals", "Warned about the shared routines/globals database")
+    set output = ..CaptureDatabaseWarning("WarnRoutinesDatabaseIsGlobalsDatabase", sameNS)
+    do $$$AssertTrue(output [ "for routines and globals", "Install warned about the shared routines/globals database")
+
+    set output = ..CaptureDatabaseWarning("WarnPackagingRoutinesDatabaseIsGlobalsDatabase", sameNS)
+    do $$$AssertTrue(output [ "will ship inside this package", "Packaging warned that the namespace's globals ship in the package")
 
     set splitNS = "TESTDBSPLITDB"
     do $$$AssertStatusOK(..CreateTestNamespace(splitNS), "Created namespace with a separate globals DB")
-    set output = ..CaptureGlobalsWarning(splitNS)
-    do $$$AssertEquals(output, "", "No warning when globals live in their own database")
+    do $$$AssertEquals(..CaptureDatabaseWarning("WarnRoutinesDatabaseIsGlobalsDatabase", splitNS), "", "No install warning when globals live in their own database")
+    do $$$AssertEquals(..CaptureDatabaseWarning("WarnPackagingRoutinesDatabaseIsGlobalsDatabase", splitNS), "", "No packaging warning when globals live in their own database")
 }
 
 }

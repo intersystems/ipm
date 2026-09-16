@@ -37,18 +37,21 @@ Method %Package(ByRef params) As %Status
 
     try {
         set verbose = $get(params("Verbose"))
-        set includeTests = $get(params("IncludeTests"), 0)
+        set includeTests = $get(params("IncludeTests"), ..Module.IncludeTests)
 
         write:verbose !, "Starting database packaging: ", ..Module.Name, " v", ..Module.VersionString
-
         write:verbose !, "Validating..."
         do ..ValidateIPMNotInRoutinesDB()
         do ..ValidateRoutinesDatabaseNotMirrored(ns)
 
         do ..WarnUnrunnableInvokes()
         do ..WarnMappingsNotApplied()
-        do ..WarnMissingCode()
-        do ..WarnExtraContents(includeTests)
+        do ..WarnMissingDependencyCode()
+        do ..WarnOtherModulesInDatabase()
+        if 'includeTests {
+            do ..WarnTestCodeAlreadyInDatabase()
+        }
+        do ..WarnRoutinesDatabaseSharedForPackaging(ns)
         do ..WarnPackagingRoutinesDatabaseIsGlobalsDatabase(ns)
 
         if includeTests {
@@ -60,13 +63,11 @@ Method %Package(ByRef params) As %Status
             do ..ExportPythonDependencies(..Module, .params)
         }
 
-        set stagingDir = ##class(%Library.File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory() _ "stage")
-        if '##class(%Library.File).CreateDirectoryChain(stagingDir, .result) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create staging dir: " _ $get(result)))
-        }
+        set stagingDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(##class(%IPM.Utils.File).CreateTempDirectory(), "stage"))
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(stagingDir))
 
         write:verbose !, "Snapshotting the routines database..."
-        do ..SnapshotRoutinesDatabase(ns, stagingDir, verbose)
+        do ..SnapshotRoutinesDatabase(ns, stagingDir)
 
         set packageFile = ..AssemblePackage(stagingDir, .params)
         set params("PackageFile") = packageFile
@@ -96,10 +97,6 @@ Method %Package(ByRef params) As %Status
 /// Document.OnPhase take its load branch. <UnitTest> directory resources have Scope="" and a Test
 /// processor whose OnPhase does nothing at Reload, so they load via LoadTestDirectory. Neither path
 /// compiles and Base.%Compile skips test-scoped resources, hence the explicit compile at the end.
-///
-/// A failure partway through leaves already-loaded test code in the namespace. That is deliberate:
-/// packaging does not own the namespace's contents, and a half-loaded test package is visible in the
-/// error rather than silently shipped.
 Method LoadTestResources(ByRef params)
 {
     if ..Module.Root = "" {
@@ -110,6 +107,11 @@ Method LoadTestResources(ByRef params)
     }
 
     set verbose = $get(params("Verbose"))
+    // Document.OnPhase configures package mappings unless told not to and packaging must not leave
+    // Config.MapPackages entries behind in the namespace it snapshots.
+    merge loadParams = params
+    set loadParams("NoMapping") = 1
+
     kill toCompile
     set orderedResourceList = ..Module.GetOrderedResourceList()
     set key = ""
@@ -129,7 +131,8 @@ Method LoadTestResources(ByRef params)
             $$$ThrowOnError(##class(%IPM.Test.Manager).LoadTestDirectory(testDir, verbose, , resource.Processor.Format))
         } elseif resource.IsTestScoped() {
             write:verbose !, "  Loading test resource ", resource.Name
-            $$$ThrowOnError(resource.Processor.OnPhase(resource.Scope, .params))
+            do resource.Processor.SetParams(.loadParams)
+            $$$ThrowOnError(resource.Processor.OnPhase(resource.Scope, .loadParams))
         } else {
             continue
         }
@@ -140,10 +143,10 @@ Method LoadTestResources(ByRef params)
         for {
             set docName = $order(children(docName))
             quit:docName=""
-            // A Test processor also reports a "Scope" key, which is not a document name. Filter that
-            // key by name rather than by whether the document exists, so a test document that failed
-            // to load surfaces as a compile error instead of being dropped from the package.
-            continue:docName="Scope"
+            // Skip names that are not documents, like the "Scope" key a Test processor reports. The
+            // test is on the extension rather than on whether the document exists: a test document
+            // that failed to load has none, and skipping it here would let the compile pass without it.
+            continue:'..IsCodeResourceName(docName)
             set toCompile(docName) = ""
         }
     }
@@ -370,66 +373,43 @@ Method WarnUnrunnableInvokes()
             write !, "WARNING: <Invoke Class="""_invoke.Class_""" Method="""_invoke.Method_""" Phase="""_invoke.Phase_""" When="""_invoke.When_""">"
             write " in ", $select(isRoot: "this module", 1: "dependency '" _ module.Name _ "'"), " will not run during database install."
             if isRoot {
-                write !, "  The DB swap runs inside %Reload, so Initialize and Reload.Before both fire before the packaged DB is mounted."
-                write !, "  Use Phase=""Reload"" When=""After"" or a later phase for install-time setup."
+                write !, "  Initialize and Reload.Before run before the swap mounts the packaged database."
+                write !, "  Use Phase=""Reload"" When=""After"" or a later phase instead."
             } else {
                 // An update install runs one extra phase per dependency, so name both sets.
-                write !, "  Dependencies run ", $listtostring(..GetDependencyInstallPhases(0), ", "), " after the swap"
-                write !, "  (plus ApplyUpdateSteps when the install is an update); their code is already compiled into IRIS.DAT."
-                write !, "  Use one of those phases for install-time setup in a dependency."
+                write !, "  Dependencies only run ", $listtostring(..GetDependencyInstallPhases(0), ", "), " after the swap, plus ApplyUpdateSteps on an update."
+                write !, "  Use one of those phases instead."
             }
         }
     }
 }
 
-/// Warns when a module declares code resources but none of that code is in the local routines
-/// database, so the snapshot will ship without it.
-/// The dependency case is the one to care about: nothing at install time compiles a dependency's
+/// Warns when a dependency declares code resources but none of that code is in the local routines
+/// database, so the snapshot will ship without it. Nothing at install time compiles a dependency's
 /// source, so a dependency missing from the snapshot is missing from the installation.
-Method WarnMissingCode()
+/// The root module needs no equivalent warning: the Compile phase runs ahead of packaging and fails
+/// outright when the root module's code cannot be compiled into the namespace.
+Method WarnMissingDependencyCode()
 {
-    set modules = ..GetSelfAndDependencyModules()
+    set modules = ..GetDependencyModules(..Module)
     set mKey = ""
     for {
         #dim module As %IPM.Storage.Module
         set module = modules.GetNext(.mKey)
         quit:mKey=""
+        set hasCode = ..HasCodeInLocalRoutinesDB(module, .declaresCode)
         // A module of purely non-compiled resources has nothing to find.
-        continue:'..DeclaresCodeResources(module)
-        set hasCodeSC = ..HasCodeInLocalRoutinesDB(module, .hasCode)
-        if $$$ISERR(hasCodeSC) {
-            write !, "  (Could not check whether ", module.Name, " has code in the routines database; resource inspection failed)"
-            continue
-        }
+        continue:'declaresCode
         continue:hasCode
 
-        set isRoot = (module.Name = ..Module.Name)
-        write !, "WARNING: ", $select(isRoot: "no code from this module was found", 1: "no code from dependency '" _ module.Name _ "' was found"), " in this namespace's routines database."
+        write !!, "WARNING: no code from dependency '", module.Name, "' was found in this namespace's routines database."
         write !, "  The package is a snapshot of that database, so ", module.Name, " ", module.VersionString, " will not be in it."
         write !, "  Load or install ", module.Name, " into this namespace before packaging."
     }
 }
 
-/// Whether a module declares at least one resource that compiles into the routines database.
-ClassMethod DeclaresCodeResources(module As %IPM.Storage.Module) As %Boolean
-{
-    set orderedResourceList = module.GetOrderedResourceList()
-    set key = ""
-    for {
-        #dim resource As %IPM.Storage.ResourceReference
-        set resource = orderedResourceList.GetNext(.key)
-        quit:key=""
-        if $listfind($listbuild("CLS", "PKG", "MAC", "INT", "INC"), $zconvert($piece(resource.Name, ".", *), "U")) {
-            return 1
-        }
-    }
-    quit 0
-}
-
-/// Warns about code the snapshot ships that this module did not ask for: other installed modules
-/// whose code is in this routines database, and test-scoped classes that are in it when tests were
-/// not requested.
-Method WarnExtraContents(includeTests As %Boolean)
+/// Warns when the snapshot ships code from other installed modules, which this module did not ask for.
+Method WarnOtherModulesInDatabase()
 {
     kill expected
     set expected($zconvert(..Module.Name, "U")) = ""
@@ -444,42 +424,31 @@ Method WarnExtraContents(includeTests As %Boolean)
 
     set extra = ""
     set rs = ##class(%SQL.Statement).%ExecDirect(, "select Name from %IPM_Storage.ModuleItem")
-    if rs.%SQLCODE < 0 {
-        write !, "  (Could not list installed modules to check for extra code: ", rs.%Message, ")"
-    } else {
-        while rs.%Next(.sc) {
-            if $$$ISERR(sc) {
-                write !, "  (Skipped one module while checking for extra code; could not read its name)"
-                continue
-            }
-            set name = rs.%Get("Name")
-            continue:$data(expected($zconvert(name, "U")))
-            #dim otherModule As %IPM.Storage.Module
-            set otherModule = ##class(%IPM.Storage.Module).NameOpen(name)
-            continue:'$isobject(otherModule)
-            set hasCodeSC = ..HasCodeInLocalRoutinesDB(otherModule, .hasCode)
-            if $$$ISERR(hasCodeSC) {
-                write !, "  (Skipped checking module ", name, " for extra code; could not inspect its resources)"
-                continue
-            }
-            continue:'hasCode
-            set extra = extra _ $listbuild(name)
-        }
-        if $$$ISERR(sc) {
-            write !, "  (Could not complete checking for extra code; module inspection failed)"
-        }
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    while rs.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set name = rs.%Get("Name")
+        continue:$data(expected($zconvert(name, "U")))
+        #dim otherModule As %IPM.Storage.Module
+        set otherModule = ##class(%IPM.Storage.Module).NameOpen(name)
+        continue:'$isobject(otherModule)
+        continue:'..HasCodeInLocalRoutinesDB(otherModule)
+        set extra = extra _ $listbuild(name)
     }
+    $$$ThrowOnError(sc)
 
-    if extra '= "" {
-        write !, "WARNING: this namespace's routines database also holds code from: ", $listtostring(extra, ", "), "."
-        write !, "  The package is a snapshot of the whole database, so that code ships in it too."
-        write !, "  Package from a namespace holding only ", ..Module.Name, " and its dependencies to avoid this."
-    }
+    quit:extra=""
 
-    quit:includeTests
+    write !!, "WARNING: this namespace's routines database also holds code from: ", $listtostring(extra, ", "), "."
+    write !, "  The package is a snapshot of the whole database, so that code ships too."
+    write !, "  Package from a namespace holding only ", ..Module.Name, " and its dependencies to avoid this."
+}
 
-    // -include-tests controls whether packaging adds test code, not whether it is absent. Anything
-    // already compiled into the database ships either way.
+/// Warns when test code is already compiled into the routines database and -include-tests was not
+/// passed. That flag controls whether packaging adds test code, not whether it is absent. Anything
+/// already in the database ships either way.
+Method WarnTestCodeAlreadyInDatabase()
+{
     set present = ""
     set orderedResourceList = ..Module.GetOrderedResourceList()
     set key = ""
@@ -490,43 +459,57 @@ Method WarnExtraContents(includeTests As %Boolean)
         continue:'resource.IsTestScoped()
 
         kill children
-        set resolveSC = resource.ResolveChildren(.children)
-        if $$$ISERR(resolveSC) {
-            write !, "  (Could not inspect test resource ", resource.Name, " for extra code already in the database)"
-            continue
-        }
+        $$$ThrowOnError(resource.ResolveChildren(.children))
         set docName = ""
         for {
             set docName = $order(children(docName))
             quit:docName=""
-            continue:'##class(%Library.RoutineMgr).Exists(docName)
-            continue:##class(%Library.RoutineMgr).IsMapped(docName)
+            continue:'..IsLocalDocument(docName)
             set present = present _ $listbuild(docName)
         }
     }
 
-    if present '= "" {
-        write !, "WARNING: test code is already in the routines database and will ship in the package: ", $listtostring(present, ", "), "."
-        write !, "  -include-tests was not passed, but the package is a snapshot and excludes nothing."
-        write !, "  Delete it from this namespace, or package from one where it was never compiled."
-    }
+    quit:present=""
+
+    write !!, "WARNING: test code is already in the routines database and will ship in the package: ", $listtostring(present, ", "), "."
+    write !, "  -include-tests was not passed, but the package is a snapshot and excludes nothing."
+    write !, "  Delete it from this namespace or package from one where it was never compiled."
+}
+
+/// Returns the shared database directory when a namespace's routines and globals are the same
+/// database, or "" when they differ. Compares directories rather than names, since two
+/// Config.Databases entries can name one directory and only the directory identifies the file.
+ClassMethod GetSharedRoutinesAndGlobalsDirectory(ns As %String) As %String
+{
+    set routinesDir = ..GetDatabaseDirectory(..GetRoutinesDBName(ns))
+    set globalsDir = ..GetDatabaseDirectory(..GetGlobalsDBName(ns))
+    quit $select(routinesDir=globalsDir: routinesDir, 1: "")
 }
 
 /// Warns when a namespace's routines and globals are the same database during packaging.
 /// The snapshot copies the whole IRIS.DAT, so every global in that namespace ships in the package,
 /// including application data and ^IPM.Storage.*, the packaging machine's own module registry.
-/// Compares directories rather than names, since two Config.Databases entries can name one directory
-/// and only the directory identifies the file being copied.
 ClassMethod WarnPackagingRoutinesDatabaseIsGlobalsDatabase(ns As %String)
 {
-    set routinesDir = ..GetDatabaseDirectory(..GetRoutinesDBName(ns))
-    set globalsDir = ..GetDatabaseDirectory(..GetGlobalsDBName(ns))
-    quit:routinesDir'=globalsDir
+    set sharedDir = ..GetSharedRoutinesAndGlobalsDirectory(ns)
+    quit:sharedDir=""
 
-    write !, "WARNING: namespace ", ns, " uses the same database for routines and globals (", routinesDir, ")."
-    write !, "  The snapshot copies that entire database, so every global in this namespace ships in the package."
-    write !, "  This includes application data and ^IPM.Storage.*, the module registry from this machine."
-    write !, "  Give ", ns, " a globals database of its own before packaging to avoid shipping unintended data."
+    write !!, "WARNING: globals in namespace ", ns, " will ship inside this package."
+    write !, "  ", ns, " uses one database for both routines and globals (", sharedDir, "), and the snapshot copies it whole."
+    write !, "  Give ", ns, " a globals database of its own to avoid shipping that data."
+}
+
+/// Warns when another namespace shares the routines database being snapshotted. Packaging dismounts
+/// that database for the length of the copy, so every namespace pointing at it is down until the
+/// remount, not just the one being packaged.
+ClassMethod WarnRoutinesDatabaseSharedForPackaging(ns As %String)
+{
+    set sharing = ..GetNamespacesSharingRoutinesDatabase(ns)
+    quit:sharing=""
+
+    write !!, "WARNING: packaging will briefly take down these namespaces as well: ", $listtostring(sharing, ", "), "."
+    write !, "  They share the routines database of ", ns, ", which is dismounted for the copy."
+    write !, "  Package from a namespace with a routines database of its own to avoid this."
 }
 
 /// Throws if IPM classes are in the local routines database. IPM must be mapped so it survives the swap.
@@ -552,20 +535,18 @@ ClassMethod ValidateRoutinesDatabaseNotMirrored(ns As %String)
     }
 }
 
-/// Throws if any other namespace uses the same routines database. The swap replaces the IRIS.DAT
-/// behind that database, so every namespace pointing at it silently gets the packaged code too.
+/// Returns the names of other namespaces whose routines database is the same database as this
+/// namespace's, as a $list, or "" when none share it.
 /// Matches on directory rather than database name: two Config.Databases entries can name the same
-/// directory, and only the directory identifies the file the swap actually replaces.
-ClassMethod ValidateRoutinesDatabaseNotShared(ns As %String)
+/// directory, and only the directory identifies the file being swapped or dismounted.
+ClassMethod GetNamespacesSharingRoutinesDatabase(ns As %String) As %List
 {
     set dbDir = ..GetDatabaseDirectory(..GetRoutinesDBName(ns))
     new $namespace
     set $namespace = "%SYS"
 
     set dbResult = ##class(%SQL.Statement).%ExecDirect(, "select Name, Server, Directory from Config.Databases_List()")
-    if dbResult.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing configured databases: " _ dbResult.%Message))
-    }
+    $$$ThrowSQLIfError(dbResult.%SQLCODE, dbResult.%Message)
     while dbResult.%Next(.sc) {
         $$$ThrowOnError(sc)
         // Remote databases are distinct files even when the path matches.
@@ -578,9 +559,7 @@ ClassMethod ValidateRoutinesDatabaseNotShared(ns As %String)
 
     set sharing = ""
     set nsResult = ##class(%SQL.Statement).%ExecDirect(, "select Namespace, Routines from Config.Namespaces_List()")
-    if nsResult.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing configured namespaces: " _ nsResult.%Message))
-    }
+    $$$ThrowSQLIfError(nsResult.%SQLCODE, nsResult.%Message)
     while nsResult.%Next(.sc) {
         $$$ThrowOnError(sc)
         continue:$zconvert(nsResult.Namespace,"U")=$zconvert(ns,"U")
@@ -590,26 +569,31 @@ ClassMethod ValidateRoutinesDatabaseNotShared(ns As %String)
     }
     $$$ThrowOnError(sc)
 
-    if sharing '= "" {
-        set msg = "The routines database of namespace " _ ns _ " (" _ dbDir _ ") is also the routines database of: " _ $listtostring(sharing, ", ") _ ". Swapping it would replace the code of those namespaces as well. Give " _ ns _ " a routines database of its own before installing a database package."
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-    }
+    quit sharing
+}
+
+/// Throws if any other namespace uses the same routines database. The swap replaces the IRIS.DAT
+/// behind that database, so every namespace pointing at it silently gets the packaged code too.
+ClassMethod ValidateRoutinesDatabaseNotShared(ns As %String)
+{
+    set sharing = ..GetNamespacesSharingRoutinesDatabase(ns)
+    quit:sharing=""
+
+    set dbDir = ..GetDatabaseDirectory(..GetRoutinesDBName(ns))
+    set msg = "The routines database of namespace " _ ns _ " (" _ dbDir _ ") is also the routines database of: " _ $listtostring(sharing, ", ") _ ". Swapping it would replace the code of those namespaces as well. Give " _ ns _ " a routines database of its own before installing a database package."
+    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
 }
 
 /// Warns when a namespace's routines and globals are the same database. The swap replaces that
 /// database wholesale, so the namespace's globals are replaced by the package's, including
 /// ^IPM.Storage.*, the module registry recording the install being performed.
-/// Compares directories rather than names, since two Config.Databases entries can name one directory
-/// and only the directory identifies the file the swap replaces.
 ClassMethod WarnRoutinesDatabaseIsGlobalsDatabase(ns As %String)
 {
-    set routinesDir = ..GetDatabaseDirectory(..GetRoutinesDBName(ns))
-    set globalsDir = ..GetDatabaseDirectory(..GetGlobalsDBName(ns))
-    quit:routinesDir'=globalsDir
+    set sharedDir = ..GetSharedRoutinesAndGlobalsDirectory(ns)
+    quit:sharedDir=""
 
-    write !, "WARNING: namespace ", ns, " uses the same database for routines and globals (", routinesDir, ")."
-    write !, "  The swap replaces that database, so this namespace's globals will be replaced by the package's."
-    write !, "  IPM's own module registry lives in those globals and goes with them."
+    write !!, "WARNING: namespace ", ns, " uses the same database for routines and globals (", sharedDir, ")."
+    write !, "  The swap replaces that database, so this namespace's globals, including IPM's module registry, will be replaced by the package's."
     write !, "  Give ", ns, " a globals database of its own before installing a database package."
 }
 
@@ -636,8 +620,7 @@ ClassMethod ComputeSHA256Hex(filePath As %String) As %String
 /// database breaks the mirror (see ValidateRoutinesDatabaseNotMirrored).
 ClassMethod SnapshotRoutinesDatabase(
 	ns As %String,
-	stagingDir As %String,
-	verbose As %Boolean = 0)
+	stagingDir As %String)
 {
     set dbName = ..GetRoutinesDBName(ns)
     set dbDir = ..GetDatabaseDirectory(dbName)
@@ -647,19 +630,40 @@ ClassMethod SnapshotRoutinesDatabase(
     }
     set destDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", stagingDir)
 
+    // DismountDatabase neither checks for nor waits on other users of the database. It succeeds while
+    // another process is writing, and that process then takes <PROTECT> on ^ZBUSY2 until the remount.
+    // This is an outage the caller chooses, not a check that the namespace is idle.
+    write !, "Dismounting ", dbName, " for the copy. ", ns, " cannot run code until the copy finishes."
+    set copySC = ..CopyDismountedDatabase(dbDir, srcDAT, destDAT, .mountSC)
+
+    if $$$ISERR(mountSC) {
+        write !, "ERROR: failed to remount ", dbName, " (", dbDir, "). Mount it manually before using ", ns, "."
+        write !, "  ", $system.Status.GetErrorText(mountSC)
+    }
+
+    // Report the copy failure first when both happened. It is why packaging stopped, and the mount
+    // failure has already reported itself.
+    $$$ThrowOnError(copySC)
+    $$$ThrowOnError(mountSC)
+}
+
+/// Dismounts dbDir, copies srcDAT to destDAT, then remounts. Returns the copy's status, and the
+/// remount's in mountSC.
+/// Writes nothing. Output capture resolves its handler routine in the current namespace, which %SYS
+/// cannot see, so a write here takes <NOROUTINE>. The caller reports instead.
+ClassMethod CopyDismountedDatabase(
+	dbDir As %String,
+	srcDAT As %String,
+	destDAT As %String,
+	Output mountSC As %Status) As %Status
+{
     new $namespace
     set $namespace = "%SYS"
 
-    // DismountDatabase does not check for or wait on other users of the database. It succeeds while
-    // another process is writing, and that process then takes <PROTECT> on ^ZBUSY2 until the remount,
-    // so this is an outage the caller chooses rather than a check that the namespace is idle. It is
-    // also not a quiesce: transactions open against the database still commit once it is back.
-    write:verbose !, "Dismounting ", dbName, " for the copy..."
     $$$ThrowOnError(##class(SYS.Database).DismountDatabase(dbDir))
 
     // Everything between the dismount and the remount is caught, including what CopyFile itself may
-    // throw and an <INTERRUPT> from a user tired of waiting on a large database. An exception escaping
-    // here would skip the remount entirely.
+    // throw. An exception escaping here would skip the remount entirely.
     set copySC = $$$OK
     try {
         if '##class(%Library.File).CopyFile(srcDAT, destDAT, 1, .result) {
@@ -672,21 +676,10 @@ ClassMethod SnapshotRoutinesDatabase(
     // Remount even after a failed copy. Leaving the namespace's code database dismounted is worse
     // than any packaging error.
     set mountSC = ##class(SYS.Database).MountDatabase(dbDir)
-    if $$$ISERR(mountSC) && '$system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
-        write !, "ERROR: Failed to remount the routines database of namespace ", ns, ". Manual intervention required."
-        write !, "  Database: ", dbName, " (", dbDir, ")"
-        write !, "  ", ns, " cannot run code until it is mounted again."
-        write !, "  Mount it from the Management Portal under System Administration > Configuration > System Configuration > Local Databases,"
-        write !, "  or in %SYS run: do ##class(SYS.Database).MountDatabase(""", dbDir, """)"
-        write !, $system.Status.GetErrorText(mountSC)
-    } else {
+    if $system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
         set mountSC = $$$OK
     }
-
-    // Report the copy failure first when both happened. It is why packaging stopped, and the mount
-    // failure has already printed its own repair instructions.
-    $$$ThrowOnError(copySC)
-    $$$ThrowOnError(mountSC)
+    quit copySC
 }
 
 /// Enriches an already-populated staging dir and creates the final .tgz, whose path it returns.
@@ -704,10 +697,10 @@ Method AssemblePackage(
     // came from may have moved on since.
     write:$get(params("Verbose")) !, "Computing SHA-256 checksum..."
     set checksumHex = ..ComputeSHA256Hex(stagedDAT)
-    write !, "  Checksum: ", checksumHex
+    write !!, "Checksum: ", checksumHex
 
     // Stage non-compiled resource files so processors can find them during install
-    set includeTestResources = $get(params("IncludeTests"), 0)
+    set includeTestResources = $get(params("IncludeTests"), ..Module.IncludeTests)
     set exportPythonDeps = $get(params("ExportPythonDependencies"), 1)
     do ..CopyNonCompiledResources(stagingDir, includeTestResources, exportPythonDeps)
     kill depWheels
@@ -734,13 +727,11 @@ Method AssemblePackage(
     } else {
         set outputDir = ##class(%Library.File).NormalizeDirectory(outputDir)
         if '##class(%Library.File).DirectoryExists(outputDir) {
-            if '##class(%Library.File).CreateDirectoryChain(outputDir, .reason) {
-                $$$ThrowStatus($$$ERROR($$$GeneralError,"Cannot create output directory " _ outputDir _ ": " _ reason))
-            }
+            $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
         }
     }
 
-    set packageFile = outputDir _ ..Module.Name _ "-" _ ..Module.VersionString _ "-database.tgz"
+    set packageFile = ##class(%Library.File).Construct(outputDir, ..Module.Name _ "-" _ ..Module.VersionString _ "-database.tgz")
     $$$ThrowOnError(##class(%IPM.General.Archive).Create(stagingDir, packageFile, .archiveOutput))
 
     set verbose = $get(params("Verbose"))
@@ -758,7 +749,7 @@ ClassMethod GetDependencyStagingDir(
 	stagingDir As %String,
 	depName As %String) As %String
 {
-    quit ##class(%Library.File).NormalizeDirectory(stagingDir _ "deps-files/" _ depName)
+    quit ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(stagingDir, "deps-files", depName))
 }
 
 /// Copies non-compiled resource files (FileCopy, PythonWheel, CPF) for this module and each
@@ -782,10 +773,7 @@ Method CopyNonCompiledResources(
         quit:mKey=""
 
         set depDir = ..GetDependencyStagingDir(stagingDir, depModule.Name)
-        set result = ""
-        if '##class(%Library.File).CreateDirectoryChain(depDir, .result) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create dependency staging dir: " _ depDir _ " - " _ result))
-        }
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(depDir))
         do ..StageModuleResources(depModule, depDir, includeTestResources, exportPythonDeps)
     }
 }
@@ -795,8 +783,8 @@ Method CopyNonCompiledResources(
 ///
 /// Source paths resolve the same way the consuming processor resolves them, so the staged file lands
 /// where install-time lookup expects it. Destination paths are built with Construct instead, because
-/// %Library.File.NormalizeFilename(name, dir) chdir's into dir and returns "" when dir does not exist
-/// — and these destination subdirectories do not exist until StageFile creates them.
+/// %Library.File.NormalizeFilename(name, dir) chdir's into dir and returns "" when dir does not exist,
+/// and these destination subdirectories do not exist until StageFile creates them.
 Method StageModuleResources(
 	module As %IPM.Storage.Module,
 	targetDir As %String,
@@ -888,7 +876,7 @@ Method StageDependencyWheels(
             set declared($zconvert(depResource.Name, "L")) = ""
         }
 
-        set destWheelDir = ##class(%Library.File).NormalizeDirectory(..GetDependencyStagingDir(stagingDir, depModule.Name) _ "wheels")
+        set destWheelDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(..GetDependencyStagingDir(stagingDir, depModule.Name), "wheels"))
 
         set rs = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT ItemName FROM %Library.File_FileSet(?, ?, ?, ?)",
@@ -904,7 +892,7 @@ Method StageDependencyWheels(
             do ..StageResourceFile(
                 depModule.Name _ "/" _ wheelName,
                 ##class(%Library.File).NormalizeFilename(wheelName, wheelsDir),
-                destWheelDir _ wheelName)
+                ##class(%Library.File).Construct(destWheelDir, wheelName))
             if '$data(declared($zconvert(wheelName, "L"))) {
                 set depWheels(depModule.Name, wheelName) = ""
             }
@@ -938,9 +926,7 @@ ClassMethod StageFile(
     // separators already inside a segment alone. Normalize before splitting off the directory.
     set destPath = ##class(%Library.File).NormalizeFilename(destPath)
     set destDir = ##class(%Library.File).GetDirectory(destPath)
-    if '##class(%Library.File).CreateDirectoryChain(destDir) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create directory: " _ destDir))
-    }
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(destDir))
     if '##class(%Library.File).CopyFile(sourcePath, destPath, 1) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot copy file: " _ sourcePath _ " to " _ destPath))
     }
@@ -1341,9 +1327,7 @@ Method ValidateNoOrphanedModules(
         }
         set installedModule = ##class(%IPM.Storage.Module).NameOpen(moduleName, , .sc)
         $$$ThrowOnError(sc)
-        set hasCodeSC = ..HasCodeInLocalRoutinesDB(installedModule, .hasCode)
-        $$$ThrowOnError(hasCodeSC)
-        if hasCode {
+        if ..HasCodeInLocalRoutinesDB(installedModule) {
             set orphaned = orphaned _ $listbuild(moduleName)
         }
     }
@@ -1425,43 +1409,47 @@ ClassMethod GetPackagedDependencyNames(depsDir As %String) As %List
     quit names
 }
 
-/// Determines whether any of the module's code resources exist locally in the routines database
-/// (not mapped from elsewhere). Only CLS/PKG/MAC/INT/INC are checked; other types don't live there.
-/// The answer comes back in found, and the return value reports whether the check itself succeeded.
-ClassMethod HasCodeInLocalRoutinesDB(module As %IPM.Storage.Module, Output found As %Boolean) As %Status
+/// Whether any of the module's code resources exist locally in the routines database.
+/// declaresCode reports whether the module declared any code resource at all, which distinguishes a
+/// module whose code is missing from one that has none to begin with.
+ClassMethod HasCodeInLocalRoutinesDB(
+	module As %IPM.Storage.Module,
+	Output declaresCode As %Boolean) As %Boolean
 {
-    set found = 0
-    set sc = $$$OK
+    set declaresCode = 0
     set orderedResourceList = module.GetOrderedResourceList()
     set key = ""
     for {
         #dim resource As %IPM.Storage.ResourceReference
         set resource = orderedResourceList.GetNext(.key)
         quit:key=""
-
-        if '$listfind($listbuild("CLS", "PKG", "MAC", "INT", "INC"), $zconvert($piece(resource.Name, ".", *), "U")) {
-            continue
-        }
+        continue:'..IsCodeResourceName(resource.Name)
+        set declaresCode = 1
 
         kill children
-        set resolveSC = resource.ResolveChildren(.children)
-        if $$$ISERR(resolveSC) {
-            set sc = $$$ADDSC(sc, resolveSC)
-            continue
-        }
+        $$$ThrowOnError(resource.ResolveChildren(.children))
         set docName = ""
         for {
             set docName = $order(children(docName))
             quit:docName=""
-            continue:'##class(%Library.RoutineMgr).Exists(docName)
-            if '##class(%Library.RoutineMgr).IsMapped(docName) {
-                set found = 1
-                quit
+            if ..IsLocalDocument(docName) {
+                return 1
             }
         }
-        quit:found
     }
-    quit sc
+    quit 0
+}
+
+/// Whether a resource or document name is one of the types that compiles into the routines database.
+ClassMethod IsCodeResourceName(name As %String) As %Boolean
+{
+    quit $listfind($listbuild("CLS", "PKG", "MAC", "INT", "INC"), $zconvert($piece(name, ".", *), "U")) > 0
+}
+
+/// Whether a document exists in the current routines database rather than being mapped from elsewhere.
+ClassMethod IsLocalDocument(docName As %String) As %Boolean
+{
+    quit ##class(%Library.RoutineMgr).Exists(docName) && '##class(%Library.RoutineMgr).IsMapped(docName)
 }
 
 /// Shows swap details and prompts for y/N confirmation. Throws if the user declines.
@@ -1473,7 +1461,7 @@ Method PromptForSwapConfirmation(
     set dbDir = ..GetDatabaseDirectory(routinesDBName)
 
     write !, "WARNING: This will replace the routines database for namespace ", ns
-    write !, "  Current database: ", dbDir _ "IRIS.DAT"
+    write !, "  Current database: ", ##class(%Library.File).Construct(dbDir, "IRIS.DAT")
     write !, "  The current IRIS.DAT will be renamed to a timestamped backup before the swap."
     if staleModules '= "" {
         write !, "  These modules are no longer part of this package and will be removed: ", $listtostring(staleModules, ", ")
@@ -1511,20 +1499,21 @@ Method PerformDatabaseSwap(
     // Timestamp is second-resolution, so append a counter suffix if that name already exists
     set h = $horolog
     set timestamp = $translate($zdate(h, 8), "-", "") _ $translate($ztime($piece(h, ",", 2), 2), ":", "")
-    set backupBase = dbDir _ "IRIS_" _ routinesDBName _ "_" _ timestamp
+    set backupBase = ##class(%Library.File).Construct(dbDir, "IRIS_" _ routinesDBName _ "_" _ timestamp)
     set backupPath = backupBase _ ".DAT"
     set suffix = 0
     while ##class(%Library.File).Exists(backupPath) {
         set suffix = suffix + 1
         set backupPath = backupBase _ "_" _ suffix _ ".DAT"
     }
-    if '##class(%Library.File).Rename(dbDir _ "IRIS.DAT", backupPath) {
+    set liveDAT = ##class(%Library.File).Construct(dbDir, "IRIS.DAT")
+    if '##class(%Library.File).Rename(liveDAT, backupPath) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to rename IRIS.DAT to backup: " _ backupPath))
     }
 
     // Move (rename) packaged IRIS.DAT into the database directory
     set srcDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
-    if '##class(%Library.File).Rename(srcDAT, dbDir _ "IRIS.DAT") {
+    if '##class(%Library.File).Rename(srcDAT, liveDAT) {
         set tMsg = "Failed to move IRIS.DAT from " _ srcDAT _ " to " _ dbDir
         $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
     }
@@ -1751,34 +1740,54 @@ Method RollbackDatabaseSwap(
         quit
     }
 
+    do ..RestoreDatabaseFromBackup(dbDir, backupPath, .warnings)
+    set key = ""
+    for {
+        set key = $order(warnings(key))
+        quit:key=""
+        write !, warnings(key)
+    }
+}
+
+/// Does the %SYS half of the rollback: dismount dbDir, restore the backup IRIS.DAT when there is one,
+/// remount. Collects its warnings in warnings() for the caller to write instead of writing them here.
+/// See CopyDismountedDatabase for why a write from %SYS is unsafe.
+ClassMethod RestoreDatabaseFromBackup(
+	dbDir As %String,
+	backupPath As %String,
+	Output warnings)
+{
+    kill warnings
+    set count = 0
+
     new $namespace
     set $namespace = "%SYS"
 
     set sc = ##class(SYS.Database).DismountDatabase(dbDir)
     if $$$ISERR(sc) {
-        write !, "Rollback warning — could not dismount database at ", dbDir
+        set warnings($increment(count)) = "Rollback warning: could not dismount database at " _ dbDir
     }
 
-    // Only touch dbDir/IRIS.DAT when a backup exists to restore. If no backup exists,
-    // the swap failed before the original was renamed out — the file still in place is
-    // the original routines DB and must not be deleted.
+    // Only touch dbDir/IRIS.DAT when a backup exists to restore. If no backup exists, the swap failed
+    // before the original was renamed out, so the file still in place is the original routines DB and
+    // must not be deleted.
     if (backupPath '= "") && ##class(%Library.File).Exists(backupPath) {
-        set newDAT = dbDir _ "IRIS.DAT"
+        set newDAT = ##class(%Library.File).Construct(dbDir, "IRIS.DAT")
         if ##class(%Library.File).Exists(newDAT) {
             if '##class(%Library.File).Delete(newDAT) {
-                write !, "Rollback warning — could not delete swapped-in IRIS.DAT at ", newDAT
+                set warnings($increment(count)) = "Rollback warning: could not delete swapped-in IRIS.DAT at " _ newDAT
             }
         }
-        if '##class(%Library.File).Rename(backupPath, dbDir _ "IRIS.DAT") {
-            write !, "Rollback warning — could not restore backup from ", backupPath
-            write !, "  Manual intervention required to restore IRIS.DAT."
+        if '##class(%Library.File).Rename(backupPath, newDAT) {
+            set warnings($increment(count)) = "Rollback warning: could not restore backup from " _ backupPath
+            set warnings($increment(count)) = "  Manual intervention required to restore IRIS.DAT."
         }
     }
 
     set mountSC = ##class(SYS.Database).MountDatabase(dbDir)
     if $$$ISERR(mountSC) && '$system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
-        write !, "Rollback warning — could not remount database at ", dbDir
-        write !, "  Namespace routines may be unavailable — manual remount required."
+        set warnings($increment(count)) = "Rollback warning: could not remount database at " _ dbDir
+        set warnings($increment(count)) = "  Namespace routines may be unavailable. Manual remount required."
     }
 }
 
