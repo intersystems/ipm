@@ -22,6 +22,8 @@ Method Log(
         do ..Log("Log has incorrect logLevel "_level_". Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message, "ERROR")
     }
 
+    set timestamp = $zdatetime($ztimestamp,3)
+
     // TODO: Add the message to the LogFile(s) going in that instance in the same namespace
 }
 
