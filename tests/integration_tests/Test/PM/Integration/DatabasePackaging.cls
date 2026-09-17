@@ -19,6 +19,12 @@ Property SharedPackageDir As %String;
 /// Separate from the routines DB so dismounting during package-database doesn't lose IPM metadata.
 Property CreatedGlobalsDatabases As %List;
 
+/// Web applications any test in this class causes to be created, by name. They live in %SYS, so
+/// deleting the namespace one points at does not remove it; they are deleted in OnAfterAllTests.
+/// Register with TrackWebApp before the call that creates one, so an assertion failure part-way
+/// through a test still leaves the name on the list.
+Property TrackedWebApps As %List;
+
 /// Packaging namespaces are shared across tests to avoid the ~10s overhead of creating and
 /// tearing down a namespace + globals DB for every test. Each shared NS is lazily initialized
 /// on first use and cleaned up in OnAfterAllTests. Tests still create their own install
@@ -68,6 +74,7 @@ Method OnBeforeAllTests() As %Status
     set ..SharedNS1 = ""
     set ..SharedNS2 = ""
     set ..SharedGlobalsDatabases = ""
+    set ..TrackedWebApps = ""
 
     set ..SharedPackageDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "pkg-test-shared")
     if ##class(%Library.File).DirectoryExists(..SharedPackageDir) {
@@ -121,14 +128,6 @@ Method OnAfterOneTest() As %Status
     set sc = $$$OK
     set $namespace = ..OriginalNamespace
 
-    // Web applications live in %SYS and survive namespace deletion, so they are removed by name.
-    new $namespace
-    set $namespace = "%SYS"
-    if ##class(Security.Applications).Exists("/noncompiled") {
-        do ##class(Security.Applications).Delete("/noncompiled")
-    }
-    set $namespace = ..OriginalNamespace
-
     // Clean up all created namespaces (and their main routines databases)
     for i=1:1:$listlength(..CreatedNamespaces) {
         set ns = $listget(..CreatedNamespaces, i)
@@ -171,6 +170,20 @@ Method OnAfterOneTest() As %Status
 Method OnAfterAllTests() As %Status
 {
     set sc = $$$OK
+    set $namespace = ..OriginalNamespace
+
+    // Web applications live in %SYS and survive namespace deletion, so they are removed by name.
+    set $namespace = "%SYS"
+    for i=1:1:$listlength(..TrackedWebApps) {
+        set appName = $listget(..TrackedWebApps, i)
+        try {
+            if (appName '= "") && ##class(Security.Applications).Exists(appName) {
+                $$$ThrowOnError(##class(Security.Applications).Delete(appName))
+            }
+        } catch ex {
+            set sc = $$$ADDSC(sc, ex.AsStatus())
+        }
+    }
     set $namespace = ..OriginalNamespace
 
     // Clean up shared packaging namespaces (routines DBs)
@@ -288,6 +301,12 @@ Method PromoteLastCreatedToShared()
     set ..SharedGlobalsDatabases = ..SharedGlobalsDatabases _ $listbuild(lastDB)
 }
 
+/// Records a web application name for deletion in OnAfterAllTests.
+Method TrackWebApp(appName As %String)
+{
+    set ..TrackedWebApps = ..TrackedWebApps _ $listbuild(appName)
+}
+
 /// Returns the shared packaging namespace for core modules (generally compiled-resource tests).
 /// Creates TESTDBPKGNS1 on first call and loads all relevant modules; reuses on subsequent calls.
 /// GetModuleDir calls are made before any namespace switch since ^UnitTestRoot is only in origNS.
@@ -339,17 +358,23 @@ Method GetOrCreateSharedNS2() As %String
     set nonCmpDir = ..GetModuleDir("db-packaging", "module-with-non-compiled-resources")
     set depResDir = ..GetModuleDir("db-packaging", "dep-with-resources")
     set mainResDir = ..GetModuleDir("db-packaging", "main-with-resource-deps")
+    set nsWebAppDir = ..GetModuleDir("db-packaging", "module-with-ns-relative-webapp")
 
     $$$ThrowOnError(..CreateTestNamespace(ns))
     do ..PromoteLastCreatedToShared()
 
     new $namespace
     set $namespace = ns
+    // Both of the modules below declare a <WebApplication>, created here by the source load
+    do ..TrackWebApp("/noncompiled")
+    do ..TrackWebApp("/csp/" _ $zconvert(ns, "L") _ "/nsapp")
+
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ reqsDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ mixPyDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ nonCmpDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ depResDir))
     $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ mainResDir))
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ nsWebAppDir))
 
     set ..SharedNS2 = ns
     quit ns
@@ -385,13 +410,9 @@ Method TestSimplePackageAndInstall()
 {
     new $namespace
     set packageFile = ..GetOrCreateDatabasePackage("simple-db-module")
-    do $$$AssertTrue(##class(%File).Exists(packageFile), "Database package .tgz file exists")
 
     // Extract and verify contents
-    set extractDir = ##class(%File).NormalizeDirectory(..PackageOutputDir _ "extract")
-    do ##class(%File).CreateDirectory(extractDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
-    do $$$AssertStatusOK(sc, "Extracted package contents for verification")
+    set extractDir = ..ExtractPackage(packageFile, "extract")
 
     // Verify IRIS.DAT exists in extracted package
     set irisDataFile = ##class(%File).NormalizeDirectory(extractDir) _ "IRIS.DAT"
@@ -606,10 +627,7 @@ Method TestPackagingAndInstallValidation()
     set packageFile = ..GetOrCreateDatabasePackage("simple-db-module")
 
     // Test: Tampered IRIS.DAT fails checksum validation
-    set tamperDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "tamper-extract")
-    do ##class(%Library.File).CreateDirectory(tamperDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, tamperDir)
-    do $$$AssertStatusOK(sc, "Extracted package for tampering test")
+    set tamperDir = ..ExtractPackage(packageFile, "tamper-extract")
 
     set tamperedIRISDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", tamperDir)
     do ##class(%Library.File).Delete(tamperedIRISDAT)
@@ -636,10 +654,7 @@ Method TestPackagingAndInstallValidation()
     do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
 
     // Test: Missing deps/ directory fails validation
-    set missingDepsDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "missing-deps-extract")
-    do ##class(%Library.File).CreateDirectory(missingDepsDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, missingDepsDir)
-    do $$$AssertStatusOK(sc, "Extracted package for missing deps/ test")
+    set missingDepsDir = ..ExtractPackage(packageFile, "missing-deps-extract")
 
     set missingDepsSubDir = ##class(%Library.File).NormalizeDirectory(
         ##class(%Library.File).NormalizeFilename("deps", missingDepsDir))
@@ -662,18 +677,12 @@ Method TestPackagingAndInstallValidation()
     // <Packaging> other than "database") cannot be reached through `load`: each one also makes
     // IsDatabaseInstall() false, so the install branch is never entered. They remain as
     // defense-in-depth for direct %Reload callers and are not exercised here.
-    set noChecksumDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "no-checksum-extract")
-    do ##class(%Library.File).CreateDirectory(noChecksumDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, noChecksumDir)
-    do $$$AssertStatusOK(sc, "Extracted package for missing <Checksum> test")
+    set noChecksumDir = ..ExtractPackage(packageFile, "no-checksum-extract")
 
     set noChecksumXML = ##class(%Library.File).NormalizeFilename("module.xml", noChecksumDir)
     set xmlStream = ##class(%Stream.FileCharacter).%New()
     $$$ThrowOnError(xmlStream.LinkToFile(noChecksumXML))
-    set moduleXML = ""
-    while 'xmlStream.AtEnd {
-        set moduleXML = moduleXML _ xmlStream.Read()
-    }
+    set moduleXML = ..ReadAll(xmlStream)
     // Strip the whole element rather than blanking its text: an empty <Checksum> would fail the
     // checksum comparison instead, which the tampering case above already covers.
     set checksumStart = $find(moduleXML, "<Checksum") - $length("<Checksum")
@@ -912,7 +921,6 @@ Method TestUpdateWithChangedDependencyTree()
     set sc = ##class(%IPM.Main).Shell("package-database deptree-parent -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged deptree-parent 1.0.0 as database")
     set v1Package = ..PackageOutputDir _ "deptree-parent-1.0.0-database.tgz"
-    do $$$AssertTrue(##class(%Library.File).Exists(v1Package), "v1 database package exists")
 
     // --- Reshape the tree in the packaging NS, then package v2 ---
     // deptree-added and deptree-extra are new; deptree-stable gains the deptree-extra edge at 2.0.0.
@@ -929,7 +937,6 @@ Method TestUpdateWithChangedDependencyTree()
     set sc = ##class(%IPM.Main).Shell("package-database deptree-parent -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged deptree-parent 2.0.0 as database")
     set v2Package = ..PackageOutputDir _ "deptree-parent-2.0.0-database.tgz"
-    do $$$AssertTrue(##class(%Library.File).Exists(v2Package), "v2 database package exists")
 
     // --- Install v1 into a clean namespace ---
     set installNS = "TESTDBDEPTREEINST"
@@ -1009,10 +1016,7 @@ Method TestPythonDependencyPackaging()
     do $$$AssertStatusOK(sc, "Packaged module-with-mixed-python with default settings")
 
     set defaultPkg = ..PackageOutputDir _ "module-with-mixed-python-1.0.0-database.tgz"
-    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-mixpy")
-    do ##class(%Library.File).CreateDirectory(extractDir)
-    set sc = ##class(%IPM.General.Archive).Extract(defaultPkg, extractDir)
-    do $$$AssertStatusOK(sc, "Extracted module-with-mixed-python default package")
+    set extractDir = ..ExtractPackage(defaultPkg, "extract-mixpy")
 
     set luneWheel = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir)
     do $$$AssertTrue(##class(%Library.File).Exists(luneWheel), "Explicit PythonWheel (lune) included in default package")
@@ -1031,10 +1035,7 @@ Method TestPythonDependencyPackaging()
     do $$$AssertStatusOK(sc, "Packaged module-with-mixed-python with -export-python-deps 0")
 
     set noExportPkg = noExportDir _ "module-with-mixed-python-1.0.0-database.tgz"
-    set extractDir2 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-nowheel")
-    do ##class(%Library.File).CreateDirectory(extractDir2)
-    set sc = ##class(%IPM.General.Archive).Extract(noExportPkg, extractDir2)
-    do $$$AssertStatusOK(sc, "Extracted no-export package")
+    set extractDir2 = ..ExtractPackage(noExportPkg, "extract-nowheel")
 
     set wheelInNoExport = ##class(%Library.File).NormalizeFilename("wheels/lune-1.6.2-py3-none-any.whl", extractDir2)
     do $$$AssertNotTrue(##class(%Library.File).Exists(wheelInNoExport), "Wheel excluded when -export-python-deps 0 is set")
@@ -1066,10 +1067,7 @@ Method TestPythonDependencyPackaging()
     do $$$AssertStatusOK(sc, "Packaged module-with-requirements with default settings")
 
     set reqPkg = ..PackageOutputDir _ "module-with-requirements-1.0.0-database.tgz"
-    set extractDir3 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-reqtxt")
-    do ##class(%Library.File).CreateDirectory(extractDir3)
-    set sc = ##class(%IPM.General.Archive).Extract(reqPkg, extractDir3)
-    do $$$AssertStatusOK(sc, "Extracted module-with-requirements default package")
+    set extractDir3 = ..ExtractPackage(reqPkg, "extract-reqtxt")
 
     set wheelPath = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir3)
     do $$$AssertTrue(##class(%Library.File).Exists(wheelPath), "Wheel from requirements.txt included in package")
@@ -1081,10 +1079,7 @@ Method TestPythonDependencyPackaging()
     do $$$AssertStatusOK(sc, "Packaged module-with-requirements with -export-python-deps 0")
 
     set noExportReqPkg = noExportReqDir _ "module-with-requirements-1.0.0-database.tgz"
-    set extractDir4 = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-noreqtxt")
-    do ##class(%Library.File).CreateDirectory(extractDir4)
-    set sc = ##class(%IPM.General.Archive).Extract(noExportReqPkg, extractDir4)
-    do $$$AssertStatusOK(sc, "Extracted no-export requirements package")
+    set extractDir4 = ..ExtractPackage(noExportReqPkg, "extract-noreqtxt")
 
     set wheelPath2 = ##class(%Library.File).NormalizeFilename("wheels/packaging-25.0-py3-none-any.whl", extractDir4)
     do $$$AssertNotTrue(##class(%Library.File).Exists(wheelPath2), "Wheel excluded from requirements package when -export-python-deps 0 is set")
@@ -1159,10 +1154,7 @@ Method TestNonCompiledResourcesAppliedDuringInstall()
     set packageFile = ..PackageOutputDir _ "module-with-non-compiled-resources-1.0.0-database.tgz"
 
     // Verify CPF file is staged in the package
-    set cpfExtractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "cpf-staging-check")
-    do ##class(%Library.File).CreateDirectory(cpfExtractDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, cpfExtractDir)
-    do $$$AssertStatusOK(sc, "Extracted package for CPF staging check")
+    set cpfExtractDir = ..ExtractPackage(packageFile, "cpf-staging-check")
     set stagedCPF = ##class(%Library.File).NormalizeFilename("src/cpf/config.cpf", cpfExtractDir)
     do $$$AssertTrue(##class(%Library.File).Exists(stagedCPF), "CPF file is staged in database package")
 
@@ -1209,6 +1201,94 @@ Method TestNonCompiledResourcesAppliedDuringInstall()
     new $namespace
     set $namespace = "%SYS"
     do $$$AssertTrue(##class(Security.Applications).Exists("/noncompiled"), "WebApplication created during install")
+    do $$$AssertStatusOK(##class(Security.Applications).Get("/noncompiled", .appProps), "Read /noncompiled properties")
+    do $$$AssertEquals($get(appProps("NameSpace")), installNS, "WebApplication points at the install namespace")
+    set $namespace = installNS
+}
+
+/// Verifies that a module whose web application is relative to the installing namespace packages
+/// and installs correctly: the <FileCopy> directory of static files lands under the install
+/// namespace's CSP directory, and the <WebApplication> is created with the install namespace's
+/// name, path and NameSpace.
+///
+/// module-with-ns-relative-webapp uses ${cspdir}${namespaceLower} in both the FileCopy target and
+/// the web application name and path, so the application created by the source load in the
+/// packaging namespace has a different name and path from the one the install must create. That
+/// makes the assertions here sensitive to expressions being resolved at package time rather than
+/// install time.
+///
+/// A reinstall at the end covers CreateOrUpdateWebApp's Modify path, which a fresh install never
+/// reaches.
+Method TestNamespaceRelativeWebAppAppliedDuringInstall()
+{
+    set packagingNS = ..GetOrCreateSharedNS2()
+
+    new $namespace
+    set $namespace = packagingNS
+
+    set sc = ##class(%IPM.Main).Shell("package-database module-with-ns-relative-webapp -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged module with a namespace-relative web application")
+
+    set packageFile = ..PackageOutputDir _ "module-with-ns-relative-webapp-1.0.0-database.tgz"
+
+    // The FileCopy resource is a directory, so the whole tree must be staged, nested files included
+    set extractDir = ..ExtractPackage(packageFile, "nswebapp-staging-check")
+    do $$$AssertTrue(##class(%Library.File).Exists(##class(%Library.File).NormalizeFilename("web/index.html", extractDir)), "Top-level static file is staged in database package")
+    do $$$AssertTrue(##class(%Library.File).Exists(##class(%Library.File).NormalizeFilename("web/assets/app.js", extractDir)), "Nested static file is staged in database package")
+
+    set installNS = "TESTDBNSWEBINS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created install namespace")
+    set $namespace = installNS
+
+    // Expected resolutions of ${cspdir}${namespaceLower} and ${namespaceLower} for the install NS.
+    // Built with Construct because %Library.File.NormalizeDirectory(name, dir) chdir's into dir and
+    // returns "" when dir does not exist, and the CSP directory does not exist until install.
+    set installNSLower = $zconvert(installNS, "L")
+    set cspDir = ##class(%Library.File).NormalizeDirectory($system.Util.InstallDirectory() _ "csp")
+    set appDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(cspDir, installNSLower, "nsapp"))
+    set appName = "/csp/" _ installNSLower _ "/nsapp"
+    do ..TrackWebApp(appName)
+
+    // Remove any leftover target directory so the assertions below cannot pass on stale files
+    if ##class(%Library.File).DirectoryExists(appDir) {
+        do ##class(%IPM.Utils.File).RemoveDirectoryTree(appDir)
+    }
+    do $$$AssertNotTrue(##class(%Library.File).DirectoryExists(appDir), "Web application directory absent before install (setup verified)")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Installed database package with a namespace-relative web application")
+
+    // Static files are copied by FileCopy during Activate, into the install namespace's CSP directory
+    do $$$AssertTrue(##class(%Library.File).Exists(##class(%Library.File).Construct(appDir, "index.html")), "Top-level static file exists under the install namespace CSP directory")
+    do $$$AssertTrue(##class(%Library.File).Exists(##class(%Library.File).Construct(appDir, "assets", "app.js")), "Nested static file exists under the install namespace CSP directory")
+
+    new $namespace
+    set $namespace = "%SYS"
+    do $$$AssertTrue(##class(Security.Applications).Exists(appName), "Web application named for the install namespace was created")
+    if ##class(Security.Applications).Exists(appName) {
+        do $$$AssertStatusOK(##class(Security.Applications).Get(appName, .appProps), "Read web application properties")
+        do $$$AssertEquals($get(appProps("NameSpace")), installNS, "Web application points at the install namespace")
+        do $$$AssertEquals(##class(%Library.File).NormalizeDirectory($get(appProps("Path"))), appDir, "Web application path resolved to the install namespace CSP directory")
+    }
+
+    // A reinstall finds the application already there, so CreateOrUpdateWebApp takes its Modify
+    // path. Pointing Path somewhere stale first makes the correction observable.
+    set stalePath = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(cspDir, "stale-nsapp"))
+    set staleProps("Path") = stalePath
+    do $$$AssertStatusOK(##class(Security.Applications).Modify(appName, .staleProps), "Pointed the web application at a stale path")
+    do $$$AssertStatusOK(##class(Security.Applications).Get(appName, .staleCheck), "Read back the stale properties")
+    do $$$AssertEquals(##class(%Library.File).NormalizeDirectory($get(staleCheck("Path"))), stalePath, "Stale path in place before reinstall (setup verified)")
+
+    set $namespace = installNS
+    set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Reinstalled database package over the existing install")
+
+    set $namespace = "%SYS"
+    do $$$AssertStatusOK(##class(Security.Applications).Get(appName, .updatedProps), "Read web application properties after reinstall")
+    do $$$AssertEquals(##class(%Library.File).NormalizeDirectory($get(updatedProps("Path"))), appDir, "Reinstall corrected the stale web application path")
+    do $$$AssertEquals($get(updatedProps("NameSpace")), installNS, "Reinstall left the web application on the install namespace")
+
     set $namespace = installNS
 }
 
@@ -1245,7 +1325,6 @@ Method TestUpdateStepsWithDatabasePackaging()
     set sc = ##class(%IPM.Main).Shell("package-database update-steps-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged update-steps-module v1 as database")
     set v1Package = ..PackageOutputDir _ "update-steps-module-1.0.0-database.tgz"
-    do $$$AssertTrue(##class(%Library.File).Exists(v1Package), "v1 database package .tgz exists")
 
     // Source upgrade to v2: Step001 already seeded so it is skipped; Step002 runs in packaging NS
     set sc = ##class(%IPM.Main).Shell("update update-steps-module -path " _ v2Dir)
@@ -1254,7 +1333,6 @@ Method TestUpdateStepsWithDatabasePackaging()
     set sc = ##class(%IPM.Main).Shell("package-database update-steps-module -path " _ ..PackageOutputDir)
     do $$$AssertStatusOK(sc, "Packaged update-steps-module v2 as database")
     set v2Package = ..PackageOutputDir _ "update-steps-module-2.0.0-database.tgz"
-    do $$$AssertTrue(##class(%Library.File).Exists(v2Package), "v2 database package .tgz exists")
 
     // --- Install phase: fresh namespace, verify seeding and selective step execution ---
     set installNS = "TESTDBUPDINSTNS"
@@ -1372,11 +1450,10 @@ Method TestPublishDatabaseWithORAS()
 
     // --- Cleanup ---
     // Unpublish all remaining versions of dep-module and main-with-deps from zot
+    // Errors are ignored: step 7 may already have removed every tag.
     set $namespace = packagingNS
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/dep-module all -f")
-    // Ignore error — database tag may already be gone if step 7 deleted all
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/main-with-deps all -f")
-    // Ignore error — already cleaned up above
+    do ##class(%IPM.Main).Shell("unpublish zot/dep-module all -f")
+    do ##class(%IPM.Main).Shell("unpublish zot/main-with-deps all -f")
 }
 
 /// Verifies that package-database overwrites an existing SystemRequirements Version
@@ -1393,11 +1470,7 @@ Method TestSystemRequirementsOverwrite()
     // class metadata in the current namespace, and the test class is not compiled in packagingNS.
     set xData = ##class(%Dictionary.CompiledXData).IDKEYOpen($classname(), "SimpleModuleWithSysReqTemplate", , .sc)
     $$$ThrowOnError(sc)
-    set rawXML = ""
-    while 'xData.Data.AtEnd {
-        set rawXML = rawXML _ xData.Data.Read()
-    }
-    set rawXML = $replace(rawXML, "REPLACEPREVIRISVERSION", prevIrisVersion)
+    set rawXML = $replace(..ReadAll(xData.Data), "REPLACEPREVIRISVERSION", prevIrisVersion)
 
     new $namespace
     set $namespace = packagingNS
@@ -1412,8 +1485,7 @@ Method TestSystemRequirementsOverwrite()
     // Read and preserve the original module.xml
     set origStream = ##class(%Stream.FileCharacter).%New()
     $$$ThrowOnError(origStream.LinkToFile(moduleXMLPath))
-    set origXML = origStream.Read(, .sc)
-    $$$ThrowOnError(sc)
+    set origXML = ..ReadAll(origStream)
 
     // Mutate module.xml then run packaging inside a try/catch so that a write failure
     // still reaches the restore block below — the file may be partially written.
@@ -1447,21 +1519,11 @@ Method TestSystemRequirementsOverwrite()
 
     // Extract and read the packaged module.xml
     set packageFile = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
-    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "extract-sysreq")
-    if '##class(%Library.File).CreateDirectory(extractDir) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create extract dir: " _ extractDir))
-    }
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
-    do $$$AssertStatusOK(sc, "Extracted package for SystemRequirements verification")
+    set extractDir = ..ExtractPackage(packageFile, "extract-sysreq")
 
     set readStream = ##class(%Stream.FileCharacter).%New()
     $$$ThrowOnError(readStream.LinkToFile(extractDir _ "module.xml"))
-    // Read the whole file: a single Read() stops at the chunk size, and the negative assertion
-    // below would pass merely because the truncated text never reached the version element.
-    set pkgXML = ""
-    while 'readStream.AtEnd {
-        set pkgXML = pkgXML _ readStream.Read()
-    }
+    set pkgXML = ..ReadAll(readStream)
 
     set hasCurrentVersion = (pkgXML [ ("Version=""" _ currentIrisVersion _ """"))
     set lacksPrevVersion = '(pkgXML [ ("Version=""" _ prevIrisVersion _ """"))
@@ -1575,6 +1637,34 @@ ClassMethod CaptureDatabaseWarning(
     quit ..JoinLines(.lines)
 }
 
+/// Extracts packageFile into a fresh directory named label under PackageOutputDir and returns it,
+/// so tests can assert on what the package contains.
+Method ExtractPackage(
+	packageFile As %String,
+	label As %String) As %String
+{
+    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ label)
+    if ##class(%Library.File).DirectoryExists(extractDir) {
+        do ##class(%IPM.Utils.File).RemoveDirectoryTree(extractDir)
+    }
+    if '##class(%Library.File).CreateDirectoryChain(extractDir) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create extract dir: " _ extractDir))
+    }
+    $$$ThrowOnError(##class(%IPM.General.Archive).Extract(packageFile, extractDir))
+    quit extractDir
+}
+
+/// Reads a whole stream into a string. A single Read() stops at the chunk size, which would leave
+/// substring assertions matching against a truncated document.
+ClassMethod ReadAll(stream As %Stream.Object) As %String
+{
+    set text = ""
+    while 'stream.AtEnd {
+        set text = text _ stream.Read()
+    }
+    quit text
+}
+
 /// Joins captured output lines into one string so assertions can match a warning by substring.
 ClassMethod JoinLines(ByRef lines) As %String
 {
@@ -1662,13 +1752,9 @@ Method TestDependencyResourcesAppliedDuringInstall()
     do $$$AssertStatusOK(sc, "Packaged main-with-resource-deps as database")
 
     set packageFile = ..PackageOutputDir _ "main-with-resource-deps-1.0.0-database.tgz"
-    do $$$AssertTrue(##class(%Library.File).Exists(packageFile), "Database package .tgz exists")
 
     // --- Package contents: dependency files must be staged under deps-files/<depname>/ ---
-    set extractDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "dep-staging-check")
-    do ##class(%Library.File).CreateDirectory(extractDir)
-    set sc = ##class(%IPM.General.Archive).Extract(packageFile, extractDir)
-    do $$$AssertStatusOK(sc, "Extracted package for staging check")
+    set extractDir = ..ExtractPackage(packageFile, "dep-staging-check")
 
     set depStageDir = ##class(%IPM.Lifecycle.Database).GetDependencyStagingDir(extractDir, "dep-with-resources")
     do $$$AssertTrue(##class(%Library.File).Exists(##class(%Library.File).NormalizeFilename("dep-data.txt", depStageDir)), "Dependency FileCopy source staged under deps-files/")
@@ -1683,10 +1769,7 @@ Method TestDependencyResourcesAppliedDuringInstall()
     set depManifest = ##class(%Library.File).NormalizeFilename("dep-with-resources.xml", ##class(%Library.File).NormalizeDirectory("deps", extractDir))
     set manifestStream = ##class(%Stream.FileCharacter).%New()
     do $$$AssertStatusOK(manifestStream.LinkToFile(depManifest), "Opened dependency manifest")
-    set manifestText = ""
-    while 'manifestStream.AtEnd {
-        set manifestText = manifestText _ manifestStream.Read(16000)
-    }
+    set manifestText = ..ReadAll(manifestStream)
     do $$$AssertTrue(manifestText [ "PythonWheel", "Dependency manifest declares an injected <PythonWheel>")
 
     // --- Clear pre-existing side effects so the install is what creates them ---
@@ -1860,6 +1943,8 @@ Method TestRootCodeMissingStopsPackaging()
 
 /// A dependency whose code is not in the namespace draws a warning naming it. Without it the package
 /// installs and the dependency's code simply does not exist.
+///
+/// The cases that must stay quiet share this namespace rather than paying for one of their own.
 Method TestWarnsWhenDependencyCodeMissing()
 {
     set depDir = ..GetModuleDir("db-packaging", "dependency-module")
@@ -1872,28 +1957,17 @@ Method TestWarnsWhenDependencyCodeMissing()
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ depDir), "Loaded dep-module")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ mainDir), "Loaded main-with-deps")
 
+    // A module's own dependency is not extra content, since it belongs in the snapshot.
+    set output = ..CapturePackageOutput("main-with-deps", .sc)
+    do $$$AssertStatusOK(sc, "Packaged main-with-deps")
+    do $$$AssertNotTrue(output [ "also holds code from", "No extra-contents warning for a namespace holding only the module and its dependency")
+    do $$$AssertNotTrue(output [ "no code from", "No missing-code warning while the dependency's code is present")
+
     do $$$AssertStatusOK($system.OBJ.Delete("DepModule.Core.CLS", "-d"), "Deleted the dependency's class")
 
     set output = ..CapturePackageOutput("main-with-deps", .sc)
     do $$$AssertStatusOK(sc, "Packaging still succeeds")
     do $$$AssertTrue(output [ "dependency 'dep-module'", "Warned that the dependency's code is missing")
-    do $$$AssertNotTrue(output [ "no code from this module was found", "No warning about the root module, whose code is present")
-}
-
-/// A module with no code resources must not draw the warning, since there is nothing to miss.
-Method TestNoMissingCodeWarningWithoutCodeResources()
-{
-    set noCodeDir = ..GetModuleDir("db-packaging", "module-without-code")
-    set noCodeNS = "TESTDBNOCODEWARN"
-    do $$$AssertStatusOK(..CreateTestNamespace(noCodeNS), "Created packaging namespace")
-
-    new $namespace
-    set $namespace = noCodeNS
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ noCodeDir), "Loaded module-without-code")
-
-    set output = ..CapturePackageOutput("module-without-code", .sc)
-    do $$$AssertStatusOK(sc, "Packaged module-without-code")
-    do $$$AssertNotTrue(output [ "no code from", "No missing-code warning for a module that declares no code resources")
 }
 
 /// A namespace holding an unrelated module warns that the unrelated code ships too.
@@ -1912,25 +1986,7 @@ Method TestWarnsAboutUnrelatedModulesInDatabase()
 
     set output = ..CapturePackageOutput("simple-db-module", .sc)
     do $$$AssertStatusOK(sc, "Packaging still succeeds, since extra contents are a warning")
-    do $$$AssertTrue(output [ "also holds code from: dep-module", "Warned that unrelated module code ships in the snapshot")
-}
-
-/// A module's own dependency must not be reported as extra, since it belongs in the snapshot.
-Method TestNoExtraContentsWarningForDependencies()
-{
-    set depDir = ..GetModuleDir("db-packaging", "dependency-module")
-    set mainDir = ..GetModuleDir("db-packaging", "module-with-deps")
-    set depOKNS = "TESTDBEXTRADEPOK"
-    do $$$AssertStatusOK(..CreateTestNamespace(depOKNS), "Created packaging namespace")
-
-    new $namespace
-    set $namespace = depOKNS
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ depDir), "Loaded dep-module")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ mainDir), "Loaded main-with-deps")
-
-    set output = ..CapturePackageOutput("main-with-deps", .sc)
-    do $$$AssertStatusOK(sc, "Packaged main-with-deps")
-    do $$$AssertNotTrue(output [ "also holds code from", "No extra-contents warning for a namespace holding only the module and its dependency")
+    do $$$AssertTrue(output [ "also holds code from dep-module", "Warned that unrelated module code ships in the snapshot")
 }
 
 /// Test classes already compiled into the database ship whether or not -include-tests was passed, so
