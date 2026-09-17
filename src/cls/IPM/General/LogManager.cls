@@ -23,6 +23,7 @@ Method Log(
     }
 
     set timestamp = $zdatetime($ztimestamp,3)
+    write timestamp_" ["_level_"] "_message
 
     // TODO: Add the message to the LogFile(s) going in that instance in the same namespace
 }
