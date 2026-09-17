@@ -9,6 +9,7 @@
       <Resource Name="NonCompiled.Main.CLS" />
       <CPF Name="config.cpf" />
       <FileCopy Name="non-compiled-data.txt" Target="${mgrdir}../non-compiled-data.txt" />
+      <WebApplication Name="/noncompiled" NameSpace="${namespace}" Path="csp/noncompiled" Recurse="1" ServeFiles="1" AuthenticationMethods="32" IsNameSpaceDefault="0" MatchRoles=":${globalsDbRole}" />
     </Module>
   </Document>
 </Export>
