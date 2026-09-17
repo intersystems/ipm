@@ -3,12 +3,30 @@ Include %IPM.Common
 Class %IPM.General.LogManager Extends %IPM.General.Singleton
 {
 
+Parameter logLevels As STRING = "TRACE,INFO,WARNING,ERROR";
+
 /// Has hashes of unique messages (with data equal to the index in ..Messages of that message)
 Property UniqueMessageHashes [ MultiDimensional, Private ];
 
 Property Messages As list Of %IPM.General.LogManager.Message;
 
 Property Threshold As %Integer [ InitialExpression = {$$$ZPMLogWARNING} ];
+
+Property CurrentLogFiles [ MultiDimensional ];
+
+Method Log(
+    message As %String,
+    level As %String)
+{
+    if '$listfind($listfromstring(..#logLevels), level) {
+        do ..Log("Log has incorrect logLevel "_level_". Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message, "ERROR")
+    }
+
+    set timestamp = $zdatetime($ztimestamp,3)
+    write timestamp_" ["_level_"] "_message
+
+    // TODO: Add the message to the LogFile(s) going in that instance in the same namespace
+}
 
 Method Flush(pThreshold As %Integer = {..Threshold})
 {
