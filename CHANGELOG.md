@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
-- #986: Database packaging: new `package-database` and `publish-database` commands create an IRIS.DAT-based package that installs via swapping of the routines database rather than compilation of source files. Pass `-dev` to include test resources (`Scope="test"` or `Scope="verify"`) in the package; they are excluded by default.
+- #986: Database packaging: new `package-database` and `publish-database` commands create an IRIS.DAT-based package that installs via swapping of the routines database rather than compilation of source files. Pass `-dev` to include test resources (`Scope="test"` or `Scope="verify"`) in the package, which are excluded by default.
 
 ### Changed
 - Minimum supported Python version is now 3.9

@@ -807,6 +807,87 @@ Method TestMixedPackaging()
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "Only one database package", "Error mentions one-package-per-namespace constraint")
 }
 
+/// A database install replaces the namespace's routines DB wholesale, so any module whose code
+/// lives in that DB would lose its classes while its metadata (in the globals DB) survived.
+/// Verifies that install is rejected in that case, and that uninstalling the module clears the way.
+///
+/// Also verifies the two exemptions: the package's own transitive dependencies (their code is in
+/// the incoming IRIS.DAT) and modules with no routines-DB code do not trigger the rejection.
+Method TestInstallRejectedWhenModulesWouldBeOrphaned()
+{
+    set depModuleDir = ..GetModuleDir("db-packaging", "dependency-module")
+    set noCodeDir = ..GetModuleDir("db-packaging", "module-without-code")
+
+    set packagingNS = ..GetOrCreateSharedNS1()
+    new $namespace
+    set $namespace = packagingNS
+
+    set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged simple-db-module as database")
+    set dbPackage = ..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz"
+
+    // main-with-deps depends on dep-module, so dep-module's code ships inside this IRIS.DAT
+    set sc = ##class(%IPM.Main).Shell("package-database main-with-deps -path " _ ..PackageOutputDir)
+    do $$$AssertStatusOK(sc, "Packaged main-with-deps as database")
+    set withDepsPackage = ..PackageOutputDir _ "main-with-deps-1.0.0-database.tgz"
+
+    // --- Rejection: a source module with classes in the routines DB blocks the install ---
+    set installNS = "TESTDBORPHANINS"
+    set sc = ..CreateTestNamespace(installNS)
+    do $$$AssertStatusOK(sc, "Created install namespace")
+    set $namespace = installNS
+
+    set sc = ##class(%IPM.Main).Shell("load -v " _ depModuleDir)
+    do $$$AssertStatusOK(sc, "Loaded dep-module from source into install namespace")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ dbPackage _ " -swap-db")
+    do $$$AssertStatusNotOK(sc, "Install rejected — dep-module's code would be destroyed by the swap")
+    set errorText = $system.Status.GetErrorText(sc)
+    do $$$AssertTrue(errorText [ "dep-module", "Error names the module that would be orphaned")
+    do $$$AssertTrue(errorText [ "uninstall", "Error tells the user to uninstall first")
+
+    // The rejection happens before any swap, so the original DB must be untouched
+    do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "dep-module's classes still present after rejection")
+
+    // --- Uninstalling the blocking module clears the way ---
+    set sc = ##class(%IPM.Main).Shell("uninstall dep-module")
+    do $$$AssertStatusOK(sc, "Uninstalled dep-module")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ dbPackage _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Install succeeds once the blocking module is uninstalled")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Database package installed")
+
+    // --- Exemption: a module with no routines-DB code does not block ---
+    // module-without-code has only a FileCopy resource, which lives on the filesystem rather
+    // than in the routines DB, so the swap cannot orphan it.
+    set installNS2 = "TESTDBORPHANINS2"
+    set sc = ..CreateTestNamespace(installNS2)
+    do $$$AssertStatusOK(sc, "Created second install namespace")
+    set $namespace = installNS2
+
+    set sc = ##class(%IPM.Main).Shell("load -v " _ noCodeDir)
+    do $$$AssertStatusOK(sc, "Loaded module-without-code from source")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ dbPackage _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Module with no routines-DB code does not block the install")
+
+    // --- Exemption: the package's own transitive dependencies do not block ---
+    // dep-module is installed as source here, but main-with-deps carries its code and metadata,
+    // so the swap replaces rather than orphans it.
+    set installNS3 = "TESTDBORPHANINS3"
+    set sc = ..CreateTestNamespace(installNS3)
+    do $$$AssertStatusOK(sc, "Created third install namespace")
+    set $namespace = installNS3
+
+    set sc = ##class(%IPM.Main).Shell("load -v " _ depModuleDir)
+    do $$$AssertStatusOK(sc, "Loaded dep-module from source into third namespace")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ withDepsPackage _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Packaged dependency does not block the install")
+    do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepModule.Core"), "dep-module's code came from the packaged IRIS.DAT")
+}
+
 /// Tests all Python dependency packaging behaviour in one pass:
 /// - module-with-mixed-python (explicit PythonWheel + requirements.txt): both wheels present
 ///   by default; both absent with -export-python-deps 0; lune installs correctly at runtime
@@ -1332,13 +1413,15 @@ ClassMethod DeletePattern(
 }
 
 /// Counts IRIS_<dbname>_*.DAT backup files in the routines DB directory for a namespace.
+/// The last FileSet argument must be 0: with directories included they are returned regardless
+/// of the wildcard, so the DB directory's own subdirectories (e.g. stream) would be counted.
 Method CountBackupFiles(ns As %String) As %Integer
 {
     set routinesDBName = ##class(%IPM.Lifecycle.Database).GetRoutinesDBName(ns)
     set dbDir = ##class(%IPM.Lifecycle.Database).GetDatabaseDirectory(routinesDBName)
     set rs = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT COUNT(*) AS fileCount FROM %Library.File_FileSet(?, ?, ?, ?)",
-        dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", "", 1)
+        dbDir, "IRIS_" _ routinesDBName _ "_*.DAT", "", 0)
     if rs.%SQLCODE < 0 {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Error counting backup files: " _ rs.%Message))
     }
