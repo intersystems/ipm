@@ -32,7 +32,7 @@ Property Module As %IPM.Storage.Module;
 /// @Argument module        The %IPM.Storage.Module object for version info
 Method InitializeLog(command As %String, module As %IPM.Storage.Module) As %Status
 {
-    set ..Timestamp = $now()
+    set ..Timestamp = $zdatetime($horolog,-2)
     set ..Command = command
     set ..Module = module
 
@@ -40,21 +40,19 @@ Method InitializeLog(command As %String, module As %IPM.Storage.Module) As %Stat
         // Namespaces are case-insensitive; '%' (e.g. %SYS) is path-hostile and can't collide once mapped to '_'.
         set normalizedNamespace = $translate($zconvert(..%namespace, "L"), "%", "_")
 
-        // Create log directory: <IRIS-mgr>/ipm-logs/<namespace>/
-        set mgr = ##class(%File).GetDirectory("")
-        set logDir = ##class(%File).NormalizeDirectory(mgr _ "ipm-logs/" _ normalizedNamespace _ "/")
+        // Create log directory: <IRIS-mgr>/<namespace>/ipm-logs/
+        set mgr = ##class(%Library.File).ManagerDirectory()
+        set logDir = ##class(%File).NormalizeDirectory(mgr _ normalizedNamespace _ "/ipm-logs/")
         $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
 
         // Set file paths with timestamp
-        set unixTimestamp = $zdatetime($horolog,-2)
-        set baseFileName = command _ "_" _ module.Name _ "_" _ unixTimestamp
+        set baseFileName = command _ "_" _ module.Name _ "_" _ ..Timestamp
         set ..JSONFilePath = logDir _ baseFileName _ ".jsonl"
         set ..TxtFilePath = logDir _ baseFileName _ ".txt"
 
-        // Get IPM version
-        set versionInfo = ""
+        // Get IPM version. GetVersion() returns per-module info in versionInfo("zpm") as $lb(namespace, version).
         $$$ThrowOnError(##class(%IPM.Main).GetVersion("zpm", .versionInfo))
-        set ipmVersion = $listget(versionInfo, 2)
+        set ipmVersion = $listget($get(versionInfo("zpm")), 2)
 
         // Write TXT header
         set txtStream = ##class(%Stream.FileCharacter).%New()
@@ -68,9 +66,8 @@ Method InitializeLog(command As %String, module As %IPM.Storage.Module) As %Stat
 
         // Write the JSON Lines header as the first record; subsequent lines are log entries.
         set header = ##class(%DynamicObject).%New()
+        do header.%Set("$schema", "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/1.0.0")
         set header.ipm = ipmVersion
-        // TODO: Replace hardcoded schema version with global IPM log schema setting
-        set header.schema = "1.0.0"
         set header.command = command
 
         set jsonStream = ##class(%Stream.FileCharacter).%New()
@@ -93,6 +90,9 @@ Method WriteLogLine(level As %String, message As %String) As %Status
 {
     try
     {
+        if '$listfind($listfromstring(..#logLevels), level) {
+            do ..WriteLogLine("Log has incorrect logLevel "_level_". Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message, "ERROR")
+        }
         set entry = ##class(%DynamicObject).%New()
         set entry.level = level
         set entry.message = message
@@ -101,14 +101,14 @@ Method WriteLogLine(level As %String, message As %String) As %Status
         // Append one NDJSON record; no full-file read/parse required.
         set jsonStream = ##class(%Stream.FileCharacter).%New()
         set jsonStream.Filename = ..JSONFilePath
-        $$$ThrowOnError(jsonStream.%Open("A"))
+        $$$ThrowOnError(jsonStream.MoveToEnd())
         do jsonStream.WriteLine(entry.%ToJSON())
         $$$ThrowOnError(jsonStream.%Save())
 
         // Append to TXT file
         set txtStream = ##class(%Stream.FileCharacter).%New()
         set txtStream.Filename = ..TxtFilePath
-        $$$ThrowOnError(txtStream.%Open("A"))  // Append mode
+        $$$ThrowOnError(txtStream.MoveToEnd())
         do txtStream.WriteLine(entry.timestamp _ " [" _ level _ "] " _ message)
         $$$ThrowOnError(txtStream.%Save())
 
@@ -118,22 +118,6 @@ Method WriteLogLine(level As %String, message As %String) As %Status
     {
         return ex.AsStatus()
     }
-}
-
-Property CurrentLogFiles [ MultiDimensional ];
-
-Method Log(
-    message As %String,
-    level As %String)
-{
-    if '$listfind($listfromstring(..#logLevels), level) {
-        do ..Log("Log has incorrect logLevel "_level_". Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message, "ERROR")
-    }
-
-    set timestamp = $zdatetime($ztimestamp,3)
-    write timestamp_" ["_level_"] "_message
-
-    // TODO: Add the message to the LogFile(s) going in that instance in the same namespace
 }
 
 Method Flush(pThreshold As %Integer = {..Threshold})

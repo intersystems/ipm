@@ -21,10 +21,6 @@
                     "type": "string",
                     "description": "IPM version that produced this log."
                 },
-                "schema": {
-                    "type": "string",
-                    "description": "Version of this log schema."
-                },
                 "command": {
                     "type": "string",
                     "description": "Command being logged, with credentials obfuscated."
@@ -32,7 +28,6 @@
             },
             "required": [
                 "ipm",
-                "schema",
                 "command"
             ],
             "additionalProperties": false
