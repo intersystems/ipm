@@ -10,6 +10,114 @@ Property Messages As list Of %IPM.General.LogManager.Message;
 
 Property Threshold As %Integer [ InitialExpression = {$$$ZPMLogWARNING} ];
 
+/// Command being logged (with credentials obfuscated)
+Property Command As %String;
+
+/// Absolute path to the JSON Lines (NDJSON) log file
+Property JSONFilePath As %String;
+
+/// Absolute path to the TXT log file
+Property TxtFilePath As %String;
+
+/// Starting Unix timestamp for this log
+Property Timestamp As %Integer;
+
+/// The module object for this operation
+Property Module As %IPM.Storage.Module;
+
+/// Initialize log files and write headers.
+/// @Argument command       The command verb being logged (e.g., "install", "load", "update", "uninstall")
+/// @Argument module        The %IPM.Storage.Module object for version info
+Method InitializeLog(command As %String, module As %IPM.Storage.Module) As %Status
+{
+    set ..Timestamp = $now()
+    set ..Command = command
+    set ..Module = module
+
+    try {
+        // Namespaces are case-insensitive; '%' (e.g. %SYS) is path-hostile and can't collide once mapped to '_'.
+        set normalizedNamespace = $translate($zconvert(..%namespace, "L"), "%", "_")
+
+        // Create log directory: <IRIS-mgr>/ipm-logs/<namespace>/
+        set mgr = ##class(%File).GetDirectory("")
+        set logDir = ##class(%File).NormalizeDirectory(mgr _ "ipm-logs/" _ normalizedNamespace _ "/")
+        $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
+
+        // Set file paths with timestamp
+        set unixTimestamp = $zdatetime($horolog,-2)
+        set baseFileName = command _ "_" _ module.Name _ "_" _ unixTimestamp
+        set ..JSONFilePath = logDir _ baseFileName _ ".jsonl"
+        set ..TxtFilePath = logDir _ baseFileName _ ".txt"
+
+        // Get IPM version
+        set versionInfo = ""
+        $$$ThrowOnError(##class(%IPM.Main).GetVersion("zpm", .versionInfo))
+        set ipmVersion = $listget(versionInfo, 2)
+
+        // Write TXT header
+        set txtStream = ##class(%Stream.FileCharacter).%New()
+        set txtStream.Filename = ..TxtFilePath
+        do txtStream.WriteLine("IPM Version: " _ ipmVersion)
+        // TODO: Replace hardcoded schema version with global IPM log schema setting
+        do txtStream.WriteLine("Schema Version: 1.0.0")
+        do txtStream.WriteLine("Command: " _ command)
+        do txtStream.WriteLine("")
+        $$$ThrowOnError(txtStream.%Save())
+
+        // Write the JSON Lines header as the first record; subsequent lines are log entries.
+        set header = ##class(%DynamicObject).%New()
+        set header.ipm = ipmVersion
+        // TODO: Replace hardcoded schema version with global IPM log schema setting
+        set header.schema = "1.0.0"
+        set header.command = command
+
+        set jsonStream = ##class(%Stream.FileCharacter).%New()
+        set jsonStream.Filename = ..JSONFilePath
+        do jsonStream.WriteLine(header.%ToJSON())
+        $$$ThrowOnError(jsonStream.%Save())
+
+        return $$$OK
+    }
+    catch ex
+    {
+        return ex.AsStatus()
+    }
+}
+
+/// Write a log entry to both the JSON Lines and TXT files.
+/// @Argument level         The log level: TRACE, INFO, WARNING, or ERROR
+/// @Argument message       The human-readable log message to append
+Method WriteLogLine(level As %String, message As %String) As %Status
+{
+    try
+    {
+        set entry = ##class(%DynamicObject).%New()
+        set entry.level = level
+        set entry.message = message
+        set entry.timestamp = $zdatetime($ztimestamp, 3) _ " UTC"
+
+        // Append one NDJSON record; no full-file read/parse required.
+        set jsonStream = ##class(%Stream.FileCharacter).%New()
+        set jsonStream.Filename = ..JSONFilePath
+        $$$ThrowOnError(jsonStream.%Open("A"))
+        do jsonStream.WriteLine(entry.%ToJSON())
+        $$$ThrowOnError(jsonStream.%Save())
+
+        // Append to TXT file
+        set txtStream = ##class(%Stream.FileCharacter).%New()
+        set txtStream.Filename = ..TxtFilePath
+        $$$ThrowOnError(txtStream.%Open("A"))  // Append mode
+        do txtStream.WriteLine(entry.timestamp _ " [" _ level _ "] " _ message)
+        $$$ThrowOnError(txtStream.%Save())
+
+        return $$$OK
+    }
+    catch ex
+    {
+        return ex.AsStatus()
+    }
+}
+
 Method Flush(pThreshold As %Integer = {..Threshold})
 {
     set tLastMessage = $$$NULLOREF
