@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
 - #1158: Searching for or installing modules with deployed code will automatically filter for the currently installed IRIS version
 - `ArtifactoryTarball` resources download without credentials from Artifactory servers that allow anonymous read access, using the artifact and property search APIs instead of AQL. Only `ARTI_SERVER` is required: `ARTI_PORT` defaults to 443 and `ARTI_AQL_URL` to `/artifactory/api/search/aql`.
-- #986: Database packaging: new `package-database` and `publish-database` commands create an IRIS.DAT-based package that installs via swapping of the routines database rather than compilation of source files. Pass `-dev` to include test resources (`Scope="test"` or `Scope="verify"`) in the package; they are excluded by default.
+- #986: Database packaging: new `package-database` and `publish-database` commands create an IRIS.DAT-based package that installs via swapping of the routines database rather than compilation of source files. Pass `-dev` to include test resources (`Scope="test"` or `Scope="verify"`) in the package, which are excluded by default.
 
 ### Changed
 - Minimum supported Python version is now 3.9

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="module-without-code.ZPM">
+    <Module>
+      <Name>module-without-code</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <FileCopy Name="no-code-data.txt" Target="${mgrdir}../no-code-data.txt" />
+    </Module>
+  </Document>
+</Export>
