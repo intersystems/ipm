@@ -21,6 +21,6 @@ Parameter MAXLEN As INTEGER = 50;
 /// is called for "*", and no resource processor hooks or <Invoke> elements target it.
 ///
 /// Should be kept in sync with %IPM.Lifecycle.Base.PHASES.
-Parameter VALUELIST = ",Clean,Initialize,Reload,*,Validate,ExportData,Compile,Activate,Document,MakeDeployed,Test,Package,Verify,Publish,Configure,Unconfigure,ApplyUpdateSteps";
+Parameter VALUELIST = ",Clean,Initialize,Reload,*,Validate,ExportData,Compile,Activate,Document,MakeDeployed,Test,Package,Verify,Publish,Configure,Unconfigure,ApplyUpdateSteps,Sync";
 
 }

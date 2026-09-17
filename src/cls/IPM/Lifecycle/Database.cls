@@ -440,7 +440,7 @@ Method WarnOtherModulesInDatabase()
 
     quit:extra=""
 
-    write !!, "WARNING: this namespace's routines database also holds code from: ", $listtostring(extra, ", "), "."
+    write !!, "WARNING: this namespace's routines database also holds code from ", $listtostring(extra, ", "), "."
     write !, "  The package is a snapshot of the whole database, so that code ships too."
     write !, "  Package from a namespace holding only ", ..Module.Name, " and its dependencies to avoid this."
 }
@@ -905,12 +905,21 @@ ClassMethod StageResourceFile(
     }
 }
 
-/// Copies a file to a destination path, creating parent directories as needed.
-/// Throws on failure. Returns 1 if the file was copied, 0 if the source did not exist.
+/// Copies a file, or a whole directory tree, to a destination path, creating parent directories as
+/// needed. A <FileCopy> resource names either, and the processor resolves both at install time, so
+/// both must be staged.
+/// Throws on failure. Returns 1 if the source was copied, 0 if it did not exist.
 ClassMethod StageFile(
 	sourcePath As %String,
 	destPath As %String) As %Boolean
 {
+    // %Library.File.Exists is true for directories too, so test for a directory first.
+    if ##class(%Library.File).DirectoryExists(sourcePath) {
+        set destDir = ##class(%Library.File).NormalizeDirectory(destPath)
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(destDir))
+        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(sourcePath, destDir))
+        quit 1
+    }
     if '##class(%Library.File).Exists(sourcePath) {
         quit 0
     }
@@ -1584,7 +1593,7 @@ Method ReassertRootInitializeResources(
             if (resource.Processor.CustomPhase '= "") || (resource.Processor.Phase '= "Initialize") {
                 continue
             }
-            write !, "Re-merging Configuration Parameter File (CPF) '", resource.Name, "' as a dependency merged a CPF after this module's Initialize phase."
+            write !, "Re-merging Configuration Parameter File (CPF) '", resource.Name, "', as a dependency merged a CPF after this module's Initialize phase."
             if resource.Processor.When = "After" {
                 $$$ThrowOnError(resource.Processor.OnAfterPhase("Initialize", .params))
             } else {
@@ -1592,7 +1601,7 @@ Method ReassertRootInitializeResources(
             }
 
         } elseif resource.Processor.%IsA("%IPM.ResourceProcessor.PythonWheel") && $data(depInitClasses("%IPM.ResourceProcessor.PythonWheel")) {
-            write !, "Re-installing Python wheel '", resource.Name, "' as a dependency installed a wheel after this module's Initialize phase."
+            write !, "Re-installing Python wheel '", resource.Name, "', as a dependency installed a wheel after this module's Initialize phase."
             set handled = 0
             $$$ThrowOnError(resource.Processor.OnPhase("Initialize", .params, .handled))
         }
