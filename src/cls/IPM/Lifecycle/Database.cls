@@ -42,7 +42,7 @@ Method %Package(ByRef params) As %Status
 
     try {
         set verbose = $get(params("Verbose"))
-        set includeTests = $get(params("IncludeTestResources"), 0)
+        set includeTests = $get(params("DeveloperMode"), 0)
         set useCurrentDB = $get(params("UseCurrentDB"), 0)
         set dbName = $get(params("DatabaseName"), "")
 
@@ -197,11 +197,12 @@ Method %Package(ByRef params) As %Status
     quit sc
 }
 
-/// Handles three contexts:
+/// Handles four contexts:
 /// - Install (Packaging=database and IRIS.DAT in root): skip source loading entirely.
 /// - Database packaging inside %Package (params("DatabasePackaging")=1):
-///   load resources into temp DB, filtering test scope unless requested.
-/// - All other contexts (packaging phase chain on source): delegate to ##super.
+///   load resources into temp DB, filtering test scope unless in dev mode.
+/// - Packaging phase chain with no RootDirectory (the Reload phase before Package): no-op.
+/// - Loading from a source directory (RootDirectory set): delegate to ##super.
 Method %Reload(ByRef params) As %Status
 {
     // Install context: IRIS.DAT already in place — no source to reload.
@@ -214,12 +215,10 @@ Method %Reload(ByRef params) As %Status
     }
 
     // Inside %Package.LoadResourcesIntoDatabase: load resources, filtering test scope.
-    // Cannot delegate to ##super here: Base.%Reload quits early without DeveloperMode
-    // and RootDirectory in params, which are never set during packaging.
-    // This means this branch does not inherit Base.%Reload behavior (e.g., package/routine
-    // mappings from module.xml). Python requirements are handled separately in %Package
-    // via ExportPythonDependencies. If Base.%Reload gains new resource-loading logic,
-    // this branch must be updated to match.
+    // Cannot delegate to ##super here: this branch loads resources into the temp DB directly
+    // and does not inherit Base.%Reload behavior (e.g., package/routine mappings from module.xml).
+    // Python requirements are handled separately in %Package via ExportPythonDependencies.
+    // If Base.%Reload gains new resource-loading logic, this branch must be updated to match.
     if $get(params("DatabasePackaging")) {
         set sc = $$$OK
         try {
@@ -230,18 +229,15 @@ Method %Reload(ByRef params) As %Status
                 set resource = orderedResourceList.GetNext(.key)
                 quit:key=""
 
-                // Type A: regular resources with Scope="test" or Scope="verify" — skip unless requested
-                if '$get(params("IncludeTestResources")) {
-                    set scope = $zconvert(resource.Scope, "L")
-                    if (scope = "test") || (scope = "verify") {
-                        continue
-                    }
+                // Type A: regular resources with Scope="test" or Scope="verify" — skip unless in dev mode
+                if '$get(params("DeveloperMode")) && resource.IsTestScoped() {
+                    continue
                 }
 
                 // Type B: <UnitTest> parent resources have Scope="" and a Test processor.
                 // OnPhase("Reload") is a no-op for this processor; loading is done via LoadTestDirectory.
                 if $isobject(resource.Processor) && resource.Processor.%IsA("%IPM.ResourceProcessor.Test") && ($extract(resource.Name, *) = "/") {
-                    if $get(params("IncludeTestResources")) {
+                    if $get(params("DeveloperMode")) {
                         set testDir = ##class(%Library.File).NormalizeDirectory(resource.Module.Root _ resource.Name)
                         set format = resource.Processor.Format
                         set loadSC = ##class(%IPM.Test.Manager).LoadTestDirectory(testDir, $get(params("Verbose")), , format)
@@ -261,7 +257,18 @@ Method %Reload(ByRef params) As %Status
         quit sc
     }
 
-    // Packaging phase chain on source module: delegate to Base.
+    // Packaging phase chain on the source module (e.g. the Reload phase that precedes Package
+    // during `package-database <name>`): no source root to load from. %Package loads resources
+    // into the temp DB itself, so this phase is a no-op. We must NOT delegate to ##super here:
+    // Base.%Reload treats DeveloperMode as a signal to load from ..Module.Root even when no
+    // RootDirectory is passed, which would reload source into the current namespace and mutate
+    // it (^Sources, persisted DeveloperMode, Python requirements) mid-package.
+    if '$data(params("RootDirectory")) {
+        quit $$$OK
+    }
+
+    // Loading a database-packaged module from a source directory (RootDirectory set): behaves
+    // like a normal source load — delegate to Base.
     quit ##super(.params)
 }
 
@@ -436,11 +443,8 @@ Method ExportGeneratedResources(
         set tResource = orderedList.GetNext(.tKey)
         quit:tKey=""
 
-        if 'includeTestResources {
-            set scope = $zconvert(tResource.Scope, "L")
-            if (scope = "test") || (scope = "verify") {
-                continue
-            }
+        if 'includeTestResources && tResource.IsTestScoped() {
+            continue
         }
 
         if 'tResource.Generated {
@@ -535,7 +539,7 @@ Method LoadResourcesIntoDatabase(
 
     set loadParams("Verbose") = $get(params("Verbose"))
     set loadParams("DatabasePackaging") = 1
-    set loadParams("IncludeTestResources") = includeTestResources
+    set loadParams("DeveloperMode") = includeTestResources
 
     $$$ThrowOnError(..%Reload(.loadParams))
     $$$ThrowOnError(..%Compile(.loadParams))
@@ -565,7 +569,7 @@ ClassMethod ComputeSHA256Hex(filePath As %String) As %String
 /// irisDAT: full path to the IRIS.DAT to package.
 /// stagingDir: temporary directory to assemble package contents into.
 /// checksumHex: SHA-256 hex string to embed in module.xml.
-/// params: packaging params (Path for output dir, IncludeTestResources, ExportPythonDependencies, Verbose).
+/// params: packaging params (Path for output dir, DeveloperMode, ExportPythonDependencies, Verbose).
 /// moveFile: 1 (default) renames IRIS.DAT into staging to avoid copying multi-GB files;
 ///           0 copies instead — required for -use-current-db where irisDAT is the live routines DB.
 Method AssemblePackage(
@@ -593,7 +597,7 @@ Method AssemblePackage(
     }
 
     // Stage non-compiled resource files so processors can find them during install
-    set includeTestResources = $get(params("IncludeTestResources"), 0)
+    set includeTestResources = $get(params("DeveloperMode"), 0)
     set exportPythonDeps = $get(params("ExportPythonDependencies"), 1)
     do ..CopyNonCompiledResources(stagingDir, includeTestResources, exportPythonDeps)
 
@@ -649,11 +653,8 @@ Method CopyNonCompiledResources(
         quit:key=""
 
         // Skip test-scoped resources unless requested
-        if 'includeTestResources {
-            set scope = $zconvert(resource.Scope, "L")
-            if (scope = "test") || (scope = "verify") {
-                continue
-            }
+        if 'includeTestResources && resource.IsTestScoped() {
+            continue
         }
 
         if '$isobject(resource.Processor) {
@@ -995,10 +996,18 @@ Method PerformDatabaseSwap(
 
     $$$ThrowOnError(##class(SYS.Database).DismountDatabase(dbDir))
 
-    // Rename current IRIS.DAT to timestamped backup: IRIS_<dbname>_YYYYMMDDHHmmss.DAT
+    // Rename current IRIS.DAT to timestamped backup: IRIS_<dbname>_YYYYMMDDHHmmss.DAT.
+    // Timestamp is second-resolution, so append a counter suffix if that name already exists
+    // (e.g. two swaps of the same DB within one second, as in a package upgrade).
     set h = $horolog
     set timestamp = $translate($zdate(h, 8), "-", "") _ $translate($ztime($piece(h, ",", 2), 2), ":", "")
-    set backupPath = dbDir _ "IRIS_" _ routinesDBName _ "_" _ timestamp _ ".DAT"
+    set backupBase = dbDir _ "IRIS_" _ routinesDBName _ "_" _ timestamp
+    set backupPath = backupBase _ ".DAT"
+    set suffix = 0
+    while ##class(%Library.File).Exists(backupPath) {
+        set suffix = suffix + 1
+        set backupPath = backupBase _ "_" _ suffix _ ".DAT"
+    }
     if '##class(%Library.File).Rename(dbDir _ "IRIS.DAT", backupPath) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to rename IRIS.DAT to backup: " _ backupPath))
     }
@@ -1083,9 +1092,19 @@ Method RollbackDatabaseSwap(
 // Database utilities
 // =====================================================================
 
-/// Returns the normalized filesystem directory path for a database registered in Config.Databases.
+/// Returns the normalized filesystem directory path for a database.
+/// Reads the registered Directory from Config.Databases when the database exists — a database
+/// can be mounted from any path, not just <ManagerDirectory>/<dbName>. Falls back to the
+/// conventional <ManagerDirectory>/<dbName> layout for databases not (yet) registered, which is
+/// where CreateTempDatabase places new databases.
 ClassMethod GetDatabaseDirectory(dbName As %String) As %String
 {
+    new $namespace
+    set $namespace = "%SYS"
+    if ##class(Config.Databases).Exists(dbName) {
+        $$$ThrowOnError(##class(Config.Databases).Get(dbName, .dbProps))
+        quit ##class(%Library.File).NormalizeDirectory($get(dbProps("Directory")))
+    }
     quit ##class(%Library.File).NormalizeDirectory(
         ##class(%Library.File).ManagerDirectory() _ dbName)
 }
