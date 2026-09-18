@@ -156,12 +156,12 @@ Creates a .tgz archive of module source files. Equivalent to the existing `packa
 <command name="package-database" dataPrefix="D">
 <description>
 Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), and a deps/ directory of dependency manifests and non-compiled resource files.
-The package is a snapshot of the namespace's routines database as it currently stands, so it contains all compiled code from every module installed there, not just this module's. Beyond compiling this module's own resources, packaging loads nothing into the namespace unless -include-tests is passed, so load the module and its dependencies before packaging.
+The package ships a copy of the namespace's routines database as it currently stands, so it contains all compiled code from every module installed there, not just this module's. Beyond compiling this module's own resources, packaging loads nothing into the namespace unless -include-tests is passed, so load the module and its dependencies before packaging.
 The database is dismounted for the duration of the copy, so the namespace cannot run code while packaging runs, and mirrored databases are not supported.
 </description>
 <parameter name="module" required="true" description="Name of module to package as database" />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
-<modifier name="include-tests" dataAlias="IncludeTests" dataValue="1" description="Loads and compiles this module's test resources (Scope=test or Scope=verify, and &lt;UnitTest&gt; directories) into the namespace before the snapshot, so they ship in the package. Requires the module's source." />
+<modifier name="include-tests" dataAlias="IncludeTests" dataValue="1" description="Loads and compiles this module's test resources (Scope=test or Scope=verify, and &lt;UnitTest&gt; directories) into the namespace before the database is copied, so they ship in the package. Requires the module's source." />
 <modifier name="export-python-deps" value="true" valueList="0,1" dataAlias="ExportPythonDependencies" description="Controls whether Python wheels are included in the database package. Defaults to 1 (included). Pass 0 to exclude." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>
@@ -195,12 +195,12 @@ This command is an alias for `module-action module-name publish`
 <command name="publish-database" dataPrefix="D">
 <description>
 Packages the module as an IRIS.DAT database package and publishes it to a registry in one step.
-Equivalent to running `package-database` followed by `publish`, but without needing a separate output path. As with `package-database`, the package is a snapshot of the namespace's routines database as it currently stands, and the database is dismounted for the duration of the copy.
+Equivalent to running `package-database` followed by `publish`, but without needing a separate output path. As with `package-database`, the package ships a copy of the namespace's routines database as it currently stands, and the database is dismounted for the duration of the copy.
 </description>
 <parameter name="module" required="true" description="Name of module to package as database and publish" />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository to publish to (deployment must be enabled)" />
 <modifier name="use-external-name" aliases="use-ext" dataAlias="UseExternalName" dataValue="1" description="Publish the package under the &lt;ExternalName&gt; of the package. If ExternalName is unspecified or illegal, an error will be thrown."/>
-<modifier name="include-tests" dataAlias="IncludeTests" dataValue="1" description="Loads and compiles this module's test resources (Scope=test or Scope=verify, and &lt;UnitTest&gt; directories) into the namespace before the snapshot, so they ship in the package. Requires the module's source." />
+<modifier name="include-tests" dataAlias="IncludeTests" dataValue="1" description="Loads and compiles this module's test resources (Scope=test or Scope=verify, and &lt;UnitTest&gt; directories) into the namespace before the database is copied, so they ship in the package. Requires the module's source." />
 <modifier name="export-python-deps" value="true" valueList="0,1" dataAlias="ExportPythonDependencies" description="Controls whether Python wheels are included in the database package. Defaults to 1 (included). Pass 0 to exclude." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 </command>

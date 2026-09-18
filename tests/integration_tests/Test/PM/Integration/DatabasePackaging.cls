@@ -518,7 +518,7 @@ Method TestPackageAndInstallWithDependencies()
     // packaging namespace, which resolves module directories from ^UnitTestRoot in this namespace.
     set mainPkg = ..GetOrCreateDatabasePackage("main-with-deps")
 
-    // dep-module needs a namespace holding nothing else. The package is a snapshot, so any module
+    // dep-module needs a namespace holding nothing else. The package copies the database whole, so any module
     // loaded alongside it would end up in dep-module's IRIS.DAT.
     set depOnlyNS = "TESTDBDEPONLYPKG"
     do $$$AssertStatusOK(..CreateTestNamespace(depOnlyNS), "Created dep-only packaging namespace")
@@ -929,7 +929,7 @@ Method TestUpdateWithChangedDependencyTree()
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("update deptree-stable -path " _ stableV2Dir), "Updated deptree-stable to 2.0.0")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("update deptree-parent -path " _ parentV2Dir), "Updated deptree-parent to 2.0.0")
 
-    // The snapshot ships whatever is in the namespace, so a dependency the new version drops has to
+    // The package ships whatever is in the namespace, so a dependency the new version drops has to
     // leave the namespace before packaging. `update` only reshapes the dependency tree.
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall deptree-dropped"), "Uninstalled the dropped dependency")
     do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("DepTree.Dropped"), "deptree-dropped code gone from the packaging namespace")
@@ -1830,31 +1830,31 @@ Method AssertGlobals8KB(
     do $$$AssertEquals(props("globals8kb"), expected, message)
 }
 
-/// The snapshot dismounts the routines database, copies its IRIS.DAT, and remounts it, leaving the
+/// Packaging dismounts the routines database, copies its IRIS.DAT, and remounts it, leaving the
 /// namespace usable. Uses a dedicated namespace so the dismount does not disturb the shared ones.
 ///
 /// The staged copy must contain a class loaded moments earlier. This is the assertion that guards the
 /// dismount itself: a copy taken while the database stayed mounted reads only what is on disk, and
 /// misses everything still in the buffer pool from the write daemon's last cycle.
-Method TestSnapshotDismountsCopiesAndRemounts()
+Method TestCopyDismountsAndRemounts()
 {
-    set snapNS = "TESTDBSNAPDISMOUNT"
-    do $$$AssertStatusOK(..CreateTestNamespace(snapNS), "Created snapshot namespace")
+    set copyNS = "TESTDBCOPYDISMOUNT"
+    do $$$AssertStatusOK(..CreateTestNamespace(copyNS), "Created packaging namespace")
     set simpleDir = ..GetModuleDir("db-packaging", "simple-module")
 
     new $namespace
-    set $namespace = snapNS
+    set $namespace = copyNS
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ simpleDir), "Loaded simple-db-module")
 
-    set stagingDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "snap-dismount")
+    set stagingDir = ##class(%Library.File).NormalizeDirectory(..PackageOutputDir _ "copy-dismount")
     do $$$AssertTrue(##class(%Library.File).CreateDirectoryChain(stagingDir), "Created staging dir")
 
-    set dbDir = ##class(%IPM.Utils.Module).GetRoutineDatabaseDir(snapNS)
+    set dbDir = ##class(%IPM.Utils.Module).GetRoutineDatabaseDir(copyNS)
     set srcDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", dbDir)
 
-    // Called from inside snapNS, as %Package does, so the database being dismounted is the one on
+    // Called from inside copyNS, as %Package does, so the database being dismounted is the one on
     // this process's namespace stack.
-    do ##class(%IPM.Lifecycle.Database).SnapshotRoutinesDatabase(snapNS, stagingDir)
+    do ##class(%IPM.Lifecycle.Database).CopyRoutinesDatabase(copyNS, stagingDir)
 
     set staged = ##class(%Library.File).NormalizeFilename("IRIS.DAT", stagingDir)
     do $$$AssertTrue(##class(%Library.File).Exists(staged), "IRIS.DAT staged from the dismounted database")
@@ -1862,7 +1862,7 @@ Method TestSnapshotDismountsCopiesAndRemounts()
     // Same bytes as the live file, so the package is a copy rather than a rebuild.
     do $$$AssertEquals(##class(%Library.File).GetFileSize(staged), ##class(%Library.File).GetFileSize(srcDAT), "Staged IRIS.DAT is the same size as the live one")
 
-    do $$$AssertTrue(..StagedDATContains(staged, "SimpleModule.Main"), "Staged IRIS.DAT holds code loaded just before the snapshot")
+    do $$$AssertTrue(..StagedDATContains(staged, "SimpleModule.Main"), "Staged IRIS.DAT holds code loaded just before the copy")
 
     // Reading a class out of the namespace proves the remount succeeded.
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Routines database remounted and readable")
@@ -1874,8 +1874,8 @@ Method TestSnapshotDismountsCopiesAndRemounts()
 /// for a destination whose directory is absent, and CopyFile cannot write to an empty path.
 Method TestFailedCopyStillRemounts()
 {
-    set failNS = "TESTDBSNAPCOPYFAIL"
-    do $$$AssertStatusOK(..CreateTestNamespace(failNS), "Created snapshot namespace")
+    set failNS = "TESTDBCOPYFAIL"
+    do $$$AssertStatusOK(..CreateTestNamespace(failNS), "Created packaging namespace")
     set simpleDir = ..GetModuleDir("db-packaging", "simple-module")
 
     new $namespace
@@ -1885,11 +1885,11 @@ Method TestFailedCopyStillRemounts()
     set missingDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(..PackageOutputDir, "no-such-staging-dir"))
     set caught = ""
     try {
-        do ##class(%IPM.Lifecycle.Database).SnapshotRoutinesDatabase(failNS, missingDir)
+        do ##class(%IPM.Lifecycle.Database).CopyRoutinesDatabase(failNS, missingDir)
     } catch ex {
         set caught = ex
     }
-    do $$$AssertNotEquals(caught, "", "Snapshot reports the failed copy rather than succeeding silently")
+    do $$$AssertNotEquals(caught, "", "Packaging reports the failed copy rather than succeeding silently")
 
     do $$$AssertTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SimpleModule.Main"), "Routines database remounted after the failed copy")
 }
@@ -1957,7 +1957,7 @@ Method TestWarnsWhenDependencyCodeMissing()
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ depDir), "Loaded dep-module")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ mainDir), "Loaded main-with-deps")
 
-    // A module's own dependency is not extra content, since it belongs in the snapshot.
+    // A module's own dependency is not extra content, since it belongs in the package.
     set output = ..CapturePackageOutput("main-with-deps", .sc)
     do $$$AssertStatusOK(sc, "Packaged main-with-deps")
     do $$$AssertNotTrue(output [ "also holds code from", "No extra-contents warning for a namespace holding only the module and its dependency")
@@ -1986,7 +1986,7 @@ Method TestWarnsAboutUnrelatedModulesInDatabase()
 
     set output = ..CapturePackageOutput("simple-db-module", .sc)
     do $$$AssertStatusOK(sc, "Packaging still succeeds, since extra contents are a warning")
-    do $$$AssertTrue(output [ "also holds code from dep-module", "Warned that unrelated module code ships in the snapshot")
+    do $$$AssertTrue(output [ "also holds code from dep-module", "Warned that unrelated module code ships in the package")
 }
 
 /// Test classes already compiled into the database ship whether or not -include-tests was passed, so
@@ -2010,7 +2010,7 @@ Method TestWarnsAboutTestClassesWithoutIncludeTests()
 }
 
 /// A namespace whose routines and globals are the same database is warned about on both sides: the
-/// swap replaces its globals along with IPM's own registry, and the snapshot ships them.
+/// swap replaces its globals along with IPM's own registry, and packaging ships them.
 /// Asserted against the warning methods rather than a real install or package, which would wreck the
 /// registry the assertions depend on.
 Method TestWarnsWhenRoutinesDatabaseIsGlobalsDatabase()
