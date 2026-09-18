@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="all-resources-module.ZPM">
+    <Module>
+      <Name>all-resources-module</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="AllResources.Main.CLS" />
+      <Resource Name="AllResources.Generator.CLS" />
+      <Invoke Class="AllResources.Generator" Method="Generate" Phase="Compile" When="After" />
+      <Resource Name="AllResources.Generated.CLS" Generated="1" Compile="0" />
+      <Resource Name="AllResources.INC" />
+<FileCopy Name="test-data.txt" Target="${mgrdir}../all-resources-data.txt" />
+      <PythonWheel Name="colorama-0.4.6-py2.py3-none-any.whl" />
+      <WebApplication
+        Name="/allresources"
+        NameSpace="${namespace}"
+        Path="csp/allresources"
+        Recurse="1"
+        ServeFiles="1"
+        AuthenticationMethods="32"
+        IsNameSpaceDefault="1"
+        MatchRoles=":${globalsDbRole}"
+      />
+    </Module>
+  </Document>
+</Export>
