@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="shared-ns-wheel-alpha.ZPM">
+    <Module>
+      <Name>shared-ns-wheel-alpha</Name>
+      <Version>0.1</Version>
+      <Packaging>module</Packaging>
+      <PythonWheel Name="ipm_ns_alpha-0.1-py3-none-any.whl" Directory="."/>
+    </Module>
+  </Document>
+</Export>

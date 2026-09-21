@@ -429,7 +429,15 @@ ClassMethod GetClient(
             }
         }
     } catch e {
-        if e.Name = "<OBJECT DISPATCH>" {
+        // The same permission failure has been seen as both <SYNTAX> and <PYTHON EXCEPTION>, so match on the details rather than the name
+        // Python reports the path as it appeared in sys.path, whose case can differ from the manager directory's
+        set details = $zconvert(e.DisplayString(), "L")
+        set pythonDir = $zconvert(##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory()), "L")
+        if (details [ "permissionerror") && (details [ pythonDir) {
+            set eStatus = e.AsStatus()
+            set usrStatus = $$$ERROR($$$GeneralError,$$$OrasPythonPackagesUnreadable)
+            $$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))
+        } elseif e.Name = "<OBJECT DISPATCH>" {
             set eStatus = e.AsStatus()
             set usrStatus = $$$ERROR($$$GeneralError,$$$OrasRequiresFlexiblePython)
             $$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))

@@ -11,6 +11,10 @@ Parameter LuneReqsOfflineLocation = "lune-wheel-reqs-offline";
 
 Parameter LuneNoWheelReqsOfflineLocation = "lune-no-wheel-reqs-offline";
 
+Parameter SharedNamespaceAlphaLocation = "shared-ns-wheel-alpha";
+
+Parameter SharedNamespaceBetaLocation = "shared-ns-wheel-beta";
+
 Parameter PackageWithPythonDepsLocation = "package-with-python-deps";
 
 Parameter ExportPackageWithPythonDepsLocation = "export-package-with-python-deps";
@@ -89,7 +93,6 @@ ClassMethod DeletePattern(
 ClassMethod PurgePythonPackage(name As %String)
 {
     set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
-    zwrite target
     // common layouts
     //   <target>/<name>/
     //   <target>/<name>-<ver>.dist-info/
@@ -126,6 +129,39 @@ Method TestWheelPresent()
     } catch ex {
         do $$$AssertFailure("Failed to import lune-wheel resource: "_ex.AsStatus())
     }
+}
+
+/// Two wheels whose contents share one top-level directory name, a namespace package.
+/// The second wheel's module reaches mgr/python even though the directory holding it is already there.
+Method TestWheelInstallsIntoSharedTopLevelDirectory()
+{
+    set alphaDir = ..GetModuleDir("python-deps-tests", ..#SharedNamespaceAlphaLocation)
+    set betaDir = ..GetModuleDir("python-deps-tests", ..#SharedNamespaceBetaLocation)
+    do ..PurgeSharedNamespacePackages()
+
+    // Construct rather than NormalizeFilename: the paths are built while ipm_shared_ns is purged,
+    // and NormalizeFilename returns "" for a directory that does not exist
+    set pythonDir = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
+    set alphaModule = ##class(%File).Construct(pythonDir, "ipm_shared_ns", "alpha.py")
+    set betaModule = ##class(%File).Construct(pythonDir, "ipm_shared_ns", "beta.py")
+
+    set sc = ##class(%IPM.Main).Shell("load -v " _ alphaDir)
+    do $$$AssertStatusOK(sc, "Successfully installed shared-ns-wheel-alpha")
+    do $$$AssertTrue(##class(%File).Exists(alphaModule), "First wheel installed "_alphaModule)
+
+    set sc = ##class(%IPM.Main).Shell("load -v " _ betaDir)
+    do $$$AssertStatusOK(sc, "Successfully installed shared-ns-wheel-beta")
+    do $$$AssertTrue(##class(%File).Exists(betaModule), "Second wheel installed "_betaModule)
+
+    do ..PurgeSharedNamespacePackages()
+}
+
+/// Remove the shared namespace package directory and the dist-info of each shared namespace wheel
+ClassMethod PurgeSharedNamespacePackages()
+{
+    do ..PurgePythonPackage("ipm_shared_ns")
+    do ..PurgePythonPackage("ipm_ns_alpha")
+    do ..PurgePythonPackage("ipm_ns_beta")
 }
 
 /// Testing case where Python wheel and requirements.txt is present. System connected to Internet.

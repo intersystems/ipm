@@ -139,7 +139,14 @@ ClassMethod MapIfLegacy()
 ClassMethod InstallORASIfMissing()
 {
     if ..ValidatePythonRuntime() {
-        if '..ORASInstalled() {
+        try {
+            set installed = ..ORASInstalled()
+        } catch e {
+            // A wheel install cannot succeed while the packages are unreadable, so report rather than reinstall
+            set installed = 1
+            write !!,"WARNING: Unable to check whether the ORAS Python components are installed. Not all IPM features will be available. "_e.DisplayString(),!
+        }
+        if 'installed {
             // Need to run in a background process to pick up new %IPM.Storage.Module definition
             write !,"Installing ORAS Python components..."
             job ..InitializeAndSignal()
@@ -187,7 +194,7 @@ ClassMethod ORASInstalled() [ Language = python ]
   try:
     import oras
     return True
-  except:
+  except ImportError:
     return False
 }
 

@@ -46,20 +46,10 @@ Method OnPhase(
             write !,"Installing wheel package """_wheel_"""..."
         }
 
-        set pipCaller = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.pParams)
         set target = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
-        set command = pipCaller _ $listbuild("install", wheel, "-t", target) _ $listfromstring(..ExtraPipFlags, " ")
-        if verbose {
-            write !,"Running command: ",command
-        }
-        set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
-        if explicitQuiet {
-            // Redirect pip stdout/stderr to a sink stream so subprocess output doesn't bypass device suppression
-            set pipOutput = ##class(%Stream.TmpCharacter).%New()
-            $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommand(, command, .pipOutput, .pipOutput))
-        } else {
-            $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommand(, command))
-        }
+        set quiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
+        set pipArgs = $listbuild("install", wheel) _ $listfromstring(..ExtraPipFlags, " ")
+        $$$ThrowOnError(##class(%IPM.Utils.Module).StagedPipInstall(pipArgs, target, quiet, verbose, , 1, .pParams))
     } catch ex {
         set pResourceHandled = 0
         // Special case: we want the installation of IPM to continue, even if the wheel package fails to install
