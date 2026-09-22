@@ -24,9 +24,22 @@ Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
 
 Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
 {
-    set tModule = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..Root,pModuleReference.Name,pModuleReference.VersionString,,.tStatus)
-    $$$ThrowOnError(tStatus)
-    quit tModule.Manifest
+    // Use validated open to ensure cache is fresh
+    set module = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..Root, pModuleReference.Name, pModuleReference.VersionString, , .status)
+    $$$ThrowOnError(status)
+
+    // Lazy load manifest if not already populated (ManifestLoaded=0)
+    // This defers expensive XML parsing until manifest is actually needed
+    if 'module.ManifestLoaded {
+        // Reconstruct file path
+        set dirPath = ##class(%File).NormalizeFilename(module.SubDirectory, module.Root)
+        set filePath = ##class(%File).NormalizeFilename("module.xml", dirPath)
+
+        set status = ##class(%IPM.Repo.Filesystem.Definition).LoadManifestForCacheEntry(module, filePath)
+        $$$ThrowOnError(status)
+    }
+
+    quit module.Manifest
 }
 
 Method GetModule(
@@ -47,11 +60,11 @@ Method GetModule(
 
 Method GetModuleDirectory(pModuleReference As %IPM.Storage.ModuleInfo) As %String
 {
-    // Get the module ...
-    set tModule = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpen(..Root,pModuleReference.Name,pModuleReference.VersionString,,.tStatus)
-    $$$ThrowOnError(tStatus)
+    // Use validated open to ensure cache is fresh
+    set module = ##class(%IPM.Repo.Filesystem.Cache).RootNameVersionOpenValidated(..Root, pModuleReference.Name, pModuleReference.VersionString, , .status)
+    $$$ThrowOnError(status)
 
-    quit ##class(%File).NormalizeDirectory(tModule.Root_tModule.SubDirectory)
+    quit ##class(%File).NormalizeDirectory(module.Root_module.SubDirectory)
 }
 
 /// Returns 1 if the service supports a particular method.
