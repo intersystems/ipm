@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="deptree-stable.ZPM">
+    <Module>
+      <Name>deptree-stable</Name>
+      <Version>2.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Dependencies>
+        <ModuleReference>
+          <Name>deptree-extra</Name>
+          <Version>1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+      <Resource Name="DepTree.Stable.CLS" />
+      <Resource Name="DepTree.StableSteps.PKG" />
+      <UpdatePackage>DepTree.StableSteps</UpdatePackage>
+    </Module>
+  </Document>
+</Export>

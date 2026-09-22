@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="module-with-ns-relative-webapp.ZPM">
+    <Module>
+      <Name>module-with-ns-relative-webapp</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="NSWebApp.Main.CLS" />
+      <FileCopy Name="web/" Target="${cspdir}${namespaceLower}/nsapp/" />
+      <WebApplication Name="/csp/${namespaceLower}/nsapp" NameSpace="${namespace}" Path="${cspdir}${namespaceLower}/nsapp" Recurse="1" ServeFiles="1" AuthenticationMethods="32" IsNameSpaceDefault="0" MatchRoles=":${globalsDbRole}" />
+    </Module>
+  </Document>
+</Export>
