@@ -21,8 +21,11 @@ Property JSONFilePath As %String;
 /// Absolute path to the TXT log file
 Property TxtFilePath As %String;
 
-/// Starting Unix timestamp for this log
-Property Timestamp As %Integer;
+/// Unix timestamp marking the start time of logging
+Property TimeStampStart As %String;
+
+/// Unix timestamp marking the end time of logging
+Property TimeStampEnd As %String;
 
 /// The module object for this operation
 Property Module As %IPM.Storage.Module;
@@ -32,7 +35,7 @@ Property Module As %IPM.Storage.Module;
 /// @Argument module        The %IPM.Storage.Module object for version info
 Method InitializeLog(command As %String, module As %IPM.Storage.Module) As %Status
 {
-    set ..Timestamp = $zdatetime($horolog,-2)
+    set ..TimeStampStart = $zdatetime($horolog,-2)
     set ..Command = command
     set ..Module = module
 
@@ -46,7 +49,7 @@ Method InitializeLog(command As %String, module As %IPM.Storage.Module) As %Stat
         $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
 
         // Set file paths with timestamp
-        set baseFileName = command _ "_" _ module.Name _ "_" _ ..Timestamp
+        set baseFileName = command _ "_" _ module.Name _ "_" _ ..TimeStampStart
         set ..JSONFilePath = logDir _ baseFileName _ ".jsonl"
         set ..TxtFilePath = logDir _ baseFileName _ ".txt"
 
@@ -66,6 +69,7 @@ Method InitializeLog(command As %String, module As %IPM.Storage.Module) As %Stat
 
         // Write the JSON Lines header as the first record; subsequent lines are log entries.
         set header = ##class(%DynamicObject).%New()
+        // TODO: Replace hardcoded schema path with global IPM log schema setting
         do header.%Set("$schema", "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/1.0.0")
         set header.ipm = ipmVersion
         set header.command = command
