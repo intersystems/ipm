@@ -30,11 +30,13 @@ Property TimeStampEnd As %String;
 /// The module object for this operation
 Property Module As %IPM.Storage.Module;
 
+Property SchemaVersion As %String [InitialExpression = "1.0.0"];
+
 /// Initialize log files and write headers.
-/// @Argument command       Full command passed into the shell (e.g., "install package-name 1.2.0 -quiet -force")
-/// @Argument module        The %IPM.Storage.Module object for version info
-/// @Argument commandName   The name of the command being logged (e.g., "install", "load", "update", "uninstall")
-Method InitializeLog(fullCommand As %String, module As %IPM.Storage.Module, commandName As %String ) As %Status
+/// @Argument fullCommand           The full shell command as entered by the user
+/// @Argument ByRef commandInfo     Contains the parsed shell command (for format, see output of ##class(%IPM.CLI).%ParseCommandInput())
+/// @Argument module                The %IPM.Storage.Module object for version info
+Method InitializeLog(fullCommand As %String, ByRef commandInfo, module As %IPM.Storage.Module) As %Status
 {
     set ..TimeStampStart = $zdatetime($horolog,-2)
     // TO-DO: obfuscate sensitive information like credentials in the command before logging
@@ -51,7 +53,7 @@ Method InitializeLog(fullCommand As %String, module As %IPM.Storage.Module, comm
         $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
 
         // Set file paths with timestamp
-        set baseFileName = commandName _ "_" _ module.Name _ "_" _ ..TimeStampStart
+        set baseFileName = commandInfo _ "_" _ module.Name _ "_" _ ..TimeStampStart
         set ..JSONFilePath = logDir _ baseFileName _ ".jsonl"
         set ..TxtFilePath = logDir _ baseFileName _ ".txt"
 
@@ -63,18 +65,16 @@ Method InitializeLog(fullCommand As %String, module As %IPM.Storage.Module, comm
         set txtStream = ##class(%Stream.FileCharacter).%New()
         set txtStream.Filename = ..TxtFilePath
         do txtStream.WriteLine("IPM Version: " _ ipmVersion)
-        // TODO: Replace hardcoded schema version with global IPM log schema setting
-        do txtStream.WriteLine("Schema Version: 1.0.0")
-        do txtStream.WriteLine("Command: " _ fullCommand)
+        do txtStream.WriteLine("Command: " _ ..Command)
         do txtStream.WriteLine("")
         $$$ThrowOnError(txtStream.%Save())
 
         // Write the JSON Lines header as the first record; subsequent lines are log entries.
         set header = ##class(%DynamicObject).%New()
         // TODO: Replace hardcoded schema path with global IPM log schema setting
-        do header.%Set("$schema", "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/1.0.0")
+        do header.%Set("$schema", "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/" _ ..SchemaVersion)
         set header.ipm = ipmVersion
-        set header.command = fullCommand
+        set header.command = ..Command
 
         set jsonStream = ##class(%Stream.FileCharacter).%New()
         set jsonStream.Filename = ..JSONFilePath
