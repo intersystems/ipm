@@ -1124,6 +1124,8 @@ ClassMethod ShellInternal(
 
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
+            // Process-private, so clear it once acted on to keep later shells in this process working.
+            kill ^||%IPM.SelfUninstallFlag
             write !,!,$$$FormattedLine($$$Yellow, "IPM has been uninstalled from this namespace. Exiting shell..."),!
             return
         }
@@ -2662,29 +2664,27 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
 
-            // Check if other modules are installed
-            set hasModules = 0
+            // List the other modules that a full cleanup would remove
             set rs = ##class(%SQL.Statement).%ExecDirect(,
                 "SELECT Name, VersionString FROM %IPM_Storage.ModuleItem WHERE Name != ?",
                 $$$IPMModuleName)
-            if rs.%Next() {
-                set hasModules = 1
+            $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
 
-                // Show list of installed modules
-                write !,"The following modules are currently installed:"
+            set hasModules = 0
+            while rs.%Next(.sc) {
+                if 'hasModules {
+                    write !,"The following modules are currently installed:"
+                    set hasModules = 1
+                }
                 write !,"  - ",rs.Name," (",rs.VersionString,")"
-                while rs.%Next() {
-                    write !,"  - ",rs.Name," (",rs.VersionString,")"
-                }
-                write !
+            }
+            $$$ThrowOnError(sc)
+            write:hasModules !
 
-                if 'tForce {
-                    // Dialog: Ask about full cleanup (downgrade scenario)
-                    write !,"Do you want to fully remove all modules and IPM metadata (except history log)?"
-                    write !,"This is required for downgrading IPM. [y/N]: "
-                    read fullCleanupResponse
-                    set tParams("Clean","FullCleanup") = $case($zconvert(fullCleanupResponse,"L"),"y":1,"yes":1,:0)
-                }
+            if 'tForce {
+                set tFullCleanup = 0
+                do ##class(%Library.Prompt).GetYesNo("Do you want to fully remove all modules and IPM metadata (except history log)? This is required for downgrading IPM.", .tFullCleanup)
+                set tParams("Clean","FullCleanup") = tFullCleanup
             }
 
             if $get(tParams("Clean","FullCleanup")) {
@@ -2693,7 +2693,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
                 $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
             }
 
-            // Set flag to indicate self-uninstall - will be checked by Interactive() loop
+            // Set flag to indicate self-uninstall - will be checked by ShellInternal() loop
             set ^||%IPM.SelfUninstallFlag = 1
         }
         set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
