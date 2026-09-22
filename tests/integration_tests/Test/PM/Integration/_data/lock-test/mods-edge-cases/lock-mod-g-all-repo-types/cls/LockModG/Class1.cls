@@ -5,10 +5,10 @@ ClassMethod MethodA()
 {
     write !, "This is ##class(LockModG.Class1).MethodA()"
 
-    write !, "Now calling dependency classes (LockModRemote, LockModORAS, LockModC)"
+    write !, "Now calling dependency classes (LockModB, LockModRemote, LockModORAS)"
+    do ##class(LockModB.Class1).MethodA()
     do ##class(LockModRemote.Class1).MethodA()
     do ##class(LockModORAS.Class1).MethodA()
-    do ##class(LockModC.Class1).MethodA()
 }
 
 }
