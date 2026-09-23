@@ -250,7 +250,8 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
         set tOrigNS = $namespace
         set dbDir = $$$defdir
         new $namespace
-        set $namespace="%SYS"
+        $$$SuspendRedirection(redirect)
+        set $namespace = "%SYS"
 
         // Map properties of this object (inherited from %Installer.CSPApplication) to subscripts of tProperties
         // In other cases, the default mapping is accepted.
@@ -378,6 +379,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
     } catch ex {
         set tSC = ex.AsStatus()
     }
+    $$$RestoreRedirection(redirect)
     quit tSC
 }
 

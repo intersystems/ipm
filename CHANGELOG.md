@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
+- #1213: Add a `-log-file` modifier to every command, writing a plain-text copy of session output to the given file while still showing it on the terminal. A bare filename resolves under the new `LogDirectory` setting. Set the new `AutoLog` setting to 1 to log every shell session automatically.
 
 ### Changed
 - Minimum supported Python version is now 3.9

@@ -1,3 +1,5 @@
+Include %IPM.Formatting
+
 /// IPM settings are placed in ^IPM.settings global in %SYS namespace
 /// Use this class to set or get settings
 ///
@@ -50,7 +52,16 @@ Parameter TestReportFormat = "TestReportFormat";
 
 Parameter ModuleRoot = "ModuleRoot";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot";
+/// Directory holding `-log-file` logs given as a bare filename, AutoLog session logs,
+/// and CPF merge logs.
+Parameter LogDirectory = "LogDirectory";
+
+/// Possible values: "", 0, 1
+/// When 1, every shell session is logged to a file under <parameter>LogDirectory</parameter>.
+/// Read once when the shell starts, so a change applies to the next shell session.
+Parameter AutoLog = "AutoLog";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot,LogDirectory,AutoLog";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -97,6 +108,12 @@ ClassMethod ResetToDefault(key As %String) As %Status
     } elseif key = ..#ModuleRoot {
         // Computed directly rather than read from storage — older IPM versions did not seed this default node
         set defaultValue = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
+    } elseif key = ..#LogDirectory {
+        // Derived from the instance data directory rather than stored
+        set defaultValue = ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/logs/")
+    } elseif key = ..#AutoLog {
+        // No factory default; empty string means AutoLog is disabled
+        set defaultValue = ""
     } else {
         set defaultValue = ..GetDefaultValue($parameter(..%ClassName(1),key))
     }
@@ -130,11 +147,22 @@ ClassMethod UpdateOne(
                 }
                 set value = ##class(%File).NormalizeDirectory(value)
                 do ..EnsureWritableDirectory(value)
+            } elseif key = ..#LogDirectory {
+                if value = "" {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError, "LogDirectory cannot be empty"))
+                }
+                set value = ##class(%File).NormalizeDirectory(value)
+                do ..EnsureWritableDirectory(value)
+            } elseif key = ..#AutoLog {
+                if '$listfind($lb("","0","1"), value) {
+                    $$$ThrowOnError($$$ERROR($$$GeneralError, "AutoLog must be 0 or 1"))
+                }
             }
             set sc = ..SetValue($parameter(..%ClassName(1),key), value)
         }
         if $$$ISOK(sc) {
             write !,"Key """_key_""" succesfully updated",!
+            do ..WarnLoggingUnchanged(key, value)
         } else {
             write !,$system.Status.GetErrorText(sc),!
         }
@@ -143,6 +171,29 @@ ClassMethod UpdateOne(
         write !,$system.Status.GetErrorText(sc),!
     }
     return sc
+}
+
+/// Warns that a new AutoLog or LogDirectory value will not change how the running shell
+/// logs, since both are read once when the shell starts. Silent when the new value
+/// matches what the session is already doing.
+ClassMethod WarnLoggingUnchanged(
+	key As %String,
+	value As %String) [ Internal, Private ]
+{
+    set active = ##class(%IPM.General.OutputLog).IsActive()
+    if key = ..#AutoLog {
+        if +value = active {
+            return
+        }
+    } elseif key = ..#LogDirectory {
+        if 'active && '..GetAutoLog() {
+            return
+        }
+    } else {
+        return
+    }
+    write !,$$$FormattedLine($$$Yellow,"This takes effect in your next IPM shell session; logging for the current one is unchanged."),!
+    write "Use the -log-file modifier to log a single command in this session.",!
 }
 
 /// Gets value from global array
@@ -249,6 +300,22 @@ ClassMethod GetModuleRoot() As %String
         return ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/")
     }
     return value
+}
+
+/// Returns the configured LogDirectory. Falls back to an ipm/logs/ subdirectory under the IRIS data directory if not set.
+ClassMethod GetLogDirectory() As %String
+{
+    set value = ..GetValue(..#LogDirectory)
+    if value = "" {
+        return ##class(%File).NormalizeDirectory(##class(%SYSTEM.Util).DataDirectory() _ "ipm/logs/")
+    }
+    return value
+}
+
+/// Returns the AutoLog setting. Returns 1 if enabled, 0 otherwise.
+ClassMethod GetAutoLog() As %Boolean
+{
+    return +..GetValue(..#AutoLog)
 }
 
 /// Expects a normalized directory path (caller must call NormalizeDirectory first).

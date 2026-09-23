@@ -1,4 +1,4 @@
-Include (%occErrors, %occOptions, %syPrompt)
+Include (%occErrors, %occOptions, %syPrompt, %IPM.Common)
 
 Class %IPM.Utils.Build
 {
@@ -162,9 +162,12 @@ ClassMethod PrepareDatabase(
 	pDBName As %String,
 	pVerbose As %Boolean = 1) As %Status
 {
-    new $namespace
     set tSC = $$$OK
     try {
+        // CompactDatabase() below is handed $io and writes its own progress from inside the
+        // excursion, so suspending redirection covers callee output as well as the writes here.
+        new $namespace
+        $$$SuspendRedirection(redirect)
         set $namespace = "%SYS"
 
         set tDB = ##class(Config.Databases).Open(pDBName,,.tSC)
@@ -191,6 +194,7 @@ ClassMethod PrepareDatabase(
     } catch e {
         set tSC = e.AsStatus()
     }
+    $$$RestoreRedirection(redirect)
     quit tSC
 }
 
@@ -440,10 +444,11 @@ ClassMethod DeleteNamespace(
 	pNSName As %String,
 	pVerbose As %Boolean = 0) As %Status
 {
-    new $namespace
     set tFinalStatus = $$$OK
     try {
-    if pVerbose write !,"Deleting namespace: " _ pNSName
+        if pVerbose write !,"Deleting namespace: " _ pNSName
+        new $namespace
+        $$$SuspendRedirection(redirect)
         set $namespace = "%SYS"
         set tLowerName = $zconvert(pNSName,"L")
         // The csp directory is lower case on unix but upper case on windows
@@ -507,6 +512,7 @@ ClassMethod DeleteNamespace(
     } catch e {
         set tFinalStatus = $$$ADDSC(tFinalStatus,e.AsStatus())
     }
+    $$$RestoreRedirection(redirect)
     quit tFinalStatus
 }
 
@@ -725,7 +731,6 @@ ClassMethod CleanBuild(
 
 ClassMethod Backup() As %Status [ Internal ]
 {
-    new $namespace
     set tSC = $$$OK
     set tFrozen = 0
     try {
@@ -735,6 +740,8 @@ ClassMethod Backup() As %Status [ Internal ]
         kill %objlasterror
         set tSC = ##class(%IPM.Utils.File).CreateDirectoryChain(tTargetDir)
         $$$ThrowOnError(tSC)
+        new $namespace
+        $$$SuspendRedirection(redirect)
         set $namespace = "%SYS"
         write !,"Freezing writes..."
         set tSC = ##class(Backup.General).ExternalFreeze()
@@ -757,6 +764,7 @@ ClassMethod Backup() As %Status [ Internal ]
         set $namespace = "%SYS"
         set tSC = $$$ADDSC(tSC,##class(Backup.General).ExternalThaw())
     }
+    $$$RestoreRedirection(redirect)
     quit tSC
 }
 
