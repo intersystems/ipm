@@ -49,7 +49,7 @@ Method OnPhase(
         set target = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
         set quiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
         set pipArgs = $listbuild("install", wheel) _ $listfromstring(..ExtraPipFlags, " ")
-        $$$ThrowOnError(##class(%IPM.Utils.Module).StagedPipInstall(pipArgs, target, quiet, verbose, , 1, .pParams))
+        $$$ThrowOnError(##class(%IPM.Utils.Module).PipInstall(pipArgs, target, quiet, verbose, , .pParams))
     } catch ex {
         set pResourceHandled = 0
         // Special case: we want the installation of IPM to continue, even if the wheel package fails to install
