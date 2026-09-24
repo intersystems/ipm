@@ -658,4 +658,49 @@ Method TestSortListVersionPrerelease()
     do $$$AssertEquals($listget(sorted(6),1), "snap", "version desc: snap (1.0.0-SNAPSHOT)")
 }
 
+Method TestLocateCommand()
+{
+    set ipmModule = ##class(%IPM.Storage.Module).NameOpen("zpm",,.sc)
+    do $$$AssertStatusOK(sc, "Opened zpm module to get version")
+    set ipmVersion = ipmModule.VersionString
+
+    do $$$LogMessage("Testing locate-resource with .inc resource")
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set status = ##class(%IPM.Main).Shell("locate-resource %IPM.Common.inc")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(status, "locate-resource %IPM.Common.inc executed successfully")
+    set content = ""
+    set i = ""
+    for {
+        set i = $order(output(i))
+        quit:i=""
+        set content = content _ output(i) _ $char(10)
+    }
+    do $$$AssertTrue(content [ "zpm", "output contains module name 'zpm'")
+    do $$$AssertTrue(content [ ipmVersion, "output contains IPM version "_ipmVersion)
+
+    do $$$LogMessage("Testing locate-resource with .cls resource")
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set status = ##class(%IPM.Main).Shell("locate-resource %IPM.Main.cls")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(status, "locate-resource %IPM.Main.cls executed successfully")
+    set content = ""
+    set i = ""
+    for {
+        set i = $order(output(i))
+        quit:i=""
+        set content = content _ output(i) _ $char(10)
+    }
+    do $$$AssertTrue(content [ "zpm", "output contains module name 'zpm'")
+    do $$$AssertTrue(content [ ipmVersion, "output contains IPM version "_ipmVersion)
+
+    do $$$LogMessage("Testing locate-resource with non-existing resource")
+    set status = ..RunCommand("locate-resource Test.Sample.inc")
+    do $$$AssertStatusOK(status, "Gracefully handled non-existing resource")
+
+    do $$$LogMessage("Testing locate-resource without required argument")
+    set status = ..RunCommand("locate-resource")
+    do $$$AssertStatusNotOK(status, "Handled missing argument")
+}
+
 }
