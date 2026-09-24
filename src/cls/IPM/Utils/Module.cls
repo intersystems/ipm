@@ -2506,6 +2506,11 @@ ClassMethod ResetProtectedPermissions(
         // Find the entries with a protected ACL
         // With /C, an entry this process cannot read fails on its own and the others are still listed, so reset those regardless.
         set sc = ..RunCommand(, $listbuild("icacls", ##class(%File).NormalizeFilename("*", directory), "/save", aclFile, "/C", "/Q"), .output)
+        // Only when verbose, since /T below can fail on every file in a package
+        if $$$ISERR(sc) && verbose {
+            write !
+            do output.OutputToDevice()
+        }
 
         // /save writes each entry as a line with its name, then a line with its ACL in SDDL, such as "D:P(A;OICI;FA;;;SY)...", whatever the system language
         set aclStream = ##class(%Stream.FileCharacter).%New()
@@ -2525,13 +2530,19 @@ ClassMethod ResetProtectedPermissions(
             set entry = ##class(%File).NormalizeFilename(name, directory)
             write:verbose !,"Resetting permissions of ",entry
             // /reset replaces the ACL with the inherited one, /T does the same for everything under entry, and /C carries on past any that fail
-            set sc = $$$ADDSC(sc, ..RunCommand(, $listbuild("icacls", entry, "/reset", "/T", "/C", "/Q"), .output))
+            set resetStatus = ..RunCommand(, $listbuild("icacls", entry, "/reset", "/T", "/C", "/Q"), .output)
+            if $$$ISERR(resetStatus) && verbose {
+                write !
+                do output.OutputToDevice()
+            }
+            set sc = $$$ADDSC(sc, resetStatus)
         }
     } catch ex {
         set sc = $$$ADDSC(sc, ex.AsStatus())
     }
     // Release the file before deleting it
     set aclStream = ""
+    // Result ignored, since a leftover temp file is harmless
     do ##class(%File).Delete(aclFile)
     $$$ThrowOnError(sc)
 }
