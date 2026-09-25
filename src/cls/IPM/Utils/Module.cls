@@ -2430,24 +2430,19 @@ ClassMethod RunCommand(
     quit tSC
 }
 
-/// Runs <code>pip install</code> into a staging directory, then copies the result into <var>target</var>.
-/// <var>pipArgs</var> is the argument $list following the pip caller; <code>-t &lt;staging&gt;</code> is appended to it.
-/// With <var>replaceExisting</var>, a top-level entry of <var>target</var> named like one pip staged is
-/// deleted before the copy; otherwise the staged entry is dropped and the installed one kept.
-ClassMethod StagedPipInstall(
+/// Runs `pip install` into target. pipArgs is the argument $list following
+/// the pip caller, starting with "install"; -t is inserted after it, so a -t
+/// in pipArgs takes precedence.
+ClassMethod PipInstall(
 	pipArgs As %List,
 	target As %String,
 	quiet As %Boolean = 0,
 	verbose As %Boolean = 0,
 	cwd As %String = "",
-	replaceExisting As %Boolean = 1,
 	ByRef params) As %Status
 {
-    set staging = ""
     set sc = $$$OK
     try {
-        set staging = ##class(%IPM.Utils.File).CreateTempDirectory()
-
         // A trailing or repeated space in a flag string yields an empty argument, which pip rejects as a requirement
         set args = ""
         for i = 1:1:$listlength(pipArgs) {
@@ -2455,7 +2450,8 @@ ClassMethod StagedPipInstall(
             set:arg'="" args = args _ $listbuild(arg)
         }
 
-        set command = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.params) _ args _ $listbuild("-t", staging)
+        set args = $listbuild($listget(args, 1), "-t", target) _ $list(args, 2, *)
+        set command = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.params) _ args
         if verbose {
             write !,"Running "
             zwrite command
@@ -2476,80 +2472,79 @@ ClassMethod StagedPipInstall(
             $$$ThrowOnError(..RunCommand(cwd, command))
         }
 
-        do ..ResolveStagedEntries(staging, target, replaceExisting)
-
-        // Copying rather than moving lets the entries inherit the permissions of the target instead of the staging directory's
-        set copyStatus = ##class(%IPM.Utils.File).CopyDir(staging, target, 0, verbose)
-        if $$$ISERR(copyStatus) {
-            set copyError = $$$ERROR($$$GeneralError, $$$FormatText("Error copying staged Python packages into %1. Any package being replaced may be left partially installed.", target))
-            $$$ThrowStatus($$$EMBEDSC(copyError, copyStatus))
+        // On Windows, pip stages the install in a directory Python creates with a protected ACL, and each entry it moves into target keeps that ACL
+        if $$$isWINDOWS {
+            try {
+                do ..ResetProtectedPermissions(target, verbose)
+            } catch ex {
+                write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: Unable to reset the permissions of Python packages in %1. They may be unreadable to other users. %2", target, ex.DisplayString())),!
+            }
         }
     } catch ex {
         set sc = ex.AsStatus()
     }
-
-    if (staging '= "") {
-        set cleanupStatus = ##class(%IPM.Utils.File).RemoveDirectoryTree(staging)
-        if $$$ISERR(cleanupStatus) {
-            set sc = $$$ADDSC(sc, cleanupStatus)
-        }
-    }
     quit sc
 }
 
-/// Deletes the losing side of each name shared by a top-level entry of <var>staging</var> and one of
-/// <var>target</var>, leaving the copy out of <var>staging</var> with no collision to resolve.
-ClassMethod ResolveStagedEntries(
-	staging As %String,
-	target As %String,
-	replaceExisting As %Boolean = 1) [ Internal ]
+/// Makes each top-level entry of directory that has a protected ACL, and everything under it,
+/// inherit its permissions from directory. Windows only.
+/// Resetting every entry takes seconds on each pip install into a large directory, so only the protected entries are reset.
+ClassMethod ResetProtectedPermissions(
+	directory As %String,
+	verbose As %Boolean = 0) [ Internal ]
 {
-    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)", staging, "*", "", 1)
-    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-    while rs.%Next(.sc) {
-        $$$ThrowOnError(sc)
-        set stagedEntry = rs.%Get("Name")
-        set name = ##class(%File).GetFilename(stagedEntry)
-        // An empty name would resolve to the target itself, and deleting that takes every package with it
-        continue:(name = "")
-        continue:..IsSharedPipEntry(name)
-
-        set installedEntry = ##class(%File).Construct(target, name)
-        if '##class(%File).DirectoryExists(installedEntry), '##class(%File).Exists(installedEntry) {
-            continue
-        }
-        if replaceExisting {
-            do ..RemoveFileOrDirectory(installedEntry)
-        } else {
-            write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: '%1' is already installed in %2. Keeping the installed one.", name, target)),!
-            do ..RemoveFileOrDirectory(stagedEntry)
-        }
+    // An empty directory would list and reset the process's current directory instead
+    if (directory = "") || '##class(%File).DirectoryExists(directory) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Directory does not exist: " _ directory))
     }
-}
+    set aclFile = ##class(%File).TempFilename("txt")
+    set sc = $$$OK
+    try {
+        // Keep icacls' progress messages out of the terminal. /Q drops the line per file, which /reset /T would write for every file in a package.
+        set output = ##class(%Stream.TmpCharacter).%New()
 
-/// Whether <var>name</var> is a top-level entry <code>pip install -t</code> creates for its own
-/// bookkeeping rather than for one distribution. Every wheel carrying a console script writes into
-/// the same <code>bin</code>, so these are merged instead of replaced.
-ClassMethod IsSharedPipEntry(name As %String) As %Boolean [ Internal ]
-{
-    quit $listfind($listbuild("bin", "scripts", "__pycache__"), $zconvert(name, "L")) > 0
-}
+        // Find the entries with a protected ACL
+        // With /C, an entry this process cannot read fails on its own and the others are still listed, so reset those regardless.
+        set sc = ..RunCommand(, $listbuild("icacls", ##class(%File).NormalizeFilename("*", directory), "/save", aclFile, "/C", "/Q"), .output)
+        // Only when verbose, since /T below can fail on every file in a package
+        if $$$ISERR(sc) && verbose {
+            write !
+            do output.OutputToDevice()
+        }
 
-/// Deletes <var>path</var>, whether it names a file or a directory tree. A symlink to a directory is
-/// followed, so the tree it points at is what gets deleted.
-ClassMethod RemoveFileOrDirectory(path As %String) [ Internal ]
-{
-    if ##class(%File).DirectoryExists(path) {
-        $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(path))
-        // RemoveDirectoryTree can report success with the directory still there, and a surviving directory keeps its permissions
-        if ##class(%File).DirectoryExists(path) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Error removing directory " _ path))
+        // /save writes each entry as a line with its name, then a line with its ACL in SDDL, such as "D:P(A;OICI;FA;;;SY)...", whatever the system language
+        set aclStream = ##class(%Stream.FileCharacter).%New()
+        set aclStream.TranslateTable = "UnicodeLittle"
+        // icacls ends lines with CRLF, whatever the system default for streams is
+        set aclStream.LineTerminator = $char(13,10)
+        $$$ThrowOnError(aclStream.LinkToFile(aclFile))
+        while 'aclStream.AtEnd {
+            set name = aclStream.ReadLine()
+            set sddl = aclStream.ReadLine()
+            // An empty name would resolve to directory itself
+            continue:(name = "")
+            // The flags between "D:" and the first ACE include "P" when the ACL is protected from inheritance
+            continue:($piece($piece(sddl, "D:", 2), "(") '[ "P")
+
+            // Reset the protected entry
+            set entry = ##class(%File).NormalizeFilename(name, directory)
+            write:verbose !,"Resetting permissions of ",entry
+            // /reset replaces the ACL with the inherited one, /T does the same for everything under entry, and /C carries on past any that fail
+            set resetStatus = ..RunCommand(, $listbuild("icacls", entry, "/reset", "/T", "/C", "/Q"), .output)
+            if $$$ISERR(resetStatus) && verbose {
+                write !
+                do output.OutputToDevice()
+            }
+            set sc = $$$ADDSC(sc, resetStatus)
         }
-    } elseif ##class(%File).Exists(path) {
-        if '##class(%File).Delete(path, .osErr) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Error deleting " _ path _ ": " _ $zutil(209, osErr)))
-        }
+    } catch ex {
+        set sc = $$$ADDSC(sc, ex.AsStatus())
     }
+    // Release the file before deleting it
+    set aclStream = ""
+    // Result ignored, since a leftover temp file is harmless
+    do ##class(%File).Delete(aclFile)
+    $$$ThrowOnError(sc)
 }
 
 ClassMethod GetFilename4Output(

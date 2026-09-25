@@ -790,8 +790,7 @@ Method InstallOrDownloadPythonRequirements(
             do ..Log(processType _ " START")
             write:tVerbose !
             set pipArgs = $listbuild("install", "-r", "requirements.txt", "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
-            // A package already installed in the target is kept, so a module's requirements cannot change the version other code gets
-            set tSC = ##class(%IPM.Utils.Module).StagedPipInstall(pipArgs, target, 'tVerbose, tVerbose, pRoot, 0, .pParams)
+            set tSC = ##class(%IPM.Utils.Module).PipInstall(pipArgs, target, 'tVerbose, tVerbose, pRoot, .pParams)
             $$$ThrowOnError(tSC)
         }
         do ..Log(processType _ " SUCCESS")
