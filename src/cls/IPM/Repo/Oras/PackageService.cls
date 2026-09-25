@@ -403,7 +403,7 @@ ClassMethod GetClient(
 	tokenAuthMethod As %String) As %SYS.Python
 {
     try {
-        set orasProvider = ##class(%SYS.Python).Import("oras.provider")
+        set orasProvider = ..ImportOrasProvider()
 
         set args = {}
         set args.hostname = registry
@@ -430,10 +430,10 @@ ClassMethod GetClient(
         }
     } catch e {
         // The same permission failure has been seen as both <SYNTAX> and <PYTHON EXCEPTION>, so match on the details rather than the name
-        // Python reports the path as it appeared in sys.path, whose case can differ from the manager directory's
         set details = $zconvert(e.DisplayString(), "L")
-        set pythonDir = $zconvert(##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory()), "L")
-        if (details [ "permissionerror") && (details [ pythonDir) {
+        set pythonDir = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
+        // Python reports the path as it appeared in sys.path, whose case can differ from the manager directory's
+        if ((details [ "permissionerror") && (details [ $zconvert(pythonDir, "L"))) || ((details [ "modulenotfounderror") && ..IsOrasUnreadable(pythonDir)) {
             set eStatus = e.AsStatus()
             set usrStatus = $$$ERROR($$$GeneralError,$$$OrasPythonPackagesUnreadable)
             $$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))
@@ -446,6 +446,43 @@ ClassMethod GetClient(
         }
     }
     return client
+}
+
+/// Imports oras.provider, retrying once if it is not found.
+/// A process that tried to import oras while it was unreadable keeps the result, so retrying lets a repaired installation work without a new process.
+ClassMethod ImportOrasProvider() As %SYS.Python [ Internal, Language = python ]
+{
+    import importlib
+    import sys
+
+    try:
+        return importlib.import_module("oras.provider")
+    except ModuleNotFoundError:
+        pass
+
+    for name in [name for name in sys.modules if (name == "oras") or name.startswith("oras.")]:
+        del sys.modules[name]
+    # Python caches each directory's listing, including the empty one it got for an unreadable directory
+    importlib.invalidate_caches()
+    return importlib.import_module("oras.provider")
+}
+
+/// Returns whether this process is denied access to the oras package in pythonDir.
+/// Python reports that as oras or one of its modules not being found, rather than as a PermissionError.
+ClassMethod IsOrasUnreadable(pythonDir As %String) As %Boolean [ Internal, Language = python ]
+{
+    import os
+
+    orasDir = os.path.join(pythonDir, "oras")
+    try:
+        os.listdir(orasDir)
+        with open(os.path.join(orasDir, "__init__.py"), "rb"):
+            pass
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return False
 }
 
 /// Pulls the specified module to disk and returns the module in tgz form as %Stream.FileBinary
