@@ -310,6 +310,8 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="output-log" dataAlias="LogFilePath" value="true" description="Directory to generate log files under." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -437,6 +439,8 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="output-log" dataAlias="LogFilePath" value="true" description="Directory to generate log files under." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 </command>
 
@@ -2373,11 +2377,20 @@ ClassMethod Sync(ByRef commandInfo) [ Private ]
     }
 }
 
-
 ClassMethod Load(
 	ByRef pCommandInfo,
 	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
 {
+    if $$$HasData(pCommandInfo,"NoLog") && $$$HasData(pCommandInfo, "LogFilePath") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Modifiers -no-log and -output-log contradict each other and can't both be used at the same time"))
+    }
+    set logFile = ""
+    if '$$$GetDataDef(pCommandInfo, "NoLog", 0) {
+        set logFile = ##class(%IPM.General.LogManager).%New()
+        $$$ThrowOnError(logFile.InitializeLog($$$ZPMCommandToLog, .pCommandInfo))
+    }
+
+
 	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
     if pLog = "" {
 	    set log = ##class(%IPM.General.HistoryTemp).LoadInit("")
@@ -2385,11 +2398,15 @@ ClassMethod Load(
         set log = pLog
     }
 	try {
-		do ..LoadInternal(.pCommandInfo, log)
+		do ..LoadInternal(.pCommandInfo, log, logFile)
 	} catch Ex {
+        $$$LogLine(Ex.DisplayString(),, logFile, "ERROR")
 		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
 		throw Ex
 	}
+    if $isobject(logFile) {
+        do logFile.FinishLogFile()
+    }
 	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
@@ -2402,7 +2419,8 @@ ClassMethod ExecuteCOS(ByRef commandInfo)
 
 ClassMethod LoadInternal(
 	ByRef pCommandInfo,
-	pLog As %IPM.General.AbstractHistory) [ Internal ]
+	pLog As %IPM.General.AbstractHistory,
+	pLogFile As %IPM.General.LogManager = "") [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
     set isAbsolutePath = ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) = tDirectoryName)
@@ -2485,7 +2503,7 @@ ClassMethod LoadInternal(
 
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , pLog)
+    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams,, pLog, pLogFile)
     set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
     $$$ThrowOnError(tSC)
 }
@@ -2514,6 +2532,15 @@ ClassMethod Install(
 	ByRef pCommandInfo,
 	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
 {
+    if $$$HasData(pCommandInfo,"NoLog") && $$$HasData(pCommandInfo, "LogFilePath") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Modifiers -no-log and -output-log contradict each other and can't both be used at the same time"))
+    }
+    set logFile = ""
+    if '$$$GetDataDef(pCommandInfo, "NoLog", 0) {
+        set logFile = ##class(%IPM.General.LogManager).%New()
+        $$$ThrowOnError(logFile.InitializeLog($$$ZPMCommandToLog, .pCommandInfo))
+    }
+
     set devMode = $get(pCommandInfo("data","DeveloperMode"), 0)
     set tRegistry = ""
     set tModuleName = $get(pCommandInfo("parameters","module"))
@@ -2594,9 +2621,9 @@ ClassMethod Install(
                         $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
                     }
                 }
-				$$$ThrowOnError(log.SetSource(tResult.ServerName))
-				$$$ThrowOnError(log.SetVersion(tResult.Version))
-                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
+                $$$ThrowOnError(log.SetSource(tResult.ServerName))
+                $$$ThrowOnError(log.SetVersion(tResult.Version))
+                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log, logFile))
             }
         } else {
             set tPrefix = ""
@@ -2613,9 +2640,13 @@ ClassMethod Install(
             }
         }
     } catch ex {
+        $$$LogLine(ex.DisplayString(),, logFile, "ERROR")
 		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
 		throw ex
 	}
+    if $isobject(logFile) {
+        do logFile.FinishLogFile()
+    }
 	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
@@ -2967,7 +2998,9 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 /// append "-d" for descending (e.g. "n-d", "d-d", "v-d"). Default: ascending by name.
 /// List entries are $listbuild(label, versionString, externalName, developerMode, root, lastUpdated)
 /// where label may be "ExternalName (internalName)" (e.g. "IPM (zpm)").
-ClassMethod SortList(ByRef list, sortModeRaw As %String) [ Internal ]
+ClassMethod SortList(
+	ByRef list,
+	sortModeRaw As %String) [ Internal ]
 {
     set newlist = ""
     set ipmEntry = ""
@@ -4138,7 +4171,7 @@ ClassMethod ShellScript(
 	pCommand As %String,
 	pOutputLogFile As %String = "",
 	pAppendToLog As %Boolean = 0,
-    pTerminateOnError As %Boolean = 1) As %Status
+	pTerminateOnError As %Boolean = 1) As %Status
 {
     set tSC = $$$OK
     set tFileOpen = 0
