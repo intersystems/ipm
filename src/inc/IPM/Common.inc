@@ -42,10 +42,16 @@ ROUTINE %IPM.Common [Type=INC]
 #define ZPMLogWARNING	2
 #define ZPMLogERROR		3
 
+#; Log file tools
+#define LogLine(%line, %verbose, %file, %level) Do ##class(%IPM.General.LogManager).LogLine(%line, %verbose, %file, %level)
+
 #; System method/special variable wrappers
 #define InProgrammerMode ##class(%SYSTEM.Process).IsProgrammerMode()
 
 #; CLI tools
+#define HasData(%array,%x) ''$Data(%array("data",%x))
+#define GetData(%array,%x) $Get(%array("data",%x))
+#define GetDataDef(%array,%x,%y) $Get(%array("data",%x),%y)
 #define HasModifier(%array,%x) ''$Data(%array("modifiers",%x))
 #define GetModifier(%array,%x) $Get(%array("modifiers",%x))
 #define GetModifierDef(%array,%x,%y) $Get(%array("modifiers",%x),%y)
