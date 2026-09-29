@@ -192,7 +192,8 @@ ClassMethod ValidatePythonRuntime() As %Boolean
 ClassMethod ORASInstalled() [ Language = python ]
 {
   try:
-    import oras
+    # oras alone imports as an empty namespace package when its __init__.py is unreadable
+    import oras.provider
     return True
   except ImportError:
     return False
