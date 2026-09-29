@@ -2,6 +2,9 @@
 Class %IPM.Utils.File
 {
 
+/// Ceiling on how far <method>WalkDirectoriesSQL</method> will descend, well past any real source tree.
+Parameter MAXWALKDEPTH = 64;
+
 /// Create this directory and all the parent directories if they do not exist. This differs from
 /// <method>CreateDirectory</method> as that method only creates one new directory where as
 /// this will create the entire chain of directories. Returns true if it succeeds and false otherwise.
@@ -239,6 +242,300 @@ ClassMethod Exists(
         }
     }
     return 0
+}
+
+/// Normalize a relative path: forward slashes, collapse //, drop "." segments, strip leading slash.
+///
+/// Dot collapsing is what makes <SourcesRoot>.</SourcesRoot> work. Such a module composes resource
+/// paths as SourcesRoot_"/"_Directory, so a file arrives as "./cls/Foo.cls" while the directory walk
+/// keys it as "cls/Foo.cls". Both forms reduce to one here so the sync reverse index matches.
+ClassMethod NormalizePath(path As %String) As %String
+{
+    set path = $translate(path, "\", "/")
+    while path [ "//" {
+        set path = $replace(path, "//", "/")
+    }
+    while path [ "/./" {
+        set path = $replace(path, "/./", "/")
+    }
+    while $extract(path) = "/" {
+        set path = $extract(path, 2, *)
+    }
+    // A leading "./" has no slash in front of it, so the loop above misses it. Repeats for "./.".
+    while $extract(path, 1, 2) = "./" {
+        set path = $extract(path, 3, *)
+    }
+    // A bare "." is the module root, not a file.
+    if path = "." {
+        set path = ""
+    }
+    quit path
+}
+
+/// Walk one or more directories and report the files found, optionally with content hashes.
+/// Shared by sync's change detection and the filesystem repository cache scan.
+/// <var>dirs</var>(n) = absolute directory to walk; callers pass only directories that exist.
+/// <var>relativeTo</var> is the root that result keys are made relative to.
+/// <var>maxDepth</var> limits how far below each walked directory to descend; 0 is unlimited.
+/// A file exactly <var>maxDepth</var> levels down is kept; anything deeper is not visited.
+/// <var>filenameFilter</var>, when non-empty, keeps only files with that name (e.g. "module.xml"),
+/// compared case-insensitively on Windows and case-sensitively elsewhere, matching the filesystem.
+/// <var>files</var>(relPath) = fullPath, and <var>hashes</var>(relPath) = lowercase SHA-1 hex
+/// (empty when <var>computeHashes</var> is 0). Keys are normalized: forward slashes, no leading slash.
+/// Directories named .git, __pycache__ or node_modules are never descended into.
+/// Symlinked directories are skipped by the embedded Python walk but followed by the SQL fallback,
+/// since no %Library.File API distinguishes a symlink from a directory.
+ClassMethod WalkDirectories(
+	ByRef dirs,
+	relativeTo As %String,
+	maxDepth As %Integer = 0,
+	filenameFilter As %String = "",
+	computeHashes As %Boolean = 1,
+	Output files,
+	Output hashes) As %Status
+{
+    set sc = $$$OK
+    kill files, hashes
+    try {
+        set relativeTo = ##class(%Library.File).NormalizeDirectory(relativeTo)
+
+        set dirCount = 0
+        set key = ""
+        for {
+            set key = $order(dirs(key),1,dir)
+            quit:key=""
+            set dirCount = dirCount + 1
+            set dirList(dirCount) = ##class(%Library.File).NormalizeDirectory(dir)
+        }
+        quit:dirCount=0
+
+        // A single Python call across all directories avoids per-directory interpreter overhead.
+        set dirsJson = "["
+        for i = 1:1:dirCount {
+            set dirsJson = dirsJson _ $select(i>1:",",1:"") _ """" _ $replace(dirList(i), "\", "\\") _ """"
+        }
+        set dirsJson = dirsJson _ "]"
+
+        set pythonSC = ..WalkDirectoriesPython(dirsJson, relativeTo, maxDepth, filenameFilter, computeHashes, .files, .hashes)
+        if $$$ISOK(pythonSC) {
+            quit
+        }
+
+        // Fall back to a SQL-driven breadth-first walk, one directory at a time.
+        // Warn, because the fallback is far slower and otherwise indistinguishable from a slow disk.
+        set warning = "Falling back to a slower SQL directory walk. The embedded Python walk of "_relativeTo_" could not be completed or read back: "_$system.Status.GetOneErrorText(pythonSC)
+        do ##class(%IPM.General.LogManager).Warning(warning,1)
+
+        kill files, hashes
+        for i = 1:1:dirCount {
+            $$$ThrowOnError(..WalkDirectoriesSQL(dirList(i), relativeTo, maxDepth, filenameFilter, computeHashes, .files, .hashes))
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+ClassMethod WalkDirectoriesPython(
+	dirsJson As %String,
+	relativeTo As %String,
+	maxDepth As %Integer,
+	filenameFilter As %String,
+	computeHashes As %Boolean,
+	Output files,
+	Output hashes) As %Status [ Private ]
+{
+    set sc = $$$OK
+    try {
+        // One JSON object per line in a stream rather than one JSON document in a string. A single
+        // string caps out around 3.6MB, which a large source tree exceeds.
+        set outputStream = ##class(%Stream.GlobalCharacter).%New()
+        // Python writes "\n"; the default terminator is CRLF, which would make ReadLine() return the
+        // whole stream as a single line.
+        set outputStream.LineTerminator = $char(10)
+        set expected = ..WalkDirectoriesPythonImpl(dirsJson, relativeTo, maxDepth, filenameFilter, computeHashes, outputStream)
+
+        do outputStream.Rewind()
+        set parsed = 0
+        while 'outputStream.AtEnd {
+            set line = outputStream.ReadLine()
+            continue:line=""
+            set entry = ##class(%DynamicObject).%FromJSON(line)
+            set relPath = entry.%Get("rel")
+            set files(relPath) = entry.%Get("full")
+            set hashes(relPath) = entry.%Get("hash")
+            set parsed = parsed + 1
+        }
+        // Python cannot check the %Status of its stream writes, so verify the count instead. A short
+        // stream returns an error, which sends the caller to the SQL walk rather than a partial list.
+        if (parsed '= expected) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError,"Python directory walk found "_expected_" files but only "_parsed_" were readable from the stream"))
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
+}
+
+/// os.walk() is C-based and far faster than a SQL FileSet walk; hashing runs on a thread pool
+/// because SHA-1 releases the GIL, so threads overlap I/O wait.
+/// Writes one JSON object per line to outputStream and returns how many were written.
+ClassMethod WalkDirectoriesPythonImpl(
+	dirsJson As %String,
+	relativeTo As %String,
+	maxDepth As %Integer,
+	filenameFilter As %String,
+	computeHashes As %Boolean,
+	outputStream As %Stream.GlobalCharacter) As %Integer [ Language = python, Private ]
+{
+import os
+import json
+import hashlib
+import concurrent.futures
+
+SKIP_DIRS = {'.git', '__pycache__', 'node_modules'}
+
+dirs = json.loads(dirsJson)
+max_depth = int(maxDepth)
+compute_hashes = int(computeHashes)
+root_len = len(relativeTo.rstrip(os.sep)) + 1
+
+# Windows filenames are case-insensitive, so "Module.xml" must match a "module.xml" filter there.
+# Elsewhere those are two distinct files, so the comparison stays exact.
+fold_case = os.name == 'nt'
+name_filter = filenameFilter.lower() if fold_case else filenameFilter
+
+file_list = []
+
+for d in dirs:
+    dir_len = len(d.rstrip(os.sep))
+    for dirpath, dirnames, filenames in os.walk(d):
+        dirnames[:] = [x for x in dirnames if x not in SKIP_DIRS]
+
+        # Depth of dirpath below the walked directory; 0 for the directory itself. Recomputed each
+        # iteration because os.walk() yields absolute paths rather than incremental navigation.
+        rel_dir = dirpath[dir_len:].lstrip(os.sep)
+        current_depth = rel_dir.count(os.sep) + 1 if rel_dir else 0
+
+        # Stop descending once the cap is reached; files at exactly the cap are still kept.
+        if max_depth > 0 and current_depth >= max_depth:
+            dirnames[:] = []
+
+        for fname in filenames:
+            if name_filter and (fname.lower() if fold_case else fname) != name_filter:
+                continue
+            full_path = os.path.join(dirpath, fname)
+            rel_path = full_path[root_len:].replace('\\', '/')
+            if not rel_path:
+                continue
+            file_list.append((rel_path, full_path))
+
+def hash_file(full_path):
+    try:
+        h = hashlib.sha1()
+        with open(full_path, 'rb') as f:
+            while chunk := f.read(65536):
+                h.update(chunk)
+        return h.hexdigest()
+    except (OSError, PermissionError):
+        return ""
+
+if compute_hashes:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=24) as executor:
+        hash_results = list(executor.map(hash_file, [f for _, f in file_list]))
+else:
+    hash_results = [""] * len(file_list)
+
+# Buffer into ~1MB chunks: one Write() per file would cross into IRIS more times than the walk
+# itself costs. json.dumps() escapes newlines, so a record can never span lines.
+buffer = []
+buffer_len = 0
+for (rel, full), h in zip(file_list, hash_results):
+    record = json.dumps({"rel": rel, "full": full, "hash": h})
+    buffer.append(record)
+    buffer_len += len(record) + 1
+    if buffer_len >= 1000000:
+        outputStream.Write("\n".join(buffer) + "\n")
+        buffer = []
+        buffer_len = 0
+if buffer:
+    outputStream.Write("\n".join(buffer) + "\n")
+
+return len(file_list)
+}
+
+/// Breadth-first walk of a single directory using %Library.File_FileSet, for use when embedded
+/// Python is unavailable. Adds to the caller's files/hashes rather than resetting them.
+ClassMethod WalkDirectoriesSQL(
+	dir As %String,
+	relativeTo As %String,
+	maxDepth As %Integer,
+	filenameFilter As %String,
+	computeHashes As %Boolean,
+	ByRef files,
+	ByRef hashes) As %Status [ Internal ]
+{
+    set sc = $$$OK
+    try {
+        // Windows matches filenames case-insensitively; other platforms do not. See WalkDirectories.
+        set foldCase = $$$isWINDOWS
+        set nameFilter = $select(foldCase:$$$lcase(filenameFilter),1:filenameFilter)
+
+        set walkHead = 1, walkTail = 1
+        set walkQueue(1) = ##class(%Library.File).NormalizeDirectory(dir)
+        set walkQueue(1,"depth") = 0
+        for {
+            quit:walkHead>walkTail
+            set walkDir = walkQueue(walkHead)
+            set walkDepth = walkQueue(walkHead,"depth")
+            set walkHead = walkHead + 1
+
+            // FileSet cannot tell a symlink from a directory, so an unlimited walk through a symlink
+            // loop would descend forever, each pass yielding a longer but distinct path. The ceiling is
+            // set far above any real source tree, so a legitimate walk never reaches it.
+            if (walkDepth > ..#MAXWALKDEPTH) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Directory walk exceeded "_..#MAXWALKDEPTH_" levels below "_dir_"; check for a symbolic link cycle"))
+            }
+
+            // The 4th argument is includedirs. Without it there are no Type = "D" rows to descend into.
+            set rs = ##class(%SQL.Statement).%ExecDirect(,
+                "SELECT Name, Type FROM %Library.File_FileSet(?, ?, ?, ?)",
+                walkDir, "*", "", 1)
+            if rs.%SQLCODE < 0 {
+                $$$ThrowStatus($$$ERROR($$$SQLCode,rs.%SQLCODE,rs.%Message))
+            }
+            while rs.%Next() {
+                set entryPath = rs.%Get("Name")
+                if rs.%Get("Type") = "D" {
+                    if (maxDepth > 0) && ((walkDepth + 1) > maxDepth) {
+                        continue
+                    }
+                    if ",.git,__pycache__,node_modules," [ (","_##class(%Library.File).GetFilename(entryPath)_",") {
+                        continue
+                    }
+                    set walkTail = walkTail + 1
+                    set walkQueue(walkTail) = ##class(%Library.File).NormalizeDirectory(entryPath)
+                    set walkQueue(walkTail,"depth") = walkDepth + 1
+                    continue
+                }
+                if (nameFilter '= "") {
+                    set entryName = ##class(%Library.File).GetFilename(entryPath)
+                    if $select(foldCase:$$$lcase(entryName),1:entryName) '= nameFilter {
+                        continue
+                    }
+                }
+                set relPath = ..NormalizePath($extract(entryPath, $length(relativeTo) + 1, *))
+                if (relPath = "") {
+                    continue
+                }
+                set files(relPath) = entryPath
+                set hashes(relPath) = $select(computeHashes:$$$lcase(##class(%Library.File).SHA1Hash(entryPath, 1)),1:"")
+            }
+        }
+    } catch e {
+        set sc = e.AsStatus()
+    }
+    quit sc
 }
 
 /// Creates a new temporary directory and returns its normalized path.

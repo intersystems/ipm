@@ -36,7 +36,7 @@ ClassMethod Run(
         }
 
         // Step 1: Check if module.xml changed; reload manifest if so
-        set moduleXmlRelPath = ##class(%IPM.Storage.FileHash).NormalizePath("module.xml")
+        set moduleXmlRelPath = ##class(%IPM.Utils.File).NormalizePath("module.xml")
         set moduleXmlPath = root _ "module.xml"
         set moduleXmlChanged = ..SyncCheckModuleXml(.module, moduleXmlPath, moduleXmlRelPath)
 
@@ -305,7 +305,7 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
                 set relPath = resource.Processor.OnItemRelativePath(childName)
             }
             if relPath '= "" {
-                set normalizedRelPath = ##class(%IPM.Storage.FileHash).NormalizePath(relPath)
+                set normalizedRelPath = ##class(%IPM.Utils.File).NormalizePath(relPath)
                 set reverseIndex(normalizedRelPath) = resource.Name
                 set reverseIndex(normalizedRelPath, "Processor") = resource.Processor
                 set reverseIndex(normalizedRelPath, "Resource") = resource
@@ -320,7 +320,7 @@ ClassMethod SyncBuildReverseIndex(module As %IPM.Storage.Module, orderedResource
         // directory. Prefix-scan allFiles to map every file under that dir to this resource.
         set syncDir = resource.Processor.GetSyncDirectory()
         if syncDir '= "" {
-            set prefix = ##class(%IPM.Storage.FileHash).NormalizePath(syncDir _ "/")
+            set prefix = ##class(%IPM.Utils.File).NormalizePath(syncDir _ "/")
             set prefixLen = $length(prefix)
             set dirRelPath = prefix
             for {

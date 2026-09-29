@@ -5,15 +5,32 @@ Class %IPM.Repo.Filesystem.Cache Extends (%Persistent, %IPM.General.ModuleInfo)
 
 Parameter DEFAULTGLOBAL = "^IPM.Repo.Filesystem.Cache";
 
-Index CacheItemIndex On (Root, SubDirectory) [ Data = LastModified, Unique ];
+/// Uniqueness constraint only: one cache entry per directory under a given root.
+Index CacheItemIndex On (Root, SubDirectoryHash) [ Unique ];
 
 Property Root As %String(MAXLEN = 260) [ Required ];
 
 ForeignKey RootFK(Root) References %IPM.Repo.Filesystem.Definition(RootIndex) [ OnDelete = cascade ];
 
-Property SubDirectory As %String(MAXLEN = 260);
+Property SubDirectory As %String(MAXLEN = "");
+
+/// SHA-1 of SubDirectory as uppercase hex, giving the unique index a fixed 40-character subscript.
+/// SubDirectory itself cannot be one: a path can exceed the combined subscript budget, and %String's
+/// SQLUPPER collation reports "mods/Foo" and "mods/foo" as the same key when they are two directories.
+Property SubDirectoryHash As %String(MAXLEN = 40) [ Required, SqlComputeCode = {set {*} = ##class(%IPM.Repo.Filesystem.Cache).PathHash({SubDirectory})}, SqlComputed, SqlComputeOnChange = (%%INSERT, %%UPDATE, SubDirectory) ];
 
 Property LastModified As %TimeStamp [ Required ];
+
+/// SHA-1 content hash (lowercase hex) of the module.xml file this entry was built from.
+/// Content, not modification time: mtime is unreliable across container bind mounts, where it can
+/// be coarse, stale, or never propagate at all.
+Property ContentHash As %String(MAXLEN = 40);
+
+/// Indicates if full manifest has been populated (deferred loading optimization).
+/// When 0: Only metadata (Name, Version) is cached; Manifest stream is empty.
+/// When 1: Full <Module> XML has been loaded into Manifest property.
+/// Use LoadManifestForCacheEntry() to populate on-demand when needed.
+Property ManifestLoaded As %Boolean [ InitialExpression = 0 ];
 
 /// Full module manifest
 Property Manifest As %Stream.GlobalCharacter;
@@ -25,8 +42,22 @@ Property SemVer As %String(MAXLEN = 512) [ SqlComputeCode = {set {*} = ##class(%
 
 Index RootNameVersion On (Root, Name, VersionString) [ Unique ];
 
+ClassMethod PathHash(subDirectory As %String) As %String [ CodeMode = expression ]
+{
+##class(%xsd.hexBinary).LogicalToXSD($system.Encryption.SHA1Hash(subDirectory))
+}
+
 ClassMethod %OnBeforeBuildIndices(ByRef indexlist As %String(MAXLEN="") = "") As %Status [ Private, ServerOnly = 1 ]
 {
+    if (indexlist [ "CacheItemIndex") || (indexlist = "") {
+        // CacheItemIndex is unique on SubDirectoryHash, so rows carried over from a release that
+        // predates that property would all index under the same empty value. A cache row is derived
+        // data. Drop them and let the next build re-parse the manifests.
+        set tRes = ##class(%SQL.Statement).%ExecDirect(,"delete from %IPM_Repo_Filesystem.Cache where SubDirectoryHash is null or SubDirectoryHash = ''")
+        if tRes.%SQLCODE < 0 {
+            quit $$$ERROR($$$SQLCode,tRes.%SQLCODE,tRes.%Message)
+        }
+    }
     if (indexlist [ "SemVer") || (indexlist = "") {
         // Force recomputation of SemVer property if index needs to be rebuilt (i.e., because structure has changed)
         set tRes = ##class(%SQL.Statement).%ExecDirect(,"update %IPM_Repo_Filesystem.Cache set SemVer = ''")
@@ -113,6 +144,68 @@ Method HandleSaveError(pSC As %Status) As %Status
     quit tSC
 }
 
+/// Open a cache entry and validate it against the filesystem
+/// If the cached entry is stale (ContentHash differs from the hash of the module.xml on disk),
+/// re-parse the module.xml and update the cache entry
+/// Returns the cache object (possibly refreshed) or throws error if not found
+ClassMethod RootNameVersionOpenValidated(
+	root As %String,
+	name As %String,
+	versionString As %String,
+	concurrency As %Integer = -1,
+	Output status As %Status) As %IPM.Repo.Filesystem.Cache
+{
+    set status = $$$OK
+    set cacheObj = ""
+
+    try {
+        // Open the cache entry
+        set cacheObj = ..RootNameVersionOpen(root, name, versionString, concurrency, .status)
+        if $$$ISERR(status) {
+            quit
+        }
+
+        set dirPath = ##class(%File).NormalizeFilename(cacheObj.SubDirectory, cacheObj.Root)
+        set filePath = ##class(%File).NormalizeFilename("module.xml", dirPath)
+        if '##class(%File).Exists(filePath) {
+            // Report it but leave the row alone. The absence may be transient, such as a source
+            // control sync in flight or an unmounted share. Pruning belongs to CleanupStaleEntries,
+            // which only runs after a full walk has established the file is really gone.
+            set cacheObj = ""
+            set status = $$$ERROR($$$GeneralError, "module.xml not found in " _ dirPath)
+            quit
+        }
+
+        set currentHash = $$$lcase(##class(%File).SHA1Hash(filePath, 1))
+        if (cacheObj.ContentHash '= currentHash) {
+            // An unsaved row still holds the old Name and Version, so the index re-check below would
+            // pass on stale data.
+            if '##class(%IPM.Repo.Filesystem.Definition).RefreshCacheEntry(cacheObj, filePath, currentHash) {
+                set message = filePath_" now describes a module already cached under "_root
+                set cacheObj = ""
+                set status = $$$ERROR($$$GeneralError, message)
+                quit
+            }
+
+            // The re-parse can change Name or Version, so the entry may no longer be the module that
+            // was asked for. Returning it would install something other than what the caller resolved.
+            // Re-check through the index rather than comparing properties, so the same key semantics
+            // apply on both sides of the comparison as on the original lookup.
+            if '..RootNameVersionExists(root, name, versionString, .stillId) || (stillId '= cacheObj.%Id()) {
+                set message = filePath_" now describes "_cacheObj.Name_" "_cacheObj.VersionString_", not "_name_" "_versionString
+                set cacheObj = ""
+                set status = $$$ERROR($$$GeneralError, message)
+                quit
+            }
+        }
+    } catch ex {
+        set status = ex.AsStatus()
+        set cacheObj = ""
+    }
+
+    quit cacheObj
+}
+
 Storage Default
 {
 <Data name="CacheDefaultData">
@@ -163,6 +256,15 @@ Storage Default
 </Value>
 <Value name="16">
 <Value>DisplayName</Value>
+</Value>
+<Value name="17">
+<Value>ContentHash</Value>
+</Value>
+<Value name="18">
+<Value>ManifestLoaded</Value>
+</Value>
+<Value name="19">
+<Value>SubDirectoryHash</Value>
 </Value>
 </Data>
 <DataLocation>^IPM.Repo.Filesystem.CacheD</DataLocation>
