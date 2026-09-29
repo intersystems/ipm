@@ -1,0 +1,2 @@
+Data file for module-without-code. This module has no code resources, so a database
+swap in its namespace cannot orphan it.

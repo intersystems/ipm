@@ -7,6 +7,10 @@ Parameter CLIENTNS As STRING = "UTCLIENT";
 
 Parameter NEEDSREGISTRY As BOOLEAN = 1;
 
+/// Set to 1 in subclasses that load interoperability resources (DTL, BPL, productions) into
+/// the client namespace. Off by default.
+Parameter NEEDSINTEROP As BOOLEAN = 0;
+
 Property UserCreated As %Boolean [ InitialExpression = 0 ];
 
 Property ClientNSCreated As %Boolean [ InitialExpression = 0 ];
@@ -21,7 +25,7 @@ Method Setup() As %Status
 		do $$$AssertStatusOK(##class(%IPM.Repo.Filesystem.Definition).%DeleteExtent())
 		do $$$AssertStatusOK(##class(%IPM.Repo.Remote.Definition).%DeleteExtent())
 
-		if '$$$AssertStatusOK(##class(%IPM.Test.Utils).CreateNamespace(..#CLIENTNS)) {
+		if '$$$AssertStatusOK(##class(%IPM.Test.Utils).CreateNamespace(..#CLIENTNS, ..#NEEDSINTEROP)) {
 			quit
 		}
 		set ..ClientNSCreated = 1

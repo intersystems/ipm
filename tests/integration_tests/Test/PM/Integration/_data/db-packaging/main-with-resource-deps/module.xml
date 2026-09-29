@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="main-with-resource-deps.ZPM">
+    <Module>
+      <Name>main-with-resource-deps</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Dependencies>
+        <ModuleReference>
+          <Name>dep-with-resources</Name>
+          <Version>1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+      <Resource Name="MainRes.App.CLS" />
+      <CPF Name="main.cpf" />
+      <FileCopy Name="main-data.txt" Target="${mgrdir}../main-res-data.txt" />
+    </Module>
+  </Document>
+</Export>

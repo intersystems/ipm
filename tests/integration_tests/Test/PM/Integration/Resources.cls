@@ -3,6 +3,9 @@ Class Test.PM.Integration.Resources Extends Test.PM.Integration.Base
 
 Parameter NEEDSREGISTRY = 0;
 
+/// The resource-test modules include DTL and BPL resources.
+Parameter NEEDSINTEROP = 1;
+
 Parameter ResourceTestIRISHealthMod = "ResourceTestIRISHealth";
 
 Parameter ResourceTestIRISMod = "ResourceTestIRIS";

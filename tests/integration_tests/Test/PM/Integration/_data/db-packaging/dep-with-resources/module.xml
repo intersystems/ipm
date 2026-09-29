@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="dep-with-resources.ZPM">
+    <Module>
+      <Name>dep-with-resources</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="DepRes.Core.CLS" />
+      <Resource Name="DepRes.Generator.CLS" />
+      <Invoke Class="DepRes.Generator" Method="Generate" Phase="Compile" When="After" />
+      <Resource Name="DepRes.Generated.CLS" Generated="1" Compile="0" />
+      <Invoke Class="DepRes.Generator" Method="MarkInvoked" Phase="Activate" When="After" />
+      <CPF Name="dep.cpf" />
+      <FileCopy Name="dep-data.txt" Target="${mgrdir}../dep-res-data.txt" />
+    </Module>
+  </Document>
+</Export>

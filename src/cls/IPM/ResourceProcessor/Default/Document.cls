@@ -103,10 +103,6 @@ Method OnPhase(
                     // then it should have a package mapping of this specific resource to its namespace database
                     $$$ThrowOnError(..OnConfigureMappings(.pParams))
                 }
-                if ..ResourceReference.Generated {
-                    set pResourceHandled = 1
-                    quit
-                }
 
                 if '..ResourceReference.Generated {
                     set tSubDirectory = $select(..ResourceReference.Preload:"preload/",1:"")

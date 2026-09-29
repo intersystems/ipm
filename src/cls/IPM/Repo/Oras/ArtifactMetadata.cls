@@ -22,4 +22,6 @@ Property IPMModuleV1XML As %IPM.DataType.LongString(%JSONFIELDNAME = "com.inters
 
 Property IPMPlatformVersion As %String(%JSONFIELDNAME = "com.intersystems.ipm.platformVersion");
 
+Property IPMPackaging As %String(%JSONFIELDNAME = "com.intersystems.ipm.packaging");
+
 }

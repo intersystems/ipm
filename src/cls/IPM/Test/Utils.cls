@@ -3,7 +3,10 @@ Include %sySecurity
 Class %IPM.Test.Utils
 {
 
-ClassMethod CreateNamespace(pNSName As %String) As %Status
+/// Only ensemble-enable the namespace when required.
+ClassMethod CreateNamespace(
+	pNSName As %String,
+	pEnableEnsemble As %Boolean = 0) As %Status
 {
     new $namespace
     set tSC = $$$OK
@@ -72,9 +75,32 @@ ClassMethod CreateNamespace(pNSName As %String) As %Status
         }
 
         // Ensemble-enable namespace
-        set tSC = ##class(%EnsembleMgr).EnableNamespace(pNSName)
-        if $$$ISERR(tSC) {
-            quit
+        if pEnableEnsemble {
+            // pFromInstall=1 (4th arg) suppresses HS-specific global mappings that would otherwise
+            // point ^IRIS.Msg and its subscripts at HSLIB (read-only) on IRIS for Health.
+            set tSC = ##class(%EnsembleMgr).EnableNamespace(pNSName,,,1)
+            if $$$ISERR(tSC) {
+                quit
+            }
+            // Map ^IRIS.Msg to the namespace's own database so LOC compilation can write message domains.
+            set tMsgProps("Database") = pNSName
+            for tMsgGlobal = "IRIS.Msg", "IRIS.MsgNames" {
+                if ##class(Config.MapGlobals).Exists(pNSName, tMsgGlobal) {
+                    set tSC = ##class(Config.MapGlobals).Modify(pNSName, tMsgGlobal, .tMsgProps)
+                } else {
+                    set tSC = ##class(Config.MapGlobals).Create(pNSName, tMsgGlobal, .tMsgProps)
+                }
+                if $$$ISERR(tSC) { quit }
+            }
+            if $$$ISERR(tSC) {
+                quit
+            }
+            set tSC = ##class(Config.CPF).Write()
+            if $$$ISERR(tSC) { quit }
+            set tSC = ##class(Config.Map).MoveToActive()
+            if $$$ISERR(tSC) { quit }
+            set tSC = ##class(Config.Namespaces).Load(pNSName)
+            if $$$ISERR(tSC) { quit }
         }
 
         // Create default web application
@@ -128,6 +154,10 @@ ClassMethod DeleteNamespace(pNSName As %String) As %Status
         set tEnsTempDB = pNSName_##class(%Library.EnsembleMgr).#TEMPSUFFIX
         for tOtherDB = tSecondaryDB,tEnsTempDB {
             set tSC = $$$OK
+            // Absent unless the namespace was ensemble-enabled
+            if '##class(Config.Databases).Exists(tOtherDB) {
+                continue
+            }
             set tDB = ##class(Config.Databases).Open(tOtherDB,,.tSC)
             if $isobject(tDB) {
                 // Delete database
