@@ -2555,7 +2555,7 @@ ClassMethod Install(
         set tSearchCriteria.Name = $$$lcase(tModuleName)
         set tSearchCriteria.VersionExpression = tVersion
         set tSearchCriteria.Keywords = tKeywords
-        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults,,.tPlatformFiltered))
+        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults,,.tPlatformIncompatibleModules))
 
         if (tResults.Count() > 0) {
             set tResult = ""
@@ -2595,18 +2595,16 @@ ClassMethod Install(
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
-            // The module may have matched but been excluded for being deployed for other platforms
-            // only, which deserves a better message than "not found".
-            // Only a deployed module with platforms that don't include this one is ever filtered,
-            // so there is always something to report here.
-            if $isobject(tPlatformFiltered) && (tPlatformFiltered.Count() > 0) {
+            // The module may have been found in a configured repository but no
+            // platform-compatible version exists.
+            if $isobject(tPlatformIncompatibleModules) && (tPlatformIncompatibleModules.Count() > 0) {
                 // Report the newest filtered version: the one an unversioned install resolves to.
                 // A pinned install filters only its own version, so this names that version too.
                 #dim tFiltered As %IPM.Storage.ModuleInfo
                 #dim tCandidate As %IPM.Storage.ModuleInfo
-                set tFiltered = tPlatformFiltered.GetAt(1)
-                for tIdx = 2:1:tPlatformFiltered.Count() {
-                    set tCandidate = tPlatformFiltered.GetAt(tIdx)
+                set tFiltered = tPlatformIncompatibleModules.GetAt(1)
+                for tIdx = 2:1:tPlatformIncompatibleModules.Count() {
+                    set tCandidate = tPlatformIncompatibleModules.GetAt(tIdx)
                     if tCandidate.Version.Follows(tFiltered.Version) {
                         set tFiltered = tCandidate
                     }

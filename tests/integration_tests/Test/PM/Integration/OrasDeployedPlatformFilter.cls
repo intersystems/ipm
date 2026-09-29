@@ -64,7 +64,7 @@ Method TestCompatiblePlatformVisibleAndInstallable()
     do ..LoadAndPackage()
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish " _ ..#ModuleName _ " -v -only"), "Published for current platform")
 
-    do $$$AssertTrue(..ModuleVisibleInList(..#ModuleName), "Compatible module is resolvable")
+    do $$$AssertTrue(..ModuleAvailableInRepositories(..#ModuleName), "Compatible module is available")
     do $$$AssertTrue(..QueryListedModule(..#ModuleName, .platforms), "Compatible module is listed by list-modules")
     do $$$AssertEquals(platforms, $$$CurrentPlatformVersion, "list-modules reports the platform it was published for")
 
@@ -80,7 +80,7 @@ Method TestIncompatiblePlatformHiddenFromList()
     set tgzPath = ..LoadAndPackage()
     do $$$AssertStatusOK(..PublishWithPlatform(tgzPath, ..#IncompatiblePlatform), "Published for incompatible platform")
 
-    do $$$AssertNotTrue(..ModuleVisibleInList(..#ModuleName), "Incompatible module is not resolvable")
+    do $$$AssertNotTrue(..ModuleAvailableInRepositories(..#ModuleName), "Incompatible module is not available")
     do $$$AssertNotTrue(..QueryListedModule(..#ModuleName), "Incompatible module is hidden from list-modules")
 }
 
@@ -197,7 +197,8 @@ Method LoadAndPackage(moduleFolder As %String = "") As %String
     if (moduleFolder = "") {
         set moduleFolder = ..#ModuleFolder
     }
-    // -nodev is required: the deploy branch of the Reload phase is skipped in developer mode
+    // -nodev persists Module.DeveloperMode = 0, which Compile reads on a later repackage
+    // to skip resources already marked deployed instead of recompiling them from source.
     set folder = ..FixtureDir(moduleFolder)
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v -nodev " _ folder), "Loaded module from " _ folder)
 
@@ -263,19 +264,6 @@ Method PublishWithPlatform(
         set sc = ex.AsStatus()
     }
     return sc
-}
-
-/// Returns true if any configured repository offers the named module. Queries the resolution
-/// API directly rather than parsing the terminal output of repo -list-modules.
-ClassMethod ModuleVisibleInList(moduleName As %String) As %Boolean
-{
-    set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
-    set criteria.Name = $$$lcase(moduleName)
-    set sc = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(criteria, .results)
-    if $$$ISERR(sc) || '$isobject(results) {
-        return 0
-    }
-    return results.Count() > 0
 }
 
 /// Returns true if the named module is offered by the oras repository according to the query

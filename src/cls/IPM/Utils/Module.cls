@@ -1401,9 +1401,9 @@ ClassMethod ConstructInvertedDependencyGraph(
         if (moduleName = "") {
             quit
         }
-        // Invert dependency graph, subscripts (<module>, <depends on>)
-        // Repository, version, deployed flag and platform version. See BuildDependencyGraph
-        // for the full node layout.
+        // pInvertedDependencyGraph(<module>) holds repository, version, deployed flag and
+        // platform version (see BuildDependencyGraph for the full node layout).
+        // pInvertedDependencyGraph(<module>, <depends on>) = "" marks a remaining dependency edge.
         set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3) _ $list(data, 6, 7)
         set dependentKey = ""
         for {
