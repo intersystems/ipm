@@ -151,10 +151,7 @@ Method GetModule(
 	pModuleReference As %IPM.Storage.ModuleInfo,
 	Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-    set tag = $$$Semver2Tag(pModuleReference.VersionString)
-    if (pModuleReference.Deployed) {
-        set tag = tag _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
-    }
+    set tag = ..TagForReference(pModuleReference)
     set status = ..Pull(..Location, pModuleReference.Name, tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
     $$$ThrowOnError(status)
     #; module is pulled as a .tgz file
@@ -164,8 +161,31 @@ Method GetModule(
 
 Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
 {
-    set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
-    return ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    set name = pModuleReference.Name _ ":" _ ..TagForReference(pModuleReference)
+    // GetModuleXML returns a string, but callers expect a stream per %IPM.Repo.IPackageService
+    set moduleXML = ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    if (moduleXML = "") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No manifest found for '" _ name _ "' in registry " _ ..Location))
+    }
+    set stream = ##class(%Stream.GlobalCharacter).%New()
+    $$$ThrowOnError(stream.Write(moduleXML))
+    $$$ThrowOnError(stream.Rewind())
+    return stream
+}
+
+/// Returns the registry tag holding the artifact for the given module reference.
+/// A deployed module is tagged with a platform version suffix, since one version of it
+/// is built separately for each supported platform.
+ClassMethod TagForReference(moduleReference As %IPM.Storage.ModuleInfo) As %String [ Private ]
+{
+    set tag = $$$Semver2Tag(moduleReference.VersionString)
+    if moduleReference.Deployed {
+        if (moduleReference.PlatformVersion = "") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot locate deployed module '" _ moduleReference.Name _ "' " _ moduleReference.VersionString _ " without a platform version."))
+        }
+        set tag = tag _ $$$OrasTagPlatformSeparator _ moduleReference.PlatformVersion
+    }
+    return tag
 }
 
 Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
@@ -213,6 +233,29 @@ ClassMethod AggregatePlatformVersions(
     return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
+/// Reorders versionsList so that versions with an artifact for currentPlatform come first, each
+/// group keeping the newest-first order it arrived in. A caller that reports only the first version
+/// therefore reports the newest installable one, falling back to the newest version overall when
+/// the module has no artifact for this platform at all.
+ClassMethod PreferCompatibleVersions(
+	versionsList As %List,
+	ByRef aggregatedPlatformVersion,
+	currentPlatform As %String) As %List
+{
+    set compatible = "", incompatible = ""
+    set ptr = 0
+    while $listnext(versionsList, ptr, version) {
+        set platformVersions = $get(aggregatedPlatformVersion(version))
+        // An empty platform means the version is not platform-specific, so anything can use it.
+        if ($listfind(platformVersions, "") > 0) || ($listfind(platformVersions, currentPlatform) > 0) {
+            set compatible = compatible _ $listbuild(version)
+        } else {
+            set incompatible = incompatible _ $listbuild(version)
+        }
+    }
+    return compatible _ incompatible
+}
+
 /// <var>moduleList</var> is a list of objects of type <class>%IPM.Storage.ModuleInfo</class> to which this method adds entries
 /// <var>name</var> is the name of the package for which we are enumerating versions
 Method ListModulesFromTagString(
@@ -224,6 +267,11 @@ Method ListModulesFromTagString(
 {
     set allTagsString = ..GetAllTags(..Location, name, "", client)
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
+    // The tri-states of AllVersions that report a single version should report one this platform
+    // can actually install. The empty state reports every version, so its order doesn't matter.
+    if (searchCriteria.AllVersions '= "") {
+        set allVersionsList = ..PreferCompatibleVersions(allVersionsList, .aggregatedPlatformVersion, $$$CurrentPlatformVersion)
+    }
     set pointer = 0
     while $listnext(allVersionsList,pointer,moduleVersion) {
         // filter by version
@@ -300,7 +348,9 @@ Method ListModulesFromTagString(
         set tModRef.Repository = artifactMetadata.ImageSource
         set tModRef.Description = artifactMetadata.ImageDescription
         set tModRef.Deployed = artifactMetadata.IPMDeployed
-        if (artifactMetadata.IPMDeployed '= "") {
+        // Skipped for AllVersions, which reports a single entry standing in for every version;
+        // these platforms belong to just one of them.
+        if (artifactMetadata.IPMDeployed '= "") && 'searchCriteria.AllVersions {
             set pvPtr = 0
             while $listnext(platformVersions, pvPtr, pv) {
                 $$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))

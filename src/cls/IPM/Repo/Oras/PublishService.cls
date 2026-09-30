@@ -41,6 +41,9 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
         set metadata.IPMModuleV1XML = moduleXML
         do metadata.%JSONExportToString(.metaDataString)
         if (pModule.Deployed) {
+            if (pModule.PlatformVersion = "") {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot publish deployed module '" _ pModule.Name _ "' without a platform version."))
+            }
             set tag = tag _ $$$OrasTagPlatformSeparator _ pModule.PlatformVersion
         }
 
