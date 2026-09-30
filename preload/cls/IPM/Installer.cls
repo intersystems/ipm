@@ -45,9 +45,13 @@ XData PM [ XMLNamespace = INSTALLER ]
 
 ClassMethod ForceCompileEvenInSYS()
 {
-    $$$RemoveClsTempNodes
+    if $data(%ISCName)#2 {
+        $$$RemoveClsTempNodes
+    }
     do $system.OBJ.CompilePackage("%IPM","ckf")
-    $$$AddClsTempNodes
+    if $data(%ISCName)#2 {
+        $$$AddClsTempNodes
+    }
 }
 
 XData MapOnly [ XMLNamespace = INSTALLER ]
