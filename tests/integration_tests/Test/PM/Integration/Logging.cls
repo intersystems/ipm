@@ -8,7 +8,7 @@ Parameter BaseModule As String = "base-mod";
 Parameter DepModule As String = "dep-mod";
 
 /// Module with a non-existent dependency (to throw install errors)
-Parameter BadModule As String = "bad-mod";
+Parameter NonExistentDepMod As String = "non-existent-dep-mod";
 
 /// Module with an <Invoke> with an <UNDEFINED> error to interrupt execution of a command
 Parameter InterruptModule As String = "execution-interrupt-mod";
@@ -21,36 +21,45 @@ Property DefaultLogFileDir As %String;
 
 Method OnBeforeAllTests() As %Status
 {
-    // Set default property values
-    set ..DefaultLogFileDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "ipm-logs/" _ $namespace)
+    set sc = $$$OK
+    try {
+        // Set default property values
+        set ..DefaultLogFileDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ $zconvert($namespace, "l") _ "ipm-logs/")
 
-    // Setup repos for LockFile tests
-    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
-    do $$$AssertStatusOK(sc,"Deleted all leftover repos from other tests successfully.")
-    set sc = ##class(%IPM.Main).Shell("repo -n logging-test -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/logging/")
-    do $$$AssertStatusOK(sc,"Created logging-test repo successfully.")
+        // Setup repos for LockFile tests
+        $$$ThrowOnError(##class(%IPM.Main).Shell("repo -delete-all"))
+        $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n logging-test -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/logging/"))
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
     return sc
 }
 
 Method OnAfterAllTests() As %Status
 {
-    // Delete repos for LockFile tests
-    set sc = ##class(%IPM.Main).Shell("repo -delete -name logging-test")
-    do $$$AssertStatusOK(sc,"Removed logging-test repo successfully.")
+    set sc = $$$OK
+    try {
+        // Delete repos for LockFile tests
+        $$$ThrowOnError(##class(%IPM.Main).Shell("repo -delete -name logging-test"))
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
     return sc
 }
 
 Method OnAfterOneTest() As %Status
 {
-    // Make test environment clean by uninstalling all modules at the end of each test
-    set sc = ##class(%IPM.Main).Shell("uninstall -all")
-    do $$$AssertStatusOK(sc, "Successfully uninstalled all modules after test")
+    set sc = $$$OK
+    try {
+        // Make test environment clean by uninstalling all modules at the end of each test
+        $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall -all"))
 
-    // Delete any log files created under either the default path or custom path
-    set sc = ..CleanLogFileDir(..#CustomOutputDir)
-    do $$$AssertStatusOK(sc, "Successfully deleted log files in the custom output directory")
-    set sc = ..CleanLogFileDir(..DefaultLogFileDir)
-    do $$$AssertStatusOK(sc, "Successfully deleted log files in the default output directory")
+        // Delete any log files created under either the default path or custom path
+        $$$ThrowOnError(..CleanLogFileDir(..#CustomOutputDir))
+        $$$ThrowOnError(..CleanLogFileDir(..DefaultLogFileDir))
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
     return sc
 }
 
@@ -72,7 +81,7 @@ Method TestLoad()
 Method TestUpdate()
 {
     set commands = $listbuild("install -no-log " _ ..#BaseModule _ " 1.0.0",
-                       "update " _ ..#BaseModule _ " 2.0.0")
+                              "update " _ ..#BaseModule _ " 2.0.0")
     do ..GenericLoggingTest(commands, ..DefaultLogFileDir)
 }
 
@@ -80,7 +89,7 @@ Method TestUpdate()
 Method TestUninstall()
 {
     set commands = $listbuild("install -no-log " _ ..#BaseModule,
-                       "uninstall -r " _ ..#BaseModule)
+                              "uninstall -r " _ ..#BaseModule)
     do ..GenericLoggingTest(commands, ..DefaultLogFileDir)
 }
 
@@ -100,16 +109,16 @@ Method TestNoLog()
 
     set files = ..GetLogFilesInDir(..DefaultLogFileDir)
     do $$$AssertTrue($listlength(files.%Get("txt")) = 0, "No .txt log file created when -no-log flag provided")
-    do $$$AssertTrue($listlength(files.%Get("json")) = 0, "No .json log file created when -no-log flag provided")
+    do $$$AssertTrue($listlength(files.%Get("jsonl")) = 0, "No .jsonl log file created when -no-log flag provided")
 }
 
 /// Tests log output in the case of an erroring IPM
 /// Error cause: Install failure due to module referencing a dependency that it can't find in any repository
 Method TestInstallFailure()
 {
-    set command = "install " _ ..#BadModule
+    set command = "install " _ ..#NonExistentDepMod
     set sc = ##class(%IPM.Main).Shell(command)
-    do $$$AssertStatusNotOK(sc, "Install failure on " _ ..#BadModule)
+    do $$$AssertStatusNotOK(sc, "Install failure on " _ ..#NonExistentDepMod)
 
     // TODO: Add a check for erroring log file contents
 }
@@ -129,6 +138,9 @@ Method TestExecutionInterrupted()
 /// Accepts a list of IPM command strings and runs each sequentially, checking their status
 /// Then verifies the log files created using the logFileDir argument
 /// Assumes that the last command (and that command only) is the one that creates the log files to be checked
+/// 
+/// Argument   commands    List of IPM command strings to be executed sequentially, with the last one expected to create the log files.
+/// Argument   logFileDir  Directory where log files are expected to be created.
 Method GenericLoggingTest(
 	commands As %List,
 	logFileDir As %String)
@@ -136,23 +148,28 @@ Method GenericLoggingTest(
     set lastCommand = ""
     set ptr = 0
     while $listnext(commands, ptr, cmd) {
-        set sc = ##class(%IPM.Main).Shell(cmd)
-        do $$$AssertStatusOK(sc, "Successfully ran command """ _ cmd _ """")
+        $$$ThrowOnError(##class(%IPM.Main).Shell(cmd))
         set lastCommand = cmd
     }
 
     set files = ..GetLogFilesInDir(logFileDir)
-    if ($listlength(files.%Get("txt")) '= 1) || ($listlength(files.%Get("json")) '= 1) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"Expected exactly 1 .txt and 1 .json file in VerifyLogFilesInDirectory() but that was not the case"))
+    if ($listlength(files.%Get("txt")) '= 1) || ($listlength(files.%Get("jsonl")) '= 1) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Expected exactly 1 .txt and 1 .jsonl file in VerifyLogFilesInDirectory() but that was not the case"))
     }
     set txtLogFile = $listget(files.%Get("txt"), 1)
-    set jsonLogFile = $listget(files.%Get("json"), 1)
+    set jsonlLogFile = $listget(files.%Get("jsonl"), 1)
 
     do ..VerifyTxtFileContents(txtLogFile, lastCommand)
-    do ..VerifyJsonFileContents(jsonLogFile, lastCommand)
+    do ..VerifyJsonlFileContents(jsonlLogFile, lastCommand)
 }
 
-/// Retreives a list of names for files/directories under the directory provided
+/// Retrieves a %DynamicObject containing the names of .txt and .jsonl log files in the specified directory.
+/// 
+/// Return object:
+/// {
+///     "txt": <List of .txt log file names>,
+///     "jsonl": <List of .jsonl log file names>
+/// }
 ClassMethod GetLogFilesInDir(directory As %String) As %DynamicObject [ Internal ]
 {
     set files = {}
@@ -165,16 +182,16 @@ ClassMethod GetLogFilesInDir(directory As %String) As %DynamicObject [ Internal 
         set file = $zsearch("")
     }
 
-    // Compile all .json files
-    set jsonFiles = ""
-    set file = $zsearch(directory _ "*.json")
+    // Compile all .jsonl files
+    set jsonlFiles = ""
+    set file = $zsearch(directory _ "*.jsonl")
     while file '="" {
-        set jsonFiles = jsonFiles _ $listbuild(file)
+        set jsonlFiles = jsonlFiles _ $listbuild(file)
         set file = $zsearch("")
     }
 
     do files.%Set("txt", txtFiles)
-    do files.%Set("json", jsonFiles)
+    do files.%Set("jsonl", jsonlFiles)
     return files
 }
 
@@ -186,7 +203,6 @@ Method VerifyTxtFileContents(
 {
     // Verify top-level info
     set expectedIPMVersion = "IPM Version: " _ ##class(%IPM.Storage.Module).NameOpen("zpm").VersionString
-    set expectedSchemaVersion = "Schema Version: 1.0.0"
     set expectedCommand = "Command: """ _ command _ """"
     set stream = ##class(%Stream.FileCharacter).%New()
     set sc = stream.LinkToFile(fileName)
@@ -194,7 +210,6 @@ Method VerifyTxtFileContents(
     set txtSchema = $zstrip(stream.ReadLine(), "*C")
     set txtCommand = $zstrip(stream.ReadLine(), "*C")
     do $$$AssertEquals(txtVersion, expectedIPMVersion, "IPM version in txt file matches expected value")
-    do $$$AssertEquals(txtSchema, expectedSchemaVersion, "Schema version in txt file matches expected value")
     do $$$AssertEquals(txtCommand, expectedCommand, "Command in txt file matches expected value")
 
     // Verify end message
@@ -205,9 +220,9 @@ Method VerifyTxtFileContents(
     do $$$AssertEquals(lastLine, expectedEndMessage, "End message is present in the txt log file")
 }
 
-/// Verifies the contents of a .json log file at a given path and command that created the file
+/// Verifies the contents of a .jsonl log file at a given path and command that created the file
 /// Log files that are expected to have special output should not be checked using this method
-Method VerifyJsonFileContents(
+Method VerifyJsonlFileContents(
 	fileName As %String,
 	command As %String = "") [ Internal ]
 {
@@ -215,18 +230,18 @@ Method VerifyJsonFileContents(
     set expectedIPMVersion = ##class(%IPM.Storage.Module).NameOpen("zpm").VersionString
     set expectedSchemaVersion = "1.0.0"
     set expectedCommand = command
-    set json = ##class(%DynamicAbstractObject).%FromJSONFile(fileName)
-    do $$$AssertEquals(json.%Get("ipm"), expectedIPMVersion, "IPM version in json file matches expected value")
-    do $$$AssertEquals(json.%Get("schema"), expectedSchemaVersion, "Schema version in json file matches expected value")
-    do $$$AssertEquals(json.%Get("command"), expectedCommand, "Command in json file matches expected value")
+    set jsonl = ##class(%DynamicAbstractObject).%FromJSONFile(fileName)
+    do $$$AssertEquals(jsonl.%Get("ipm"), expectedIPMVersion, "IPM version in jsonl file matches expected value")
+    do $$$AssertEquals(jsonl.%Get("schema"), expectedSchemaVersion, "Schema version in jsonl file matches expected value")
+    do $$$AssertEquals(jsonl.%Get("command"), expectedCommand, "Command in jsonl file matches expected value")
 
     // Verify end message
-    set endMessage = json.%Get("log").%Pop()
+    set endMessage = jsonl.%Get("log").%Pop()
     set endMessageIsAsExpected = (endMessage.%Get("level") = "INFO") && (endMessage.%Get("message") = "Logging COMPLETE")
-    do $$$AssertTrue(endMessageIsAsExpected, "End message is present in the json log file")
+    do $$$AssertTrue(endMessageIsAsExpected, "End message is present in the jsonl log file")
 }
 
-/// For a given directory, deletes the log files in that location (.txt and .json files)
+/// For a given directory, deletes the log files in that location (.txt and .jsonl files)
 ClassMethod CleanLogFileDir(directory As %String) As %Status [ Internal ]
 {
     set sc = $$$OK
@@ -238,8 +253,8 @@ ClassMethod CleanLogFileDir(directory As %String) As %Status [ Internal ]
             set file = $zsearch("")
         }
 
-        // Delete all .json files
-        set file = $zsearch(directory _ "*.json")
+        // Delete all .jsonl files
+        set file = $zsearch(directory _ "*.jsonl")
         while file '="" {
             do ##class(%File).Delete(file)
             set file = $zsearch("")
