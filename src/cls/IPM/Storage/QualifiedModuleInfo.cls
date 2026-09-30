@@ -19,6 +19,7 @@ Method %OnNew(
         set ..Name = pResolvedReference.Name
         set ..Version = pResolvedReference.Version
         set ..Deployed = pResolvedReference.Deployed
+        set ..PlatformVersion = pResolvedReference.PlatformVersion
         set ..PlatformVersions = pResolvedReference.PlatformVersions
         set ..VersionString = pResolvedReference.VersionString
         set ..AllVersions = pResolvedReference.AllVersions
