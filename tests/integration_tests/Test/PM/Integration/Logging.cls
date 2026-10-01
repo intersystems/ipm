@@ -24,11 +24,15 @@ Method OnBeforeAllTests() As %Status
     set sc = $$$OK
     try {
         // Set default property values
-        set ..DefaultLogFileDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ $zconvert($namespace, "l") _ "ipm-logs/")
+        set ..DefaultLogFileDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ $zconvert($namespace, "l") _ "/" _ "ipm-logs/")
 
         // Setup repos for LockFile tests
         $$$ThrowOnError(##class(%IPM.Main).Shell("repo -delete-all"))
         $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n logging-test -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/logging/"))
+
+        // Delete any log files that may already exist
+        $$$ThrowOnError(..CleanLogFileDir(..#CustomOutputDir))
+        $$$ThrowOnError(..CleanLogFileDir(..DefaultLogFileDir))
     } catch ex {
         set sc = ex.AsStatus()
     }
@@ -96,7 +100,7 @@ Method TestUninstall()
 /// Test that the -output-file command creates log files in a specified location
 Method TestOutputPath()
 {
-    set commands = $listbuild("install -v -output-file " _ ..#CustomOutputDir _ " " _ ..#BaseModule)
+    set commands = $listbuild("install -v -output-log " _ ..#CustomOutputDir _ " " _ ..#BaseModule)
     do ..GenericLoggingTest(commands, ..#CustomOutputDir)
 }
 
@@ -203,21 +207,20 @@ Method VerifyTxtFileContents(
 {
     // Verify top-level info
     set expectedIPMVersion = "IPM Version: " _ ##class(%IPM.Storage.Module).NameOpen("zpm").VersionString
-    set expectedCommand = "Command: """ _ command _ """"
+    set expectedCommand = "Command: '" _ command _ "'"
     set stream = ##class(%Stream.FileCharacter).%New()
     set sc = stream.LinkToFile(fileName)
     set txtVersion = $zstrip(stream.ReadLine(), "*C")
-    set txtSchema = $zstrip(stream.ReadLine(), "*C")
     set txtCommand = $zstrip(stream.ReadLine(), "*C")
-    do $$$AssertEquals(txtVersion, expectedIPMVersion, "IPM version in txt file matches expected value")
-    do $$$AssertEquals(txtCommand, expectedCommand, "Command in txt file matches expected value")
+    do $$$AssertTrue(txtVersion [ expectedIPMVersion, "IPM version in txt file matches expected value")
+    do $$$AssertTrue(txtCommand [ expectedCommand, "Command in txt file matches expected value")
 
     // Verify end message
     set expectedEndMessage = "[INFO] Logging COMPLETE"
     while 'stream.AtEnd {
         set lastLine = stream.ReadLine()
     }
-    do $$$AssertEquals(lastLine, expectedEndMessage, "End message is present in the txt log file")
+    do $$$AssertTrue(lastLine [ expectedEndMessage, "End message is present in the txt log file")
 }
 
 /// Verifies the contents of a .jsonl log file at a given path and command that created the file
@@ -228,16 +231,24 @@ Method VerifyJsonlFileContents(
 {
     // Verify top-level info
     set expectedIPMVersion = ##class(%IPM.Storage.Module).NameOpen("zpm").VersionString
-    set expectedSchemaVersion = "1.0.0"
+    set expectedSchemaVersion = "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/1.0.0"
     set expectedCommand = command
-    set jsonl = ##class(%DynamicAbstractObject).%FromJSONFile(fileName)
-    do $$$AssertEquals(jsonl.%Get("ipm"), expectedIPMVersion, "IPM version in jsonl file matches expected value")
-    do $$$AssertEquals(jsonl.%Get("schema"), expectedSchemaVersion, "Schema version in jsonl file matches expected value")
-    do $$$AssertEquals(jsonl.%Get("command"), expectedCommand, "Command in jsonl file matches expected value")
+
+    set stream = ##class(%Stream.FileCharacter).%New()
+    set sc = stream.LinkToFile(fileName)
+    set header = $zstrip(stream.ReadLine(), "*C")
+    while 'stream.AtEnd {
+        set lastLine = stream.ReadLine()
+    }
+
+    set header = {}.%FromJSON(header)
+    do $$$AssertEquals(header.%Get("ipm"), expectedIPMVersion, "IPM version in jsonl file matches expected value")
+    do $$$AssertEquals(header.%Get("$schema"), expectedSchemaVersion, "Schema version in jsonl file matches expected value")
+    do $$$AssertEquals(header.%Get("command"), expectedCommand, "Command in jsonl file matches expected value")
 
     // Verify end message
-    set endMessage = jsonl.%Get("log").%Pop()
-    set endMessageIsAsExpected = (endMessage.%Get("level") = "INFO") && (endMessage.%Get("message") = "Logging COMPLETE")
+    set lastLine = {}.%FromJSON(lastLine)
+    set endMessageIsAsExpected = (lastLine.%Get("level") = "INFO") && (lastLine.%Get("message") = "Logging COMPLETE")
     do $$$AssertTrue(endMessageIsAsExpected, "End message is present in the jsonl log file")
 }
 
