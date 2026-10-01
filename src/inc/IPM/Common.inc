@@ -10,6 +10,10 @@ ROUTINE %IPM.Common [Type=INC]
 #; Useful because each install/load/uninstall command can potentially affect multiple packages
 #; The log entry for each package should include the same command
 #define ZPMCommandToLog %IPMCommandToLog
+#define Error "ERROR"
+#define Trace "TRACE"
+#define Info "INFO"
+#define Warning "WARNING"
 
 #; Default packages for package manager, module lifecycle classes and resource processors
 #define ZPMRootPackage "%IPM"

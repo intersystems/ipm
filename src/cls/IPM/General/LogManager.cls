@@ -12,20 +12,117 @@ Property Messages As list Of %IPM.General.LogManager.Message;
 
 Property Threshold As %Integer [ InitialExpression = {$$$ZPMLogWARNING} ];
 
-Property CurrentLogFiles [ MultiDimensional ];
+/// Command being logged (with credentials obfuscated)
+Property Command As %String;
 
-Method Log(
-    message As %String,
-    level As %String)
+/// Absolute path to the JSON Lines (NDJSON) log file
+Property JSONFilePath As %String;
+
+/// Absolute path to the TXT log file
+Property TxtFilePath As %String;
+
+/// Unix timestamp marking the start time of logging
+Property TimeStampStart As %String;
+
+/// Unix timestamp marking the end time of logging
+Property TimeStampEnd As %String;
+
+Property SchemaVersion As %String [InitialExpression = "1.0.0"];
+
+/// Initialize log files and write headers.
+/// @Argument fullCommand           The full shell command as entered by the user
+/// @Argument ByRef commandInfo     Contains the parsed shell command (for format, see output of ##class(%IPM.CLI).%ParseCommandInput())
+Method InitializeLog(fullCommand As %String, ByRef commandInfo) As %Status
 {
-    if '$listfind($listfromstring(..#logLevels), level) {
-        do ..Log("Log has incorrect logLevel "_level_". Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message, "ERROR")
+    set ..TimeStampStart = $zdatetime($horolog,-2)
+    // TO-DO: obfuscate sensitive information like credentials in the command before logging
+    set ..Command = fullCommand
+    set moduleName = $get(commandInfo("parameters","module"), "module-not-parsed")
+
+    try {
+        // Convert namespace to lowercase and replace % in namespace with _ so filepath is valid
+        set normalizedNamespace = $translate($zconvert(..%namespace, "L"), "%", "_")
+
+        // Create log directory: <IRIS-mgr>/<namespace>/ipm-logs/
+        set mgr = ##class(%Library.File).ManagerDirectory()
+        set logDir = ##class(%File).NormalizeDirectory(mgr _ normalizedNamespace _ "/ipm-logs/")
+        $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
+
+        // Set file paths with timestamp
+        set baseFileName = $get(commandInfo, "command-not-parsed") _ "_" _ moduleName _ "_" _ ..TimeStampStart
+        set ..JSONFilePath = logDir _ baseFileName _ ".jsonl"
+        set ..TxtFilePath = logDir _ baseFileName _ ".txt"
+
+        // Write log file path to terminal
+        write !, "Writing to the following log files: "_..JSONFilePath_" and "_..TxtFilePath
+
+        // Get IPM version. GetVersion() returns per-module info in versionInfo("zpm") as $lb(namespace, version).
+        $$$ThrowOnError(##class(%IPM.Main).GetVersion("zpm", .versionInfo))
+        set ipmVersion = $listget($get(versionInfo("zpm")), 2)
+
+        // Write TXT header
+        set txtStream = ##class(%Stream.FileCharacter).%New()
+        set txtStream.Filename = ..TxtFilePath
+        do txtStream.WriteLine("IPM Version: " _ ipmVersion)
+        do txtStream.WriteLine("Command: "_"'"_..Command_"'")
+        $$$ThrowOnError(txtStream.%Save())
+
+        // Write the JSON Lines header as the first record; subsequent lines are log entries.
+        set header = ##class(%DynamicObject).%New()
+        // TODO: Replace hardcoded schema path with global IPM log schema setting
+        do header.%Set("$schema", "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/" _ ..SchemaVersion)
+        set header.ipm = ipmVersion
+        set header.command = ..Command
+
+        set jsonStream = ##class(%Stream.FileCharacter).%New()
+        set jsonStream.Filename = ..JSONFilePath
+        do jsonStream.WriteLine(header.%ToJSON())
+        $$$ThrowOnError(jsonStream.%Save())
+
+        return $$$OK
     }
+    catch ex
+    {
+        return ex.AsStatus()
+    }
+}
 
-    set timestamp = $zdatetime($ztimestamp,3)
-    write timestamp_" ["_level_"] "_message
+/// Write a log entry to both the JSON Lines and TXT files.
+/// @Argument level         The log level: TRACE, INFO, WARNING, or ERROR
+/// @Argument message       The human-readable log message to append
+Method WriteLogLine(level As %String, message As %String) As %Status
+{
+    try
+    {
+        if '$listfind($listfromstring(..#logLevels), level) {
+            do ..WriteLogLine("ERROR","Attempted to write to log with invalid log level '"_level_"'. Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message)
+            $$$ThrowOnError($$$ERROR($$$GeneralError, "Attempted to write to log with invalid log level '"_level_"'. Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message))
+        }
+        set entry = ##class(%DynamicObject).%New()
+        set entry.level = level
+        set entry.message = message
+        set entry.timestamp = $zdatetime($ztimestamp, 3) _ " UTC"
 
-    // TODO: Add the message to the LogFile(s) going in that instance in the same namespace
+        // Append one NDJSON record; no full-file read/parse required.
+        set jsonStream = ##class(%Stream.FileCharacter).%New()
+        set jsonStream.Filename = ..JSONFilePath
+        $$$ThrowOnError(jsonStream.MoveToEnd())
+        do jsonStream.WriteLine(entry.%ToJSON())
+        $$$ThrowOnError(jsonStream.%Save())
+
+        // Append to TXT file
+        set txtStream = ##class(%Stream.FileCharacter).%New()
+        set txtStream.Filename = ..TxtFilePath
+        $$$ThrowOnError(txtStream.MoveToEnd())
+        do txtStream.WriteLine(entry.timestamp _ " [" _ level _ "] " _ message)
+        $$$ThrowOnError(txtStream.%Save())
+
+        return $$$OK
+    }
+    catch ex
+    {
+        return ex.AsStatus()
+    }
 }
 
 Method Flush(pThreshold As %Integer = {..Threshold})
