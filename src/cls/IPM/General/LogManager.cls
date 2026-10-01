@@ -54,8 +54,7 @@ Method InitializeLog(fullCommand As %String, ByRef commandInfo) As %Status
         set ..TxtFilePath = logDir _ baseFileName _ ".txt"
 
         // Write log file path to terminal
-        write !, ..JSONFilePath
-        write !, ..TxtFilePath
+        write !, "Writing to the following log files: "_..JSONFilePath_" and "_..TxtFilePath
 
         // Get IPM version. GetVersion() returns per-module info in versionInfo("zpm") as $lb(namespace, version).
         $$$ThrowOnError(##class(%IPM.Main).GetVersion("zpm", .versionInfo))
