@@ -187,9 +187,10 @@ ClassMethod ResetPythonPermissions(timeout As %Integer = 300)
         quit $$$OK
     }
 
-    // Named, so a late signal from a timed-out job cannot reach another wait on this process's queue
-    set eventName = $name(^IPM.ResetPyPerms($job))
+    // Unique per call, so a late signal from a timed-out job cannot reach a later wait
+    set eventName = $name(^IPM.ResetPyPerms($job, $zhorolog))
     do $system.Event.Create(eventName)
+    write !,"Resetting permissions of Python packages..."
     try {
         job ..ResetPythonPermissionsAndSignal(pythonDir, eventName)::10
         if '$test {
@@ -208,6 +209,7 @@ ClassMethod ResetPythonPermissions(timeout As %Integer = 300)
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Job did not report a result"))
         }
         $$$ThrowOnError($listget(result, 2))
+        write " done."
     } catch ex {
         write !!,"WARNING: Unable to reset the permissions of Python packages in "_pythonDir_". They may be unreadable to other users. "_ex.DisplayString(),!
     }
