@@ -22,6 +22,8 @@
             <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify" />
             <Invoke Class="IPM.Installer" Method="Map" Phase="Reload" When="Before" />
             <Invoke Class="IPM.Installer" Method="MapIfLegacy" Phase="Compile" When="After" />
+            <Invoke Class="IPM.Installer" Method="ResetPythonPermissions" Phase="Activate"
+                When="After" />
             <Invoke Class="IPM.Installer" Method="InstallORASIfMissing" Phase="Activate"
                 When="After" />
             <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" />
