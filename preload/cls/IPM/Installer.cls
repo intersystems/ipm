@@ -175,6 +175,61 @@ ClassMethod InitializeAndSignal()
     do $system.Event.Signal($zparent,sc)
 }
 
+/// On Windows, resets protected ACLs in mgr/python from a job.
+/// The job runs as the IRIS service account, so it can reset entries a terminal user cannot read.
+ClassMethod ResetPythonPermissions(timeout As %Integer = 300)
+{
+    if '$$$isWINDOWS {
+        quit $$$OK
+    }
+    set pythonDir = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
+    if '##class(%File).DirectoryExists(pythonDir) {
+        quit $$$OK
+    }
+
+    // Unique per call, so a late signal from a timed-out job cannot reach a later wait
+    set eventName = $name(^IPM.ResetPyPerms($job, $zhorolog))
+    do $system.Event.Create(eventName)
+    write !,"Resetting permissions of Python packages..."
+    try {
+        job ..ResetPythonPermissionsAndSignal(pythonDir, eventName)::10
+        if '$test {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Job did not start"))
+        }
+        set child = $zchild
+        set deadline = $zhorolog + timeout
+        do {
+            set result = $system.Event.WaitMsg(eventName, 1)
+        } while ($listget(result, 1) '= 1) && $data(^$job(child)) && ($zhorolog < deadline)
+        if $listget(result, 1) '= 1 {
+            // The job may have signaled just before exiting
+            set result = $system.Event.WaitMsg(eventName, 0)
+        }
+        if $listget(result, 1) '= 1 {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Job did not report a result"))
+        }
+        $$$ThrowOnError($listget(result, 2))
+        write " done."
+    } catch ex {
+        write !!,"WARNING: Unable to reset the permissions of Python packages in "_pythonDir_". They may be unreadable to other users. "_ex.DisplayString(),!
+    }
+    do $system.Event.Delete(eventName)
+    quit $$$OK
+}
+
+ClassMethod ResetPythonPermissionsAndSignal(
+	pythonDir As %String,
+	eventName As %String) [ Internal ]
+{
+    set sc = $$$OK
+    try {
+        do ##class(%IPM.Utils.Module).ResetProtectedPermissions(pythonDir)
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    do $system.Event.Signal(eventName, sc)
+}
+
 ClassMethod ValidatePythonRuntime() As %Boolean
 {
     try {
