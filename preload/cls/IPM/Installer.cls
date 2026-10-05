@@ -192,12 +192,20 @@ ClassMethod ResetPythonPermissions(timeout As %Integer = 300)
     do $system.Event.Create(eventName)
     write !,"Resetting permissions of Python packages..."
     try {
-        job ..ResetPythonPermissionsAndSignal(pythonDir, eventName)::10
+        // JOB can fail to start transiently (e.g. the process table is briefly full), so retry a few times
+        set maxAttempts = 3
+        for attempt=1:1:maxAttempts {
+            job ..ResetPythonPermissionsAndSignal(pythonDir, eventName)::10
+            quit:$test
+            set jobError = $zerror
+            hang 1
+        }
         if '$test {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Job did not start"))
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Job to reset permissions of %1 did not start after %2 attempts: %3", pythonDir, maxAttempts, jobError)))
         }
         set child = $zchild
         set deadline = $zhorolog + timeout
+        // Poll until the job signals a result, the job's process ends (so a crashed job cannot hang this), or timeout elapses
         do {
             set result = $system.Event.WaitMsg(eventName, 1)
         } while ($listget(result, 1) '= 1) && $data(^$job(child)) && ($zhorolog < deadline)
@@ -206,12 +214,16 @@ ClassMethod ResetPythonPermissions(timeout As %Integer = 300)
             set result = $system.Event.WaitMsg(eventName, 0)
         }
         if $listget(result, 1) '= 1 {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Job did not report a result"))
+            if $zhorolog >= deadline {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Timed out after %1 seconds waiting for the job to reset permissions of %2", timeout, pythonDir)))
+            } else {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Job %1 exited without reporting a result for resetting permissions of %2", child, pythonDir)))
+            }
         }
         $$$ThrowOnError($listget(result, 2))
         write " done."
     } catch ex {
-        write !!,"WARNING: Unable to reset the permissions of Python packages in "_pythonDir_". They may be unreadable to other users. "_ex.DisplayString(),!
+        write !!,"WARNING: Unable to reset the permissions of Python packages in "_pythonDir_". Entries created by a different Windows account (for example, a manual irispip run, or an earlier IPM install that ran as a different account) may remain unreadable outside that account, which can make ORAS installs fail with a PermissionError. To fix this manually, run 'icacls "_pythonDir_" /reset /T' as an administrator. "_ex.DisplayString(),!
     }
     do $system.Event.Delete(eventName)
     quit $$$OK
