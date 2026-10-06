@@ -10,6 +10,10 @@ ROUTINE %IPM.Common [Type=INC]
 #; Useful because each install/load/uninstall command can potentially affect multiple packages
 #; The log entry for each package should include the same command
 #define ZPMCommandToLog %IPMCommandToLog
+#define Error "ERROR"
+#define Trace "TRACE"
+#define Info "INFO"
+#define Warning "WARNING"
 
 #; Default packages for package manager, module lifecycle classes and resource processors
 #define ZPMRootPackage "%IPM"
@@ -43,7 +47,7 @@ ROUTINE %IPM.Common [Type=INC]
 #define ZPMLogERROR		3
 
 #; Log file tools
-#define LogLine(%line, %verbose, %file, %level) Do ##class(%IPM.General.LogManager).LogLine(%line, %verbose, %file, %level)
+#define LogLine(%message, %level) $$$ThrowOnError(##class(%IPM.General.LogManager).WriteLogLine(%message, %level))
 
 #; System method/special variable wrappers
 #define InProgrammerMode ##class(%SYSTEM.Process).IsProgrammerMode()

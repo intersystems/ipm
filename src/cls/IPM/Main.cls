@@ -1053,6 +1053,10 @@ ClassMethod ShellInternal(
 			new $$$ZPMCommandToLog
 			set $$$ZPMCommandToLog = tCommand
 
+            // Instantiate log file for command
+            set tCommandInfo("logMgr") = ##class(%IPM.General.LogManager).%Get()
+            $$$ThrowOnError(tCommandInfo("logMgr").InitializeLog($$$ZPMCommandToLog, .tCommandInfo))
+
             if (tCommandInfo = "quit") {
                 return
             } elseif (tCommandInfo = "help") {
@@ -2384,11 +2388,6 @@ ClassMethod Load(
     if $$$HasData(pCommandInfo,"NoLog") && $$$HasData(pCommandInfo, "LogFilePath") {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Modifiers -no-log and -output-log contradict each other and can't both be used at the same time"))
     }
-    set logFile = ""
-    if '$$$GetDataDef(pCommandInfo, "NoLog", 0) {
-        set logFile = ##class(%IPM.General.LogManager).%New()
-        $$$ThrowOnError(logFile.InitializeLog($$$ZPMCommandToLog, .pCommandInfo))
-    }
 
 
 	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
@@ -2398,14 +2397,17 @@ ClassMethod Load(
         set log = pLog
     }
 	try {
-		do ..LoadInternal(.pCommandInfo, log, logFile)
+		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
-        $$$LogLine(Ex.DisplayString(),, logFile, "ERROR")
+        $$$LogLine(Ex.DisplayString(), "ERROR")
+        if (pCommandInfo("logMgr").Initialized) {
+            do pCommandInfo("logMgr").Finalize()
+        }
 		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
 		throw Ex
 	}
-    if $isobject(logFile) {
-        do logFile.FinishLogFile()
+    if (pCommandInfo("logMgr").Initialized) {
+        do pCommandInfo("logMgr").Finalize()
     }
 	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
@@ -2419,8 +2421,7 @@ ClassMethod ExecuteCOS(ByRef commandInfo)
 
 ClassMethod LoadInternal(
 	ByRef pCommandInfo,
-	pLog As %IPM.General.AbstractHistory,
-	pLogFile As %IPM.General.LogManager = "") [ Internal ]
+	pLog As %IPM.General.AbstractHistory) [ Internal ]
 {
     set tDirectoryName = $get(pCommandInfo("parameters","path"))
     set isAbsolutePath = ($extract(##class(%File).NormalizeDirectory(tDirectoryName), 1, $length(tDirectoryName)) = tDirectoryName)
@@ -2503,7 +2504,7 @@ ClassMethod LoadInternal(
 
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams,, pLog, pLogFile)
+    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams,, pLog)
     set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
     $$$ThrowOnError(tSC)
 }
@@ -2534,11 +2535,6 @@ ClassMethod Install(
 {
     if $$$HasData(pCommandInfo,"NoLog") && $$$HasData(pCommandInfo, "LogFilePath") {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Modifiers -no-log and -output-log contradict each other and can't both be used at the same time"))
-    }
-    set logFile = ""
-    if '$$$GetDataDef(pCommandInfo, "NoLog", 0) {
-        set logFile = ##class(%IPM.General.LogManager).%New()
-        $$$ThrowOnError(logFile.InitializeLog($$$ZPMCommandToLog, .pCommandInfo))
     }
 
     set devMode = $get(pCommandInfo("data","DeveloperMode"), 0)
@@ -2623,7 +2619,7 @@ ClassMethod Install(
                 }
                 $$$ThrowOnError(log.SetSource(tResult.ServerName))
                 $$$ThrowOnError(log.SetVersion(tResult.Version))
-                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log, logFile))
+                $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
             set tPrefix = ""
@@ -2640,14 +2636,17 @@ ClassMethod Install(
             }
         }
     } catch ex {
-        $$$LogLine(ex.DisplayString(),, logFile, "ERROR")
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
-		throw ex
-	}
-    if $isobject(logFile) {
-        do logFile.FinishLogFile()
+        $$$LogLine(ex.DisplayString(), "ERROR")
+        if (pCommandInfo("logMgr").Initialized) {
+            do pCommandInfo("logMgr").Finalize()
+        }
+        $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        throw ex
     }
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+    if (pCommandInfo("logMgr").Initialized) {
+        do pCommandInfo("logMgr").Finalize()
+    }
+    $$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]

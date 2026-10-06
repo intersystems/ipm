@@ -24,14 +24,13 @@ ClassMethod LoadQualifiedReference(
 	pReference As %IPM.Storage.QualifiedModuleInfo,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pLog As %IPM.General.AbstractHistory = "",
-	pLogFile As %IPM.General.LogManager = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
         #dim tReference As %IPM.Storage.QualifiedModuleInfo
         set tReference = pReference.%ConstructClone()
-        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog, pLogFile)
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog)
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -46,8 +45,7 @@ ClassMethod LoadModuleReference(
 	pPlatformVersion As %String,
 	ByRef pParams,
 	ByRef pDependencyGraph,
-	pLog As %IPM.General.AbstractHistory = "",
-	pLogFile As %IPM.General.LogManager = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     // if install of module is already being logged, don't duplicate
     set prelogged = $case(pLog, "": 0, :1)
@@ -137,15 +135,15 @@ ClassMethod LoadModuleReference(
             }
             set dotModules = ##class(%File).NormalizeDirectory(".modules", tDirectory)
             set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-            set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName,log,pLogFile)
+            set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName,log)
             set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         } else {
             set tAsArchive = -1
             set tPayload = tClient.GetModule(tModRef, .tAsArchive)
             set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
-            $$$LogLine("Module "_pModuleName_" was downloaded from " _ pServerName, tVerbose, pLogFile, "INFO")
+            $$$LogLine("Module "_pModuleName_" was downloaded from " _ pServerName, "INFO")
             if $isobject(serverDef) {
-                $$$LogLine(" ("_serverDef.Details_")", tVerbose, pLogFile, "INFO")
+                $$$LogLine(" ("_serverDef.Details_")", "INFO")
             }
             set tFileName = ""
             if ($isobject(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
@@ -169,7 +167,7 @@ ClassMethod LoadModuleReference(
             do tTmpStream.CopyFromAndSave(tPayload)
 
             if (tAsArchive) {
-                set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName,log,pLogFile)
+                set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName,log)
             } else {
                 // Old format (TODO: officially deprecate): try loading a .xml file
 
@@ -220,8 +218,7 @@ ClassMethod LoadModuleFromArchive(
 	pArchiveStream As %Stream.Object,
 	ByRef pParams,
 	pRepository As %String = "",
-	pLog As %IPM.General.AbstractHistory = "",
-	pLogFile As %IPM.General.LogManager = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -260,7 +257,7 @@ ClassMethod LoadModuleFromArchive(
 
         set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
         set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-        set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository, pLog, pLogFile)
+        set tSC = ..LoadModuleFromDirectory(tTargetDirectory, .pParams, , pRepository, pLog)
         set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         if $$$ISERR(tSC) {
             quit
@@ -276,15 +273,14 @@ ClassMethod LoadModuleFromDirectory(
 	ByRef pParams,
 	pOverrideDeveloperMode As %Boolean = 0,
 	pRepository As %String = "",
-	pLog As %IPM.General.AbstractHistory = "",
-	pLogFile As %IPM.General.LogManager = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         set line = "Loading from "_pDirectory
-        $$$LogLine(line, tVerbose, pLogFile, "INFO")
+        $$$LogLine(line, "INFO")
 
         // Propagate all params to dependencies except those that should only apply to the top level module
         // pParams("Install") indicates this is a top-level module
@@ -302,7 +298,7 @@ ClassMethod LoadModuleFromDirectory(
             zkill tParams("Install")
         }
 
-        set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pLog,pLogFile)
+        set tSC = ..LoadNewModule(pDirectory,.tParams,pRepository,pLog)
         if $$$ISERR(tSC) {
             quit
         }
@@ -360,7 +356,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-///
+/// 
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -1009,7 +1005,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-///
+/// 
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1124,8 +1120,7 @@ ClassMethod LoadNewModule(
 	pDirectory As %String,
 	ByRef pParams,
 	pRepository As %String = "",
-	pLog As %IPM.General.AbstractHistory = "",
-	pLogFile As %IPM.General.LogManager = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
 	if $data(pLog) # 2 = 0 {
 		set pLog = ""
@@ -1245,7 +1240,7 @@ ClassMethod LoadNewModule(
                 if +##class(%IPM.Repo.Definition).ReadOnlyGetStored(tRepositoryId) {
                     // Set in params directly so that this value gets transmitted downstream
                     set params("DeveloperMode") = 0
-                    $$$LogLine("Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode", tVerbose, pLogFile, "INFO")
+                    $$$LogLine("Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode", "INFO")
                 }
             }
         }
@@ -1285,7 +1280,7 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule,, .params, pLogFile)
+        do ..LoadDependencies(tModule,, .params)
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1298,15 +1293,15 @@ ClassMethod LoadNewModule(
             tcommit
         }
         set params("RootDirectory") = pDirectory
-        $$$LogLine("Loading "_tDisplayName_" in process "_$job, (tVerbose || $get(params("Multicompile","Verbose"),0)), pLogFile, "INFO")
+        $$$LogLine("Loading "_tDisplayName_" in process "_$job, "INFO")
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
-        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog, pLogFile)
+        set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
             tcommit
         }
         $$$ThrowOnError(tSC)
-        do tModule.WriteAfterInstallMessage(pLogFile)
+        do tModule.WriteAfterInstallMessage()
     } catch e {
         set tSC = e.AsStatus()
     }
@@ -1323,8 +1318,7 @@ ClassMethod LoadNewModule(
 ClassMethod LoadDependencies(
 	pModule As %IPM.Storage.Module,
 	phaseList As %List = "",
-	ByRef pParams,
-	pLogFile As %IPM.General.LogManager = "")
+	ByRef pParams)
 {
     set isVerbose = $get(pParams("Verbose"),0)
 
@@ -1332,20 +1326,20 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     set coUpdatingModules = $get(pParams("CoUpdatingModules"))
-    $$$LogLine("Building dependency graph...", 1, pLogFile, "INFO") // Intentionally always write even in non-verbose mode
+    $$$LogLine("Building dependency graph...", "INFO")
     set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade,,,,.coUpdatingModules)
     $$$ThrowOnError(sc)
-    $$$LogLine("Done.", 1, pLogFile, "INFO")
+    $$$LogLine("Done.", "INFO")
 
     // Install dependencies from the graph
     do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
-    $$$LogLine("Created inverted dependency graph from dependency graph", isVerbose, pLogFile, "INFO")
+    $$$LogLine("Created inverted dependency graph from dependency graph", "INFO")
 
     #dim flatDepList As %Library.ListOfObjects
     set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
-    $$$LogLine("Constructed flat dependency list from inverted dependency graph", isVerbose, pLogFile, "INFO")
-    $$$LogLine("Starting installation of dependencies...", isVerbose, pLogFile, "INFO")
-    $$$LogLine("", isVerbose, pLogFile, "INFO")
+    $$$LogLine("Constructed flat dependency list from inverted dependency graph", "INFO")
+    $$$LogLine("Starting installation of dependencies...", "INFO")
+    $$$LogLine("", "INFO")
 
     set coUpdatingModules = ""
     for i = 1:1:flatDepList.Count() {
@@ -1360,7 +1354,7 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, .dependencyGraph,, pLogFile)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, .dependencyGraph,)
         $$$ThrowOnError(sc)
     }
 
@@ -1370,7 +1364,7 @@ ClassMethod LoadDependencies(
             do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
         } catch (ex) {
             set line = "Error creating lock file for " _ pModule.Name _ " - " _ ex.DisplayString()
-            $$$LogLine(line,,pLogFile, "ERROR")
+            $$$LogLine(line, "ERROR")
         }
     }
 }

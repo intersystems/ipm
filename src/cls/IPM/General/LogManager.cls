@@ -5,6 +5,8 @@ Class %IPM.General.LogManager Extends %IPM.General.Singleton
 
 Parameter logLevels As STRING = "TRACE,INFO,WARNING,ERROR";
 
+Parameter supportedCommands As STRING = "install,load,update,uninstall";
+
 /// Has hashes of unique messages (with data equal to the index in ..Messages of that message)
 Property UniqueMessageHashes [ MultiDimensional, Private ];
 
@@ -27,32 +29,34 @@ Property TimeStampStart As %String;
 /// Unix timestamp marking the end time of logging
 Property TimeStampEnd As %String;
 
-/// The module object for this operation
-Property Module As %IPM.Storage.Module;
-
 Property SchemaVersion As %String [ InitialExpression = "1.0.0" ];
+
+/// Verbosity attached to the current command
+Property Verbose As %Boolean [ InitialExpression = 0 ];
+
+/// Indicates whether the log manager has been initialized (currently writing to .txt and .jsonl log files)
+Property Initialized As %Boolean [ InitialExpression = 0 ];
 
 /// Initialize log files and write headers.
 /// @Argument fullCommand           The full shell command as entered by the user
 /// @Argument ByRef commandInfo     Contains the parsed shell command (for format, see output of ##class(%IPM.CLI).%ParseCommandInput())
-/// @Argument module                The %IPM.Storage.Module object for version info
 Method InitializeLog(
 	fullCommand As %String,
-	ByRef commandInfo,
-	module As %IPM.Storage.Module) As %Status
+	ByRef commandInfo) As %Status
 {
+    // Skip log initialization if -no-log flag was given, command does not support a log file, or log is already initialized
+    if $$$GetDataDef(commandInfo, "NoLog", 0) || '$listfind($listfromstring(..#supportedCommands), commandInfo) || ..Initialized {
+        return $$$OK
+    }
+
+    set ..Verbose = $$$GetDataDef(commandInfo,"Verbose", 0)
     set ..TimeStampStart = $zdatetime($horolog,-2)
     // TO-DO: obfuscate sensitive information like credentials in the command before logging
     set ..Command = fullCommand
-    if $data(module) {
-        set ..Module = module
-        set moduleName = module.Name
-    } else {
-        set moduleName = commandInfo("parameters","module")
-    }
+    set moduleName = $get(commandInfo("parameters","module"), "module-not-parsed")
 
     try {
-        // Namespaces are case-insensitive; '%' (e.g. %SYS) is path-hostile and can't collide once mapped to '_'.
+        // Convert namespace to lowercase and replace % in namespace with _ so filepath is valid
         set normalizedNamespace = $translate($zconvert(..%namespace, "L"), "%", "_")
 
         // Create log directory: Either the path specified in the LogFilePath modifier or default <IRIS-mgr>/<namespace>/ipm-logs/
@@ -65,20 +69,23 @@ Method InitializeLog(
         $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
 
         // Set file paths with timestamp
-        set baseFileName = commandInfo _ "_" _ moduleName _ "_" _ ..TimeStampStart
+        set baseFileName = $get(commandInfo, "command-not-parsed") _ "_" _ moduleName _ "_" _ ..TimeStampStart
         set ..JSONFilePath = logDir _ baseFileName _ ".jsonl"
         set ..TxtFilePath = logDir _ baseFileName _ ".txt"
 
+        // Write log file path to terminal
+        write !, "Writing to the following log files: "_..JSONFilePath_" and "_..TxtFilePath
+
         // Get IPM version. GetVersion() returns per-module info in versionInfo("zpm") as $lb(namespace, version).
         do ##class(%IPM.Main).GetVersion("zpm", .versionInfo)
-        set ipmVersion = $listget($get(versionInfo("zpm")), 2)
+        set ipmVersion = $listget($get(versionInfo("zpm")), 2, "N/A (is this command installing IPM?)")
+
 
         // Write TXT header
         set txtStream = ##class(%Stream.FileCharacter).%New()
         set txtStream.Filename = ..TxtFilePath
         do txtStream.WriteLine("IPM Version: " _ ipmVersion)
-        do txtStream.WriteLine("Command: " _ ..Command)
-        do txtStream.WriteLine("")
+        do txtStream.WriteLine("Command: "_"'"_..Command_"'")
         $$$ThrowOnError(txtStream.%Save())
 
         // Write the JSON Lines header as the first record; subsequent lines are log entries.
@@ -93,6 +100,7 @@ Method InitializeLog(
         do jsonStream.WriteLine(header.%ToJSON())
         $$$ThrowOnError(jsonStream.%Save())
 
+        set ..Initialized = 1
         return $$$OK
     }
     catch ex
@@ -102,17 +110,28 @@ Method InitializeLog(
 }
 
 /// Write a log entry to both the JSON Lines and TXT files.
-/// @Argument level         The log level: TRACE, INFO, WARNING, or ERROR
 /// @Argument message       The human-readable log message to append
-Method WriteLogLine(
-	level As %String,
-	message As %String) As %Status
+/// @Argument level         The log level: TRACE, INFO, WARNING, or ERROR
+ClassMethod WriteLogLine(
+	message As %String,
+	level As %String) As %Status
 {
     try
     {
-        if '$listfind($listfromstring(..#logLevels), level) {
-            do ..WriteLogLine("Log has incorrect logLevel "_level_". Please ensure log level is one of: "_..#logLevels_$$$NL_"Attempted message to log was: "_message, "ERROR")
+        set logMgr = ##class(%IPM.General.LogManager).%Get()
+
+        if (logMgr.Verbose) {
+            write !, message
         }
+        if 'logMgr.Initialized {
+            return $$$OK
+        }
+
+        if '$listfind($listfromstring(logMgr.#logLevels), level) {
+            do ..WriteLogLine("Attempted to write to log with invalid log level '"_level_"'. Please ensure log level is one of: "_logMgr.#logLevels_$$$NL_"Attempted message to log was: "_message, "ERROR")
+            $$$ThrowOnError($$$ERROR($$$GeneralError, "Attempted to write to log with invalid log level '"_level_"'. Please ensure log level is one of: "_logMgr.#logLevels_$$$NL_"Attempted message to log was: "_message))
+        }
+
         set entry = ##class(%DynamicObject).%New()
         set entry.level = level
         set entry.message = message
@@ -120,14 +139,14 @@ Method WriteLogLine(
 
         // Append one NDJSON record; no full-file read/parse required.
         set jsonStream = ##class(%Stream.FileCharacter).%New()
-        set jsonStream.Filename = ..JSONFilePath
+        set jsonStream.Filename = logMgr.JSONFilePath
         $$$ThrowOnError(jsonStream.MoveToEnd())
         do jsonStream.WriteLine(entry.%ToJSON())
         $$$ThrowOnError(jsonStream.%Save())
 
         // Append to TXT file
         set txtStream = ##class(%Stream.FileCharacter).%New()
-        set txtStream.Filename = ..TxtFilePath
+        set txtStream.Filename = logMgr.TxtFilePath
         $$$ThrowOnError(txtStream.MoveToEnd())
         do txtStream.WriteLine(entry.timestamp _ " [" _ level _ "] " _ message)
         $$$ThrowOnError(txtStream.%Save())
@@ -140,25 +159,11 @@ Method WriteLogLine(
     }
 }
 
-/// Write a standard final "Logging Complete" message to both the JSON and TXT log files
-Method FinishLogFile()
+/// Write a standard final "Logging Complete" message to both the JSON and TXT log files and mark log as no longer initialized
+Method Finalize()
 {
-    do ..WriteLogLine("INFO", "Logging COMPLETE")
-}
-
-/// Write a line to terminal and log file
-ClassMethod LogLine(
-	line As %String,
-	verbose As %Boolean = 1,
-	logFile As %IPM.General.LogManager = "",
-	level As %String = "INFO")
-{
-    if verbose {
-        write !, line
-    }
-    if $isobject(logFile) {
-        do logFile.WriteLogLine(level, line)
-    }
+    do ..WriteLogLine("Logging COMPLETE", "INFO")
+    set ..Initialized = 0
 }
 
 Method Flush(pThreshold As %Integer = {..Threshold})

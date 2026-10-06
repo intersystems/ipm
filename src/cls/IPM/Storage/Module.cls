@@ -353,10 +353,10 @@ ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
     return tSC
 }
 
-Method WriteAfterInstallMessage(logFile As %IPM.General.LogManager)
+Method WriteAfterInstallMessage()
 {
     if ..AfterInstallMessage '= "" {
-        $$$LogLine(..%Evaluate(..AfterInstallMessage), 1, logFile, "INFO")
+        $$$LogLine(..%Evaluate(..AfterInstallMessage), "INFO")
     }
 }
 
@@ -449,8 +449,7 @@ ClassMethod ExecutePhases(
 	pPhases As %List,
 	pIsComplete As %Boolean = 0,
 	ByRef pParams,
-	pLog As %IPM.General.AbstractHistory = "",
-	pLogFile As %IPM.General.LogManager = "") As %Status
+	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
     set tSC = $$$OK
     try {
@@ -513,7 +512,7 @@ ClassMethod ExecutePhases(
             // Note: this is used later if the module object is reloaded.
             set tOverrideClass = $classname(tModule.Lifecycle)
             set line = "Using lifecycle class "_tOverrideClass_"; override class is "_tModule.OverrideLifecycleClass
-            $$$LogLine(line, tVerbose, pLogFile, "INFO")
+            $$$LogLine(line, "INFO")
         }
 
         set tLifecycle = tModule.Lifecycle
@@ -564,7 +563,7 @@ ClassMethod ExecutePhases(
                 set tLifecycle = tModule.Lifecycle
                 set tLifecycle.PhaseList = tPhases
                 set line = "["_tModule.DisplayName_"]"_$char(9)_"Module object refreshed."
-                $$$LogLine(line,,pLogFile, "INFO")
+                $$$LogLine(line, "INFO")
                 continue
             }
             // history logging for phases
@@ -575,11 +574,11 @@ ClassMethod ExecutePhases(
             set tSC = $$$OK
             try {
                 set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" START"
-                $$$LogLine(line,,pLogFile, "INFO")
+                $$$LogLine(line, "INFO")
                 // for the reload phase, print root from which module is being loaded
                 if tOnePhase = "Reload" {
                     set line = line_" ("_tModule.Root_")"
-                    $$$LogLine(line,,pLogFile, "INFO")
+                    $$$LogLine(line, "INFO")
                 }
 
                 // Notify source control (no-op if not configured)
@@ -651,10 +650,10 @@ ClassMethod ExecutePhases(
                     if isSelfUninstall {
                         // Print success message before skipping
                         set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" SUCCESS"
-                        $$$LogLine(line,,pLogFile, "INFO")
+                        $$$LogLine(line, "INFO")
                         if tTiming {
                             set line = " ("_($zhorolog-tStart)_" s)"
-                            $$$LogLine(line,,pLogFile, "INFO")
+                            $$$LogLine(line, "INFO")
                         }
                         // Skip all post-phase processing - classes have been deleted
                         continue
@@ -703,14 +702,14 @@ ClassMethod ExecutePhases(
 
             if $$$ISERR(tSC) {
                 set line = "["_tModule.DisplayName_"]"_$char(9)_tOnePhase_" FAILURE"_$select(tTiming:" ("_($zhorolog-tStart)_" s)",1:"")
-                $$$LogLine(line,,pLogFile, "ERROR")
+                $$$LogLine(line, "ERROR")
             } else {
                 set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" SUCCESS"
-                $$$LogLine(line,,pLogFile, "INFO")
+                $$$LogLine(line, "INFO")
             }
             if tTiming {
                 set line = " ("_($zhorolog-tStart)_" s)"
-                $$$LogLine(line,,pLogFile, "INFO")
+                $$$LogLine(line, "INFO")
             }
             $$$ThrowOnError(tSC)
 
@@ -720,7 +719,7 @@ ClassMethod ExecutePhases(
         }
         if tOverallTiming {
             set line = "["_tModule.DisplayName_"]"_$char(9)_"(total time: "_($zhorolog-tFullStart)_" s)"
-            $$$LogLine(line,,pLogFile, "INFO")
+            $$$LogLine(line, "INFO")
         }
     } catch e {
         set tSC = e.AsStatus()
