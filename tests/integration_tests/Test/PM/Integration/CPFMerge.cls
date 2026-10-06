@@ -71,6 +71,44 @@ Method TestCPFMerge()
     do $$$AssertStatusOK(sc, "Cleaned up web application: /csp/my-test-webapp")
 }
 
+Method TestCPFPackage()
+{
+    set moduleDir = ..GetModuleDir(..#TargetModuleName)
+    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Loaded module successfully")
+
+    set pkgDir = ##class(%File).NormalizeDirectory("cpf-merge-pkg", $$$FileTempDir)
+    set extractDir = ##class(%File).NormalizeDirectory("cpf-merge-extract", $$$FileTempDir)
+    do ##class(%File).RemoveDirectoryTree(pkgDir)
+    do ##class(%File).RemoveDirectoryTree(extractDir)
+    try {
+        set sc = ##class(%IPM.Main).Shell("package " _ ..#TargetModuleName _ " -only -v -path " _ pkgDir)
+        do $$$AssertStatusOK(sc, "Packaged module with CPF resources successfully")
+
+        // Verify CPF files land where DoMerge will look for them after install
+        set tgz = $extract(pkgDir, 1, *-1) _ ".tgz"
+        do $$$AssertTrue(##class(%File).Exists(tgz), "Package tgz was created: " _ tgz)
+        do ##class(%File).CreateDirectoryChain(extractDir)
+        set sc = ##class(%IPM.General.Archive).Extract(tgz, extractDir)
+        do $$$AssertStatusOK(sc, "Extracted packaged tgz")
+
+        set expectedFiles = $listbuild(
+            "src/cpf/config-globals.cpf",
+            "src/custom-cpf-directory/actions.cpf",
+            "src/cpf/package-mapping.cpf",
+            "src/cpf/system-expressions.cpf")
+        set ptr = 0
+        while $listnext(expectedFiles, ptr, relPath) {
+            set absPath = ##class(%File).NormalizeFilename(relPath, extractDir)
+            do $$$AssertTrue(##class(%File).Exists(absPath), "Archive contains " _ relPath)
+        }
+    } catch ex {
+        do $$$AssertStatusOK(ex.AsStatus(), "Exception during package verification")
+    }
+    do ##class(%File).RemoveDirectoryTree(pkgDir)
+    do ##class(%File).RemoveDirectoryTree(extractDir)
+}
+
 Method TestSystemExpressions()
 {
     set moduleDir = ..GetModuleDir(..#TargetModuleName)
