@@ -162,8 +162,10 @@ ClassMethod WriteLogLine(
 /// Write a standard final "Logging Complete" message to both the JSON and TXT log files and mark log as no longer initialized
 Method Finalize()
 {
-    do ..WriteLogLine("Logging COMPLETE", "INFO")
-    set ..Initialized = 0
+    if (..Initialized) {
+        do ..WriteLogLine("Logging COMPLETE", "INFO")
+        set ..Initialized = 0
+    }
 }
 
 Method Flush(pThreshold As %Integer = {..Threshold})

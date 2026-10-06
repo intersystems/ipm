@@ -182,6 +182,8 @@ This command is an alias for `module-action module-name publish`
 <modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
+<modifier name="output-log" dataAlias="LogFilePath" value="true" description="Directory to generate log files under." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 </command>
 
 <command name="makedeployed">
@@ -502,6 +504,8 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
+<modifier name="output-log" dataAlias="LogFilePath" value="true" description="Directory to generate log files under." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 </command>
 
@@ -1123,12 +1127,14 @@ ClassMethod ShellInternal(
                 do ..Sync(.tCommandInfo)
             }
         } catch pException {
+            do ##class(%IPM.General.LogManager).%Get().Finalize()
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
                 return
             }
             do ..DisplayError(pException.AsStatus())
         }
+        do ##class(%IPM.General.LogManager).%Get().Finalize()
 
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
@@ -2400,15 +2406,9 @@ ClassMethod Load(
 		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
         $$$LogLine(Ex.DisplayString(), "ERROR")
-        if (pCommandInfo("logMgr").Initialized) {
-            do pCommandInfo("logMgr").Finalize()
-        }
 		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
 		throw Ex
 	}
-    if (pCommandInfo("logMgr").Initialized) {
-        do pCommandInfo("logMgr").Finalize()
-    }
 	$$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
@@ -2637,14 +2637,8 @@ ClassMethod Install(
         }
     } catch ex {
         $$$LogLine(ex.DisplayString(), "ERROR")
-        if (pCommandInfo("logMgr").Initialized) {
-            do pCommandInfo("logMgr").Finalize()
-        }
         $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
         throw ex
-    }
-    if (pCommandInfo("logMgr").Initialized) {
-        do pCommandInfo("logMgr").Finalize()
     }
     $$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
