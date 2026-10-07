@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1228: `uninstall zpm` now prompts to remove IPM metadata even when no other module is installed, so downgrading IPM does not require installing an unrelated module first
 - #987: Fixed issue where installing dependencies with ORAS would fail due to failure to properly get the manifest
 - #1215: installer is synchronous rather than jobbed for simplified logging/debugging
+- #1261: Modules containing CPF resources can now be packaged
 
 ## [0.10.9] - 2026-08-05
 

@@ -3,6 +3,50 @@ Class Test.PM.Integration.CPFMerge Extends Test.PM.Integration.Base
 
 Parameter TargetModuleName As STRING = "cpf-merge";
 
+Method OnAfterOneTest() As %Status
+{
+    do ..CleanupCPFArtifacts()
+    quit $$$OK
+}
+
+Method OnAfterAllTests() As %Status
+{
+    do ..CleanupCPFArtifacts()
+    quit $$$OK
+}
+
+/// Removes the module and any %SYS artifacts created by the CPF merges, so a failed
+/// test does not leak state into the next test or test case. Each step swallows errors
+/// since the artifact may not exist on a given run.
+Method CleanupCPFArtifacts()
+{
+    set originalNamespace = $namespace
+    try {
+        do ##class(%IPM.Main).Shell("uninstall " _ ..#TargetModuleName _ " -force -quiet")
+    } catch {}
+
+    new $namespace
+    set $namespace = "%SYS"
+    set roleName = originalNamespace _ "-MyTestRole"
+    for item = $listbuild("Config.MapPackages", "%SYS", "MyPackage"),
+            $listbuild("Security.Roles", "MyTestRole"),
+            $listbuild("Security.Roles", roleName),
+            $listbuild("Security.Resources", "MyTestResource"),
+            $listbuild("Security.Applications", "/csp/my-test-webapp"),
+            $listbuild("Security.Applications", "/ipm/cpfwebapp") {
+        try {
+            set cls = $listget(item, 1)
+            set arg1 = $listget(item, 2)
+            set arg2 = $listget(item, 3)
+            if (arg2 '= "") {
+                do $classmethod(cls, "Delete", arg1, arg2)
+            } else {
+                do $classmethod(cls, "Delete", arg1)
+            }
+        } catch {}
+    }
+}
+
 Method TestCPFMerge()
 {
     set moduleDir = ..GetModuleDir(..#TargetModuleName)
@@ -56,19 +100,44 @@ Method TestCPFMerge()
 
     // Test Web Application
     do $$$AssertTrue(##class(Security.Applications).Exists("/csp/my-test-webapp"))
+}
 
-    // Cleanup: Remove resources created by the test
-    set sc = ##class(Config.MapPackages).Delete("%SYS", "MyPackage")
-    do $$$AssertStatusOK(sc, "Cleaned up package mapping: MyPackage")
+Method TestCPFPackage()
+{
+    set moduleDir = ..GetModuleDir(..#TargetModuleName)
+    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Loaded module successfully")
 
-    set sc = ##class(Security.Roles).Delete("MyTestRole")
-    do $$$AssertStatusOK(sc, "Cleaned up role: MyTestRole")
+    set pkgDir = ##class(%File).NormalizeDirectory("cpf-merge-pkg", $$$FileTempDir)
+    set extractDir = ##class(%File).NormalizeDirectory("cpf-merge-extract", $$$FileTempDir)
+    do ##class(%File).RemoveDirectoryTree(pkgDir)
+    do ##class(%File).RemoveDirectoryTree(extractDir)
+    try {
+        set sc = ##class(%IPM.Main).Shell("package " _ ..#TargetModuleName _ " -only -v -path " _ pkgDir)
+        do $$$AssertStatusOK(sc, "Packaged module with CPF resources successfully")
 
-    set sc = ##class(Security.Resources).Delete("MyTestResource")
-    do $$$AssertStatusOK(sc, "Cleaned up resource: MyTestResource")
+        // Verify CPF files land where DoMerge will look for them after install
+        set tgz = $extract(pkgDir, 1, *-1) _ ".tgz"
+        do $$$AssertTrue(##class(%File).Exists(tgz), "Package tgz was created: " _ tgz)
+        do ##class(%File).CreateDirectoryChain(extractDir)
+        set sc = ##class(%IPM.General.Archive).Extract(tgz, extractDir)
+        do $$$AssertStatusOK(sc, "Extracted packaged tgz")
 
-    set sc = ##class(Security.Applications).Delete("/csp/my-test-webapp")
-    do $$$AssertStatusOK(sc, "Cleaned up web application: /csp/my-test-webapp")
+        set expectedFiles = $listbuild(
+            "src/cpf/config-globals.cpf",
+            "src/custom-cpf-directory/actions.cpf",
+            "src/cpf/package-mapping.cpf",
+            "src/cpf/system-expressions.cpf")
+        set ptr = 0
+        while $listnext(expectedFiles, ptr, relPath) {
+            set absPath = ##class(%File).NormalizeFilename(relPath, extractDir)
+            do $$$AssertTrue(##class(%File).Exists(absPath), "Archive contains " _ relPath)
+        }
+    } catch ex {
+        do $$$AssertStatusOK(ex.AsStatus(), "Exception during package verification")
+    }
+    do ##class(%File).RemoveDirectoryTree(pkgDir)
+    do ##class(%File).RemoveDirectoryTree(extractDir)
 }
 
 Method TestSystemExpressions()
@@ -105,13 +174,6 @@ Method TestSystemExpressions()
     do $$$AssertStatusOK(sc, "Retrieved web application properties successfully")
     do $$$AssertEquals(webAppProps("NameSpace"), originalNamespace, "Web app namespace set correctly using {$ns} expression")
     do $$$AssertEquals(webAppProps("AutheEnabled"), $$$AutheUnauthenticated, "Web app authentication set correctly using $$$AutheUnauthenticated macro")
-
-    // Cleanup: Remove the web application and role created by the test
-    set sc = ##class(Security.Applications).Delete(webAppName)
-    do $$$AssertStatusOK(sc, "Cleaned up web application: "_webAppName)
-
-    set sc = ##class(Security.Roles).Delete(roleName)
-    do $$$AssertStatusOK(sc, "Cleaned up role: "_roleName)
 }
 
 }
