@@ -29,7 +29,7 @@ Property TimeStampStart As %String;
 /// Unix timestamp marking the end time of logging
 Property TimeStampEnd As %String;
 
-Property SchemaVersion As %String [ InitialExpression = "1.0.0" ];
+Property SchemaVersion As %String [InitialExpression = "1.0.0"];
 
 /// Verbosity attached to the current command
 Property Verbose As %Boolean [ InitialExpression = 0 ];
