@@ -175,6 +175,73 @@ ClassMethod InitializeAndSignal()
     do $system.Event.Signal($zparent,sc)
 }
 
+/// On Windows, resets protected ACLs in mgr/python from a job.
+/// The job runs as the IRIS service account, so it can reset entries a terminal user cannot read.
+ClassMethod ResetPythonPermissions(timeout As %Integer = 300)
+{
+    if '$$$isWINDOWS {
+        quit $$$OK
+    }
+    set pythonDir = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
+    if '##class(%File).DirectoryExists(pythonDir) {
+        quit $$$OK
+    }
+
+    // Unique per call, so a late signal from a timed-out job cannot reach a later wait
+    set eventName = $name(^IPM.ResetPyPerms($job, $zhorolog))
+    do $system.Event.Create(eventName)
+    write !,"Resetting permissions of Python packages..."
+    try {
+        // JOB can fail to start transiently (e.g. the process table is briefly full), so retry a few times
+        set maxAttempts = 3
+        for attempt=1:1:maxAttempts {
+            job ..ResetPythonPermissionsAndSignal(pythonDir, eventName)::10
+            quit:$test
+            set jobError = $zerror
+            hang 1
+        }
+        if '$test {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Job to reset permissions of %1 did not start after %2 attempts: %3", pythonDir, maxAttempts, jobError)))
+        }
+        set child = $zchild
+        set deadline = $zhorolog + timeout
+        // Poll until the job signals a result, the job's process ends (so a crashed job cannot hang this), or timeout elapses
+        do {
+            set result = $system.Event.WaitMsg(eventName, 1)
+        } while ($listget(result, 1) '= 1) && $data(^$job(child)) && ($zhorolog < deadline)
+        if $listget(result, 1) '= 1 {
+            // The job may have signaled just before exiting
+            set result = $system.Event.WaitMsg(eventName, 0)
+        }
+        if $listget(result, 1) '= 1 {
+            if $zhorolog >= deadline {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Timed out after %1 seconds waiting for the job to reset permissions of %2", timeout, pythonDir)))
+            } else {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Job %1 exited without reporting a result for resetting permissions of %2", child, pythonDir)))
+            }
+        }
+        $$$ThrowOnError($listget(result, 2))
+        write " done."
+    } catch ex {
+        write !!,"WARNING: Unable to reset the permissions of Python packages in "_pythonDir_". Entries created by a different Windows account (for example, a manual irispip run, or an earlier IPM install that ran as a different account) may remain unreadable outside that account, which can make ORAS installs fail with a PermissionError. To fix this manually, run 'icacls "_pythonDir_" /reset /T' as an administrator. "_ex.DisplayString(),!
+    }
+    do $system.Event.Delete(eventName)
+    quit $$$OK
+}
+
+ClassMethod ResetPythonPermissionsAndSignal(
+	pythonDir As %String,
+	eventName As %String) [ Internal ]
+{
+    set sc = $$$OK
+    try {
+        do ##class(%IPM.Utils.Module).ResetProtectedPermissions(pythonDir)
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    do $system.Event.Signal(eventName, sc)
+}
+
 ClassMethod ValidatePythonRuntime() As %Boolean
 {
     try {
