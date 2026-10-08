@@ -14,7 +14,7 @@ Parameter NonExistentDepMod As String = "non-existent-dep-mod";
 Parameter InterruptModule As String = "execution-interrupt-mod";
 
 /// Custom directory to use to store log files using the -output-file flag
-Parameter CustomOutputDir As String = "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/logging/custom-dir/";
+Property CustomOutputDir As %String;
 
 /// Default log file directory
 Property DefaultLogFileDir As %String;
@@ -25,13 +25,14 @@ Method OnBeforeAllTests() As %Status
     try {
         // Set default property values
         set ..DefaultLogFileDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ $zconvert($namespace, "l") _ "/" _ "ipm-logs/")
+        set ..CustomOutputDir = ..GetModuleDir("logging", "custom-dir")
 
         // Setup repos for LockFile tests
         $$$ThrowOnError(##class(%IPM.Main).Shell("repo -delete-all"))
-        $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n logging-test -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/logging/"))
+        $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n logging-test -fs -path " _ ..GetModuleDir("logging")))
 
         // Delete any log files that may already exist
-        $$$ThrowOnError(..CleanLogFileDir(..#CustomOutputDir))
+        $$$ThrowOnError(..CleanLogFileDir(..CustomOutputDir))
         $$$ThrowOnError(..CleanLogFileDir(..DefaultLogFileDir))
     } catch ex {
         set sc = ex.AsStatus()
@@ -59,7 +60,7 @@ Method OnAfterOneTest() As %Status
         $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall -all"))
 
         // Delete any log files created under either the default path or custom path
-        $$$ThrowOnError(..CleanLogFileDir(..#CustomOutputDir))
+        $$$ThrowOnError(..CleanLogFileDir(..CustomOutputDir))
         $$$ThrowOnError(..CleanLogFileDir(..DefaultLogFileDir))
     } catch ex {
         set sc = ex.AsStatus()
@@ -77,7 +78,7 @@ Method TestInstall()
 /// Tests creation of a log file on the 'load' command
 Method TestLoad()
 {
-    set commands = $listbuild("load /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/logging/v1/base-mod")
+    set commands = $listbuild("load " _ ..GetModuleDir("logging", "v1", "base-mod"))
     do ..GenericLoggingTest(commands, ..DefaultLogFileDir)
 }
 
@@ -100,8 +101,8 @@ Method TestUninstall()
 /// Test that the -output-file command creates log files in a specified location
 Method TestOutputPath()
 {
-    set commands = $listbuild("install -v -output-log " _ ..#CustomOutputDir _ " " _ ..#BaseModule)
-    do ..GenericLoggingTest(commands, ..#CustomOutputDir)
+    set commands = $listbuild("install -v -output-log " _ ..CustomOutputDir _ " " _ ..#BaseModule)
+    do ..GenericLoggingTest(commands, ..CustomOutputDir)
 }
 
 /// Test that the -no-log flag does not create log files
@@ -203,6 +204,8 @@ Method GenericLoggingTest(
 ///     "txt": <List of .txt log file names>,
 ///     "jsonl": <List of .jsonl log file names>
 /// }
+///
+/// @Argument   directory   Directory to search for log files.
 ClassMethod GetLogFilesInDir(directory As %String) As %DynamicObject [ Internal ]
 {
     set files = {}
@@ -239,7 +242,7 @@ Method VerifyTxtFileContents(
     set expectedIPMVersion = "IPM Version: " _ ##class(%IPM.Storage.Module).NameOpen("zpm").VersionString
     set expectedCommand = "Command: '" _ command _ "'"
     set stream = ##class(%Stream.FileCharacter).%New()
-    set sc = stream.LinkToFile(fileName)
+    $$$ThrowOnError(stream.LinkToFile(fileName))
     set txtVersion = $zstrip(stream.ReadLine(), "*C")
     set txtCommand = $zstrip(stream.ReadLine(), "*C")
     do $$$AssertTrue(txtVersion [ expectedIPMVersion, "IPM version in txt file matches expected value")
@@ -255,7 +258,6 @@ Method VerifyTxtFileContents(
     }
     do $$$AssertTrue(lastLine [ expectedEndMessage, "End message is present in the txt log file")
 
-    // Verify error message if expected
     if checkForErrors {
         set expectedErrorMessage = "[ERROR]"
         do $$$AssertTrue(secondLastLine [ expectedErrorMessage, "Message with log level [ERROR] is present in the txt log file")
@@ -275,7 +277,7 @@ Method VerifyJsonlFileContents(
     set expectedCommand = command
 
     set stream = ##class(%Stream.FileCharacter).%New()
-    set sc = stream.LinkToFile(fileName)
+    $$$ThrowOnError(stream.LinkToFile(fileName))
     set header = $zstrip(stream.ReadLine(), "*C")
     set secondLastLine = ""
     set lastLine = ""
@@ -295,6 +297,7 @@ Method VerifyJsonlFileContents(
     do $$$AssertTrue(endMessageIsAsExpected, "End message is present in the jsonl log file")
 
     // Verify error message if expected
+    // Verify error message if expected
     if checkForErrors {
         set secondLastLine = {}.%FromJSON(secondLastLine)
         set errorMessageIsAsExpected = (secondLastLine.%Get("level") = "ERROR")
@@ -310,14 +313,20 @@ ClassMethod CleanLogFileDir(directory As %String) As %Status [ Internal ]
         // Delete all .txt files
         set file = $zsearch(directory _ "*.txt")
         while file '="" {
-            do ##class(%File).Delete(file)
+            set deleted = ##class(%File).Delete(file)
+            if 'deleted {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to delete file: %1",file)))
+            }
             set file = $zsearch("")
         }
 
         // Delete all .jsonl files
         set file = $zsearch(directory _ "*.jsonl")
-        while file '="" {
-            do ##class(%File).Delete(file)
+        while file '= "" {
+            set deleted = ##class(%File).Delete(file)
+            if 'deleted {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to delete file: %1",file)))
+            }
             set file = $zsearch("")
         }
     } catch (ex) {

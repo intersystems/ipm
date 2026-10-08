@@ -14,7 +14,7 @@ Method TestInstantiation()
     // Replicating a commandInfo object for this test
     set command = "install logging-test"
     set commandInfo = "install"
-    //set commandInfo("logMgr") = logMgr
+    set commandInfo("logMgr") = logMgr
     set commandInfo("parameters","module") = "logging-test"
 
     set sc = logMgr.InitializeLog(command, .commandInfo)
