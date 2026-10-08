@@ -124,7 +124,16 @@ Method TestInstallFailure()
     set sc = ##class(%IPM.Main).Shell(command)
     do $$$AssertStatusNotOK(sc, "Install failure on " _ ..#NonExistentDepMod)
 
-    // TODO: Add a check for erroring log file contents
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    if ($listlength(files.%Get("txt")) '= 1) || ($listlength(files.%Get("jsonl")) '= 1) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Expected exactly 1 .txt and 1 .jsonl file in VerifyLogFilesInDirectory() but that was not the case"))
+    }
+
+    set txtLogFile = $listget(files.%Get("txt"), 1)
+    set jsonlLogFile = $listget(files.%Get("jsonl"), 1)
+
+    do ..VerifyTxtFileContents(txtLogFile, command, 1)
+    do ..VerifyJsonlFileContents(jsonlLogFile, command, 1)
 }
 
 /// Test log output in the case of the execution being interrupted
@@ -133,9 +142,29 @@ Method TestExecutionInterrupted()
 {
     set command = "install " _ ..#InterruptModule
     set sc = ##class(%IPM.Main).Shell(command)
-    do $$$AssertStatusNotOK(sc, "Install interurpted on " _ ..#InterruptModule)
+    do $$$AssertStatusNotOK(sc, "Install interrupted on " _ ..#InterruptModule)
 
-    // TODO: Add a check for erroring log file contents
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    if ($listlength(files.%Get("txt")) '= 1) || ($listlength(files.%Get("jsonl")) '= 1) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"Expected exactly 1 .txt and 1 .jsonl file in VerifyLogFilesInDirectory() but that was not the case"))
+    }
+
+    set txtLogFile = $listget(files.%Get("txt"), 1)
+    set jsonlLogFile = $listget(files.%Get("jsonl"), 1)
+
+    do ..VerifyTxtFileContents(txtLogFile, command, 1)
+    do ..VerifyJsonlFileContents(jsonlLogFile, command, 1)
+}
+
+/// Tests that when performing an unsupported command, no log files are created.
+Method TestNonSupportedCommand()
+{
+    set command = "repo -list"
+    $$$ThrowOnError(##class(%IPM.Main).Shell(command))
+
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    set noLogsCreated = ($listlength(files.%Get("txt")) = 0) && ($listlength(files.%Get("jsonl")) = 0)
+    do $$$AssertTrue(noLogsCreated, "No log files created for an unsupported command")
 }
 
 /// Performs a generic logging test
@@ -203,7 +232,8 @@ ClassMethod GetLogFilesInDir(directory As %String) As %DynamicObject [ Internal 
 /// Log files that are expected to have special output should not be checked using this method
 Method VerifyTxtFileContents(
 	fileName As %String,
-	command As %String = "") [ Internal ]
+	command As %String = "",
+	checkForErrors As %Boolean = 0) [ Internal ]
 {
     // Verify top-level info
     set expectedIPMVersion = "IPM Version: " _ ##class(%IPM.Storage.Module).NameOpen("zpm").VersionString
@@ -217,17 +247,27 @@ Method VerifyTxtFileContents(
 
     // Verify end message
     set expectedEndMessage = "[INFO] Logging COMPLETE"
+    set secondLastLine = ""
+    set lastLine = ""
     while 'stream.AtEnd {
+        set secondLastLine = lastLine
         set lastLine = stream.ReadLine()
     }
     do $$$AssertTrue(lastLine [ expectedEndMessage, "End message is present in the txt log file")
+
+    // Verify error message if expected
+    if checkForErrors {
+        set expectedErrorMessage = "[ERROR]"
+        do $$$AssertTrue(secondLastLine [ expectedErrorMessage, "Message with log level [ERROR] is present in the txt log file")
+    }
 }
 
 /// Verifies the contents of a .jsonl log file at a given path and command that created the file
 /// Log files that are expected to have special output should not be checked using this method
 Method VerifyJsonlFileContents(
 	fileName As %String,
-	command As %String = "") [ Internal ]
+	command As %String = "",
+	checkForErrors As %Boolean = 0) [ Internal ]
 {
     // Verify top-level info
     set expectedIPMVersion = ##class(%IPM.Storage.Module).NameOpen("zpm").VersionString
@@ -237,7 +277,10 @@ Method VerifyJsonlFileContents(
     set stream = ##class(%Stream.FileCharacter).%New()
     set sc = stream.LinkToFile(fileName)
     set header = $zstrip(stream.ReadLine(), "*C")
+    set secondLastLine = ""
+    set lastLine = ""
     while 'stream.AtEnd {
+        set secondLastLine = lastLine
         set lastLine = stream.ReadLine()
     }
 
@@ -250,6 +293,13 @@ Method VerifyJsonlFileContents(
     set lastLine = {}.%FromJSON(lastLine)
     set endMessageIsAsExpected = (lastLine.%Get("level") = "INFO") && (lastLine.%Get("message") = "Logging COMPLETE")
     do $$$AssertTrue(endMessageIsAsExpected, "End message is present in the jsonl log file")
+
+    // Verify error message if expected
+    if checkForErrors {
+        set secondLastLine = {}.%FromJSON(secondLastLine)
+        set errorMessageIsAsExpected = (secondLastLine.%Get("level") = "ERROR")
+        do $$$AssertTrue(errorMessageIsAsExpected, "Message with log level [ERROR] is present in the jsonl log file")
+    }
 }
 
 /// For a given directory, deletes the log files in that location (.txt and .jsonl files)
