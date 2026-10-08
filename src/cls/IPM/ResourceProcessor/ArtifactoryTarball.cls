@@ -11,14 +11,22 @@ Class %IPM.ResourceProcessor.ArtifactoryTarball Extends %IPM.ResourceProcessor.A
 Parameter DESCRIPTION As STRING = "Retrieves a build artifact from an external repository and unpacks it into the desired location(s).";
 
 /// Comma-separated list of resource attribute names that this processor uses.
-Parameter ATTRIBUTES As STRING = "InstallDirectory,Filter";
+Parameter ATTRIBUTES As STRING = "InstallDirectory,Filter,Server,Port";
 
 /// Path to which the artifact should be unpacked upon activation; may contain expressions.
 Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest}, Required ];
 
 /// As JSON, the contents of the filter to be used in the items.find() query in JFrog Artifactory
 /// For more details on specific values, visit <a href="https://jfrog.com/help/r/jfrog-artifactory-documentation/artifactory-query-language" target="_blank">JFrog AQL Documentation</a>
+/// Without credentials, the filter may only use <code>repo</code>, <code>name</code>, <code>path</code>,
+/// <code>type</code> and <code>@property</code> keys, with <code>$eq</code> (or <code>$match</code> for name and path), and must set a name or a property.
 Property Filter As %String(MAXLEN = "");
+
+/// Artifactory host name. The ARTI_SERVER environment variable takes precedence.
+Property Server As %String(MAXLEN = "");
+
+/// Artifactory port; defaults to 443. The ARTI_PORT environment variable takes precedence.
+Property Port As %String(MAXLEN = "");
 
 Method OnAfterPhase(
 	phase As %String,
@@ -106,18 +114,28 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
 
     set server = $system.Util.GetEnviron("ARTI_SERVER")
+    if (server = "") {
+        set server = ..Server
+    }
     set port = $system.Util.GetEnviron("ARTI_PORT")
+    if (port = "") {
+        set port = ..Port
+    }
     set aqlURL = $system.Util.GetEnviron("ARTI_AQL_URL")
+    if (aqlURL = "") {
+        set aqlURL = "/artifactory/api/search/aql"
+    }
     set username = $system.Util.GetEnviron("ARTI_USERNAME")
     set password = $system.Util.GetEnviron("ARTI_PASSWORD")
     set bearerToken = $system.Util.GetEnviron("ARTI_TOKEN")
+    set hasCredentials = (bearerToken '= "") || ((username '= "") && (password '= ""))
 
-    if ((server = "") || (port = "") || (aqlURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
+    if (server = "") {
         if (developerMode) {
-            write !, $$$FormattedLine($$$Yellow, "WARNING: Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact.")
+            write !, $$$FormattedLine($$$Yellow, "WARNING: No Artifactory server was provided (Server attribute or ARTI_SERVER), skipping downloading artifact.")
             quit
         }
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, aql url, and a bearer token or username and password must be provided to download an artifact"))
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"An Artifactory server (Server attribute or ARTI_SERVER) must be provided to download an artifact"))
     }
     if (verbose) {
         write !, "Start retrieving artifact..."
@@ -135,8 +153,21 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     // SubDirectoryName does normalization as well
     set PMTempDir = ##class(%File).SubDirectoryName(OSTempDir, ..ResourceReference.Name, 1)
 
-    set artifactPath = ..GetArtifactPath(server, port, aqlURL, username, password, bearerToken, ..Filter, verbose)
-    set artifactName = ..RetrieveArtifact(server, port, artifactPath, PMTempDir, verbose)
+    if (hasCredentials) {
+        set artifactPath = ..GetArtifactPath(server, port, aqlURL, username, password, bearerToken, ..Filter, verbose)
+        set artifactName = ..RetrieveArtifact(server, port, artifactPath, PMTempDir, verbose)
+    } else {
+        try {
+            set artifactPath = ..GetArtifactPathAnonymous(server, port, ..Filter, verbose)
+            set artifactName = ..RetrieveArtifact(server, port, artifactPath, PMTempDir, verbose)
+        } catch ex {
+            if ('developerMode) {
+                throw ex
+            }
+            write !, $$$FormattedLine($$$Yellow, "WARNING: Anonymous download failed, skipping downloading artifact: "_ex.DisplayString())
+            return
+        }
+    }
 
     // Unpack artifact in temp location (so that if anything goes wrong, the true destination does not get affected)
     // and copy artifact to destination
@@ -227,6 +258,223 @@ ClassMethod GetArtifactPath(
     }
 
     return artifactPath
+}
+
+/// Returns the path of the most recently updated artifact matching the filter, without authenticating.<br />
+/// Artifactory denies AQL to anonymous users, so this uses the artifact (name) or property search instead.<br />
+/// Errors if no valid artifact is found.<br />
+ClassMethod GetArtifactPathAnonymous(
+	artifactServer As %String,
+	artifactPort As %String,
+	filter As %String,
+	verbose As %Boolean = 0) As %String [ Internal ]
+{
+    set criteria = ..ParseAnonymousFilter(filter)
+
+    set httpRequest = ##class(%Net.HttpRequest).%New()
+    set httpRequest.Https = 1
+    set httpRequest.SSLConfiguration = ##class(%IPM.Utils.Module).CreateAndGetSSLConfig()
+    set httpRequest.Server = artifactServer
+    set httpRequest.Port = artifactPort
+    do httpRequest.SetHeader("X-Result-Detail", "info, properties")
+    if (criteria.repo '= "") {
+        do httpRequest.SetParam("repos", criteria.repo)
+    }
+    if (criteria.name '= "") {
+        set searchURL = "/artifactory/api/search/artifact"
+        do httpRequest.SetParam("name", criteria.name.value)
+    } else {
+        set searchURL = "/artifactory/api/search/prop"
+        set iterator = criteria.properties.%GetIterator()
+        while iterator.%GetNext(.key, .value) {
+            do httpRequest.SetParam(key, value)
+        }
+    }
+    if (verbose) {
+        write !, "No credentials provided. Going to search anonymously: "_searchURL_httpRequest.ReturnParams()
+    }
+    $$$ThrowOnError(httpRequest.Get(searchURL))
+
+    set responseData = httpRequest.HttpResponse.Data
+    set responseDataStr = responseData.Read(,.readStatus)
+    $$$ThrowOnError(readStatus)
+    $$$ThrowOnError(responseData.Rewind())
+    set statusCode = httpRequest.HttpResponse.StatusCode
+    if (statusCode = 401) || (statusCode = 403) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Anonymous search was refused (HTTP %1); provide ARTI_TOKEN, or ARTI_USERNAME and ARTI_PASSWORD", statusCode)))
+    } elseif (statusCode '= 200) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "The following error occurred while retrieving artifact info: " _ responseDataStr))
+    }
+
+    set results = ##class(%Library.DynamicAbstractObject).%FromJSON(responseData).%Get("results")
+    if '$isobject(results) {
+        set results = []
+    }
+    set artifactPath = ..SelectNewestArtifact(results, criteria)
+    if (artifactPath = "") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No valid artifact was found based on the query parameters"))
+    }
+    if (verbose) {
+        write !, "Valid artifact found at: "_artifactPath
+    }
+
+    return artifactPath
+}
+
+/// Converts an AQL filter into the criteria used by <method>GetArtifactPathAnonymous</method>, e.g.
+/// <example>
+/// {"repo": "generic-local", "name": {"$match": "my-ui-1.2.*"}, "@commit.branch": "main"}
+/// </example>
+/// becomes
+/// <example>
+/// {"repo": "generic-local", "name": {"value": "my-ui-1.2.*", "isPattern": 1}, "properties": {"commit.branch": "main"}}
+/// </example>
+/// Errors if the filter uses anything that only AQL can evaluate.
+ClassMethod ParseAnonymousFilter(filter As %String) As %DynamicObject [ Internal ]
+{
+    set criteria = {"repo": "", "properties": {}}
+    set filterObject = $select(filter = "": {}, 1: {}.%FromJSON(filter))
+    set iterator = filterObject.%GetIterator()
+    while iterator.%GetNext(.key, .condition) {
+        if (key = "repo") {
+            set criteria.repo = ..ParseCondition(key, condition, 0)
+        } elseif (key = "name") || (key = "path") {
+            set value = ..ParseCondition(key, condition, 1, .isPattern)
+            do criteria.%Set(key, {"value": (value), "isPattern": (isPattern)})
+        } elseif (key = "type") {
+            if (..ParseCondition(key, condition, 0) '= "file") {
+                do ..ThrowUnsupportedFilter(key)
+            }
+        } elseif ($extract(key) = "@") {
+            do criteria.properties.%Set($extract(key, 2, *), ..ParseCondition(key, condition, 0))
+        } else {
+            do ..ThrowUnsupportedFilter(key)
+        }
+    }
+    if (criteria.name = "") && (criteria.properties.%Size() = 0) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Without credentials, the filter must specify a name or a @property"))
+    }
+    return criteria
+}
+
+/// Returns the value of an AQL condition, which is either a plain value or a single
+/// <code>$eq</code> (or, if allowMatch is set, <code>$match</code>) operator.
+ClassMethod ParseCondition(
+	key As %String,
+	condition,
+	allowMatch As %Boolean,
+	Output isPattern As %Boolean) As %String [ Internal, Private ]
+{
+    set isPattern = 0
+    if '$isobject(condition) {
+        return condition
+    }
+    if 'condition.%IsA("%Library.DynamicObject") || (condition.%Size() '= 1) {
+        do ..ThrowUnsupportedFilter(key)
+    }
+    set operator = condition.%GetIterator()
+    do operator.%GetNext(.name, .value)
+    if $isobject(value) {
+        do ..ThrowUnsupportedFilter(key)
+    }
+    if (name = "$match") && allowMatch {
+        set isPattern = 1
+    } elseif (name '= "$eq") {
+        do ..ThrowUnsupportedFilter(key)
+    }
+    return value
+}
+
+ClassMethod ThrowUnsupportedFilter(key As %String) [ Internal, Private ]
+{
+    $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Filter key %1 cannot be evaluated without credentials; provide ARTI_TOKEN, or ARTI_USERNAME and ARTI_PASSWORD, to use AQL", key)))
+}
+
+/// Returns the path (as in <method>GetArtifactPath</method>) of the most recently updated search result
+/// that matches the criteria, or "" if none does. Results carry the <code>X-Result-Detail: info, properties</code> fields.
+ClassMethod SelectNewestArtifact(
+	results As %DynamicArray,
+	criteria As %DynamicObject) As %String [ Internal ]
+{
+    set artifactPath = ""
+    set newestUpdated = ""
+    set iterator = results.%GetIterator()
+    while iterator.%GetNext(, .result) {
+        // e.g. /my-ui/-/my-ui-1.2.3.tgz
+        set fullPath = result.path
+        set name = $piece(fullPath, "/", *)
+        set folder = $piece(fullPath, "/", 2, *-1)
+        if (criteria.repo '= "") && (result.repo '= criteria.repo) {
+            continue
+        }
+        if '..MatchesCondition(name, criteria.name) || '..MatchesCondition($select(folder = "": ".", 1: folder), criteria.path) {
+            continue
+        }
+        if '..HasProperties(result.properties, criteria.properties) {
+            continue
+        }
+        if (artifactPath = "") || (result.lastUpdated ] newestUpdated) {
+            set newestUpdated = result.lastUpdated
+            set artifactPath = "artifactory/"_result.repo_"/"_$select(folder = "": "", 1: folder_"/")_name
+        }
+    }
+    return artifactPath
+}
+
+ClassMethod MatchesCondition(
+	value As %String,
+	condition As %DynamicObject) As %Boolean [ Internal, Private ]
+{
+    if (condition = "") {
+        return 1
+    }
+    if 'condition.isPattern {
+        return (value = condition.value)
+    }
+    return ..WildcardMatch(value, condition.value)
+}
+
+ClassMethod HasProperties(
+	actual As %DynamicObject,
+	expected As %DynamicObject) As %Boolean [ Internal, Private ]
+{
+    set iterator = expected.%GetIterator()
+    while iterator.%GetNext(.key, .expectedValue) {
+        set values = $select($isobject(actual): actual.%Get(key), 1: "")
+        if '$isobject(values) {
+            return 0
+        }
+        set found = 0
+        set valueIterator = values.%GetIterator()
+        while 'found && valueIterator.%GetNext(, .value) {
+            set found = (value = expectedValue)
+        }
+        if 'found {
+            return 0
+        }
+    }
+    return 1
+}
+
+/// Matches an AQL <code>$match</code> pattern, where * is any run of characters and ? is any one character.
+ClassMethod WildcardMatch(
+	value As %String,
+	pattern As %String) As %Boolean [ Internal ]
+{
+    set regex = ""
+    for i = 1:1:$length(pattern) {
+        set char = $extract(pattern, i)
+        if (char = "*") {
+            set regex = regex_".*"
+        } elseif (char = "?") {
+            set regex = regex_"."
+        } elseif (char?1AN) {
+            set regex = regex_char
+        } else {
+            set regex = regex_"\"_char
+        }
+    }
+    return $match(value, regex)
 }
 
 /// Retrieves the artifact based on the artifactPath provided
