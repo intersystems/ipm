@@ -2178,7 +2178,8 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 ClassMethod LoadEnvironmentConfig(paths As %String)
 {
     #dim config As %IPM.General.EnvironmentConfig
-    set config = ##class(%IPM.General.EnvironmentConfig).%Get()
+    set config = ##class(%IPM.General.EnvironmentConfig).%Get(.sc)
+    $$$ThrowOnError(sc)
     do config.Clear()
     set paths = $listfromstring(paths, ";")
     set ptr = 0
