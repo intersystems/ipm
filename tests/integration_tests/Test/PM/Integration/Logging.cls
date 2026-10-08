@@ -142,7 +142,7 @@ Method TestExecutionInterrupted()
 /// Accepts a list of IPM command strings and runs each sequentially, checking their status
 /// Then verifies the log files created using the logFileDir argument
 /// Assumes that the last command (and that command only) is the one that creates the log files to be checked
-/// 
+///
 /// Argument   commands    List of IPM command strings to be executed sequentially, with the last one expected to create the log files.
 /// Argument   logFileDir  Directory where log files are expected to be created.
 Method GenericLoggingTest(
@@ -168,7 +168,7 @@ Method GenericLoggingTest(
 }
 
 /// Retrieves a %DynamicObject containing the names of .txt and .jsonl log files in the specified directory.
-/// 
+///
 /// Return object:
 /// {
 ///     "txt": <List of .txt log file names>,
