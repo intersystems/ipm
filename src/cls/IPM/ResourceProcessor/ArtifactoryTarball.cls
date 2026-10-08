@@ -11,7 +11,7 @@ Class %IPM.ResourceProcessor.ArtifactoryTarball Extends %IPM.ResourceProcessor.A
 Parameter DESCRIPTION As STRING = "Retrieves a build artifact from an external repository and unpacks it into the desired location(s).";
 
 /// Comma-separated list of resource attribute names that this processor uses.
-Parameter ATTRIBUTES As STRING = "InstallDirectory,Filter,Server,Port";
+Parameter ATTRIBUTES As STRING = "InstallDirectory,Filter";
 
 /// Path to which the artifact should be unpacked upon activation; may contain expressions.
 Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest}, Required ];
@@ -21,12 +21,6 @@ Property InstallDirectory As %String(MAXLEN = "") [ Aliases = {Target,Dest}, Req
 /// Without credentials, the filter may only use <code>repo</code>, <code>name</code>, <code>path</code>,
 /// <code>type</code> and <code>@property</code> keys, with <code>$eq</code> (or <code>$match</code> for name and path), and must set a name or a property.
 Property Filter As %String(MAXLEN = "");
-
-/// Artifactory host name. The ARTI_SERVER environment variable takes precedence.
-Property Server As %String(MAXLEN = "");
-
-/// Artifactory port; defaults to 443. The ARTI_PORT environment variable takes precedence.
-Property Port As %String(MAXLEN = "");
 
 Method OnAfterPhase(
 	phase As %String,
@@ -114,13 +108,8 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
 
     set server = $system.Util.GetEnviron("ARTI_SERVER")
-    if (server = "") {
-        set server = ..Server
-    }
+    // %Net.HttpRequest uses 443 when the port is empty
     set port = $system.Util.GetEnviron("ARTI_PORT")
-    if (port = "") {
-        set port = ..Port
-    }
     set aqlURL = $system.Util.GetEnviron("ARTI_AQL_URL")
     if (aqlURL = "") {
         set aqlURL = "/artifactory/api/search/aql"
@@ -132,10 +121,10 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 
     if (server = "") {
         if (developerMode) {
-            write !, $$$FormattedLine($$$Yellow, "WARNING: No Artifactory server was provided (Server attribute or ARTI_SERVER), skipping downloading artifact.")
+            write !, $$$FormattedLine($$$Yellow, "WARNING: ARTI_SERVER was not provided, skipping downloading artifact.")
             quit
         }
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"An Artifactory server (Server attribute or ARTI_SERVER) must be provided to download an artifact"))
+        $$$ThrowStatus($$$ERROR($$$GeneralError,"ARTI_SERVER must be provided to download an artifact"))
     }
     if (verbose) {
         write !, "Start retrieving artifact..."
