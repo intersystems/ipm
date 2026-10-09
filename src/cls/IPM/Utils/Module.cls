@@ -140,12 +140,10 @@ ClassMethod LoadModuleReference(
         } else {
             set tAsArchive = -1
             set tPayload = tClient.GetModule(tModRef, .tAsArchive)
-            if (tVerbose) {
-                set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
-                write !,"Module "_pModuleName_" was downloaded from " _ pServerName
-                if $isobject(serverDef) {
-                    write " (",serverDef.Details,")"
-                }
+            set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
+            $$$LogLine("Module "_pModuleName_" was downloaded from " _ pServerName, $$$Info)
+            if $isobject(serverDef) {
+                $$$LogLine(" ("_serverDef.Details_")", $$$Info)
             }
             set tFileName = ""
             if ($isobject(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
@@ -281,7 +279,8 @@ ClassMethod LoadModuleFromDirectory(
     try {
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
-        write:tVerbose !,"Loading from ",pDirectory,!
+        set line = "Loading from "_pDirectory
+        $$$LogLine(line, $$$Info)
 
         // Propagate all params to dependencies except those that should only apply to the top level module
         // pParams("Install") indicates this is a top-level module
@@ -357,7 +356,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-///
+/// 
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -1006,7 +1005,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-///
+/// 
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1241,9 +1240,7 @@ ClassMethod LoadNewModule(
                 if +##class(%IPM.Repo.Definition).ReadOnlyGetStored(tRepositoryId) {
                     // Set in params directly so that this value gets transmitted downstream
                     set params("DeveloperMode") = 0
-                    if tVerbose {
-                        write !, "Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode"
-                    }
+                    $$$LogLine("Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode", $$$Info)
                 }
             }
         }
@@ -1297,7 +1294,7 @@ ClassMethod LoadNewModule(
         }
         set params("RootDirectory") = pDirectory
         if tVerbose || $get(params("Multicompile","Verbose"),0) {
-            write !,"Loading "_tDisplayName_" in process "_$job
+            $$$LogLine("Loading "_tDisplayName_" in process "_$job, $$$Info)
         }
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
@@ -1331,24 +1328,20 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     set coUpdatingModules = $get(pParams("CoUpdatingModules"))
-    write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
+    $$$LogLineVerbose("Building dependency graph...", $$$Info)
     set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade,,,,.coUpdatingModules)
     $$$ThrowOnError(sc)
-    write "Done."
+    $$$LogLineVerbose("Done.", $$$Info)
 
     // Install dependencies from the graph
     do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
-    if isVerbose {
-        write !, "Created inverted dependency graph from dependency graph"
-    }
+    $$$LogLine("Created inverted dependency graph from dependency graph", $$$Info)
 
     #dim flatDepList As %Library.ListOfObjects
     set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
-    if isVerbose {
-        write !, "Constructed flat dependency list from inverted dependency graph"
-        write !, "Starting installation of dependencies..."
-        write !
-    }
+    $$$LogLine("Constructed flat dependency list from inverted dependency graph", $$$Info)
+    $$$LogLine("Starting installation of dependencies...", $$$Info)
+    $$$LogLine("", $$$Info)
 
     set coUpdatingModules = ""
     for i = 1:1:flatDepList.Count() {
@@ -1372,7 +1365,8 @@ ClassMethod LoadDependencies(
         try {
             do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
         } catch (ex) {
-            write !, $$$FormatText("Error creating lock file for %1 - %2", pModule.Name, ex.DisplayString()), !
+            set line = "Error creating lock file for " _ pModule.Name _ " - " _ ex.DisplayString()
+            $$$LogLine(line, $$$Error)
         }
     }
 }
