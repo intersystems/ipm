@@ -47,7 +47,8 @@ ROUTINE %IPM.Common [Type=INC]
 #define ZPMLogERROR		3
 
 #; Log file tools
-#define LogLine(%message, %level) $$$ThrowOnError(##class(%IPM.General.LogManager).WriteLogLine(%message, %level))
+#define LogLine(%message, %level) if ('##class(%IPM.General.LogManager).%Get().WriteLogLine(%message, %level)) { do ##class(%IPM.General.LogManager).%Get().WriteLogLine("Error in writing to log manager", $$$Error) }
+#define LogLineVerbose(%message, %level) if ('##class(%IPM.General.LogManager).%Get().WriteLogLineVerbose(%message, %level)) { do ##class(%IPM.General.LogManager).%Get().WriteLogLineVerbose("Error in writing to log manager", $$$Error) }
 
 #; System method/special variable wrappers
 #define InProgrammerMode ##class(%SYSTEM.Process).IsProgrammerMode()

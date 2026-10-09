@@ -356,7 +356,7 @@ ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 Method WriteAfterInstallMessage()
 {
     if ..AfterInstallMessage '= "" {
-        $$$LogLine(..%Evaluate(..AfterInstallMessage), "INFO")
+        $$$LogLine(..%Evaluate(..AfterInstallMessage), $$$Info)
     }
 }
 
@@ -512,7 +512,7 @@ ClassMethod ExecutePhases(
             // Note: this is used later if the module object is reloaded.
             set tOverrideClass = $classname(tModule.Lifecycle)
             set line = "Using lifecycle class "_tOverrideClass_"; override class is "_tModule.OverrideLifecycleClass
-            $$$LogLine(line, "INFO")
+            $$$LogLine(line, $$$Info)
         }
 
         set tLifecycle = tModule.Lifecycle
@@ -563,7 +563,7 @@ ClassMethod ExecutePhases(
                 set tLifecycle = tModule.Lifecycle
                 set tLifecycle.PhaseList = tPhases
                 set line = "["_tModule.DisplayName_"]"_$char(9)_"Module object refreshed."
-                $$$LogLine(line, "INFO")
+                $$$LogLine(line, $$$Info)
                 continue
             }
             // history logging for phases
@@ -574,12 +574,11 @@ ClassMethod ExecutePhases(
             set tSC = $$$OK
             try {
                 set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" START"
-                $$$LogLine(line, "INFO")
                 // for the reload phase, print root from which module is being loaded
                 if tOnePhase = "Reload" {
                     set line = line_" ("_tModule.Root_")"
-                    $$$LogLine(line, "INFO")
                 }
+                $$$LogLine(line, $$$Info)
 
                 // Notify source control (no-op if not configured)
                 set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnBeforePhase(tModule,tOnePhase,.pParams)
@@ -650,11 +649,10 @@ ClassMethod ExecutePhases(
                     if isSelfUninstall {
                         // Print success message before skipping
                         set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" SUCCESS"
-                        $$$LogLine(line, "INFO")
                         if tTiming {
-                            set line = " ("_($zhorolog-tStart)_" s)"
-                            $$$LogLine(line, "INFO")
+                            set line = line_" ("_($zhorolog-tStart)_" s)"
                         }
+                        $$$LogLine(line, $$$Info)
                         // Skip all post-phase processing - classes have been deleted
                         continue
                     }
@@ -702,15 +700,13 @@ ClassMethod ExecutePhases(
 
             if $$$ISERR(tSC) {
                 set line = "["_tModule.DisplayName_"]"_$char(9)_tOnePhase_" FAILURE"_$select(tTiming:" ("_($zhorolog-tStart)_" s)",1:"")
-                $$$LogLine(line, "ERROR")
             } else {
                 set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" SUCCESS"
-                $$$LogLine(line, "INFO")
             }
             if tTiming {
-                set line = " ("_($zhorolog-tStart)_" s)"
-                $$$LogLine(line, "INFO")
+                set line = line_" ("_($zhorolog-tStart)_" s)"
             }
+            $$$LogLine(line, $$$Info)
             $$$ThrowOnError(tSC)
 
             if pLog '= "" {
@@ -719,7 +715,7 @@ ClassMethod ExecutePhases(
         }
         if tOverallTiming {
             set line = "["_tModule.DisplayName_"]"_$char(9)_"(total time: "_($zhorolog-tFullStart)_" s)"
-            $$$LogLine(line, "INFO")
+            $$$LogLine(line, $$$Info)
         }
     } catch e {
         set tSC = e.AsStatus()
