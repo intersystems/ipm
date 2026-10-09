@@ -78,7 +78,8 @@ The **registry** container runs [zpm-registry](https://github.com/intersystems-c
   docker-compose up -d
   net start winnat
   ```
-- If you are on an ARM chip (e.g., M-series Macs), you may need to change the `oras` section in `docker-compose.yml` to use `ghcr.io/project-zot/zot-linux-arm64:latest` instead of `ghcr.io/project-zot/zot-linux-amd64:latest`.
+- Docker Compose 2.17 or newer with BuildKit is required. The `oras` service automatically selects the Zot Linux image for Docker's target CPU architecture (`arm64` or `amd64`), including on macOS and Windows using Linux containers. Use `docker compose up -d --build` to pull the latest architecture-specific image; `docker compose pull` does not fetch build base images.
+
 #### Development
 The VS Code workspace settings in `.vscode/settings.json` automatically connect to the IRIS instance on 52774. With the "Compile on Save" VS Code option enabled, saving any IPM source file will automatically compile it into the running `ipm-iris-1` container.
 
@@ -288,4 +289,3 @@ Now you have zpm.xml at the top level of your git repo and can test installation
 ---
 ### Pull Request (PR)
 Before creating a Github PR, make sure you document the changes involved in `CHANGELOG.md` and add unit/integration tests in the `tests/` folder.
-

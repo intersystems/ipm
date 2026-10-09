@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minimum supported Python version is now 3.9
 
 ### Fixed
+- #1260: ensure appropriate error reported if -env file does not exist.
 - Performance: Studio project creation on package load in dev mode is now 80% faster.
 - #994: Prevent crash in `zn` command when target namespace lacks IPM mappings
 - #1137: On Windows, Python packages installed into `mgr/python` are reset to inherit that directory's permissions, keeping them readable to non-elevated processes, which had failed with a `PermissionError` when using ORAS registries. Reinstalling IPM repairs an affected instance. If IRIS runs as a dedicated service account, entries created by another account (e.g. a manual `irispip`) still need an elevated `icacls /reset`.
