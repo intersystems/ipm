@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #987: Fixed issue where installing dependencies with ORAS would fail due to failure to properly get the manifest
 - #1215: installer is synchronous rather than jobbed for simplified logging/debugging
 - #1261: Modules containing CPF resources can now be packaged
+- #1267: Dependencies of modules installed from an ORAS repository with a namespace now resolve within that namespace. Search results from such a repository list modules without the namespace prefix, and the namespace is lowercased with leading or trailing slashes ignored.
 
 ## [0.10.9] - 2026-08-05
 
