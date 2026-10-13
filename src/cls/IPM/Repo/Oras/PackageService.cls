@@ -11,6 +11,23 @@ Property Location As %IPM.DataType.RepoLocation;
 /// i.e. the API endpoint for a given module will be at <Location>/v2/<Namespace>/<Module>
 Property Namespace As %IPM.DataType.OrasNamespace;
 
+Method NamespaceGet() As %IPM.DataType.OrasNamespace
+{
+    // OCI repository names are lowercase
+    return $$$lcase($zstrip(i%Namespace, "<>", "/"))
+}
+
+/// Module name for a registry repository path, i.e. the path without this service's namespace.
+/// e.g. with namespace "packages", "packages/module-a" -> "module-a"
+Method ModuleNameFromRepository(repository As %String) As %String
+{
+    set prefix = ..Namespace _ "/"
+    if (..Namespace '= "") && ($extract(repository, 1, $length(prefix)) = prefix) {
+        return $extract(repository, $length(prefix) + 1, *)
+    }
+    return repository
+}
+
 /// Prefix for ORAS API calls
 Property PathPrefix As %String(MAXLEN = "");
 
@@ -342,7 +359,8 @@ Method ListModulesFromTagString(
 
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
         // `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
-        set tModRef.Name = name
+        // The other methods of this service prefix the namespace again.
+        set tModRef.Name = ..ModuleNameFromRepository(name)
         // `artifactMetadata.ImageVersion` can be different from `moduleVersion`. E.g., when the module was simply "moved" from elsewhere under a different tag
         set tModRef.VersionString = tVersion.ToString()
         set tModRef.Repository = artifactMetadata.ImageSource
@@ -567,7 +585,7 @@ ClassMethod Pull(
         }
 
         #; Pull the module using ORAS
-        do ..PullOras(registry, package, tag, "", username, password, token, tokenAuthMethod, tempDirectory)
+        do ..PullOras(registry, package, tag, namespace, username, password, token, tokenAuthMethod, tempDirectory)
 
         #; Find only the tgz file
         set result=##class(%ResultSet).%New("%File:FileSet")
@@ -591,7 +609,7 @@ ClassMethod Pull(
         set hash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
         set hash = ##class(%xsd.hexBinary).LogicalToXSD(hash)
 
-        set verified = ..VerifyModuleHashAndSize(registry, package _ ":" _ tag, "", username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
+        set verified = ..VerifyModuleHashAndSize(registry, package _ ":" _ tag, namespace, username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
         if 'verified {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Module size and/or hash failed validation!"))
         }

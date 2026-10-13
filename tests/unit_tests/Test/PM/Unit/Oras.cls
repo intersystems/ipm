@@ -42,4 +42,28 @@ Method TestGetPackageServiceUrlNormalizationWithPort()
     do $$$AssertEquals(svc.PathPrefix, "", "No path prefix when no path in URL")
 }
 
+/// The namespace is lowercased and leading and trailing slashes are stripped.
+Method TestNamespaceNormalization()
+{
+    set svc = ##class(%IPM.Repo.Oras.PackageService).%New()
+    set svc.Namespace = "/packages/ipm/"
+    do $$$AssertEquals(svc.Namespace, "packages/ipm", "Slashes stripped from both ends")
+    set svc.Namespace = "Packages/IPM"
+    do $$$AssertEquals(svc.Namespace, "packages/ipm", "Namespace lowercased")
+    set svc.Namespace = "/"
+    do $$$AssertEquals(svc.Namespace, "", "Lone slash is no namespace")
+}
+
+/// Module names are registry repository paths without the configured namespace.
+Method TestModuleNameFromRepository()
+{
+    set svc = ##class(%IPM.Repo.Oras.PackageService).%New()
+    do $$$AssertEquals(svc.ModuleNameFromRepository("packages/module-a"), "packages/module-a", "Path unchanged without namespace")
+
+    set svc.Namespace = "packages/ipm/"
+    do $$$AssertEquals(svc.ModuleNameFromRepository("packages/ipm/module-a"), "module-a", "Namespace stripped")
+    do $$$AssertEquals(svc.ModuleNameFromRepository("module-a"), "module-a", "Bare name unchanged")
+    do $$$AssertEquals(svc.ModuleNameFromRepository("packages/ipmx/module-a"), "packages/ipmx/module-a", "Namespace matched only as a whole path segment")
+}
+
 }
