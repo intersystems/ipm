@@ -11,12 +11,6 @@ Property Location As %IPM.DataType.RepoLocation;
 /// i.e. the API endpoint for a given module will be at <Location>/v2/<Namespace>/<Module>
 Property Namespace As %IPM.DataType.OrasNamespace;
 
-Method NamespaceGet() As %IPM.DataType.OrasNamespace
-{
-    // OCI repository names are lowercase
-    return $$$lcase($zstrip(i%Namespace, "<>", "/"))
-}
-
 /// Module name for a registry repository path, i.e. the path without this service's namespace.
 /// e.g. with namespace "packages", "packages/module-a" -> "module-a"
 Method ModuleNameFromRepository(repository As %String) As %String
@@ -359,7 +353,7 @@ Method ListModulesFromTagString(
 
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
         // `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
-        // The other methods of this service prefix the namespace again.
+        // Without the namespace, which the other methods of this service prefix
         set tModRef.Name = ..ModuleNameFromRepository(name)
         // `artifactMetadata.ImageVersion` can be different from `moduleVersion`. E.g., when the module was simply "moved" from elsewhere under a different tag
         set tModRef.VersionString = tVersion.ToString()
@@ -570,7 +564,7 @@ ClassMethod Pull(
     set tSC = $$$OK
 
     if tag = "" {
-        set tag = ..GetLatestTag(registry, package,  namespace, username, password, token, tokenAuthMethod, 1)
+        set tag = ..GetLatestTag(registry, package, namespace, username, password, token, tokenAuthMethod)
     }
 
     try {
