@@ -182,6 +182,8 @@ This command is an alias for `module-action module-name publish`
 <modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
+<modifier name="log-dir" dataAlias="LogFileDir" value="true" description="Directory to generate log files under.  Defaults to /mgr/ipm-logs/namespace." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 </command>
 
 <command name="makedeployed">
@@ -310,6 +312,8 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="log-dir" dataAlias="LogFileDir" value="true" description="Directory to generate log files under.  Defaults to /mgr/ipm-logs/namespace." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -437,6 +441,8 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="log-dir" dataAlias="LogFileDir" value="true" description="Directory to generate log files under. Defaults to /mgr/ipm-logs/namespace." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 </command>
 
@@ -498,6 +504,8 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
+<modifier name="log-dir" dataAlias="LogFileDir" value="true" description="Directory to generate log files under.  Defaults to /mgr/ipm-logs/namespace." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 </command>
 
@@ -1049,6 +1057,10 @@ ClassMethod ShellInternal(
 			new $$$ZPMCommandToLog
 			set $$$ZPMCommandToLog = tCommand
 
+            // Instantiate log file for command
+            set tCommandInfo("logMgr") = ##class(%IPM.General.LogManager).%Get()
+            $$$ThrowOnError(tCommandInfo("logMgr").InitializeLog($$$ZPMCommandToLog, .tCommandInfo))
+
             if (tCommandInfo = "quit") {
                 return
             } elseif (tCommandInfo = "help") {
@@ -1115,12 +1127,15 @@ ClassMethod ShellInternal(
                 do ..Sync(.tCommandInfo)
             }
         } catch pException {
+            $$$LogLine(pException.DisplayString(), $$$Error)
+            do ##class(%IPM.General.LogManager).%Get().Finalize()
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
                 return
             }
             do ..DisplayError(pException.AsStatus())
         }
+        do ##class(%IPM.General.LogManager).%Get().Finalize()
 
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
@@ -2373,7 +2388,6 @@ ClassMethod Sync(ByRef commandInfo) [ Private ]
     }
 }
 
-
 ClassMethod Load(
 	ByRef pCommandInfo,
 	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
@@ -2387,6 +2401,7 @@ ClassMethod Load(
 	try {
 		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
+        $$$LogLine(Ex.DisplayString(), $$$Error)
 		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
 		throw Ex
 	}
@@ -2485,7 +2500,7 @@ ClassMethod LoadInternal(
 
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , pLog)
+    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams,, pLog)
     set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
     $$$ThrowOnError(tSC)
 }
@@ -2594,8 +2609,8 @@ ClassMethod Install(
                         $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
                     }
                 }
-				$$$ThrowOnError(log.SetSource(tResult.ServerName))
-				$$$ThrowOnError(log.SetVersion(tResult.Version))
+                $$$ThrowOnError(log.SetSource(tResult.ServerName))
+                $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
@@ -2613,10 +2628,11 @@ ClassMethod Install(
             }
         }
     } catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
-		throw ex
-	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+        $$$LogLine(ex.DisplayString(), $$$Error)
+        $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        throw ex
+    }
+    $$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
@@ -2967,7 +2983,9 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 /// append "-d" for descending (e.g. "n-d", "d-d", "v-d"). Default: ascending by name.
 /// List entries are $listbuild(label, versionString, externalName, developerMode, root, lastUpdated)
 /// where label may be "ExternalName (internalName)" (e.g. "IPM (zpm)").
-ClassMethod SortList(ByRef list, sortModeRaw As %String) [ Internal ]
+ClassMethod SortList(
+	ByRef list,
+	sortModeRaw As %String) [ Internal ]
 {
     set newlist = ""
     set ipmEntry = ""
@@ -4138,7 +4156,7 @@ ClassMethod ShellScript(
 	pCommand As %String,
 	pOutputLogFile As %String = "",
 	pAppendToLog As %Boolean = 0,
-    pTerminateOnError As %Boolean = 1) As %Status
+	pTerminateOnError As %Boolean = 1) As %Status
 {
     set tSC = $$$OK
     set tFileOpen = 0
