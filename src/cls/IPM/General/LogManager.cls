@@ -136,10 +136,7 @@ Method WriteLogLine(
 {
     try
     {
-        set verbose = ..Verbose
-        if writeVerbose {
-            set verbose = 1
-        }
+        set verbose = ..Verbose || writeVerbose
         if (verbose) {
             write !, message
         }
