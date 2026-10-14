@@ -7,6 +7,9 @@ Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleInfo";
 
 Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
 
+/// Registry packaging type: "source" or "database".
+Property IPMPackaging As %String(%JSONFIELDNAME = "ipm_packaging", VALUELIST = ",source,database") [ InitialExpression = "source" ];
+
 /// Returns true if this module is installable on the given platform. Non-deployed modules are not
 /// platform-specific and always match. A deployed module is built and tagged per platform, so it is
 /// only installable when this platform is among the platforms it reports.
@@ -69,6 +72,9 @@ Storage Default
 </Value>
 <Value name="11">
 <Value>DisplayName</Value>
+</Value>
+<Value name="12">
+<Value>IPMPackaging</Value>
 </Value>
 </Data>
 <State>ModuleInfoState</State>

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.11] - Unreleased
+
+### Added
+- #986: Database packaging: new `package-database` and `publish-database` commands create a package from a copy of the namespace's routines database, which installs via swapping of the routines database rather than compilation of source files. The module and its dependencies must be loaded into the namespace before packaging. Pass `-include-tests` to include test resources (`Scope="test"` or `Scope="verify"`), which are excluded by default.
+
 ## [0.10.10] - 2026-10-14
 
 ### Added

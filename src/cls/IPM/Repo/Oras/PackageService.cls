@@ -190,7 +190,10 @@ Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream
 ClassMethod TagForReference(moduleReference As %IPM.Storage.ModuleInfo) As %String [ Private ]
 {
     set tag = $$$Semver2Tag(moduleReference.VersionString)
-    if moduleReference.Deployed {
+
+    if (moduleReference.IPMPackaging = "database") {
+        set tag = tag _ "_database" _ $$$OrasTagPlatformSeparator _ moduleReference.PlatformVersion
+    } elseif moduleReference.Deployed {
         if (moduleReference.PlatformVersion = "") {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot locate deployed module '" _ moduleReference.Name _ "' " _ moduleReference.VersionString _ " without a platform version."))
         }
@@ -306,6 +309,10 @@ Method ListModulesFromTagString(
 
         // get metadata from annotations
         set metadata = ..GetPackageMetadata(..Location, name, tag, "", client)
+        if (metadata = "") {
+            // Tag exists in the tag list but manifest is unreachable — skip silently
+            continue
+        }
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
         $$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
@@ -351,18 +358,34 @@ Method ListModulesFromTagString(
             }
         }
 
+        // Determine packaging type from annotation; absent means source for backwards compatibility
+        set modPackaging = $case(artifactMetadata.IPMPackaging, "database":"database", :"source")
+
+        // Apply packaging filter if specified
+        if (searchCriteria.Packaging '= "") && (modPackaging '= searchCriteria.Packaging) {
+            continue
+        }
+
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
         // `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
         // Without the namespace, which the other methods of this service prefix
         set tModRef.Name = ..ModuleNameFromRepository(name)
         // `artifactMetadata.ImageVersion` can be different from `moduleVersion`. E.g., when the module was simply "moved" from elsewhere under a different tag
-        set tModRef.VersionString = tVersion.ToString()
+        // For database packages, VersionString must be the plain semver (e.g. "1.0.0"), not "1.0.0+database".
+        // GetModule constructs the full tag ("1.0.0_database__<platform>") from IPMPackaging + PlatformVersion.
+        // Using tVersion.ToString() for database packages would embed "+database" in VersionString,
+        // causing GetModule to build "1.0.0_database_database__<platform>".
+        set tModRef.VersionString = $select(modPackaging = "database": tVersion.Major _ "." _ tVersion.Minor _ "." _ tVersion.Patch, 1: tVersion.ToString())
         set tModRef.Repository = artifactMetadata.ImageSource
         set tModRef.Description = artifactMetadata.ImageDescription
+        set tModRef.IPMPackaging = modPackaging
         set tModRef.Deployed = artifactMetadata.IPMDeployed
-        // Skipped for AllVersions, which reports a single entry standing in for every version;
-        // these platforms belong to just one of them.
-        if (artifactMetadata.IPMDeployed '= "") && 'searchCriteria.AllVersions {
+        if (modPackaging = "database") {
+            // For database packages, store PlatformVersion so GetModule can build the correct tag.
+            set tModRef.PlatformVersion = platformVersion
+        } elseif (artifactMetadata.IPMDeployed '= "") && 'searchCriteria.AllVersions {
+            // Skipped for AllVersions, which reports a single entry standing in for every version;
+            // these platforms belong to just one of them.
             set pvPtr = 0
             while $listnext(platformVersions, pvPtr, pv) {
                 $$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))
@@ -595,13 +618,12 @@ ClassMethod Pull(
         #; Convert into stream
         set tFileBinStream = ##class(%Stream.FileBinary).%New()
         set tSC = tFileBinStream.LinkToFile(tempFile)
-        if $$$ISOK(tSC) {
-            set stream = tFileBinStream
-        }
+        $$$ThrowOnError(tSC)
+        set stream = tFileBinStream
 
-        #; Check hash and size against the manifest
-        set hash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
-        set hash = ##class(%xsd.hexBinary).LogicalToXSD(hash)
+        // Check hash and size against the manifest. VerifyModuleHashAndSize lowercases before
+        // comparing to the manifest digest, so the helper's lowercase hex is fine here.
+        set hash = ##class(%IPM.Utils.File).ComputeSHA256Hex(tempFile)
 
         set verified = ..VerifyModuleHashAndSize(registry, package _ ":" _ tag, namespace, username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
         if 'verified {
