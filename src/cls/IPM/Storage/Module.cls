@@ -356,7 +356,7 @@ ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 Method WriteAfterInstallMessage()
 {
     if ..AfterInstallMessage '= "" {
-        $$$LogLine(..%Evaluate(..AfterInstallMessage), $$$Info)
+        $$$LogLine(..%Evaluate(..AfterInstallMessage))
     }
 }
 
@@ -512,7 +512,7 @@ ClassMethod ExecutePhases(
             // Note: this is used later if the module object is reloaded.
             set tOverrideClass = $classname(tModule.Lifecycle)
             set line = "Using lifecycle class "_tOverrideClass_"; override class is "_tModule.OverrideLifecycleClass
-            $$$LogLine(line, $$$Info)
+            $$$LogLine(line)
         }
 
         set tLifecycle = tModule.Lifecycle
@@ -563,7 +563,7 @@ ClassMethod ExecutePhases(
                 set tLifecycle = tModule.Lifecycle
                 set tLifecycle.PhaseList = tPhases
                 set line = "["_tModule.DisplayName_"]"_$char(9)_"Module object refreshed."
-                $$$LogLine(line, $$$Info)
+                $$$LogLine(line)
                 continue
             }
             // history logging for phases
@@ -578,7 +578,7 @@ ClassMethod ExecutePhases(
                 if tOnePhase = "Reload" {
                     set line = line_" ("_tModule.Root_")"
                 }
-                $$$LogLine(line, $$$Info)
+                $$$LogLine(line)
 
                 // Notify source control (no-op if not configured)
                 set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnBeforePhase(tModule,tOnePhase,.pParams)
@@ -652,7 +652,7 @@ ClassMethod ExecutePhases(
                         if tTiming {
                             set line = line_" ("_($zhorolog-tStart)_" s)"
                         }
-                        $$$LogLine(line, $$$Info)
+                        $$$LogLine(line)
                         // Skip all post-phase processing - classes have been deleted
                         continue
                     }
@@ -706,7 +706,7 @@ ClassMethod ExecutePhases(
             if tTiming {
                 set line = line_" ("_($zhorolog-tStart)_" s)"
             }
-            $$$LogLine(line, $$$Info)
+            $$$LogLine(line)
             $$$ThrowOnError(tSC)
 
             if pLog '= "" {
@@ -715,7 +715,7 @@ ClassMethod ExecutePhases(
         }
         if tOverallTiming {
             set line = "["_tModule.DisplayName_"]"_$char(9)_"(total time: "_($zhorolog-tFullStart)_" s)"
-            $$$LogLine(line, $$$Info)
+            $$$LogLine(line)
         }
     } catch e {
         set tSC = e.AsStatus()
