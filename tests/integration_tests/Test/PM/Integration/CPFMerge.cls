@@ -176,4 +176,16 @@ Method TestSystemExpressions()
     do $$$AssertEquals(webAppProps("AutheEnabled"), $$$AutheUnauthenticated, "Web app authentication set correctly using $$$AutheUnauthenticated macro")
 }
 
+Method TestInvalidCPFReportsDetails()
+{
+    set moduleDir = ..GetModuleDir(..#TargetModuleName)
+    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    do $$$AssertStatusOK(sc, "Loaded module successfully")
+
+    set sc = ##class(%IPM.Main).Shell("cpf-merge testinvalidcpf -only")
+    do $$$AssertStatusNotOK(sc, "Merging an invalid CPF file fails")
+    set errorText = $system.Status.GetErrorText(sc)
+    do $$$AssertTrue(errorText [ "Invalid or duplicate section name BLAH", "Error includes merge output: " _ errorText)
+}
+
 }
