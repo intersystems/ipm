@@ -128,7 +128,7 @@ Method InitializeLog(
 /// Write a log entry to both the JSON Lines and TXT files.
 /// @Argument message           The human-readable log message to append
 /// @Argument level             The log level: TRACE, INFO, WARNING, or ERROR. If none supplied, defaults to INFO
-/// @Argument writeToTerminal   If set to 1, write line to terminal verbosely, regardless of the default verbosity setting
+/// @Argument writeToTerminal   If set to 1, write line to terminal, regardless of the default verbosity setting
 Method WriteLogLine(
 	message As %String,
 	level As %String = "INFO",
