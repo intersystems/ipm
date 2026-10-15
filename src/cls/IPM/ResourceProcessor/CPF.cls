@@ -184,7 +184,7 @@ ClassMethod MergeCPF(
 
     // Somehow, if the STDOUT is not set, the merge will silently fail
     set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
-    // Without STDIN bound, the child tries to open the caller's terminal and logs "Unable to open principal input device"
+    // Keeps the child from opening the caller's terminal
     set flags = flags _ "/STDIN=""" _ ##class(%Library.Device).GetNullDevice() _ """"
     set status = $zf(-100, flags, "iris", .args)
     if status '= 0 {
@@ -203,7 +203,9 @@ ClassMethod ReadOutputFile(name As %String) As %String [ Private ]
         return ""
     }
     set stream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(stream.LinkToFile(path))
+    if $$$ISERR(stream.LinkToFile(path)) {
+        return ""
+    }
     set text = ""
     while 'stream.AtEnd {
         set line = $zstrip(stream.ReadLine(), "<>W")

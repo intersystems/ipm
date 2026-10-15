@@ -185,6 +185,7 @@ Method TestInvalidCPFReportsDetails()
     set sc = ##class(%IPM.Main).Shell("cpf-merge testinvalidcpf -only")
     do $$$AssertStatusNotOK(sc, "Merging an invalid CPF file fails")
     set errorText = $system.Status.GetErrorText(sc)
+    do $$$AssertTrue(errorText [ "invalid-section.cpf", "Error names the source CPF file: " _ errorText)
     do $$$AssertTrue(errorText [ "Invalid or duplicate section name BLAH", "Error includes merge output: " _ errorText)
 }
 
