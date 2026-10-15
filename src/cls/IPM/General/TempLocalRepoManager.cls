@@ -1,4 +1,4 @@
-Include %IPM.Formatting
+Include (%IPM.Common, %IPM.Formatting)
 
 Class %IPM.General.TempLocalRepoManager Extends %RegisteredObject
 {
@@ -80,7 +80,7 @@ Method CleanUp() As %Status
     if $$$ISERR(sc) {
         set msg = $$$FormatText("Failed to clean up repository '%1'. You may need to manually delete it using 'repo -delete -n %1'", ..Repo.Name)
         set msg = $$$FormattedLine($$$Red, msg)
-        write !, msg
+        $$$LogLine(msg, $$$Error, 1)
     }
     quit sc
 }

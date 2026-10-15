@@ -1,4 +1,4 @@
-Include (%sySecurity, %occErrors, %occReference)
+Include (%IPM.Common, %sySecurity, %occErrors, %occReference)
 
 Class %IPM.ResourceProcessor.WebApplication Extends (%IPM.ResourceProcessor.Abstract, %XML.Adaptor) [ PropertyClass = %IPM.ResourceProcessor.PropertyParameters ]
 {
@@ -90,14 +90,12 @@ Method OnBeforePhase(
     try {
         $$$ThrowOnError(##super(pPhase,.pParams))
 
-        set tVerbose = $get(pParams("Verbose"))
-
         if ((pPhase = "Configure") || (pPhase = "Activate")) {
             // Create web application
-            do ..CreateOrUpdateWebApp(tVerbose)
+            do ..CreateOrUpdateWebApp()
         } elseif ((pPhase = "Unconfigure") || (pPhase = "Clean")) {
             // Remove web application
-            do ..DeleteWebApp(tVerbose)
+            do ..DeleteWebApp()
         }
     } catch e {
         set sc = e.AsStatus()
@@ -105,7 +103,7 @@ Method OnBeforePhase(
     quit sc
 }
 
-Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
+Method CreateOrUpdateWebApp() [ Internal ]
 {
     new $namespace
     set $namespace = "%SYS"
@@ -113,7 +111,7 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
     merge properties = ..SecurityProperties
 
     if ##class(Security.Applications).Exists(..Name) {
-        write:pVerbose !,"Updating Web Application ",..Name
+        $$$LogLine("Updating Web Application "_..Name)
         set sc = ##class(Security.Applications).Get(..Name,.oldProperties)
         $$$ThrowOnError(sc)
 
@@ -135,35 +133,31 @@ Method CreateOrUpdateWebApp(pVerbose As %Boolean = 0) [ Internal ]
         }
 
         if $data(changes) {
-            if (pVerbose) {
-                for i=1:1:$get(changes) {
-                    write !,changes(i)
-                }
+            for i=1:1:$get(changes) {
+                $$$LogLine(changes(i))
             }
             set sc = ##class(Security.Applications).Modify(..Name,.properties)
             $$$ThrowOnError(sc)
-            write:pVerbose !,"Done."
+            $$$LogLine("Done.")
         } else {
-            write:pVerbose !,"No changes detected or made."
+            $$$LogLine("No changes detected or made.")
         }
     } else {
-        write:pVerbose !,"Creating Web Application ",..Name
+        $$$LogLine("Creating Web Application "_..Name)
         set sc = ##class(Security.Applications).Create(..Name,.properties)
-        if (pVerbose) {
-            set key = ""
-            for {
-                set key = $order(properties(key),1,tValue)
-                quit:key=""
-                write !,key,": ",tValue
-            }
+        set key = ""
+        for {
+            set key = $order(properties(key),1,tValue)
+            quit:key=""
+            $$$LogLine("   "_key_": "_tValue)
         }
         $$$ThrowOnError(sc)
-        write:pVerbose !,"Done."
+        $$$LogLine("Done.")
     }
 }
 
 /// This removes an existing CSP application
-Method DeleteWebApp(pVerbose As %Boolean = 0) [ Internal ]
+Method DeleteWebApp() [ Internal ]
 {
     new $namespace
     set $namespace = "%SYS"

@@ -83,7 +83,6 @@ ClassMethod LoadModuleReference(
         #dim manager As %IPM.Repo.Manager
         set manager = ##class(%IPM.Repo.Manager).%Get(.tSC)
         $$$ThrowOnError(tSC)
-
         set tClient = manager.CheckServiceCache(pServerName,.tAvailable)
         if 'tAvailable {
             set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pServerName))
@@ -223,8 +222,6 @@ ClassMethod LoadModuleFromArchive(
 {
     set tSC = $$$OK
     try {
-        set tVerbose = $get(pParams("Verbose"))
-
         set moduleRoot = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
         // Custom roots are always pre-created by EnsureWritableDirectory at config time, so the fallback
         // only triggers for the default ipm/ path before first use — one level up reaches DataDirectory(), which always exists.
@@ -253,7 +250,7 @@ ClassMethod LoadModuleFromArchive(
             quit
         }
         for i=1:1:$get(tOutput) {
-            write:tVerbose !,tOutput(i)
+            $$$LogLine(tOutput(i))
         }
 
         set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
@@ -357,7 +354,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-/// 
+///
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -722,9 +719,7 @@ ClassMethod UninstallAll(
                 quit
             }
             if '$data(simpleModList(module)) {
-                if $get(pParams("Verbose")) {
-                    write !,"WARNING: module ",module," is missing, skipping uninstall",!
-                }
+                $$$LogLine("WARNING: module "_module_" is missing, skipping uninstall", $$$Warning)
                 kill tModuleNames(module)
             }
         }
@@ -769,7 +764,7 @@ ClassMethod UninstallAll(
 
                 kill tParams
                 merge tParams = pParams
-                write !,"Uninstalling ",tModuleName
+                $$$LogLine("Uninstalling "_tModuleName,,1)
                 set tOneSC = ##class(%IPM.Storage.Module).Uninstall(tModuleName,pForce,,.tParams)
                 if $$$ISOK(tOneSC) || pForce {
                     // If we are forcing uninstallation of everything that can be uninstalled,
@@ -787,7 +782,7 @@ ClassMethod UninstallAll(
                     set tProgressMade = 1
                 }
                 if $$$ISERR(tOneSC) {
-                    write !,"Error uninstalling ",tModuleName,": ",$system.Status.GetErrorText(tOneSC)
+                    $$$LogLine("Error uninstalling "_tModuleName_": "_$system.Status.GetErrorText(tOneSC), $$$Error, 1)
                     set tSC = $system.Status.AppendStatus(tSC,tOneSC)
                     set tFailedModules(tModuleName) = ""
                 }
@@ -1006,7 +1001,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-/// 
+///
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -2561,7 +2556,7 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 
     if '$get($$$DeprecationWarned("<expression>", "dbrole")) && ((result [ "${dbrole}") || (result [ "{$dbrole}")) {
         set $$$DeprecationWarned("<expression>", "dbrole") = 1
-        write !, $$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.")
+        $$$LogLine($$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead."), $$$Warning, 1)
     }
     set dbRole = ..GetDatabaseRole()
     set result = ..%RegExReplace(result, "dbrole", dbRole)
