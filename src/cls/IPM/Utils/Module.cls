@@ -83,7 +83,6 @@ ClassMethod LoadModuleReference(
         #dim manager As %IPM.Repo.Manager
         set manager = ##class(%IPM.Repo.Manager).%Get(.tSC)
         $$$ThrowOnError(tSC)
-
         set tClient = manager.CheckServiceCache(pServerName,.tAvailable)
         if 'tAvailable {
             set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pServerName))
@@ -141,10 +140,11 @@ ClassMethod LoadModuleReference(
             set tAsArchive = -1
             set tPayload = tClient.GetModule(tModRef, .tAsArchive)
             set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
-            $$$LogLine("Module "_pModuleName_" was downloaded from " _ pServerName, $$$Info)
+            set line = "Module "_pModuleName_" was downloaded from " _ pServerName
             if $isobject(serverDef) {
-                $$$LogLine(" ("_serverDef.Details_")", $$$Info)
+                set line = line_" ("_serverDef.Details_")"
             }
+            $$$LogLine(line)
             set tFileName = ""
             if ($isobject(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
                 set tFileName = tPayload.Filename
@@ -222,8 +222,6 @@ ClassMethod LoadModuleFromArchive(
 {
     set tSC = $$$OK
     try {
-        set tVerbose = $get(pParams("Verbose"))
-
         set moduleRoot = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
         // Custom roots are always pre-created by EnsureWritableDirectory at config time, so the fallback
         // only triggers for the default ipm/ path before first use — one level up reaches DataDirectory(), which always exists.
@@ -252,7 +250,7 @@ ClassMethod LoadModuleFromArchive(
             quit
         }
         for i=1:1:$get(tOutput) {
-            write:tVerbose !,tOutput(i)
+            $$$LogLine(tOutput(i))
         }
 
         set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
@@ -280,7 +278,7 @@ ClassMethod LoadModuleFromDirectory(
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         set line = "Loading from "_pDirectory
-        $$$LogLine(line, $$$Info)
+        $$$LogLine(line)
 
         // Propagate all params to dependencies except those that should only apply to the top level module
         // pParams("Install") indicates this is a top-level module
@@ -356,7 +354,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-/// 
+///
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -721,9 +719,7 @@ ClassMethod UninstallAll(
                 quit
             }
             if '$data(simpleModList(module)) {
-                if $get(pParams("Verbose")) {
-                    write !,"WARNING: module ",module," is missing, skipping uninstall",!
-                }
+                $$$LogLine("WARNING: module "_module_" is missing, skipping uninstall", $$$Warning)
                 kill tModuleNames(module)
             }
         }
@@ -768,7 +764,7 @@ ClassMethod UninstallAll(
 
                 kill tParams
                 merge tParams = pParams
-                write !,"Uninstalling ",tModuleName
+                $$$LogLine("Uninstalling "_tModuleName,,1)
                 set tOneSC = ##class(%IPM.Storage.Module).Uninstall(tModuleName,pForce,,.tParams)
                 if $$$ISOK(tOneSC) || pForce {
                     // If we are forcing uninstallation of everything that can be uninstalled,
@@ -786,7 +782,7 @@ ClassMethod UninstallAll(
                     set tProgressMade = 1
                 }
                 if $$$ISERR(tOneSC) {
-                    write !,"Error uninstalling ",tModuleName,": ",$system.Status.GetErrorText(tOneSC)
+                    $$$LogLine("Error uninstalling "_tModuleName_": "_$system.Status.GetErrorText(tOneSC), $$$Error, 1)
                     set tSC = $system.Status.AppendStatus(tSC,tOneSC)
                     set tFailedModules(tModuleName) = ""
                 }
@@ -1005,7 +1001,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-/// 
+///
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -1240,7 +1236,7 @@ ClassMethod LoadNewModule(
                 if +##class(%IPM.Repo.Definition).ReadOnlyGetStored(tRepositoryId) {
                     // Set in params directly so that this value gets transmitted downstream
                     set params("DeveloperMode") = 0
-                    $$$LogLine("Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode", $$$Info)
+                    $$$LogLine("Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode")
                 }
             }
         }
@@ -1293,9 +1289,7 @@ ClassMethod LoadNewModule(
             tcommit
         }
         set params("RootDirectory") = pDirectory
-        if tVerbose || $get(params("Multicompile","Verbose"),0) {
-            $$$LogLine("Loading "_tDisplayName_" in process "_$job, $$$Info)
-        }
+        $$$LogLine("Loading "_tDisplayName_" in process "_$job)
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
@@ -1328,20 +1322,20 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     set coUpdatingModules = $get(pParams("CoUpdatingModules"))
-    $$$LogLineVerbose("Building dependency graph...", $$$Info)
+    $$$LogLine("Building dependency graph...",, 1)
     set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade,,,,.coUpdatingModules)
     $$$ThrowOnError(sc)
-    $$$LogLineVerbose("Done.", $$$Info)
+    $$$LogLine("Done.",, 1)
 
     // Install dependencies from the graph
     do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
-    $$$LogLine("Created inverted dependency graph from dependency graph", $$$Info)
+    $$$LogLine("Created inverted dependency graph from dependency graph")
 
     #dim flatDepList As %Library.ListOfObjects
     set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
-    $$$LogLine("Constructed flat dependency list from inverted dependency graph", $$$Info)
-    $$$LogLine("Starting installation of dependencies...", $$$Info)
-    $$$LogLine("", $$$Info)
+    $$$LogLine("Constructed flat dependency list from inverted dependency graph")
+    $$$LogLine("Starting installation of dependencies...")
+    $$$LogLine("")
 
     set coUpdatingModules = ""
     for i = 1:1:flatDepList.Count() {
@@ -2562,7 +2556,7 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 
     if '$get($$$DeprecationWarned("<expression>", "dbrole")) && ((result [ "${dbrole}") || (result [ "{$dbrole}")) {
         set $$$DeprecationWarned("<expression>", "dbrole") = 1
-        write !, $$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.")
+        $$$LogLine($$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead."), $$$Warning, 1)
     }
     set dbRole = ..GetDatabaseRole()
     set result = ..%RegExReplace(result, "dbrole", dbRole)

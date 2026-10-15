@@ -132,7 +132,7 @@ Method OnCompileDocument(ByRef qstruct As %String) As %Status
         $$$ThrowOnError(tSC)
         set tSuppressCompilation = tGeneralSettings.SuppressCompilation
         if tSuppressCompilation {
-            write !, "Module compilation suppressed due to user settings."
+            $$$LogLine("Module compilation suppressed due to user settings.",, 1)
         } else {
             set tSC = tModule.%Compile(.qstruct)
             $$$ThrowOnError(tSC)

@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.Repo.Filesystem.Definition Extends %IPM.Repo.Definition
 {
 
@@ -170,7 +172,7 @@ Method BuildCache(
 
             set tSubDirectory = tFilenameList(tKey,"sub")
             set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,.tName,.tVersionString))
-            write:pVerbose !,tName," ",tVersionString," @ ",##class(%File).NormalizeDirectory(..Root_tSubDirectory)
+            $$$LogLine(tName_" "_tVersionString_" @ "_##class(%File).NormalizeDirectory(..Root_tSubDirectory), $$$Info, pVerbose)
         }
         $$$ThrowOnError(tAggSC)
         tcommit
@@ -339,10 +341,10 @@ ClassMethod ScanDirectory(
             set tRes = tStmt.%Execute(tFullDir,"module.xml",,1)
             while tRes.%Next() {
                 if (tRes.%Get("Type") = "D") {
-                    write:pVerbose !,"Scanning directory: ",tRes.%Get("ItemName")
+                    $$$LogLine("Scanning directory: "_tRes.%Get("ItemName"),, pVerbose)
                     set tDirArray($increment(tDirArray)) = tDirArray(i)_$case(tDirArray(i),"":"",:"/")_tRes.%Get("ItemName")
                 } else {
-                    write:pVerbose !,"Found file: ",tRes.%Get("Name")
+                    $$$LogLine("Found file: "_tRes.%Get("Name"),, pVerbose)
                     set pFilenameList($increment(pFilenameList)) = tRes.%Get("Name")
                     set pFilenameList(pFilenameList,"sub") = tDirArray(i)
                     if (pDepth > pMaxDepth) {

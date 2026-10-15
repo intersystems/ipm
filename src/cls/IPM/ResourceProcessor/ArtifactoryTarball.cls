@@ -28,37 +28,28 @@ Method OnAfterPhase(
     set sc = $$$OK
     try {
         if (phase = "Activate") {
-            set verbose  = $get(params("Verbose"),0)
             // If install directory exists, use that
             // Else, download from artifactory
             set downloadDirectory = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
             if '##class(%File).DirectoryExists(downloadDirectory) {
-                if (verbose) {
-                    write !, "No artifact found in "_downloadDirectory_", will now download it from artifactory."
-                }
+                $$$LogLine("No artifact found in "_downloadDirectory_", will now download it from artifactory.")
                 do ..DownloadArtifact(.params)
             } else {
-                if (verbose) {
-                    write !, "Artifact found in "_downloadDirectory_". Will use that instead of downloading a new one."
-                }
+                $$$LogLine("Artifact found in "_downloadDirectory_". Will use that instead of downloading a new one.")
             }
             // Check that an artifact was downloaded in DownloadArtifact(). If so, copy contents over to the final destination
             if ##class(%File).DirectoryExists(downloadDirectory) {
                 // copy everything from /<module root>/<resource name>/ into the final destination
                 // overwrite existing files if there are any in destination dir
-                if (verbose) {
-                    write !, "Going to copy extracted contents from "_downloadDirectory_" to "_..InstallDirectory
-                    if ##class(%File).DirectoryExists(..InstallDirectory) {
-                        write !, $$$FormattedLine($$$Yellow, "WARNING: "_..InstallDirectory_" has contents which will be overwritten by this action.")
-                    }
+                $$$LogLine("Going to copy extracted contents from "_downloadDirectory_" to "_..InstallDirectory)
+                if ##class(%File).DirectoryExists(..InstallDirectory) {
+                    $$$LogLine($$$FormattedLine($$$Yellow, "WARNING: "_..InstallDirectory_" has contents which will be overwritten by this action."), $$$Warning)
                 }
                 // Copy contents over with pDeleteBeforeCopy = 1
                 if '##class(%File).CopyDir(downloadDirectory, ..InstallDirectory, 1, , 1) {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_..InstallDirectory))
                 }
-                if (verbose) {
-                    write !, "Copy Succeeded."
-                }
+                $$$LogLine("Copy Succeeded.")
             }
         }
     } catch ex {
@@ -114,14 +105,12 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 
     if ((server = "") || (port = "") || (aqlURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
         if (developerMode) {
-            write !, $$$FormattedLine($$$Yellow, "WARNING: Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact.")
+            $$$LogLine($$$FormattedLine($$$Yellow, "WARNING: Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact."), $$$Warning, 1)
             quit
         }
         $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, aql url, and a bearer token or username and password must be provided to download an artifact"))
     }
-    if (verbose) {
-        write !, "Start retrieving artifact..."
-    }
+    $$$LogLine("Start retrieving artifact...")
 
     set tempFile = ##class(%File).TempFilename(,,.errorCode)
     if (errorCode < 0) {
@@ -136,18 +125,14 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
     set PMTempDir = ##class(%File).SubDirectoryName(OSTempDir, ..ResourceReference.Name, 1)
 
     set artifactPath = ..GetArtifactPath(server, port, aqlURL, username, password, bearerToken, ..Filter, verbose)
-    set artifactName = ..RetrieveArtifact(server, port, artifactPath, PMTempDir, verbose)
+    set artifactName = ..RetrieveArtifact(server, port, artifactPath, PMTempDir)
 
     // Unpack artifact in temp location (so that if anything goes wrong, the true destination does not get affected)
     // and copy artifact to destination
     set artifactTarPath = ##class(%File).NormalizeFilename(artifactName, PMTempDir)
-    if (verbose) {
-        write !, "Going to extract contents from "_artifactTarPath_" to "_downloadDirectory
-    }
+    $$$LogLine("Going to extract contents from "_artifactTarPath_" to "_downloadDirectory)
     $$$ThrowOnError(##class(%IPM.General.Archive).Extract(artifactTarPath, downloadDirectory))
-    if (verbose) {
-        write !, "Extract Succeeded."
-    }
+    $$$LogLine("Extract Succeeded.")
 }
 
 /// Returns the path of a valid artifact.<br />
@@ -178,24 +163,17 @@ ClassMethod GetArtifactPath(
     // Token auth gets priority over basic auth
     if (bearerToken '= "") {
         do httpRequest.SetHeader("Authorization", "Bearer "_bearerToken)
-        if (verbose) {
-            write !, "Using token auth in HTTP request"
-        }
+        $$$LogLine("Using token auth in HTTP request")
     } else {
         set httpRequest.Username = username
         set httpRequest.Password = password
-        if (verbose) {
-            write !, "Using basic auth in HTTP request"
-        }
+        $$$LogLine("Using basic auth in HTTP request")
     }
 
-    set body = "items.find("_filter_").sort({""$desc"": [""updated""]})"
-    if (verbose) {
-        // {}.%FromJSON(filter).%ToJSON() does not change the contents of the filter but does normalize its whitespace to make it easier for readability in verbose mode
-        set body = "items.find("_{}.%FromJSON(filter).%ToJSON()_").sort({""$desc"": [""updated""]})"
-        write !, "Going to POST with the following query to retrieve info of qualified artifacts: "
-        write !, body
-    }
+    // {}.%FromJSON(filter).%ToJSON() does not change the contents of the filter but does normalize its whitespace to make it easier for readability in logging
+    set body = "items.find("_{}.%FromJSON(filter).%ToJSON()_").sort({""$desc"": [""updated""]})"
+    $$$LogLine("Going to POST with the following query to retrieve info of qualified artifacts: ")
+    $$$LogLine(body)
     do httpRequest.EntityBody.Write(body)
     do httpRequest.ContentTypeSet("text/plain")
     $$$ThrowOnError(httpRequest.Send("POST", aqlURL))
@@ -214,17 +192,15 @@ ClassMethod GetArtifactPath(
     set jsonObj = ##class(%Library.DynamicAbstractObject).%FromJSON(responseData)
     #dim results As %Library.DynamicArray
     set results = jsonObj.%Get("results")
-    if (results.%Size() > 1) && (verbose) {
-        write !, results.%Size()_" valid artifacts found matching the filtered criteria. Choosing the one most recently updated."
+    if results.%Size() > 1 {
+        $$$LogLine(results.%Size()_" valid artifacts found matching the filtered criteria. Choosing the one most recently updated.")
     }
     set resultArtifact = results.%Get(0, "")
     if (resultArtifact = "") {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "No valid artifact was found based on the query parameters"))
     }
     set artifactPath = "artifactory/"_resultArtifact.%Get("repo")_"/"_resultArtifact.%Get("path")_"/"_resultArtifact.%Get("name")
-    if (verbose) {
-        write !, "Valid artifact found at: "_artifactPath
-    }
+    $$$LogLine("Valid artifact found at: "_artifactPath)
 
     return artifactPath
 }
@@ -236,8 +212,7 @@ ClassMethod RetrieveArtifact(
 	artifactServer As %String,
 	artifactPort As %String,
 	artifactPath As %String,
-	downloadDirectory As %String,
-	verbose As %Boolean = 0) As %String [ Internal ]
+    downloadDirectory As %String) As %String [ Internal ]
 {
     set httpRequest = ##class(%Net.HttpRequest).%New()
     set httpRequest.Https = 1
@@ -245,9 +220,7 @@ ClassMethod RetrieveArtifact(
     set httpRequest.Server = artifactServer
     set httpRequest.Port = artifactPort
 
-    if verbose {
-        write !, "Start retrieving artifact at https://"_artifactServer_$select(artifactPort = "": "", 1: ":"_artifactPort)_"/"_artifactPath
-    }
+    $$$LogLine("Start retrieving artifact at https://"_artifactServer_$select(artifactPort = "": "", 1: ":"_artifactPort)_"/"_artifactPath)
     $$$ThrowOnError(httpRequest.Get(artifactPath))
 
     set responseData = httpRequest.HttpResponse.Data
@@ -261,9 +234,7 @@ ClassMethod RetrieveArtifact(
     }
 
     set artifactName = httpRequest.HttpResponse.Headers("X-ARTIFACTORY-FILENAME")
-    if verbose {
-        write !, "Found: " _ artifactName
-    }
+    $$$LogLine("Found: " _ artifactName)
 
     // Create directory if it doesn't exist
     if '##class(%File).DirectoryExists(downloadDirectory) {
@@ -272,9 +243,7 @@ ClassMethod RetrieveArtifact(
 
     set localPath = ##class(%File).NormalizeFilename(artifactName, downloadDirectory)
     if '##class(%File).Exists(localPath) {
-        if verbose {
-            write !, "Saving to " _ localPath
-        }
+        $$$LogLine("Saving to " _ localPath)
 
         set stream = ##class(%FileBinaryStream).%New()
         set stream.Filename = localPath
