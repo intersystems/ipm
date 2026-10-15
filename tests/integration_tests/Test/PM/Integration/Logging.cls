@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class Test.PM.Integration.Logging Extends Test.PM.Integration.Base
 {
 
@@ -13,7 +15,7 @@ Parameter NonExistentDepMod As String = "non-existent-dep-mod";
 /// Module with an <Invoke> with an <UNDEFINED> error to interrupt execution of a command
 Parameter InterruptModule As String = "execution-interrupt-mod";
 
-/// Custom directory to use to store log files using the -output-file flag
+/// Custom directory to use to store log files using the -log-dir flag
 Property CustomOutputDir As %String;
 
 /// Default log file directory
@@ -27,7 +29,7 @@ Method OnBeforeAllTests() As %Status
         set ..DefaultLogFileDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ $zconvert($namespace, "l") _ "/" _ "ipm-logs/")
         set ..CustomOutputDir = ..GetModuleDir("logging", "custom-dir")
 
-        // Setup repos for LockFile tests
+        // Setup repos for Logging tests
         $$$ThrowOnError(##class(%IPM.Main).Shell("repo -delete-all"))
         $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n logging-test -fs -path " _ ..GetModuleDir("logging")))
 
@@ -101,7 +103,7 @@ Method TestUninstall()
 /// Test that the -output-file command creates log files in a specified location
 Method TestOutputPath()
 {
-    set commands = $listbuild("install -v -output-log " _ ..CustomOutputDir _ " " _ ..#BaseModule)
+    set commands = $listbuild("install -v -log-dir " _ ..CustomOutputDir _ " " _ ..#BaseModule)
     do ..GenericLoggingTest(commands, ..CustomOutputDir)
 }
 
@@ -126,9 +128,8 @@ Method TestInstallFailure()
     do $$$AssertStatusNotOK(sc, "Install failure on " _ ..#NonExistentDepMod)
 
     set files = ..GetLogFilesInDir(..DefaultLogFileDir)
-    if ($listlength(files.%Get("txt")) '= 1) || ($listlength(files.%Get("jsonl")) '= 1) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"Expected exactly 1 .txt and 1 .jsonl file in VerifyLogFilesInDirectory() but that was not the case"))
-    }
+    set fileLengthsAsExpected = ($listlength(files.%Get("txt")) = 1) && ($listlength(files.%Get("jsonl")) = 1)
+    do $$$AssertTrue(fileLengthsAsExpected, "Created exactly 1 .txt and 1 .jsonl file as expected")
 
     set txtLogFile = $listget(files.%Get("txt"), 1)
     set jsonlLogFile = $listget(files.%Get("jsonl"), 1)
@@ -146,9 +147,8 @@ Method TestExecutionInterrupted()
     do $$$AssertStatusNotOK(sc, "Install interrupted on " _ ..#InterruptModule)
 
     set files = ..GetLogFilesInDir(..DefaultLogFileDir)
-    if ($listlength(files.%Get("txt")) '= 1) || ($listlength(files.%Get("jsonl")) '= 1) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError,"Expected exactly 1 .txt and 1 .jsonl file in VerifyLogFilesInDirectory() but that was not the case"))
-    }
+    set fileLengthsAsExpected = ($listlength(files.%Get("txt")) = 1) && ($listlength(files.%Get("jsonl")) = 1)
+    do $$$AssertTrue(fileLengthsAsExpected, "Created exactly 1 .txt and 1 .jsonl file as expected")
 
     set txtLogFile = $listget(files.%Get("txt"), 1)
     set jsonlLogFile = $listget(files.%Get("jsonl"), 1)
@@ -259,8 +259,7 @@ Method VerifyTxtFileContents(
     do $$$AssertTrue(lastLine [ expectedEndMessage, "End message is present in the txt log file")
 
     if checkForErrors {
-        set expectedErrorMessage = "[ERROR]"
-        do $$$AssertTrue(secondLastLine [ expectedErrorMessage, "Message with log level [ERROR] is present in the txt log file")
+        do $$$AssertTrue(secondLastLine [ $$$Error, "Message with log level [ERROR] is present in the txt log file")
     }
 }
 
@@ -310,24 +309,26 @@ ClassMethod CleanLogFileDir(directory As %String) As %Status [ Internal ]
 {
     set sc = $$$OK
     try {
+        set files = ##class(Test.PM.Integration.Logging).GetLogFilesInDir(directory)
+
         // Delete all .txt files
-        set file = $zsearch(directory _ "*.txt")
-        while file '="" {
+        set txtFiles = files.%Get("txt")
+        set ptr = 0
+        while $listnext(txtFiles, ptr, file) {
             set deleted = ##class(%File).Delete(file)
             if 'deleted {
                 $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to delete file: %1",file)))
             }
-            set file = $zsearch("")
         }
 
         // Delete all .jsonl files
-        set file = $zsearch(directory _ "*.jsonl")
-        while file '= "" {
+        set jsonlFiles = files.%Get("jsonl")
+        set ptr = 0
+        while $listnext(jsonlFiles, ptr, file) {
             set deleted = ##class(%File).Delete(file)
             if 'deleted {
                 $$$ThrowStatus($$$ERROR($$$GeneralError,$$$FormatText("Failed to delete file: %1",file)))
             }
-            set file = $zsearch("")
         }
     } catch (ex) {
         set sc = ex.AsStatus()
