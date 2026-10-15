@@ -141,10 +141,11 @@ ClassMethod LoadModuleReference(
             set tAsArchive = -1
             set tPayload = tClient.GetModule(tModRef, .tAsArchive)
             set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
-            $$$LogLine("Module "_pModuleName_" was downloaded from " _ pServerName, $$$Info)
+            set line = "Module "_pModuleName_" was downloaded from " _ pServerName
             if $isobject(serverDef) {
-                $$$LogLine(" ("_serverDef.Details_")", $$$Info)
+                set line = line_" ("_serverDef.Details_")"
             }
+            $$$LogLine(line)
             set tFileName = ""
             if ($isobject(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
                 set tFileName = tPayload.Filename
@@ -280,7 +281,7 @@ ClassMethod LoadModuleFromDirectory(
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
         set line = "Loading from "_pDirectory
-        $$$LogLine(line, $$$Info)
+        $$$LogLine(line)
 
         // Propagate all params to dependencies except those that should only apply to the top level module
         // pParams("Install") indicates this is a top-level module
@@ -1240,7 +1241,7 @@ ClassMethod LoadNewModule(
                 if +##class(%IPM.Repo.Definition).ReadOnlyGetStored(tRepositoryId) {
                     // Set in params directly so that this value gets transmitted downstream
                     set params("DeveloperMode") = 0
-                    $$$LogLine("Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode", $$$Info)
+                    $$$LogLine("Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode")
                 }
             }
         }
@@ -1293,9 +1294,7 @@ ClassMethod LoadNewModule(
             tcommit
         }
         set params("RootDirectory") = pDirectory
-        if tVerbose || $get(params("Multicompile","Verbose"),0) {
-            $$$LogLine("Loading "_tDisplayName_" in process "_$job, $$$Info)
-        }
+        $$$LogLine("Loading "_tDisplayName_" in process "_$job)
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
@@ -1328,20 +1327,20 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     set coUpdatingModules = $get(pParams("CoUpdatingModules"))
-    $$$LogLineVerbose("Building dependency graph...", $$$Info)
+    $$$LogLine("Building dependency graph...",, 1)
     set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade,,,,.coUpdatingModules)
     $$$ThrowOnError(sc)
-    $$$LogLineVerbose("Done.", $$$Info)
+    $$$LogLine("Done.",, 1)
 
     // Install dependencies from the graph
     do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
-    $$$LogLine("Created inverted dependency graph from dependency graph", $$$Info)
+    $$$LogLine("Created inverted dependency graph from dependency graph")
 
     #dim flatDepList As %Library.ListOfObjects
     set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
-    $$$LogLine("Constructed flat dependency list from inverted dependency graph", $$$Info)
-    $$$LogLine("Starting installation of dependencies...", $$$Info)
-    $$$LogLine("", $$$Info)
+    $$$LogLine("Constructed flat dependency list from inverted dependency graph")
+    $$$LogLine("Starting installation of dependencies...")
+    $$$LogLine("")
 
     set coUpdatingModules = ""
     for i = 1:1:flatDepList.Count() {

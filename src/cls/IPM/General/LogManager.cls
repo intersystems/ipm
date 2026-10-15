@@ -31,7 +31,7 @@ Property TimeStampEnd As %String;
 
 Property SchemaVersion As %String [ InitialExpression = "1.0.0" ];
 
-/// Verbosity attached to the current command
+/// Default verbosity of terminal logging in the log manager for this command. Set by the verbose modifier in the command input.
 Property Verbose As %Boolean [ InitialExpression = 1 ];
 
 /// Indicates whether the log manager has been initialized (currently writing to .txt and .jsonl log files)
@@ -55,7 +55,7 @@ Method InitializeLog(
     }
 
     if $$$HasData(commandInfo,"NoLog") {
-        $$$LogLine($$$FormattedLine($$$Yellow, "WARNING: -no-log modifier is used, so file logging will be disabled."),)
+        $$$LogLine($$$FormattedLine($$$Yellow, "WARNING: -no-log modifier is used, so file logging will be disabled."))
     }
 
     // Skip log initialization if -no-log flag was given, command does not support a log file, or log is already initialized
@@ -126,15 +126,18 @@ Method InitializeLog(
 }
 
 /// Write a log entry to both the JSON Lines and TXT files.
-/// @Argument message       The human-readable log message to append
-/// @Argument level         The log level: TRACE, INFO, WARNING, or ERROR
+/// @Argument message           The human-readable log message to append
+/// @Argument level             The log level: TRACE, INFO, WARNING, or ERROR. If none supplied, defaults to INFO
+/// @Argument writeToTerminal   If set to 1, write line to terminal, regardless of the default verbosity setting
 Method WriteLogLine(
 	message As %String,
-	level As %String) As %Status
+	level As %String = "INFO",
+	writeToTerminal As %Boolean = 0) As %Status
 {
     try
     {
-        if (..Verbose) {
+        set verbose = ..Verbose || writeToTerminal
+        if (verbose) {
             write !, message
         }
         if '..Initialized {
@@ -172,18 +175,6 @@ Method WriteLogLine(
     {
         return ex.AsStatus()
     }
-}
-
-/// In some cases, we will want to override the verbosity setting and force a log line to be written verbosely
-Method WriteLogLineVerbose(
-	message As %String,
-	level As %String) As %Status
-{
-    set verbosity = ..Verbose
-    set ..Verbose = 1
-    set sc = ..WriteLogLine(message, level)
-    set ..Verbose = verbosity
-    return sc
 }
 
 /// Write a standard final "Logging Complete" message to both the JSON and TXT log files and mark log as no longer initialized
