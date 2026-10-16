@@ -89,9 +89,8 @@ Method DoMerge(ByRef pParams) As %Status
         set tempFileManager = ##class(%IPM.Utils.TempFileManager).%Get(.status)
         $$$ThrowOnError(status)
         set tempFile = tempFileManager.GetTempFileName("cpf")
-        if verbose {
-            write !, "Evaluating system expressions using temporary file at " _ tempFile,!
-        }
+        $$$LogLine("Evaluating system expressions using temporary file at " _ tempFile)
+        $$$LogLine("")
         set outputStream = ##class(%Stream.FileCharacter).%New()
         set outputStream.Filename = tempFile
 
@@ -104,8 +103,8 @@ Method DoMerge(ByRef pParams) As %Status
         }
         $$$ThrowOnError(outputStream.%Save())
 
+        $$$LogLine("Merging CPF file: "_filename)
         if verbose {
-            write !, "Merging CPF file: ", filename, !
             // OutputToDevice() without a len argument will rewind to the beginning of the stream
             $$$ThrowOnError(outputStream.OutputToDevice())
         }

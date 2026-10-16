@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.StudioDocument.Abstract Extends %Studio.AbstractDocument [ Abstract, DependsOn = %IPM.StudioDocument.AbstractStream, Owner = {%Developer} ]
 {
 
@@ -193,7 +195,7 @@ Method CompileDocument(ByRef qstruct As %String) As %Status
     }
 
     if $get(qstruct("displaylog")) && $$$ISERR(tSC) {
-        write !,$system.Status.GetErrorText(tSC)
+        $$$LogLine($system.Status.GetErrorText(tSC), $$$Error, 1)
     }
     quit tSC
 }

@@ -2,6 +2,8 @@
 /// This works with a resource like /localize/MessageFileName.xml (Domains attribute required; resource name used as export target), or
 /// MyPackage.Errors.LOC (Filename attribute required; Domains populated automatically from the message file)
 /// For .LOC resources, the default resource processor class (%IPM.ResourceProcessor.Default.LocalizedMessages) should be used instead.
+Include %IPM.Common
+
 Class %IPM.ResourceProcessor.LocalizationExport Extends %IPM.ResourceProcessor.Abstract
 {
 
@@ -23,7 +25,6 @@ Method OnBeforePhase(
 {
     set tSC = $$$OK
     try {
-        set tVerbose = $get(pParams("Verbose"))
         set tIsLoc = ($piece(..ResourceReference.Name,".",*) = "LOC")
         if tIsLoc {
             set ..Domains = ..GetDomainsForResource()
@@ -59,9 +60,7 @@ Method OnBeforePhase(
             } else {
                 $$$ThrowStatus($$$ERROR($$$PropertyRequired,"Filename"))
             }
-            if tVerbose {
-                write !,"Exporting messages for '",..Domains,"' domain(s) to ",tExportFile
-            }
+            $$$LogLine("Exporting messages for '"_..Domains_"' domain(s) to "_tExportFile)
             set tDirectory = ##class(%Library.File).GetDirectory(tExportFile)
             if '##class(%Library.File).DirectoryExists(tDirectory) {
                 $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tDirectory))

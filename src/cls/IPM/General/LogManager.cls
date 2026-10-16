@@ -150,23 +150,28 @@ Method WriteLogLine(
             $$$ThrowOnError($$$ERROR($$$GeneralError, errMsg))
         }
 
-        set entry = ##class(%DynamicObject).%New()
-        set entry.level = level
-        set entry.message = message
-        set entry.timestamp = $zdatetime($ztimestamp, 3) _ " UTC"
+        set timestamp = $zdatetime($ztimestamp, 3) _ " UTC"
 
-        // Append one NDJSON record; no full-file read/parse required.
-        set jsonStream = ##class(%Stream.FileCharacter).%New()
-        set jsonStream.Filename = ..JSONFilePath
-        $$$ThrowOnError(jsonStream.MoveToEnd())
-        do jsonStream.WriteLine(entry.%ToJSON())
-        $$$ThrowOnError(jsonStream.%Save())
+        // Skip writing to .jsonl file if message is empty string
+        if (message '= "") {
+            set entry = ##class(%DynamicObject).%New()
+            set entry.level = level
+            set entry.message = message
+            set entry.timestamp = timestamp
+
+            // Append one NDJSON record; no full-file read/parse required.
+            set jsonStream = ##class(%Stream.FileCharacter).%New()
+            set jsonStream.Filename = ..JSONFilePath
+            $$$ThrowOnError(jsonStream.MoveToEnd())
+            do jsonStream.WriteLine(entry.%ToJSON())
+            $$$ThrowOnError(jsonStream.%Save())
+        }
 
         // Append to TXT file
         set txtStream = ##class(%Stream.FileCharacter).%New()
         set txtStream.Filename = ..TxtFilePath
         $$$ThrowOnError(txtStream.MoveToEnd())
-        do txtStream.WriteLine(entry.timestamp _ " [" _ level _ "] " _ message)
+        do txtStream.WriteLine(timestamp _ " [" _ level _ "] " _ message)
         $$$ThrowOnError(txtStream.%Save())
 
         return $$$OK
