@@ -172,7 +172,7 @@ Method BuildCache(
 
             set tSubDirectory = tFilenameList(tKey,"sub")
             set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,.tName,.tVersionString))
-            $$$LogLine(tName_" "_tVersionString_" @ "_##class(%File).NormalizeDirectory(..Root_tSubDirectory), $$$Info, pVerbose)
+            $$$LogLine(tName_" "_tVersionString_" @ "_##class(%File).NormalizeDirectory(..Root_tSubDirectory),, pVerbose)
         }
         $$$ThrowOnError(tAggSC)
         tcommit

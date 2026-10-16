@@ -105,13 +105,14 @@ Method OnBeforePhase(
 
 Method CreateOrUpdateWebApp() [ Internal ]
 {
+    set verbose = ##class(%IPM.General.LogManager).%Get().Verbose
     new $namespace
     set $namespace = "%SYS"
 
     merge properties = ..SecurityProperties
 
     if ##class(Security.Applications).Exists(..Name) {
-        $$$LogLine("Updating Web Application "_..Name)
+        write:verbose !,"Updating Web Application ",..Name
         set sc = ##class(Security.Applications).Get(..Name,.oldProperties)
         $$$ThrowOnError(sc)
 
@@ -133,26 +134,30 @@ Method CreateOrUpdateWebApp() [ Internal ]
         }
 
         if $data(changes) {
-            for i=1:1:$get(changes) {
-                $$$LogLine(changes(i))
+            if (verbose) {
+                for i=1:1:$get(changes) {
+                    write !,changes(i)
+                }
             }
             set sc = ##class(Security.Applications).Modify(..Name,.properties)
             $$$ThrowOnError(sc)
-            $$$LogLine("Done.")
+            write:verbose !, "Done."
         } else {
-            $$$LogLine("No changes detected or made.")
+            write:verbose !,"No changes detected or made."
         }
     } else {
-        $$$LogLine("Creating Web Application "_..Name)
+        write:verbose !,"Creating Web Application "_..Name
         set sc = ##class(Security.Applications).Create(..Name,.properties)
-        set key = ""
-        for {
-            set key = $order(properties(key),1,tValue)
-            quit:key=""
-            $$$LogLine("   "_key_": "_tValue)
+        if (verbose) {
+            set key = ""
+            for {
+                set key = $order(properties(key),1,tValue)
+                quit:key=""
+                write !,key,": ",tValue
+            }
         }
         $$$ThrowOnError(sc)
-        $$$LogLine("Done.")
+        write:verbose !,"Done."
     }
 }
 

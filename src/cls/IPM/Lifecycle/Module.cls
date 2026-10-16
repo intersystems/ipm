@@ -2,6 +2,7 @@ Include %IPM.Common
 
 Class %IPM.Lifecycle.Module Extends %IPM.Lifecycle.Base
 {
+
 Property Payload As %Stream.TmpBinary [ Private ];
 
 Parameter PACKAGING As STRING [ Final ] = "module";
@@ -67,7 +68,7 @@ Method %Clean(ByRef pParams) As %Status
 
                 if $listlength(orphanedModules) > 0 {
                     // Modules were orphaned - warn user but still clean up
-                    $$$LogLine($listlength(orphanedModules)_" module(s) orphaned:", $$$Warning, 1)
+                    $$$LogLine("WARNING: "_$listlength(orphanedModules)_" module(s) orphaned:", $$$Warning, 1)
 
                     // List orphaned modules with versions
                     set ptr = 0
@@ -111,8 +112,8 @@ Method %Activate(ByRef pParams) As %Status
             if $$$ISOK(tStudioProjectSC) {
                 $$$LogLine("Studio project created/updated: " _ tProject.Name _ ".PRJ")
             } else {
-                $$$LogLine("Unable to create/update Studio project: " _ tProject.Name _ ".PRJ", $$$Warning)
-                $$$LogLine($system.Status.GetErrorText(tStudioProjectSC), $$$Warning)
+                $$$LogLine("Unable to create/update Studio project: " _ tProject.Name _ ".PRJ", $$$Error)
+                $$$LogLine($system.Status.GetErrorText(tStudioProjectSC), $$$Error)
             }
         }
         if '$get(pParams("Update")) && '..Module.DeveloperMode {

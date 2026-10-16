@@ -601,7 +601,7 @@ Method %Initialize(ByRef pParams) As %Status
             set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
             if $$$ISERR(tSC) { quit }
         } else {
-            $$$LogLine("Skipping preload - directory does not exist.", $$$Warn)
+            $$$LogLine("Skipping preload - directory does not exist.")
         }
     } catch ex {
         set status = ex.AsStatus()
@@ -822,8 +822,7 @@ ClassMethod ResolvePipCaller(ByRef pParams) As %List
 /// Auto-detects a pip caller when PipCaller is not configured. Tries, in order:
 /// flexible Python (PythonRuntimeLibrary), irispip.exe (Windows),
 /// python3/python in PATH, pip3/pip in PATH. Throws if nothing is found.
-ClassMethod DetectPipCaller(
-	pUseStandalonePip As %Boolean) As %List
+ClassMethod DetectPipCaller(pUseStandalonePip As %Boolean) As %List
 {
     $$$LogLine("Detecting pip caller")
 
@@ -841,7 +840,7 @@ ClassMethod DetectPipCaller(
             $$$LogLine(line_"Success!")
             return $listbuild(irispip)
         }
-        $$$LogLine(line_"Not Found")
+        $$$LogLine(line_"Not Found", $$$Warning)
     }
 
     // UseStandalonePip is a tristate: 0 = python only, 1 = pip only, "" = try both.
@@ -863,7 +862,7 @@ ClassMethod DetectPipCaller(
                 return cmd
             }
             set line = line_"Not Found"
-            $$$LogLine(line)
+            $$$LogLine(line, $$$Warning)
         }
     }
 
@@ -893,7 +892,9 @@ ClassMethod DetectPipCaller(
 
 /// Looks for executables by searching names in priority order across all dirs.
 /// Returns the full path of the highest-priority name found, or "" if none exists.
-ClassMethod FindExecutableInDirs(dirs As %List, names As %List) As %String
+ClassMethod FindExecutableInDirs(
+	dirs As %List,
+	names As %List) As %String
 {
     set namePtr = 0
     while $listnext(names, namePtr, name) {
@@ -919,11 +920,10 @@ ClassMethod DetectFlexiblePythonCaller(useStandalonePip As %Boolean) As %List
         return ""
     }
 
-    set line = "Attempting to find flexible python... "
+    $$$LogLine("Attempting to find flexible python... ")
 
     do ##class(%SYS.Python).GetPythonInfo(.info)
     if '$data(info("CPF_PythonRuntimeLibrary"), pyDylib) || (pyDylib = "") {
-        $$$LogLine(line)
         return ""
     }
 
@@ -952,10 +952,9 @@ ClassMethod DetectFlexiblePythonCaller(useStandalonePip As %Boolean) As %List
         }
         set interpreter = ..FindExecutableInDirs(searchDirs, pythonNames)
         if interpreter '= "" {
-            $$$LogLine(line_"Success!")
+            $$$LogLine("Success!")
             return $listbuild(interpreter, "-m", "pip")
         }
-        $$$LogLine(line)
         $$$LogLine("Python interpreter not found in flexible Python directories")
     }
 
