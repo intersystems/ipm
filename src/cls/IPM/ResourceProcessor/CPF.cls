@@ -160,7 +160,7 @@ Method DoMerge(ByRef pParams) As %Status
             $$$ThrowOnError(outputStream.OutputToDevice())
         }
 
-        do ..MergeCPF(tempFile)
+        do ..MergeCPF(tempFile, filename)
     } catch ex {
         set sc = ex.AsStatus()
     }
@@ -168,7 +168,11 @@ Method DoMerge(ByRef pParams) As %Status
     return sc
 }
 
-ClassMethod MergeCPF(file As %String)
+/// Merges file into the running instance. sourceFile is the name reported on failure,
+/// since file may be a processed temporary copy. Defaults to file.
+ClassMethod MergeCPF(
+	file As %String,
+	sourceFile As %String = "")
 {
     // TODO The $zf(-100) callout is much slower than ##class(Config.CPF).Merge()
     //      Figure out why ##class(Config.CPF).Merge() doesn't work
@@ -180,10 +184,36 @@ ClassMethod MergeCPF(file As %String)
 
     // Somehow, if the STDOUT is not set, the merge will silently fail
     set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
+    // Keeps the child from opening the caller's terminal
+    set flags = flags _ "/STDIN=""" _ ##class(%Library.Device).GetNullDevice() _ """"
     set status = $zf(-100, flags, "iris", .args)
     if status '= 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error merging CPF file. $zf(-100) exited with "_status))
+        set msg = $$$FormatText("Error merging CPF file '%1'. $zf(-100) exited with %2", $select(sourceFile = "": file, 1: sourceFile), status)
+        set details = ..ReadOutputFile("zf100stdout") _ ..ReadOutputFile("zf100stderr")
+        set details = details _ $char(13, 10) _ "See messages.log for details."
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg _ details))
     }
+}
+
+/// Returns the non-blank lines of a merge output file in the process's current directory, each preceded by a newline.
+ClassMethod ReadOutputFile(name As %String) As %String [ Private ]
+{
+    set path = ##class(%File).NormalizeFilename(name, ##class(%SYSTEM.Process).CurrentDirectory())
+    if '##class(%File).Exists(path) {
+        return ""
+    }
+    set stream = ##class(%Stream.FileCharacter).%New()
+    if $$$ISERR(stream.LinkToFile(path)) {
+        return ""
+    }
+    set text = ""
+    while 'stream.AtEnd {
+        set line = $zstrip(stream.ReadLine(), "<>W")
+        if line '= "" {
+            set text = text _ $char(13, 10) _ line
+        }
+    }
+    return text
 }
 
 }
