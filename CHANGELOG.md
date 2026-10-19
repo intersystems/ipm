@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
+- #1242: Deployed code is installed into the database its resource mappings point to, rather than one an existing namespace mapping points to, so it is reachable after the first install
 
 ## [0.10.10] - 2026-10-14
 
@@ -17,9 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
 - #1158: Searching for or installing modules with deployed code will automatically filter for the currently installed IRIS version
 - `ArtifactoryTarball` resources download without credentials from Artifactory servers that allow anonymous read access, using the artifact and property search APIs instead of AQL. Only `ARTI_SERVER` is required: `ARTI_PORT` defaults to 443 and `ARTI_AQL_URL` to `/artifactory/api/search/aql`.
-
-### Changed
-- Minimum supported Python version is now 3.9
+- Minimum supported Python version is now 3.9 (was previously 3.10)
 
 ### Fixed
 - #1260: ensure appropriate error reported if -env file does not exist.

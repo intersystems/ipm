@@ -204,6 +204,12 @@ Method OnAfterPhase(
     quit $$$OK
 }
 
+/// Subclasses may override to create the mappings this resource needs. Called at the beginning of the Reload phase, before any resource in the module is loaded.
+Method OnConfigureMappings(ByRef pParams) As %Status
+{
+    quit $$$OK
+}
+
 /// Called during 'sync' for resources whose files changed on disk.
 /// modifiedPaths(relPath)="" for changed files; deletedPaths(relPath)="" for removed files.
 /// Set handled=1 to fully own sync for this resource (skip default load+compile handling).

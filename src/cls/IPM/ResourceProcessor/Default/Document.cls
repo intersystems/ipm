@@ -308,12 +308,6 @@ Method OnExportDeployedItem(
     quit tSC
 }
 
-/// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
-Method OnConfigureMappings(ByRef pParams) As %Status
-{
-    quit $$$OK
-}
-
 /// Subclasses may override to customize resource load behavior during the Reload phase. <br />
 /// @Argument	pFullResourcePath			The absolute path to the resource present on the file system
 /// @Argument	pVerbose					1: display output from loading files, 0: do not display output
