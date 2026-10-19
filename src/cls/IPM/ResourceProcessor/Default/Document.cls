@@ -92,17 +92,14 @@ Method OnPhase(
             set tListNames = tListNames _ $listbuild($translate(tName, "%", "_"))
             set tListNames = tListNames _ $listbuild($translate(tName, "_", ""))
             set tListNames = tListNames _ $listbuild($translate(tName, "%", ""))
+            // Reload already created mappings; this covers test- and verify-scoped resources
+            if '$get(pParams("NoMapping"),0) {
+                $$$ThrowOnError(..OnConfigureMappings(.pParams))
+            }
             set ptrn = 0
             while $listnext(tListNames, ptrn, tName) {
-                // Runs in Reload normally, and also in Test for test scope / Verify for verify scope
                 set tSourcesPrefix = $char($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 
-                if '$get(pParams("NoMapping"),0) {
-                    // Currently, still need mapping creation, since if a module is installed with a resource
-                    // already presented in another namespace and have a upperlevel mapping to another namespace,
-                    // then it should have a package mapping of this specific resource to its namespace database
-                    $$$ThrowOnError(..OnConfigureMappings(.pParams))
-                }
                 if ..ResourceReference.Generated {
                     set pResourceHandled = 1
                     quit

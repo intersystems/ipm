@@ -204,7 +204,8 @@ Method OnAfterPhase(
     quit $$$OK
 }
 
-/// Subclasses may override to create the mappings this resource needs. Called at the beginning of the Reload phase, before any resource in the module is loaded.
+/// Subclasses may override to create the mappings this resource needs. Called before the resource is loaded.
+/// The default processors give a resource covered by a broader mapping to another database its own mapping to this namespace's routine database.
 Method OnConfigureMappings(ByRef pParams) As %Status
 {
     quit $$$OK
