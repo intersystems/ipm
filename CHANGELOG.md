@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
+- #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
 
 ## [0.10.10] - 2026-10-14
 
@@ -17,9 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
 - #1158: Searching for or installing modules with deployed code will automatically filter for the currently installed IRIS version
 - `ArtifactoryTarball` resources download without credentials from Artifactory servers that allow anonymous read access, using the artifact and property search APIs instead of AQL. Only `ARTI_SERVER` is required: `ARTI_PORT` defaults to 443 and `ARTI_AQL_URL` to `/artifactory/api/search/aql`.
-
-### Changed
-- Minimum supported Python version is now 3.9
+- Minimum supported Python version is now 3.9 (was previously 3.10)
 
 ### Fixed
 - #1260: ensure appropriate error reported if -env file does not exist.
@@ -29,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1227: IPM commands no longer exit the shell with "IPM has been uninstalled from this namespace" after IPM is uninstalled and reinstalled in the same process
 - #1228: `uninstall zpm` now prompts to remove IPM metadata even when no other module is installed, so downgrading IPM does not require installing an unrelated module first
 - #987: Fixed issue where installing dependencies with ORAS would fail due to failure to properly get the manifest
-- #1215: installer is synchronous rather than jobbed for simplified logging/debugging
+- #1215: Installer is synchronous rather than jobbed for simplified logging/debugging
 - #1261: Modules containing CPF resources can now be packaged
 - #1267: Dependencies of modules installed from an ORAS repository with a namespace now resolve within that namespace. Search results from such a repository list modules without the namespace prefix, and the namespace is lowercased with leading or trailing slashes ignored.
 

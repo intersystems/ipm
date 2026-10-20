@@ -1,0 +1,4 @@
+ROUTINE DeployMapR.Routine
+Hello() public {
+    quit "routine"
+}

@@ -717,6 +717,17 @@ Method %Reload(ByRef pParams) As %Status
 
         // Resource processing
         set orderedResourceList = ..Module.GetOrderedResourceList()
+        // Mappings must exist before any load, because loading deployed code writes every deployed resource at once
+        if '$get(pParams("NoMapping"),0) {
+            set tKey = ""
+            for {
+                set tResource = orderedResourceList.GetNext(.tKey)
+                quit:tKey=""
+                if $isobject(tResource.Processor) && tResource.IsInScope("Reload") {
+                    $$$ThrowOnError(tResource.Processor.OnConfigureMappings(.pParams))
+                }
+            }
+        }
         set tSC = $$$OK
         set tKey = ""
         for {
