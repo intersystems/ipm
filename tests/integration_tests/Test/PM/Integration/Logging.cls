@@ -46,7 +46,7 @@ Method OnAfterAllTests() As %Status
 {
     set sc = $$$OK
     try {
-        // Delete repos for LockFile tests
+        // Delete repos for logging tests
         $$$ThrowOnError(##class(%IPM.Main).Shell("repo -delete -name logging-test"))
     } catch ex {
         set sc = ex.AsStatus()
@@ -292,7 +292,7 @@ Method VerifyJsonlFileContents(
 
     // Verify end message
     set lastLine = {}.%FromJSON(lastLine)
-    set endMessageIsAsExpected = (lastLine.%Get("level") = "INFO") && (lastLine.%Get("message") = "Logging COMPLETE")
+    set endMessageIsAsExpected = (lastLine.%Get("level") = $$$Info) && (lastLine.%Get("message") = "Logging COMPLETE")
     do $$$AssertTrue(endMessageIsAsExpected, "End message is present in the jsonl log file")
 
     // Verify error message if expected

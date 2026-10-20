@@ -63,7 +63,9 @@ Method TestWritingToLogs()
     do $$$AssertStatusNotOK(sc, "Writing a log line with an invalid level fails.")
 
     // Writing a log line with an un-initialized log manager should succeed and not care about log level
+    kill logMgr
     do ..KillLogManagerSingleton()
+    set logMgr = ##class(%IPM.General.LogManager).%Get()
     set sc = logMgr.WriteLogLine("Un-initialized log manager test", "INVALID")
     do $$$AssertStatusOK(sc, "Writing a log line with an un-initialized log manager succeeds.")
 }
@@ -80,8 +82,9 @@ Method TestFormattedText()
     set commandInfo("data", "LogFileDir") = "/home/irisowner/zpm/output-logs/"
     $$$ThrowOnError(logMgr.InitializeLog(command, .commandInfo))
 
-    set line = $$$FormattedLine($$$Yellow, "WARNING: Command  does not exist so showing all available commands.")
-    set sc = logMgr.WriteLogLine(line, "WARNING")
+    set line = $$$FormatText("Test formatting a warning with error code %1", "12345")
+    set sc = logMgr.WriteLogLine(line, $$$Warning)
+    do $$$AssertStatusOK(sc, "Writing a formatted warning log line succeeds.")
 }
 
 /// Kills the log manager singleton to ensure that subsequent tests start with a fresh instance
