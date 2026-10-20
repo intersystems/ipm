@@ -62,7 +62,7 @@ Method OnPhase(
             set errorText = ##class(%SYSTEM.Status).GetErrorText(ex.AsStatus())
             set errMsg = $$$FormatText("Skipping installation of python wheel '%1' due to error: '%2'. ", ..Name, errorText)
             set errMsg = errMsg _ "Please verify Python is correctly configured in IRIS. Otherwise you may need to install this wheel manually or from PyPI to use certain features of IPM."
-            $$$LogLine($$$FormattedLine($$$Red, errMsg), $$$Error, 1)
+            $$$LogLine(errMsg, $$$Error, 1)
             return $$$OK
         }
         return ex.AsStatus()

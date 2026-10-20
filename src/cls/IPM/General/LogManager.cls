@@ -55,7 +55,7 @@ Method InitializeLog(
     }
 
     if $$$HasData(commandInfo,"NoLog") {
-        $$$LogLine($$$FormattedLine($$$Yellow, "WARNING: -no-log modifier is used, so file logging will be disabled."))
+        $$$LogLine("Modifier -no-log is present, file logging will be disabled.", $$$Warning)
     }
 
     // Skip log initialization if -no-log flag was given, command does not support a log file, or log is already initialized

@@ -139,7 +139,7 @@ ClassMethod ReportConflicts()
     try {
         $$$ThrowOnError(..Validate(,.tErrorList))
         for tIndex=1:1:$get(tErrorList) {
-            $$$LogLine("WARNING: "_tErrorList(tIndex), $$$Warning, 1)
+            $$$LogLine(tErrorList(tIndex), $$$Warning, 1)
         }
     } catch e {
         set tSC = e.AsStatus()

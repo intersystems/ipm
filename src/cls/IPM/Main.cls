@@ -1127,10 +1127,9 @@ ClassMethod ShellInternal(
                 do ..Sync(.tCommandInfo)
             }
         } catch pException {
-            $$$LogLine(pException.DisplayString(), $$$Error)
-            do ##class(%IPM.General.LogManager).%Get().Finalize()
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
+                do ##class(%IPM.General.LogManager).%Get().Finalize()
                 return
             }
             do ..DisplayError(pException.AsStatus())
@@ -1161,7 +1160,7 @@ ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal
             quit:name=""
             if ($get(pCommandInfo(key,name,"deprecated"),0)) {
                 set singularKey = $zconvert($extract(key,1),"U") _ $extract(key,2,*-1)
-                $$$LogLine($$$FormattedLine($$$Yellow, $$$FormatText("WARNING: %1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name)), $$$Warning, 1)
+                $$$LogLine($$$FormatText("%1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name), $$$Warning, 1)
             }
         }
     }
@@ -1170,7 +1169,7 @@ ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal
 ClassMethod DisplayError(pStatus As %Status)
 {
     if $$$ISERR(pStatus) {
-        $$$LogLine($$$FormattedLine($$$Red, "ERROR!")_" "_$system.Status.GetOneStatusText(pStatus), $$$Error, 1)
+        $$$LogLine($system.Status.GetOneStatusText(pStatus), $$$Error, 1)
     }
 }
 
@@ -2454,12 +2453,11 @@ ClassMethod LoadInternal(
         // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
         set tModuleFilePath = $listget(tList(tCount), *)
         set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-        $$$LogLine("Found "_tCount_" results. They are: ")
         set idx = ""
         for {
             set idx = $order(tList(idx))
             quit:(idx="")
-            $$$LogLine($char(9)_$list(tList(idx), *))
+            $$$LogLine("module.xml file found: "_$list(tList(idx), *))
         }
         $$$LogLine("Using module.xml file at "_tModuleFilePath)
     }

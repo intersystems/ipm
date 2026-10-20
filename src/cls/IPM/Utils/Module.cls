@@ -354,7 +354,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-///
+/// 
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -719,7 +719,7 @@ ClassMethod UninstallAll(
                 quit
             }
             if '$data(simpleModList(module)) {
-                $$$LogLine("WARNING: module "_module_" is missing, skipping uninstall", $$$Warning)
+                $$$LogLine("Module "_module_" is missing, skipping uninstall", $$$Warning)
                 kill tModuleNames(module)
             }
         }
@@ -1001,7 +1001,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-///
+/// 
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -2556,7 +2556,7 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 
     if '$get($$$DeprecationWarned("<expression>", "dbrole")) && ((result [ "${dbrole}") || (result [ "{$dbrole}")) {
         set $$$DeprecationWarned("<expression>", "dbrole") = 1
-        $$$LogLine($$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead."), $$$Warning, 1)
+        $$$LogLine("The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.", $$$Warning, 1)
     }
     set dbRole = ..GetDatabaseRole()
     set result = ..%RegExReplace(result, "dbrole", dbRole)

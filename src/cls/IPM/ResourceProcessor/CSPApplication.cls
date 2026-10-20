@@ -72,8 +72,8 @@ Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [
     set packageName = pResourceReference.Module.Name
     if ($get(packageName) '= "") && '$data($$$DeprecationWarned(packageName, "CSPApplication")) {
         set $$$DeprecationWarned(packageName, "CSPApplication") = 1
-        $$$LogLine($$$FormattedLine($$$Red, "WARNING: The <CSPApplication></CSPApplication> resource tag is deprecated and may be removed in a future release of IPM."), $$$Warning, 1)
-        $$$LogLine($$$FormattedLine($$$Red, $$$FormatText("         Please contact the package developer of %1 to use <WebApplication></WebApplication> instead", packageName)), $$$Warning, 1)
+        $$$LogLine("The <CSPApplication></CSPApplication> resource tag is deprecated and may be removed in a future release of IPM.", $$$Warning, 1)
+        $$$LogLine($$$FormatText("         Please contact the package developer of %1 to use <WebApplication></WebApplication> instead", packageName), $$$Warning, 1)
     }
     set tSC = ##super(pResourceReference)
     set ..Url = $zconvert(..Url,"L")
@@ -360,7 +360,7 @@ Method CreateOrUpdateCSPApp() As %Status [ Internal ]
             for {
                 set tKey = $order(tProperties(tKey),1,tValue)
                 quit:tKey=""
-                $$$LogLine("   "_tKey_": "_tValue)
+                $$$LogLine($char(9)_tKey_": "_tValue)
             }
             $$$ThrowOnError(tSC)
             $$$LogLine("Done.")

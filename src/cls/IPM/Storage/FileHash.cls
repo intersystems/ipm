@@ -143,7 +143,7 @@ ClassMethod StampModule(module As %IPM.Storage.Module) As %Status
             }
             set stampSC = ..StampOneFileWithHash(module.Name, relPath, hash)
             if $$$ISERR(stampSC) {
-                $$$LogLine("WARNING: could not stamp "_relPath_": "_$system.Status.GetOneErrorText(stampSC), $$$Warning, 1)
+                $$$LogLine("Could not stamp "_relPath_": "_$system.Status.GetOneErrorText(stampSC), $$$Warning, 1)
             }
         }
     } catch e {

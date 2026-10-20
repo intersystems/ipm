@@ -373,7 +373,7 @@ Method %Clean(ByRef pParams) As %Status
                         quit:tClassKey=""
 
                         if 'tRemoveMapped && ##class(%Library.RoutineMgr).IsMapped(tClassKey_".CLS") {
-                            $$$LogLine("WARNING: Skipping mapped resource "_tClassKey_".CLS", $$$Warning)
+                            $$$LogLine("Skipping mapped resource "_tClassKey_".CLS", $$$Warning)
                             continue
                         }
 
@@ -386,7 +386,7 @@ Method %Clean(ByRef pParams) As %Status
                             }
                             set tDelSC = $system.OBJ.Delete(tClassKey,$select(tVerbose:"d",1:"-d"))
                             if $$$ISERR(tDelSC) {
-                                $$$LogLine("WARNING: "_$system.Status.GetErrorText(tDelSC), $$$Warning)
+                                $$$LogLine($system.Status.GetErrorText(tDelSC), $$$Warning)
                             }
                         }
                     }
@@ -412,14 +412,14 @@ Method %Clean(ByRef pParams) As %Status
                         set tFullName = tItem_"."_tType
 
                         if 'tRemoveMapped && ##class(%Library.RoutineMgr).IsMapped(tFullName) {
-                            $$$LogLine("WARNING: Skipping mapped resource "_tFullName, $$$Warning, 1)
+                            $$$LogLine("Skipping mapped resource "_tFullName, $$$Warning, 1)
                             continue
                         }
 
                         $$$LogLine("Deleting "_tFullName)
                         set tDelSC = ##class(%Library.RoutineMgr).Delete(tFullName)
                         if $$$ISERR(tDelSC) {
-                            $$$LogLine("WARNING: "_$system.Status.GetErrorText(tDelSC), $$$Warning, 1)
+                            $$$LogLine($system.Status.GetErrorText(tDelSC), $$$Warning, 1)
                         }
                     }
                 }
@@ -439,7 +439,7 @@ Method %Clean(ByRef pParams) As %Status
                     do log.InitPhase("Clean")
                     set tModObj = ##class(%IPM.Storage.Module).NameOpen(tModName,,.tModSC)
                     if $$$ISERR(tModSC) {
-                        $$$LogLine("WARNING: "_$system.Status.GetErrorText(tModSC), $$$Warning, 1)
+                        $$$LogLine($system.Status.GetErrorText(tModSC), $$$Warning, 1)
                         do log.FinalizePhase("Clean", tModSC)
                         set status = log.Finalize(tModSC)
                         if '$$$ISOK(status) {
@@ -1189,7 +1189,7 @@ Method %Compile(ByRef pParams) As %Status
             try {
                 $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(..Module))
             } catch stampEx {
-                $$$LogLine("WARNING: sync baseline stamping failed: "_$system.Status.GetOneErrorText(stampEx.AsStatus()), $$$Warning, 1)
+                $$$LogLine("sync baseline stamping failed: "_$system.Status.GetOneErrorText(stampEx.AsStatus()), $$$Warning, 1)
             }
         }
     } catch e {
@@ -1377,7 +1377,7 @@ Method ExportPythonDependencies(
     if '##class(%File).DirectoryExists(wheelsDir) {
         // ExportPythonDependencies called on base module + dependencies so don't want to error if one of
         // the modules doesn't have a wheels directory since that might actually be the case for the module
-        $$$LogLine("WARNING: No wheels directory for this module: "_wheelsDir_" not found", $$$Warning, 1)
+        $$$LogLine("No wheels directory for this module: "_wheelsDir_" not found", $$$Warning, 1)
         quit
     }
     set stmt = ##class(%SQL.Statement).%New()
@@ -1836,22 +1836,20 @@ Method %MakeDeployed(ByRef pParams) As %Status
             set ..Module.SystemRequirements.VersionString = tSystemVersion
             $$$ThrowOnError(..Module.%Save())
             if $data(tDeployClassArray) {
-                $$$LogLine("The following classes are flagged for deployment:")
                 set tClass = ""
                 for {
                     set tClass = $order(tDeployClassArray(tClass))
                     quit:tClass=""
-                    $$$LogLine($char(9)_tClass)
+                    $$$LogLine("Class flagged for deployment:"_tClass)
                 }
                 $$$ThrowOnError($system.OBJ.MakeClassDeployed(.tDeployClassArray))
             }
             if $data(tDeployRtnArray) {
-                $$$LogLine("The following routines are flagged for deployment:")
                 set tRtn = ""
                 for {
                     set tRtn = $order(tDeployRtnArray(tRtn))
                     quit:tRtn=""
-                    $$$LogLine($char(9)_tRtn)
+                    $$$LogLine("Routine flagged for deployment:"_tRtn)
                     if 'tDev {
                         $$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
                     }
@@ -1871,7 +1869,7 @@ Method %ApplyUpdateSteps(ByRef pParams) As %Status
     set sc = $$$OK
     try {
         if $system.Mirror.IsMember() && $system.Mirror.IsPrimary() {
-            $$$LogLine("WARNING: You are running update steps on the primary member of a mirror. It is recommended to start the update process on a backup instance to minimize downtime.", $$$Warning, 1)
+            $$$LogLine("You are running update steps on the primary member of a mirror. It is recommended to start the update process on a backup instance to minimize downtime.", $$$Warning, 1)
         }
         // TODO: Add log file param after logging meeting discussion
         $$$ThrowOnError(..Module.HandleAllUpdateSteps())

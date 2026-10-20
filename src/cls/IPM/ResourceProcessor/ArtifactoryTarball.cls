@@ -43,7 +43,7 @@ Method OnAfterPhase(
                 // overwrite existing files if there are any in destination dir
                 $$$LogLine("Going to copy extracted contents from "_downloadDirectory_" to "_..InstallDirectory)
                 if ##class(%File).DirectoryExists(..InstallDirectory) {
-                    $$$LogLine($$$FormattedLine($$$Yellow, "WARNING: "_..InstallDirectory_" has contents which will be overwritten by this action."), $$$Warning)
+                    $$$LogLine(..InstallDirectory_" has contents which will be overwritten by this action.", $$$Warning)
                 }
                 // Copy contents over with pDeleteBeforeCopy = 1
                 if '##class(%File).CopyDir(downloadDirectory, ..InstallDirectory, 1, , 1) {
@@ -105,7 +105,7 @@ Method DownloadArtifact(ByRef params) [ Internal, Private ]
 
     if ((server = "") || (port = "") || (aqlURL = "") || ((bearerToken = "") && ((username = "") || (password = "")))) {
         if (developerMode) {
-            $$$LogLine($$$FormattedLine($$$Yellow, "WARNING: Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact."), $$$Warning, 1)
+            $$$LogLine("Not all of server, port, aql url, and a bearer token or username and password were provided, skipping downloading artifact.", $$$Warning, 1)
             quit
         }
         $$$ThrowStatus($$$ERROR($$$GeneralError,"All of server, port, aql url, and a bearer token or username and password must be provided to download an artifact"))
@@ -212,7 +212,7 @@ ClassMethod RetrieveArtifact(
 	artifactServer As %String,
 	artifactPort As %String,
 	artifactPath As %String,
-    downloadDirectory As %String) As %String [ Internal ]
+	downloadDirectory As %String) As %String [ Internal ]
 {
     set httpRequest = ##class(%Net.HttpRequest).%New()
     set httpRequest.Https = 1

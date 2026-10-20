@@ -79,7 +79,6 @@ Method CleanUp() As %Status
     set sc = ..Repo.%DeleteId(..Repo.%Id())
     if $$$ISERR(sc) {
         set msg = $$$FormatText("Failed to clean up repository '%1'. You may need to manually delete it using 'repo -delete -n %1'", ..Repo.Name)
-        set msg = $$$FormattedLine($$$Red, msg)
         $$$LogLine(msg, $$$Error, 1)
     }
     quit sc
