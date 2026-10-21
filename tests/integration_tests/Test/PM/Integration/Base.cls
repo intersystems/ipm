@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class Test.PM.Integration.Base Extends %UnitTest.TestCase
 {
 
@@ -144,6 +146,18 @@ ClassMethod FindStringInMultiDimArray(
 		}
 	}
 	return 0
+}
+
+/// Returns true if any configured repository offers the named module
+ClassMethod ModuleAvailableInRepositories(moduleName As %String) As %Boolean
+{
+	set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
+	set criteria.Name = $$$lcase(moduleName)
+	set sc = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(criteria, .results)
+	if $$$ISERR(sc) || '$isobject(results) {
+		return 0
+	}
+	return results.Count() > 0
 }
 
 ClassMethod HttpGet(pPath As %String = "/") As %Status

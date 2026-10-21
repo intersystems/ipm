@@ -864,6 +864,8 @@ ClassMethod HasScope(
 /// <li>Version string of the module to be installed</li>
 /// <li>Display name of the module</li>
 /// <li>Scope of the module, or empty string if the dependency is not scoped</li>
+/// <li>Whether the module is deployed</li>
+/// <li>Platform version the deployed module was built for, or empty string if not deployed</li>
 /// </ul>
 /// <p>
 /// <b>Parameters:</b><br>
@@ -1124,7 +1126,7 @@ Method ProcessSingleDependencyIterative(
                 localObj.Version.Satisfies(searchExpr) &&
                 ((version = "") || (version = localObj.VersionString))
             if installedVersionValid && '(localObj.Version.IsSnapshot() && pForceSnapshotReload) {
-                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName,pDep.Scope)
+                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName,pDep.Scope,localObj.Deployed,localObj.PlatformVersion)
                 set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
                 // Add to work queue for next depth
@@ -1186,7 +1188,8 @@ Method ProcessSingleDependencyIterative(
             }
 
             set pDependencyGraph(pDep.Name) = $listbuild(
-                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, pDep.DisplayName, pDep.Scope
+                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, pDep.DisplayName, pDep.Scope,
+                qualifiedReference.Deployed, qualifiedReference.PlatformVersion
             )
             set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
@@ -1206,9 +1209,7 @@ Method ProcessSingleDependencyIterative(
                 if '$data(pManifestCache(manifestKey), moduleObj) {
                     // Cache miss so retrieve
                     set tSC = repoManager.RetrieveModuleManifest(qualifiedReference,.manifest)
-                    if $$$ISERR(tSC) {
-                        quit
-                    }
+                    $$$ThrowOnError(tSC)
 
                     set moduleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(manifest,.found)
                     if 'found {
@@ -1221,7 +1222,8 @@ Method ProcessSingleDependencyIterative(
                 // occurs if needed.
                 set depth = $select(previousDepth=0:pDepth,previousDepth>pDepth:previousDepth,1:pDepth)
                 set dependencyGraph(pDep.Name) = $listbuild(
-                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName,pDep.Scope
+                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName,pDep.Scope,
+                    qualifiedReference.Deployed,qualifiedReference.PlatformVersion
                 )
                 set dependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 

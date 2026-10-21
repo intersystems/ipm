@@ -1138,6 +1138,8 @@ ClassMethod ShellInternal(
 
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
+            // Process-private, so clear it once acted on to keep later shells in this process working.
+            kill ^||%IPM.SelfUninstallFlag
             write !,!,$$$FormattedLine($$$Yellow, "IPM has been uninstalled from this namespace. Exiting shell..."),!
             return
         }
@@ -2274,7 +2276,7 @@ ClassMethod ShowModulesForRepository(
     } elseif pSearchString'="" {
         set where=" WHERE name = ?"
     }
-    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
+    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions,PlatformVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
     if (pSearchString = "") {
         set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
     } else {
@@ -2292,6 +2294,7 @@ ClassMethod ShowModulesForRepository(
         set list = list + 1
         set list(list) = $listbuild(name, tRes.Version)
         set list(list, "Origin") = tRes.Origin
+        set list(list, "PlatformVersions") = tRes.PlatformVersions
         if pShowDesc {
             set list(list, "Description") = tRes.Description
         }
@@ -2557,7 +2560,7 @@ ClassMethod Install(
         set tSearchCriteria.Name = $$$lcase(tModuleName)
         set tSearchCriteria.VersionExpression = tVersion
         set tSearchCriteria.Keywords = tKeywords
-        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults,,.tPlatformIncompatibleModules))
 
         if (tResults.Count() > 0) {
             set tResult = ""
@@ -2592,18 +2595,28 @@ ClassMethod Install(
                     set tParams("cmd") = "install"
                     set tParams("Install") = 1
                 }
-                if tResult.Deployed {
-                    set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
-                    set tResult.PlatformVersion = platformVersion
-                    if ('tResult.PlatformVersions.Find(platformVersion)) {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
-                    }
-                }
-                $$$ThrowOnError(log.SetSource(tResult.ServerName))
-                $$$ThrowOnError(log.SetVersion(tResult.Version))
+				        $$$ThrowOnError(log.SetSource(tResult.ServerName))
+				        $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
+            // The module may have been found in a configured repository but no
+            // platform-compatible version exists.
+            if $isobject(tPlatformIncompatibleModules) && (tPlatformIncompatibleModules.Count() > 0) {
+                // Report the newest filtered version: the one an unversioned install resolves to.
+                // A pinned install filters only its own version, so this names that version too.
+                #dim tFiltered As %IPM.Storage.ModuleInfo
+                #dim tCandidate As %IPM.Storage.ModuleInfo
+                set tFiltered = tPlatformIncompatibleModules.GetAt(1)
+                for tIdx = 2:1:tPlatformIncompatibleModules.Count() {
+                    set tCandidate = tPlatformIncompatibleModules.GetAt(tIdx)
+                    if tCandidate.Version.Follows(tFiltered.Version) {
+                        set tFiltered = tCandidate
+                    }
+                }
+                set tMsg = "'" _ tFiltered.Name _ "' " _ tFiltered.VersionString _ " is not available for platform version " _ $$$CurrentPlatformVersion _ ". Available platform versions: " _ tFiltered.FormatPlatformVersions() _ ". Run 'search " _ tFiltered.Name _ " -versions' to see all versions."
+                $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
+            }
             set tPrefix = ""
             if (tModuleName '= "") {
                 if (tVersion '= "") {
@@ -2668,29 +2681,27 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
 
-            // Check if other modules are installed
-            set hasModules = 0
+            // List the other modules that a full cleanup would remove
             set rs = ##class(%SQL.Statement).%ExecDirect(,
                 "SELECT Name, VersionString FROM %IPM_Storage.ModuleItem WHERE Name != ?",
                 $$$IPMModuleName)
-            if rs.%Next() {
-                set hasModules = 1
+            $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
 
-                // Show list of installed modules
-                write !,"The following modules are currently installed:"
+            set hasModules = 0
+            while rs.%Next(.sc) {
+                if 'hasModules {
+                    write !,"The following modules are currently installed:"
+                    set hasModules = 1
+                }
                 write !,"  - ",rs.Name," (",rs.VersionString,")"
-                while rs.%Next() {
-                    write !,"  - ",rs.Name," (",rs.VersionString,")"
-                }
-                write !
+            }
+            $$$ThrowOnError(sc)
+            write:hasModules !
 
-                if 'tForce {
-                    // Dialog: Ask about full cleanup (downgrade scenario)
-                    write !,"Do you want to fully remove all modules and IPM metadata (except history log)?"
-                    write !,"This is required for downgrading IPM. [y/N]: "
-                    read fullCleanupResponse
-                    set tParams("Clean","FullCleanup") = $case($zconvert(fullCleanupResponse,"L"),"y":1,"yes":1,:0)
-                }
+            if 'tForce {
+                set tFullCleanup = 0
+                do ##class(%Library.Prompt).GetYesNo("Do you want to fully remove all modules and IPM metadata (except history log)? This is required for downgrading IPM.", .tFullCleanup)
+                set tParams("Clean","FullCleanup") = tFullCleanup
             }
 
             if $get(tParams("Clean","FullCleanup")) {
@@ -2699,7 +2710,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
                 $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
             }
 
-            // Set flag to indicate self-uninstall - will be checked by Interactive() loop
+            // Set flag to indicate self-uninstall - will be checked by ShellInternal() loop
             set ^||%IPM.SelfUninstallFlag = 1
         }
         set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
@@ -4233,6 +4244,7 @@ ClassMethod DisplayModules(
         $listbuild("Author.Person", $$$Yellow, "Author"),
         $listbuild("Origin", $$$Default),
         $listbuild("AllVersions", $$$Default, "Versions"),
+        $listbuild("PlatformVersions", $$$Default, "Platforms"),
         $listbuild("Repository", $$$Default),
         $listbuild("Installed In", $$$Default)
     )

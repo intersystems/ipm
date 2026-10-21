@@ -92,17 +92,14 @@ Method OnPhase(
             set tListNames = tListNames _ $listbuild($translate(tName, "%", "_"))
             set tListNames = tListNames _ $listbuild($translate(tName, "_", ""))
             set tListNames = tListNames _ $listbuild($translate(tName, "%", ""))
+            // Reload already created mappings; this covers test- and verify-scoped resources
+            if '$get(pParams("NoMapping"),0) {
+                $$$ThrowOnError(..OnConfigureMappings(.pParams))
+            }
             set ptrn = 0
             while $listnext(tListNames, ptrn, tName) {
-                // Runs in Reload normally, and also in Test for test scope / Verify for verify scope
                 set tSourcesPrefix = $char($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 
-                if '$get(pParams("NoMapping"),0) {
-                    // Currently, still need mapping creation, since if a module is installed with a resource
-                    // already presented in another namespace and have a upperlevel mapping to another namespace,
-                    // then it should have a package mapping of this specific resource to its namespace database
-                    $$$ThrowOnError(..OnConfigureMappings(.pParams))
-                }
                 if ..ResourceReference.Generated {
                     set pResourceHandled = 1
                     quit
@@ -182,6 +179,13 @@ Method OnPhase(
                             if ..ResourceReference.Deploy {
                                 $$$LogLine("Loading deployed resource from Studio project: "_..ResourceReference.Name)
                                 set ..CompileFromProject = 1
+                                // Mark deployed so Compile skips source compilation of Deploy=true
+                                // resources. Persisted because the module is reopened from the
+                                // database between here and Compile.
+                                if '..ResourceReference.Module.Deployed {
+                                    set ..ResourceReference.Module.Deployed = 1
+                                    $$$ThrowOnError(..ResourceReference.Module.%Save())
+                                }
                                 if '$data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
                                     set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
                                     if $$$ISERR(sc) {
@@ -297,12 +301,6 @@ Method OnExportDeployedItem(
         set tSC = e.AsStatus()
     }
     quit tSC
-}
-
-/// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
-Method OnConfigureMappings(ByRef pParams) As %Status
-{
-    quit $$$OK
 }
 
 /// Subclasses may override to customize resource load behavior during the Reload phase. <br />

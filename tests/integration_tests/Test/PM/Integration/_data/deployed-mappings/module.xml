@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="deployed-mappings.ZPM">
+    <Module>
+      <Name>deployed-mappings</Name>
+      <Version>0.0.1</Version>
+      <Packaging>module</Packaging>
+      <!-- DeployMapA sorts first, so it triggers the deployed project install before the other two
+           resources are mapped. -->
+      <Resource Name="DeployMapA.First.CLS" Deploy="true"/>
+      <Resource Name="DeployMapP.Inner.PKG" Deploy="true"/>
+      <Resource Name="DeployMapR.Routine.MAC" Deploy="true"/>
+    </Module>
+  </Document>
+</Export>

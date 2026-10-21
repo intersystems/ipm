@@ -89,7 +89,6 @@ ClassMethod DeletePattern(
 ClassMethod PurgePythonPackage(name As %String)
 {
     set target = ##class(%File).NormalizeDirectory("python", $system.Util.ManagerDirectory())
-    zwrite target
     // common layouts
     //   <target>/<name>/
     //   <target>/<name>-<ver>.dist-info/

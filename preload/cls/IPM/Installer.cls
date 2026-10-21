@@ -29,6 +29,7 @@ XData PM [ XMLNamespace = INSTALLER ]
   </Configuration>
   <Invoke Class="IPM.Installer" Method="CleanupOldMappings"/>
   <Import File="${SRCDIR}" Recurse="1"/>
+  <Invoke Class="IPM.Installer" Method="ForceCompileEvenInSYS" />
   <Invoke Class="%IPM.Main" Method="UpdateLanguageExtensions" CheckStatus="true" />
   <Invoke Class="IPM.Installer" Method="ZPMInit" CheckStatus="true">
     <Arg Value="${REGISTRY}"/>
@@ -40,6 +41,17 @@ XData PM [ XMLNamespace = INSTALLER ]
 </Namespace>
 
 </Manifest>
+}
+
+ClassMethod ForceCompileEvenInSYS()
+{
+    if $data(%ISCName)#2 {
+        $$$RemoveClsTempNodes
+    }
+    do $system.OBJ.CompilePackage("%IPM","ckf")
+    if $data(%ISCName)#2 {
+        $$$AddClsTempNodes
+    }
 }
 
 XData MapOnly [ XMLNamespace = INSTALLER ]
@@ -95,16 +107,6 @@ ClassMethod Map(
     quit ##class(%Installer.Manifest).%Generate(%compiledclass, %code, "MapOnly")
 }
 
-ClassMethod AsyncSetup(Args...)
-{
-    try {
-        set tSC = ..setup(Args...)
-    } catch ex {
-        set tSC = ex.AsStatus()
-    }
-    do $system.Event.Signal($zparent, tSC)
-}
-
 ClassMethod ZPMInit(
 	pRegistry As %String = "",
 	pAnalyticsTrackingID As %String = "")
@@ -139,7 +141,14 @@ ClassMethod MapIfLegacy()
 ClassMethod InstallORASIfMissing()
 {
     if ..ValidatePythonRuntime() {
-        if '..ORASInstalled() {
+        try {
+            set installed = ..ORASInstalled()
+        } catch e {
+            // A wheel install cannot succeed while the packages are unreadable, so report rather than reinstall
+            set installed = 1
+            write !!,"WARNING: Unable to check whether the ORAS Python components are installed. Not all IPM features will be available. "_e.DisplayString(),!
+        }
+        if 'installed {
             // Need to run in a background process to pick up new %IPM.Storage.Module definition
             write !,"Installing ORAS Python components..."
             job ..InitializeAndSignal()
@@ -166,6 +175,73 @@ ClassMethod InitializeAndSignal()
     do $system.Event.Signal($zparent,sc)
 }
 
+/// On Windows, resets protected ACLs in mgr/python from a job.
+/// The job runs as the IRIS service account, so it can reset entries a terminal user cannot read.
+ClassMethod ResetPythonPermissions(timeout As %Integer = 300)
+{
+    if '$$$isWINDOWS {
+        quit $$$OK
+    }
+    set pythonDir = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
+    if '##class(%File).DirectoryExists(pythonDir) {
+        quit $$$OK
+    }
+
+    // Unique per call, so a late signal from a timed-out job cannot reach a later wait
+    set eventName = $name(^IPM.ResetPyPerms($job, $zhorolog))
+    do $system.Event.Create(eventName)
+    write !,"Resetting permissions of Python packages..."
+    try {
+        // JOB can fail to start transiently (e.g. the process table is briefly full), so retry a few times
+        set maxAttempts = 3
+        for attempt=1:1:maxAttempts {
+            job ..ResetPythonPermissionsAndSignal(pythonDir, eventName)::10
+            quit:$test
+            set jobError = $zerror
+            hang 1
+        }
+        if '$test {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Job to reset permissions of %1 did not start after %2 attempts: %3", pythonDir, maxAttempts, jobError)))
+        }
+        set child = $zchild
+        set deadline = $zhorolog + timeout
+        // Poll until the job signals a result, the job's process ends (so a crashed job cannot hang this), or timeout elapses
+        do {
+            set result = $system.Event.WaitMsg(eventName, 1)
+        } while ($listget(result, 1) '= 1) && $data(^$job(child)) && ($zhorolog < deadline)
+        if $listget(result, 1) '= 1 {
+            // The job may have signaled just before exiting
+            set result = $system.Event.WaitMsg(eventName, 0)
+        }
+        if $listget(result, 1) '= 1 {
+            if $zhorolog >= deadline {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Timed out after %1 seconds waiting for the job to reset permissions of %2", timeout, pythonDir)))
+            } else {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Job %1 exited without reporting a result for resetting permissions of %2", child, pythonDir)))
+            }
+        }
+        $$$ThrowOnError($listget(result, 2))
+        write " done."
+    } catch ex {
+        write !!,"WARNING: Unable to reset the permissions of Python packages in "_pythonDir_". Entries created by a different Windows account (for example, a manual irispip run, or an earlier IPM install that ran as a different account) may remain unreadable outside that account, which can make ORAS installs fail with a PermissionError. To fix this manually, run 'icacls "_pythonDir_" /reset /T' as an administrator. "_ex.DisplayString(),!
+    }
+    do $system.Event.Delete(eventName)
+    quit $$$OK
+}
+
+ClassMethod ResetPythonPermissionsAndSignal(
+	pythonDir As %String,
+	eventName As %String) [ Internal ]
+{
+    set sc = $$$OK
+    try {
+        do ##class(%IPM.Utils.Module).ResetProtectedPermissions(pythonDir)
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    do $system.Event.Signal(eventName, sc)
+}
+
 ClassMethod ValidatePythonRuntime() As %Boolean
 {
     try {
@@ -185,9 +261,10 @@ ClassMethod ValidatePythonRuntime() As %Boolean
 ClassMethod ORASInstalled() [ Language = python ]
 {
   try:
-    import oras
+    # oras alone imports as an empty namespace package when its __init__.py is unreadable
+    import oras.provider
     return True
-  except:
+  except ImportError:
     return False
 }
 
@@ -214,31 +291,10 @@ ClassMethod EndCompile(qstruct) As %Status
     write !,"Installing ZPM"
 
     set ts = $zhorolog
-    set logFile=##class(%File).TempFilename()
-    job ..AsyncSetup(tModDir, 3):(:::logFile):0
-    if '$test {
-        quit $$$ERROR($$$GeneralError, "Job did not start")
-    }
-
-    #; Wait setup
-    set child=$zchild
-    set tSC = $$$OK
-    do {
-        hang 1
-        set $listbuild(res, tSC) = $system.Event.WaitMsg("", 10)
-        quit:res=1
-    } while $data(^$job(child))
-
-    set fs=##class(%Stream.FileCharacter).%New()
-    set fs.Filename=logFile
-    while 'fs.AtEnd {
-        write !,fs.ReadLine()
-    }
-    if ##class(%File).Delete(logFile)
-
+    set sc = ..setup(tModDir, 3)
     write !,"Time spent ",$zhorolog - ts
 
-    quit tSC
+    quit sc
 }
 
 /// Check currently installed version, if any

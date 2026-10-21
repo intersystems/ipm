@@ -1,10 +1,38 @@
 /// Just a Serial Object of ModuleInfo so that it can be persisted in other objects.
+/// Adds the platform compatibility information repositories report for deployed modules.
 Class %IPM.Storage.ModuleInfo Extends (%SerialObject, %IPM.General.ModuleInfo) [ StorageStrategy = "" ]
 {
 
 Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleInfo";
 
 Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
+
+/// Returns true if this module is installable on the given platform. Non-deployed modules are not
+/// platform-specific and always match. A deployed module is built and tagged per platform, so it is
+/// only installable when this platform is among the platforms it reports.
+Method IsCompatibleWithPlatform(platformVersion As %String) As %Boolean
+{
+    if '..Deployed {
+        return 1
+    }
+    return $listfind(..PlatformVersionList(), platformVersion) > 0
+}
+
+/// Returns PlatformVersions as a comma-separated string, e.g. "2024.1, 2025.1", or "" if empty.
+Method FormatPlatformVersions() As %String
+{
+    return $listtostring(..PlatformVersionList(), ", ")
+}
+
+/// Returns PlatformVersions as a $list, so it can be inspected with $listfind/$listtostring.
+Method PlatformVersionList() As %List [ Private ]
+{
+    set result = ""
+    for i=1:1:..PlatformVersions.Count() {
+        set result = result _ $listbuild(..PlatformVersions.GetAt(i))
+    }
+    return result
+}
 
 Storage Default
 {

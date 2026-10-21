@@ -1,3 +1,5 @@
+Include %occErrors
+
 Class %IPM.General.EnvironmentConfig Extends %IPM.General.Singleton
 {
 
@@ -7,19 +9,17 @@ Property Config As %Library.DynamicObject [ InitialExpression = {{}}, Private ];
 Method Load(path As %String)
 {
     try {
+        if '##class(%File).Exists(path,.return) {
+            $$$ThrowStatus($$$EMBEDSC($$$ERROR($$$FileDoesNotExist,path),$$$ERROR($$$GeneralError,"Operating system return code: "_$get(return))))
+        }
         set stream = ##class(%Stream.FileCharacter).%New()
         set stream.TranslateTable = "UTF8"
         $$$ThrowOnError(stream.LinkToFile(path))
-        set jsonString = ""
-        while 'stream.AtEnd {
-            set jsonString = jsonString _ stream.Read()
-        }
         try {
-            set newConfig = {}.%FromJSON(jsonString)
+            set newConfig = {}.%FromJSON(stream)
         } catch Ex {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file: " _ path))
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file: " _ path _ ". Expected JSON object."))
         }
-
         if newConfig.%IsA("%Library.DynamicArray") {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid configuration file. Expected a JSON object, not a JSON array"))
         }

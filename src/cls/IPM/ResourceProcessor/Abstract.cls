@@ -204,6 +204,13 @@ Method OnAfterPhase(
     quit $$$OK
 }
 
+/// Subclasses may override to create the mappings this resource needs. Called before the resource is loaded.
+/// The default processors give a resource covered by a broader mapping to another database its own mapping to this namespace's routine database.
+Method OnConfigureMappings(ByRef pParams) As %Status
+{
+    quit $$$OK
+}
+
 /// Called during 'sync' for resources whose files changed on disk.
 /// modifiedPaths(relPath)="" for changed files; deletedPaths(relPath)="" for removed files.
 /// Set handled=1 to fully own sync for this resource (skip default load+compile handling).

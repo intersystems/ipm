@@ -711,6 +711,17 @@ Method %Reload(ByRef pParams) As %Status
 
         // Resource processing
         set orderedResourceList = ..Module.GetOrderedResourceList()
+        // Mappings must exist before any load, because loading deployed code writes every deployed resource at once
+        if '$get(pParams("NoMapping"),0) {
+            set tKey = ""
+            for {
+                set tResource = orderedResourceList.GetNext(.tKey)
+                quit:tKey=""
+                if $isobject(tResource.Processor) && tResource.IsInScope("Reload") {
+                    $$$ThrowOnError(tResource.Processor.OnConfigureMappings(.pParams))
+                }
+            }
+        }
         set tSC = $$$OK
         set tKey = ""
         for {
@@ -781,14 +792,8 @@ Method InstallOrDownloadPythonRequirements(
             set processType = "requirements.txt"
             do ..Log(processType _ " START")
             write:tVerbose !
-            set command = ..ResolvePipCaller(.pParams) _ $listbuild("install", "-r", "requirements.txt", "-t", target, "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
-            if tVerbose {
-                write !, "Running "
-                zwrite command
-            } else {
-                set stdout = ""
-            }
-            set tSC = ##class(%IPM.Utils.Module).RunCommand(pRoot, command,.stdout)
+            set pipArgs = $listbuild("install", "-r", "requirements.txt", "--python-version", tPyVersion, "--only-binary=:all:") _ $listfromstring(tExtraPipFlags, " ")
+            set tSC = ##class(%IPM.Utils.Module).PipInstall(pipArgs, target, 'tVerbose, tVerbose, pRoot, .pParams)
             $$$ThrowOnError(tSC)
         }
         do ..Log(processType _ " SUCCESS")
@@ -1087,6 +1092,7 @@ Method %Compile(ByRef pParams) As %Status
 
                     // Just copy the first level of subscripts (resource names), not all the gory details.
                     set tOneResourceKey = ""
+                    set tAnyToCompile = 0
                     for {
                         set tOneResourceKey = $order(tOneResourceList(tOneResourceKey))
                         quit:(tOneResourceKey="")
@@ -1094,6 +1100,14 @@ Method %Compile(ByRef pParams) As %Status
                             continue
                         }
                         set tCompileFlagMap(tFlags,tResource.Name,tOneResourceKey) = ""
+                        set tAnyToCompile = 1
+                    }
+
+                    // Everything under this resource is already deployed, so no compile pass will
+                    // ever claim it. Leaving it in tCompilableMap would stall the loop below, which
+                    // only clears resources it compiles.
+                    if 'tAnyToCompile {
+                        kill tCompilableMap(tResource.Name)
                     }
                 }
             }
@@ -1168,8 +1182,9 @@ Method %Compile(ByRef pParams) As %Status
                 }
             }
 
-            // Cycle detection
-            if ('tCompiledSomething && '..HasDeployedResources) {
+            // Cycle detection. Anything not compilable has already been removed above, so a
+            // resource still waiting its turn here is waiting on itself.
+            if 'tCompiledSomething {
                 set tFailedResources = ""
                 set tResource = ""
                 for {
@@ -1678,8 +1693,8 @@ Method %Document(ByRef pParams) As %Status
             set tSC = ..Module.BuildDependencyGraph(.tDependencyGraph)
             $$$ThrowOnError(tSC)
 
-            // tDependencyGraph format:
-            // tDependencyGraph(<module name>) = $ListBuild(<depth>, <server>, <version>)
+            // tDependencyGraph format: see %IPM.Storage.Module:BuildDependencyGraph for the node
+            // layout. Only <depth> and <server> are used here.
             // tDependencyGraph(<module name>,<dependent module name>_" "_<version string>) = <required version expression>
             // <server> being empty means it's already installed.
             // All these modules need to already be installed.
@@ -1832,8 +1847,7 @@ Method %MakeDeployed(ByRef pParams) As %Status
             if '$isobject(..Module.SystemRequirements) {
                 set ..Module.SystemRequirements = ##class(%IPM.Storage.SystemRequirements).%New()
             }
-            set tSystemVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
-            set ..Module.SystemRequirements.VersionString = tSystemVersion
+            set ..Module.SystemRequirements.VersionString = $$$CurrentPlatformVersion
             $$$ThrowOnError(..Module.%Save())
             if $data(tDeployClassArray) {
                 set tClass = ""
@@ -2131,7 +2145,8 @@ Query Packaging(pPackaging As %String = "") As %SQLQuery [ Final, SqlProc ]
 ClassMethod LoadEnvironmentConfig(paths As %String)
 {
     #dim config As %IPM.General.EnvironmentConfig
-    set config = ##class(%IPM.General.EnvironmentConfig).%Get()
+    set config = ##class(%IPM.General.EnvironmentConfig).%Get(.sc)
+    $$$ThrowOnError(sc)
     do config.Clear()
     set paths = $listfromstring(paths, ";")
     set ptr = 0

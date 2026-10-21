@@ -65,21 +65,71 @@ Method OnPhase(
     quit $$$OK
 }
 
+/// Steers the per-item export to <SourcesRoot>/<Directory>/<Name> so the file lands
+/// where DoMerge will look for it after install.
+Method OnResolveChildren(
+	ByRef pResourceArray,
+	pCheckModuleOwnership As %Boolean) As %Status
+{
+    set key = $order(pResourceArray(""))
+    if (key = "") {
+        quit $$$ERROR($$$GeneralError, "Empty resource array for CPF resource processor: " _ ..Name)
+    }
+    set sourcesRoot = ..ResourceReference.Module.SourcesRoot
+    set pResourceArray(key, "RelativePath") = ##class(%File).Construct(sourcesRoot, ..Directory, ..Name)
+    quit $$$OK
+}
+
+/// Copies the CPF file into the export directory. The default routine export path fails for
+/// CPF resources with `ERROR #6080: Can not export 'CPF' type in %RO format`.
+Method OnExportItem(
+	pFullExportPath As %String,
+	pItemName As %String,
+	ByRef pItemParams,
+	ByRef pParams,
+	Output pItemHandled As %Boolean = 0) As %Status
+{
+    set pItemHandled = 0
+    set verbose = $get(pParams("Verbose"))
+    set source = ..GetSourceFile()
+
+    set destDir = ##class(%File).GetDirectory(pFullExportPath)
+    if ##class(%File).Exists(destDir) && '##class(%File).DirectoryExists(destDir) {
+        quit $$$ERROR($$$GeneralError, "File '" _ destDir _ "' exists and is not a directory. Failed to export CPF item: " _ ..Name)
+    }
+    if '##class(%File).DirectoryExists(destDir) {
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(destDir))
+    }
+    if verbose {
+        write !, "Copying CPF item '" _ source _ "' to '" _ pFullExportPath _ "'"
+    }
+    set pItemHandled = ##class(%File).CopyFile(source, pFullExportPath, 1, .return)
+    if 'pItemHandled {
+        quit $$$ERROR($$$GeneralError, "Failed to copy " _ source _ " to " _ pFullExportPath _ ", OS returned code: " _ -return)
+    }
+    quit $$$OK
+}
+
+/// Resolves the absolute path of the CPF source file. Throws if the file is missing.
+Method GetSourceFile() As %String [ Private ]
+{
+    set root = ..ResourceReference.Module.Root
+    set sourcesRoot = ..ResourceReference.Module.SourcesRoot
+    set dir = ##class(%File).Construct(root, sourcesRoot, ..Directory)
+    set filename = ##class(%File).NormalizeFilename(..Name, dir)
+    if (filename = "") || ('##class(%File).Exists(filename)) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
+    }
+    return filename
+}
+
 Method DoMerge(ByRef pParams) As %Status
 {
     set tempFile = ""
     set sc = $$$OK
     try {
         set verbose = $get(pParams("Verbose"))
-        set root = ..ResourceReference.Module.Root
-        set sourcesRoot = ..ResourceReference.Module.SourcesRoot
-        // Use Construct first, rather than NormalizeFilename, so we don't have to deal with leading/trailing slashes
-        set dir = $select($$$isWINDOWS: $replace(..Directory, "/", "\"), 1: ..Directory)
-        set dir = ##class(%File).Construct(root, sourcesRoot, dir)
-        set filename = ##class(%File).NormalizeFilename(..Name, dir)
-        if (filename = "") || ('##class(%File).Exists(filename)) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
-        }
+        set filename = ..GetSourceFile()
 
         // Read the CPF file and evaluate system expressions
         set inputStream = ##class(%Stream.FileCharacter).%New()
@@ -109,7 +159,7 @@ Method DoMerge(ByRef pParams) As %Status
             $$$ThrowOnError(outputStream.OutputToDevice())
         }
 
-        do ..MergeCPF(tempFile)
+        do ..MergeCPF(tempFile, filename)
     } catch ex {
         set sc = ex.AsStatus()
     }
@@ -117,7 +167,11 @@ Method DoMerge(ByRef pParams) As %Status
     return sc
 }
 
-ClassMethod MergeCPF(file As %String)
+/// Merges file into the running instance. sourceFile is the name reported on failure,
+/// since file may be a processed temporary copy. Defaults to file.
+ClassMethod MergeCPF(
+	file As %String,
+	sourceFile As %String = "")
 {
     // TODO The $zf(-100) callout is much slower than ##class(Config.CPF).Merge()
     //      Figure out why ##class(Config.CPF).Merge() doesn't work
@@ -129,10 +183,36 @@ ClassMethod MergeCPF(file As %String)
 
     // Somehow, if the STDOUT is not set, the merge will silently fail
     set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
+    // Keeps the child from opening the caller's terminal
+    set flags = flags _ "/STDIN=""" _ ##class(%Library.Device).GetNullDevice() _ """"
     set status = $zf(-100, flags, "iris", .args)
     if status '= 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error merging CPF file. $zf(-100) exited with "_status))
+        set msg = $$$FormatText("Error merging CPF file '%1'. $zf(-100) exited with %2", $select(sourceFile = "": file, 1: sourceFile), status)
+        set details = ..ReadOutputFile("zf100stdout") _ ..ReadOutputFile("zf100stderr")
+        set details = details _ $char(13, 10) _ "See messages.log for details."
+        $$$ThrowStatus($$$ERROR($$$GeneralError, msg _ details))
     }
+}
+
+/// Returns the non-blank lines of a merge output file in the process's current directory, each preceded by a newline.
+ClassMethod ReadOutputFile(name As %String) As %String [ Private ]
+{
+    set path = ##class(%File).NormalizeFilename(name, ##class(%SYSTEM.Process).CurrentDirectory())
+    if '##class(%File).Exists(path) {
+        return ""
+    }
+    set stream = ##class(%Stream.FileCharacter).%New()
+    if $$$ISERR(stream.LinkToFile(path)) {
+        return ""
+    }
+    set text = ""
+    while 'stream.AtEnd {
+        set line = $zstrip(stream.ReadLine(), "<>W")
+        if line '= "" {
+            set text = text _ $char(13, 10) _ line
+        }
+    }
+    return text
 }
 
 }
