@@ -25,7 +25,60 @@ Method ModuleNameFromRepository(repository As %String) As %String
 /// Prefix for ORAS API calls
 Property PathPrefix As %String(MAXLEN = "");
 
+/// Name of the repo definition this service was built from, for messages.
+Property RepoName As %String(MAXLEN = "");
+
+/// Result of ProbeCredentials once RegistryFailure has needed it, otherwise "".
+Property CredentialsProbe As %String [ Private ];
+
 Parameter ALLOWPREFIXINLOCATION = 0;
+
+/// Splits url into a location with a scheme and no path, and a path prefix with no leading slash and a trailing slash.
+/// e.g. "ghcr.io/myorg" gives "https://ghcr.io" and "myorg/"
+ClassMethod SplitLocation(
+	url As %String,
+	Output location As %String,
+	Output pathPrefix As %String)
+{
+    do ..ParseLocation(url, .components)
+    set pathPrefix = components("path")
+    if (pathPrefix '= "") && ($extract(pathPrefix, *) '= "/") {
+        set pathPrefix = pathPrefix _ "/"
+    }
+    kill components("path")
+    set location = ##class(%Net.URLParser).Compose(.components)
+}
+
+/// Classifies failure, which came from an operation on repository, and returns it.
+/// A 401 or 403 with credentials configured probes them, at most once for this service.
+Method RegistryFailure(
+	failure As %IPM.Repo.Oras.HttpException,
+	repository As %String) As %IPM.Repo.Oras.HttpException
+{
+    set probe = ""
+    if ((failure.StatusCode = 401) || (failure.StatusCode = 403)) && ..HasCredentials() {
+        if ..CredentialsProbe = "" {
+            set ..CredentialsProbe = ..ProbeCredentials()
+        }
+        set probe = ..CredentialsProbe
+    }
+    // The publish service's Location is the repo URL, which may include a path
+    do ..SplitLocation(..Location, .location)
+    do failure.Classify(..RepoName, location, repository, ..HasCredentials(), probe)
+    return failure
+}
+
+/// Returns e classified by RegistryFailure if it is a failed registry response for repository, otherwise e.
+Method ClassifyException(
+	e As %Exception.AbstractException,
+	repository As %String) As %Exception.AbstractException
+{
+    set failure = ##class(%IPM.Repo.Oras.HttpException).FromException(e)
+    if $isobject(failure) {
+        return ..RegistryFailure(failure, repository)
+    }
+    return e
+}
 
 // ** PACKAGE SERVICE FUNCTIONS **
 
@@ -53,62 +106,78 @@ Method IsAvailable() As %Boolean
 
 /// Returns true if the configured credentials are accepted by the registry.
 /// Always returns true when no credentials are configured (anonymous access).
-/// This is used only for display purposes (repo -list). Actual operations (pull, push,
+/// This is used for display (repo -list). Actual operations (pull, push,
 /// list modules) delegate to the Python ORAS client via GetClient(), which handles the
 /// full token exchange independently.
 Method IsAuthenticated() As %Boolean
 {
-    if (..Username = "") && (..Password = "") && (..Token = "") {
-        return 1
+    return ..ProbeCredentials() = $$$OrasCredentialsAccepted
+}
+
+/// Returns whether the registry accepts the configured credentials: $$$OrasCredentialsAccepted, $$$OrasCredentialsRejected,
+/// or $$$OrasCredentialsUnknown when the registry could not be asked or its answer does not say.
+/// $$$OrasCredentialsAccepted when no credentials are configured.
+Method ProbeCredentials() As %String
+{
+    if '..HasCredentials() {
+        return $$$OrasCredentialsAccepted
     }
     // Probe GET /v2/ with credentials attached by GetHttpRequest().
     // Some registries accept credentials directly here and return 2xx.
-    set request = ..GetHttpRequest(..Location)
+    // The publish service's Location is the repo URL, which may include a path.
+    do ..SplitLocation(..Location, .location, .pathPrefix)
+    set request = ..GetHttpRequest(location)
     set request.Timeout = 5
-    if $$$ISERR(request.Get(..PathPrefix _ "v2/")) {
-        return 0
+    if $$$ISERR(request.Get(..PathPrefix _ pathPrefix _ "v2/")) {
+        return $$$OrasCredentialsUnknown
     }
     set statusCode = request.HttpResponse.StatusCode
     if (200 <= statusCode) && (statusCode < 300) {
-        return 1
+        return $$$OrasCredentialsAccepted
     }
-    if statusCode '= 401 {
-        return 0
+    if (statusCode '= 401) && (statusCode '= 403) {
+        return $$$OrasCredentialsUnknown
     }
-    // 401 with a WWW-Authenticate header means the registry uses a token endpoint for auth.
-    // Parse the challenge and probe that endpoint to verify the credentials.
     set wwwAuth = request.HttpResponse.GetHeader("WWW-AUTHENTICATE")
-    return ..ProbeTokenEndpoint(wwwAuth)
+    set scheme = $zconvert($piece(wwwAuth, " ", 1), "L")
+    set sentBasic = ..HasBasicCredentials()
+    // GetHttpRequest() sends any other token as a header
+    set sentToken = (..Token '= "") && (..TokenAuthMethod '= "basic")
+    // The registry refused credentials sent on /v2/ itself
+    if sentToken || (sentBasic && ((scheme = "basic") || ((statusCode = 403) && (wwwAuth = "")))) {
+        return $$$OrasCredentialsRejected
+    }
+    // A Bearer challenge means the registry uses a token endpoint for auth.
+    // Parse the challenge and probe that endpoint to verify the credentials.
+    if (scheme = "bearer") && sentBasic {
+        return ..ProbeTokenEndpoint(wwwAuth)
+    }
+    return $$$OrasCredentialsUnknown
+}
+
+Method HasCredentials() As %Boolean
+{
+    return (..Username '= "") || (..Password '= "") || (..Token '= "")
+}
+
+/// Returns whether credentials are configured that are sent as Basic authentication: a username and password, or a "basic" token.
+Method HasBasicCredentials() As %Boolean [ Private ]
+{
+    return ((..Username '= "") && (..Password '= "")) || ((..Token '= "") && (..TokenAuthMethod = "basic"))
 }
 
 /// Probes the Bearer token endpoint from a WWW-Authenticate challenge to check whether
-/// the configured credentials are accepted. We do not use the returned token — a 2xx
-/// response is sufficient to confirm the credentials are valid.
+/// the configured Basic credentials are accepted, returning the same values as ProbeCredentials.
+/// We do not use the returned token, since a 2xx response is sufficient to confirm the credentials are valid.
 /// We probe here rather than delegating to the Python ORAS client because oras-py has
-/// no request timeout — client.get_tags() can hang indefinitely/for a long time.
-Method ProbeTokenEndpoint(wwwAuth As %String) As %Boolean [ Private ]
+/// no request timeout, so client.get_tags() can hang for a long time.
+Method ProbeTokenEndpoint(wwwAuth As %String) As %String [ Private ]
 {
-    if wwwAuth = "" {
-        return 0
-    }
-    set scheme = $zconvert($piece(wwwAuth, " ", 1), "L")
-    // Basic challenge: GetHttpRequest() already sent the credentials on /v2/ and they were rejected
-    if scheme = "basic" {
-        return 0
-    }
-    if scheme '= "bearer" {
-        return 0
-    }
-    // bearer/apiKey tokens were already sent as headers by GetHttpRequest() on /v2/ and rejected —
-    // sending them again to the token endpoint won't help
-    if (..Token '= "") && ((..TokenAuthMethod = "bearer") || (..TokenAuthMethod = "apiKey")) {
-        return 0
-    }
     // Parse the token endpoint URL (realm) and optional service identifier from the challenge header.
     // Example: Bearer realm="https://ghcr.io/token",service="ghcr.io"
     set realmMatcher = ##class(%Regex.Matcher).%New("realm=""([^""]+)""", wwwAuth)
     if 'realmMatcher.Locate() {
-        return 0
+        return $$$OrasCredentialsUnknown
     }
     set realm = realmMatcher.Group(1)
     set serviceMatcher = ##class(%Regex.Matcher).%New("service=""([^""]+)""", wwwAuth)
@@ -117,14 +186,16 @@ Method ProbeTokenEndpoint(wwwAuth As %String) As %Boolean [ Private ]
         set service = serviceMatcher.Group(1)
     }
     // Build a request to the token endpoint (which may be on a different host than the registry)
-    set tokenUrl = realm
-    if ($piece(tokenUrl, "://") '[ "http") {
-        set tokenUrl = "https://" _ tokenUrl
+    do ..ParseLocation(realm, .comp)
+    do ..ParseLocation(..Location, .registry)
+    // Credentials go over plain http only to a registry that is itself plain http
+    if ($zconvert(comp("scheme"), "L") '= "https") && ($zconvert(registry("scheme"), "L") = "https") {
+        return $$$OrasCredentialsUnknown
     }
-    do ##class(%Net.URLParser).Decompose(tokenUrl, .comp)
     set tokenRequest = ##class(%Net.HttpRequest).%New()
     set tokenRequest.Timeout = 5
-    set tokenRequest.FollowRedirect = 1
+    // A redirect could send the credentials elsewhere, including over plain http
+    set tokenRequest.FollowRedirect = 0
     set tokenRequest.Server = comp("host")
     if ($data(comp("port")) # 2) && (comp("port") '= "") {
         set tokenRequest.Port = comp("port")
@@ -141,21 +212,25 @@ Method ProbeTokenEndpoint(wwwAuth As %String) As %Boolean [ Private ]
     } elseif ..TokenAuthMethod = "basic" {
         do tokenRequest.SetHeader("Authorization", "Basic " _ ..Token)
     }
-    set path = $get(comp("path"), "")
-    if $extract(path, 1) = "/" {
-        set path = $extract(path, 2, *)
-    }
-    // scope is omitted — we are only probing whether the credentials are accepted, not
+    set path = comp("path")
+    // scope is omitted, since we are only probing whether the credentials are accepted, not
     // requesting access to a specific repository. Registries that strictly require scope
-    // may return 400, causing this probe to falsely report unauthenticated.
+    // may return 400, which reads as unknown.
     if service '= "" {
         set path = path _ "?service=" _ service
     }
     if $$$ISERR(tokenRequest.Get(path)) {
-        return 0
+        return $$$OrasCredentialsUnknown
     }
-    // 2xx means the token endpoint accepted the credentials — we don't need the token itself
-    return (200 <= tokenRequest.HttpResponse.StatusCode) && (tokenRequest.HttpResponse.StatusCode < 300)
+    set statusCode = tokenRequest.HttpResponse.StatusCode
+    // 2xx means the token endpoint accepted the credentials, and we don't need the token itself
+    if (200 <= statusCode) && (statusCode < 300) {
+        return $$$OrasCredentialsAccepted
+    }
+    if (statusCode = 401) || (statusCode = 403) {
+        return $$$OrasCredentialsRejected
+    }
+    return $$$OrasCredentialsUnknown
 }
 
 Method GetModule(
@@ -163,7 +238,11 @@ Method GetModule(
 	Output AsArchive As %Boolean = 0) As %Stream.Object
 {
     set tag = ..TagForReference(pModuleReference)
-    set status = ..Pull(..Location, pModuleReference.Name, tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
+    try {
+        set status = ..Pull(..Location, pModuleReference.Name, tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
+    } catch e {
+        throw ..ClassifyException(e, pModuleReference.Name)
+    }
     $$$ThrowOnError(status)
     #; module is pulled as a .tgz file
     set AsArchive = 1
@@ -174,7 +253,11 @@ Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream
 {
     set name = pModuleReference.Name _ ":" _ ..TagForReference(pModuleReference)
     // GetModuleXML returns a string, but callers expect a stream per %IPM.Repo.IPackageService
-    set moduleXML = ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    try {
+        set moduleXML = ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    } catch e {
+        throw ..ClassifyException(e, pModuleReference.Name)
+    }
     if (moduleXML = "") {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "No manifest found for '" _ name _ "' in registry " _ ..Location))
     }
@@ -269,12 +352,31 @@ ClassMethod PreferCompatibleVersions(
 
 /// <var>moduleList</var> is a list of objects of type <class>%IPM.Storage.ModuleInfo</class> to which this method adds entries
 /// <var>name</var> is the name of the package for which we are enumerating versions
+/// A 401 or 403 from the registry adds nothing, unless the registry rejected the credentials, which throws.
 Method ListModulesFromTagString(
 	semverExpr As %IPM.General.SemanticVersionExpression,
 	client As %SYS.Python,
 	searchCriteria As %IPM.Repo.SearchCriteria,
 	name As %String,
 	ByRef moduleList As %ListOfObjects)
+{
+    try {
+        do ..AddModulesFromTags(semverExpr, client, searchCriteria, name, .moduleList)
+    } catch e {
+        set e = ..ClassifyException(e, ..ModuleNameFromRepository(name))
+        if 'e.%IsA("%IPM.Repo.Oras.HttpException") || ((e.StatusCode '= 401) && (e.StatusCode '= 403)) || e.CredentialsRejected {
+            throw e
+        }
+    }
+}
+
+/// Adds to moduleList as ListModulesFromTagString does, throwing every failure.
+Method AddModulesFromTags(
+	semverExpr As %IPM.General.SemanticVersionExpression,
+	client As %SYS.Python,
+	searchCriteria As %IPM.Repo.SearchCriteria,
+	name As %String,
+	ByRef moduleList As %ListOfObjects) [ Private ]
 {
     set allTagsString = ..GetAllTags(..Location, name, "", client)
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
@@ -465,13 +567,11 @@ ClassMethod GetClient(
 	tokenAuthMethod As %String) As %SYS.Python
 {
     try {
-        set orasProvider = ..ImportOrasProvider()
-
         set args = {}
         set args.hostname = registry
         #; assume everything not specified is using https
         set args.insecure = registry [ "http://"
-        set client = orasProvider.Registry(args...)
+        set client = ..OrasHelper().BasicAwareRegistry(args...)
 
         if username '= "", password '= "" {
             do client."set_basic_auth"(username, password)
@@ -527,6 +627,123 @@ ClassMethod ImportOrasProvider() As %SYS.Python [ Internal, Language = python ]
     # Python caches each directory's listing, including the empty one it got for an unreadable directory
     importlib.invalidate_caches()
     return importlib.import_module("oras.provider")
+}
+
+/// Returns a module with the Python IPM uses around oras-py:
+/// BasicAwareRegistry, RegistryHttpError and registry_message.
+/// Cached in sys.modules so RegistryHttpError stays one class across calls.
+ClassMethod OrasHelper() As %SYS.Python [ Internal, Language = python ]
+{
+    import json
+    import sys
+    import types
+
+    cached = sys.modules.get("_ipm_oras")
+    if (cached is not None) and (cached.provider is sys.modules.get("oras.provider")):
+        return cached
+
+    import iris
+    import requests
+
+    provider = iris.cls("%IPM.Repo.Oras.PackageService").ImportOrasProvider()
+
+    max_text = 500
+
+    def clean(text):
+        """Text from a registry on one line, without control characters, and cut at max_text characters."""
+        text = " ".join("".join(c if c.isprintable() else " " for c in str(text)).split())
+        return text if len(text) <= max_text else text[:max_text] + "..."
+
+    def registry_message(text):
+        """The registry's message from an OCI {"errors": [...]} body or a top-level {"message": ...} body."""
+        try:
+            body = json.loads(text)
+        except (TypeError, ValueError):
+            return ""
+        if not isinstance(body, dict):
+            return ""
+        errors = body.get("errors")
+        if isinstance(errors, list):
+            if errors and isinstance(errors[0], dict):
+                return clean(errors[0].get("message") or "")
+            return ""
+        return clean(body.get("message") or "")
+
+    class RegistryHttpError(Exception):
+        """A failed registry response. str() is JSON for ObjectScript to parse."""
+
+        def __init__(self, response):
+            self.status = response.status_code
+            self.reason = clean(response.reason or "")
+            # Signed blob URLs carry credentials in the query
+            self.url = (response.url or "").split("?", 1)[0]
+            try:
+                self.message = registry_message(response.text)
+            except Exception:
+                # A streamed response may already be closed
+                self.message = ""
+            super().__init__(json.dumps({"status": self.status, "reason": self.reason, "url": self.url, "message": self.message}))
+
+    def failed(response):
+        return (response is not None) and not (200 <= response.status_code < 300)
+
+    raise_on_missing = object()
+
+    class BasicAwareRegistry(provider.Registry):
+        """Answers Basic challenges, which oras-py treats as a token URL, and raises RegistryHttpError from call()."""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.last_response = None
+            self.session.hooks["response"].append(self._record_response)
+
+        def _record_response(self, response, *args, **kwargs):
+            self.last_response = response
+
+        def authenticate_request(self, originalResponse):
+            challenge = originalResponse.headers.get("Www-Authenticate", "")
+            if not challenge.lower().startswith("basic"):
+                return super().authenticate_request(originalResponse)
+            already_sent = originalResponse.request.headers.get("Authorization", "").startswith("Basic ")
+            if already_sent or not self._basic_auth:
+                return False
+            self.set_header("Authorization", "Basic %s" % self._basic_auth)
+            return True
+
+        def call(self, method_name, *args, if_missing=raise_on_missing, **kwargs):
+            """Calls an oras-py method, raising RegistryHttpError when it fails on a registry response.
+            Returns if_missing instead for a 404, if given."""
+            try:
+                return self._call(method_name, *args, **kwargs)
+            except RegistryHttpError as ex:
+                if (ex.status == 404) and (if_missing is not raise_on_missing):
+                    return if_missing
+                raise
+
+        def _call(self, method_name, *args, **kwargs):
+            self.last_response = None
+            try:
+                result = getattr(self, method_name)(*args, **kwargs)
+            except RegistryHttpError:
+                raise
+            except Exception as ex:
+                # A request that got no response, such as a refused connection, failed on its own account
+                no_response = isinstance(ex, requests.RequestException) and (ex.response is None)
+                if failed(self.last_response) and not no_response:
+                    raise RegistryHttpError(self.last_response) from None
+                raise
+            # delete_tag returns False for a 404 on its HEAD request
+            if (result is False) and failed(self.last_response):
+                raise RegistryHttpError(self.last_response)
+            return result
+
+    module = types.ModuleType("_ipm_oras")
+    module.provider = provider
+    module.registry_message = registry_message
+    module.RegistryHttpError = RegistryHttpError
+    module.BasicAwareRegistry = BasicAwareRegistry
+    sys.modules["_ipm_oras"] = module
+    return module
 }
 
 /// Returns whether this process is denied access to the oras package in pythonDir.
@@ -612,6 +829,9 @@ ClassMethod Pull(
             set eStatus = e.AsStatus()
             set usrStatus = $$$ERROR($$$GeneralError,$$$OrasRequiresFlexiblePython)
             set tSC = $$$EMBEDSC(usrStatus,eStatus)
+        } elseif ##class(%IPM.Repo.Oras.HttpException).IsRegistryFailure(e) {
+            // A status would lose what GetModule needs to classify the failure
+            throw e
         } else {
             set tSC = e.AsStatus()
         }
@@ -638,7 +858,7 @@ ClassMethod PullOras(
     set args = {}
     set args.target = target
     set args.outdir = path
-    set res = client.pull(args...)
+    set res = client.call("pull", args...)
 }
 
 /// Returns the contents of the module.xml for the given package
@@ -656,20 +876,11 @@ ClassMethod GetModuleXML(
     target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, packageAndTag, namespace)
     client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenAuthMethod)
 
-    # loop through the annotations to find the module.xml text
-    manifest=""
-    try:
-        manifest = client.get_manifest(target)
-        annotations = manifest.get('annotations', {})
-        module_xml = annotations.get('com.intersystems.ipm.module.v1+xml')
-        if module_xml:
-            # remove extraneous whitespace
-            return module_xml.strip()
-    except Exception as ex:
-        print("Exception: %s" % str(ex))
-
-    # no module.xml found
-    return ""
+    manifest = client.call("get_manifest", target, if_missing={})
+    # the module.xml text is in the annotations
+    module_xml = manifest.get('annotations', {}).get('com.intersystems.ipm.module.v1+xml')
+    # remove extraneous whitespace
+    return module_xml.strip() if module_xml else ""
 }
 
 ClassMethod GetPackageMetadata(
@@ -684,15 +895,8 @@ ClassMethod GetPackageMetadata(
 
     target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
 
-    try:
-        manifest = client.get_manifest(target)
-        annotations = manifest.get('annotations', {})
-        return json.dumps(annotations)
-    except Exception as ex:
-        print("Exception: %s" % str(ex))
-
-    # no module.xml found
-    return ""
+    manifest = client.call("get_manifest", target)
+    return json.dumps(manifest.get('annotations', {}))
 }
 
 /// Determines the latest tag for a given package by
@@ -710,13 +914,10 @@ ClassMethod GetLatestTag(
     import iris
     target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
     client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenAuthMethod)
-    try:
-        tags = client.get_tags(target)
-        # Return most recent version
-        # If no tags exist, then module has been deleted
-        return tags[-1] if tags else ""
-    except:
-        return ""
+    tags = client.call("get_tags", target)
+    # Return most recent version
+    # If no tags exist, then module has been deleted
+    return tags[-1] if tags else ""
 }
 
 /// Returns comma separated string of all the tags for a given package
@@ -727,21 +928,15 @@ ClassMethod GetAllTags(
 	client As %SYS.Python) As %String [ Language = python ]
 {
     import iris
-    try:
-        target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
-        tags = client.get_tags(target)
+    target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace)
+    # a missing package has no tags
+    tags = client.call("get_tags", target, if_missing=[])
 
-        # flip list so higher versions are first
-        tags = iris.cls("%IPM.Utils.EmbeddedPython").SortOCITags(tags, 1)
+    # flip list so higher versions are first
+    tags = iris.cls("%IPM.Utils.EmbeddedPython").SortOCITags(tags, 1)
 
-        # convert from list to comma separated string
-        return ", ".join(str(x) for x in tags)
-    except ValueError:
-        # ValueError indicates the package is missing and has no tags. Fail silently with no tags returned
-        return ""
-    except Exception as e:
-        print("Error: ", repr(e))
-        return ""
+    # convert from list to comma separated string
+    return ", ".join(str(x) for x in tags)
 }
 
 /// Returns whether the given package is in the registry
@@ -757,10 +952,7 @@ ClassMethod HasModuleHelper(
     target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, packageAndTag, namespace)
 
     # check if tags is [] through boolean coercion
-    try:
-        return bool(client.get_tags(target, 1))
-    except:
-        return False
+    return bool(client.call("get_tags", target, 1, if_missing=[]))
 }
 
 // ** UTILITY FUNCTIONS **
@@ -813,19 +1005,16 @@ ClassMethod VerifyModuleHashAndSize(
     target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, packageAndTag, namespace)
     client = iris.cls("%IPM.Repo.Oras.PackageService").GetClient(registry, username, password, token, tokenAuthMethod)
 
-    try:
-        manifest = client.get_manifest(target)
-        # parse the manifest
-        for layer in manifest['layers']:
-            if layer["mediaType"] != "application/vnd.oci.image.layer.v1.tar":
-                continue
-            # check size and hash
-            manifest_size = layer["size"]
-            manifest_hash = layer["digest"]
-            expected_hash = f"sha256:{hash}".lower()
-            return manifest_size == size and manifest_hash == expected_hash
-    except Exception as ex:
-        print("Exception: %s" % str(ex))
+    manifest = client.call("get_manifest", target)
+    # parse the manifest
+    for layer in manifest['layers']:
+        if layer["mediaType"] != "application/vnd.oci.image.layer.v1.tar":
+            continue
+        # check size and hash
+        manifest_size = layer["size"]
+        manifest_hash = layer["digest"]
+        expected_hash = f"sha256:{hash}".lower()
+        return manifest_size == size and manifest_hash == expected_hash
     return False
 }
 

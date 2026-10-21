@@ -1,0 +1,52 @@
+{
+  "storage": {
+    "rootDirectory": "/var/lib/registry"
+  },
+  "http": {
+    "address": "0.0.0.0",
+    "port": "5000",
+    "compat": ["docker2s2"],
+    "auth": {
+      "htpasswd": {
+        "path": "/etc/zot/htpasswd"
+      }
+    },
+    "accessControl": {
+      "repositories": {
+        "**": {
+          "anonymousPolicy": ["read", "create", "update", "delete"]
+        },
+        "auth-test/**": {
+          "policies": [
+            { "users": ["writer"], "actions": ["read", "create", "update", "delete"] },
+            { "users": ["reader"], "actions": ["read"] }
+          ],
+          "defaultPolicy": []
+        },
+        "auth-private/**": {
+          "policies": [
+            { "users": ["writer"], "actions": ["read", "create", "update", "delete"] }
+          ],
+          "defaultPolicy": []
+        }
+      }
+    }
+  },
+  "log": {
+    "level": "debug"
+  },
+  "extensions": {
+    "search": {
+      "enable": true,
+      "cve": {
+        "updateInterval": "2h"
+      }
+    },
+    "ui": {
+      "enable": true
+    },
+    "mgmt": {
+      "enable": true
+    }
+  }
+}

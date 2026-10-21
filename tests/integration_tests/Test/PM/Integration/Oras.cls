@@ -1,4 +1,5 @@
 /// Integration tests against the local ORAS (zot) registry.
+/// zot requires Basic authentication for auth-test/** and auth-private/** and allows anonymous access elsewhere.
 Class Test.PM.Integration.Oras Extends Test.PM.Integration.Base
 {
 
@@ -13,12 +14,24 @@ Method OnBeforeOneTest(testName As %String) As %Status
     return $$$OK
 }
 
+Method OnAfterOneTest(testName As %String) As %Status
+{
+    if (testName = "TestLookupFailureWarnsAndContinues") || (testName = "TestLookupSystemErrorFails") {
+        // The repo's class goes with the module, so the repo has to go first
+        do ##class(%IPM.Main).Shell("repo -delete -name throwing")
+        do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall oras-throwing-repo"), "Uninstalled oras-throwing-repo")
+    }
+    return $$$OK
+}
+
 Method OnAfterAllTests() As %Status
 {
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"), "Deleted repos successfully")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -reset-defaults"), "Reset repos to default successfully")
     return $$$OK
 }
+
+// ===== Anonymous publish and install =====
 
 Method TestOrasTagConversion()
 {
@@ -248,6 +261,216 @@ Method AssertVersion(
         return 0
     }
     return $$$AssertEquals(module.VersionString, ver) && $$$AssertEquals(module.Version.ToString(), ver)
+}
+
+// ===== Basic authentication =====
+
+/// Loads the oras-auth fixture and recreates repo name rather than modifying it,
+/// so no credentials carry over from an earlier configuration.
+Method ConfigureRepo(
+	name As %String,
+	namespace As %String,
+	username As %String = "",
+	password As %String = "")
+{
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ ..GetModuleDir("oras-auth")), "Loaded oras-auth successfully")
+    // Repo URLs must be unique, so the oras repo from OnBeforeOneTest goes. The repo being configured may not exist yet.
+    do ##class(%IPM.Main).Shell("repo -delete -name oras")
+    do ##class(%IPM.Main).Shell("repo -delete -name " _ name)
+    set command = "repo -o -name " _ name _ " -url " _ ..#OrasURL _ " -namespace " _ namespace _ " -publish 1"
+    if username '= "" {
+        set command = command _ " -username " _ username _ " -password " _ password
+    }
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell(command), "Configured repo " _ name)
+}
+
+Method TestBasicLoginPublishAndInstall()
+{
+    do ..ConfigureRepo("authrepo", "auth-test", "writer", "writerpass")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish oras-auth -r authrepo"))
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall oras-auth"))
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("install authrepo/oras-auth"))
+    do $$$AssertEquals(##class(OrasAuth.Hello).Hello(), "hello")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("unpublish authrepo/oras-auth all -force"))
+}
+
+Method TestBadPasswordFailsFast()
+{
+    do ..ConfigureRepo("authrepo", "auth-test", "writer", "wrong")
+    set start = $zhorolog
+    set sc = ##class(%IPM.Main).Shell("publish oras-auth -r authrepo")
+    do $$$AssertStatusNotOK(sc)
+    set elapsed = $zhorolog - start
+    do $$$AssertTrue(elapsed < 30, "Failed in " _ elapsed _ "s")
+}
+
+// ===== Error messages =====
+
+/// Asserts that sc is an error whose text contains each of the substrings.
+Method AssertErrorContains(
+	sc As %Status,
+	substrings... As %String)
+{
+    do $$$AssertStatusNotOK(sc)
+    set text = $system.Status.GetErrorText(sc)
+    for i = 1:1:$get(substrings) {
+        do $$$AssertTrue(text [ substrings(i), "Error contains: " _ substrings(i) _ $char(13,10) _ "Error was: " _ text)
+    }
+}
+
+Method TestBadPasswordPublishMessage()
+{
+    do ..ConfigureRepo("authrepo", "auth-test", "writer", "wrong")
+    set sc = ##class(%IPM.Main).Shell("publish oras-auth -r authrepo")
+    do ..AssertErrorContains(sc, "Registry 'authrepo' (http://oras:5000) rejected the credentials: 401 Unauthorized", "Update the credentials configured for repo 'authrepo'.")
+}
+
+Method TestReaderPublishDenied()
+{
+    // The repository must exist for the reader's refusal to be about permission
+    do ..ConfigureRepo("authrepo", "auth-test", "writer", "writerpass")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish oras-auth -r authrepo"))
+
+    do ..ConfigureRepo("authrepo", "auth-test", "reader", "readerpass")
+    set sc = ##class(%IPM.Main).Shell("publish oras-auth -r authrepo")
+    do ..AssertErrorContains(sc, "denied access to 'oras-auth': 403 Forbidden", "lack permission for this repository")
+
+    do ..ConfigureRepo("authrepo", "auth-test", "writer", "writerpass")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("unpublish authrepo/oras-auth all -force"))
+}
+
+Method TestNoCredentialsPublish()
+{
+    do ..ConfigureRepo("authrepo", "auth-test")
+    set sc = ##class(%IPM.Main).Shell("publish oras-auth -r authrepo")
+    do ..AssertErrorContains(sc, "requires authentication: 401 Unauthorized", "Configure credentials for repo 'authrepo'.")
+}
+
+Method TestUnpublishMissingVersion()
+{
+    do ..ConfigureRepo("authrepo", "auth-test", "writer", "writerpass")
+    set sc = ##class(%IPM.Main).Shell("unpublish authrepo/oras-auth 9.9.9 -force")
+    do ..AssertErrorContains(sc, "'oras-auth' 9.9.9 not found in repo 'authrepo'.")
+}
+
+Method TestUnpublishMissingModule()
+{
+    do ..ConfigureRepo("authrepo", "auth-test", "writer", "writerpass")
+    set sc = ##class(%IPM.Main).Shell("unpublish authrepo/no-such-module all -force")
+    do ..AssertErrorContains(sc, "'no-such-module' not found in repo 'authrepo'.")
+}
+
+// ===== Lookups across repos =====
+
+/// Number of lines containing text.
+ClassMethod CountOccurrences(
+	ByRef lines,
+	text As %String) As %Integer
+{
+    set count = 0
+    for i = 1:1:$get(lines) {
+        if $get(lines(i)) [ text {
+            set count = count + 1
+        }
+    }
+    return count
+}
+
+/// Sets the order in which lookups search repo name.
+Method SetSortOrder(
+	name As %String,
+	order As %Integer)
+{
+    set repo = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(name, , .sc)
+    if '$$$AssertStatusOK(sc, "Opened repo " _ name) {
+        return
+    }
+    set repo.OverriddenSortOrder = order
+    do $$$AssertStatusOK(repo.%Save(), "Saved sort order for repo " _ name)
+}
+
+/// Installs simplest-module 3.0.0, which has a dependency, with failingRepo searched before a filesystem repo holding both.
+/// Returns the install's status, and its output in lines.
+Method InstallWithFailingRepo(
+	failingRepo As %String,
+	Output lines) As %Status
+{
+    do ##class(%IPM.Main).Shell("repo -delete -name oras")
+    do ##class(%IPM.Main).Shell("repo -delete -name local")
+    // The dependency is in the fixture's .modules directory
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -fs -name local -path " _ ..GetModuleDir("simplest-module", "3.0.0")), "Configured filesystem repo")
+    do ..SetSortOrder(failingRepo, 1)
+    do ..SetSortOrder("local", 2)
+
+    set cookie = ""
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("install simplest-module 3.0.0")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .lines)
+
+    do ##class(%IPM.Main).Shell("uninstall simplest-module")
+    do ##class(%IPM.Main).Shell("uninstall simplest-module-dep")
+    do ##class(%IPM.Main).Shell("repo -delete -name local")
+    return sc
+}
+
+Method TestRejectingRepoWarnsOnce()
+{
+    do ..ConfigureRepo("badauth", "auth-test", "writer", "wrong")
+    set sc = ..InstallWithFailingRepo("badauth", .lines)
+    do $$$AssertStatusOK(sc, "Installed from the filesystem repo")
+    do $$$AssertEquals(..CountOccurrences(.lines, "rejected the credentials"), 1)
+}
+
+Method TestRefusalAfterLoginSilent()
+{
+    do ..ConfigureRepo("private", "auth-private", "reader", "readerpass")
+    set sc = ..InstallWithFailingRepo("private", .lines)
+    do $$$AssertStatusOK(sc, "Installed from the filesystem repo")
+    do $$$AssertEquals(..CountOccurrences(.lines, "denied access"), 0)
+    do $$$AssertEquals(..CountOccurrences(.lines, "WARNING"), 0)
+}
+
+/// Adds repo "throwing" from the oras-throwing-repo fixture. The URL is never contacted.
+Method AddThrowingRepo(url As %String)
+{
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ ..GetModuleDir("oras-throwing-repo")), "Loaded oras-throwing-repo")
+    set repo = $classmethod("OrasThrowingRepo.Definition", "%New")
+    set repo.Name = "throwing"
+    set repo.URL = url
+    set repo.Enabled = 1
+    do $$$AssertStatusOK(repo.%Save(), "Saved throwing repo")
+}
+
+Method TestLookupFailureWarnsAndContinues()
+{
+    do ..AddThrowingRepo("http://throwing.invalid")
+    set sc = ..InstallWithFailingRepo("throwing", .lines)
+    do $$$AssertStatusOK(sc, "Installed from the filesystem repo")
+    do $$$AssertEquals(..CountOccurrences(.lines, "Simulated registry failure [x:y]"), 1)
+}
+
+Method TestLookupSystemErrorFails()
+{
+    do ..AddThrowingRepo("http://system-error.invalid")
+    set sc = ..InstallWithFailingRepo("throwing", .lines)
+    do ..AssertErrorContains(sc, "<DIVIDE>")
+}
+
+/// Skipping a repo whose credentials were rejected lasts only for the shell command.
+Method TestRejectedRepoSearchedAfterCommand()
+{
+    do ..ConfigureRepo("badauth", "auth-test", "writer", "wrong")
+    // Must be the last shell command before the search, and fails since badauth is the only repo
+    do $$$AssertStatusNotOK(##class(%IPM.Main).Shell("install simplest-module 3.0.0"), "Install found nothing")
+
+    set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
+    set criteria.Name = "simplest-module"
+    set cookie = ""
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(criteria, .results)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .lines)
+    do $$$AssertStatusOK(sc, "Searched repos")
+    do $$$AssertEquals(..CountOccurrences(.lines, "rejected the credentials"), 1)
 }
 
 }

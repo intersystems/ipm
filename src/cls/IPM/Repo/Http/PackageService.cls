@@ -26,18 +26,31 @@ ClassMethod GetSSLConfiguration(name As %String) As %String
     quit name
 }
 
+/// Decomposes url with %Net.URLParser, defaulting the scheme to https and leaving no leading slash on the path.
+/// e.g. "ghcr.io/myorg" gives scheme "https", host "ghcr.io" and path "myorg"
+ClassMethod ParseLocation(
+	url As %String,
+	Output components)
+{
+    // %Net.URLParser misparses bare hostnames as path components; scheme must be present.
+    if ($piece(url, "://") '[ "http") {
+        set url = "https://" _ url
+    }
+    do ##class(%Net.URLParser).Decompose(url, .components)
+    set path = $get(components("path"))
+    if $extract(path) = "/" {
+        set path = $extract(path, 2, *)
+    }
+    set components("path") = path
+}
+
 Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As %Net.HttpRequest
 {
     set tRequest = ##class(%Net.HttpRequest).%New()
 
     set tRequest.FollowRedirect = 1
 
-    set tLocation = $$$URLDECODE(tLocation)
-    if ($piece(tLocation, "://")'["http") {
-        set tLocation = "https://" _ tLocation
-    }
-
-    do ##class(%Net.URLParser).Parse(tLocation,.tComponents)
+    do ..ParseLocation($$$URLDECODE(tLocation), .tComponents)
 
     if ($$$lcase(tComponents("scheme")) [ "http") {
         if ($data(tComponents("host"))#2) {
@@ -49,15 +62,11 @@ Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As
         if ($$$lcase(tComponents("scheme")) = "https") {
             set tRequest.Https = 1
         }
-        if ($get(tComponents("path"))'="") {
+        if (tComponents("path")'="") {
             if '..#ALLOWPREFIXINLOCATION {
                 $$$ThrowStatus($$$ERROR($$$GeneralError,"Location should not contain a prefix"))
             }
-            set path = tComponents("path")
-            if ($extract(path,1,1)="/") {
-                set path = $extract(path,2,*)
-            }
-            set tRequest.Location = path
+            set tRequest.Location = tComponents("path")
         }
         if $extract(tRequest.Location, *) '= "/" {
             set tRequest.Location = tRequest.Location _ "/"

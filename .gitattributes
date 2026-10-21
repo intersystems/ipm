@@ -11,3 +11,4 @@
 Dockerfil* text eol=lf
 ipm text eol=lf
 iriscli text eol=lf
+tests/oras/htpasswd text eol=lf
