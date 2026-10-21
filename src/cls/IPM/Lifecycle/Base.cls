@@ -251,7 +251,7 @@ Method Log(
 	pValues...)
 {
     if pMessage'="" {
-        write !,"[", $namespace, "|", ..Module.Name, "]", $char(9), $$FormatText^%occMessages(pMessage, pValues...)
+        $$$LogLine("["_$namespace_"|"_..Module.Name_"]"_$char(9)_$$FormatText^%occMessages(pMessage, pValues...),,1)
     }
 }
 
@@ -373,7 +373,7 @@ Method %Clean(ByRef pParams) As %Status
                         quit:tClassKey=""
 
                         if 'tRemoveMapped && ##class(%Library.RoutineMgr).IsMapped(tClassKey_".CLS") {
-                            write !,"WARNING: Skipping mapped resource ",tClassKey,".CLS"
+                            $$$LogLine("Skipping mapped resource "_tClassKey_".CLS", $$$Warning)
                             continue
                         }
 
@@ -386,7 +386,7 @@ Method %Clean(ByRef pParams) As %Status
                             }
                             set tDelSC = $system.OBJ.Delete(tClassKey,$select(tVerbose:"d",1:"-d"))
                             if $$$ISERR(tDelSC) {
-                                write !,"WARNING: ",$system.Status.GetErrorText(tDelSC)
+                                $$$LogLine($system.Status.GetErrorText(tDelSC), $$$Warning)
                             }
                         }
                     }
@@ -412,16 +412,14 @@ Method %Clean(ByRef pParams) As %Status
                         set tFullName = tItem_"."_tType
 
                         if 'tRemoveMapped && ##class(%Library.RoutineMgr).IsMapped(tFullName) {
-                            write !,"WARNING: Skipping mapped resource ",tFullName
+                            $$$LogLine("Skipping mapped resource "_tFullName, $$$Warning, 1)
                             continue
                         }
 
-                        if tVerbose {
-                            write !,"Deleting ",tFullName
-                        }
+                        $$$LogLine("Deleting "_tFullName)
                         set tDelSC = ##class(%Library.RoutineMgr).Delete(tFullName)
                         if $$$ISERR(tDelSC) {
-                            write !,"WARNING: "_$system.Status.GetErrorText(tDelSC)
+                            $$$LogLine($system.Status.GetErrorText(tDelSC), $$$Warning, 1)
                         }
                     }
                 }
@@ -441,7 +439,7 @@ Method %Clean(ByRef pParams) As %Status
                     do log.InitPhase("Clean")
                     set tModObj = ##class(%IPM.Storage.Module).NameOpen(tModName,,.tModSC)
                     if $$$ISERR(tModSC) {
-                        write !,"WARNING: "_$system.Status.GetErrorText(tModSC)
+                        $$$LogLine($system.Status.GetErrorText(tModSC), $$$Warning, 1)
                         do log.FinalizePhase("Clean", tModSC)
                         set status = log.Finalize(tModSC)
                         if '$$$ISOK(status) {
@@ -478,7 +476,7 @@ Method %Clean(ByRef pParams) As %Status
                             }
                             quit
                         }
-                        write:tVerbose !,"Deleted ",tModName
+                        $$$LogLine("Deleted "_tModName)
                     }
                     do log.FinalizePhase("Clean", $$$OK)
                     set tSC = log.Finalize($$$OK)
@@ -602,8 +600,8 @@ Method %Initialize(ByRef pParams) As %Status
             if $$$ISERR(tSC) { quit }
             set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
             if $$$ISERR(tSC) { quit }
-        } elseif verbose {
-            write !,"Skipping preload - directory does not exist."
+        } else {
+            $$$LogLine("Skipping preload - directory does not exist.")
         }
     } catch ex {
         set status = ex.AsStatus()
@@ -677,9 +675,7 @@ Method %Reload(ByRef pParams) As %Status
             if $$$ISERR(tSC) {
                 quit
             }
-            if (tVerbose) {
-                write !, "Added "_tExtension_" mapping "_tName_" from database "_tSource
-            }
+            $$$LogLine("Added "_tExtension_" mapping "_tName_" from database "_tSource)
         }
         if $$$ISERR(tSC) {
             quit
@@ -694,9 +690,7 @@ Method %Reload(ByRef pParams) As %Status
         }
 
         if (..Module.Root '= tRoot) {
-            if tVerbose {
-                write !,"Changing module root from '"_..Module.Root_"' to '"_tRoot_"'"
-            }
+            $$$LogLine("Changing module root from '"_..Module.Root_"' to '"_tRoot_"'")
             set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnChangeModuleRoot(..Module)
             $$$ThrowOnError(tSC)
         }
@@ -749,9 +743,7 @@ Method InstallOrDownloadPythonRequirements(
     }
     set tVerbose = $get(pParams("Verbose"))
     if $get(pParams("BypassPyDeps"), 0) {
-        if tVerbose {
-        write !, "Skipping installation of Python dependencies because -bypass-py-deps is set."
-        }
+        $$$LogLine("Skipping installation of Python dependencies because -bypass-py-deps is set.")
         quit $$$OK
     }
     set tExtraPipFlags = $zstrip($get(pParams("ExtraPipFlags"), ""), "<>WC")
@@ -824,41 +816,31 @@ ClassMethod ResolvePipCaller(ByRef pParams) As %List
             throw ##class(%Exception.General).%New(msg)
         }
     }
-    return ..DetectPipCaller(tUseStandalonePip, $get(pParams("Verbose"), 0))
+    return ..DetectPipCaller(tUseStandalonePip)
 }
 
 /// Auto-detects a pip caller when PipCaller is not configured. Tries, in order:
 /// flexible Python (PythonRuntimeLibrary), irispip.exe (Windows),
 /// python3/python in PATH, pip3/pip in PATH. Throws if nothing is found.
-ClassMethod DetectPipCaller(
-	pUseStandalonePip As %Boolean,
-	pVerbose As %Boolean = 0) As %List
+ClassMethod DetectPipCaller(pUseStandalonePip As %Boolean) As %List
 {
-    if pVerbose {
-        write !,"Detecting pip caller"
-    }
+    $$$LogLine("Detecting pip caller")
 
     // First try to detect flexible python (in 2024.2 and later)
-    set result = ..DetectFlexiblePythonCaller(pUseStandalonePip, pVerbose)
+    set result = ..DetectFlexiblePythonCaller(pUseStandalonePip)
     if result '= "" {
         return result
     }
 
     // For windows, try to find irispip.exe (in 2024.1 and earlier)
     if $$$isWINDOWS {
-        if pVerbose {
-            write !, "Attempting to find irispip.exe..."
-        }
+        set line = "Attempting to find irispip.exe..."
         set irispip = ##class(%File).NormalizeFilename("irispip.exe", $system.Util.BinaryDirectory())
         if ##class(%File).Exists(irispip) {
-            if pVerbose {
-                write "Success!"
-            }
+            $$$LogLine(line_"Success!")
             return $listbuild(irispip)
         }
-        if pVerbose {
-            write "Not Found"
-        }
+        $$$LogLine(line_"Not Found", $$$Warning)
     }
 
     // UseStandalonePip is a tristate: 0 = python only, 1 = pip only, "" = try both.
@@ -866,9 +848,7 @@ ClassMethod DetectPipCaller(
 
     // Unless UseStandalonePip is set to 1, try to find python3 or python
     if pUseStandalonePip '= 1 {
-        if pVerbose {
-            write !, "Attempting to find python3 or python..."
-        }
+        set line = "Attempting to find python3 or python..."
         for cmd = "python3", "python" {
             if $$$isWINDOWS {
                 set cmd = cmd _ ".exe"
@@ -877,22 +857,19 @@ ClassMethod DetectPipCaller(
             set cwd = ##class(%SYSTEM.Util).InstallDirectory()
             set tSC = ##class(%IPM.Utils.Module).RunCommand(cwd, cmd, "")
             if $$$ISOK(tSC) {
-                if pVerbose {
-                    write "Success!"
-                }
+                set line = line_"Success!"
+                $$$LogLine(line)
                 return cmd
             }
-            if pVerbose {
-                write "Not Found"
-            }
+            set line = line_"Not Found"
+            $$$LogLine(line, $$$Warning)
         }
     }
 
     // Unless UseStandalonePip is set to 0, try to find pip3 or pip
     if pUseStandalonePip '= 0 {
-        if pVerbose {
-            write !, "Attempting to find pip3 or pip..."
-        }
+        set line = "Attempting to find pip3 or pip..."
+        set foundCommand = ""
         for cmd = "pip3", "pip" {
             if $$$isWINDOWS {
                 set cmd = cmd _ ".exe"
@@ -901,14 +878,12 @@ ClassMethod DetectPipCaller(
             set cwd = ##class(%SYSTEM.Util).InstallDirectory()
             set tSC = ##class(%IPM.Utils.Module).RunCommand(cwd, cmd, "")
             if $$$ISOK(tSC) {
-                if pVerbose {
-                    write "Success!"
-                }
+                set line = line_"Success!"
+                $$$LogLine(line)
                 return cmd
             }
-            if pVerbose {
-                write "Not Found"
-            }
+            set line = line_"Not Found"
+            $$$LogLine(line)
         }
     }
 
@@ -917,7 +892,9 @@ ClassMethod DetectPipCaller(
 
 /// Looks for executables by searching names in priority order across all dirs.
 /// Returns the full path of the highest-priority name found, or "" if none exists.
-ClassMethod FindExecutableInDirs(dirs As %List, names As %List) As %String
+ClassMethod FindExecutableInDirs(
+	dirs As %List,
+	names As %List) As %String
 {
     set namePtr = 0
     while $listnext(names, namePtr, name) {
@@ -937,15 +914,13 @@ ClassMethod FindExecutableInDirs(dirs As %List, names As %List) As %String
 
 /// Attempts to find a pip caller using PythonRuntimeLibrary from iris.cpf (IRIS 2024.2+).
 /// Returns a $list command suitable for RunCommand, or "" if unavailable or not found.
-ClassMethod DetectFlexiblePythonCaller(useStandalonePip As %Boolean, verbose As %Boolean = 0) As %List
+ClassMethod DetectFlexiblePythonCaller(useStandalonePip As %Boolean) As %List
 {
     if '$system.CLS.IsMthd("%SYS.Python", "GetPythonInfo") {
         return ""
     }
 
-    if verbose {
-        write !, "Attempting to find flexible python... "
-    }
+    $$$LogLine("Attempting to find flexible python... ")
 
     do ##class(%SYS.Python).GetPythonInfo(.info)
     if '$data(info("CPF_PythonRuntimeLibrary"), pyDylib) || (pyDylib = "") {
@@ -977,31 +952,25 @@ ClassMethod DetectFlexiblePythonCaller(useStandalonePip As %Boolean, verbose As 
         }
         set interpreter = ..FindExecutableInDirs(searchDirs, pythonNames)
         if interpreter '= "" {
-            if verbose {
-                write "Success!"
-            }
+            $$$LogLine("Success!")
             return $listbuild(interpreter, "-m", "pip")
         }
-        if verbose {
-            write !, "Python interpreter not found in flexible Python directories"
-        }
+        $$$LogLine("Python interpreter not found in flexible Python directories")
     }
 
     if useStandalonePip '= 0 {
+        set line = "Attempting to find flexible pip... "
         set pipNames = $listbuild("pip3", "pip")
         if versionedName '= "" {
             set pipNames = $listbuild("pip" _ $piece(versionedName, "python", 2)) _ pipNames
         }
         set pipExec = ..FindExecutableInDirs(searchDirs, pipNames)
         if pipExec '= "" {
-            if verbose {
-                write "Success!"
-            }
+            $$$LogLine(line_"Success!")
             return $listbuild(pipExec)
         }
-        if verbose {
-            write !, "pip not found in flexible Python directories"
-        }
+        $$$LogLine(line)
+        $$$LogLine("pip not found in flexible Python directories")
     }
 
     return ""
@@ -1088,9 +1057,7 @@ Method %Compile(ByRef pParams) As %Status
 
             if '$data(tHandledMap(tResource.Name)) && $isobject(tResource.Processor) && tResource.IsInScope("Compile") {
                 if tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") && tResource.Processor.CompileFromProject {
-                    if tVerbose {
-                        write !, tResource.Name_" was loaded as deployed code, so compilation isn't needed."
-                    }
+                    $$$LogLine(tResource.Name_" was loaded as deployed code, so compilation isn't needed.")
                 } elseif tResource.Processor.%IsA("%IPM.ResourceProcessor.AbstractCompilable") {
                     kill tOneResourceList
                     set tOneResourceList(tResource.Name) = ""
@@ -1222,7 +1189,7 @@ Method %Compile(ByRef pParams) As %Status
             try {
                 $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(..Module))
             } catch stampEx {
-                write !, "WARNING: sync baseline stamping failed: ", $system.Status.GetOneErrorText(stampEx.AsStatus())
+                $$$LogLine("sync baseline stamping failed: "_$system.Status.GetOneErrorText(stampEx.AsStatus()), $$$Warning, 1)
             }
         }
     } catch e {
@@ -1410,7 +1377,7 @@ Method ExportPythonDependencies(
     if '##class(%File).DirectoryExists(wheelsDir) {
         // ExportPythonDependencies called on base module + dependencies so don't want to error if one of
         // the modules doesn't have a wheels directory since that might actually be the case for the module
-        write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        $$$LogLine("No wheels directory for this module: "_wheelsDir_" not found", $$$Warning, 1)
         quit
     }
     set stmt = ##class(%SQL.Statement).%New()
@@ -1592,9 +1559,7 @@ Method %Publish(ByRef pParams) As %Status
         if $$$ISERR(tSC)||'$isobject(tServer) {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "No server found to publish to."))
         }
-        if tVerbose {
-            write !,"Publish to: ", tServer.URL
-        }
+        $$$LogLine("Publish to: "_tServer.URL)
         if tNewVersion '= "" {
             set tNewVersion = ##class(%IPM.General.SemanticVersion).FromString(tNewVersion)
         }
@@ -1647,7 +1612,7 @@ Method %Publish(ByRef pParams) As %Status
 
         // May need to update the version of the currently-installed module.
         if $data(tNewVersion),$isobject(tNewVersion) {
-            write:tVerbose !,"Version: ", tNewVersion.ToString()
+            $$$LogLine("Version: "_tNewVersion.ToString())
             set ..Module.Version = tNewVersion
             set tSC = ##class(%IPM.Utils.Module).ExportDocumentForObject(..Module)
             $$$ThrowOnError(tSC)
@@ -1686,7 +1651,7 @@ Method %Installer(ByRef pParams) As %Status
     set tSC = $$$OK
     try {
         if (..Module.Name = $$$IPMModuleName) {
-            write !,"Build Installer for ", ..Module.Name
+            $$$LogLine("Build Installer for "_..Module.Name,,1)
             set tSC = ##class(IPM.Installer).Make(..Payload, ..Installer)
             if $$$ISERR(tSC) {
                 quit
@@ -1816,8 +1781,8 @@ Method %MakeDeployed(ByRef pParams) As %Status
         // module's dependencies marked for deployment
         set tLockedDependencies = $get(pParams("Recurse"),0) // Indicates whether entire dependency graph should be traversed and deployed
 
-        if tDev && tVerbose {
-            write !,"Module is in developer mode; will only report what WOULD be deployed unless packaging, in which case items WILL be deployed."
+        if tDev {
+            $$$LogLine("Module is in developer mode; will only report what WOULD be deployed unless packaging, in which case items WILL be deployed.")
         }
 
         // Default implementation: see which resources are expicitly flagged with Deploy = true.
@@ -1871,35 +1836,27 @@ Method %MakeDeployed(ByRef pParams) As %Status
             set ..Module.SystemRequirements.VersionString = tSystemVersion
             $$$ThrowOnError(..Module.%Save())
             if $data(tDeployClassArray) {
-                if (tVerbose) {
-                    set tClass = ""
-                    write !,"The following classes are flagged for deployment:"
-                    for {
-                        set tClass = $order(tDeployClassArray(tClass))
-                        quit:tClass=""
-                        write !,$char(9),tClass
-                    }
+                set tClass = ""
+                for {
+                    set tClass = $order(tDeployClassArray(tClass))
+                    quit:tClass=""
+                    $$$LogLine("Class flagged for deployment:"_tClass)
                 }
                 $$$ThrowOnError($system.OBJ.MakeClassDeployed(.tDeployClassArray))
             }
             if $data(tDeployRtnArray) {
-                if (tVerbose) {
-                    write !,"The following routines are flagged for deployment:"
-                }
                 set tRtn = ""
                 for {
                     set tRtn = $order(tDeployRtnArray(tRtn))
                     quit:tRtn=""
-                    if tVerbose {
-                        write !,$char(9),tRtn
-                    }
+                    $$$LogLine("Routine flagged for deployment:"_tRtn)
                     if 'tDev {
                         $$$ThrowOnError(##class(%Routine).Delete(tRtn,2))
                     }
                 }
             }
-        } elseif tVerbose {
-            write !,"No routines or classes to deploy."
+        } else {
+            $$$LogLine("No routines or classes to deploy.")
         }
     } catch e {
         set tSC = e.AsStatus()
@@ -1912,11 +1869,10 @@ Method %ApplyUpdateSteps(ByRef pParams) As %Status
     set sc = $$$OK
     try {
         if $system.Mirror.IsMember() && $system.Mirror.IsPrimary() {
-            write !,"WARNING: You are running update steps on the primary member of a mirror. It is recommended to start the update process on a backup instance to minimize downtime."
+            $$$LogLine("You are running update steps on the primary member of a mirror. It is recommended to start the update process on a backup instance to minimize downtime.", $$$Warning, 1)
         }
-        set verbose = $get(pParams("Verbose"))
         // TODO: Add log file param after logging meeting discussion
-        $$$ThrowOnError(..Module.HandleAllUpdateSteps(,,verbose))
+        $$$ThrowOnError(..Module.HandleAllUpdateSteps())
     } catch e {
         set sc = e.AsStatus()
     }
@@ -2102,7 +2058,7 @@ Method ExportSingleModule(
                 set tExportPath = ##class(%File).NormalizeDirectory(tExportPath)
                 set tSC = ##class(%IPM.Utils.File).CopyDir(tSourcePath,tExportPath, , pVerbose)
                 $$$ThrowOnError(tSC)
-                write:pVerbose !,tSourcePath," -> ",tExportPath
+                $$$LogLine(tSourcePath_" -> "_tExportPath)
             } elseif ##class(%File).Exists(tSourcePath) {
                 set tGood = ##class(%File).CopyFile(tSourcePath,tExportPath,1,.tReturn)
                 if 'tGood {

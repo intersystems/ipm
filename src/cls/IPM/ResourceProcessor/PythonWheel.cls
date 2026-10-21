@@ -1,4 +1,4 @@
-Include %IPM.Formatting
+Include (%IPM.Common, %IPM.Formatting)
 
 Class %IPM.ResourceProcessor.PythonWheel Extends %IPM.ResourceProcessor.Abstract
 {
@@ -33,7 +33,6 @@ Method OnPhase(
 
     try {
         set pResourceHandled = 1
-        set verbose = $get(pParams("Verbose"))
         set root = ..ResourceReference.Module.Root
         set wheel = ##class(%File).NormalizeDirectory(..Directory, root)
         set wheel = ##class(%File).NormalizeFilename(..Name, wheel)
@@ -42,16 +41,12 @@ Method OnPhase(
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheel file """_wheel_""" not found."))
         }
 
-        if verbose {
-            write !,"Installing wheel package """_wheel_"""..."
-        }
+        $$$LogLine("Installing wheel package """_wheel_"""...")
 
         set pipCaller = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.pParams)
         set target = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
         set command = pipCaller _ $listbuild("install", wheel, "-t", target) _ $listfromstring(..ExtraPipFlags, " ")
-        if verbose {
-            write !,"Running command: ",command
-        }
+        $$$LogLine("Running command: "_command)
         set explicitQuiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
         if explicitQuiet {
             // Redirect pip stdout/stderr to a sink stream so subprocess output doesn't bypass device suppression
@@ -67,7 +62,7 @@ Method OnPhase(
             set errorText = ##class(%SYSTEM.Status).GetErrorText(ex.AsStatus())
             set errMsg = $$$FormatText("Skipping installation of python wheel '%1' due to error: '%2'. ", ..Name, errorText)
             set errMsg = errMsg _ "Please verify Python is correctly configured in IRIS. Otherwise you may need to install this wheel manually or from PyPI to use certain features of IPM."
-            write !, $$$FormattedLine($$$Red, errMsg)
+            $$$LogLine(errMsg, $$$Error, 1)
             return $$$OK
         }
         return ex.AsStatus()

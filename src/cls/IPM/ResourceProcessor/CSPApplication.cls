@@ -72,8 +72,8 @@ Method %OnNew(pResourceReference As %IPM.Storage.ResourceReference) As %Status [
     set packageName = pResourceReference.Module.Name
     if ($get(packageName) '= "") && '$data($$$DeprecationWarned(packageName, "CSPApplication")) {
         set $$$DeprecationWarned(packageName, "CSPApplication") = 1
-        write !, $$$FormattedLine($$$Red, "WARNING: The <CSPApplication></CSPApplication> resource tag is deprecated and may be removed in a future release of IPM.")
-        write !, $$$FormattedLine($$$Red, $$$FormatText("         Please contact the package developer of %1 to use <WebApplication></WebApplication> instead", packageName))
+        $$$LogLine("The <CSPApplication></CSPApplication> resource tag is deprecated and may be removed in a future release of IPM.", $$$Warning, 1)
+        $$$LogLine($$$FormatText($char(9)_$char(9)_"Please contact the package developer of %1 to use <WebApplication></WebApplication> instead", packageName), $$$Warning, 1)
     }
     set tSC = ##super(pResourceReference)
     set ..Url = $zconvert(..Url,"L")
@@ -149,7 +149,7 @@ Method OnPhaseInternal(
 
         if (pTime = "Before") && ((pPhase = "Configure") || ((pPhase = "Activate"))) {
             // Create CSP application
-            set tSC = ..CreateOrUpdateCSPApp(tVerbose)
+            set tSC = ..CreateOrUpdateCSPApp()
             if $$$ISERR(tSC) {
                 quit
             }
@@ -171,17 +171,15 @@ Method OnPhaseInternal(
             if ##class(%File).DirectoryExists(..Directory) {
                 $$$ThrowOnError(##class(%IPM.Utils.File).MakeDirectoryWriteable(..Directory,.tCmd,.tOutputLog,.tErrLog))
 
-                if (tVerbose) {
-                    write !,tCmd
-                    for i=1:1:$get(tOutputLog) {
-                        if (tOutputLog(i) '= "") {
-                            write !,tOutputLog(i)
-                        }
+                $$$LogLine(tCmd)
+                for i=1:1:$get(tOutputLog) {
+                    if (tOutputLog(i) '= "") {
+                        $$$LogLine(tOutputLog(i))
                     }
                 }
                 for i=1:1:$get(tErrLog) {
                     if (tErrLog(i) '= "") {
-                        write !,tErrLog(i)
+                        $$$LogLine(tErrLog(i), $$$Warning, 1)
                     }
                 }
             }
@@ -191,25 +189,21 @@ Method OnPhaseInternal(
 
             // And also make directory writeable afterward (because read-only files were copied in)
             $$$ThrowOnError(##class(%IPM.Utils.File).MakeDirectoryWriteable(..Directory,.tCmd,.tOutputLog,.tErrLog))
-            if (tVerbose) {
-                write !,tCmd
-                for i=1:1:$get(tOutputLog) {
-                    if (tOutputLog(i) '= "") {
-                        write !,tOutputLog(i)
-                    }
+            $$$LogLine(tCmd)
+            for i=1:1:$get(tOutputLog) {
+                if (tOutputLog(i) '= "") {
+                    $$$LogLine(tOutputLog(i))
                 }
             }
             for i=1:1:$get(tErrLog) {
                 if (tErrLog(i) '= "") {
-                    write !,tErrLog(i)
+                    $$$LogLine(tErrLog(i), $$$Warning, 1)
                 }
             }
 
             // Clear CSPGateway cache of these files.
             set tClearFiles = ..Url_$case($extract(..Url,*),"/":"",:"/")_"*"
-            if (tVerbose) {
-                write !,"Clearing CSPGateway cache of ",tClearFiles
-            }
+            $$$LogLine("Clearing CSPGateway cache of "_tClearFiles)
             set tRegistry = $system.CSP.GetGatewayRegistry()
             set tSC = tRegistry.RemoveFilesFromCaches($listbuild(tClearFiles))
             $$$ThrowOnError(tSC)
@@ -243,7 +237,7 @@ Method ReplaceMatchRoles(
     return matchRoles
 }
 
-Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
+Method CreateOrUpdateCSPApp() As %Status [ Internal ]
 {
     set tSC = $$$OK
     try {
@@ -326,7 +320,7 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
         }
 
         if ##class(Security.Applications).Exists(..Url) {
-            write:pVerbose !,"Updating Web Application ",..Url
+            $$$LogLine("Updating Web Application "_..Url)
             set tSC = ##class(Security.Applications).Get(..Url,.tOldProperties)
             $$$ThrowOnError(tSC)
 
@@ -350,30 +344,26 @@ Method CreateOrUpdateCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
             }
 
             if $data(tChanges) {
-                if (pVerbose) {
-                    for i=1:1:$get(tChanges) {
-                        write !,tChanges(i)
-                    }
+                for i=1:1:$get(tChanges) {
+                    $$$LogLine(tChanges(i))
                 }
                 set tSC = ##class(Security.Applications).Modify(..Url,.tProperties)
                 $$$ThrowOnError(tSC)
-                write:pVerbose !,"Done."
+                $$$LogLine("Done.")
             } else {
-                write:pVerbose !,"No changes detected or made."
+                $$$LogLine("No changes detected or made.")
             }
         } else {
-            write:pVerbose !,"Creating Web Application ",..Url
+            $$$LogLine("Creating Web Application "_..Url)
             set tSC = ##class(Security.Applications).Create(..Url,.tProperties)
-            if (pVerbose) {
-                set tKey = ""
-                for {
-                    set tKey = $order(tProperties(tKey),1,tValue)
-                    quit:tKey=""
-                    write !,?4,tKey,": ",tValue
-                }
+            set tKey = ""
+            for {
+                set tKey = $order(tProperties(tKey),1,tValue)
+                quit:tKey=""
+                $$$LogLine($char(9)_tKey_": "_tValue)
             }
             $$$ThrowOnError(tSC)
-            write:pVerbose !,"Done."
+            $$$LogLine("Done.")
         }
     } catch ex {
         set tSC = ex.AsStatus()
