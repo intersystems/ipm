@@ -2749,6 +2749,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
     if ( tModuleName["/" ) {
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
     }
+    set tServer = ""
     if ( tRegistry = "" ) {
         set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
         if (tRS.%SQLCODE = 0) && tRS.%Next() {
@@ -2758,8 +2759,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
         set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
     }
     if ('$isobject(tServer)) {
-        write "Registry not found: "_tRegistry,!
-        return $$$ERROR(5001, "Registry not found: "_tRegistry)
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Registry not found: "_tRegistry))
     }
     set tVersion = $get(pCommandInfo("parameters","version"))
 
@@ -2794,7 +2794,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
             write !!, msg
         }
     } else {
-        write !,"The package could not be deleted (the registry denied the request)",!
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "The package could not be deleted (the registry denied the request)"))
     }
 }
 

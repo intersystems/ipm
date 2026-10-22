@@ -150,7 +150,7 @@ ClassMethod PushOras(
 	tokenAuthMethod As %String) [ Language = python ]
 {
     import iris
-    import os, sys
+    import os
     import json
     import re
     import contextlib
@@ -171,13 +171,8 @@ ClassMethod PushOras(
 
         # Suppress console output using a context manager
         with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
-            try:
-                target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
-                res = client.call("push", files=file_paths, target=target, disable_path_validation=True, manifest_annotations=manifest_annotations)
-            except Exception as e:
-                # stderr is unaffected by redirect_stdout
-                print("Error: ", repr(e), file=sys.stderr)
-                raise e
+            target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
+            res = client.call("push", files=file_paths, target=target, disable_path_validation=True, manifest_annotations=manifest_annotations)
 }
 
 /// Deletes the specified tags from the module

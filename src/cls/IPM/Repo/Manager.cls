@@ -114,7 +114,7 @@ Method SearchRepositoriesForModule(
             try {
                 set tServerResults = tClient.ListModules(tClientCriteria)
             } catch e {
-                // Errors in IPM itself and interrupts such as Ctrl+C stop the search
+                // System errors, such as Ctrl+C, stop the search
                 if e.%IsA("%Exception.SystemException") {
                     throw e
                 }

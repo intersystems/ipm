@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Lookups warn about a repo whose credentials are rejected and continue with the other repos
     - Shell errors are shown in full, including every error in a combined status, instead of being cut off at a trailing bracket
     - `unpublish` now fails when the module or version is not found or the registry refuses the request, instead of printing the error and reporting success
+    - Credential checks no longer follow redirects from a registry's token endpoint, so credentials are not sent to another host
 
 ## [0.10.10] - 2026-10-14
 

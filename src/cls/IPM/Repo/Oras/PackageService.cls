@@ -541,6 +541,15 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
             }
             do ..ListModulesFromTagString(tVersionExpression, client, pSearchCriteria, name, .tList)
         } elseif response.StatusCode '= 200 {
+            if (response.StatusCode = 401) || (response.StatusCode = 403) {
+                set failure = ##class(%IPM.Repo.Oras.HttpException).%New("RegistryHttpError", response.StatusCode)
+                set failure.StatusCode = response.StatusCode
+                set failure.Reason = response.ReasonPhrase
+                set failure.URL = ..Location _ ..PathPrefix _ "/v2/_catalog"
+                if ..RegistryFailure(failure, "_catalog").CredentialsRejected {
+                    throw failure
+                }
+            }
             if response.StatusCode = 401 {
                 set msg = "Registry requires authorization for catalog listing or does not support it."
             } else {

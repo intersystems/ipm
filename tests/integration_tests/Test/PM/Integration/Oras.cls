@@ -362,6 +362,12 @@ Method TestUnpublishMissingModule()
     do ..AssertErrorContains(sc, "'no-such-module' not found in repo 'authrepo'.")
 }
 
+Method TestUnpublishMissingRegistry()
+{
+    set sc = ##class(%IPM.Main).Shell("unpublish no-such-repo/oras-auth all -force")
+    do ..AssertErrorContains(sc, "Registry not found: no-such-repo")
+}
+
 // ===== Lookups across repos =====
 
 /// Number of lines containing text.
@@ -473,6 +479,18 @@ Method TestRejectedRepoSearchedAfterCommand()
     set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set sc = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(criteria, .results)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .lines)
+    do $$$AssertStatusOK(sc, "Searched repos")
+    do $$$AssertEquals(..CountOccurrences(.lines, "rejected the credentials"), 1)
+}
+
+/// search without a name lists the catalog, which the registry refuses with the bad password.
+Method TestSearchRejectedCredentials()
+{
+    do ..ConfigureRepo("badauth", "auth-test", "writer", "wrong")
+    set cookie = ""
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("search")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .lines)
     do $$$AssertStatusOK(sc, "Searched repos")
     do $$$AssertEquals(..CountOccurrences(.lines, "rejected the credentials"), 1)
