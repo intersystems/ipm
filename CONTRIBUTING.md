@@ -101,6 +101,8 @@ repo -o -name zot -url http://oras:5000/
 
 You can browse the contents of the zot registry at [http://localhost:5001/home](http://localhost:5001/home) in your browser.
 
+The `auth-test` and `auth-private` namespaces of the zot registry require credentials. See [tests/oras/README.md](tests/oras/README.md) for the test users and their access.
+
 If you need to shut down all the containers (either to switch to another branch or to revert back to a clean state) involved in the `docker-compose.yml`, run the following command in the project folder:
 ```bash
 docker compose down --remove-orphans --volumes

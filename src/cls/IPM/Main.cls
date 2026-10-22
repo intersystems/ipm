@@ -1002,7 +1002,7 @@ ClassMethod ShellInternal(
 	pCommand As %String,
 	Output pException As %Exception.AbstractException) [ Internal ]
 {
-    new $$$DeprecationWarned
+    new $$$DeprecationWarned, $$$RepoLookupState
     // Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
     set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
 
@@ -1016,6 +1016,8 @@ ClassMethod ShellInternal(
     set tInShell = 0
     for {
         kill $$$DeprecationWarned
+        kill $$$RepoLookupState
+        set $$$RepoLookupState = ""
         try {
             // Have intro message just for first entrance to shell
             // Ensure not displayed if its just one command
@@ -1158,8 +1160,15 @@ ClassMethod DisplayError(pStatus As %Status)
 {
     if $$$ISERR(pStatus) {
         write !,$$$FormattedLine($$$Red, "ERROR!")
-        write " ",$system.Status.GetOneStatusText(pStatus)
+        write " ",..ErrorText(pStatus)
     }
+}
+
+/// Full text of status, without the "ERROR #nnnn: " prefix on each error.
+ClassMethod ErrorText(status As %Status) As %String
+{
+    set matcher = ##class(%Regex.Matcher).%New("(?m)^(\s*>\s*)?ERROR #-?\d+: ", $system.Status.GetErrorText(status))
+    return matcher.ReplaceAll("$1")
 }
 
 /// Show modules in Namespace and to go namespace
@@ -2740,6 +2749,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
     if ( tModuleName["/" ) {
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
     }
+    set tServer = ""
     if ( tRegistry = "" ) {
         set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
         if (tRS.%SQLCODE = 0) && tRS.%Next() {
@@ -2749,47 +2759,42 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
         set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
     }
     if ('$isobject(tServer)) {
-        write "Registry not found: "_tRegistry,!
-        return $$$ERROR(5001, "Registry not found: "_tRegistry)
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Registry not found: "_tRegistry))
     }
     set tVersion = $get(pCommandInfo("parameters","version"))
 
-    try {
-        set tManager = tServer.GetPublishingManager(.tSC)
-        $$$ThrowOnError(tSC)
-        $$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+    set tManager = tServer.GetPublishingManager(.tSC)
+    $$$ThrowOnError(tSC)
+    $$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
 
-        if (isEnabled) {
-            set tResult = 0
-            set force = $data(pCommandInfo("modifiers","force"))
-            if 'force {
-                if ($$$lcase(tVersion)="all") {
-                    write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action!")
-                    set tHelp = "Enter ""Yes"" if you want to delete all package versions."
-                    set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
-                } else {
-                    write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action!")
-                    set tHelp = "Enter ""Yes"" if you want to delete selected package version."
-                    set tMsg = "Are you sure you want to delete the package """_tModuleName_" version "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
-                }
-
-                set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
-
-                if (tResponse '= $$$SuccessResponse) {
-                    $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-                }
+    if (isEnabled) {
+        set tResult = 0
+        set force = $data(pCommandInfo("modifiers","force"))
+        if 'force {
+            if ($$$lcase(tVersion)="all") {
+                write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action!")
+                set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+            } else {
+                write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action!")
+                set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+                set tMsg = "Are you sure you want to delete the package """_tModuleName_" version "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
             }
 
-            if (tResult || force) {
-                $$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
-                set msg = "Package deleted" _ $case(force, 1:" forcefully without user confirmation", :"")
-                write !!, msg
+            set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+
+            if (tResponse '= $$$SuccessResponse) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
             }
-        } else {
-            write !,"The package could not be deleted (the registry denied the request)",!
         }
-    } catch ex {
-        write !!,$$$FormattedLine($$$Red, "ERROR! "), ex.DisplayString()
+
+        if (tResult || force) {
+            $$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
+            set msg = "Package deleted" _ $case(force, 1:" forcefully without user confirmation", :"")
+            write !!, msg
+        }
+    } else {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "The package could not be deleted (the registry denied the request)"))
     }
 }
 

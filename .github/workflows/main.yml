@@ -104,6 +104,8 @@ jobs:
             --name oras \
             -p 5000:5000 \
             --network-alias oras \
+            -v "$PWD/tests/oras/zot-config.json":/etc/zot/config.json:ro \
+            -v "$PWD/tests/oras/htpasswd":/etc/zot/htpasswd:ro \
             $ORAS_IMAGE)
           sleep 5
           docker logs $ORAS
