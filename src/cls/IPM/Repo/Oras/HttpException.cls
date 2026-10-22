@@ -49,12 +49,12 @@ ClassMethod IsRegistryFailure(ex As %Exception.AbstractException) As %Boolean
     return $isobject(..FromException(ex))
 }
 
-/// Sets Text and CredentialsRejected for this failure on repository in repo repoName at repoURL.
+/// Sets Text and CredentialsRejected for this failure on module moduleName in repo repoName at repoURL.
 /// probe is the result of %IPM.Repo.Oras.PackageService:ProbeCredentials, used for a 401 or 403 when hasCredentials is set.
 Method Classify(
 	repoName As %String,
 	repoURL As %String,
-	repository As %String,
+	moduleName As %String,
 	hasCredentials As %Boolean,
 	probe As %String)
 {
@@ -70,9 +70,9 @@ Method Classify(
             set second = "Update the credentials configured for repo '" _ repoName _ "'."
             set ..CredentialsRejected = 1
         } else {
-            set first = repo _ " denied access to '" _ repository _ "': " _ status
+            set first = repo _ " denied access to '" _ moduleName _ "': " _ status
             if probe = $$$OrasCredentialsAccepted {
-                set second = "The credentials were accepted but lack permission for this repository."
+                set second = "The credentials were accepted but lack permission for this module."
             } else {
                 set second = "The credentials could not be checked."
             }

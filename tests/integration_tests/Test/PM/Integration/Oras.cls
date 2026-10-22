@@ -329,13 +329,13 @@ Method TestBadPasswordPublishMessage()
 
 Method TestReaderPublishDenied()
 {
-    // The repository must exist for the reader's refusal to be about permission
+    // The module must exist for the reader's refusal to be about permission
     do ..ConfigureRepo("authrepo", "auth-test", "writer", "writerpass")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish oras-auth -r authrepo"))
 
     do ..ConfigureRepo("authrepo", "auth-test", "reader", "readerpass")
     set sc = ##class(%IPM.Main).Shell("publish oras-auth -r authrepo")
-    do ..AssertErrorContains(sc, "denied access to 'oras-auth': 403 Forbidden", "lack permission for this repository")
+    do ..AssertErrorContains(sc, "denied access to 'oras-auth': 403 Forbidden", "lack permission for this module")
 
     do ..ConfigureRepo("authrepo", "auth-test", "writer", "writerpass")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("unpublish authrepo/oras-auth all -force"))

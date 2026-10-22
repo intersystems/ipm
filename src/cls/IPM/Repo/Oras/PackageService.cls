@@ -59,11 +59,11 @@ Method SplitRepoLocation(
     set pathPrefix = ..PathPrefix _ pathPrefix
 }
 
-/// Classifies failure, which came from an operation on repository, and returns it.
+/// Classifies failure, which came from an operation on module moduleName, and returns it.
 /// A 401 or 403 with credentials configured probes them, at most once for this service.
 Method RegistryFailure(
 	failure As %IPM.Repo.Oras.HttpException,
-	repository As %String) As %IPM.Repo.Oras.HttpException
+	moduleName As %String) As %IPM.Repo.Oras.HttpException
 {
     set probe = ""
     if ((failure.StatusCode = 401) || (failure.StatusCode = 403)) && ..HasCredentials() {
@@ -74,18 +74,18 @@ Method RegistryFailure(
     }
     do ..SplitRepoLocation(.location, .pathPrefix)
     set repoURL = $zstrip(location _ "/" _ pathPrefix, ">", "/")
-    do failure.Classify(..RepoName, repoURL, repository, ..HasCredentials(), probe)
+    do failure.Classify(..RepoName, repoURL, moduleName, ..HasCredentials(), probe)
     return failure
 }
 
-/// Returns e classified by RegistryFailure if it is a failed registry response for repository, otherwise e.
+/// Returns e classified by RegistryFailure if it is a failed registry response for module moduleName, otherwise e.
 Method ClassifyException(
 	e As %Exception.AbstractException,
-	repository As %String) As %Exception.AbstractException
+	moduleName As %String) As %Exception.AbstractException
 {
     set failure = ##class(%IPM.Repo.Oras.HttpException).FromException(e)
     if $isobject(failure) {
-        return ..RegistryFailure(failure, repository)
+        return ..RegistryFailure(failure, moduleName)
     }
     return e
 }
@@ -218,7 +218,7 @@ Method ProbeTokenEndpoint(wwwAuth As %String) As %String [ Private ]
     }
     set path = comp("path")
     // scope is omitted, since we are only probing whether the credentials are accepted, not
-    // requesting access to a specific repository. Registries that strictly require scope
+    // requesting access to a specific module. Registries that strictly require scope
     // may return 400, which reads as unknown.
     if service '= "" {
         set path = path _ "?service=" _ service

@@ -111,7 +111,7 @@ Method TestDeniedProbeAccepted()
 {
     set failure = ..NewFailure(403, "Forbidden", "denied")
     set line1 = "Repo 'myrepo' (https://registry.example.com) denied access to 'demo': 403 Forbidden - denied."
-    do ..AssertClassified(failure, 1, $$$OrasCredentialsAccepted, line1, "The credentials were accepted but lack permission for this repository.", 0)
+    do ..AssertClassified(failure, 1, $$$OrasCredentialsAccepted, line1, "The credentials were accepted but lack permission for this module.", 0)
 }
 
 Method TestDeniedProbeUnknown()
