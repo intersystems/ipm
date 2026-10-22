@@ -324,7 +324,7 @@ Method TestBadPasswordPublishMessage()
 {
     do ..ConfigureRepo("authrepo", "auth-test", "writer", "wrong")
     set sc = ##class(%IPM.Main).Shell("publish oras-auth -r authrepo")
-    do ..AssertErrorContains(sc, "Registry 'authrepo' (http://oras:5000) rejected the credentials: 401 Unauthorized", "Update the credentials configured for repo 'authrepo'.")
+    do ..AssertErrorContains(sc, "Repo 'authrepo' (http://oras:5000) rejected the credentials: 401 Unauthorized", "Update the credentials configured for repo 'authrepo'.")
 }
 
 Method TestReaderPublishDenied()

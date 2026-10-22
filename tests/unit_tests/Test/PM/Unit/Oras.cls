@@ -103,42 +103,42 @@ Method AssertClassified(
 Method TestCredentialsRejected()
 {
     set failure = ..NewFailure(401, "Unauthorized", "Bad Credentials.")
-    set line1 = "Registry 'myrepo' (https://registry.example.com) rejected the credentials: 401 Unauthorized - Bad Credentials."
+    set line1 = "Repo 'myrepo' (https://registry.example.com) rejected the credentials: 401 Unauthorized - Bad Credentials."
     do ..AssertClassified(failure, 1, $$$OrasCredentialsRejected, line1, "Update the credentials configured for repo 'myrepo'.", 1)
 }
 
 Method TestDeniedProbeAccepted()
 {
     set failure = ..NewFailure(403, "Forbidden", "denied")
-    set line1 = "Registry 'myrepo' (https://registry.example.com) denied access to 'demo': 403 Forbidden - denied."
+    set line1 = "Repo 'myrepo' (https://registry.example.com) denied access to 'demo': 403 Forbidden - denied."
     do ..AssertClassified(failure, 1, $$$OrasCredentialsAccepted, line1, "The credentials were accepted but lack permission for this repository.", 0)
 }
 
 Method TestDeniedProbeUnknown()
 {
     set failure = ..NewFailure(403, "Forbidden", "denied")
-    set line1 = "Registry 'myrepo' (https://registry.example.com) denied access to 'demo': 403 Forbidden - denied."
+    set line1 = "Repo 'myrepo' (https://registry.example.com) denied access to 'demo': 403 Forbidden - denied."
     do ..AssertClassified(failure, 1, $$$OrasCredentialsUnknown, line1, "The credentials could not be checked.", 0)
 }
 
 Method TestRequiresAuthentication()
 {
     set failure = ..NewFailure(401, "Unauthorized", "")
-    set line1 = "Registry 'myrepo' (https://registry.example.com) requires authentication: 401 Unauthorized."
+    set line1 = "Repo 'myrepo' (https://registry.example.com) requires authentication: 401 Unauthorized."
     do ..AssertClassified(failure, 0, "", line1, "Configure credentials for repo 'myrepo'.", 0)
 }
 
 Method TestNotFound()
 {
     set failure = ..NewFailure(404, "Not Found", "x", "http://reg/v2/demo/blobs/uploads/?a=1")
-    set line1 = "Registry 'myrepo' (https://registry.example.com) returned 404 Not Found for /v2/demo/blobs/uploads/."
+    set line1 = "Repo 'myrepo' (https://registry.example.com) returned 404 Not Found for /v2/demo/blobs/uploads/."
     do ..AssertClassified(failure, 1, "", line1, "Check the repo URL and namespace.", 0)
 }
 
 Method TestServerError()
 {
     set failure = ..NewFailure(500, "Internal Server Error", "boom")
-    set line1 = "Registry 'myrepo' (https://registry.example.com) returned 500 Internal Server Error for /v2/auth-test/demo/tags/list - boom."
+    set line1 = "Repo 'myrepo' (https://registry.example.com) returned 500 Internal Server Error for /v2/auth-test/demo/tags/list - boom."
     set line2 = "The registry failed to handle the request. Try again later, or contact the registry's administrator if it persists."
     do ..AssertClassified(failure, 1, "", line1, line2, 0)
 }
@@ -146,7 +146,7 @@ Method TestServerError()
 Method TestOtherClientError()
 {
     set failure = ..NewFailure(400, "Bad Request", "")
-    set line1 = "Registry 'myrepo' (https://registry.example.com) returned 400 Bad Request for /v2/auth-test/demo/tags/list."
+    set line1 = "Repo 'myrepo' (https://registry.example.com) returned 400 Bad Request for /v2/auth-test/demo/tags/list."
     set line2 = "The registry rejected the request. Check the repo URL and namespace, and that the registry supports the OCI distribution API."
     do ..AssertClassified(failure, 1, "", line1, line2, 0)
 }
@@ -157,7 +157,7 @@ Method TestRegistryFailureShowsPath()
     set def = ##class(%IPM.Repo.Oras.Definition).%New()
     set def.Name = "myrepo"
     set def.URL = "registry.example.com/artifactory/api/oci/x"
-    set expected = "Registry 'myrepo' (https://registry.example.com/artifactory/api/oci/x) returned 404 Not Found"
+    set expected = "Repo 'myrepo' (https://registry.example.com/artifactory/api/oci/x) returned 404 Not Found"
     set failure = def.GetPackageService().RegistryFailure(..NewFailure(404, "Not Found", ""), "demo")
     do $$$AssertTrue(failure.Text [ expected, "Package service: " _ failure.Text)
     set failure = def.GetPublishService().RegistryFailure(..NewFailure(404, "Not Found", ""), "demo")

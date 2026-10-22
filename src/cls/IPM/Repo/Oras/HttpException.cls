@@ -58,19 +58,19 @@ Method Classify(
 	hasCredentials As %Boolean,
 	probe As %String)
 {
-    set registry = "Registry '" _ repoName _ "' (" _ repoURL _ ")"
+    set repo = "Repo '" _ repoName _ "' (" _ repoURL _ ")"
     set status = ..StatusCode _ " " _ ..Reason
     set ..CredentialsRejected = 0
     if (..StatusCode = 401) || (..StatusCode = 403) {
         if 'hasCredentials {
-            set first = registry _ " requires authentication: " _ status
+            set first = repo _ " requires authentication: " _ status
             set second = "Configure credentials for repo '" _ repoName _ "'."
         } elseif probe = $$$OrasCredentialsRejected {
-            set first = registry _ " rejected the credentials: " _ status
+            set first = repo _ " rejected the credentials: " _ status
             set second = "Update the credentials configured for repo '" _ repoName _ "'."
             set ..CredentialsRejected = 1
         } else {
-            set first = registry _ " denied access to '" _ repository _ "': " _ status
+            set first = repo _ " denied access to '" _ repository _ "': " _ status
             if probe = $$$OrasCredentialsAccepted {
                 set second = "The credentials were accepted but lack permission for this repository."
             } else {
@@ -79,10 +79,10 @@ Method Classify(
         }
         set first = first _ ..MessageSuffix()
     } elseif ..StatusCode = 404 {
-        set first = registry _ " returned " _ status _ " for " _ ..Path()
+        set first = repo _ " returned " _ status _ " for " _ ..Path()
         set second = "Check the repo URL and namespace."
     } else {
-        set first = registry _ " returned " _ status _ " for " _ ..Path() _ ..MessageSuffix()
+        set first = repo _ " returned " _ status _ " for " _ ..Path() _ ..MessageSuffix()
         if ..StatusCode >= 500 {
             set second = "The registry failed to handle the request. Try again later, or contact the registry's administrator if it persists."
         } else {
