@@ -151,6 +151,19 @@ Method TestOtherClientError()
     do ..AssertClassified(failure, 1, "", line1, line2, 0)
 }
 
+/// The message names the repo URL with its path, from both the package and the publish service.
+Method TestRegistryFailureShowsPath()
+{
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set def.Name = "myrepo"
+    set def.URL = "registry.example.com/artifactory/api/oci/x"
+    set expected = "Registry 'myrepo' (https://registry.example.com/artifactory/api/oci/x) returned 404 Not Found"
+    set failure = def.GetPackageService().RegistryFailure(..NewFailure(404, "Not Found", ""), "demo")
+    do $$$AssertTrue(failure.Text [ expected, "Package service: " _ failure.Text)
+    set failure = def.GetPublishService().RegistryFailure(..NewFailure(404, "Not Found", ""), "demo")
+    do $$$AssertTrue(failure.Text [ expected, "Publish service: " _ failure.Text)
+}
+
 Method TestFromPythonException()
 {
     try {
@@ -221,8 +234,6 @@ Method TestRegistryMessageSanitized()
 {
     set helper = ##class(%IPM.Repo.Oras.PackageService).OrasHelper()
     do $$$AssertEquals(helper."registry_message"("{""message"":""\u001b[2Jbad\r\n\tline ""}"), "[2Jbad line")
-    set long = helper."registry_message"("{""message"":""" _ $translate($justify("", 600), " ", "x") _ """}")
-    do $$$AssertEquals(long, $translate($justify("", 500), " ", "x") _ "...")
 }
 
 }

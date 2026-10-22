@@ -63,8 +63,9 @@ Method RegistryFailure(
         set probe = ..CredentialsProbe
     }
     // The publish service's Location is the repo URL, which may include a path
-    do ..SplitLocation(..Location, .location)
-    do failure.Classify(..RepoName, location, repository, ..HasCredentials(), probe)
+    do ..SplitLocation(..Location, .location, .pathPrefix)
+    set repoURL = $zstrip(location _ "/" _ ..PathPrefix _ pathPrefix, ">", "/")
+    do failure.Classify(..RepoName, repoURL, repository, ..HasCredentials(), probe)
     return failure
 }
 
@@ -144,7 +145,7 @@ Method ProbeCredentials() As %String
     // GetHttpRequest() sends any other token as a header
     set sentToken = (..Token '= "") && (..TokenAuthMethod '= "basic")
     // The registry refused credentials sent on /v2/ itself
-    if sentToken || (sentBasic && ((scheme = "basic") || ((statusCode = 403) && (wwwAuth = "")))) {
+    if sentToken || (sentBasic && (scheme = "basic")) {
         return $$$OrasCredentialsRejected
     }
     // A Bearer challenge means the registry uses a token endpoint for auth.
@@ -187,11 +188,6 @@ Method ProbeTokenEndpoint(wwwAuth As %String) As %String [ Private ]
     }
     // Build a request to the token endpoint (which may be on a different host than the registry)
     do ..ParseLocation(realm, .comp)
-    do ..ParseLocation(..Location, .registry)
-    // Credentials go over plain http only to a registry that is itself plain http
-    if ($zconvert(comp("scheme"), "L") '= "https") && ($zconvert(registry("scheme"), "L") = "https") {
-        return $$$OrasCredentialsUnknown
-    }
     set tokenRequest = ##class(%Net.HttpRequest).%New()
     set tokenRequest.Timeout = 5
     // A redirect could send the credentials elsewhere, including over plain http
@@ -647,12 +643,9 @@ ClassMethod OrasHelper() As %SYS.Python [ Internal, Language = python ]
 
     provider = iris.cls("%IPM.Repo.Oras.PackageService").ImportOrasProvider()
 
-    max_text = 500
-
     def clean(text):
-        """Text from a registry on one line, without control characters, and cut at max_text characters."""
-        text = " ".join("".join(c if c.isprintable() else " " for c in str(text)).split())
-        return text if len(text) <= max_text else text[:max_text] + "..."
+        """Text from a registry on one line, without control characters."""
+        return " ".join("".join(c if c.isprintable() else " " for c in str(text)).split())
 
     def registry_message(text):
         """The registry's message from an OCI {"errors": [...]} body or a top-level {"message": ...} body."""

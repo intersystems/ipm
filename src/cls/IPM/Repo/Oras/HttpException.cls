@@ -49,16 +49,16 @@ ClassMethod IsRegistryFailure(ex As %Exception.AbstractException) As %Boolean
     return $isobject(..FromException(ex))
 }
 
-/// Sets Text and CredentialsRejected for this failure on repository in repo repoName at location.
+/// Sets Text and CredentialsRejected for this failure on repository in repo repoName at repoURL.
 /// probe is the result of %IPM.Repo.Oras.PackageService:ProbeCredentials, used for a 401 or 403 when hasCredentials is set.
 Method Classify(
 	repoName As %String,
-	location As %String,
+	repoURL As %String,
 	repository As %String,
 	hasCredentials As %Boolean,
 	probe As %String)
 {
-    set registry = "Registry '" _ repoName _ "' (" _ location _ ")"
+    set registry = "Registry '" _ repoName _ "' (" _ repoURL _ ")"
     set status = ..StatusCode _ " " _ ..Reason
     set ..CredentialsRejected = 0
     if (..StatusCode = 401) || (..StatusCode = 403) {

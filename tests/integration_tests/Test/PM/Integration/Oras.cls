@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 /// Integration tests against the local ORAS (zot) registry.
 /// zot requires Basic authentication for auth-test/** and auth-private/** and allows anonymous access elsewhere.
 Class Test.PM.Integration.Oras Extends Test.PM.Integration.Base
@@ -463,6 +465,9 @@ Method TestRejectedRepoSearchedAfterCommand()
     // Must be the last shell command before the search, and fails since badauth is the only repo
     do $$$AssertStatusNotOK(##class(%IPM.Main).Shell("install simplest-module 3.0.0"), "Install found nothing")
 
+    // The tests themselves run inside a shell command, so hide its lookup state to search as code outside one does
+    new $$$RepoLookupState
+    kill $$$RepoLookupState
     set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
     set criteria.Name = "simplest-module"
     set cookie = ""
