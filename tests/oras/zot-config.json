@@ -33,5 +33,13 @@
   },
   "log": {
     "level": "debug"
+  },
+  "extensions": {
+    "search": {
+      "enable": true
+    },
+    "ui": {
+      "enable": true
+    }
   }
 }

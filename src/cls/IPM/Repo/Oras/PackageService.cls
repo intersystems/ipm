@@ -49,6 +49,16 @@ ClassMethod SplitLocation(
     set location = ##class(%Net.URLParser).Compose(.components)
 }
 
+/// Splits the repo URL as SplitLocation does. The package service keeps the path in PathPrefix,
+/// while the publish service's Location is the whole repo URL.
+Method SplitRepoLocation(
+	Output location As %String,
+	Output pathPrefix As %String) [ Private ]
+{
+    do ..SplitLocation(..Location, .location, .pathPrefix)
+    set pathPrefix = ..PathPrefix _ pathPrefix
+}
+
 /// Classifies failure, which came from an operation on repository, and returns it.
 /// A 401 or 403 with credentials configured probes them, at most once for this service.
 Method RegistryFailure(
@@ -62,9 +72,8 @@ Method RegistryFailure(
         }
         set probe = ..CredentialsProbe
     }
-    // The publish service's Location is the repo URL, which may include a path
-    do ..SplitLocation(..Location, .location, .pathPrefix)
-    set repoURL = $zstrip(location _ "/" _ ..PathPrefix _ pathPrefix, ">", "/")
+    do ..SplitRepoLocation(.location, .pathPrefix)
+    set repoURL = $zstrip(location _ "/" _ pathPrefix, ">", "/")
     do failure.Classify(..RepoName, repoURL, repository, ..HasCredentials(), probe)
     return failure
 }
@@ -125,11 +134,10 @@ Method ProbeCredentials() As %String
     }
     // Probe GET /v2/ with credentials attached by GetHttpRequest().
     // Some registries accept credentials directly here and return 2xx.
-    // The publish service's Location is the repo URL, which may include a path.
-    do ..SplitLocation(..Location, .location, .pathPrefix)
+    do ..SplitRepoLocation(.location, .pathPrefix)
     set request = ..GetHttpRequest(location)
     set request.Timeout = 5
-    if $$$ISERR(request.Get(..PathPrefix _ pathPrefix _ "v2/")) {
+    if $$$ISERR(request.Get(pathPrefix _ "v2/")) {
         return $$$OrasCredentialsUnknown
     }
     set statusCode = request.HttpResponse.StatusCode
@@ -545,7 +553,8 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
                 set failure = ##class(%IPM.Repo.Oras.HttpException).%New("RegistryHttpError", response.StatusCode)
                 set failure.StatusCode = response.StatusCode
                 set failure.Reason = response.ReasonPhrase
-                set failure.URL = ..Location _ ..PathPrefix _ "/v2/_catalog"
+                do ..SplitRepoLocation(.location, .pathPrefix)
+                set failure.URL = location _ "/" _ pathPrefix _ "v2/_catalog"
                 if ..RegistryFailure(failure, "_catalog").CredentialsRejected {
                     throw failure
                 }
