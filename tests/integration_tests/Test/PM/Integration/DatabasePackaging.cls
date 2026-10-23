@@ -17,7 +17,6 @@ Method OnBeforeOneTest() As %Status
     set ..OriginalNamespace = $namespace
     // Use ManagerDirectory + job PID for a reliable absolute temp path
     set ..PackageOutputDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "pkg-test-output-" _ $job)
-    write !, "DEBUG OnBefore: ManagerDir=[", ##class(%File).ManagerDirectory(), "] PackageOutputDir=[", ..PackageOutputDir, "]"
     do ##class(%File).CreateDirectory(..PackageOutputDir)
     return $$$OK
 }
@@ -190,11 +189,6 @@ Method TestSimplePackageAndInstall()
     do $$$AssertStatusOK(sc, "Created installation test namespace")
 
     set $namespace = installNS
-
-    // Debug: verify path before load
-    write !, "DEBUG packageFile=[", packageFile, "]"
-    write !, "DEBUG packageFile exists=[", ##class(%File).Exists(packageFile), "]"
-    write !, "DEBUG namespace=[", $namespace, "]"
 
     // Install database package with -swap-db flag
     set sc = ##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db")
