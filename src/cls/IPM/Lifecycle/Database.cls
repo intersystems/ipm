@@ -15,18 +15,19 @@ Parameter PACKAGING As STRING [ Final ] = "database";
 // Lifecycle overrides
 // =====================================================================
 
-/// Entry point for database packaging. The package is a snapshot of the namespace it runs in:
+/// Entry point for database packaging. The package ships a copy of the routines database of the
+/// namespace it runs in:
 /// 1. Validate that IPM is mapped in rather than living in the routines DB, and that the routines DB
 ///    is not mirrored
-/// 2. Warn about anything the snapshot cannot carry, cannot run, or will carry unexpectedly
-/// 3. Under -include-tests, load and compile the root module's test resources so the snapshot has them
+/// 2. Warn about anything the copy cannot carry, cannot run, or will carry unexpectedly
+/// 3. Under -include-tests, load and compile the root module's test resources so the copy has them
 /// 4. Dismount the namespace's routines database, copy its IRIS.DAT into a staging dir, remount it
 /// 5. Enrich the staging dir (module.xml with the staged IRIS.DAT's SHA-256 checksum, deps/
 ///    manifests, non-compiled resources, Python wheels) and create the .tgz
 ///
 /// Step 3 is the only step here that loads or compiles anything, so what ships is what the namespace
 /// already holds. Note that the Compile phase runs ahead of this method and does compile the module's
-/// own resources into the namespace, so the snapshot picks those up too.
+/// own resources into the namespace, so the copy picks those up too.
 /// The staging dir is removed on every path.
 Method %Package(ByRef params) As %Status
 {
@@ -66,8 +67,8 @@ Method %Package(ByRef params) As %Status
         set stagingDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(##class(%IPM.Utils.File).CreateTempDirectory(), "stage"))
         $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(stagingDir))
 
-        write:verbose !, "Snapshotting the routines database..."
-        do ..SnapshotRoutinesDatabase(ns, stagingDir)
+        write:verbose !, "Copying the routines database..."
+        do ..CopyRoutinesDatabase(ns, stagingDir)
 
         set packageFile = ..AssemblePackage(stagingDir, .params)
         set params("PackageFile") = packageFile
@@ -88,8 +89,8 @@ Method %Package(ByRef params) As %Status
     quit sc
 }
 
-/// Loads and compiles the root module's test resources into the current namespace so the snapshot
-/// that follows contains them. Dependencies' tests are not loaded, since a database package ships
+/// Loads and compiles the root module's test resources into the current namespace so the database
+/// copy that follows contains them. Dependencies' tests are not loaded, since a database package ships
 /// its dependencies as installed code and nothing at install time runs their tests.
 ///
 /// Both halves are driven by hand. A Scope="test" resource is out of scope in every phase of a
@@ -108,7 +109,7 @@ Method LoadTestResources(ByRef params)
 
     set verbose = $get(params("Verbose"))
     // Document.OnPhase configures package mappings unless told not to and packaging must not leave
-    // Config.MapPackages entries behind in the namespace it snapshots.
+    // Config.MapPackages entries behind in the namespace it copies.
     merge loadParams = params
     set loadParams("NoMapping") = 1
 
@@ -177,7 +178,7 @@ Method %Reload(ByRef params) As %Status
         quit ..DoDatabaseInstall(.params)
     }
     // The packaging phase chain on the source module (the Reload phase that precedes Package during
-    // `package-database <name>`) has no source root to load from, and packaging snapshots what the
+    // `package-database <name>`) has no source root to load from, and packaging copies what the
     // namespace already holds, so this phase is a no-op. Do not delegate to ##super here:
     // Base.%Reload treats DeveloperMode as a signal to load from ..Module.Root even when no
     // RootDirectory is passed, which would reload source into the current namespace mid-package.
@@ -286,7 +287,7 @@ Method %Validate(ByRef pParams) As %Status
 /// During a database package install, there is no source to compile.
 /// In all other contexts, delegate to ##super. Packaging is one of those: the package phase chain
 /// includes Compile, so Base.%Compile compiles the module's resources into the namespace just before
-/// %Package snapshots it.
+/// %Package copies its routines database.
 Method %Compile(ByRef pParams) As %Status
 {
     if $get(pParams("DatabaseInstall")) {
@@ -386,8 +387,8 @@ Method WarnUnrunnableInvokes()
 }
 
 /// Warns when a dependency declares code resources but none of that code is in the local routines
-/// database, so the snapshot will ship without it. Nothing at install time compiles a dependency's
-/// source, so a dependency missing from the snapshot is missing from the installation.
+/// database, so the database copy will ship without it. Nothing at install time compiles a
+/// dependency's source, so a dependency missing from the copy is missing from the installation.
 /// The root module needs no equivalent warning: the Compile phase runs ahead of packaging and fails
 /// outright when the root module's code cannot be compiled into the namespace.
 Method WarnMissingDependencyCode()
@@ -404,12 +405,12 @@ Method WarnMissingDependencyCode()
         continue:hasCode
 
         write !!, "WARNING: no code from dependency '", module.Name, "' was found in this namespace's routines database."
-        write !, "  The package is a snapshot of that database, so ", module.Name, " ", module.VersionString, " will not be in it."
+        write !, "  The package ships a copy of that database, so ", module.Name, " ", module.VersionString, " will not be in it."
         write !, "  Load or install ", module.Name, " into this namespace before packaging."
     }
 }
 
-/// Warns when the snapshot ships code from other installed modules, which this module did not ask for.
+/// Warns when the database copy ships code from other installed modules, which this module did not ask for.
 Method WarnOtherModulesInDatabase()
 {
     kill expected
@@ -441,7 +442,7 @@ Method WarnOtherModulesInDatabase()
     quit:extra=""
 
     write !!, "WARNING: this namespace's routines database also holds code from ", $listtostring(extra, ", "), "."
-    write !, "  The package is a snapshot of the whole database, so that code ships too."
+    write !, "  The package ships a copy of the whole database, so that code ships too."
     write !, "  Package from a namespace holding only ", ..Module.Name, " and its dependencies to avoid this."
 }
 
@@ -473,7 +474,7 @@ Method WarnTestCodeAlreadyInDatabase()
     quit:present=""
 
     write !!, "WARNING: test code is already in the routines database and will ship in the package: ", $listtostring(present, ", "), "."
-    write !, "  -include-tests was not passed, but the package is a snapshot and excludes nothing."
+    write !, "  -include-tests was not passed, but the package copies the database whole and excludes nothing."
     write !, "  Delete it from this namespace or package from one where it was never compiled."
 }
 
@@ -488,7 +489,7 @@ ClassMethod GetSharedRoutinesAndGlobalsDirectory(ns As %String) As %String
 }
 
 /// Warns when a namespace's routines and globals are the same database during packaging.
-/// The snapshot copies the whole IRIS.DAT, so every global in that namespace ships in the package,
+/// Packaging copies the whole IRIS.DAT, so every global in that namespace ships in the package,
 /// including application data and ^IPM.Storage.*, the packaging machine's own module registry.
 ClassMethod WarnPackagingRoutinesDatabaseIsGlobalsDatabase(ns As %String)
 {
@@ -496,11 +497,11 @@ ClassMethod WarnPackagingRoutinesDatabaseIsGlobalsDatabase(ns As %String)
     quit:sharedDir=""
 
     write !!, "WARNING: globals in namespace ", ns, " will ship inside this package."
-    write !, "  ", ns, " uses one database for both routines and globals (", sharedDir, "), and the snapshot copies it whole."
+    write !, "  ", ns, " uses one database for both routines and globals (", sharedDir, "), and packaging copies it whole."
     write !, "  Give ", ns, " a globals database of its own to avoid shipping that data."
 }
 
-/// Warns when another namespace shares the routines database being snapshotted. Packaging dismounts
+/// Warns when another namespace shares the routines database being copied. Packaging dismounts
 /// that database for the length of the copy, so every namespace pointing at it is down until the
 /// remount, not just the one being packaged.
 ClassMethod WarnRoutinesDatabaseSharedForPackaging(ns As %String)
@@ -603,14 +604,14 @@ ClassMethod WarnRoutinesDatabaseIsGlobalsDatabase(ns As %String)
 }
 
 /// Copies the routines database of ns into stagingDir as IRIS.DAT. This is the whole of what
-/// database packaging produces: the package is a snapshot of a namespace, not a build.
+/// database packaging produces: the package carries a namespace's database as it stands, not a build.
 /// The database is dismounted for the copy and remounted afterwards, so ns cannot run code while the
 /// copy runs. The dismount is not an optimization to skip: a copy of a mounted IRIS.DAT reads only
 /// what is on disk, and blocks written since the write daemon last ran are still in the buffer pool,
-/// so code compiled shortly before packaging would be missing from the snapshot. Dismounting flushes.
+/// so code compiled shortly before packaging would be missing from the copy. Dismounting flushes.
 /// The caller must have validated that the database is not mirrored, since dismounting a mirrored
 /// database breaks the mirror (see ValidateRoutinesDatabaseNotMirrored).
-ClassMethod SnapshotRoutinesDatabase(
+ClassMethod CopyRoutinesDatabase(
 	ns As %String,
 	stagingDir As %String)
 {
