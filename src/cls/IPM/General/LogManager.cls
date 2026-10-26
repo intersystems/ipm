@@ -152,7 +152,8 @@ Method WriteLogLine(
 
         set entry = ##class(%DynamicObject).%New()
         set entry.level = level
-        set entry.message = message
+        // Terminal echo above keeps ANSI color; the log files get a stripped copy.
+        set entry.message = ..StripControlSequences(message)
         set entry.timestamp = $zdatetime($ztimestamp, 3) _ " UTC"
 
         // Append one NDJSON record; no full-file read/parse required.
@@ -279,4 +280,177 @@ Method AddMessage(
     }
 }
 
+/// Install a chained output-capture tee that routes IRIS-native output into the log in real
+/// time while still forwarding it live down the redirect chain (terminal or an outer capture).
+/// Each logical line (one per newline) is sent to <method>WriteLogLine</method>.
+/// Pair with <method>EndChainedCaptureToLog</method>. The predecessor handler is recorded so this
+/// coexists with an already-active <class>%IPM.Utils.Module</class> capture or the test harness.
+/// @Argument writeToTerminal   Forwarded to <method>WriteLogLine</method> for each captured line.
+///                             When 0, forwarding up the redirect chain is blocked, so output
+///                             reaches the log only and not the terminal or any outer capture.
+ClassMethod BeginChainedCaptureToLog(writeToTerminal As %Boolean = 0) As %Status [ ProcedureBlock = 0 ]
+{
+    new priorIOHandler
+
+    if $data($$$IPMLogCapture("active")) {
+        $$$ThrowOnError($$$ERROR($$$GeneralError, "Chained log capture already active"))
+    }
+
+    // Record the previous redirect handler so that it can be restored once EndChainedCaptureToLog is called.
+    if ##class(%Device).ReDirectIO() {
+        set priorIOHandler = $zutil(96,12)
+    } else {
+        set priorIOHandler = ""
+    }
+    // This is safeguard for the case that redirection from this method is still on but the $$$IPMLogCapture metadata somehow got wiped,
+    // since priorIOHandler = $zname would cause out() to re-enter wstr() in an infinite loop
+    if (priorIOHandler = $zname) {
+        set priorIOHandler = ""
+    }
+    set $$$IPMLogCapture("priorIOHandler") = priorIOHandler
+    set $$$IPMLogCapture("line") = ""
+    set $$$IPMLogCapture("writeToTerminal") = writeToTerminal
+    set $$$IPMLogCapture("active") = 1
+
+    // Install this routine's labels as the device mnemonic routine and switch interception on.
+    use $io::("^"_$zname)
+    do ##class(%Device).ReDirectIO(1)
+    quit $$$OK
+
+    // --- Device redirection entry points (called by the kernel while interception is on) ---
+rstr(size,timeout) [result,readExpr,isRedirectOn] public {
+    new result,readExpr,isRedirectOn
+    set readExpr = "result"
+    set isRedirectOn = ##class(%Device).ReDirectIO(0)
+    set:$data(size) readExpr = readExpr_"#"_size
+    set:$data(timeout) readExpr = readExpr_":"_timeout
+    read @readExpr
+    do:$data(timeout) $system.Process.IODollarTest($test)
+    do ##class(%Device).ReDirectIO(isRedirectOn)
+    quit result
 }
+wchr(char) public { do fwd($char(char)) do buf($char(char)) }
+wff() public { do fwd($char(12)) do buf($char(12)) }
+wnl() public { do fwd($char(13,10)) do buf($char(10)) }
+wstr(string) public { do fwd(string) do buf(string) }
+wtab(col) [pad] public {
+    new pad
+    set pad = $justify("", $select(col>$x:col-$x, 1:0))
+    do fwd(pad) do buf(pad)
+}
+    // Forward raw bytes (ANSI intact) to the predecessor sink so the terminal still sees output
+    // live, but only when the caller opted into terminal output.
+fwd(string) [priorIOHandler,isRedirectOn] public {
+    new priorIOHandler,isRedirectOn
+    if '$get($$$IPMLogCapture("writeToTerminal")) { quit }
+    set priorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
+    set isRedirectOn = ##class(%Device).ReDirectIO(0)
+    if (priorIOHandler '= "") {
+        use $io::("^"_priorIOHandler)
+        do ##class(%Device).ReDirectIO(1)
+        write string
+        do ##class(%Device).ReDirectIO(0)
+    } else {
+        write string
+    }
+    use $io::("^"_$zname)
+    do ##class(%Device).ReDirectIO(isRedirectOn)
+}
+    // Assemble logical lines; on each newline flush the completed line to the log.
+buf(string) [line,nl] public {
+    new line,nl
+    // After teardown an outer capture may reinstall this routine; without this guard the
+    // nodes below would resurrect a half-populated tee and log stray lines.
+    if '$data($$$IPMLogCapture("active")) { quit }
+    set line = $get($$$IPMLogCapture("line"))
+    set nl = $find(string,$char(10))
+    while nl {
+        set line = line_$extract(string,1,nl-2)
+        do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line, $get($$$IPMLogCapture("writeToTerminal")))
+        set line = ""
+        set string = $extract(string,nl,*)
+        set nl = $find(string,$char(10))
+    }
+    set $$$IPMLogCapture("line") = line_string
+}
+}
+
+/// Remove the chained capture tee installed by <method>BeginChainedCaptureToLog</method>,
+/// flushing any trailing partial line, and restore the predecessor redirect handler.
+/// @Argument writeToTerminal   Forwarded to <method>WriteLogLine</method> for the trailing line.
+ClassMethod EndChainedCaptureToLog() As %Status [ ProcedureBlock = 0 ]
+{
+    new priorIOHandler,line
+
+    if '$data($$$IPMLogCapture("active")) {
+        quit $$$OK
+    }
+
+    set line = $get($$$IPMLogCapture("line"))
+    if (line '= "") {
+        do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line, $get($$$IPMLogCapture("writeToTerminal"), 0))
+    }
+
+    set priorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
+
+    // Another handler was installed on top of this tee, so it sits above us in the chain and
+    // restoring our prior handler would drop it. Release our state and leave the chain alone; the
+    // entry points fall through to that handler once our state is gone.
+    if ##class(%Device).ReDirectIO(), ($zutil(96,12) '= $zname) {
+        kill $$$IPMLogCapture
+        quit $$$OK
+    }
+
+    if (priorIOHandler '= "") {
+        use $io::("^"_priorIOHandler)
+    } else {
+        do ##class(%Device).ReDirectIO(0)
+        use $io::("")
+    }
+
+    kill $$$IPMLogCapture
+    quit $$$OK
+}
+
+/// Write one captured logical line to the log. Interception is turned off for the duration so the
+/// log write cannot re-enter the tee, and <property>Verbose</property> is forced off so the command's
+/// verbosity does not re-echo the line the tee already forwarded live; <var>writeToTerminal</var>
+/// gives the caller explicit control over terminal echo.
+ClassMethod FlushCapturedBuffer(
+	pLine As %String,
+	writeToTerminal As %Boolean = 0)
+{
+    set st = ##class(%Device).ReDirectIO(0)
+    set currentLogMgr = ..%Get(.sc)
+    if $isobject(currentLogMgr) {
+        set verbose = currentLogMgr.Verbose
+        set currentLogMgr.Verbose = 0
+        do currentLogMgr.WriteLogLine(pLine,, writeToTerminal)
+        set currentLogMgr.Verbose = verbose
+    }
+    do ##class(%Device).ReDirectIO(st)
+}
+
+/// Strip ANSI SGR control sequences (<code>ESC[...m</code>) so color codes written for the
+/// terminal do not reach the log files.
+ClassMethod StripControlSequences(pText As %String) As %String
+{
+    set esc = $char(27)_"["
+    set out = ""
+    set p = $find(pText, esc)
+    while p {
+        set out = out_$extract(pText, 1, p-$length(esc)-1)
+        set pText = $extract(pText, p, *)
+        set m = $find(pText, "m")
+        if m {
+            set pText = $extract(pText, m, *)
+        } else {
+            set pText = ""
+        }
+        set p = $find(pText, esc)
+    }
+    quit out_pText
+}
+
+}
+
