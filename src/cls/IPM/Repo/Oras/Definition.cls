@@ -7,6 +7,11 @@ Parameter MONIKER As STRING = "oras";
 
 Property Namespace As %IPM.DataType.OrasNamespace;
 
+Method NamespaceGet() As %IPM.DataType.OrasNamespace
+{
+    return ##class(%IPM.DataType.OrasNamespace).Normalize(i%Namespace)
+}
+
 XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI" ]
 {
 <commands>

@@ -11,6 +11,17 @@ Property Location As %IPM.DataType.RepoLocation;
 /// i.e. the API endpoint for a given module will be at <Location>/v2/<Namespace>/<Module>
 Property Namespace As %IPM.DataType.OrasNamespace;
 
+/// Module name for a registry repository path, i.e. the path without this service's namespace.
+/// e.g. with namespace "packages", "packages/module-a" -> "module-a"
+Method ModuleNameFromRepository(repository As %String) As %String
+{
+    set prefix = ..Namespace _ "/"
+    if (..Namespace '= "") && ($extract(repository, 1, $length(prefix)) = prefix) {
+        return $extract(repository, $length(prefix) + 1, *)
+    }
+    return repository
+}
+
 /// Prefix for ORAS API calls
 Property PathPrefix As %String(MAXLEN = "");
 
@@ -151,10 +162,7 @@ Method GetModule(
 	pModuleReference As %IPM.Storage.ModuleInfo,
 	Output AsArchive As %Boolean = 0) As %Stream.Object
 {
-    set tag = $$$Semver2Tag(pModuleReference.VersionString)
-    if (pModuleReference.Deployed) {
-        set tag = tag _ $$$OrasTagPlatformSeparator _ pModuleReference.PlatformVersion
-    }
+    set tag = ..TagForReference(pModuleReference)
     set status = ..Pull(..Location, pModuleReference.Name, tag, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod, .stream)
     $$$ThrowOnError(status)
     #; module is pulled as a .tgz file
@@ -164,8 +172,31 @@ Method GetModule(
 
 Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream.Object
 {
-    set name = pModuleReference.Name _ ":" _ $$$Semver2Tag(pModuleReference.VersionString)
-    return ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    set name = pModuleReference.Name _ ":" _ ..TagForReference(pModuleReference)
+    // GetModuleXML returns a string, but callers expect a stream per %IPM.Repo.IPackageService
+    set moduleXML = ..GetModuleXML(..Location, name, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    if (moduleXML = "") {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "No manifest found for '" _ name _ "' in registry " _ ..Location))
+    }
+    set stream = ##class(%Stream.GlobalCharacter).%New()
+    $$$ThrowOnError(stream.Write(moduleXML))
+    $$$ThrowOnError(stream.Rewind())
+    return stream
+}
+
+/// Returns the registry tag holding the artifact for the given module reference.
+/// A deployed module is tagged with a platform version suffix, since one version of it
+/// is built separately for each supported platform.
+ClassMethod TagForReference(moduleReference As %IPM.Storage.ModuleInfo) As %String [ Private ]
+{
+    set tag = $$$Semver2Tag(moduleReference.VersionString)
+    if moduleReference.Deployed {
+        if (moduleReference.PlatformVersion = "") {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot locate deployed module '" _ moduleReference.Name _ "' " _ moduleReference.VersionString _ " without a platform version."))
+        }
+        set tag = tag _ $$$OrasTagPlatformSeparator _ moduleReference.PlatformVersion
+    }
+    return tag
 }
 
 Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean
@@ -213,6 +244,29 @@ ClassMethod AggregatePlatformVersions(
     return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
+/// Reorders versionsList so that versions with an artifact for currentPlatform come first, each
+/// group keeping the newest-first order it arrived in. A caller that reports only the first version
+/// therefore reports the newest installable one, falling back to the newest version overall when
+/// the module has no artifact for this platform at all.
+ClassMethod PreferCompatibleVersions(
+	versionsList As %List,
+	ByRef aggregatedPlatformVersion,
+	currentPlatform As %String) As %List
+{
+    set compatible = "", incompatible = ""
+    set ptr = 0
+    while $listnext(versionsList, ptr, version) {
+        set platformVersions = $get(aggregatedPlatformVersion(version))
+        // An empty platform means the version is not platform-specific, so anything can use it.
+        if ($listfind(platformVersions, "") > 0) || ($listfind(platformVersions, currentPlatform) > 0) {
+            set compatible = compatible _ $listbuild(version)
+        } else {
+            set incompatible = incompatible _ $listbuild(version)
+        }
+    }
+    return compatible _ incompatible
+}
+
 /// <var>moduleList</var> is a list of objects of type <class>%IPM.Storage.ModuleInfo</class> to which this method adds entries
 /// <var>name</var> is the name of the package for which we are enumerating versions
 Method ListModulesFromTagString(
@@ -224,6 +278,11 @@ Method ListModulesFromTagString(
 {
     set allTagsString = ..GetAllTags(..Location, name, "", client)
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
+    // The tri-states of AllVersions that report a single version should report one this platform
+    // can actually install. The empty state reports every version, so its order doesn't matter.
+    if (searchCriteria.AllVersions '= "") {
+        set allVersionsList = ..PreferCompatibleVersions(allVersionsList, .aggregatedPlatformVersion, $$$CurrentPlatformVersion)
+    }
     set pointer = 0
     while $listnext(allVersionsList,pointer,moduleVersion) {
         // filter by version
@@ -294,13 +353,16 @@ Method ListModulesFromTagString(
 
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
         // `artifactMetadata.ImageTitle` can be different from `name`. E.g., when the module was simply "moved" from elsewhere under a different name.
-        set tModRef.Name = name
+        // Without the namespace, which the other methods of this service prefix
+        set tModRef.Name = ..ModuleNameFromRepository(name)
         // `artifactMetadata.ImageVersion` can be different from `moduleVersion`. E.g., when the module was simply "moved" from elsewhere under a different tag
         set tModRef.VersionString = tVersion.ToString()
         set tModRef.Repository = artifactMetadata.ImageSource
         set tModRef.Description = artifactMetadata.ImageDescription
         set tModRef.Deployed = artifactMetadata.IPMDeployed
-        if (artifactMetadata.IPMDeployed '= "") {
+        // Skipped for AllVersions, which reports a single entry standing in for every version;
+        // these platforms belong to just one of them.
+        if (artifactMetadata.IPMDeployed '= "") && 'searchCriteria.AllVersions {
             set pvPtr = 0
             while $listnext(platformVersions, pvPtr, pv) {
                 $$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))
@@ -403,7 +465,7 @@ ClassMethod GetClient(
 	tokenAuthMethod As %String) As %SYS.Python
 {
     try {
-        set orasProvider = ##class(%SYS.Python).Import("oras.provider")
+        set orasProvider = ..ImportOrasProvider()
 
         set args = {}
         set args.hostname = registry
@@ -429,7 +491,15 @@ ClassMethod GetClient(
             }
         }
     } catch e {
-        if e.Name = "<OBJECT DISPATCH>" {
+        // The same permission failure has been seen as both <SYNTAX> and <PYTHON EXCEPTION>, so match on the details rather than the name
+        set details = $zconvert(e.DisplayString(), "L")
+        set pythonDir = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
+        // Python reports the path as it appeared in sys.path, whose case can differ from the manager directory's
+        if ((details [ "permissionerror") && (details [ $zconvert(pythonDir, "L"))) || ((details [ "modulenotfounderror") && ..IsOrasUnreadable(pythonDir)) {
+            set eStatus = e.AsStatus()
+            set usrStatus = $$$ERROR($$$GeneralError,$$$OrasPythonPackagesUnreadable)
+            $$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))
+        } elseif e.Name = "<OBJECT DISPATCH>" {
             set eStatus = e.AsStatus()
             set usrStatus = $$$ERROR($$$GeneralError,$$$OrasRequiresFlexiblePython)
             $$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))
@@ -438,6 +508,43 @@ ClassMethod GetClient(
         }
     }
     return client
+}
+
+/// Imports oras.provider, retrying once if it is not found.
+/// A process that tried to import oras while it was unreadable keeps the result, so retrying lets a repaired installation work without a new process.
+ClassMethod ImportOrasProvider() As %SYS.Python [ Internal, Language = python ]
+{
+    import importlib
+    import sys
+
+    try:
+        return importlib.import_module("oras.provider")
+    except ModuleNotFoundError:
+        pass
+
+    for name in [name for name in sys.modules if (name == "oras") or name.startswith("oras.")]:
+        del sys.modules[name]
+    # Python caches each directory's listing, including the empty one it got for an unreadable directory
+    importlib.invalidate_caches()
+    return importlib.import_module("oras.provider")
+}
+
+/// Returns whether this process is denied access to the oras package in pythonDir.
+/// Python reports that as oras or one of its modules not being found, rather than as a PermissionError.
+ClassMethod IsOrasUnreadable(pythonDir As %String) As %Boolean [ Internal, Language = python ]
+{
+    import os
+
+    orasDir = os.path.join(pythonDir, "oras")
+    try:
+        os.listdir(orasDir)
+        with open(os.path.join(orasDir, "__init__.py"), "rb"):
+            pass
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return False
 }
 
 /// Pulls the specified module to disk and returns the module in tgz form as %Stream.FileBinary
@@ -457,7 +564,7 @@ ClassMethod Pull(
     set tSC = $$$OK
 
     if tag = "" {
-        set tag = ..GetLatestTag(registry, package,  namespace, username, password, token, tokenAuthMethod, 1)
+        set tag = ..GetLatestTag(registry, package, namespace, username, password, token, tokenAuthMethod)
     }
 
     try {
@@ -472,7 +579,7 @@ ClassMethod Pull(
         }
 
         #; Pull the module using ORAS
-        do ..PullOras(registry, package, tag, "", username, password, token, tokenAuthMethod, tempDirectory)
+        do ..PullOras(registry, package, tag, namespace, username, password, token, tokenAuthMethod, tempDirectory)
 
         #; Find only the tgz file
         set result=##class(%ResultSet).%New("%File:FileSet")
@@ -496,7 +603,7 @@ ClassMethod Pull(
         set hash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
         set hash = ##class(%xsd.hexBinary).LogicalToXSD(hash)
 
-        set verified = ..VerifyModuleHashAndSize(registry, package _ ":" _ tag, "", username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
+        set verified = ..VerifyModuleHashAndSize(registry, package _ ":" _ tag, namespace, username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
         if 'verified {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Module size and/or hash failed validation!"))
         }

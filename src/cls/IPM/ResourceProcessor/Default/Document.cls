@@ -92,17 +92,14 @@ Method OnPhase(
             set tListNames = tListNames _ $listbuild($translate(tName, "%", "_"))
             set tListNames = tListNames _ $listbuild($translate(tName, "_", ""))
             set tListNames = tListNames _ $listbuild($translate(tName, "%", ""))
+            // Reload already created mappings; this covers test- and verify-scoped resources
+            if '$get(pParams("NoMapping"),0) {
+                $$$ThrowOnError(..OnConfigureMappings(.pParams))
+            }
             set ptrn = 0
             while $listnext(tListNames, ptrn, tName) {
-                // Runs in Reload normally, and also in Test for test scope / Verify for verify scope
                 set tSourcesPrefix = $char($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 
-                if '$get(pParams("NoMapping"),0) {
-                    // Currently, still need mapping creation, since if a module is installed with a resource
-                    // already presented in another namespace and have a upperlevel mapping to another namespace,
-                    // then it should have a package mapping of this specific resource to its namespace database
-                    $$$ThrowOnError(..OnConfigureMappings(.pParams))
-                }
                 if ..ResourceReference.Generated {
                     set pResourceHandled = 1
                     quit
@@ -180,10 +177,15 @@ Method OnPhase(
                                 quit
                             }
                             if ..ResourceReference.Deploy {
-                                if tVerbose {
-                                    write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
-                                }
+                                $$$LogLine("Loading deployed resource from Studio project: "_..ResourceReference.Name)
                                 set ..CompileFromProject = 1
+                                // Mark deployed so Compile skips source compilation of Deploy=true
+                                // resources. Persisted because the module is reopened from the
+                                // database between here and Compile.
+                                if '..ResourceReference.Module.Deployed {
+                                    set ..ResourceReference.Module.Deployed = 1
+                                    $$$ThrowOnError(..ResourceReference.Module.%Save())
+                                }
                                 if '$data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
                                     set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
                                     if $$$ISERR(sc) {
@@ -301,12 +303,6 @@ Method OnExportDeployedItem(
     quit tSC
 }
 
-/// Subclasses may override to customize mapping behavior at the beginning of the Reload phase.
-Method OnConfigureMappings(ByRef pParams) As %Status
-{
-    quit $$$OK
-}
-
 /// Subclasses may override to customize resource load behavior during the Reload phase. <br />
 /// @Argument	pFullResourcePath			The absolute path to the resource present on the file system
 /// @Argument	pVerbose					1: display output from loading files, 0: do not display output
@@ -364,12 +360,13 @@ Method OnLoad(
                     } catch ex { }
                     if 'tProcessed {
                         try {
-                            write:tVerbose !,"Loading file " _ pFullResourcePath _ " as " _ docclass
+                            $$$LogLine("Loading file " _ pFullResourcePath _ " as " _ docclass)
                             set routineMgr = ##class(%RoutineMgr).%OpenId(..ResourceReference.Name)
                             do routineMgr.Code.Rewind()
                             do routineMgr.Code.CopyFrom(stream)
                             $$$ThrowOnError(routineMgr.%Save())
-                            write:tVerbose !,"Imported document: ", ..ResourceReference.Name, !, "Load finished successfully.", !
+                            $$$LogLine("Imported document: "_..ResourceReference.Name)
+                            $$$LogLine("Load finished successfully.")
                             set tProcessed = 1
                         } catch ex { }
                     }

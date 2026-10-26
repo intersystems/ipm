@@ -83,7 +83,6 @@ ClassMethod LoadModuleReference(
         #dim manager As %IPM.Repo.Manager
         set manager = ##class(%IPM.Repo.Manager).%Get(.tSC)
         $$$ThrowOnError(tSC)
-
         set tClient = manager.CheckServiceCache(pServerName,.tAvailable)
         if 'tAvailable {
             set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pServerName))
@@ -223,8 +222,6 @@ ClassMethod LoadModuleFromArchive(
 {
     set tSC = $$$OK
     try {
-        set tVerbose = $get(pParams("Verbose"))
-
         set moduleRoot = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
         // Custom roots are always pre-created by EnsureWritableDirectory at config time, so the fallback
         // only triggers for the default ipm/ path before first use — one level up reaches DataDirectory(), which always exists.
@@ -253,7 +250,7 @@ ClassMethod LoadModuleFromArchive(
             quit
         }
         for i=1:1:$get(tOutput) {
-            write:tVerbose !,tOutput(i)
+            $$$LogLine(tOutput(i))
         }
 
         set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
@@ -630,13 +627,20 @@ ClassMethod BuildAllDependencyGraphs(
                     #dim tModRef As %IPM.Storage.ModuleInfo
                     set tModRef = tList.GetAt(i)
 
-                    // Retrieve module manifest
-                    set tManifest = tPackageService.GetModuleManifest(tModRef)
+                    // Retrieve module manifest. A missing or unreadable manifest for one module must
+                    // not abort discovery across every repository, so record it and move on.
+                    try {
+                        set tManifest = tPackageService.GetModuleManifest(tModRef)
+                    } catch manifestEx {
+                        set pErrorList($increment(pErrorList)) = $listbuild(tRepoName,tModRef.Name,tModRef.VersionString,manifestEx.AsStatus())
+                        continue
+                    }
 
                     set tReader = ##class(%XML.Reader).%New()
                     set tSC = tReader.OpenStream(tManifest)
                     if $$$ISERR(tSC) {
-                        quit
+                        set pErrorList($increment(pErrorList)) = $listbuild(tRepoName,tModRef.Name,tModRef.VersionString,tSC)
+                        continue
                     }
                     do tReader.Correlate("Module","%IPM.Storage.Module")
                     do tReader.Next(.tModule,.tCorrSC)
@@ -722,9 +726,7 @@ ClassMethod UninstallAll(
                 quit
             }
             if '$data(simpleModList(module)) {
-                if $get(pParams("Verbose")) {
-                    write !,"WARNING: module ",module," is missing, skipping uninstall",!
-                }
+                $$$LogLine("Module "_module_" is missing, skipping uninstall", $$$Warning)
                 kill tModuleNames(module)
             }
         }
@@ -769,7 +771,7 @@ ClassMethod UninstallAll(
 
                 kill tParams
                 merge tParams = pParams
-                write !,"Uninstalling ",tModuleName
+                $$$LogLine("Uninstalling "_tModuleName,,1)
                 set tOneSC = ##class(%IPM.Storage.Module).Uninstall(tModuleName,pForce,,.tParams)
                 if $$$ISOK(tOneSC) || pForce {
                     // If we are forcing uninstallation of everything that can be uninstalled,
@@ -787,7 +789,7 @@ ClassMethod UninstallAll(
                     set tProgressMade = 1
                 }
                 if $$$ISERR(tOneSC) {
-                    write !,"Error uninstalling ",tModuleName,": ",$system.Status.GetErrorText(tOneSC)
+                    $$$LogLine("Error uninstalling "_tModuleName_": "_$system.Status.GetErrorText(tOneSC), $$$Error, 1)
                     set tSC = $system.Status.AppendStatus(tSC,tOneSC)
                     set tFailedModules(tModuleName) = ""
                 }
@@ -870,7 +872,7 @@ ClassMethod GetAvailableModuleNamesClose(ByRef qHandle As %Binary) As %Status [ 
 
 Query GetModuleList(
 	pServer As %String,
-	pShowAllVersions As %Boolean) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,Origin:%String,AllVersions:%String") [ SqlProc ]
+	pShowAllVersions As %Boolean) As %Query(ROWSPEC = "Name:%String,Version:%String,Repository:%String,Description:%String,Origin:%String,AllVersions:%String,PlatformVersions:%String") [ SqlProc ]
 {
 }
 
@@ -903,9 +905,13 @@ ClassMethod GetModuleListExecute(
                 write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
             }
             if $isobject(tList) {
+                set platformVersion = $$$CurrentPlatformVersion
                 for i=1:1:tList.Count() {
                     set tMod = tList.GetAt(i)
-                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions)
+                    if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
+                        continue
+                    }
+                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
                 }
             }
         }
@@ -1383,8 +1389,10 @@ ClassMethod ConstructInvertedDependencyGraph(
         if (moduleName = "") {
             quit
         }
-        // Invert dependency graph, subscripts (<module>, <depends on>)
-        set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3)
+        // pInvertedDependencyGraph(<module>) holds repository, version, deployed flag and
+        // platform version (see BuildDependencyGraph for the full node layout).
+        // pInvertedDependencyGraph(<module>, <depends on>) = "" marks a remaining dependency edge.
+        set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3) _ $list(data, 6, 7)
         set dependentKey = ""
         for {
             set dependentKey = $order(pDependencyGraph(moduleName, dependentKey))
@@ -1418,12 +1426,14 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
 
         // If it has no remaining dependencies
         if $data(pInvertedDependencyGraph(moduleName)) < 10 {
-            set $listbuild(repositoryName, versionString) = $get(pInvertedDependencyGraph(moduleName))
+            set $listbuild(repositoryName, versionString, deployed, platformVersion) = $get(pInvertedDependencyGraph(moduleName))
             // Create qualified module reference to add to list
             set moduleReference = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
             set moduleReference.Name = moduleName
             set moduleReference.VersionString = versionString
             set moduleReference.ServerName = repositoryName
+            set moduleReference.Deployed = deployed
+            set moduleReference.PlatformVersion = platformVersion
             $$$ThrowOnError(orderedDependencyList.Insert(moduleReference))
             // Remove node from graph
             kill pInvertedDependencyGraph(moduleName)
@@ -2423,6 +2433,123 @@ ClassMethod RunCommand(
     quit tSC
 }
 
+/// Runs `pip install` into target. pipArgs is the argument $list following
+/// the pip caller, starting with "install"; -t is inserted after it, so a -t
+/// in pipArgs takes precedence.
+ClassMethod PipInstall(
+	pipArgs As %List,
+	target As %String,
+	quiet As %Boolean = 0,
+	verbose As %Boolean = 0,
+	cwd As %String = "",
+	ByRef params) As %Status
+{
+    set sc = $$$OK
+    try {
+        // A trailing or repeated space in a flag string yields an empty argument, which pip rejects as a requirement
+        set args = ""
+        for i = 1:1:$listlength(pipArgs) {
+            set arg = $listget(pipArgs, i)
+            set:arg'="" args = args _ $listbuild(arg)
+        }
+
+        set args = $listbuild($listget(args, 1), "-t", target) _ $list(args, 2, *)
+        set command = ##class(%IPM.Lifecycle.Base).ResolvePipCaller(.params) _ args
+        if verbose {
+            write !,"Running "
+            zwrite command
+        }
+        if quiet {
+            // Redirect pip stdout/stderr to a sink stream so subprocess output doesn't bypass device suppression
+            set pipOutput = ##class(%Stream.TmpCharacter).%New()
+            set runStatus = ..RunCommand(cwd, command, .pipOutput, .pipOutput)
+            if $$$ISERR(runStatus) {
+                // pip's own diagnostics are what explains a failed install, so let them through the suppression
+                do pipOutput.Rewind()
+                while 'pipOutput.AtEnd {
+                    write !,pipOutput.ReadLine()
+                }
+                $$$ThrowStatus(runStatus)
+            }
+        } else {
+            $$$ThrowOnError(..RunCommand(cwd, command))
+        }
+
+        // On Windows, pip stages the install in a directory Python creates with a protected ACL, and each entry it moves into target keeps that ACL
+        if $$$isWINDOWS {
+            try {
+                do ..ResetProtectedPermissions(target, verbose)
+            } catch ex {
+                write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: Unable to reset the permissions of Python packages in %1. They may be unreadable to other users. %2", target, ex.DisplayString())),!
+            }
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    quit sc
+}
+
+/// Makes each top-level entry of directory that has a protected ACL, and everything under it,
+/// inherit its permissions from directory. Windows only.
+/// Resetting every entry takes seconds on each pip install into a large directory, so only the protected entries are reset.
+ClassMethod ResetProtectedPermissions(
+	directory As %String,
+	verbose As %Boolean = 0) [ Internal ]
+{
+    // An empty directory would list and reset the process's current directory instead
+    if (directory = "") || '##class(%File).DirectoryExists(directory) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Directory does not exist: " _ directory))
+    }
+    set aclFile = ##class(%File).TempFilename("txt")
+    set sc = $$$OK
+    try {
+        // Keep icacls' progress messages out of the terminal. /Q drops the line per file, which /reset /T would write for every file in a package.
+        set output = ##class(%Stream.TmpCharacter).%New()
+
+        // Find the entries with a protected ACL
+        // With /C, an entry this process cannot read fails on its own and the others are still listed, so reset those regardless.
+        set sc = ..RunCommand(, $listbuild("icacls", ##class(%File).NormalizeFilename("*", directory), "/save", aclFile, "/C", "/Q"), .output)
+        // Only when verbose, since /T below can fail on every file in a package
+        if $$$ISERR(sc) && verbose {
+            write !
+            do output.OutputToDevice()
+        }
+
+        // /save writes each entry as a line with its name, then a line with its ACL in SDDL, such as "D:P(A;OICI;FA;;;SY)...", whatever the system language
+        set aclStream = ##class(%Stream.FileCharacter).%New()
+        set aclStream.TranslateTable = "UnicodeLittle"
+        // icacls ends lines with CRLF, whatever the system default for streams is
+        set aclStream.LineTerminator = $char(13,10)
+        $$$ThrowOnError(aclStream.LinkToFile(aclFile))
+        while 'aclStream.AtEnd {
+            set name = aclStream.ReadLine()
+            set sddl = aclStream.ReadLine()
+            // An empty name would resolve to directory itself
+            continue:(name = "")
+            // The flags between "D:" and the first ACE include "P" when the ACL is protected from inheritance
+            continue:($piece($piece(sddl, "D:", 2), "(") '[ "P")
+
+            // Reset the protected entry
+            set entry = ##class(%File).NormalizeFilename(name, directory)
+            write:verbose !,"Resetting permissions of ",entry
+            // /reset replaces the ACL with the inherited one, /T does the same for everything under entry, and /C carries on past any that fail
+            set resetStatus = ..RunCommand(, $listbuild("icacls", entry, "/reset", "/T", "/C", "/Q"), .output)
+            if $$$ISERR(resetStatus) && verbose {
+                write !
+                do output.OutputToDevice()
+            }
+            set sc = $$$ADDSC(sc, resetStatus)
+        }
+    } catch ex {
+        set sc = $$$ADDSC(sc, ex.AsStatus())
+    }
+    // Release the file before deleting it
+    set aclStream = ""
+    // Result ignored, since a leftover temp file is harmless
+    do ##class(%File).Delete(aclFile)
+    $$$ThrowOnError(sc)
+}
+
 ClassMethod GetFilename4Output(
 	pOutput As %Stream.Object,
 	Output pAsTemporary = 0) As %String
@@ -2561,7 +2688,7 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 
     if '$get($$$DeprecationWarned("<expression>", "dbrole")) && ((result [ "${dbrole}") || (result [ "{$dbrole}")) {
         set $$$DeprecationWarned("<expression>", "dbrole") = 1
-        write !, $$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.")
+        $$$LogLine("The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.", $$$Warning, 1)
     }
     set dbRole = ..GetDatabaseRole()
     set result = ..%RegExReplace(result, "dbrole", dbRole)

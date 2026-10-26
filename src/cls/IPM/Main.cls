@@ -1127,10 +1127,9 @@ ClassMethod ShellInternal(
                 do ..Sync(.tCommandInfo)
             }
         } catch pException {
-            $$$LogLine(pException.DisplayString(), $$$Error)
-            do ##class(%IPM.General.LogManager).%Get().Finalize()
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
+                do ##class(%IPM.General.LogManager).%Get().Finalize()
                 return
             }
             do ..DisplayError(pException.AsStatus())
@@ -1139,6 +1138,8 @@ ClassMethod ShellInternal(
 
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
+            // Process-private, so clear it once acted on to keep later shells in this process working.
+            kill ^||%IPM.SelfUninstallFlag
             write !,!,$$$FormattedLine($$$Yellow, "IPM has been uninstalled from this namespace. Exiting shell..."),!
             return
         }
@@ -1161,7 +1162,7 @@ ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal
             quit:name=""
             if ($get(pCommandInfo(key,name,"deprecated"),0)) {
                 set singularKey = $zconvert($extract(key,1),"U") _ $extract(key,2,*-1)
-                write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: %1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name)),!
+                $$$LogLine($$$FormatText("%1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name), $$$Warning, 1)
             }
         }
     }
@@ -1170,8 +1171,7 @@ ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal
 ClassMethod DisplayError(pStatus As %Status)
 {
     if $$$ISERR(pStatus) {
-        write !,$$$FormattedLine($$$Red, "ERROR!")
-        write " ",$system.Status.GetOneStatusText(pStatus)
+        $$$LogLine($system.Status.GetOneStatusText(pStatus), $$$Error, 1)
     }
 }
 
@@ -2276,7 +2276,7 @@ ClassMethod ShowModulesForRepository(
     } elseif pSearchString'="" {
         set where=" WHERE name = ?"
     }
-    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
+    set tQuery = "SELECT Name,Version,Repository,Description,Origin,AllVersions,PlatformVersions FROM %IPM_Utils.Module_GetModuleList(?,?) "_where
     if (pSearchString = "") {
         set tRes = ##class(%SQL.Statement).%ExecDirect(, tQuery, pRepoName, pShowAllVersions)
     } else {
@@ -2294,6 +2294,7 @@ ClassMethod ShowModulesForRepository(
         set list = list + 1
         set list(list) = $listbuild(name, tRes.Version)
         set list(list, "Origin") = tRes.Origin
+        set list(list, "PlatformVersions") = tRes.PlatformVersions
         if pShowDesc {
             set list(list, "Description") = tRes.Description
         }
@@ -2334,16 +2335,14 @@ ClassMethod LoadFromRepo(
     if $get(tParams("Branch"))'="" set tCmd=tCmd_" -b "_tParams("Branch")
     $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr))
     set tDirectoryName = TempDir_slash_RepoName
-    if ($get(tParams("Verbose"))) {
-        write !,"Create tempory directory "_TempDir
-        write !,tCmd
-        for i=1:1:$get(tLog) {
-            write tLog(i),!
-        }
-        write !,tDirectoryName
+    $$$LogLine("Create temporary directory "_TempDir)
+    $$$LogLine(tCmd)
+    for i=1:1:$get(tLog) {
+        $$$LogLine(tLog(i))
     }
+    $$$LogLine(tDirectoryName)
     for i=1:1:$get(tErr) {
-        write tErr(i),!
+        $$$LogLine(tErr(i), $$$Error)
     }
     hang 2
     quit tDirectoryName
@@ -2445,14 +2444,10 @@ ClassMethod LoadInternal(
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = ##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory())
         set tTempExtractionRoot = tTargetDirectory
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Extracting archive to ",tTargetDirectory
-        }
+        $$$LogLine("Extracting archive to "_tTargetDirectory)
         $$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
         // Try to locate the top-level module.xml file
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Trying to locate module.xml file in ", tTargetDirectory
-        }
+        $$$LogLine("Trying to locate module.xml file in "_tTargetDirectory)
         set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
         if (tCount = 0) {
             $$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
@@ -2461,16 +2456,13 @@ ClassMethod LoadInternal(
         // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
         set tModuleFilePath = $listget(tList(tCount), *)
         set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Found "_tCount_" results. They are: "
-            set idx = ""
-            for {
-                set idx = $order(tList(idx))
-                quit:(idx="")
-                write !, $char(9), $list(tList(idx), *)
-            }
-            write !, "Using module.xml file at ", tModuleFilePath
+        set idx = ""
+        for {
+            set idx = $order(tList(idx))
+            quit:(idx="")
+            $$$LogLine("module.xml file found: "_$list(tList(idx), *))
         }
+        $$$LogLine("Using module.xml file at "_tModuleFilePath)
     }
 
     // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
@@ -2512,15 +2504,16 @@ ClassMethod CheckModuleNamespace() As %Status
         quit $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' in namespace '%2' because it is mapped from namespace '%3'.", $$$IPMModuleName, $namespace, sourceNS))
     }
     if $data(tIsMappedTo($namespace)) / 2 {
-        write !, "Will affect the following namespaces:", $namespace
+        set line = "Will affect the following namespaces: "_$namespace
         set ns = ""
         for {
             set ns = $order(tIsMappedTo($namespace, ns))
             if ns = "" {
                 quit
             }
-            write ", ", ns
+            set line = line_", "_ns
         }
+        $$$LogLine(line,,1)
     }
     quit $$$OK
 }
@@ -2567,7 +2560,7 @@ ClassMethod Install(
         set tSearchCriteria.Name = $$$lcase(tModuleName)
         set tSearchCriteria.VersionExpression = tVersion
         set tSearchCriteria.Keywords = tKeywords
-        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults))
+        $$$ThrowOnError(##class(%IPM.Repo.Utils).SearchRepositoriesForModule(tSearchCriteria,.tResults,,.tPlatformIncompatibleModules))
 
         if (tResults.Count() > 0) {
             set tResult = ""
@@ -2602,18 +2595,28 @@ ClassMethod Install(
                     set tParams("cmd") = "install"
                     set tParams("Install") = 1
                 }
-                if tResult.Deployed {
-                    set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
-                    set tResult.PlatformVersion = platformVersion
-                    if ('tResult.PlatformVersions.Find(platformVersion)) {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
-                    }
-                }
-                $$$ThrowOnError(log.SetSource(tResult.ServerName))
-                $$$ThrowOnError(log.SetVersion(tResult.Version))
+				        $$$ThrowOnError(log.SetSource(tResult.ServerName))
+				        $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
+            // The module may have been found in a configured repository but no
+            // platform-compatible version exists.
+            if $isobject(tPlatformIncompatibleModules) && (tPlatformIncompatibleModules.Count() > 0) {
+                // Report the newest filtered version: the one an unversioned install resolves to.
+                // A pinned install filters only its own version, so this names that version too.
+                #dim tFiltered As %IPM.Storage.ModuleInfo
+                #dim tCandidate As %IPM.Storage.ModuleInfo
+                set tFiltered = tPlatformIncompatibleModules.GetAt(1)
+                for tIdx = 2:1:tPlatformIncompatibleModules.Count() {
+                    set tCandidate = tPlatformIncompatibleModules.GetAt(tIdx)
+                    if tCandidate.Version.Follows(tFiltered.Version) {
+                        set tFiltered = tCandidate
+                    }
+                }
+                set tMsg = "'" _ tFiltered.Name _ "' " _ tFiltered.VersionString _ " is not available for platform version " _ $$$CurrentPlatformVersion _ ". Available platform versions: " _ tFiltered.FormatPlatformVersions() _ ". Run 'search " _ tFiltered.Name _ " -versions' to see all versions."
+                $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
+            }
             set tPrefix = ""
             if (tModuleName '= "") {
                 if (tVersion '= "") {
@@ -2624,7 +2627,7 @@ ClassMethod Install(
             } elseif (tKeywords '= "") {
                 $$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
             } else {
-                write !,"No modules found. Are there any repositories configured in the current namespace?"
+                $$$LogLine("No modules found. Are there any repositories configured in the current namespace?", $$$Warning, 1)
             }
         }
     } catch ex {
@@ -2678,38 +2681,36 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
         if (tModuleName = $$$IPMModuleName) {
             $$$ThrowOnError(..CheckModuleNamespace())
 
-            // Check if other modules are installed
-            set hasModules = 0
+            // List the other modules that a full cleanup would remove
             set rs = ##class(%SQL.Statement).%ExecDirect(,
                 "SELECT Name, VersionString FROM %IPM_Storage.ModuleItem WHERE Name != ?",
                 $$$IPMModuleName)
-            if rs.%Next() {
-                set hasModules = 1
+            $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
 
-                // Show list of installed modules
-                write !,"The following modules are currently installed:"
+            set hasModules = 0
+            while rs.%Next(.sc) {
+                if 'hasModules {
+                    write !,"The following modules are currently installed:"
+                    set hasModules = 1
+                }
                 write !,"  - ",rs.Name," (",rs.VersionString,")"
-                while rs.%Next() {
-                    write !,"  - ",rs.Name," (",rs.VersionString,")"
-                }
-                write !
+            }
+            $$$ThrowOnError(sc)
+            write:hasModules !
 
-                if 'tForce {
-                    // Dialog: Ask about full cleanup (downgrade scenario)
-                    write !,"Do you want to fully remove all modules and IPM metadata (except history log)?"
-                    write !,"This is required for downgrading IPM. [y/N]: "
-                    read fullCleanupResponse
-                    set tParams("Clean","FullCleanup") = $case($zconvert(fullCleanupResponse,"L"),"y":1,"yes":1,:0)
-                }
+            if 'tForce {
+                set tFullCleanup = 0
+                do ##class(%Library.Prompt).GetYesNo("Do you want to fully remove all modules and IPM metadata (except history log)? This is required for downgrading IPM.", .tFullCleanup)
+                set tParams("Clean","FullCleanup") = tFullCleanup
             }
 
             if $get(tParams("Clean","FullCleanup")) {
                 // User chose full cleanup - uninstall all modules
-                write !,"Performing full cleanup: uninstalling all modules..."
+                $$$LogLine("Performing full cleanup: uninstalling all modules...",,1)
                 $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
             }
 
-            // Set flag to indicate self-uninstall - will be checked by Interactive() loop
+            // Set flag to indicate self-uninstall - will be checked by ShellInternal() loop
             set ^||%IPM.SelfUninstallFlag = 1
         }
         set tRecurse = $$$HasModifier(pCommandInfo,"recurse") // Recursively uninstall unneeded dependencies
@@ -4243,6 +4244,7 @@ ClassMethod DisplayModules(
         $listbuild("Author.Person", $$$Yellow, "Author"),
         $listbuild("Origin", $$$Default),
         $listbuild("AllVersions", $$$Default, "Versions"),
+        $listbuild("PlatformVersions", $$$Default, "Platforms"),
         $listbuild("Repository", $$$Default),
         $listbuild("Installed In", $$$Default)
     )
@@ -4387,21 +4389,18 @@ ClassMethod Update(ByRef pCommandInfo)
     if $get(pCommandInfo("data","PermitDowngrade"),0) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"The 'PermitDowngrade' flag is not allowed for the update command."))
     }
-    set verbose = $get(pCommandInfo("data","Verbose"))
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
     if '##class(%IPM.Storage.Module).NameExists(moduleName) && '##class(%IPM.Storage.Module).ExternalNameExists(moduleName) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
-    if verbose {
-        if path '= "" {
-            write !,"Resolving version of module specified by -path flag: ",path," to update",!
-        } elseif version = "" {
-            write !,"Resolving latest available version of module ",moduleName," to install",!
-        } else {
-            write !,"Preparing to update module ",moduleName," to version ",version,!
-        }
+    if path '= "" {
+        $$$LogLine("Resolving version of module specified by -path flag: "_path_" to update")
+    } elseif version = "" {
+        $$$LogLine("Resolving latest available version of module "_moduleName_" to install")
+    } else {
+        $$$LogLine("Preparing to update module "_moduleName_" to version "_version)
     }
     // Indicating to pCommandInfo that this is an update command, not an install or load command. pCommandInfo will be passed to either Install() or Load() to continue performing the update.
     set pCommandInfo("data","cmd") = "update"

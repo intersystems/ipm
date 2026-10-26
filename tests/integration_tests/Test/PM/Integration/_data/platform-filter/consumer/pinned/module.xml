@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="platform-filter-consumer-pinned.ZPM">
+    <Module>
+      <Name>platform-filter-consumer-pinned</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="PlatformFilterConsumerPinned.App.CLS"/>
+      <Dependencies>
+        <ModuleReference>
+          <Name>platform-filter-test</Name>
+          <!-- Only satisfied by 2.0.0, which is published for an incompatible platform,
+               so this dependency must be unresolvable. -->
+          <Version>^2.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>

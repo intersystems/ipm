@@ -93,15 +93,12 @@ Property UpdatePackage As %Dictionary.Classname;
 /// seedSteps: (Default) 0 = Execute Steps | 1 = Seeds Steps
 Method HandleAllUpdateSteps(
 	logFile As %Library.File = "",
-	seedSteps As %Boolean = 0,
-	verbose As %Boolean = 0) As %Status
+    seedSteps As %Boolean = 0) As %Status
 {
     set sc = $$$OK
     // Only need to acquire lock when applying the steps, not when seeding them
     if 'seedSteps {
-        if verbose {
-            write !, "Acquiring lock on ^IPM.UpdateLock("_..Name_")"
-        }
+        $$$LogLine("Acquiring lock on ^IPM.UpdateLock("_..Name_")")
         $$$LockUpdateModule(..Name)
         if ('$test) {
             return sc
@@ -118,42 +115,37 @@ Method HandleAllUpdateSteps(
                 quit
             }
             set className = classList(keyVersion)
-            if verbose {
-                if seedSteps {
-                    write !, "Starting seeding steps for module = "_..Name_" & class = "_className
-                } else {
-                    write !, "Starting to run update steps for module = "_..Name_" & class = "_className
-                }
+            if seedSteps {
+                set line = "Starting seeding steps for module = "_..Name_" & class = "_className
+            } else {
+                set line = "Starting to run update steps for module = "_..Name_" & class = "_className
             }
+            $$$LogLine(line)
 
             // Don't want newStepToApply (execution of all subsequent steps when encountering a new one) to persist across versions
             set newStepToApply = 0
             if $system.CLS.IsMthd(className, "GetOrderedMethods") {
                 set orderedMethodNames = $classmethod(className, "GetOrderedMethods")
-                do ..HandleUpdateStepsFromList(orderedMethodNames, className, 0, logFile, seedSteps, .newStepToApply, verbose)
+                do ..HandleUpdateStepsFromList(orderedMethodNames, className, 0, logFile, seedSteps, .newStepToApply)
             }
             if $system.CLS.IsMthd(className, "GetOrderedMethodsPrimaryOnly") {
                 set primaryOnlyMethodNames = $classmethod(className, "GetOrderedMethodsPrimaryOnly")
-                do ..HandleUpdateStepsFromList(primaryOnlyMethodNames, className, 1, logFile, seedSteps, .newStepToApply, verbose)
+                do ..HandleUpdateStepsFromList(primaryOnlyMethodNames, className, 1, logFile, seedSteps, .newStepToApply)
             }
 
-            if verbose {
-                if seedSteps {
-                    write !, "Finished seeding steps for module = "_..Name_" & class = "_className
-                }
-                else {
-                    write !, "Finished running update steps for module = "_..Name_" & class = "_className
-                }
+            if seedSteps {
+                set line = "Finished seeding steps for module = "_..Name_" & class = "_className
+            } else {
+                set line = "Finished running update steps for module = "_..Name_" & class = "_className
             }
+            $$$LogLine(line)
         }
     } catch (ex) {
         set sc = ex.AsStatus()
     }
 
     if 'seedSteps {
-        if verbose {
-            write !, "Releasing lock on ^IPM.UpdateLock("_..Name_")"
-        }
+        $$$LogLine("Releasing lock on ^IPM.UpdateLock("_..Name_")")
         $$$UnlockUpdateModule(..Name)
     }
 
@@ -175,15 +167,14 @@ Method HandleUpdateStepsFromList(
 	primaryOnly As %Boolean,
 	logFile As %Library.File,
 	seedSteps As %Boolean = 0,
-	ByRef newStepToApply As %Boolean = 0,
-	verbose As %Boolean = 0) [ Internal, Private ]
+    ByRef newStepToApply As %Boolean = 0) [ Internal, Private ]
 {
     set iter = methodList.%GetIterator()
     while iter.%GetNext(, .methodName) {
         // Get update step object for this className + methodName. If one does not already exist, create a new one and use that
         set stepObj = ..GetAddUpdateStep(className, methodName, primaryOnly)
         if seedSteps {
-            do ..SeedUpdateStep(stepObj, verbose)
+            do ..SeedUpdateStep(stepObj)
         } else {
             // Once we come across a step that hasn't been run/seeded or failed on its last run, mark newStepToApply as true.
             // This indicates that we should run all subsequent steps, regardless of their current status
@@ -191,7 +182,7 @@ Method HandleUpdateStepsFromList(
                 set newStepToApply = 1
             }
             if newStepToApply {
-                do ..ExecuteUpdateStep(stepObj, primaryOnly, verbose)
+                do ..ExecuteUpdateStep(stepObj, primaryOnly)
             }
         }
     }
@@ -201,39 +192,29 @@ Method HandleUpdateStepsFromList(
 /// Seeding steps mark the steps as having been successfully run so will not be run on subsequent 'update' calls
 /// Only seed steps that have no TimeStampEnd defined (not already been run/seeded) or errored on their last run
 Method SeedUpdateStep(
-	updateStep As %IPM.Storage.UpdateStep.Base,
-	verbose As %Boolean = 0)
+    updateStep As %IPM.Storage.UpdateStep.Base)
 {
     if 'updateStep.TimeStampEnd || $$$ISERR(updateStep.Status) {
-        if verbose {
-            write !, $char(9)_"Seeding "_updateStep.MethodName_"()"
-        }
+        $$$LogLine($char(9)_"Seeding "_updateStep.MethodName_"()")
         set updateStep.TimeStampEnd = $zdatetime($horolog,3)
         set updateStep.Status = $$$OK
         $$$ThrowOnError(updateStep.%Save())
     }
     else {
-        if verbose {
-            write !, $char(9)_"Skipping seeding "_updateStep.MethodName_"() (already run or seeded)"
-        }
+        $$$LogLine($char(9)_"Skipping seeding "_updateStep.MethodName_"() (already run or seeded)")
     }
 }
 
 /// Executes an update step
 Method ExecuteUpdateStep(
 	updateStep As %IPM.Storage.UpdateStep.Base,
-	primaryOnly As %Boolean,
-	verbose As %Boolean = 0)
+    primaryOnly As %Boolean)
 {
     if primaryOnly && $system.Mirror.IsMember() && '$system.Mirror.IsPrimary() {
-        if verbose {
-            write !, $char(9)_"Skipping "_updateStep.MethodName_"(). This step is to be run on the mirror primary only."
-        }
+        $$$LogLine($char(9)_"Skipping "_updateStep.MethodName_"(). This step is to be run on the mirror primary only.")
         quit
     }
-    if verbose {
-        write !, $char(9)_"Running "_updateStep.MethodName_"()"
-    }
+    $$$LogLine($char(9)_"Running "_updateStep.MethodName_"()")
     set updateStep.TimeStampStart = $zdatetime($horolog,3)
     set sc = $$$OK
     try {
@@ -246,9 +227,7 @@ Method ExecuteUpdateStep(
     set sc = updateStep.%Save()
     $$$ThrowOnError(sc)
     $$$ThrowOnError(updateStep.Status)
-    if verbose {
-        write !, $char(9)_updateStep.MethodName_"() Finished"
-    }
+    $$$LogLine($char(9)_updateStep.MethodName_"() Finished")
 }
 
 /// Get or Add an update step for this current module based on className + methodName index
@@ -885,6 +864,8 @@ ClassMethod HasScope(
 /// <li>Version string of the module to be installed</li>
 /// <li>Display name of the module</li>
 /// <li>Scope of the module, or empty string if the dependency is not scoped</li>
+/// <li>Whether the module is deployed</li>
+/// <li>Platform version the deployed module was built for, or empty string if not deployed</li>
 /// </ul>
 /// <p>
 /// <b>Parameters:</b><br>
@@ -1145,7 +1126,7 @@ Method ProcessSingleDependencyIterative(
                 localObj.Version.Satisfies(searchExpr) &&
                 ((version = "") || (version = localObj.VersionString))
             if installedVersionValid && '(localObj.Version.IsSnapshot() && pForceSnapshotReload) {
-                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName,pDep.Scope)
+                set pDependencyGraph(pDep.Name) = $listbuild(pDepth,"",localObj.VersionString,pDep.DisplayName,pDep.Scope,localObj.Deployed,localObj.PlatformVersion)
                 set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
                 // Add to work queue for next depth
@@ -1207,7 +1188,8 @@ Method ProcessSingleDependencyIterative(
             }
 
             set pDependencyGraph(pDep.Name) = $listbuild(
-                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, pDep.DisplayName, pDep.Scope
+                pDepth, qualifiedReference.ServerName, moduleObj.VersionString, pDep.DisplayName, pDep.Scope,
+                qualifiedReference.Deployed, qualifiedReference.PlatformVersion
             )
             set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
@@ -1227,9 +1209,7 @@ Method ProcessSingleDependencyIterative(
                 if '$data(pManifestCache(manifestKey), moduleObj) {
                     // Cache miss so retrieve
                     set tSC = repoManager.RetrieveModuleManifest(qualifiedReference,.manifest)
-                    if $$$ISERR(tSC) {
-                        quit
-                    }
+                    $$$ThrowOnError(tSC)
 
                     set moduleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(manifest,.found)
                     if 'found {
@@ -1242,7 +1222,8 @@ Method ProcessSingleDependencyIterative(
                 // occurs if needed.
                 set depth = $select(previousDepth=0:pDepth,previousDepth>pDepth:previousDepth,1:pDepth)
                 set dependencyGraph(pDep.Name) = $listbuild(
-                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName,pDep.Scope
+                    depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName,pDep.Scope,
+                    qualifiedReference.Deployed,qualifiedReference.PlatformVersion
                 )
                 set dependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 

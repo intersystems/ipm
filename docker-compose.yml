@@ -40,7 +40,11 @@ services:
       - -a
       - iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords("*")'
   oras:
-    image: ghcr.io/project-zot/zot-linux-amd64:latest
+    build:
+      context: .
+      pull: true
+      dockerfile_inline: |
+        FROM ghcr.io/project-zot/zot-linux-$${TARGETARCH}:latest
     restart: always
     ports:
       - 5001:5000

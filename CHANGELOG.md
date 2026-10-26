@@ -5,18 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.10.10] - Unreleased
+## [0.10.11] - Unreleased
+
+### Fixed
+- #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
+- #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
+
+## [0.10.10] - 2026-10-14
 
 ### Added
 - #1117: Add `sync` command for incremental loading of changed files in dev-mode modules. Detects modified files since last sync using SHA-1 hash and recompiles only what is stale. Supports `-delete` for processing removed files and `-test` for running changed test-phase unit tests.
 - #106: A module can now specify `<SystemRequirements SYSNamespace="true"/>` to prevent installation in non-%SYS namespaces.
+- #1240: Added logging to a .txt and .jsonl file for the Install/Load/Update/Uninstall commands
 
 ### Changed
 - Minimum supported Python version is now 3.9
+- #1158: Searching for or installing modules with deployed code will automatically filter for the currently installed IRIS version
+- `ArtifactoryTarball` resources download without credentials from Artifactory servers that allow anonymous read access, using the artifact and property search APIs instead of AQL. Only `ARTI_SERVER` is required: `ARTI_PORT` defaults to 443 and `ARTI_AQL_URL` to `/artifactory/api/search/aql`.
+- Minimum supported Python version is now 3.9 (was previously 3.10)
 
 ### Fixed
+- #1260: ensure appropriate error reported if -env file does not exist.
 - Performance: Studio project creation on package load in dev mode is now 80% faster.
 - #994: Prevent crash in `zn` command when target namespace lacks IPM mappings
+- #1137: On Windows, Python packages installed into `mgr/python` are reset to inherit that directory's permissions, keeping them readable to non-elevated processes, which had failed with a `PermissionError` when using ORAS registries. Reinstalling IPM repairs an affected instance. If IRIS runs as a dedicated service account, entries created by another account (e.g. a manual `irispip`) still need an elevated `icacls /reset`.
+- #1227: IPM commands no longer exit the shell with "IPM has been uninstalled from this namespace" after IPM is uninstalled and reinstalled in the same process
+- #1228: `uninstall zpm` now prompts to remove IPM metadata even when no other module is installed, so downgrading IPM does not require installing an unrelated module first
+- #987: Fixed issue where installing dependencies with ORAS would fail due to failure to properly get the manifest
+- #1215: Installer is synchronous rather than jobbed for simplified logging/debugging
+- #1261: Modules containing CPF resources can now be packaged
+- #1267: Dependencies of modules installed from an ORAS repository with a namespace now resolve within that namespace. Search results from such a repository list modules without the namespace prefix, and the namespace is lowercased with leading or trailing slashes ignored.
 
 ## [0.10.9] - 2026-08-05
 

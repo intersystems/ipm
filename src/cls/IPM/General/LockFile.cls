@@ -1,5 +1,7 @@
 /// This class is used for interacting with a lock file for a given module
 /// Covers functionality for both creating a lock file and installing from a lock file
+Include %IPM.Common
+
 Class %IPM.General.LockFile Extends (%RegisteredObject, %JSON.Adaptor)
 {
 
@@ -31,10 +33,7 @@ ClassMethod CreateLockFileForModule(
 	ByRef flatDependencyList,
 	ByRef params)
 {
-    set verbose = $get(params("Verbose"), 0)
-    if (verbose) {
-        write !, "Creating lock file for module "_module.DisplayName
-    }
+    $$$LogLine("Creating lock file for module "_module.DisplayName)
 
     // Create lock file object and set values for the base module
     set lockFile = ##class(%IPM.General.LockFile).%New()
@@ -52,9 +51,7 @@ ClassMethod CreateLockFileForModule(
         set mod = ##class(%IPM.Storage.Module).NameOpen(moduleName, 0, .sc)
         $$$ThrowOnError(sc)
 
-        if (verbose) {
-            write !, "Adding "_mod.DisplayName_" to the lock file"
-        }
+        $$$LogLine("Adding "_mod.DisplayName_" to the lock file")
 
         // Add the dependency to the lock file
         set dependencyVal = ##class(%IPM.General.LockFile.Dependency).%New()
@@ -69,20 +66,18 @@ ClassMethod CreateLockFileForModule(
         $$$ThrowOnError(lockFile.Dependencies.SetAt(dependencyVal, mod.Name))
 
         // Add the dependency's repository to the lock file
-        do AddRepositoryToLockFile(.lockFile, mod.Repository, verbose)
+        do AddRepositoryToLockFile(.lockFile, mod.Repository)
     }
     // Add repository for base module if not already added by a dependency
     // Skip undefined repositories as that means the module was installed via the zpm "load" command
     if (module.Repository '= "") {
-        do AddRepositoryToLockFile(.lockFile, module.Repository, verbose)
+        do AddRepositoryToLockFile(.lockFile, module.Repository)
     }
 
     $$$ThrowOnError(lockFile.%JSONExportToStream(.lockFileJSON, "LockFileMapping"))
 
     set lockFilePath = module.Root_..#LockFileName
-    if (verbose) {
-        write !, "Saving lock file for "_module.Name_" to: "_lockFilePath
-    }
+    $$$LogLine("Saving lock file for "_module.Name_" to: "_lockFilePath)
     set file = ##class(%Stream.FileCharacter).%New()
     $$$ThrowOnError(file.LinkToFile(lockFilePath))
     $$$ThrowOnError(file.CopyFrom(lockFileJSON))
@@ -92,14 +87,11 @@ ClassMethod CreateLockFileForModule(
 /// Adds a module's repository to the lock file
 ClassMethod AddRepositoryToLockFile(
 	ByRef lockFile As %IPM.General.LockFile,
-	repositoryName As %String,
-	verbose As %Boolean = 0) [ Internal ]
+	repositoryName As %String) [ Internal ]
 {
     set repo = ..GetRepo(repositoryName)
     if 'lockFile.Repositories.IsDefined(repo.Name) {
-        if (verbose) {
-            write !, "Adding new repository to the lock file: "_repo.Name
-        }
+        $$$LogLine("Adding new repository to the lock file: "_repo.Name)
         $$$ThrowOnError(lockFile.Repositories.SetAt(repo, repo.Name))
     }
 }

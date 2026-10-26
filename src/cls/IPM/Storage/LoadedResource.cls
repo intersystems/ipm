@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.Storage.LoadedResource Extends %Persistent
 {
 
@@ -137,7 +139,7 @@ ClassMethod ReportConflicts()
     try {
         $$$ThrowOnError(..Validate(,.tErrorList))
         for tIndex=1:1:$get(tErrorList) {
-            write !,"WARNING: ",tErrorList(tIndex)
+            $$$LogLine(tErrorList(tIndex), $$$Warning, 1)
         }
     } catch e {
         set tSC = e.AsStatus()
