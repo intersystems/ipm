@@ -33,6 +33,7 @@ Method OnPhase(
 
     try {
         set pResourceHandled = 1
+        set verbose = $get(pParams("Verbose"))
         set root = ..ResourceReference.Module.Root
         set wheel = ##class(%File).NormalizeDirectory(..Directory, root)
         set wheel = ##class(%File).NormalizeFilename(..Name, wheel)
