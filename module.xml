@@ -37,7 +37,7 @@
             <!-- List of python wheels for offline installation – oras and its transitive
             dependencies -->
             <PythonWheel Name="attrs-25.1.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
-            <PythonWheel Name="certifi-2025.1.31-py3-none-any.whl" ExtraPipFlags="--no-deps" />
+            <PythonWheel Name="certifi-2026.10.19-py3-none-any.whl" ExtraPipFlags="--no-deps" />
             <PythonWheel Name="charset_normalizer-2.1.1-py3-none-any.whl" ExtraPipFlags="--no-deps" />
             <PythonWheel Name="idna-3.15-py3-none-any.whl" ExtraPipFlags="--no-deps" />
             <PythonWheel Name="jsonschema-4.23.0-py3-none-any.whl" ExtraPipFlags="--no-deps" />
