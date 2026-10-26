@@ -1349,7 +1349,7 @@ ClassMethod GetKnownDependencies(pModuleName As %String) As %List
     quit tKnownDependencyList
 }
 
-/// Recursively builds depMap(lowercased name) = module oref (or "" if not installed).
+/// Recursively builds depMap(lowercased name) = %IPM.Storage.Module, or "" if not installed.
 /// Sets the entry before recursing so circular dependencies terminate.
 Method CollectAllDependencies(ByRef depMap) [ Private ]
 {
@@ -1370,10 +1370,10 @@ Method CollectAllDependencies(ByRef depMap) [ Private ]
     }
 }
 
-/// Returns installed transitive dependency modules in name order, excluding this module.
-/// Uninstalled dependencies are omitted rather than reported: a module with no local record has
-/// nothing to inspect.
-Method GetDependencyModules() As %ListOfObjects
+/// Returns installed transitive dependencies as %IPM.Storage.Module objects in name order, excluding
+/// this module. Uninstalled dependencies are omitted rather than reported: a module with no local
+/// record has nothing to inspect.
+Method GetDependencyModules() As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.Module")
 {
     do ..CollectAllDependencies(.depMap)
     set deps = ##class(%ListOfObjects).%New()

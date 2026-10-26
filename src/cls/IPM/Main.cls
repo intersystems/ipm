@@ -133,6 +133,7 @@ This command is an alias for `module-action module-name test`
 </command>
 
 <command name="package" dataPrefix="D">
+<summary>Packages a module according to its Packaging property.</summary>
 <description>
 This command is an alias for `module-action module-name package`.
 Packages the module according to its Packaging property, which defaults to source packaging (a .tgz of the module's source files). Equivalent to `package-source` unless the module specifies a different Packaging type.
@@ -155,6 +156,7 @@ Creates a .tgz archive of module source files. Equivalent to the existing `packa
 </command>
 
 <command name="package-database" dataPrefix="D">
+<summary>Packages a module as a copy of the namespace's routines database.</summary>
 <description>
 Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), and a deps/ directory of dependency manifests and non-compiled resource files.
 The package ships a copy of the namespace's routines database as it currently stands, so it contains all compiled code from every module installed there, not just this module's. Beyond compiling this module's own resources, packaging loads nothing into the namespace unless -include-tests is passed, so load the module and its dependencies before packaging.
@@ -168,6 +170,7 @@ The database is dismounted for the duration of the copy, so the namespace cannot
 </command>
 
 <command name="package-studio-project" dataPrefix="D">
+<summary>Packages a module as a Studio project. Deprecated.</summary>
 <description>
 Creates a Studio project package. Deprecated: will be removed in IPM 1.0.0. Equivalent to using `package` on a module with Packaging=studio-project.
 </description>
@@ -194,6 +197,7 @@ This command is an alias for `module-action module-name publish`
 </command>
 
 <command name="publish-database" dataPrefix="D">
+<summary>Packages a module as a database package and publishes it to a registry.</summary>
 <description>
 Packages the module as an IRIS.DAT database package and publishes it to a registry in one step.
 Equivalent to running `package-database` followed by `publish`, but without needing a separate output path. As with `package-database`, the package ships a copy of the namespace's routines database as it currently stands, and the database is dismounted for the duration of the copy.

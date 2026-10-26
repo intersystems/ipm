@@ -627,24 +627,22 @@ ClassMethod CopyRoutinesDatabase(
     // another process is writing, and that process then takes <PROTECT> on ^ZBUSY2 until the remount.
     // This is an outage the caller chooses, not a check that the namespace is idle.
     write !, "Dismounting ", dbName, " for the copy. ", ns, " cannot run code until the copy finishes."
-    set copySC = ..CopyDismountedDatabase(dbDir, srcDAT, destDAT, .mountSC)
+    set copySC = ..DismountAndCopyDatabase(dbDir, srcDAT, destDAT, .mountSC)
 
+    // Written here as well as thrown: DisplayError shows only the first error of a combined status.
     if $$$ISERR(mountSC) {
         write !, "ERROR: failed to remount ", dbName, " (", dbDir, "). Mount it manually before using ", ns, "."
         write !, "  ", $system.Status.GetErrorText(mountSC)
     }
 
-    // Report the copy failure first when both happened. It is why packaging stopped, and the mount
-    // failure has already reported itself.
-    $$$ThrowOnError(copySC)
-    $$$ThrowOnError(mountSC)
+    $$$ThrowOnError($$$ADDSC(copySC, mountSC))
 }
 
 /// Dismounts dbDir, copies srcDAT to destDAT, then remounts. Returns the copy's status, and the
 /// remount's in mountSC.
 /// Writes nothing. Output capture resolves its handler routine in the current namespace, which %SYS
 /// cannot see, so a write here takes <NOROUTINE>. The caller reports instead.
-ClassMethod CopyDismountedDatabase(
+ClassMethod DismountAndCopyDatabase(
 	dbDir As %String,
 	srcDAT As %String,
 	destDAT As %String,
@@ -704,13 +702,7 @@ Method AssemblePackage(
     // Bare "<major>.<minor>" is an exact-match semver expression, not a floor, so the package will
     // only install on the IRIS version that built it.
     set irisVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
-    set existingVersion = ""
-    if $isobject(..Module.SystemRequirements) {
-        set existingVersion = ..Module.SystemRequirements.VersionString
-    }
-    if (existingVersion '= "") && (existingVersion '= irisVersion) {
-        write !, "WARNING: Overwriting existing SystemRequirements Version '", existingVersion, "' with '", irisVersion, "'"
-    }
+    write !, "This package will only install on IRIS ", irisVersion, ", the version it was built on."
     do ..WritePackageModuleXML(stagingDir, checksumHex, irisVersion)
     do ..WriteDependencies(stagingDir, .depWheels)
 
@@ -874,9 +866,7 @@ Method StageDependencyWheels(
         set rs = ##class(%SQL.Statement).%ExecDirect(,
             "SELECT ItemName FROM %Library.File_FileSet(?, ?, ?, ?)",
             wheelsDir, "*.whl", "", 0)
-        if rs.%SQLCODE < 0 {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing wheels for dependency '" _ depModule.Name _ "': " _ rs.%Message))
-        }
+        $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
         set sc = $$$OK
         while rs.%Next(.sc) {
             $$$ThrowOnError(sc)
@@ -1181,12 +1171,11 @@ Method ValidateBeforeSwap(
     set conflictRS = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT Name FROM %IPM_Storage.ModuleItem WHERE Packaging = 'database' AND Name != ?",
         ..Module.Name)
-    if conflictRS.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error checking for conflicting database packages: " _ conflictRS.%Message))
-    }
-    if conflictRS.%Next() {
+    $$$ThrowSQLIfError(conflictRS.%SQLCODE, conflictRS.%Message)
+    if conflictRS.%Next(.sc) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "A database package ('" _ conflictRS.%Get("Name") _ "') is already installed in this namespace. Only one database package per namespace is allowed."))
     }
+    $$$ThrowOnError(sc)
 
     do ..ValidateNoOrphanedModules(depsDir, $get(params("PreviousDependencies")), .staleModules)
 
@@ -1234,12 +1223,11 @@ Method ValidateNoOrphanedModules(
     set rs = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT Name FROM %IPM_Storage.ModuleItem WHERE Name != ?",
         ..Module.Name)
-    if rs.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing installed modules: " _ rs.%Message))
-    }
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
 
     set orphaned = ""
-    while rs.%Next() {
+    while rs.%Next(.sc) {
+        $$$ThrowOnError(sc)
         set moduleName = rs.%Get("Name")
         if $listfind(incomingDeps, $zconvert(moduleName, "L")) {
             continue
@@ -1250,12 +1238,13 @@ Method ValidateNoOrphanedModules(
             set staleModules = staleModules _ $listbuild(moduleName)
             continue
         }
-        set installedModule = ##class(%IPM.Storage.Module).NameOpen(moduleName, , .sc)
-        $$$ThrowOnError(sc)
+        set installedModule = ##class(%IPM.Storage.Module).NameOpen(moduleName, , .openSC)
+        $$$ThrowOnError(openSC)
         if ..HasCodeInLocalRoutinesDB(installedModule) {
             set orphaned = orphaned _ $listbuild(moduleName)
         }
     }
+    $$$ThrowOnError(sc)
     if orphaned = "" {
         quit
     }
@@ -1330,14 +1319,14 @@ ClassMethod GetPackagedDependencyNames(depsDir As %String) As %List
     set rs = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT ItemName FROM %Library.File_FileSet(?, ?, ?, ?)",
         depsDir, "*.xml", "", 0)
-    if rs.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing deps: " _ rs.%Message))
-    }
-    while rs.%Next() {
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    while rs.%Next(.sc) {
+        $$$ThrowOnError(sc)
         set itemName = rs.%Get("ItemName")
         continue:itemName=""
         set names = names _ $listbuild($zconvert($piece(itemName, ".", 1, *-1), "L"))
     }
+    $$$ThrowOnError(sc)
     quit names
 }
 
@@ -1457,6 +1446,8 @@ Method PerformDatabaseSwap(
 
 /// Loads deps/ export files to register dependency metadata in IPM storage.
 /// The dependency code is already in the swapped-in DB; this only makes it visible to `zpm list`.
+/// Loads every file even when one fails, since the swap has already landed, then throws all
+/// failures together.
 ClassMethod RegisterDependencyMetadata(packageDir As %String)
 {
     set depsDir = ##class(%Library.File).NormalizeDirectory(
@@ -1467,12 +1458,20 @@ ClassMethod RegisterDependencyMetadata(packageDir As %String)
     set rs = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)",
         depsDir, "*.xml", "", 0)
-    if rs.%SQLCODE < 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Error listing deps: " _ rs.%Message))
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    set loadSC = $$$OK
+    while rs.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set fileName = rs.%Get("Name")
+        set oneSC = $system.OBJ.Load(fileName, "ck")
+        if $$$ISERR(oneSC) {
+            // Written as it happens: DisplayError shows only the first error of a combined status.
+            write !, "ERROR: failed to register dependency metadata from ", fileName, ": ", $system.Status.GetErrorText(oneSC)
+            set loadSC = $$$ADDSC(loadSC, oneSC)
+        }
     }
-    while rs.%Next() {
-        $$$ThrowOnError($system.OBJ.Load(rs.%Get("Name"), "ck"))
-    }
+    $$$ThrowOnError(sc)
+    $$$ThrowOnError(loadSC)
 }
 
 /// Phases a dependency must not run during a database install, with the reason for each.
@@ -1690,7 +1689,7 @@ Method RollbackDatabaseSwap(
 }
 
 /// Does the %SYS half of the rollback: dismount dbDir, restore the backup IRIS.DAT when there is one,
-/// remount. See CopyDismountedDatabase for why a write from %SYS is unsafe.
+/// remount. See DismountAndCopyDatabase for why a write from %SYS is unsafe.
 /// warnings (output): warnings(1..n) = message text, in the order they occurred, killed on entry.
 /// Collected rather than written so the caller can write them from a namespace that can.
 /// dbDir and backupPath carry the same meaning as in RollbackDatabaseSwap.

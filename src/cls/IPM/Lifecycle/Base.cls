@@ -2155,7 +2155,7 @@ Method ExportSingleModule(
 
 /// Returns this module followed by its installed transitive dependencies.
 /// The root comes first because every caller needs its resources considered before its dependencies'.
-Method GetSelfAndDependencyModules() As %ListOfObjects [ Private ]
+Method GetSelfAndDependencyModules() As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.Module") [ Private ]
 {
     set modules = ..Module.GetDependencyModules()
     do modules.InsertAt(..Module, 1)
