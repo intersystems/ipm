@@ -1233,7 +1233,7 @@ Method %Compile(ByRef pParams) As %Status
         // Stamp file baselines for sync change detection (dev mode only).
         // Non-fatal: stamping failure must not break a normal compile cycle.
         // Done after compile so test classes are in ^oddDEF and pass the namespace filter in StampModule.
-        if tDevMode {
+        if tDevMode && '$get(pParams("SkipSync"), 0) {
             try {
                 $$$ThrowOnError(##class(%IPM.Storage.FileHash).StampModule(..Module))
             } catch stampEx {
