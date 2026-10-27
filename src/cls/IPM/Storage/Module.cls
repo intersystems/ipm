@@ -1303,9 +1303,9 @@ Method ProcessSingleDependencyIterative(
 
 /// Retrieves all known dependencies for a module, including transitive dependencies.
 /// Takes a name and queries stored dependency rows, so it works without opening the module, and the
-/// returned list includes pModuleName itself. Both callers use it only as a membership test.
+/// returned list includes pModuleName itself. Callers use it only as a membership test.
 /// Use <method>GetDependencyNames</method> instead when you need the dependencies of a module you
-/// already have open, without the module itself, or when order matters.
+/// already have open, without the module itself, in dependency order.
 ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 {
     set tStatement = ##class(%SQL.Statement).%New()
@@ -1349,92 +1349,35 @@ ClassMethod GetKnownDependencies(pModuleName As %String) As %List
     quit tKnownDependencyList
 }
 
-/// Recursively builds depMap(lowercased name) = %IPM.Storage.Module, or "" if not installed.
-/// Sets the entry before recursing so circular dependencies terminate.
-Method CollectAllDependencies(ByRef depMap) [ Private ]
-{
-    for i=1:1:..Dependencies.Count() {
-        set depName = ..Dependencies.GetAt(i).Name
-        set depKey = $zconvert(depName, "L")
-        if $data(depMap(depKey)) {
-            continue
-        }
-        if '..NameExists(depName) {
-            set depMap(depKey) = ""
-            continue
-        }
-        set depModule = ..NameOpen(depName, , .sc)
-        $$$ThrowOnError(sc)
-        set depMap(depKey) = depModule
-        do depModule.CollectAllDependencies(.depMap)
-    }
-}
-
-/// Returns installed transitive dependencies as %IPM.Storage.Module objects in name order, excluding
-/// this module. Uninstalled dependencies are omitted rather than reported: a module with no local
-/// record has nothing to inspect.
+/// Returns installed transitive dependencies as %IPM.Storage.Module objects, dependencies before
+/// dependents, excluding this module. Uninstalled dependencies are omitted rather than reported: a
+/// module with no local record has nothing to inspect.
 Method GetDependencyModules() As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.Module")
 {
-    do ..CollectAllDependencies(.depMap)
+    set names = ..GetDependencyNames()
     set deps = ##class(%ListOfObjects).%New()
-    set depKey = ""
-    for {
-        set depKey = $order(depMap(depKey), 1, depModule)
-        quit:depKey=""
-        continue:'$isobject(depModule)
+    set ptr = 0
+    while $listnext(names, ptr, name) {
+        set depModule = ..NameOpen(name, , .sc)
+        $$$ThrowOnError(sc)
         do deps.Insert(depModule)
     }
     quit deps
 }
 
-/// Returns the installed transitive dependency names in name order, excluding this module.
+/// Returns the installed transitive dependency names, dependencies before dependents, excluding
+/// this module. Resolves from local records only.
 /// See <method>GetKnownDependencies</method> for the name-only, self-inclusive variant.
 Method GetDependencyNames() As %List
 {
-    set deps = ..GetDependencyModules()
+    do ##class(%IPM.Utils.Module).BuildInstalledDependencyGraph($this, .dependencyGraph)
+    do ##class(%IPM.Utils.Module).ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
+    set flatDepList = ##class(%IPM.Utils.Module).GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
     set names = ""
-    for i=1:1:deps.Count() {
-        set names = names _ $listbuild(deps.GetAt(i).Name)
+    for i = 1:1:flatDepList.Count() {
+        set names = names _ $listbuild(flatDepList.GetAt(i).Name)
     }
     quit names
-}
-
-/// Returns installed transitive dependency names with dependencies before dependents.
-/// Unlike GetDependencyNames (name order), this ordering is required when running lifecycle phases:
-/// a dependency's phase may rely on a deeper dependency's files already being in place.
-/// Resolves entirely from locally registered metadata — no repository access.
-Method GetTopologicalDependencyNames() As %List
-{
-    kill visited
-    set ordered = ""
-    do ..VisitDependencies(.visited, .ordered)
-    quit ordered
-}
-
-/// Depth-first post-order helper for GetTopologicalDependencyNames.
-/// visited: set of lowercased dependency names already reached, shared across the whole traversal.
-/// Marked before recursing, so a cycle terminates and a module two dependencies share is listed once.
-/// Also holds names that are not installed, which are marked and then skipped.
-/// ordered: accumulated $list of names as declared, appended to after a module's own dependencies
-/// have been appended. Grows across recursion levels; the caller reads the final list.
-Method VisitDependencies(
-	ByRef visited,
-	ByRef ordered) [ Private ]
-{
-    for i=1:1:..Dependencies.Count() {
-        set depName = ..Dependencies.GetAt(i).Name
-        if $data(visited($zconvert(depName, "L"))) {
-            continue
-        }
-        set visited($zconvert(depName, "L")) = ""
-        if '..NameExists(depName) {
-            continue
-        }
-        set depModule = ..NameOpen(depName, , .sc)
-        $$$ThrowOnError(sc)
-        do depModule.VisitDependencies(.visited, .ordered)
-        set ordered = ordered _ $listbuild(depModule.Name)
-    }
 }
 
 /// Builds a module's immediate dependency graph and array of resources.<br />

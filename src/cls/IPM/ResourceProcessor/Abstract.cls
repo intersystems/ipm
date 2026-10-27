@@ -211,6 +211,16 @@ Method OnConfigureMappings(ByRef pParams) As %Status
     quit $$$OK
 }
 
+/// Subclasses that read files from the module root at install time override this to copy them
+/// into a database package. <var>targetDir</var> becomes the module's root at install, so stage each
+/// file at the same path relative to it. <var>params</var>("ExportPythonDependencies") carries
+/// -export-python-deps.
+Method OnStageForDatabasePackage(
+	targetDir As %String,
+	ByRef params)
+{
+}
+
 /// Called during 'sync' for resources whose files changed on disk.
 /// modifiedPaths(relPath)="" for changed files; deletedPaths(relPath)="" for removed files.
 /// Set handled=1 to fully own sync for this resource (skip default load+compile handling).

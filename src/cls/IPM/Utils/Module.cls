@@ -1324,8 +1324,10 @@ ClassMethod LoadNewModule(
         }
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
+        // A database install commits this transaction once its swap lands.
+        set params("InstallTLevel") = tInitTLevel
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
-        if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
+        if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions && ($tlevel > tInitTLevel) {
             tcommit
         }
         $$$ThrowOnError(tSC)
@@ -1400,6 +1402,46 @@ ClassMethod LoadDependencies(
     }
 }
 
+/// Builds a dependency graph of module's installed transitive dependencies from local records only,
+/// in the layout of <method>%IPM.Storage.Module.BuildDependencyGraph</method>. Every dependency is
+/// included regardless of Scope. Declared dependencies with no installed record, and module itself,
+/// are left out.
+ClassMethod BuildInstalledDependencyGraph(
+	module As %IPM.Storage.Module,
+	Output dependencyGraph)
+{
+    kill dependencyGraph
+    set modules(module.Name) = module
+    // Walk from module's in-memory dependencies, which can differ from its stored record.
+    for i = 1:1:module.Dependencies.Count() {
+        set names = ##class(%IPM.Storage.Module).GetKnownDependencies(module.Dependencies.GetAt(i).Name)
+        set ptr = 0
+        while $listnext(names, ptr, name) {
+            if $data(modules(name)) || '##class(%IPM.Storage.Module).NameExists(name) {
+                continue
+            }
+            set depModule = ##class(%IPM.Storage.Module).NameOpen(name, , .sc)
+            $$$ThrowOnError(sc)
+            set modules(name) = depModule
+            set dependencyGraph(name) = $listbuild(1, "", depModule.VersionString, depModule.DisplayName, "", depModule.Deployed, depModule.PlatformVersion)
+        }
+    }
+
+    // Edges only between nodes: the sort never resolves an edge to a missing node.
+    set parentName = ""
+    for {
+        set parentName = $order(modules(parentName), 1, parent)
+        quit:parentName=""
+        set parentInfo = parent.Name _ " " _ parent.VersionString
+        for i = 1:1:parent.Dependencies.Count() {
+            set dep = parent.Dependencies.GetAt(i)
+            if $data(dependencyGraph(dep.Name)) {
+                set dependencyGraph(dep.Name, parentInfo) = dep.VersionString
+            }
+        }
+    }
+}
+
 /// Construct an inverted dependency graph from the dependency graph of a module. <br />
 /// @Argument	pDependencyGraph			Dependency graph constructed. <br />
 /// @Argument	pInvertedDependencyGraph	Inverted dependency graph constructed. <br />
@@ -1437,14 +1479,27 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
     #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
     set orderedDependencyList = ##class(%Library.ListOfObjects).%New()
     set moduleName = ""
+    set removedThisPass = 0
     while 1 {
-        // Note that all nodes have to be killed eventually because no cyclic dependencies
-        // are allowed to exist
         if '$data(pInvertedDependencyGraph) {
             quit
         }
         set moduleName = $order(pInvertedDependencyGraph(moduleName))
         if (moduleName = "") {
+            // A pass that removed nothing means a cycle, which only installed records can hold.
+            // Drop the remaining edges so the next pass emits the rest in name order. Valueless
+            // nodes (dependents outside the graph) go with them.
+            if 'removedThisPass {
+                for {
+                    set moduleName = $order(pInvertedDependencyGraph(moduleName), 1, data)
+                    quit:moduleName=""
+                    set hasValue = $data(pInvertedDependencyGraph(moduleName)) # 2
+                    kill pInvertedDependencyGraph(moduleName)
+                    set:hasValue pInvertedDependencyGraph(moduleName) = data
+                }
+                continue
+            }
+            set removedThisPass = 0
             set moduleName = $order(pInvertedDependencyGraph(moduleName))
         }
 
@@ -1459,6 +1514,7 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
             set moduleReference.Deployed = deployed
             set moduleReference.PlatformVersion = platformVersion
             $$$ThrowOnError(orderedDependencyList.Insert(moduleReference))
+            set removedThisPass = 1
             // Remove node from graph
             kill pInvertedDependencyGraph(moduleName)
             // Remove from all entries in graph

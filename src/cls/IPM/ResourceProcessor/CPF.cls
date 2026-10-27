@@ -75,8 +75,7 @@ Method OnResolveChildren(
     if (key = "") {
         quit $$$ERROR($$$GeneralError, "Empty resource array for CPF resource processor: " _ ..Name)
     }
-    set sourcesRoot = ..ResourceReference.Module.SourcesRoot
-    set pResourceArray(key, "RelativePath") = ##class(%File).Construct(sourcesRoot, ..Directory, ..Name)
+    set pResourceArray(key, "RelativePath") = ..GetRelativePath()
     quit $$$OK
 }
 
@@ -113,14 +112,26 @@ Method OnExportItem(
 /// Resolves the absolute path of the CPF source file. Throws if the file is missing.
 Method GetSourceFile() As %String [ Private ]
 {
-    set root = ..ResourceReference.Module.Root
-    set sourcesRoot = ..ResourceReference.Module.SourcesRoot
-    set dir = ##class(%File).Construct(root, sourcesRoot, ..Directory)
-    set filename = ##class(%File).NormalizeFilename(..Name, dir)
-    if (filename = "") || ('##class(%File).Exists(filename)) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
+    set filename = ##class(%File).NormalizeFilename(##class(%File).Construct(..ResourceReference.Module.Root, ..GetRelativePath()))
+    if '##class(%File).Exists(filename) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, ##class(%File).GetDirectory(filename))))
     }
     return filename
+}
+
+/// Returns the CPF file's path relative to the module root.
+Method GetRelativePath() As %String [ Private ]
+{
+    return ##class(%File).Construct(..ResourceReference.Module.SourcesRoot, ..Directory, ..Name)
+}
+
+Method OnStageForDatabasePackage(
+	targetDir As %String,
+	ByRef params)
+{
+    set relativePath = ..GetRelativePath()
+    set sourcePath = ##class(%File).NormalizeFilename(##class(%File).Construct(..ResourceReference.Module.Root, relativePath))
+    do ##class(%IPM.Utils.File).StageResourceFile(..ResourceReference.Name, sourcePath, ##class(%File).Construct(targetDir, relativePath))
 }
 
 Method DoMerge(ByRef pParams) As %Status

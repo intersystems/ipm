@@ -99,6 +99,19 @@ Method OnExportItem(
     quit $$$OK
 }
 
+/// Stages the wheel at Directory/Name, unless Python dependencies are not exported.
+Method OnStageForDatabasePackage(
+	targetDir As %String,
+	ByRef params)
+{
+    if '$get(params("ExportPythonDependencies"), 1) {
+        quit
+    }
+    set sourcePath = ##class(%File).NormalizeFilename(..Name, ##class(%File).NormalizeDirectory(..Directory, ..ResourceReference.Module.Root))
+    set destPath = ##class(%File).Construct(targetDir, ..Directory, ..Name)
+    do ##class(%IPM.Utils.File).StageResourceFile(..ResourceReference.Name, sourcePath, destPath)
+}
+
 Method OnResolveChildren(
 	ByRef pResourceArray,
 	pCheckModuleOwnership As %Boolean) As %Status

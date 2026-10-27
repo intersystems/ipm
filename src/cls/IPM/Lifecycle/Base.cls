@@ -611,6 +611,34 @@ Method %Initialize(ByRef pParams) As %Status
     quit status
 }
 
+/// Adds each of module's <Mapping> elements to the current namespace.
+ClassMethod ApplyModuleMappings(
+	module As %IPM.Storage.Module,
+	verbose As %Boolean = 0)
+{
+    set key = ""
+    for {
+        #dim mapping As %IPM.Storage.MappingReference
+        set mapping = module.Mappings.GetNext(.key)
+        quit:key=""
+
+        set name = $piece(mapping.Name,".",1,*-1)
+        set extension = $piece(mapping.Name,".",*)
+        set source = mapping.SourceResolved
+
+        set sc = $case(extension,
+            "GBL":##class(%IPM.Utils.Module).AddGlobalMapping($namespace,name,source),
+            "INC":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,name,,source),
+            "MAC":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,name,"MAC",source),
+            "PKG":##class(%IPM.Utils.Module).AddPackageMapping($namespace,name,source),
+            "":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,name,"ALL",source))
+        $$$ThrowOnError(sc)
+        if verbose {
+            write !, "Added "_extension_" mapping "_name_" from database "_source
+        }
+    }
+}
+
 Method %Reload(ByRef pParams) As %Status
 {
     set tSC = $$$OK
@@ -657,33 +685,7 @@ Method %Reload(ByRef pParams) As %Status
         set ..Module = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
 
-        // Set up mappings
-        set tKey = ""
-        for {
-            #dim tMapping As %IPM.Storage.MappingReference
-            set tMapping = ..Module.Mappings.GetNext(.tKey)
-            quit:tKey=""
-
-            set tName = $piece(tMapping.Name,".",1,*-1)
-            set tExtension = $piece(tMapping.Name,".",*)
-            set tSource = tMapping.SourceResolved
-
-            set tSC = $case(tExtension,
-                "GBL":##class(%IPM.Utils.Module).AddGlobalMapping($namespace,tName,tSource),
-                "INC":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,,tSource),
-                "MAC":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,"MAC",tSource),
-                "PKG":##class(%IPM.Utils.Module).AddPackageMapping($namespace,tName,tSource),
-                "":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,"ALL",tSource))
-            if $$$ISERR(tSC) {
-                quit
-            }
-            if (tVerbose) {
-                write !, "Added "_tExtension_" mapping "_tName_" from database "_tSource
-            }
-        }
-        if $$$ISERR(tSC) {
-            quit
-        }
+        do ..ApplyModuleMappings(..Module, tVerbose)
 
         $$$ThrowOnError(..InstallOrDownloadPythonRequirements(tRoot, .pParams))
 

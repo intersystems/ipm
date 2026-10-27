@@ -133,18 +133,35 @@ Method NormalizeNames(
 /// Prefixes the path to the module root if it does not start with a $ variable
 Method GetSource()
 {
-    set prefix = $extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 0, 2)
-    if ((prefix = "{$") || (prefix = "${")) {
+    set relativeSource = ..GetRelativeSource()
+    if relativeSource = "" {
         return $case(..SourceDirectory,
             "": ..ResourceReference.Module.Root _ ..ResourceReference.Name,
             : ..SourceDirectory
         )
     }
-    return ..ResourceReference.Module.Root _
-        $case(..SourceDirectory,
-            "": ..ResourceReference.Name,
-            : ..SourceDirectory
-        )
+    return ..ResourceReference.Module.Root _ relativeSource
+}
+
+/// Returns the source path relative to the module root, or "" if SourceDirectory is an expression.
+Method GetRelativeSource() As %String [ Private ]
+{
+    set prefix = $extract(..ResourceReference.Attributes.GetAt("SourceDirectory"), 1, 2)
+    if (prefix = "{$") || (prefix = "${") {
+        return ""
+    }
+    return $case(..SourceDirectory, "": ..ResourceReference.Name, : ..SourceDirectory)
+}
+
+/// Stages what <method>GetSource</method> reads. An expression SourceDirectory resolves outside the
+/// module root on the installing system, so nothing is staged for it.
+Method OnStageForDatabasePackage(
+	targetDir As %String,
+	ByRef params)
+{
+    set relativeSource = ..GetRelativeSource()
+    quit:relativeSource=""
+    do ##class(%IPM.Utils.File).StageResourceFile(..ResourceReference.Name, ..GetSource(), ##class(%File).Construct(targetDir, relativeSource))
 }
 
 Method DoCopy(

@@ -652,6 +652,8 @@ Method TestPackagingAndInstallValidation()
     set sc = ##class(%IPM.Main).Shell("load " _ tamperedPackage _ " -swap-db")
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "SHA-256", "Tampered IRIS.DAT rejected with a SHA-256 checksum mismatch")
     do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
+    // The record is saved once module.xml loads, so a pre-swap rejection must roll it back.
+    do $$$AssertNotTrue(##class(%IPM.Storage.Module).NameExists("simple-db-module"), "No module record left behind by a pre-swap rejection")
 
     // Test: Missing deps/ directory fails validation
     set missingDepsDir = ..ExtractPackage(packageFile, "missing-deps-extract")
@@ -679,20 +681,14 @@ Method TestPackagingAndInstallValidation()
     // defense-in-depth for direct %Reload callers and are not exercised here.
     set noChecksumDir = ..ExtractPackage(packageFile, "no-checksum-extract")
 
-    set noChecksumXML = ##class(%Library.File).NormalizeFilename("module.xml", noChecksumDir)
-    set xmlStream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(xmlStream.LinkToFile(noChecksumXML))
-    set moduleXML = ..ReadAll(xmlStream)
+    set moduleXML = ..ReadPackageModuleXML(noChecksumDir)
     // Strip the whole element rather than blanking its text: an empty <Checksum> would fail the
     // checksum comparison instead, which the tampering case above already covers.
     set checksumStart = $find(moduleXML, "<Checksum") - $length("<Checksum")
     do $$$AssertTrue(checksumStart > 0, "Packaged module.xml has a <Checksum> element to remove")
     set checksumEnd = $find(moduleXML, "</Checksum>")
     set moduleXML = $extract(moduleXML, 1, checksumStart - 1) _ $extract(moduleXML, checksumEnd, *)
-
-    $$$ThrowOnError(xmlStream.Clear())
-    $$$ThrowOnError(xmlStream.Write(moduleXML))
-    $$$ThrowOnError(xmlStream.%Save())
+    do ..WritePackageModuleXML(noChecksumDir, moduleXML)
 
     set noChecksumPackage = ..PackageOutputDir _ "simple-db-module-no-checksum.tgz"
     set sc = ##class(%IPM.General.Archive).Create(noChecksumDir, noChecksumPackage)
@@ -702,6 +698,20 @@ Method TestPackagingAndInstallValidation()
 
     set sc = ##class(%IPM.Main).Shell("load " _ noChecksumPackage _ " -swap-db")
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "Checksum", "module.xml without a <Checksum> element rejected by validation")
+    do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
+
+    // Test: a <Mapping> whose source database doesn't exist fails validation. The checksum covers
+    // IRIS.DAT only, so editing module.xml doesn't trip it.
+    set badMapDir = ..ExtractPackage(packageFile, "bad-mapping-extract")
+    set moduleXML = ..ReadPackageModuleXML(badMapDir)
+    do $$$AssertTrue(moduleXML [ "<Module>", "Packaged module.xml has a <Module> element to extend")
+    do ..WritePackageModuleXML(badMapDir, $replace(moduleXML, "<Module>", "<Module><Mapping Name=""DbPkgBadMap.GBL"" Source=""DBPKGNOSUCHDB""/>", 1, 1))
+
+    set badMapPackage = ..PackageOutputDir _ "simple-db-module-bad-mapping.tgz"
+    do $$$AssertStatusOK(##class(%IPM.General.Archive).Create(badMapDir, badMapPackage), "Repacked archive with a bad <Mapping>")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ badMapPackage _ " -swap-db")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "DBPKGNOSUCHDB", "<Mapping> with a missing source database rejected by validation")
     do $$$AssertEquals(..CountBackupFiles(installNS), 0, "No DB swap occurred — rejection is pre-swap")
 }
 
@@ -1206,6 +1216,106 @@ Method TestNonCompiledResourcesAppliedDuringInstall()
     set $namespace = installNS
 }
 
+/// <Mapping> elements of the root and of a dependency are applied during a database install. The
+/// dependency also has a <CPF>, the combination that deadlocks when mappings are applied inside the
+/// install's transaction.
+Method TestMappingsAppliedDuringInstall()
+{
+    new $namespace
+    set packageFile = ..PackageModuleWithMappingsV1("TESTDBMAPPKG")
+
+    set installNS = "TESTDBMAPINS"
+    do $$$AssertStatusOK(..CreateTestNamespace(installNS), "Created install namespace")
+    set $namespace = installNS
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ packageFile _ " -swap-db"), "Installed database package")
+
+    set $namespace = "%SYS"
+    for globalName = "DbPkgRootMap", "DbPkgDepMap" {
+        kill props
+        set sc = ##class(Config.MapGlobals).Get(installNS, globalName, .props)
+        do $$$AssertStatusOK(sc, globalName _ " mapping exists in the install namespace")
+        do $$$AssertEquals($get(props("Database")), "IRISTEMP", globalName _ " maps to IRISTEMP")
+    }
+}
+
+/// A failure after the swap keeps the new state: the new module record, the removal of a dependency
+/// the new version dropped, and mappings already applied. Re-running the same update then finishes.
+/// The 1.0.4 package is broken after it's built, because packaging loads each fixture from source
+/// first: deleting dep-with-cpf's staged CPF file makes its Initialize fail after the swap.
+Method TestPostSwapFailureKeepsNewState()
+{
+    set depCPFDir = ..GetModuleDir("db-packaging", "dep-with-cpf")
+    set v104Dir = ..GetModuleDir("db-packaging", "module-with-mappings-v1.0.4")
+
+    new $namespace
+    // Leaves $namespace in the packaging namespace, where 1.0.4 is built next.
+    set v1Package = ..PackageModuleWithMappingsV1("TESTDBPOSTSWAPPKG")
+
+    // The package ships whatever is in the namespace, so the dropped dependency has to leave it.
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ depCPFDir), "Loaded dep-with-cpf")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("update module-with-mappings -path " _ v104Dir), "Updated module-with-mappings to 1.0.4")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall dep-with-mapping"), "Uninstalled the dropped dependency")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("package-database module-with-mappings -path " _ ..PackageOutputDir), "Packaged module-with-mappings 1.0.4")
+    set v104Package = ..PackageOutputDir _ "module-with-mappings-1.0.4-database.tgz"
+
+    set brokenDir = ..ExtractPackage(v104Package, "post-swap-broken")
+    set stagedCPF = ##class(%Library.File).NormalizeFilename(##class(%Library.File).Construct(brokenDir, "deps-files", "dep-with-cpf", "src", "cpf", "dep-with-cpf.cpf"))
+    do $$$AssertTrue(##class(%Library.File).Delete(stagedCPF), "Deleted dep-with-cpf's staged CPF file (setup)")
+
+    set installNS = "TESTDBPOSTSWAPINS"
+    do $$$AssertStatusOK(..CreateTestNamespace(installNS), "Created install namespace")
+    set $namespace = installNS
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ v1Package _ " -swap-db"), "Installed module-with-mappings 1.0.0")
+
+    set output = ..CaptureShellOutput("update module-with-mappings -path " _ brokenDir _ " -swap-db", .sc)
+    do $$$AssertStatusNotOK(sc, "Update fails after the swap")
+    set module = ##class(%IPM.Storage.Module).NameOpen("module-with-mappings")
+    do $$$AssertEquals($select($isobject(module): module.VersionString, 1: ""), "1.0.4", "Module record kept at the new version")
+    do $$$AssertNotTrue(##class(%IPM.Storage.Module).NameExists("dep-with-mapping"), "Dropped dependency's record removed")
+    do $$$AssertTrue(output [ "Re-run the same update command", "Failure tells the user to re-run the update")
+
+    set sc = ##class(%IPM.Main).Shell("update module-with-mappings -path " _ v104Package _ " -swap-db")
+    do $$$AssertStatusOK(sc, "Re-running the update from the intact package succeeds")
+    do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("dep-with-cpf"), "dep-with-cpf record present")
+
+    set $namespace = "%SYS"
+    do $$$AssertTrue(##class(Config.MapGlobals).Exists(installNS, "DbPkgRootMap"), "Root mapping still exists after re-applying it")
+}
+
+/// Loads dep-with-mapping and module-with-mappings 1.0.0 into a new namespace packagingNS, packages
+/// it, and returns the .tgz path. Leaves $namespace set to packagingNS.
+Method PackageModuleWithMappingsV1(packagingNS As %String) As %String
+{
+    set depDir = ..GetModuleDir("db-packaging", "dep-with-mapping")
+    set rootDir = ..GetModuleDir("db-packaging", "module-with-mappings-v1.0.0")
+    do $$$AssertStatusOK(..CreateTestNamespace(packagingNS), "Created packaging namespace")
+    set $namespace = packagingNS
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ depDir), "Loaded dep-with-mapping")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ rootDir), "Loaded module-with-mappings 1.0.0")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("package-database module-with-mappings -path " _ ..PackageOutputDir), "Packaged module-with-mappings 1.0.0")
+    quit ..PackageOutputDir _ "module-with-mappings-1.0.0-database.tgz"
+}
+
+/// Packaging warns about <Global> resources of the root and of its dependencies, whose data lives in
+/// the globals database and is not shipped.
+Method TestWarnsAboutGlobals()
+{
+    set depDir = ..GetModuleDir("db-packaging", "dep-with-global")
+    set rootDir = ..GetModuleDir("db-packaging", "module-with-global")
+    new $namespace
+    set ns = "TESTDBGLOBALPKG"
+    do $$$AssertStatusOK(..CreateTestNamespace(ns), "Created packaging namespace")
+    set $namespace = ns
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ depDir), "Loaded dep-with-global")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ rootDir), "Loaded module-with-global")
+    set output = ..CapturePackageOutput("module-with-global", .sc)
+    do $$$AssertStatusOK(sc, "Packaged module as database")
+
+    do $$$AssertTrue(output [ "Global resource 'DbPkgRootGlobal.GBL' in this module cannot be shipped in a database package", "Warning names the root's global")
+    do $$$AssertTrue(output [ "Global resource 'DbPkgDepGlobal.GBL' in dependency 'dep-with-global'", "Warning names the dependency's global")
+}
+
 /// Verifies that a module whose web application is relative to the installing namespace packages
 /// and installs correctly: the <FileCopy> directory of static files lands under the install
 /// namespace's CSP directory, and the <WebApplication> is created with the install namespace's
@@ -1457,7 +1567,7 @@ Method TestPublishDatabaseWithORAS()
 }
 
 /// Verifies that package-database overwrites an existing SystemRequirements Version
-/// with the current IRIS version and emits a warning when the versions differ.
+/// with the current IRIS version.
 Method TestSystemRequirementsOverwrite()
 {
     set packagingNS = ..GetOrCreateSharedNS1()
@@ -1599,10 +1709,18 @@ Method CapturePackageOutput(
 	module As %String,
 	Output status As %Status) As %String
 {
+    quit ..CaptureShellOutput("package-database " _ module _ " -path " _ ..PackageOutputDir, .status)
+}
+
+/// Runs an IPM shell command in the current namespace and returns everything it wrote.
+ClassMethod CaptureShellOutput(
+	command As %String,
+	Output status As %Status) As %String
+{
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     set exception = ""
     try {
-        set status = ##class(%IPM.Main).Shell("package-database " _ module _ " -path " _ ..PackageOutputDir)
+        set status = ##class(%IPM.Main).Shell(command)
     } catch ex {
         set exception = ex
     }
@@ -1663,6 +1781,26 @@ ClassMethod ReadAll(stream As %Stream.Object) As %String
         set text = text _ stream.Read()
     }
     quit text
+}
+
+/// Returns the text of dir/module.xml.
+ClassMethod ReadPackageModuleXML(dir As %String) As %String
+{
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(##class(%Library.File).NormalizeFilename("module.xml", dir)))
+    quit ..ReadAll(stream)
+}
+
+/// Replaces the contents of dir/module.xml with xml.
+ClassMethod WritePackageModuleXML(
+	dir As %String,
+	xml As %String)
+{
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(##class(%Library.File).NormalizeFilename("module.xml", dir)))
+    $$$ThrowOnError(stream.Clear())
+    $$$ThrowOnError(stream.Write(xml))
+    $$$ThrowOnError(stream.%Save())
 }
 
 /// Joins captured output lines into one string so assertions can match a warning by substring.
