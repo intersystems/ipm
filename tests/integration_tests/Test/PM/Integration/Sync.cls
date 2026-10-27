@@ -68,6 +68,28 @@ Method TestGetStoredPathsReturnsStampedPaths()
 }
 
 
+/// load -skip-sync stamps no baseline. The next sync establishes one and later syncs detect edits.
+Method TestLoadSkipSyncStampsNoBaseline()
+{
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall sync-test"), "Uninstalled the module loaded by setup")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ ..TempDir _ " -dev -skip-sync"), "Loaded with -skip-sync")
+    do $$$AssertNotTrue(##class(%IPM.Storage.FileHash).HasBaseline("sync-test"), "No baseline rows after load -skip-sync")
+
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
+    do $$$AssertStatusOK(sc, "First sync after load -skip-sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output, "Baseline established"), "First sync establishes the baseline")
+
+    do ..ReplaceInFile(..TempDir _ "src/cls/SyncTest/SuperClass.cls", """original""", """modified""")
+    kill output2
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie2)
+    set sc2 = ##class(%IPM.Main).Shell("sync sync-test -verbose")
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie2, .output2)
+    do $$$AssertStatusOK(sc2, "Second sync succeeds")
+    do $$$AssertTrue(..FindInOutput(.output2, "Sync complete"), "Second sync detects the edit")
+}
+
 /// Sync with no files changed on disk since the last load/sync reports nothing to do.
 Method TestNoChangeIsNoOp()
 {
