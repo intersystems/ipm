@@ -1,5 +1,3 @@
-Include %IPM.Common
-
 Class %IPM.Storage.LoadedResource Extends %Persistent
 {
 
@@ -136,6 +134,7 @@ ClassMethod Clear(pNamespace As %String = {$namespace}) As %Status
 /// @Modifier Availability InterSystems
 ClassMethod ReportConflicts()
 {
+    #include %IPM.Common
     try {
         $$$ThrowOnError(..Validate(,.tErrorList))
         for tIndex=1:1:$get(tErrorList) {
