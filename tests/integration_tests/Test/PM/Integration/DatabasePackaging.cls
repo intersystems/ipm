@@ -881,7 +881,7 @@ Method TestInstallRejectedWhenModulesWouldBeOrphaned()
 }
 
 /// Upgrading a database package whose dependency tree changed shape must not be blocked by the
-/// orphan check, and dependencies that no longer ship in the new IRIS.DAT must have their stale
+/// orphan check and dependencies that no longer ship in the new IRIS.DAT must have their stale
 /// IPM metadata removed rather than left behind pointing at code that is gone.
 ///
 /// deptree-parent v1 -> v2 exercises all four kinds of change at once. The comparison is between
@@ -897,7 +897,7 @@ Method TestInstallRejectedWhenModulesWouldBeOrphaned()
 ///
 /// deptree-leaf and deptree-extra are deliberately reached through different parents than the
 /// added/dropped pair so that each feature is isolated: a bug that keys off direct dependencies
-/// rather than the flattened set fails on deptree-leaf, and one that ignores transitive additions
+/// rather than the flattened set fails on deptree-leaf and one that ignores transitive additions
 /// fails on deptree-extra.
 ///
 /// deptree-stable also carries an <UpdatePackage>, so the version bump doubles as coverage that a
@@ -1182,7 +1182,7 @@ Method TestNonCompiledResourcesAppliedDuringInstall()
 
     // Delete the /noncompiled web application from %SYS before install so the assertion can fail.
     // GetOrCreateSharedNS2 loads the module from source, which creates /noncompiled. The install
-    // must recreate it, and this test verifies that the install-time processor fires.
+    // must recreate it and this test verifies that the install-time processor fires.
     new $namespace
     set $namespace = "%SYS"
     if ##class(Security.Applications).Exists("/noncompiled") {
@@ -1296,6 +1296,23 @@ Method PackageModuleWithMappingsV1(packagingNS As %String) As %String
     quit ..PackageOutputDir _ "module-with-mappings-1.0.0-database.tgz"
 }
 
+/// A module.xml declaring <Packaging>database</Packaging> with no IRIS.DAT beside it is rejected
+/// rather than loaded as source.
+Method TestSourceManifestDeclaringDatabaseRejected()
+{
+    set moduleDir = ..GetModuleDir("db-packaging", "source-declaring-database")
+    new $namespace
+    set ns = "TESTDBSRCDECL"
+    do $$$AssertStatusOK(..CreateTestNamespace(ns), "Created namespace")
+    set $namespace = ns
+
+    set sc = ##class(%IPM.Main).Shell("load " _ moduleDir)
+    do $$$AssertStatusNotOK(sc, "Load rejected")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "IRIS.DAT", "Error says the IRIS.DAT is missing")
+    do $$$AssertNotTrue(##class(%IPM.Storage.Module).NameExists("source-declaring-database"), "No module record left behind")
+    do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("SourceDeclaringDatabase.Main"), "Nothing loaded as source")
+}
+
 /// Packaging warns about <Global> resources of the root and of its dependencies, whose data lives in
 /// the globals database and is not shipped.
 Method TestWarnsAboutGlobals()
@@ -1318,7 +1335,7 @@ Method TestWarnsAboutGlobals()
 
 /// Verifies that a module whose web application is relative to the installing namespace packages
 /// and installs correctly: the <FileCopy> directory of static files lands under the install
-/// namespace's CSP directory, and the <WebApplication> is created with the install namespace's
+/// namespace's CSP directory and the <WebApplication> is created with the install namespace's
 /// name, path and NameSpace.
 ///
 /// module-with-ns-relative-webapp uses ${cspdir}${namespaceLower} in both the FileCopy target and
@@ -1353,7 +1370,7 @@ Method TestNamespaceRelativeWebAppAppliedDuringInstall()
 
     // Expected resolutions of ${cspdir}${namespaceLower} and ${namespaceLower} for the install NS.
     // Built with Construct because %Library.File.NormalizeDirectory(name, dir) chdir's into dir and
-    // returns "" when dir does not exist, and the CSP directory does not exist until install.
+    // returns "" when dir does not exist and the CSP directory does not exist until install.
     set installNSLower = $zconvert(installNS, "L")
     set cspDir = ##class(%Library.File).NormalizeDirectory($system.Util.InstallDirectory() _ "csp")
     set appDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(cspDir, installNSLower, "nsapp"))
@@ -1577,7 +1594,7 @@ Method TestSystemRequirementsOverwrite()
     set currentIrisVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
 
     // Read XData template before switching namespaces — %Dictionary.CompiledXData looks up
-    // class metadata in the current namespace, and the test class is not compiled in packagingNS.
+    // class metadata in the current namespace and the test class is not compiled in packagingNS.
     set xData = ##class(%Dictionary.CompiledXData).IDKEYOpen($classname(), "SimpleModuleWithSysReqTemplate", , .sc)
     $$$ThrowOnError(sc)
     set rawXML = $replace(..ReadAll(xData.Data), "REPLACEPREVIRISVERSION", prevIrisVersion)
@@ -2009,7 +2026,7 @@ Method TestCopyDismountsAndRemounts()
 /// A failed copy still remounts the routines database. Leaving a namespace's code database dismounted
 /// is worse than any packaging error, so the remount cannot be conditional on the copy succeeding.
 /// A staging directory that does not exist is enough to fail the copy: NormalizeFilename returns ""
-/// for a destination whose directory is absent, and CopyFile cannot write to an empty path.
+/// for a destination whose directory is absent and CopyFile cannot write to an empty path.
 Method TestFailedCopyStillRemounts()
 {
     set failNS = "TESTDBCOPYFAIL"
@@ -2148,7 +2165,7 @@ Method TestWarnsAboutTestClassesWithoutIncludeTests()
 }
 
 /// A namespace whose routines and globals are the same database is warned about on both sides: the
-/// swap replaces its globals along with IPM's own registry, and packaging ships them.
+/// swap replaces its globals along with IPM's own registry and packaging ships them.
 /// Asserted against the warning methods rather than a real install or package, which would wreck the
 /// registry the assertions depend on.
 Method TestWarnsWhenRoutinesDatabaseIsGlobalsDatabase()

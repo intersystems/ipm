@@ -1302,7 +1302,7 @@ Method ProcessSingleDependencyIterative(
 }
 
 /// Retrieves all known dependencies for a module, including transitive dependencies.
-/// Takes a name and queries stored dependency rows, so it works without opening the module, and the
+/// Takes a name and queries stored dependency rows, so it works without opening the module and the
 /// returned list includes pModuleName itself. Callers use it only as a membership test.
 /// Use <method>GetDependencyNames</method> instead when you need the dependencies of a module you
 /// already have open, without the module itself, in dependency order.

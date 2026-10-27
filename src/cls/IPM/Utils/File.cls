@@ -95,7 +95,7 @@ ClassMethod StageResourceFile(
 }
 
 /// Copies a file, or a whole directory tree, to a destination path, creating parent directories as
-/// needed. A <FileCopy> resource names either, and the processor resolves both at install time, so
+/// needed. A <FileCopy> resource names either and the processor resolves both at install time, so
 /// both must be staged.
 /// Throws on failure. Returns 1 if the source was copied, 0 if it did not exist.
 ClassMethod StageFile(

@@ -160,7 +160,7 @@ Creates a .tgz archive of module source files. Equivalent to the existing `packa
 <description>
 Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), and a deps/ directory of dependency manifests and non-compiled resource files.
 The package ships a copy of the namespace's routines database as it currently stands, so it contains all compiled code from every module installed there, not just this module's. Beyond compiling this module's own resources, packaging loads nothing into the namespace unless -include-tests is passed, so load the module and its dependencies before packaging.
-The database is dismounted for the duration of the copy, so the namespace cannot run code while packaging runs, and mirrored databases are not supported.
+The database is dismounted for the duration of the copy, so the namespace cannot run code while packaging runs. Mirrored databases are not supported.
 </description>
 <parameter name="module" required="true" description="Name of module to package as database" />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
@@ -200,7 +200,7 @@ This command is an alias for `module-action module-name publish`
 <summary>Packages a module as a database package and publishes it to a registry.</summary>
 <description>
 Packages the module as an IRIS.DAT database package and publishes it to a registry in one step.
-Equivalent to running `package-database` followed by `publish`, but without needing a separate output path. As with `package-database`, the package ships a copy of the namespace's routines database as it currently stands, and the database is dismounted for the duration of the copy.
+Equivalent to running `package-database` followed by `publish`, but without needing a separate output path. As with `package-database`, the package ships a copy of the namespace's routines database as it currently stands and the database is dismounted for the duration of the copy.
 </description>
 <parameter name="module" required="true" description="Name of module to package as database and publish" />
 <modifier name="repo" aliases="r" dataAlias="PublishTo" description="Namespace-unique name of repository to publish to (deployment must be enabled)" />

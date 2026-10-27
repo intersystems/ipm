@@ -143,7 +143,7 @@ Method LoadTestResources(ByRef params)
             quit:docName=""
             // Skip names that are not documents, like the "Scope" key a Test processor reports. The
             // test is on the extension rather than on whether the document exists: a test document
-            // that failed to load has none, and skipping it here would let the compile pass without it.
+            // that failed to load has none and skipping it here would let the compile pass without it.
             continue:'..IsCodeResourceName(docName)
             set toCompile(docName) = ""
         }
@@ -163,9 +163,8 @@ Method LoadTestResources(ByRef params)
     $$$ThrowOnError($system.OBJ.CompileList(compileItems, "ck-d"))
 }
 
-/// Dispatches to one of three contexts: installing a package, the no-op Reload that precedes
-/// Package, or an ordinary source load. A package directory whose IRIS.DAT a completed swap already
-/// moved away is refused.
+/// Dispatches to one of two contexts: installing a package, or the no-op Reload that precedes
+/// Package. Any other directory declaring database packaging has no IRIS.DAT and is refused.
 /// A database install does the lifecycle's work here, so %Validate, %Compile and %Activate are no-ops.
 /// Processor hooks and invokes from Reload.After onward run against the mounted database.
 Method %Reload(ByRef params) As %Status
@@ -179,13 +178,12 @@ Method %Reload(ByRef params) As %Status
         quit $$$OK
     }
     // A packaged manifest with no IRIS.DAT beside it is what a completed swap leaves, since
-    // PerformDatabaseSwap moves IRIS.DAT rather than copying it. Loading it as source would compile
-    // into the swapped-in database, which its manifest's checksum describes.
+    // PerformDatabaseSwap moves IRIS.DAT rather than copying it.
     if ..IsDatabasePackagedManifest(params("RootDirectory")) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, "This directory holds a database package whose IRIS.DAT is no longer present (" _ params("RootDirectory") _ "). The swap that has already run moved it into the database directory. Re-run the install from the original .tgz rather than from this directory."))
     }
-    // A database-packaged module loaded from a source directory is an ordinary source load.
-    quit ##super(.params)
+    set msg = "module.xml in " _ params("RootDirectory") _ " declares <Packaging>database</Packaging> but there is no IRIS.DAT beside it."
+    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
 }
 
 /// Validate, swap the DB, register metadata, and run post-swap steps.
@@ -530,7 +528,7 @@ ClassMethod WarnPackagingRoutinesDatabaseIsGlobalsDatabase(ns As %String)
     quit:sharedDir=""
 
     write !!, "WARNING: globals in namespace ", ns, " will ship inside this package."
-    write !, "  ", ns, " uses one database for both routines and globals (", sharedDir, "), and packaging copies it whole."
+    write !, "  ", ns, " uses one database for both routines and globals (", sharedDir, ") and packaging copies it whole."
     write !, "  Give ", ns, " a globals database of its own to avoid shipping that data."
 }
 
@@ -577,7 +575,7 @@ ClassMethod ValidateRoutinesDatabaseNotMirrored(ns As %String)
 /// Returns the names of other namespaces whose routines database is the same database as this
 /// namespace's, as a $list, or "" when none share it.
 /// Matches on directory rather than database name: two Config.Databases entries can name the same
-/// directory, and only the directory identifies the file being swapped or dismounted.
+/// directory and only the directory identifies the file being swapped or dismounted.
 ClassMethod GetNamespacesSharingRoutinesDatabase(ns As %String) As %List
 {
     set dbDir = ##class(%IPM.Utils.Module).GetRoutineDatabaseDir(ns)
@@ -640,7 +638,7 @@ ClassMethod WarnRoutinesDatabaseIsGlobalsDatabase(ns As %String)
 /// database packaging produces: the package carries a namespace's database as it stands, not a build.
 /// The database is dismounted for the copy and remounted afterwards, so ns cannot run code while the
 /// copy runs. The dismount is not an optimization to skip: a copy of a mounted IRIS.DAT reads only
-/// what is on disk, and blocks written since the write daemon last ran are still in the buffer pool,
+/// what is on disk and blocks written since the write daemon last ran are still in the buffer pool,
 /// so code compiled shortly before packaging would be missing from the copy. Dismounting flushes.
 /// The caller must have validated that the database is not mirrored, since dismounting a mirrored
 /// database breaks the mirror (see ValidateRoutinesDatabaseNotMirrored).
@@ -657,7 +655,7 @@ ClassMethod CopyRoutinesDatabase(
     set destDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", stagingDir)
 
     // DismountDatabase neither checks for nor waits on other users of the database. It succeeds while
-    // another process is writing, and that process then takes <PROTECT> on ^ZBUSY2 until the remount.
+    // another process is writing and that process then takes <PROTECT> on ^ZBUSY2 until the remount.
     // This is an outage the caller chooses, not a check that the namespace is idle.
     write !, "Dismounting ", dbName, " for the copy. ", ns, " cannot run code until the copy finishes."
     set copySC = ..DismountAndCopyDatabase(dbDir, srcDAT, destDAT, .mountSC)
@@ -671,7 +669,7 @@ ClassMethod CopyRoutinesDatabase(
     $$$ThrowOnError($$$ADDSC(copySC, mountSC))
 }
 
-/// Dismounts dbDir, copies srcDAT to destDAT, then remounts. Returns the copy's status, and the
+/// Dismounts dbDir, copies srcDAT to destDAT, then remounts. Returns the copy's status and puts the
 /// remount's in mountSC.
 /// Writes nothing. Output capture resolves its handler routine in the current namespace, which %SYS
 /// cannot see, so a write here takes <NOROUTINE>. The caller reports instead.
@@ -717,7 +715,7 @@ Method AssemblePackage(
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Staging directory has no IRIS.DAT: " _ stagingDir))
     }
 
-    // Checksum the staged file. Those are the exact bytes the .tgz ships, and the live database it
+    // Checksum the staged file. Those are the exact bytes the .tgz ships and the live database it
     // came from may have moved on since.
     write:$get(params("Verbose")) !, "Computing SHA-256 checksum..."
     set checksumHex = ##class(%IPM.Utils.File).ComputeSHA256Hex(stagedDAT)
@@ -773,7 +771,7 @@ ClassMethod GetDependencyStagingDir(
 /// Has each resource processor of this module and of each transitive dependency stage the files it
 /// reads at install time into stagingDir. Dependency files go under deps-files/<depname>/ so the
 /// install-time dependency pass can point that dependency's Root at them.
-/// The per-dependency directory is created even when empty: install always sets Root to it, and a
+/// The per-dependency directory is created even when empty: install always sets Root to it and a
 /// Root pointing at a nonexistent directory would resolve paths on the packaging machine instead.
 Method CopyNonCompiledResources(
 	stagingDir As %String,
@@ -1045,10 +1043,8 @@ Method WriteDependencies(
 // Install helpers
 // =====================================================================
 
-/// Returns 1 if this is a database install rather than a source load: the module is database-packaged
-/// and IRIS.DAT sits in its root. The IRIS.DAT is what discriminates, since Packaging = "database"
-/// only selects this lifecycle class and a source tree loaded from disk declares it too, with nothing
-/// to swap in.
+/// Returns 1 if this is a database install: the module is database-packaged and IRIS.DAT sits in its
+/// root.
 Method IsDatabaseInstall() As %Boolean [ Private ]
 {
     set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", ..Module.Root)
@@ -1082,7 +1078,7 @@ ClassMethod IsDatabasePackagedManifest(dir As %String) As %Boolean
 /// Pre-install validation. Throws on any failure; does not modify state.
 /// Ordered so the failure reported is the one worth acting on: namespace preconditions, which no
 /// package can satisfy, then the package's own structure, then the whole-file hash.
-/// params: only params("PreviousDependencies") is read, and passed straight to
+/// params: only params("PreviousDependencies") is read and passed straight to
 /// ValidateNoOrphanedModules.
 /// staleModules (output): modules the previous version carried that the incoming one drops.
 Method ValidateBeforeSwap(
@@ -1092,7 +1088,7 @@ Method ValidateBeforeSwap(
 {
     set staleModules = ""
 
-    // Namespace preconditions first: they read nothing from the package, and a namespace that cannot
+    // Namespace preconditions first: they read nothing from the package and a namespace that cannot
     // host a database package at all should say so before the user's package is picked apart.
     do ..ValidateIPMNotInRoutinesDB()
     do ..ValidateRoutinesDatabaseNotMirrored($namespace)
@@ -1278,7 +1274,7 @@ ClassMethod RemoveStaleModuleMetadata(staleModules As %List = "")
 /// Must be called before the swap, while these modules' own code is still in the namespace's routines
 /// database.
 /// Failures are reported and skipped: a module that cannot unconfigure cleanly must not abort an
-/// install that has already been confirmed, and the swap will remove its code regardless.
+/// install that has already been confirmed and the swap will remove its code regardless.
 ClassMethod UnconfigureStaleModules(
 	staleModules As %List = "",
 	ByRef params)
@@ -1467,7 +1463,7 @@ ClassMethod RegisterDependencyMetadata(packageDir As %String)
 }
 
 /// Phases a dependency must not run during a database install, with the reason for each.
-/// Reload: no source ships for a dependency, and Base.%Reload early-exits without a root.
+/// Reload: no source ships for a dependency and Base.%Reload early-exits without a root.
 /// Compile: the code is already compiled into IRIS.DAT.
 /// "*": the module-refresh checkpoint, meaningful only for the module being installed.
 /// Edit here, not in GetDependencyInstallPhases, when this judgment changes.
@@ -1558,8 +1554,8 @@ Method ApplyDependencyResources(
 /// The root's Initialize completed before the swap, so a dependency's Initialize resources land
 /// afterwards and take precedence. Re-asserting restores the root's intended precedence.
 /// Scoped to processor classes a dependency actually used at Initialize: with no dependency CPF or
-/// wheel there is nothing to correct, and a CPF merge costs a subprocess call. Both affected
-/// processors are safe to repeat: a merge applies file values, and a present wheel is a no-op.
+/// wheel there is nothing to correct and a CPF merge costs a subprocess call. Both affected
+/// processors are safe to repeat: a merge applies file values and a present wheel is a no-op.
 Method ReassertRootInitializeResources(
 	ByRef depInitClasses,
 	ByRef params) [ Private ]

@@ -73,7 +73,7 @@ Method WriteModuleXML(
 	content As %String)
 {
     set path = ##class(%Library.File).NormalizeFilename("module.xml", dir)
-    // Delete rather than Clear: this is called repeatedly against the same path, and a fresh file
+    // Delete rather than Clear: this is called repeatedly against the same path and a fresh file
     // is unambiguous about what the stream ends up containing.
     do ##class(%Library.File).Delete(path)
     set stream = ##class(%Stream.FileCharacter).%New()
@@ -164,7 +164,7 @@ Method TestFileCopyExpressionSourceNotStaged()
     set module = ..NewModuleWithResource("expr-source.txt", "FileCopy")
     set module.Root = rootDir
     set resource = module.Resources.GetAt(1)
-    // Module.xml import records Name as an attribute too, and it overrides its SourceDirectory alias.
+    // Module.xml import records Name as an attribute too and it overrides its SourceDirectory alias.
     do resource.Attributes.SetAt("expr-source.txt", "Name")
     do resource.Attributes.SetAt("${mgrdir}does-not-exist/", "SourceDirectory")
     do resource.Attributes.SetAt("${mgrdir}expr-target/", "Target")
@@ -241,7 +241,7 @@ Method TestDependencyPhasesCoverCanonicalChain()
             do $$$AssertTrue(accountedFor, "Canonical phase '" _ onePhase _ "' (" _ entryPhase _ " chain) is either run for dependencies or explicitly excluded")
         }
 
-        // A phase cannot be both, and nothing may be run that the canonical chain does not contain.
+        // A phase cannot be both and nothing may be run that the canonical chain does not contain.
         set runPtr = 0
         while $listnext(run, runPtr, runPhase) {
             do $$$AssertNotTrue($listfind(excluded, runPhase), "Phase '" _ runPhase _ "' is not both run and excluded")

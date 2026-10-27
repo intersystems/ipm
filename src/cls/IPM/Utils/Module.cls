@@ -1404,7 +1404,7 @@ ClassMethod LoadDependencies(
 
 /// Builds a dependency graph of module's installed transitive dependencies from local records only,
 /// in the layout of <method>%IPM.Storage.Module.BuildDependencyGraph</method>. Every dependency is
-/// included regardless of Scope. Declared dependencies with no installed record, and module itself,
+/// included regardless of Scope. Declared dependencies with no installed record and module itself
 /// are left out.
 ClassMethod BuildInstalledDependencyGraph(
 	module As %IPM.Storage.Module,

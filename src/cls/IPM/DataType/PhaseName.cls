@@ -18,7 +18,7 @@ Parameter MAXLEN As INTEGER = 50;
 /// When ExecutePhases (in %IPM.Storage.Module) encounters "*", it kills and reopens
 /// the module and lifecycle objects from storage, picking up any changes made by
 /// earlier phases (e.g., module.xml modifications during Reload). No lifecycle method
-/// is called for "*", and no resource processor hooks or <Invoke> elements target it.
+/// is called for "*" and no resource processor hooks or <Invoke> elements target it.
 ///
 /// Should be kept in sync with %IPM.Lifecycle.Base.PHASES.
 Parameter VALUELIST = ",Clean,Initialize,Reload,*,Validate,ExportData,Compile,Activate,Document,MakeDeployed,Test,Package,Verify,Publish,Configure,Unconfigure,ApplyUpdateSteps,Sync";
