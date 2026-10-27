@@ -319,8 +319,9 @@ Method CreateOrUpdateCSPApp() As %Status [ Internal ]
             set tProperties("UseCookies") = 1
         }
 
+        // IPM isn't available in %SYS, so log after returning to tOrigNS
         if ##class(Security.Applications).Exists(..Url) {
-            $$$LogLine("Updating Web Application "_..Url)
+            set logLines($increment(logLines)) = "Updating Web Application "_..Url
             set tSC = ##class(Security.Applications).Get(..Url,.tOldProperties)
             $$$ThrowOnError(tSC)
 
@@ -345,28 +346,32 @@ Method CreateOrUpdateCSPApp() As %Status [ Internal ]
 
             if $data(tChanges) {
                 for i=1:1:$get(tChanges) {
-                    $$$LogLine(tChanges(i))
+                    set logLines($increment(logLines)) = tChanges(i)
                 }
                 set tSC = ##class(Security.Applications).Modify(..Url,.tProperties)
                 $$$ThrowOnError(tSC)
-                $$$LogLine("Done.")
+                set logLines($increment(logLines)) = "Done."
             } else {
-                $$$LogLine("No changes detected or made.")
+                set logLines($increment(logLines)) = "No changes detected or made."
             }
         } else {
-            $$$LogLine("Creating Web Application "_..Url)
+            set logLines($increment(logLines)) = "Creating Web Application "_..Url
             set tSC = ##class(Security.Applications).Create(..Url,.tProperties)
             set tKey = ""
             for {
                 set tKey = $order(tProperties(tKey),1,tValue)
                 quit:tKey=""
-                $$$LogLine($char(9)_tKey_": "_tValue)
+                set logLines($increment(logLines)) = $char(9)_tKey_": "_tValue
             }
             $$$ThrowOnError(tSC)
-            $$$LogLine("Done.")
+            set logLines($increment(logLines)) = "Done."
         }
     } catch ex {
         set tSC = ex.AsStatus()
+    }
+    set $namespace = tOrigNS
+    for i=1:1:$get(logLines) {
+        $$$LogLine(logLines(i))
     }
     quit tSC
 }
