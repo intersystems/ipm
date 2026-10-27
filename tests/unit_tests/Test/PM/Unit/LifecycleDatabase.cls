@@ -39,12 +39,7 @@ Method TestPackagingDerivesLifecycleClass()
 /// source manifest and a database-packaged one must be told apart on that alone.
 Method TestIsDatabasePackagedManifestDetection()
 {
-    // TempFilename creates the file it names, so derive a sibling directory from it and delete it.
-    set tempFile = ##class(%Library.File).TempFilename()
-    set dir = ##class(%Library.File).NormalizeDirectory(tempFile _ ".d")
-    do ##class(%Library.File).Delete(tempFile)
-    do $$$AssertTrue(##class(%Library.File).CreateDirectoryChain(dir), "Created temp directory")
-
+    set dir = ##class(%IPM.Utils.File).CreateTempDirectory()
     do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Directory with no module.xml is not a database-packaged manifest")
     do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(""), "Empty directory path is not a database-packaged manifest")
 
@@ -59,12 +54,14 @@ Method TestIsDatabasePackagedManifestDetection()
     do ..WriteModuleXML(dir, "<Export><Document")
     do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Unparseable module.xml is not a database-packaged manifest")
 
-    do ..WriteModuleXML(dir, header _ "<Packaging>database</Packaging>" _
-        "<Checksum Algorithm=""SHA-256"">ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad</Checksum>" _
-        "</Module></Document></Export>")
+    // Packaging alone does not make a manifest a packaged one.
+    do ..WriteModuleXML(dir, header _ "<Packaging>database</Packaging></Module></Document></Export>")
+    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Manifest declaring database packaging without a Checksum is not a database-packaged manifest")
+
+    do ..WriteModuleXML(dir, header _ "<Checksum Algorithm=""SHA-256"">ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad</Checksum></Module></Document></Export>")
     do $$$AssertTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Manifest with Checksum is a database-packaged manifest")
 
-    do ##class(%Library.File).RemoveDirectoryTree(dir)
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(dir)
 }
 
 /// Writes content to dir/module.xml, replacing any previous file.
@@ -95,9 +92,7 @@ Method TestSHA256HexFormat()
     set hex = ##class(%IPM.Utils.File).ComputeSHA256Hex(tmp)
     do ##class(%Library.File).Delete(tmp)
 
-    do $$$AssertEquals($length(hex), 64, "SHA-256 hex is 64 characters")
-    do $$$AssertEquals($zconvert(hex, "L"), hex, "SHA-256 hex is lowercase")
-    // SHA-256 of "abc" is a well-known constant.
+    // SHA-256 of "abc" is a well-known constant, in lowercase hex.
     do $$$AssertEquals(hex, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256('abc') matches known value")
 }
 
@@ -254,13 +249,13 @@ Method TestDependencyPhasesCoverCanonicalChain()
 /// than a silent behavior change.
 Method TestDependencyPhasesExcludeReloadAndCompile()
 {
-    set phases = ##class(%IPM.Lifecycle.Database).GetDependencyInstallPhases(0)
-    do $$$AssertEquals($listtostring(phases, ","), "Initialize,Validate,Activate", "Dependency install phases")
-
-    // An update runs each dependency's own update steps, matching a source update: params("Update")
-    // propagates to dependency loads, which then enter at ApplyUpdateSteps.
-    set updatePhases = ##class(%IPM.Lifecycle.Database).GetDependencyInstallPhases(1)
-    do $$$AssertEquals($listtostring(updatePhases, ","), "Initialize,Validate,Activate,ApplyUpdateSteps", "Dependency update phases")
+    for isUpdate = 0, 1 {
+        set phases = ##class(%IPM.Lifecycle.Database).GetDependencyInstallPhases(isUpdate)
+        do $$$AssertNotTrue($listfind(phases, "Reload"), "Dependencies skip Reload")
+        do $$$AssertNotTrue($listfind(phases, "Compile"), "Dependencies skip Compile")
+        // An update runs each dependency's own update steps, matching a source update.
+        do $$$AssertEquals($listfind(phases, "ApplyUpdateSteps") > 0, isUpdate, "Dependencies run ApplyUpdateSteps only on an update")
+    }
 }
 
 }
