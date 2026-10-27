@@ -182,6 +182,8 @@ This command is an alias for `module-action module-name publish`
 <modifier name="path" aliases="p" value="true" description="Location of local tarball containing the updated version of the module. Overrides 'version' parameter if present." />
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
+<modifier name="log-dir" dataAlias="LogFileDir" value="true" description="Directory to generate log files under.  Defaults to /mgr/ipm-logs/namespace." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 </command>
 
 <command name="makedeployed">
@@ -310,6 +312,8 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
+<modifier name="log-dir" dataAlias="LogFileDir" value="true" description="Directory to generate log files under.  Defaults to /mgr/ipm-logs/namespace." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -437,6 +441,8 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="synchronous" value="false" deprecated="true" description="DEPRECATED. Dependencies are now always loaded synchronously with independent lifecycle phases doing their own multi-threading as needed." />
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
+<modifier name="log-dir" dataAlias="LogFileDir" value="true" description="Directory to generate log files under. Defaults to /mgr/ipm-logs/namespace." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 </command>
 
@@ -498,6 +504,8 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="quiet" aliases="q" dataAlias="Verbose" dataValue="0" description="Produces minimal output from the command." />
 <modifier name="verbose" aliases="v" dataAlias="Verbose" dataValue="1" description="Produces verbose output from the command." />
 <modifier name="purge" dataAlias="Purge" dataValue="1" description="Purge data from tables during uninstall." />
+<modifier name="log-dir" dataAlias="LogFileDir" value="true" description="Directory to generate log files under.  Defaults to /mgr/ipm-logs/namespace." />
+<modifier name="no-log" dataAlias="NoLog" dataValue="1" description="Don't create a log file for this command." />
 
 </command>
 
@@ -1049,6 +1057,10 @@ ClassMethod ShellInternal(
 			new $$$ZPMCommandToLog
 			set $$$ZPMCommandToLog = tCommand
 
+            // Instantiate log file for command
+            set tCommandInfo("logMgr") = ##class(%IPM.General.LogManager).%Get()
+            $$$ThrowOnError(tCommandInfo("logMgr").InitializeLog($$$ZPMCommandToLog, .tCommandInfo))
+
             if (tCommandInfo = "quit") {
                 return
             } elseif (tCommandInfo = "help") {
@@ -1117,10 +1129,12 @@ ClassMethod ShellInternal(
         } catch pException {
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
+                do ##class(%IPM.General.LogManager).%Get().Finalize()
                 return
             }
             do ..DisplayError(pException.AsStatus())
         }
+        do ##class(%IPM.General.LogManager).%Get().Finalize()
 
         // Check if IPM has uninstalled itself - exit gracefully if so
         if $get(^||%IPM.SelfUninstallFlag, 0) {
@@ -1148,7 +1162,7 @@ ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal
             quit:name=""
             if ($get(pCommandInfo(key,name,"deprecated"),0)) {
                 set singularKey = $zconvert($extract(key,1),"U") _ $extract(key,2,*-1)
-                write !,$$$FormattedLine($$$Yellow, $$$FormatText("WARNING: %1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name)),!
+                $$$LogLine($$$FormatText("%1 '%2' is deprecated and will be removed in future versions. Run 'help <command name>' to view further details.",singularKey,name), $$$Warning, 1)
             }
         }
     }
@@ -1157,8 +1171,7 @@ ClassMethod WarnOnDeprecatedModifiersOrParameters(ByRef pCommandInfo) [ Internal
 ClassMethod DisplayError(pStatus As %Status)
 {
     if $$$ISERR(pStatus) {
-        write !,$$$FormattedLine($$$Red, "ERROR!")
-        write " ",$system.Status.GetOneStatusText(pStatus)
+        $$$LogLine($system.Status.GetOneStatusText(pStatus), $$$Error, 1)
     }
 }
 
@@ -2322,16 +2335,14 @@ ClassMethod LoadFromRepo(
     if $get(tParams("Branch"))'="" set tCmd=tCmd_" -b "_tParams("Branch")
     $$$ThrowOnError(##class(%IPM.Utils.Module).RunCommandViaZF(tCmd,.tLog,.tErr))
     set tDirectoryName = TempDir_slash_RepoName
-    if ($get(tParams("Verbose"))) {
-        write !,"Create tempory directory "_TempDir
-        write !,tCmd
-        for i=1:1:$get(tLog) {
-            write tLog(i),!
-        }
-        write !,tDirectoryName
+    $$$LogLine("Create temporary directory "_TempDir)
+    $$$LogLine(tCmd)
+    for i=1:1:$get(tLog) {
+        $$$LogLine(tLog(i))
     }
+    $$$LogLine(tDirectoryName)
     for i=1:1:$get(tErr) {
-        write tErr(i),!
+        $$$LogLine(tErr(i), $$$Error)
     }
     hang 2
     quit tDirectoryName
@@ -2376,7 +2387,6 @@ ClassMethod Sync(ByRef commandInfo) [ Private ]
     }
 }
 
-
 ClassMethod Load(
 	ByRef pCommandInfo,
 	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
@@ -2390,6 +2400,7 @@ ClassMethod Load(
 	try {
 		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
+        $$$LogLine(Ex.DisplayString(), $$$Error)
 		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
 		throw Ex
 	}
@@ -2433,14 +2444,10 @@ ClassMethod LoadInternal(
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = ##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory())
         set tTempExtractionRoot = tTargetDirectory
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Extracting archive to ",tTargetDirectory
-        }
+        $$$LogLine("Extracting archive to "_tTargetDirectory)
         $$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
         // Try to locate the top-level module.xml file
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Trying to locate module.xml file in ", tTargetDirectory
-        }
+        $$$LogLine("Trying to locate module.xml file in "_tTargetDirectory)
         set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
         if (tCount = 0) {
             $$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
@@ -2449,16 +2456,13 @@ ClassMethod LoadInternal(
         // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
         set tModuleFilePath = $listget(tList(tCount), *)
         set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Found "_tCount_" results. They are: "
-            set idx = ""
-            for {
-                set idx = $order(tList(idx))
-                quit:(idx="")
-                write !, $char(9), $list(tList(idx), *)
-            }
-            write !, "Using module.xml file at ", tModuleFilePath
+        set idx = ""
+        for {
+            set idx = $order(tList(idx))
+            quit:(idx="")
+            $$$LogLine("module.xml file found: "_$list(tList(idx), *))
         }
+        $$$LogLine("Using module.xml file at "_tModuleFilePath)
     }
 
     // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
@@ -2488,7 +2492,7 @@ ClassMethod LoadInternal(
 
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
-    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams, , pLog)
+    set tSC = ##class(%IPM.Utils.Module).LoadNewModule(tTargetDirectory, .tParams,, pLog)
     set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
     $$$ThrowOnError(tSC)
 }
@@ -2500,15 +2504,16 @@ ClassMethod CheckModuleNamespace() As %Status
         quit $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' in namespace '%2' because it is mapped from namespace '%3'.", $$$IPMModuleName, $namespace, sourceNS))
     }
     if $data(tIsMappedTo($namespace)) / 2 {
-        write !, "Will affect the following namespaces:", $namespace
+        set line = "Will affect the following namespaces: "_$namespace
         set ns = ""
         for {
             set ns = $order(tIsMappedTo($namespace, ns))
             if ns = "" {
                 quit
             }
-            write ", ", ns
+            set line = line_", "_ns
         }
+        $$$LogLine(line,,1)
     }
     quit $$$OK
 }
@@ -2590,8 +2595,8 @@ ClassMethod Install(
                     set tParams("cmd") = "install"
                     set tParams("Install") = 1
                 }
-				$$$ThrowOnError(log.SetSource(tResult.ServerName))
-				$$$ThrowOnError(log.SetVersion(tResult.Version))
+				        $$$ThrowOnError(log.SetSource(tResult.ServerName))
+				        $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))
             }
         } else {
@@ -2622,14 +2627,15 @@ ClassMethod Install(
             } elseif (tKeywords '= "") {
                 $$$ThrowStatus($$$ERROR($$$GeneralError,"No modules found matching keywords: '"_tKeywords_"'"))
             } else {
-                write !,"No modules found. Are there any repositories configured in the current namespace?"
+                $$$LogLine("No modules found. Are there any repositories configured in the current namespace?", $$$Warning, 1)
             }
         }
     } catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
-		throw ex
-	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+        $$$LogLine(ex.DisplayString(), $$$Error)
+        $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        throw ex
+    }
+    $$$ThrowOnError(log.Finalize($$$OK, devMode))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
@@ -2700,7 +2706,7 @@ ClassMethod Uninstall(ByRef pCommandInfo) [ Internal ]
 
             if $get(tParams("Clean","FullCleanup")) {
                 // User chose full cleanup - uninstall all modules
-                write !,"Performing full cleanup: uninstalling all modules..."
+                $$$LogLine("Performing full cleanup: uninstalling all modules...",,1)
                 $$$ThrowOnError(##class(%IPM.Utils.Module).UninstallAll(tForce,.tParams))
             }
 
@@ -2978,7 +2984,9 @@ ClassMethod ListInstalled(ByRef pCommandInfo) [ Private ]
 /// append "-d" for descending (e.g. "n-d", "d-d", "v-d"). Default: ascending by name.
 /// List entries are $listbuild(label, versionString, externalName, developerMode, root, lastUpdated)
 /// where label may be "ExternalName (internalName)" (e.g. "IPM (zpm)").
-ClassMethod SortList(ByRef list, sortModeRaw As %String) [ Internal ]
+ClassMethod SortList(
+	ByRef list,
+	sortModeRaw As %String) [ Internal ]
 {
     set newlist = ""
     set ipmEntry = ""
@@ -4149,7 +4157,7 @@ ClassMethod ShellScript(
 	pCommand As %String,
 	pOutputLogFile As %String = "",
 	pAppendToLog As %Boolean = 0,
-    pTerminateOnError As %Boolean = 1) As %Status
+	pTerminateOnError As %Boolean = 1) As %Status
 {
     set tSC = $$$OK
     set tFileOpen = 0
@@ -4381,21 +4389,18 @@ ClassMethod Update(ByRef pCommandInfo)
     if $get(pCommandInfo("data","PermitDowngrade"),0) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"The 'PermitDowngrade' flag is not allowed for the update command."))
     }
-    set verbose = $get(pCommandInfo("data","Verbose"))
     set version = $get(pCommandInfo("parameters","version"))
     set path = $$$GetModifier(pCommandInfo,"path")
     set moduleName = $get(pCommandInfo("parameters","module"))
     if '##class(%IPM.Storage.Module).NameExists(moduleName) && '##class(%IPM.Storage.Module).ExternalNameExists(moduleName) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Module "_moduleName_" has not been installed. Please use the install or load commands to install the module before calling update."))
     }
-    if verbose {
-        if path '= "" {
-            write !,"Resolving version of module specified by -path flag: ",path," to update",!
-        } elseif version = "" {
-            write !,"Resolving latest available version of module ",moduleName," to install",!
-        } else {
-            write !,"Preparing to update module ",moduleName," to version ",version,!
-        }
+    if path '= "" {
+        $$$LogLine("Resolving version of module specified by -path flag: "_path_" to update")
+    } elseif version = "" {
+        $$$LogLine("Resolving latest available version of module "_moduleName_" to install")
+    } else {
+        $$$LogLine("Preparing to update module "_moduleName_" to version "_version)
     }
     // Indicating to pCommandInfo that this is an update command, not an install or load command. pCommandInfo will be passed to either Install() or Load() to continue performing the update.
     set pCommandInfo("data","cmd") = "update"

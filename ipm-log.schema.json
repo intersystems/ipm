@@ -1,0 +1,66 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/1.0.0",
+    "title": "IPM Log Record",
+    "description": "Schema (version 1.0.0) for a single record in an IPM JSON Lines (NDJSON) log file. Each line of a '.jsonl' log is one JSON document: the first line is a header record and every subsequent line is a log entry.",
+    "$comment": "Validate each line of the NDJSON log independently against this schema; the file as a whole is not a single JSON document.",
+    "oneOf": [
+        {
+            "$ref": "#/$defs/header"
+        },
+        {
+            "$ref": "#/$defs/entry"
+        }
+    ],
+    "$defs": {
+        "header": {
+            "type": "object",
+            "description": "First record of a log file; identifies the IPM and log schema versions and the command being logged.",
+            "properties": {
+                "ipm": {
+                    "type": "string",
+                    "description": "IPM version that produced this log."
+                },
+                "command": {
+                    "type": "string",
+                    "description": "Command being logged, with credentials obfuscated."
+                }
+            },
+            "required": [
+                "ipm",
+                "command"
+            ],
+            "additionalProperties": false
+        },
+        "entry": {
+            "type": "object",
+            "description": "A single log line emitted during the command.",
+            "properties": {
+                "level": {
+                    "type": "string",
+                    "enum": [
+                        "TRACE",
+                        "INFO",
+                        "WARNING",
+                        "ERROR"
+                    ],
+                    "description": "Severity of the log entry."
+                },
+                "message": {
+                    "type": "string",
+                    "description": "Human-readable log message."
+                },
+                "timestamp": {
+                    "type": "string",
+                    "description": "Time the entry was written."
+                }
+            },
+            "required": [
+                "level",
+                "message",
+                "timestamp"
+            ],
+            "additionalProperties": false
+        }
+    }
+}

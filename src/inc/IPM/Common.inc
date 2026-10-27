@@ -10,6 +10,10 @@ ROUTINE %IPM.Common [Type=INC]
 #; Useful because each install/load/uninstall command can potentially affect multiple packages
 #; The log entry for each package should include the same command
 #define ZPMCommandToLog %IPMCommandToLog
+#define Error "ERROR"
+#define Trace "TRACE"
+#define Info "INFO"
+#define Warning "WARNING"
 
 #; Default packages for package manager, module lifecycle classes and resource processors
 #define ZPMRootPackage "%IPM"
@@ -42,10 +46,16 @@ ROUTINE %IPM.Common [Type=INC]
 #define ZPMLogWARNING	2
 #define ZPMLogERROR		3
 
+#; Log file tools
+#def1arg LogLine(%args) if ('##class(%IPM.General.LogManager).%Get().WriteLogLine(%args)) { do ##class(%IPM.General.LogManager).%Get().WriteLogLine("Error in writing to log manager", $$$Error) }
+
 #; System method/special variable wrappers
 #define InProgrammerMode ##class(%SYSTEM.Process).IsProgrammerMode()
 
 #; CLI tools
+#define HasData(%array,%x) ''$Data(%array("data",%x))
+#define GetData(%array,%x) $Get(%array("data",%x))
+#define GetDataDef(%array,%x,%y) $Get(%array("data",%x),%y)
 #define HasModifier(%array,%x) ''$Data(%array("modifiers",%x))
 #define GetModifier(%array,%x) $Get(%array("modifiers",%x))
 #define GetModifierDef(%array,%x,%y) $Get(%array("modifiers",%x),%y)

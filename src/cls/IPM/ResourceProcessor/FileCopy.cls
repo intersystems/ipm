@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.ResourceProcessor.FileCopy Extends %IPM.ResourceProcessor.Abstract
 {
 
@@ -164,8 +166,9 @@ Method DoCopy(
             }
         }
 
-        write:tVerbose !,"Copying ",tSource," to ",tTarget
+        set line = "Copying "_tSource_" to "_tTarget
         if (copyAsFile) {
+            $$$LogLine(line)
             if '##class(%File).Exists(tSource) {
                 set tSC = $$$ERROR($$$GeneralError, "Source file does not exist: "_tSource)
                 quit
@@ -175,7 +178,7 @@ Method DoCopy(
                 quit
             }
         } else {
-            write:tVerbose " as directory "
+            $$$LogLine(line_" as directory ")
             set tSC = ##class(%IPM.Utils.File).CopyDir(tSource,tTarget,'..Overlay)
         }
     } catch e {
@@ -203,13 +206,12 @@ Method OnPhase(
 	ByRef pParams,
 	Output pResourceHandled As %Boolean = 0) As %Status
 {
-    set tVerbose = $get(pParams("Verbose"))
     if (pPhase = "Clean") {
         set pResourceHandled = 1
         set tSource = ..ResourceReference.Module.Root _ ..Name
         set tTarget = ..InstallDirectory
         do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
-        write:tVerbose !,"Deleting ",tTarget
+        $$$LogLine("Deleting "_tTarget)
         if copyAsFile {
             do ##class(%File).Delete(tTarget)
         } else {

@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 /// This class contains inheritence hacks to override final methods in %Studio.* methods
 /// And provides utilities to work with extension classes and namespace-specific source control classes
 Class %IPM.ExtensionBase.CompositeMethodOverrides
@@ -203,7 +205,8 @@ Method GetMenuExtension(
                     }
                 } catch e {
                     set tSC = e.AsStatus()
-                    write !,"Error checking Studio extension menu item in ",tSourceNamespace,": ",$system.Status.GetErrorText(tSC)
+                    set $namespace = ..Namespace
+                    $$$LogLine("Error checking Studio extension menu item in "_tSourceNamespace_": "_$system.Status.GetErrorText(tSC), $$$Error, 1)
                 }
                 set $namespace = ..Namespace
             }
