@@ -205,6 +205,7 @@ Method GetMenuExtension(
                     }
                 } catch e {
                     set tSC = e.AsStatus()
+                    set $namespace = ..Namespace
                     $$$LogLine("Error checking Studio extension menu item in "_tSourceNamespace_": "_$system.Status.GetErrorText(tSC), $$$Error, 1)
                 }
                 set $namespace = ..Namespace
