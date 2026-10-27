@@ -122,13 +122,12 @@ Method OnBeforeAllTests() As %Status
     quit $$$OK
 }
 
-/// Resets test state: clears namespace/DB tracking lists, records original namespace,
-/// and creates a clean package output directory (wiping any leftover from previous runs).
+/// Resets test state: clears namespace/DB tracking lists and creates a clean package output
+/// directory (wiping any leftover from previous runs).
 Method OnBeforeOneTest() As %Status
 {
     set ..CreatedNamespaces = ""
     set ..CreatedGlobalsDatabases = ""
-    set ..OriginalNamespace = $namespace
     set ..PackageOutputDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "pkg-test-output")
     if ##class(%Library.File).DirectoryExists(..PackageOutputDir) {
         do ##class(%IPM.Utils.File).RemoveDirectoryTree(..PackageOutputDir)
@@ -1036,22 +1035,13 @@ ClassMethod DeletePattern(
     }
 }
 
-/// Returns how many files in dir match pattern, or 0 if dir does not exist.
-/// The last FileSet argument must be 0: with directories included they are returned regardless
-/// of the wildcard, so subdirectories would be counted.
+/// Returns how many files under dir match pattern, or 0 if dir does not exist.
 ClassMethod CountFiles(
 	dir As %String,
 	pattern As %String) As %Integer
 {
-    if '##class(%Library.File).DirectoryExists(dir) {
-        quit 0
-    }
-    set rs = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT COUNT(*) AS fileCount FROM %Library.File_FileSet(?, ?, ?, ?)",
-        dir, pattern, "", 0)
-    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-    do rs.%Next()
-    quit rs.%Get("fileCount")
+    quit:'##class(%Library.File).DirectoryExists(dir) 0
+    quit ##class(%IPM.Utils.File).FindFiles(dir, pattern)
 }
 
 /// Counts IRIS_<dbname>_*.DAT backup files in the routines DB directory for a namespace.
@@ -1100,7 +1090,15 @@ ClassMethod CaptureCall(
         throw exception
     }
 
-    quit ..JoinLines(.lines)
+    // One string, so assertions can match a warning by substring.
+    set text = ""
+    set key = ""
+    for {
+        set key = $order(lines(key))
+        quit:key=""
+        set text = text _ lines(key) _ $char(10)
+    }
+    quit text
 }
 
 /// Runs one of %IPM.Lifecycle.Database's packaging warnings for moduleName, installed in the current
@@ -1133,10 +1131,12 @@ Method ExtractPackage(
     quit extractDir
 }
 
-/// Reads a whole stream into a string. A single Read() stops at the chunk size, which would leave
+/// Reads a whole file into a string. A single Read() stops at the chunk size, which would leave
 /// substring assertions matching against a truncated document.
-ClassMethod ReadAll(stream As %Stream.Object) As %String
+ClassMethod ReadFile(path As %String) As %String
 {
+    set stream = ##class(%Stream.FileCharacter).%New()
+    $$$ThrowOnError(stream.LinkToFile(path))
     set text = ""
     while 'stream.AtEnd {
         set text = text _ stream.Read()
@@ -1147,9 +1147,7 @@ ClassMethod ReadAll(stream As %Stream.Object) As %String
 /// Returns the text of dir/module.xml.
 ClassMethod ReadPackageModuleXML(dir As %String) As %String
 {
-    set stream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(stream.LinkToFile(##class(%Library.File).NormalizeFilename("module.xml", dir)))
-    quit ..ReadAll(stream)
+    quit ..ReadFile(##class(%Library.File).NormalizeFilename("module.xml", dir))
 }
 
 /// Replaces the contents of dir/module.xml with xml.
@@ -1162,19 +1160,6 @@ ClassMethod WritePackageModuleXML(
     $$$ThrowOnError(stream.Clear())
     $$$ThrowOnError(stream.Write(xml))
     $$$ThrowOnError(stream.%Save())
-}
-
-/// Joins captured output lines into one string so assertions can match a warning by substring.
-ClassMethod JoinLines(ByRef lines) As %String
-{
-    set text = ""
-    set key = ""
-    for {
-        set key = $order(lines(key))
-        quit:key=""
-        set text = text _ lines(key) _ $char(10)
-    }
-    quit text
 }
 
 /// Removes all installed files of a Python package from the shared pip target directory.
@@ -1208,14 +1193,13 @@ Method TestDependencyResourcesAppliedDuringInstall()
     set $namespace = packagingNS
     set packageFile = ..PackageDatabase("main-with-resource-deps")
 
-    // A dependency's requirements.txt wheel is staged and injected into its manifest as a
+    // A dependency's requirements.txt wheel is staged and added to its manifest as a
     // <PythonWheel>, the only route by which the install gets it.
     set extractDir = ..ExtractPackage(packageFile, "dep-staging-check")
     set depStageDir = ##class(%IPM.Lifecycle.Database).GetDependencyStagingDir(extractDir, "dep-with-resources")
     do $$$AssertTrue(..CountFiles(##class(%Library.File).NormalizeDirectory("wheels", depStageDir), "six*.whl") > 0, "Dependency requirements.txt wheel (six) staged under deps-files/")
-    set manifestStream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(manifestStream.LinkToFile(##class(%Library.File).NormalizeFilename("dep-with-resources.xml", ##class(%Library.File).NormalizeDirectory("deps", extractDir))))
-    do $$$AssertTrue(..ReadAll(manifestStream) [ "PythonWheel", "Dependency manifest declares the injected <PythonWheel>")
+    set depManifest = ##class(%Library.File).NormalizeFilename("dep-with-resources.xml", ##class(%IPM.Lifecycle.Database).GetDepsDir(extractDir))
+    do $$$AssertTrue(..ReadFile(depManifest) [ "PythonWheel", "Dependency manifest declares the added <PythonWheel>")
 
     // The source load in the packaging namespace already created the dependency's FileCopy target.
     set depCopyTarget = ..ManagerParentFile("dep-res-data.txt")
@@ -1232,7 +1216,7 @@ Method TestDependencyResourcesAppliedDuringInstall()
 }
 
 /// Asserts the [config] globals 8KB-buffer setting both CPF fixtures target.
-/// Read-back property name matches Test.PM.Integration.CPFMerge:45.
+/// Read-back property name matches the one Test.PM.Integration.CPFMerge asserts on.
 /// A CPF merge is instance-wide, not namespace-scoped, so this test leaves globals8kb at the
 /// root fixture's value for whatever runs next. Test.PM.Integration.CPFMerge asserts its own
 /// value after its own merge, so it is unaffected by run order — but any new test that reads

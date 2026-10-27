@@ -610,8 +610,7 @@ ClassMethod Pull(
         $$$ThrowOnError(tSC)
         set stream = tFileBinStream
 
-        // Check hash and size against the manifest. VerifyModuleHashAndSize lowercases before
-        // comparing to the manifest digest, so the helper's lowercase hex is fine here.
+        // Check hash and size against the manifest
         set hash = ##class(%IPM.Utils.File).ComputeSHA256Hex(tempFile)
 
         set verified = ..VerifyModuleHashAndSize(registry, package _ ":" _ tag, namespace, username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))

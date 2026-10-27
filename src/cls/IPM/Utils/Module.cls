@@ -28,25 +28,25 @@ ClassMethod LoadQualifiedReference(
 {
     set tSC = $$$OK
     try {
-        set tSC = ..LoadModuleReference(pReference, .pParams, .pDependencyGraph, pLog)
+        #dim tReference As %IPM.Storage.QualifiedModuleInfo
+        set tReference = pReference.%ConstructClone()
+        set tSC = ..LoadModuleReference(tReference.ServerName, tReference.Name, tReference.VersionString, tReference.Deployed, tReference.PlatformVersion, .pParams, .pDependencyGraph, pLog)
     } catch e {
         set tSC = e.AsStatus()
     }
     quit tSC
 }
 
-/// Loads a module resolved from a repository. pReference is cloned rather than used directly, since this method adds the current
-/// platform version to PlatformVersions for deployed modules.
 ClassMethod LoadModuleReference(
-	pReference As %IPM.Storage.QualifiedModuleInfo,
+	pServerName As %String,
+	pModuleName As %String,
+	pVersion As %String,
+	pDeployed As %Boolean,
+	pPlatformVersion As %String,
 	ByRef pParams,
 	ByRef pDependencyGraph,
 	pLog As %IPM.General.AbstractHistory = "") As %Status
 {
-    set serverName = pReference.ServerName
-    set moduleName = pReference.Name
-    set version = pReference.VersionString
-
     // if install of module is already being logged, don't duplicate
     set prelogged = $case(pLog, "": 0, :1)
 
@@ -62,12 +62,12 @@ ClassMethod LoadModuleReference(
         }
         if pLog = "" {
             if $get(pParams("cmd")) = "install" {
-                set log = ##class(%IPM.General.HistoryTemp).InstallInit(moduleName)
+                set log = ##class(%IPM.General.HistoryTemp).InstallInit(pModuleName)
             } else {
-                set log = ##class(%IPM.General.HistoryTemp).LoadInit(moduleName)
+                set log = ##class(%IPM.General.HistoryTemp).LoadInit(pModuleName)
             }
-            $$$ThrowOnError(log.SetSource(serverName))
-            $$$ThrowOnError(log.SetVersion(version))
+            $$$ThrowOnError(log.SetSource(pServerName))
+            $$$ThrowOnError(log.SetVersion(pVersion))
         } else {
             set log = pLog
         }
@@ -84,24 +84,28 @@ ClassMethod LoadModuleReference(
         set manager = ##class(%IPM.Repo.Manager).%Get(.tSC)
         $$$ThrowOnError(tSC)
 
-        set tClient = manager.CheckServiceCache(serverName,.tAvailable)
+        set tClient = manager.CheckServiceCache(pServerName,.tAvailable)
         if 'tAvailable {
-            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",serverName))
+            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pServerName))
             quit
         }
-        set tModRef = pReference.%ConstructClone()
-        if tModRef.Deployed && 'tModRef.PlatformVersions.Find(tModRef.PlatformVersion) {
-            $$$ThrowOnError(tModRef.PlatformVersions.Insert(tModRef.PlatformVersion))
+        set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
+        set tModRef.Name = pModuleName
+        set tModRef.VersionString = pVersion
+        set tModRef.Deployed = pDeployed
+        set tModRef.PlatformVersion = pPlatformVersion
+        if pDeployed {
+            $$$ThrowOnError(tModRef.PlatformVersions.Insert(pPlatformVersion))
         }
 
         // Make sure we're not downgrading.
         if '$get(pParams("PermitDowngrade")) {
-            if ##class(%IPM.Storage.Module).NameExists(moduleName) {
-                set tInstModule = ##class(%IPM.Storage.Module).NameOpen(moduleName,,.tSC)
+            if ##class(%IPM.Storage.Module).NameExists(pModuleName) {
+                set tInstModule = ##class(%IPM.Storage.Module).NameOpen(pModuleName,,.tSC)
                 if $$$ISERR(tSC) {
                     quit
                 }
-                if $get(pParams("Install")),moduleName'=$$$IPMModuleName,tInstModule.DeveloperMode,'$get(pParams("DeveloperMode"),0) {
+                if $get(pParams("Install")),pModuleName'=$$$IPMModuleName,tInstModule.DeveloperMode,'$get(pParams("DeveloperMode"),0) {
                     set tSC = $$$ERROR($$$GeneralError, $$$FormatText("Cannot install '%1' over previously installed in developer mode", tInstModule.Name))
                     quit
                 }
@@ -110,13 +114,13 @@ ClassMethod LoadModuleReference(
 
         // Ensure requested versions match those required by other modules in the namespace, excluding versions currently being installed
         // (the requirements of such modules are already known to be satisfied)
-        set tSC = ..GetRequiredVersionExpression(moduleName,,.pDependencyGraph,.tExpression,.tSourceList)
+        set tSC = ..GetRequiredVersionExpression(pModuleName,,.pDependencyGraph,.tExpression,.tSourceList)
         if $$$ISERR(tSC) {
             quit
         }
         if 'tExpression.IsSatisfiedBy(tModRef.Version) {
             set tSourceString = $listtostring(tSourceList,"; ")
-            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Requested version (%1 %2) does not satisfy the requirements of other modules installed in the current namespace (%3).",tModRef.Name,version,tSourceString))
+            set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Requested version (%1 %2) does not satisfy the requirements of other modules installed in the current namespace (%3).",tModRef.Name,pVersion,tSourceString))
             quit
         }
 
@@ -131,14 +135,14 @@ ClassMethod LoadModuleReference(
             }
             set dotModules = ##class(%File).NormalizeDirectory(".modules", tDirectory)
             set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 0)
-            set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,serverName,log)
+            set tSC = ..LoadModuleFromDirectory(tDirectory,.pParams,tDeveloperMode,pServerName,log)
             set tSC = $$$ADDSC(tSC, tmpRepoMgr.CleanUp())
         } else {
             set tAsArchive = -1
             set tPayload = tClient.GetModule(tModRef, .tAsArchive)
             if (tVerbose) {
-                set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(serverName)
-                write !,"Module "_moduleName_" was downloaded from " _ serverName
+                set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
+                write !,"Module "_pModuleName_" was downloaded from " _ pServerName
                 if $isobject(serverDef) {
                     write " (",serverDef.Details,")"
                 }
@@ -165,7 +169,7 @@ ClassMethod LoadModuleReference(
             do tTmpStream.CopyFromAndSave(tPayload)
 
             if (tAsArchive) {
-                set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, serverName,log)
+                set tSC = ..LoadModuleFromArchive(tModRef.Name,tModRef.VersionString,tTmpStream,.pParams, pServerName,log)
             } else {
                 // Old format (TODO: officially deprecate): try loading a .xml file
 
@@ -186,7 +190,7 @@ ClassMethod LoadModuleReference(
                 set errorMsg = $system.Status.GetErrorText(tSC)
             }
             if ($system.CLS.IsMthd(tClient, "CollectAnalytics")) {
-                do tClient.CollectAnalytics("install", moduleName, version,success,errorMsg)
+                do tClient.CollectAnalytics("install", pModuleName, pVersion,success,errorMsg)
             }
         }
         if $$$ISERR(tSC) {
@@ -1382,7 +1386,7 @@ ClassMethod LoadDependencies(
             // Ignore modules already installed that do not need to be installed again
             continue
         }
-        set sc = ..LoadModuleReference(moduleReference, .pParams, .dependencyGraph)
+        set sc = ..LoadModuleReference(moduleReference.ServerName, moduleReference.Name, moduleReference.VersionString, moduleReference.Deployed, moduleReference.PlatformVersion, .pParams, .dependencyGraph)
         $$$ThrowOnError(sc)
     }
 

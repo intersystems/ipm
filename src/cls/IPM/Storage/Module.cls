@@ -554,9 +554,7 @@ ClassMethod ExecutePhases(
                 set tOnePhase = tNormalizedPhaseName
             }
             set tStart = $zhorolog
-            // "*" is a module-object refresh checkpoint, not a real phase.
-            // Reopens the module and lifecycle from storage to pick up changes
-            // made by earlier phases (e.g., module.xml edits during Reload).
+            // Refresh checkpoint, not a real phase (see %IPM.DataType.PhaseName).
             if tOnePhase="*" {
                 kill tModule,tLifecycle
                 set tModule = ..NameOpen(pModuleName,,.tSC)
@@ -1568,7 +1566,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
                 // Derive the correct class from the Packaging value via the canonical mapping.
                 set tSC = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(..Packaging, .tDerived)
                 quit:$$$ISERR(tSC)
-                if (tDerived '= "") && $$$comClassDefined(tDerived) {
+                if tDerived '= "" {
                     set ..LifecycleClass = tDerived
                 } else {
                     // No lifecycle class claims this packaging value, so there is nothing to switch to.

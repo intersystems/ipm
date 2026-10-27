@@ -36,7 +36,8 @@ Method %Package(ByRef params) As %Status
 
     try {
         set verbose = $get(params("Verbose"))
-        set includeTests = $get(params("IncludeTests"), ..Module.IncludeTests)
+        set params("IncludeTests") = $get(params("IncludeTests"), ..Module.IncludeTests)
+        set includeTests = params("IncludeTests")
 
         write:verbose !, "Starting database packaging: ", ..Module.Name, " v", ..Module.VersionString
         write:verbose !, "Validating..."
@@ -153,15 +154,8 @@ Method LoadTestResources(ByRef params)
     quit:'$data(toCompile)
 
     // CompileList rather than Compile, because the item names carry their extension (Foo.Bar.CLS).
-    set compileItems = ""
-    set docName = ""
-    for {
-        set docName = $order(toCompile(docName))
-        quit:docName=""
-        set compileItems = compileItems _ $select(compileItems="": "", 1: ",") _ docName
-    }
-    write:verbose !, "  Compiling test documents: ", compileItems
-    $$$ThrowOnError($system.OBJ.CompileList(compileItems, "ck-d"))
+    write:verbose !, "  Compiling test documents..."
+    $$$ThrowOnError($system.OBJ.CompileList(.toCompile, "ck-d"))
 }
 
 /// Dispatches to one of two contexts: installing a package, or the no-op Reload that precedes
@@ -320,13 +314,17 @@ Method WarnMappingsNotApplied()
         quit:mKey=""
         continue:'module.Mappings.Count()
 
-        set isRoot = (module.Name = ..Module.Name)
-        write !, "WARNING: ", module.Mappings.Count(), " <Mapping> element(s) in "
-        write $select(isRoot: "this module", 1: "dependency '" _ module.Name _ "'")
+        write !, "WARNING: ", module.Mappings.Count(), " <Mapping> element(s) in ", ..DescribeModule(module)
         write " will not be applied during this install, because it runs inside an outer transaction."
         write !, "  Globals, packages and routines these map from another database will resolve locally instead."
         write !, "  Apply them manually after install, or install this module from source."
     }
+}
+
+/// Returns "this module" for the root and "dependency '<name>'" otherwise, for warnings.
+Method DescribeModule(module As %IPM.Storage.Module) As %String [ Private ]
+{
+    quit $select(module.Name = ..Module.Name: "this module", 1: "dependency '" _ module.Name _ "'")
 }
 
 /// Warns about <Invoke> elements that no phase of a database install will reach.
@@ -367,7 +365,7 @@ Method WarnUnrunnableInvokes()
             }
 
             write !, "WARNING: <Invoke Class="""_invoke.Class_""" Method="""_invoke.Method_""" Phase="""_invoke.Phase_""" When="""_invoke.When_""">"
-            write " in ", $select(isRoot: "this module", 1: "dependency '" _ module.Name _ "'"), " will not run during database install."
+            write " in ", ..DescribeModule(module), " will not run during database install."
             if isRoot {
                 write !, "  Initialize and Reload.Before run before the swap mounts the packaged database."
                 write !, "  Use Phase=""Reload"" When=""After"" or a later phase instead."
@@ -403,7 +401,7 @@ Method WarnGlobalsNotShipped(includeTests As %Boolean)
             if 'includeTests && resource.IsTestScoped() {
                 continue
             }
-            write !, "WARNING: Global resource '", resource.Name, "' in ", $select(module.Name = ..Module.Name: "this module", 1: "dependency '" _ module.Name _ "'")
+            write !, "WARNING: Global resource '", resource.Name, "' in ", ..DescribeModule(module)
             write " cannot be shipped in a database package."
             set warned = 1
         }
@@ -440,16 +438,7 @@ Method WarnMissingDependencyCode()
 /// Warns when the database copy ships code from other installed modules, which this module did not ask for.
 Method WarnOtherModulesInDatabase()
 {
-    kill expected
-    set expected(..Module.Name) = ""
-    set deps = ..Module.GetDependencyModules()
-    set mKey = ""
-    for {
-        #dim depModule As %IPM.Storage.Module
-        set depModule = deps.GetNext(.mKey)
-        quit:mKey=""
-        set expected(depModule.Name) = ""
-    }
+    set expected = ..Module.GetDependencyNames() _ $listbuild(..Module.Name)
 
     set extra = ""
     set rs = ##class(%SQL.Statement).%ExecDirect(, "select Name from %IPM_Storage.ModuleItem")
@@ -457,7 +446,7 @@ Method WarnOtherModulesInDatabase()
     while rs.%Next(.sc) {
         $$$ThrowOnError(sc)
         set name = rs.%Get("Name")
-        continue:$data(expected(name))
+        continue:$listfind(expected, name)
         #dim otherModule As %IPM.Storage.Module
         set otherModule = ##class(%IPM.Storage.Module).NameOpen(name)
         continue:'$isobject(otherModule)
@@ -544,7 +533,7 @@ ClassMethod WarnRoutinesDatabaseSharedForPackaging(ns As %String)
 /// Throws if IPM classes are in the local routines database. IPM must be mapped so it survives the swap.
 ClassMethod ValidateIPMNotInRoutinesDB()
 {
-    if ##class(%Dictionary.ClassDefinition).%ExistsId("%IPM.Main") && '##class(%Library.RoutineMgr).IsMapped("%IPM.Main.CLS") {
+    if ..IsLocalDocument("%IPM.Main.CLS") {
         set msg = "%IPM classes live in the routines database of namespace " _ $namespace _ ", so packaging would ship IPM itself and the swap would replace it. "
         set msg = msg _ "Install IPM in another namespace, run zpm ""uninstall zpm"" here, then map it in from that namespace with zpm ""enable -map -ns " _ $namespace _ """."
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
@@ -688,11 +677,15 @@ ClassMethod DismountAndCopyDatabase(
 
     // Remount even after a failed copy. Leaving the namespace's code database dismounted is worse
     // than any packaging error.
-    set mountSC = ##class(SYS.Database).MountDatabase(dbDir)
-    if $system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
-        set mountSC = $$$OK
-    }
+    set mountSC = ..RemountDatabase(dbDir)
     quit copySC
+}
+
+/// Mounts dbDir, treating an already mounted database as success. Runs in %SYS and writes nothing.
+ClassMethod RemountDatabase(dbDir As %String) As %Status
+{
+    set sc = ##class(SYS.Database).MountDatabase(dbDir)
+    quit $select($system.Status.Equals(sc, $$$ERRORCODE($$$AlreadyMounted)): $$$OK, 1: sc)
 }
 
 /// Enriches an already-populated staging dir and creates the final .tgz, whose path it returns.
@@ -701,11 +694,12 @@ Method AssemblePackage(
 	stagingDir As %String,
 	ByRef params) As %String
 {
+    set verbose = $get(params("Verbose"))
     set stagedDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", stagingDir)
 
     // Checksum the staged file. Those are the exact bytes the .tgz ships and the live database it
     // came from may have moved on since.
-    write:$get(params("Verbose")) !, "Computing SHA-256 checksum..."
+    write:verbose !, "Computing SHA-256 checksum..."
     set checksumHex = ##class(%IPM.Utils.File).ComputeSHA256Hex(stagedDAT)
     write !!, "Checksum: ", checksumHex
 
@@ -721,7 +715,7 @@ Method AssemblePackage(
 
     set outputDir = $get(params("Path"))
     if outputDir = "" {
-        set outputDir = ##class(%Library.File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory())
+        set outputDir = ##class(%IPM.Utils.File).CreateTempDirectory()
     } else {
         set outputDir = ##class(%Library.File).NormalizeDirectory(outputDir)
         $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
@@ -730,7 +724,6 @@ Method AssemblePackage(
     set packageFile = ##class(%Library.File).Construct(outputDir, ..Module.Name _ "-" _ ..Module.VersionString _ "-database.tgz")
     $$$ThrowOnError(##class(%IPM.General.Archive).Create(stagingDir, packageFile, .archiveOutput))
 
-    set verbose = $get(params("Verbose"))
     for i=1:1:$get(archiveOutput) {
         write:verbose !, archiveOutput(i)
     }
@@ -757,7 +750,7 @@ Method CopyNonCompiledResources(
 	stagingDir As %String,
 	ByRef params)
 {
-    set includeTestResources = $get(params("IncludeTests"), ..Module.IncludeTests)
+    set includeTestResources = params("IncludeTests")
     do ..StageModuleResources(..Module, stagingDir, includeTestResources, .params)
 
     set deps = ..Module.GetDependencyModules()
@@ -916,24 +909,20 @@ ClassMethod CompilePackagingTransform(checksumHex As %String, irisVersion As %St
 /// loadable at install time with $system.OBJ.Load.
 Method WriteDependencies(targetDir As %String)
 {
-    set depsDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).NormalizeFilename("deps", targetDir))
-    if '##class(%Library.File).CreateDirectoryChain(depsDir) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot create deps directory: " _ depsDir))
-    }
+    set depsDir = ..GetDepsDir(targetDir)
+    $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(depsDir))
 
     set depNames = ..Module.GetDependencyNames()
     set ptr = 0
     while $listnext(depNames, ptr, depName) {
-        set depFile = ##class(%Library.File).NormalizeFilename(depName _ ".xml", depsDir)
-        set fileStream = ##class(%Stream.FileCharacter).%New()
-        $$$ThrowOnError(fileStream.LinkToFile(depFile))
-        set exportStream = ##class(%Stream.TmpCharacter).%New()
-        $$$ThrowOnError($system.OBJ.ExportToStream(depName _ ".ZPM", .exportStream, "-d"))
-        $$$ThrowOnError(exportStream.Rewind())
-        $$$ThrowOnError(fileStream.CopyFrom(exportStream))
-        $$$ThrowOnError(fileStream.%Save())
+        $$$ThrowOnError($system.OBJ.Export(depName _ ".ZPM", ##class(%Library.File).Construct(depsDir, depName _ ".xml"), "-d"))
     }
+}
+
+/// Returns the deps/ directory of a package rooted at dir.
+ClassMethod GetDepsDir(dir As %String) As %String
+{
+    quit ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(dir, "deps"))
 }
 
 // =====================================================================
@@ -972,8 +961,7 @@ Method ValidateBeforeSwap(
     $$$ThrowOnError(xmlStream.LinkToFile(##class(%Library.File).NormalizeFilename("module.xml", packageDir)))
     $$$ThrowOnError(##class(%XML.XPATH.Document).CreateFromStream(xmlStream, .xpathDoc))
 
-    set depsDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).NormalizeFilename("deps", packageDir))
+    set depsDir = ..GetDepsDir(packageDir)
     if '##class(%Library.File).DirectoryExists(depsDir) {
         set msg = "Database package is missing deps/ directory in: " _ packageDir
         $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
@@ -1142,17 +1130,9 @@ ClassMethod UnconfigureStaleModules(
 ClassMethod GetPackagedDependencyNames(depsDir As %String) As %List
 {
     set names = ""
-    set rs = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT ItemName FROM %Library.File_FileSet(?, ?, ?, ?)",
-        depsDir, "*.xml", "", 0)
-    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-    while rs.%Next(.sc) {
-        $$$ThrowOnError(sc)
-        set itemName = rs.%Get("ItemName")
-        continue:itemName=""
-        set names = names _ $listbuild($piece(itemName, ".", 1, *-1))
+    for i = 1:1:##class(%IPM.Utils.File).FindFiles(depsDir, "*.xml", .files) {
+        set names = names _ $listbuild($piece($listget(files(i), 1), ".", 1, *-1))
     }
-    $$$ThrowOnError(sc)
     quit names
 }
 
@@ -1274,8 +1254,7 @@ Method PerformDatabaseSwap(
                 set sc = $$$ADDSC(sc, $$$ERROR($$$GeneralError, "Could not restore the original IRIS.DAT from " _ backupPath _ ". Restore it manually."))
             }
         }
-        set mountSC = ##class(SYS.Database).MountDatabase(dbDir)
-        if $$$ISERR(mountSC) && '$system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
+        if $$$ISERR(..RemountDatabase(dbDir)) {
             set sc = $$$ADDSC(sc, $$$ERROR($$$GeneralError, "Could not remount " _ dbDir _ ". Mount it manually."))
         }
         $$$ThrowStatus(sc)
@@ -1289,18 +1268,10 @@ Method PerformDatabaseSwap(
 /// failures together.
 ClassMethod RegisterDependencyMetadata(packageDir As %String)
 {
-    set depsDir = ##class(%Library.File).NormalizeDirectory(
-        ##class(%Library.File).NormalizeFilename("deps", packageDir))
-
     // Each file in deps/ is a standalone IRIS export, one per dependency.
-    set rs = ##class(%SQL.Statement).%ExecDirect(,
-        "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?)",
-        depsDir, "*.xml", "", 0)
-    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
     set loadSC = $$$OK
-    while rs.%Next(.sc) {
-        $$$ThrowOnError(sc)
-        set fileName = rs.%Get("Name")
+    for i = 1:1:##class(%IPM.Utils.File).FindFiles(..GetDepsDir(packageDir), "*.xml", .files) {
+        set fileName = $listget(files(i), 2)
         set oneSC = $system.OBJ.Load(fileName, "ck")
         if $$$ISERR(oneSC) {
             // Written as it happens: DisplayError shows only the first error of a combined status.
@@ -1308,7 +1279,6 @@ ClassMethod RegisterDependencyMetadata(packageDir As %String)
             set loadSC = $$$ADDSC(loadSC, oneSC)
         }
     }
-    $$$ThrowOnError(sc)
     $$$ThrowOnError(loadSC)
 }
 
@@ -1356,24 +1326,22 @@ Method ApplyDependencyResources(
 {
     kill depInitClasses
 
-    set depNames = ..Module.GetDependencyNames()
+    set deps = ..Module.GetDependencyModules()
     set verbose = $get(params("Verbose"))
     set isUpdate = $get(params("Update"), 0)
     set depPhases = ..GetDependencyInstallPhases(isUpdate)
-    set ptr = 0
-    while $listnext(depNames, ptr, depName) {
-        set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
-        $$$ThrowOnError(sc)
+    for i = 1:1:deps.Count() {
+        set depModule = deps.GetAt(i)
+        set depName = depModule.Name
         do ..CollectInitializePhaseClasses(depModule, .depInitClasses)
 
         write:verbose !, "Applying resources for dependency ", depName
 
-        // Only Verbose, cmd and Update carry over: the root's remaining install params (install
-        // context, root directory, swap flag, previous dependency set) describe the incoming
-        // package. Update decides whether Activate seeds update steps or ApplyUpdateSteps runs them.
+        // Only Verbose and Update carry over: the root's remaining install params (install context,
+        // root directory, swap flag, previous dependency set) describe the incoming package. Update
+        // decides whether Activate seeds update steps or ApplyUpdateSteps runs them.
         kill depParams
         set depParams("Verbose") = verbose
-        set depParams("cmd") = $get(params("cmd"))
         set depParams("Update") = isUpdate
         set depParams("RootDirectory") = ..GetDependencyStagingDir(packageDir, depName)
 
@@ -1403,9 +1371,6 @@ Method ReassertRootInitializeResources(
         quit
     }
 
-    kill rootInitClasses
-    do ..CollectInitializePhaseClasses(..Module, .rootInitClasses)
-
     set orderedResourceList = ..Module.GetOrderedResourceList()
     set key = ""
     for {
@@ -1416,7 +1381,7 @@ Method ReassertRootInitializeResources(
 
         do resource.Processor.SetParams(.params)
 
-        if resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") && $data(depInitClasses("%IPM.ResourceProcessor.CPF")) && $data(rootInitClasses("%IPM.ResourceProcessor.CPF")) {
+        if resource.Processor.%IsA("%IPM.ResourceProcessor.CPF") && $data(depInitClasses("%IPM.ResourceProcessor.CPF")) {
             if (resource.Processor.CustomPhase '= "") || (resource.Processor.Phase '= "Initialize") {
                 continue
             }

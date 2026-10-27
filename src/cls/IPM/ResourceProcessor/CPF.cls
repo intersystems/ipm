@@ -112,9 +112,12 @@ Method OnExportItem(
 /// Resolves the absolute path of the CPF source file. Throws if the file is missing.
 Method GetSourceFile() As %String [ Private ]
 {
-    set filename = ##class(%File).NormalizeFilename(##class(%File).Construct(..ResourceReference.Module.Root, ..GetRelativePath()))
-    if '##class(%File).Exists(filename) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, ##class(%File).GetDirectory(filename))))
+    set root = ..ResourceReference.Module.Root
+    set sourcesRoot = ..ResourceReference.Module.SourcesRoot
+    set dir = ##class(%File).Construct(root, sourcesRoot, ..Directory)
+    set filename = ##class(%File).NormalizeFilename(..Name, dir)
+    if (filename = "") || ('##class(%File).Exists(filename)) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
     }
     return filename
 }
