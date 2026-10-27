@@ -217,8 +217,9 @@ Method OnConfigureMappings(ByRef pParams) As %Status
 /// -export-python-deps.
 Method OnStageForDatabasePackage(
 	targetDir As %String,
-	ByRef params)
+	ByRef params) As %Status
 {
+    quit $$$OK
 }
 
 /// Called during 'sync' for resources whose files changed on disk.

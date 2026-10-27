@@ -127,11 +127,17 @@ Method GetRelativePath() As %String [ Private ]
 
 Method OnStageForDatabasePackage(
 	targetDir As %String,
-	ByRef params)
+	ByRef params) As %Status
 {
-    set relativePath = ..GetRelativePath()
-    set sourcePath = ##class(%File).NormalizeFilename(##class(%File).Construct(..ResourceReference.Module.Root, relativePath))
-    do ##class(%IPM.Utils.File).StageResourceFile(..ResourceReference.Name, sourcePath, ##class(%File).Construct(targetDir, relativePath))
+    set sc = $$$OK
+    try {
+        set relativePath = ..GetRelativePath()
+        set sourcePath = ##class(%File).NormalizeFilename(##class(%File).Construct(..ResourceReference.Module.Root, relativePath))
+        do ##class(%IPM.Utils.File).StageResourceFile(..ResourceReference.Name, sourcePath, ##class(%File).Construct(targetDir, relativePath))
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    quit sc
 }
 
 Method DoMerge(ByRef pParams) As %Status

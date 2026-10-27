@@ -1183,14 +1183,8 @@ ClassMethod LoadNewModule(
             set fromVersion = moduleCurrent.Version
             set fromVersionString = moduleCurrent.VersionString
             if foundNewModuleObj && (newModuleObj.Packaging = "database") {
-                // Capture the currently installed version's flattened dependency set before the
-                // load below overwrites this module's stored manifest. The database install needs
-                // it to tell a dependency this package used to carry (its code came from the old
-                // IRIS.DAT and is about to be replaced) from an unrelated module the user
-                // installed themselves (whose code the swap would destroy). Flattened, so a
-                // dependency that merely moved to a different parent is not seen as dropped.
-                // A dependency with no installed record is omitted, which is harmless: with no
-                // record there is nothing to orphan and nothing to clean up.
+                // Captured before the load below overwrites this module's manifest, so the database
+                // install can tell a dependency this package dropped from a module the user installed.
                 set params("PreviousDependencies") = moduleCurrent.GetDependencyNames()
             }
         }

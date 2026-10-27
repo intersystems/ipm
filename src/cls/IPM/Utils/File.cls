@@ -82,35 +82,26 @@ ClassMethod CopyFile(
     quit tSC
 }
 
-/// Stages a resource's file, warning if it doesn't exist. A missing file would ship silently
-/// and only surface at install time on the user's system.
+/// Copies a resource's file, or a whole directory tree, to destPath, creating parent directories as
+/// needed. A <FileCopy> resource names either and the processor resolves both at install time, so
+/// both must be staged.
+/// Throws on failure. Warns if sourcePath doesn't exist: a missing file would ship silently and
+/// only surface at install time on the user's system.
 ClassMethod StageResourceFile(
 	resourceName As %String,
 	sourcePath As %String,
 	destPath As %String)
-{
-    if '..StageFile(sourcePath, destPath) {
-        do ##class(%IPM.General.LogManager).Warning("Resource '" _ resourceName _ "' will be missing from this package: " _ sourcePath _ " not found")
-    }
-}
-
-/// Copies a file, or a whole directory tree, to a destination path, creating parent directories as
-/// needed. A <FileCopy> resource names either and the processor resolves both at install time, so
-/// both must be staged.
-/// Throws on failure. Returns 1 if the source was copied, 0 if it did not exist.
-ClassMethod StageFile(
-	sourcePath As %String,
-	destPath As %String) As %Boolean
 {
     // %Library.File.Exists is true for directories too, so test for a directory first.
     if ##class(%Library.File).DirectoryExists(sourcePath) {
         set destDir = ##class(%Library.File).NormalizeDirectory(destPath)
         $$$ThrowOnError(..CreateDirectoryChain(destDir))
         $$$ThrowOnError(..CopyDir(sourcePath, destDir))
-        quit 1
+        quit
     }
     if '##class(%Library.File).Exists(sourcePath) {
-        quit 0
+        do ##class(%IPM.General.LogManager).Warning("Resource '" _ resourceName _ "' will be missing from this package: " _ sourcePath _ " not found")
+        quit
     }
     // Callers build destPath with Construct, which joins with the platform delimiter but leaves any
     // separators already inside a segment alone. Normalize before splitting off the directory.
@@ -118,7 +109,6 @@ ClassMethod StageFile(
     set destDir = ##class(%Library.File).GetDirectory(destPath)
     $$$ThrowOnError(..CreateDirectoryChain(destDir))
     $$$ThrowOnError(..CopyFile(sourcePath, destPath, 1))
-    quit 1
 }
 
 ClassMethod CopyDir(

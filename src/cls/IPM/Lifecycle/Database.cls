@@ -25,8 +25,7 @@ Parameter PACKAGING As STRING [ Final ] = "database";
 /// 5. Enrich the staging dir (module.xml with the staged IRIS.DAT's SHA-256 checksum, deps/
 ///    manifests, non-compiled resources, Python wheels) and create the .tgz
 ///
-/// Step 3 is the only loading or compiling done here, so what ships is what the namespace holds after
-/// the Compile phase, which runs first, has compiled the module's own resources.
+/// What ships is what the namespace holds after the Compile phase, plus step 3's test resources.
 /// The staging dir is removed on every path.
 Method %Package(ByRef params) As %Status
 {
@@ -60,11 +59,13 @@ Method %Package(ByRef params) As %Status
         }
 
         if $get(params("ExportPythonDependencies"), 1) {
-            do ..ExportPythonDependencies(..Module, .params)
+            set modules = ..GetSelfAndDependencyModules()
+            for i = 1:1:modules.Count() {
+                do ..ExportPythonDependencies(modules.GetAt(i), .params)
+            }
         }
 
-        set stagingDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(##class(%IPM.Utils.File).CreateTempDirectory(), "stage"))
-        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(stagingDir))
+        set stagingDir = ##class(%IPM.Utils.File).CreateTempDirectory()
 
         write:verbose !, "Copying the routines database..."
         do ..CopyRoutinesDatabase(ns, stagingDir)
@@ -177,12 +178,8 @@ Method %Reload(ByRef params) As %Status
     if '$data(params("RootDirectory")) {
         quit $$$OK
     }
-    // A packaged manifest with no IRIS.DAT beside it is what a completed swap leaves, since
-    // PerformDatabaseSwap moves IRIS.DAT rather than copying it.
-    if ..IsDatabasePackagedManifest(params("RootDirectory")) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "This directory holds a database package whose IRIS.DAT is no longer present (" _ params("RootDirectory") _ "). The swap that has already run moved it into the database directory. Re-run the install from the original .tgz rather than from this directory."))
-    }
-    set msg = "module.xml in " _ params("RootDirectory") _ " declares <Packaging>database</Packaging> but there is no IRIS.DAT beside it."
+    // Also what a completed install leaves, since PerformDatabaseSwap moves IRIS.DAT out.
+    set msg = "module.xml in " _ params("RootDirectory") _ " declares <Packaging>database</Packaging> but there is no IRIS.DAT beside it. "
     $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
 }
 
@@ -194,8 +191,7 @@ Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
 {
     set params("DatabaseInstall") = 1
     set sc = $$$OK
-    set dbDir = ""
-    set backupPath = ""
+    set swapStarted = 0
     set swapCompleted = 0
     set staleModules = ""
     set verbose = $get(params("Verbose"))
@@ -217,7 +213,8 @@ Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
         // the part of their installation the swap cannot reach (web apps, installer classes).
         do ..UnconfigureStaleModules(staleModules, .params)
 
-        do ..PerformDatabaseSwap(packageDir, ns, .dbDir, .backupPath)
+        set swapStarted = 1
+        set backupPath = ..PerformDatabaseSwap(packageDir, ns)
         // Past this point the swap is the state to keep, not to undo: a rollback would discard a
         // good swap and could not reverse the side effects of the steps that follow.
         set swapCompleted = 1
@@ -259,11 +256,10 @@ Method DoDatabaseInstall(ByRef params) As %Status [ Private ]
         set sc = ex.AsStatus()
         if swapCompleted {
             do ..ReportPostSwapFailure(sc, $get(ns, $namespace), backupPath, $get(params("Update"), 0))
-        } elseif dbDir '= "" {
-            write !, "ERROR: encountered an error: ", $system.Status.GetErrorText(sc)
-            write !, "Attempting to roll back system state..."
-            do ..RollbackDatabaseSwap(dbDir, backupPath)
-            write !, "Finished rollback attempt. Please verify whether namespace state is as expected prior to performing the DB swap."
+        } elseif swapStarted {
+            // Written here as well as returned: DisplayError shows only the first error of a combined
+            // status and the rest say what the restore could not do.
+            write !, "ERROR: the database swap failed: ", $system.Status.GetErrorText(sc)
             if staleModules '= "" {
                 write !, "WARNING: the rollback restored the previous IRIS.DAT, but it cannot restore what was already"
                 write !, "  unconfigured before the swap. These modules had their web applications removed and their"
@@ -445,14 +441,14 @@ Method WarnMissingDependencyCode()
 Method WarnOtherModulesInDatabase()
 {
     kill expected
-    set expected($zconvert(..Module.Name, "U")) = ""
+    set expected(..Module.Name) = ""
     set deps = ..Module.GetDependencyModules()
     set mKey = ""
     for {
         #dim depModule As %IPM.Storage.Module
         set depModule = deps.GetNext(.mKey)
         quit:mKey=""
-        set expected($zconvert(depModule.Name, "U")) = ""
+        set expected(depModule.Name) = ""
     }
 
     set extra = ""
@@ -461,7 +457,7 @@ Method WarnOtherModulesInDatabase()
     while rs.%Next(.sc) {
         $$$ThrowOnError(sc)
         set name = rs.%Get("Name")
-        continue:$data(expected($zconvert(name, "U")))
+        continue:$data(expected(name))
         #dim otherModule As %IPM.Storage.Module
         set otherModule = ##class(%IPM.Storage.Module).NameOpen(name)
         continue:'$isobject(otherModule)
@@ -634,14 +630,9 @@ ClassMethod WarnRoutinesDatabaseIsGlobalsDatabase(ns As %String)
     write !, "  Give ", ns, " a globals database of its own before installing a database package."
 }
 
-/// Copies the routines database of ns into stagingDir as IRIS.DAT. This is the whole of what
-/// database packaging produces: the package carries a namespace's database as it stands, not a build.
-/// The database is dismounted for the copy and remounted afterwards, so ns cannot run code while the
-/// copy runs. The dismount is not an optimization to skip: a copy of a mounted IRIS.DAT reads only
-/// what is on disk and blocks written since the write daemon last ran are still in the buffer pool,
-/// so code compiled shortly before packaging would be missing from the copy. Dismounting flushes.
-/// The caller must have validated that the database is not mirrored, since dismounting a mirrored
-/// database breaks the mirror (see ValidateRoutinesDatabaseNotMirrored).
+/// Copies the routines database of ns into stagingDir as IRIS.DAT. The database is dismounted for
+/// the copy so blocks still in the buffer pool are flushed to disk, and ns cannot run code until the
+/// remount. The caller must have checked that the database is not mirrored.
 ClassMethod CopyRoutinesDatabase(
 	ns As %String,
 	stagingDir As %String)
@@ -711,9 +702,6 @@ Method AssemblePackage(
 	ByRef params) As %String
 {
     set stagedDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", stagingDir)
-    if '##class(%Library.File).Exists(stagedDAT) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Staging directory has no IRIS.DAT: " _ stagingDir))
-    }
 
     // Checksum the staged file. Those are the exact bytes the .tgz ships and the live database it
     // came from may have moved on since.
@@ -722,29 +710,21 @@ Method AssemblePackage(
     write !!, "Checksum: ", checksumHex
 
     // Stage non-compiled resource files so processors can find them during install
-    set includeTestResources = $get(params("IncludeTests"), ..Module.IncludeTests)
-    set exportPythonDeps = $get(params("ExportPythonDependencies"), 1)
-    do ..CopyNonCompiledResources(stagingDir, includeTestResources, exportPythonDeps)
-    kill depWheels
-    if exportPythonDeps {
-        do ..StageDependencyWheels(stagingDir, .params, .depWheels)
-    }
+    do ..CopyNonCompiledResources(stagingDir, .params)
 
     // Bare "<major>.<minor>" is an exact-match semver expression, not a floor, so the package will
     // only install on the IRIS version that built it.
     set irisVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
     write !, "This package will only install on IRIS ", irisVersion, ", the version it was built on."
     do ..WritePackageModuleXML(stagingDir, checksumHex, irisVersion)
-    do ..WriteDependencies(stagingDir, .depWheels)
+    do ..WriteDependencies(stagingDir)
 
     set outputDir = $get(params("Path"))
     if outputDir = "" {
         set outputDir = ##class(%Library.File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory())
     } else {
         set outputDir = ##class(%Library.File).NormalizeDirectory(outputDir)
-        if '##class(%Library.File).DirectoryExists(outputDir) {
-            $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
-        }
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(outputDir))
     }
 
     set packageFile = ##class(%Library.File).Construct(outputDir, ..Module.Name _ "-" _ ..Module.VersionString _ "-database.tgz")
@@ -775,10 +755,9 @@ ClassMethod GetDependencyStagingDir(
 /// Root pointing at a nonexistent directory would resolve paths on the packaging machine instead.
 Method CopyNonCompiledResources(
 	stagingDir As %String,
-	includeTestResources As %Boolean,
-	exportPythonDeps As %Boolean = 1)
+	ByRef params)
 {
-    set params("ExportPythonDependencies") = exportPythonDeps
+    set includeTestResources = $get(params("IncludeTests"), ..Module.IncludeTests)
     do ..StageModuleResources(..Module, stagingDir, includeTestResources, .params)
 
     set deps = ..Module.GetDependencyModules()
@@ -815,74 +794,7 @@ ClassMethod StageModuleResources(
         if '$isobject(resource.Processor) {
             continue
         }
-        do resource.Processor.OnStageForDatabasePackage(targetDir, .params)
-    }
-}
-
-/// Downloads each dependency's requirements.txt wheels and stages them under
-/// deps-files/<depname>/wheels/. Returns depWheels(depName, wheelName) = "" for each wheel that is
-/// not already an explicit <PythonWheel> resource; WriteDependencies injects those into the
-/// dependency's exported manifest so the install-time dependency pass installs them.
-/// Injecting into the export rather than the installed .ZPM keeps the packaging machine unmodified.
-Method StageDependencyWheels(
-	stagingDir As %String,
-	ByRef params,
-	Output depWheels) [ Private ]
-{
-    kill depWheels
-
-    set deps = ..Module.GetDependencyModules()
-    set mKey = ""
-    for {
-        #dim depModule As %IPM.Storage.Module
-        set depModule = deps.GetNext(.mKey)
-        quit:mKey=""
-
-        set depRoot = ##class(%Library.File).NormalizeDirectory("", depModule.Root)
-        if '##class(%Library.File).Exists(##class(%Library.File).NormalizeFilename("requirements.txt", depRoot)) {
-            continue
-        }
-
-        $$$ThrowOnError(..InstallOrDownloadPythonRequirements(depRoot, .params, 1))
-
-        set wheelsDir = ##class(%Library.File).NormalizeDirectory("wheels", depRoot)
-        if '##class(%Library.File).DirectoryExists(wheelsDir) {
-            write !, "WARNING: No wheels directory for dependency '", depModule.Name, "': ", wheelsDir, " not found"
-            continue
-        }
-
-        // Wheels already declared as <PythonWheel> are staged by StageModuleResources; injecting
-        // them again would give the dependency two resources for one file.
-        kill declared
-        set declaredList = depModule.GetOrderedResourceList()
-        set rKey = ""
-        for {
-            #dim depResource As %IPM.Storage.ResourceReference
-            set depResource = declaredList.GetNext(.rKey)
-            quit:rKey=""
-            set declared($zconvert(depResource.Name, "L")) = ""
-        }
-
-        set destWheelDir = ##class(%Library.File).Construct(..GetDependencyStagingDir(stagingDir, depModule.Name), "wheels")
-
-        set rs = ##class(%SQL.Statement).%ExecDirect(,
-            "SELECT ItemName FROM %Library.File_FileSet(?, ?, ?, ?)",
-            wheelsDir, "*.whl", "", 0)
-        $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
-        set sc = $$$OK
-        while rs.%Next(.sc) {
-            $$$ThrowOnError(sc)
-            set wheelName = rs.%Get("ItemName")
-            continue:wheelName=""
-            do ##class(%IPM.Utils.File).StageResourceFile(
-                depModule.Name _ "/" _ wheelName,
-                ##class(%Library.File).NormalizeFilename(wheelName, wheelsDir),
-                ##class(%Library.File).Construct(destWheelDir, wheelName))
-            if '$data(declared($zconvert(wheelName, "L"))) {
-                set depWheels(depModule.Name, wheelName) = ""
-            }
-        }
-        $$$ThrowOnError(sc)
+        $$$ThrowOnError(resource.Processor.OnStageForDatabasePackage(targetDir, .params))
     }
 }
 
@@ -1002,11 +914,7 @@ ClassMethod CompilePackagingTransform(checksumHex As %String, irisVersion As %St
 
 /// Writes each dependency's IPM metadata to deps/<name>.xml as a standalone IRIS export,
 /// loadable at install time with $system.OBJ.Load.
-/// depWheels(depName, wheelName) entries are injected as <PythonWheel> elements into that
-/// dependency's exported manifest.
-Method WriteDependencies(
-	targetDir As %String,
-	ByRef depWheels)
+Method WriteDependencies(targetDir As %String)
 {
     set depsDir = ##class(%Library.File).NormalizeDirectory(
         ##class(%Library.File).NormalizeFilename("deps", targetDir))
@@ -1022,17 +930,6 @@ Method WriteDependencies(
         $$$ThrowOnError(fileStream.LinkToFile(depFile))
         set exportStream = ##class(%Stream.TmpCharacter).%New()
         $$$ThrowOnError($system.OBJ.ExportToStream(depName _ ".ZPM", .exportStream, "-d"))
-
-        set wheelName = ""
-        for {
-            set wheelName = $order(depWheels(depName, wheelName))
-            quit:wheelName=""
-            $$$ThrowOnError(exportStream.Rewind())
-            set transform = ##class(%IPM.StudioDocument.Module).CompileAppendWheelUnderModuleXSLT(wheelName)
-            $$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(exportStream, transform, .injected))
-            set exportStream = injected
-        }
-
         $$$ThrowOnError(exportStream.Rewind())
         $$$ThrowOnError(fileStream.CopyFrom(exportStream))
         $$$ThrowOnError(fileStream.%Save())
@@ -1049,30 +946,6 @@ Method IsDatabaseInstall() As %Boolean [ Private ]
 {
     set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", ..Module.Root)
     quit (..Module.Packaging = "database") && ##class(%Library.File).Exists(irisDAT)
-}
-
-/// Returns 1 if the module.xml in dir was produced by database packaging.
-/// Detected by the <Checksum> element InjectDatabasePackagingTransform adds. Checksum is not a
-/// property of %IPM.Storage.Module, so it appears only in packaged manifests and never in one
-/// written by hand. Reads the file rather than the installed record: a first install whose
-/// metadata was rolled back leaves no record to consult.
-ClassMethod IsDatabasePackagedManifest(dir As %String) As %Boolean
-{
-    if dir = "" {
-        quit 0
-    }
-    set moduleXML = ##class(%Library.File).NormalizeFilename("module.xml", dir)
-    if '##class(%Library.File).Exists(moduleXML) {
-        quit 0
-    }
-    set xmlStream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(xmlStream.LinkToFile(moduleXML))
-    // A file that does not parse is not a packaged manifest; let the source path report on it.
-    if $$$ISERR(##class(%XML.XPATH.Document).CreateFromStream(xmlStream, .xpathDoc)) {
-        quit 0
-    }
-    $$$ThrowOnError(xpathDoc.EvaluateExpression("/Export/Document/Module/Checksum", "text()", .results))
-    quit (results.Count() > 0)
 }
 
 /// Pre-install validation. Throws on any failure; does not modify state.
@@ -1095,26 +968,9 @@ Method ValidateBeforeSwap(
     do ..ValidateRoutinesDatabaseNotShared($namespace)
 
     set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
-    if '##class(%Library.File).Exists(irisDAT) {
-        set msg = "Database package is missing IRIS.DAT in: " _ packageDir
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-    }
-    set moduleXML = ##class(%Library.File).NormalizeFilename("module.xml", packageDir)
-    if '##class(%Library.File).Exists(moduleXML) {
-        set msg = "Database package is missing module.xml in: " _ packageDir
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-    }
-
     set xmlStream = ##class(%Stream.FileCharacter).%New()
-    $$$ThrowOnError(xmlStream.LinkToFile(moduleXML))
+    $$$ThrowOnError(xmlStream.LinkToFile(##class(%Library.File).NormalizeFilename("module.xml", packageDir)))
     $$$ThrowOnError(##class(%XML.XPATH.Document).CreateFromStream(xmlStream, .xpathDoc))
-
-    $$$ThrowOnError(xpathDoc.EvaluateExpression("/Export/Document/Module/Packaging", "text()", .packagingResults))
-    set packagingValue = $select(packagingResults.Count() > 0: packagingResults.GetAt(1).Value, 1: "")
-    if packagingValue '= "database" {
-        set msg = "module.xml does not declare <Packaging>database</Packaging>. Got: " _ packagingValue
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
-    }
 
     set depsDir = ##class(%Library.File).NormalizeDirectory(
         ##class(%Library.File).NormalizeFilename("deps", packageDir))
@@ -1130,7 +986,7 @@ Method ValidateBeforeSwap(
 
     // Mappings are applied after the swap, where a failure isn't rolled back, so check the root's
     // source databases here. Its Initialize-phase CPFs, which may create them, have already merged.
-    do ..ValidateMappingSources(xpathDoc)
+    do ..ValidateMappingSources()
 
     // Only one database package per namespace is allowed
     set conflictRS = ##class(%SQL.Statement).%ExecDirect(,
@@ -1158,18 +1014,19 @@ Method ValidateBeforeSwap(
     do ..WarnRoutinesDatabaseIsGlobalsDatabase($namespace)
 }
 
-/// Throws if a <Mapping> in the module manifest xpathDoc maps from a database this instance lacks.
-Method ValidateMappingSources(xpathDoc As %XML.XPATH.Document) [ Private ]
+/// Throws if a <Mapping> of this module maps from a database this instance lacks.
+Method ValidateMappingSources() [ Private ]
 {
     new $namespace
     set moduleName = ..Module.Name
+    // Collected before switching: the mapping objects cannot be read from %SYS.
     set sources = ""
-    for context = "/Export/Document/Module/Mapping", "/Export/Document/Module/Mappings/Mapping" {
-        $$$ThrowOnError(xpathDoc.EvaluateExpression(context, "@Source", .sourceResults))
-        for i = 1:1:sourceResults.Count() {
-            set source = ##class(%IPM.Utils.Module).%EvaluateSystemExpression(sourceResults.GetAt(i).Value)
-            set:source'="" sources = sources _ $listbuild(source)
-        }
+    set key = ""
+    for {
+        #dim mapping As %IPM.Storage.MappingReference
+        set mapping = ..Module.Mappings.GetNext(.key)
+        quit:key=""
+        set:mapping.SourceResolved'="" sources = sources _ $listbuild(mapping.SourceResolved)
     }
 
     set $namespace = "%SYS"
@@ -1201,14 +1058,6 @@ Method ValidateNoOrphanedModules(
     set staleModules = ""
     set incomingDeps = ..GetPackagedDependencyNames(depsDir)
 
-    // Module names are stored as declared, so normalize the captured set for comparison.
-    set normalized = ""
-    set ptr = 0
-    while $listnext(previousDeps, ptr, prevName) {
-        set normalized = normalized _ $listbuild($zconvert(prevName, "L"))
-    }
-    set previousDeps = normalized
-
     set rs = ##class(%SQL.Statement).%ExecDirect(,
         "SELECT Name FROM %IPM_Storage.ModuleItem WHERE Name != ?",
         ..Module.Name)
@@ -1218,12 +1067,12 @@ Method ValidateNoOrphanedModules(
     while rs.%Next(.sc) {
         $$$ThrowOnError(sc)
         set moduleName = rs.%Get("Name")
-        if $listfind(incomingDeps, $zconvert(moduleName, "L")) {
+        if $listfind(incomingDeps, moduleName) {
             continue
         }
         // Carried by the outgoing version but not the incoming one: the swap replaces its code
         // rather than orphaning it, so the record is stale and must be removed, not protected.
-        if $listfind(previousDeps, $zconvert(moduleName, "L")) {
+        if $listfind(previousDeps, moduleName) {
             set staleModules = staleModules _ $listbuild(moduleName)
             continue
         }
@@ -1253,38 +1102,26 @@ ClassMethod RemoveStaleModuleMetadata(staleModules As %List = "")
 {
     set ptr = 0
     while $listnext(staleModules, ptr, moduleName) {
-        continue:moduleName=""
+        // The swap replaces the module records too when the routines and globals databases are one.
         if '##class(%IPM.Storage.Module).NameExists(moduleName) {
             continue
         }
-        // Deletes the ModuleStream alongside the Module record; deleting the record alone would
-        // leave an orphaned <name>.ZPM studio document behind.
+        // Delete the document, not just the record, or the .ZPM is left behind.
         $$$ThrowOnError(##class(%IPM.StudioDocument.Module).Delete(moduleName _ ".ZPM"))
         write !, "Removed module no longer carried by this package: ", moduleName
     }
 }
 
-/// Runs the Unconfigure phase for each module the incoming package drops, so the parts of their
-/// installation that live outside the routines database are undone rather than orphaned by the swap.
-/// Unconfigure covers web and CSP applications and the module's InstallerClass teardown callbacks.
-/// Not files copied by FileCopy or wheels: those processors key their teardown on Clean, which a
-/// database install cannot run here, because Clean deletes by resource name and the incoming package
-/// may declare the same names.
-///
-/// Must be called before the swap, while these modules' own code is still in the namespace's routines
-/// database.
-/// Failures are reported and skipped: a module that cannot unconfigure cleanly must not abort an
-/// install that has already been confirmed and the swap will remove its code regardless.
+/// Runs the Unconfigure phase (web applications, InstallerClass teardown) for each module the
+/// incoming package drops. Clean is not run, because it deletes by resource name and the incoming
+/// package may declare the same names. Must run before the swap, while their code is still there.
+/// Failures are reported and skipped, since the swap removes their code regardless.
 ClassMethod UnconfigureStaleModules(
 	staleModules As %List = "",
 	ByRef params)
 {
     set ptr = 0
     while $listnext(staleModules, ptr, moduleName) {
-        continue:moduleName=""
-        if '##class(%IPM.Storage.Module).NameExists(moduleName) {
-            continue
-        }
         // Run the phase rather than calling %Unconfigure directly: resource processors do their
         // teardown in OnBeforePhase("Unconfigure"), which only ExecutePhases invokes.
         // Only Verbose carries over: the other install params (root directory, forced lifecycle
@@ -1301,7 +1138,7 @@ ClassMethod UnconfigureStaleModules(
     }
 }
 
-/// Returns lowercased names of dependencies carried in deps/ (one .xml per dependency).
+/// Returns the names of dependencies carried in deps/ (one .xml per dependency).
 ClassMethod GetPackagedDependencyNames(depsDir As %String) As %List
 {
     set names = ""
@@ -1313,7 +1150,7 @@ ClassMethod GetPackagedDependencyNames(depsDir As %String) As %List
         $$$ThrowOnError(sc)
         set itemName = rs.%Get("ItemName")
         continue:itemName=""
-        set names = names _ $listbuild($zconvert($piece(itemName, ".", 1, *-1), "L"))
+        set names = names _ $listbuild($piece(itemName, ".", 1, *-1))
     }
     $$$ThrowOnError(sc)
     quit names
@@ -1385,52 +1222,65 @@ Method PromptForSwapConfirmation(
 }
 
 /// Dismounts the current routines DB, renames IRIS.DAT to a timestamped backup, moves the new one
-/// in, and remounts. The namespace is briefly without a routines DB; it should be idle during swap.
-/// dbDir and backupPath (output) are what RollbackDatabaseSwap needs on failure, so each is set as
-/// soon as it is known and stays "" until then: dbDir before the dismount, backupPath only once the
-/// rename has succeeded. A rollback can therefore tell how far the swap got from these two alone.
+/// in, and remounts. Returns the backup's path. The namespace is briefly without a routines DB; it
+/// should be idle during swap.
+/// On failure, restores the original IRIS.DAT and remounts before throwing. Anything the restore
+/// could not do is added to the thrown status, since a write from %SYS is unsafe (see
+/// DismountAndCopyDatabase).
 Method PerformDatabaseSwap(
 	packageDir As %String,
-	ns As %String,
-	Output dbDir As %String,
-	Output backupPath As %String) [ Private ]
+	ns As %String) As %String [ Private ]
 {
-    set dbDir = ""
-    set backupPath = ""
-
     // Look the database up before switching: %IPM.* classes cannot be dispatched from %SYS.
     set routinesDBName = ##class(%IPM.Utils.Module).GetRoutineDatabase(ns)
     set dbDir = ##class(%IPM.Utils.Module).GetDatabaseDirectory(routinesDBName)
+    set srcDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
 
     new $namespace
     set $namespace = "%SYS"
 
     $$$ThrowOnError(##class(SYS.Database).DismountDatabase(dbDir))
 
-    // Rename the current IRIS.DAT to IRIS_<dbname>_YYYYMMDDHHmmss.DAT. The timestamp has
-    // one-second resolution, so a counter suffix follows if that name is taken.
-    set h = $horolog
-    set timestamp = $translate($zdate(h, 8), "-", "") _ $translate($ztime($piece(h, ",", 2), 2), ":", "")
-    set backupBase = ##class(%Library.File).Construct(dbDir, "IRIS_" _ routinesDBName _ "_" _ timestamp)
-    set backupPath = backupBase _ ".DAT"
-    set suffix = 0
-    while ##class(%Library.File).Exists(backupPath) {
-        set suffix = suffix + 1
-        set backupPath = backupBase _ "_" _ suffix _ ".DAT"
-    }
     set liveDAT = ##class(%Library.File).Construct(dbDir, "IRIS.DAT")
-    if '##class(%Library.File).Rename(liveDAT, backupPath) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to rename IRIS.DAT to backup: " _ backupPath))
-    }
+    set backupPath = ""
+    try {
+        // Rename the current IRIS.DAT to IRIS_<dbname>_YYYYMMDDHHmmss.DAT. The timestamp has
+        // one-second resolution, so a counter suffix follows if that name is taken.
+        set h = $horolog
+        set timestamp = $translate($zdate(h, 8), "-", "") _ $translate($ztime($piece(h, ",", 2), 2), ":", "")
+        set backupBase = ##class(%Library.File).Construct(dbDir, "IRIS_" _ routinesDBName _ "_" _ timestamp)
+        set candidate = backupBase _ ".DAT"
+        set suffix = 0
+        while ##class(%Library.File).Exists(candidate) {
+            set suffix = suffix + 1
+            set candidate = backupBase _ "_" _ suffix _ ".DAT"
+        }
+        if '##class(%Library.File).Rename(liveDAT, candidate) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to rename IRIS.DAT to backup: " _ candidate))
+        }
+        set backupPath = candidate
 
-    // Move (rename) packaged IRIS.DAT into the database directory
-    set srcDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
-    if '##class(%Library.File).Rename(srcDAT, liveDAT) {
-        set tMsg = "Failed to move IRIS.DAT from " _ srcDAT _ " to " _ dbDir
-        $$$ThrowStatus($$$ERROR($$$GeneralError, tMsg))
+        if '##class(%Library.File).Rename(srcDAT, liveDAT) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to move IRIS.DAT from " _ srcDAT _ " to " _ dbDir))
+        }
+        $$$ThrowOnError(##class(SYS.Database).MountDatabase(dbDir))
+    } catch ex {
+        set sc = ex.AsStatus()
+        if backupPath '= "" {
+            if ##class(%Library.File).Exists(liveDAT) && '##class(%Library.File).Delete(liveDAT) {
+                set sc = $$$ADDSC(sc, $$$ERROR($$$GeneralError, "Could not delete the swapped-in IRIS.DAT at " _ liveDAT))
+            }
+            if '##class(%Library.File).Rename(backupPath, liveDAT) {
+                set sc = $$$ADDSC(sc, $$$ERROR($$$GeneralError, "Could not restore the original IRIS.DAT from " _ backupPath _ ". Restore it manually."))
+            }
+        }
+        set mountSC = ##class(SYS.Database).MountDatabase(dbDir)
+        if $$$ISERR(mountSC) && '$system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
+            set sc = $$$ADDSC(sc, $$$ERROR($$$GeneralError, "Could not remount " _ dbDir _ ". Mount it manually."))
+        }
+        $$$ThrowStatus(sc)
     }
-
-    $$$ThrowOnError(##class(SYS.Database).MountDatabase(dbDir))
+    quit backupPath
 }
 
 /// Loads deps/ export files to register dependency metadata in IPM storage.
@@ -1466,7 +1316,6 @@ ClassMethod RegisterDependencyMetadata(packageDir As %String)
 /// Reload: no source ships for a dependency and Base.%Reload early-exits without a root.
 /// Compile: the code is already compiled into IRIS.DAT.
 /// "*": the module-refresh checkpoint, meaningful only for the module being installed.
-/// Edit here, not in GetDependencyInstallPhases, when this judgment changes.
 ClassMethod GetDependencyExcludedPhases() As %List
 {
     quit $listbuild("Reload", "Compile", "*")
@@ -1474,8 +1323,7 @@ ClassMethod GetDependencyExcludedPhases() As %List
 
 /// Derives the phases each dependency runs from the canonical install chain, minus the exclusions.
 /// Derived rather than hardcoded so a phase added to GetCompletePhasesForOne is not silently
-/// skipped for dependencies; TestDependencyPhasesCoverCanonicalChain fails if a new canonical phase
-/// is neither run nor explicitly excluded.
+/// skipped for dependencies.
 ClassMethod GetDependencyInstallPhases(isUpdate As %Boolean = 0) As %List
 {
     // Mirrors the entry point the install itself picks (%IPM.Utils.Module:LoadNewModule).
@@ -1509,20 +1357,11 @@ Method ApplyDependencyResources(
     kill depInitClasses
 
     set depNames = ..Module.GetDependencyNames()
-    if depNames = "" {
-        quit
-    }
-
     set verbose = $get(params("Verbose"))
     set isUpdate = $get(params("Update"), 0)
     set depPhases = ..GetDependencyInstallPhases(isUpdate)
     set ptr = 0
     while $listnext(depNames, ptr, depName) {
-        continue:depName=""
-        if '##class(%IPM.Storage.Module).NameExists(depName) {
-            continue
-        }
-
         set depModule = ##class(%IPM.Storage.Module).NameOpen(depName, , .sc)
         $$$ThrowOnError(sc)
         do ..CollectInitializePhaseClasses(depModule, .depInitClasses)
@@ -1622,10 +1461,8 @@ ClassMethod CollectInitializePhaseClasses(
     }
 }
 
-/// Reports a failure that happened after the swap already succeeded, without rolling back.
-/// A rollback here would discard a working swap and could not reverse what the post-swap steps
-/// already did (dependency CPF merges, installed wheels, copied files), leaving old code paired
-/// with new configuration. These failures are normally fixable forward and the install re-run.
+/// Reports a failure after the swap landed. The swap is kept, since the post-swap steps' side effects
+/// cannot be undone.
 Method ReportPostSwapFailure(
 	sc As %Status,
 	ns As %String,
@@ -1634,8 +1471,6 @@ Method ReportPostSwapFailure(
 {
     write !, "ERROR: the database swap succeeded but a later step failed: ", $system.Status.GetErrorText(sc)
     write !, "  Namespace ", ns, " is running on the newly installed IRIS.DAT. It was not rolled back."
-    write !, "  Rolling back would discard a successful swap and could not undo the side effects of the steps"
-    write !, "  that already ran (CPF merges, installed Python wheels, copied files, web applications)."
     // Inside an outer transaction the install's commit only folds into it, so the caller's rollback
     // still undoes the records.
     if $tlevel > 0 {
@@ -1651,77 +1486,7 @@ Method ReportPostSwapFailure(
         write !, "  Fix the error reported above, then re-run the same install."
     }
     write !, "  Re-run from the .tgz or the registry: the package directory no longer holds IRIS.DAT."
-    if backupPath '= "" {
-        write !, "  To revert manually instead, restore the previous database from: ", backupPath
-    }
-}
-
-/// Best-effort rollback after a failed swap. Never throws; all failures are logged.
-/// Restores the backup IRIS.DAT if one exists; otherwise leaves the original in place.
-/// dbDir: the routines database directory to dismount and remount. "" means the swap failed before
-/// it was resolved, so there is nothing to roll back.
-/// backupPath: the timestamped IRIS.DAT to restore. "" means the swap failed before the original was
-/// renamed out, so the file in dbDir is still the original.
-/// Both are the outputs PerformDatabaseSwap sets, passed on unchanged.
-Method RollbackDatabaseSwap(
-	dbDir As %String,
-	backupPath As %String)
-{
-    if dbDir = "" {
-        quit
-    }
-
-    do ..RestoreDatabaseFromBackup(dbDir, backupPath, .warnings)
-    set key = ""
-    for {
-        set key = $order(warnings(key))
-        quit:key=""
-        write !, warnings(key)
-    }
-}
-
-/// Does the %SYS half of the rollback: dismount dbDir, restore the backup IRIS.DAT when there is one,
-/// remount. See DismountAndCopyDatabase for why a write from %SYS is unsafe.
-/// warnings (output): warnings(1..n) = message text, in the order they occurred, killed on entry.
-/// Collected rather than written so the caller can write them from a namespace that can.
-/// dbDir and backupPath carry the same meaning as in RollbackDatabaseSwap.
-ClassMethod RestoreDatabaseFromBackup(
-	dbDir As %String,
-	backupPath As %String,
-	Output warnings)
-{
-    kill warnings
-    set count = 0
-
-    new $namespace
-    set $namespace = "%SYS"
-
-    set sc = ##class(SYS.Database).DismountDatabase(dbDir)
-    if $$$ISERR(sc) {
-        set warnings($increment(count)) = "Rollback warning: could not dismount database at " _ dbDir
-    }
-
-    // Only touch dbDir/IRIS.DAT when a backup exists to restore. If no backup exists, the swap failed
-    // before the original was renamed out, so the file still in place is the original routines DB and
-    // must not be deleted.
-    if (backupPath '= "") && ##class(%Library.File).Exists(backupPath) {
-        set newDAT = ##class(%Library.File).Construct(dbDir, "IRIS.DAT")
-        if ##class(%Library.File).Exists(newDAT) {
-            if '##class(%Library.File).Delete(newDAT) {
-                set warnings($increment(count)) = "Rollback warning: could not delete swapped-in IRIS.DAT at " _ newDAT
-            }
-        }
-        if '##class(%Library.File).Rename(backupPath, newDAT) {
-            set warnings($increment(count)) = "Rollback warning: could not restore backup from " _ backupPath
-            set warnings($increment(count)) = "  Manual intervention required to restore IRIS.DAT."
-        }
-    }
-
-    set mountSC = ##class(SYS.Database).MountDatabase(dbDir)
-    if $$$ISERR(mountSC) && '$system.Status.Equals(mountSC, $$$ERRORCODE($$$AlreadyMounted)) {
-        set warnings($increment(count)) = "Rollback warning: could not remount database at " _ dbDir
-        set warnings($increment(count)) = "  Namespace routines may be unavailable. Manual remount required."
-    }
+    write !, "  To revert manually instead, restore the previous database from: ", backupPath
 }
 
 }

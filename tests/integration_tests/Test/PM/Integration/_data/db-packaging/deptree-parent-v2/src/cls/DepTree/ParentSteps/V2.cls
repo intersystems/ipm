@@ -1,4 +1,4 @@
-Class UpdateStepsModule.Steps.V2 Extends %IPM.General.Update.VersionBase
+Class DepTree.ParentSteps.V2 Extends %IPM.General.Update.VersionBase
 {
 
 ClassMethod GetOrderedMethods() As %Library.DynamicArray
@@ -14,7 +14,7 @@ ClassMethod GetOrderedMethodsPrimaryOnly() As %Library.DynamicArray
 /// Non-idempotent: increments a counter global so tests can detect if this ran.
 ClassMethod Step002()
 {
-    set ^DBPkgUpdateSteps("step002") = $get(^DBPkgUpdateSteps("step002"), 0) + 1
+    set ^DBPkgDepTreeParentSteps("step002") = $get(^DBPkgDepTreeParentSteps("step002"), 0) + 1
 }
 
 }

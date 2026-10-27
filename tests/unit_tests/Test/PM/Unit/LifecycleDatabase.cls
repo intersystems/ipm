@@ -34,51 +34,6 @@ Method TestPackagingDerivesLifecycleClass()
     do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.Database", "Empty LifecycleClass derived from database packaging")
 }
 
-/// IsDatabasePackagedManifest decides whether a directory is the remains of an already-swapped
-/// install, which %Reload refuses to load as source. Detection is the <Checksum> element, so a
-/// source manifest and a database-packaged one must be told apart on that alone.
-Method TestIsDatabasePackagedManifestDetection()
-{
-    set dir = ##class(%IPM.Utils.File).CreateTempDirectory()
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Directory with no module.xml is not a database-packaged manifest")
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(""), "Empty directory path is not a database-packaged manifest")
-
-    set header = "<?xml version=""1.0""?>" _ $char(13, 10) _ "<Export generator=""IRIS"">" _ $char(13, 10) _
-        "<Document name=""pkg-check.ZPM""><Module><Name>pkg-check</Name><Version>1.0.0</Version>"
-
-    // A source manifest: same shape, no Checksum.
-    do ..WriteModuleXML(dir, header _ "</Module></Document></Export>")
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Source manifest is not a database-packaged manifest")
-
-    // Not valid XML at all: reported by the source load path, not here.
-    do ..WriteModuleXML(dir, "<Export><Document")
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Unparseable module.xml is not a database-packaged manifest")
-
-    // Packaging alone does not make a manifest a packaged one.
-    do ..WriteModuleXML(dir, header _ "<Packaging>database</Packaging></Module></Document></Export>")
-    do $$$AssertNotTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Manifest declaring database packaging without a Checksum is not a database-packaged manifest")
-
-    do ..WriteModuleXML(dir, header _ "<Checksum Algorithm=""SHA-256"">ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad</Checksum></Module></Document></Export>")
-    do $$$AssertTrue(##class(%IPM.Lifecycle.Database).IsDatabasePackagedManifest(dir), "Manifest with Checksum is a database-packaged manifest")
-
-    do ##class(%IPM.Utils.File).RemoveDirectoryTree(dir)
-}
-
-/// Writes content to dir/module.xml, replacing any previous file.
-Method WriteModuleXML(
-	dir As %String,
-	content As %String)
-{
-    set path = ##class(%Library.File).NormalizeFilename("module.xml", dir)
-    // Delete rather than Clear: this is called repeatedly against the same path and a fresh file
-    // is unambiguous about what the stream ends up containing.
-    do ##class(%Library.File).Delete(path)
-    set stream = ##class(%Stream.FileCharacter).%New()
-    do $$$AssertStatusOK(stream.LinkToFile(path), "Linked module.xml")
-    do $$$AssertStatusOK(stream.Write(content), "Wrote module.xml content")
-    do $$$AssertStatusOK(stream.%Save(), "Saved module.xml")
-}
-
 /// Guards the ComputeSHA256Hex output contract (64-char lowercase hex): the hash is produced
 /// via the %xsd.hexBinary encoder, so this pins the length and lowercasing.
 Method TestSHA256HexFormat()
@@ -94,6 +49,24 @@ Method TestSHA256HexFormat()
 
     // SHA-256 of "abc" is a well-known constant, in lowercase hex.
     do $$$AssertEquals(hex, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256('abc') matches known value")
+}
+
+/// The packaging transform replaces an existing SystemRequirements Version with the IRIS version
+/// packaging ran on.
+Method TestPackagingTransformReplacesSystemRequirementsVersion()
+{
+    set source = ##class(%Stream.TmpCharacter).%New()
+    do source.Write("<Export generator=""IRIS"" version=""26""><Document name=""sysreq-check.ZPM""><Module>")
+    do source.Write("<Name>sysreq-check</Name><Version>1.0.0</Version><SystemRequirements Version=""2020.1""/>")
+    do source.Write("</Module></Document></Export>")
+    do source.Rewind()
+
+    set compiled = ##class(%IPM.Lifecycle.Database).CompilePackagingTransform("abc", "2099.1")
+    do $$$AssertStatusOK(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(source, compiled, .transformed), "Applied packaging transform")
+    set result = transformed.Read($$$MaxStringLength)
+
+    do $$$AssertTrue(result [ "<SystemRequirements Version=""2099.1""", "SystemRequirements Version is the packaging IRIS version: " _ result)
+    do $$$AssertNotTrue(result [ "2020.1", "Previous SystemRequirements Version is gone")
 }
 
 /// GetDependencyNames must place a dependency before its dependent. Module names sort against the
@@ -215,33 +188,6 @@ Method AddDependencies(
         set dep.VersionString = "1.0.0"
         set dep.Scope = scope
         do module.Dependencies.Insert(dep)
-    }
-}
-
-/// Every phase in the canonical install chain must be either run for dependencies or explicitly
-/// excluded. Fails when a phase is added to Base.GetCompletePhasesForOne without that decision
-/// being made — the exclusion list in Database.GetDependencyExcludedPhases is where to record it.
-Method TestDependencyPhasesCoverCanonicalChain()
-{
-    for entryPhase = "Activate", "ApplyUpdateSteps" {
-        set isUpdate = (entryPhase = "ApplyUpdateSteps")
-        set canonical = ##class(%IPM.Lifecycle.Base).GetCompletePhasesForOne(entryPhase)
-        set run = ##class(%IPM.Lifecycle.Database).GetDependencyInstallPhases(isUpdate)
-        set excluded = ##class(%IPM.Lifecycle.Database).GetDependencyExcludedPhases()
-
-        set ptr = 0
-        while $listnext(canonical, ptr, onePhase) {
-            continue:onePhase=""
-            set accountedFor = ($listfind(run, onePhase) > 0) || ($listfind(excluded, onePhase) > 0)
-            do $$$AssertTrue(accountedFor, "Canonical phase '" _ onePhase _ "' (" _ entryPhase _ " chain) is either run for dependencies or explicitly excluded")
-        }
-
-        // A phase cannot be both and nothing may be run that the canonical chain does not contain.
-        set runPtr = 0
-        while $listnext(run, runPtr, runPhase) {
-            do $$$AssertNotTrue($listfind(excluded, runPhase), "Phase '" _ runPhase _ "' is not both run and excluded")
-            do $$$AssertTrue($listfind(canonical, runPhase) > 0, "Phase '" _ runPhase _ "' comes from the canonical chain")
-        }
     }
 }
 

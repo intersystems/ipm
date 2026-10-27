@@ -17,6 +17,8 @@
         </ModuleReference>
       </Dependencies>
       <Resource Name="DepTree.Parent.CLS" />
+      <Resource Name="DepTree.ParentSteps.PKG" />
+      <UpdatePackage>DepTree.ParentSteps</UpdatePackage>
     </Module>
   </Document>
 </Export>

@@ -190,10 +190,7 @@ Method GetModuleManifest(pModuleReference As %IPM.Storage.ModuleInfo) As %Stream
 ClassMethod TagForReference(moduleReference As %IPM.Storage.ModuleInfo) As %String [ Private ]
 {
     set tag = $$$Semver2Tag(moduleReference.VersionString)
-
-    if (moduleReference.IPMPackaging = "database") {
-        set tag = tag _ "_database" _ $$$OrasTagPlatformSeparator _ moduleReference.PlatformVersion
-    } elseif moduleReference.Deployed {
+    if moduleReference.Deployed {
         if (moduleReference.PlatformVersion = "") {
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Cannot locate deployed module '" _ moduleReference.Name _ "' " _ moduleReference.VersionString _ " without a platform version."))
         }
@@ -371,21 +368,13 @@ Method ListModulesFromTagString(
         // Without the namespace, which the other methods of this service prefix
         set tModRef.Name = ..ModuleNameFromRepository(name)
         // `artifactMetadata.ImageVersion` can be different from `moduleVersion`. E.g., when the module was simply "moved" from elsewhere under a different tag
-        // For database packages, VersionString must be the plain semver (e.g. "1.0.0"), not "1.0.0+database".
-        // GetModule constructs the full tag ("1.0.0_database__<platform>") from IPMPackaging + PlatformVersion.
-        // Using tVersion.ToString() for database packages would embed "+database" in VersionString,
-        // causing GetModule to build "1.0.0_database_database__<platform>".
-        set tModRef.VersionString = $select(modPackaging = "database": tVersion.Major _ "." _ tVersion.Minor _ "." _ tVersion.Patch, 1: tVersion.ToString())
+        set tModRef.VersionString = tVersion.ToString()
         set tModRef.Repository = artifactMetadata.ImageSource
         set tModRef.Description = artifactMetadata.ImageDescription
-        set tModRef.IPMPackaging = modPackaging
         set tModRef.Deployed = artifactMetadata.IPMDeployed
-        if (modPackaging = "database") {
-            // For database packages, store PlatformVersion so GetModule can build the correct tag.
-            set tModRef.PlatformVersion = platformVersion
-        } elseif (artifactMetadata.IPMDeployed '= "") && 'searchCriteria.AllVersions {
-            // Skipped for AllVersions, which reports a single entry standing in for every version;
-            // these platforms belong to just one of them.
+        // Skipped for AllVersions, which reports a single entry standing in for every version;
+        // these platforms belong to just one of them.
+        if (artifactMetadata.IPMDeployed '= "") && 'searchCriteria.AllVersions {
             set pvPtr = 0
             while $listnext(platformVersions, pvPtr, pv) {
                 $$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))

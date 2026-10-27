@@ -1648,7 +1648,6 @@ Method %Publish(ByRef pParams) As %Status
         // parameter is fixed per lifecycle class and reflects how it's being published now.
         if ($parameter($this, "PACKAGING") = "database") {
             set tModule.IPMPackaging = "database"
-            set tModule.PlatformVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
         } elseif (..Module.Deployed) {
             set tModule.Deployed = 1
             if $isobject(..Module.SystemRequirements) {

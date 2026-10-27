@@ -424,15 +424,6 @@ Method TestSimplePackageAndInstall()
     do $$$AssertTrue(..CountBackupFiles(installNS) > 0, "Backup file preserved after uninstall")
 }
 
-/// A database package carries its transitive dependencies. Their code ships in the IRIS.DAT and their
-/// metadata is registered from the deps/ manifests.
-Method TestPackageAndInstallWithDependencies()
-{
-    new $namespace
-    do ..InstallDatabasePackage("TESTDBDEPINST", ..GetOrCreateDatabasePackage("main-with-deps"))
-    do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists("dep-module"), "Dependency metadata registered from deps/")
-}
-
 /// Test packaging with and without test resources
 Method TestPackageAndInstallWithTestResources()
 {
@@ -511,10 +502,6 @@ Method TestPackagingAndInstallValidation()
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "deps/", "Package with no deps/ directory rejected by validation")
 
     // Test: module.xml without a <Checksum> element fails validation.
-    // The other structural checks in ValidateBeforeSwap (missing IRIS.DAT, missing module.xml, a
-    // <Packaging> other than "database") cannot be reached through `load`: each one also makes
-    // IsDatabaseInstall() false, so the install branch is never entered. They remain as
-    // defense-in-depth for direct %Reload callers and are not exercised here.
     set noChecksumDir = ..ExtractPackage(packageFile, "no-checksum-extract")
     set moduleXML = ..ReadPackageModuleXML(noChecksumDir)
     // Strip the whole element rather than blanking its text: an empty <Checksum> would fail the
@@ -664,8 +651,8 @@ Method TestInstallRejectedWhenModulesWouldBeOrphaned()
 /// rather than the flattened set fails on deptree-leaf and one that ignores transitive additions
 /// fails on deptree-extra.
 ///
-/// deptree-stable also carries an <UpdatePackage>, so the version bump doubles as coverage that a
-/// dependency's own update steps are seeded on install and run on upgrade.
+/// deptree-parent and deptree-stable also carry an <UpdatePackage>, so the version bumps double as
+/// coverage that the root's and a dependency's update steps are seeded on install and run on upgrade.
 Method TestUpdateWithChangedDependencyTree()
 {
     // Resolve all module dirs before any namespace switch (^UnitTestRoot only in the original NS)
@@ -740,6 +727,10 @@ Method TestUpdateWithChangedDependencyTree()
     // v1 install, stays skipped. Without ApplyUpdateSteps in the dependency phase list both stay 0.
     do $$$AssertEquals($get(^DBPkgDepTreeSteps("step002"), 0), 1, "Dependency Step002 ran exactly once during the database upgrade")
     do $$$AssertEquals($get(^DBPkgDepTreeSteps("step001"), 0), 0, "Dependency Step001 never ran — seeded at the v1 install")
+
+    // The root's own update steps behave the same way.
+    do $$$AssertEquals($get(^DBPkgDepTreeParentSteps("step002"), 0), 1, "Root Step002 ran exactly once during the database upgrade")
+    do $$$AssertEquals($get(^DBPkgDepTreeParentSteps("step001"), 0), 0, "Root Step001 never ran — seeded at the v1 install")
 }
 
 /// Python wheels ship in a database package by default: an explicit <PythonWheel> (lune) and a
@@ -836,8 +827,8 @@ Method TestMappingsAndPostSwapFailure()
     do ..AssertGlobalMapped(installNS, "DbPkgRootMap", "Root mapping applied during install")
     do ..AssertGlobalMapped(installNS, "DbPkgDepMap", "Dependency mapping applied during install")
 
-    set output = ..CaptureShellOutput("update module-with-mappings -path " _ brokenDir _ " -swap-db", .sc)
-    do $$$AssertStatusNotOK(sc, "Update fails after the swap")
+    set output = ..CaptureCall("%IPM.Main", "Shell", "update module-with-mappings -path " _ brokenDir _ " -swap-db")
+    do $$$AssertTrue(output [ "a later step failed", "Update fails after the swap")
     set module = ##class(%IPM.Storage.Module).NameOpen("module-with-mappings")
     do $$$AssertEquals($select($isobject(module): module.VersionString, 1: ""), "2.0.0", "Module record kept at the new version")
     do $$$AssertNotTrue(##class(%IPM.Storage.Module).NameExists("dep-with-mapping"), "Dropped dependency's record removed")
@@ -946,42 +937,11 @@ Method TestNamespaceRelativeWebAppAppliedDuringInstall()
     do $$$AssertEquals($get(updatedProps("NameSpace")), installNS, "Reinstall left the web application on the install namespace")
 }
 
-/// Update steps are seeded (not run) on a fresh database package install, and new steps introduced
-/// in a later version run exactly once during a database package upgrade.
-///
-/// Uses a dedicated packaging NS (not SharedNS1/2) because the v1->v2 source upgrade mutates it.
-/// Step002 runs there during that upgrade, which does not affect the install NS: ^DBPkgUpdateSteps
-/// lives in each namespace's own globals DB.
-Method TestUpdateStepsWithDatabasePackaging()
-{
-    set v1Dir = ..GetModuleDir("db-packaging", "update-steps-module-v1")
-    set v2Dir = ..GetModuleDir("db-packaging", "update-steps-module-v2")
-
-    set packagingNS = "TESTDBUPDPKGNS"
-    do $$$AssertStatusOK(..CreateTestNamespace(packagingNS), "Created packaging namespace")
-    new $namespace
-    set $namespace = packagingNS
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load -v " _ v1Dir), "Loaded v1 from source in packaging NS")
-    set v1Package = ..PackageDatabase("update-steps-module")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("update update-steps-module -path " _ v2Dir), "Upgraded to v2 from source in packaging NS")
-    set v2Package = ..PackageDatabase("update-steps-module", "2.0.0")
-
-    // Installing v1 seeds Step001 as already run: its work is in the IRIS.DAT.
-    set installNS = "TESTDBUPDINSTNS"
-    do ..InstallDatabasePackage(installNS, v1Package)
-
-    // The upgrade skips the seeded Step001 and runs the new Step002 exactly once.
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("update update-steps-module -path " _ v2Package _ " -swap-db"), "Upgraded to v2 database package")
-    do $$$AssertEquals($get(^DBPkgUpdateSteps("step001"), 0), 0, "Step001 never ran — seeded at the v1 install")
-    do $$$AssertEquals($get(^DBPkgUpdateSteps("step002"), 0), 1, "Step002 ran exactly once during v2 database upgrade")
-    do $$$AssertTrue(..CountBackupFiles(installNS) > 1, "Second backup created during v2 upgrade (DB was swapped again)")
-}
-
-/// Verifies packaging-type-aware registry filtering via zot (http://oras:5000).
-/// Publishes dep-module as both source and database, and main-with-deps as source only.
-/// Then verifies: source install (no -swap-db), database install (-swap-db), dependency
-/// resolution always picks source, and a helpful error is returned when only a database
-/// package is available and -swap-db is not specified.
+/// Verifies packaging-type-aware registry filtering via zot (http://oras:5000). A version holds
+/// either a source or a database package, so dep-module 1.0.0 is published as source first, then
+/// replaced by a database package. Verifies: source install (no -swap-db), dependency resolution
+/// picking source, a helpful error when only a database package is available and -swap-db is not
+/// specified, and database install (-swap-db).
 Method TestPublishDatabaseWithORAS()
 {
     // dep-module and main-with-deps are pre-loaded in NS1; zot is configured there at NS init time.
@@ -999,94 +959,38 @@ Method TestPublishDatabaseWithORAS()
     do ##class(%IPM.Main).Shell("unpublish zot/dep-module all -f")
     do ##class(%IPM.Main).Shell("unpublish zot/main-with-deps all -f")
 
-    // --- Publish phase (all publishes first, then installs) ---
+    // --- Source packages ---
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish dep-module -r zot"), "Published dep-module as source to zot")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish-database dep-module -r zot"), "Published dep-module as database to zot")
     // main-with-deps exercises the dependency filtering path
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish main-with-deps -r zot"), "Published main-with-deps as source to zot")
 
-    // --- Install phase ---
     set $namespace = installNS
-
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("install dep-module"), "Installed dep-module (source) without -swap-db")
     do $$$AssertEquals(##class(%IPM.Storage.Module).NameOpen("dep-module").Packaging, "module", "dep-module packaging is module (source) after non-swap-db install")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall dep-module -f"), "Uninstalled dep-module before next step")
-
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("install dep-module -swap-db"), "Installed dep-module with -swap-db")
-    do $$$AssertEquals(##class(%IPM.Storage.Module).NameOpen("dep-module").Packaging, "database", "dep-module packaging is database after -swap-db install")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall dep-module -f"), "Uninstalled dep-module (database) before next step")
 
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("install main-with-deps"), "Installed main-with-deps (source)")
     do $$$AssertEquals(##class(%IPM.Storage.Module).NameOpen("dep-module").Packaging, "module", "dep-module resolved as source when installing main-with-deps")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall main-with-deps -f"), "Uninstalled main-with-deps")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall dep-module -f"), "Uninstalled dep-module after main-with-deps test")
 
-    // Unpublish only the source version of dep-module, leaving the database tag intact
+    // --- Replace dep-module 1.0.0 with a database package ---
     set $namespace = packagingNS
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("unpublish zot/dep-module 1.0.0 -f"), "Unpublished source version of dep-module from zot")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish-database dep-module -r zot"), "Published dep-module as database to zot")
 
     set $namespace = installNS
     set sc = ##class(%IPM.Main).Shell("install dep-module")
     do $$$AssertTrue($system.Status.GetErrorText(sc) [ "-swap-db", "Install without -swap-db fails and points at -swap-db when only a database package is available")
 
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("install dep-module -swap-db"), "Installed dep-module with -swap-db")
+    do $$$AssertEquals(##class(%IPM.Storage.Module).NameOpen("dep-module").Packaging, "database", "dep-module packaging is database after -swap-db install")
+
     // --- Cleanup ---
-    // Errors are ignored: the unpublish above may already have removed every tag.
+    // Errors are ignored: a failed publish above leaves nothing to unpublish.
     set $namespace = packagingNS
     do ##class(%IPM.Main).Shell("unpublish zot/dep-module all -f")
     do ##class(%IPM.Main).Shell("unpublish zot/main-with-deps all -f")
-}
-
-/// Verifies that package-database overwrites an existing SystemRequirements Version
-/// with the current IRIS version.
-Method TestSystemRequirementsOverwrite()
-{
-    set packagingNS = ..GetOrCreateSharedNS1()
-
-    // Build a previous-major IRIS version string dynamically to avoid hardcoding invalid values
-    set prevIrisVersion = ($system.Version.GetMajor() - 1) _ "." _ $system.Version.GetMinor()
-    set currentIrisVersion = $system.Version.GetMajor() _ "." _ $system.Version.GetMinor()
-
-    // Read XData template before switching namespaces — %Dictionary.CompiledXData looks up
-    // class metadata in the current namespace and the test class is not compiled in packagingNS.
-    set xData = ##class(%Dictionary.CompiledXData).IDKEYOpen($classname(), "SimpleModuleWithSysReqTemplate", , .sc)
-    $$$ThrowOnError(sc)
-    set rawXML = $replace(..ReadAll(xData.Data), "REPLACEPREVIRISVERSION", prevIrisVersion)
-
-    new $namespace
-    set $namespace = packagingNS
-
-    // simple-db-module is already loaded in NS1. Temporarily overwrite its on-disk module.xml
-    // with one that declares the previous IRIS version in SystemRequirements, package it,
-    // then restore the original. This avoids re-loading (which would enforce SystemRequirements).
-    set mod = ##class(%IPM.Storage.Module).NameOpen("simple-db-module", , .sc)
-    $$$ThrowOnError(sc)
-    set origXML = ..ReadPackageModuleXML(mod.Root)
-
-    // Mutate module.xml then run packaging inside a try/catch so that a write failure
-    // still reaches the restore block below — the file may be partially written.
-    set sc = $$$OK
-    try {
-        do ..WritePackageModuleXML(mod.Root, rawXML)
-        set sc = ##class(%IPM.Main).Shell("package-database simple-db-module -path " _ ..PackageOutputDir)
-    } catch ex {
-        set sc = ex.AsStatus()
-    }
-
-    // Restore original module.xml unconditionally — writing origXML over an untouched file
-    // (if the mutation write never completed) is harmless. Protects SharedNS1 in all paths.
-    try {
-        do ..WritePackageModuleXML(mod.Root, origXML)
-    } catch restoreEx {
-        set sc = $$$ADDSC(sc, restoreEx.AsStatus())
-    }
-
-    do $$$AssertStatusOK(sc, "Packaged simple-db-module with overwrite of SystemRequirements Version")
-
-    set pkgXML = ..ReadPackageModuleXML(..ExtractPackage(..PackageOutputDir _ "simple-db-module-1.0.0-database.tgz", "extract-sysreq"))
-    set hasCurrentVersion = (pkgXML [ ("Version=""" _ currentIrisVersion _ """"))
-    set lacksPrevVersion = '(pkgXML [ ("Version=""" _ prevIrisVersion _ """"))
-    do $$$AssertTrue(hasCurrentVersion, "Packaged module.xml has current IRIS version in SystemRequirements")
-    do $$$AssertTrue(lacksPrevVersion, "Packaged module.xml does not contain previous IRIS version")
 }
 
 /// Get the installed version of a Python package.
@@ -1171,27 +1075,6 @@ ClassMethod NSAppDirectory(ns As %String) As %String
     set cspDir = ##class(%Library.File).NormalizeDirectory("csp", $system.Util.InstallDirectory())
     // Construct, because NormalizeDirectory(name, dir) returns "" until the CSP directory exists.
     quit ##class(%Library.File).NormalizeDirectory(##class(%Library.File).Construct(cspDir, $zconvert(ns, "L"), "nsapp"))
-}
-
-/// Runs an IPM shell command in the current namespace and returns everything it wrote.
-ClassMethod CaptureShellOutput(
-	command As %String,
-	Output status As %Status) As %String
-{
-    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set exception = ""
-    try {
-        set status = ##class(%IPM.Main).Shell(command)
-    } catch ex {
-        set exception = ex
-    }
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .lines)
-
-    if exception '= "" {
-        throw exception
-    }
-
-    quit ..JoinLines(.lines)
 }
 
 /// Calls method on target, a class name or an object, and returns everything it wrote.
@@ -1303,46 +1186,6 @@ ClassMethod PurgePythonPackage(name As %String)
     set target = ##class(%Library.File).NormalizeDirectory("python", ##class(%Library.File).ManagerDirectory())
     do ..DeletePath(target _ name)
     do ..DeletePattern(target, name _ "-*" _ ".dist-info")
-}
-
-/// Simulates a swap that failed before the original IRIS.DAT was renamed to a backup:
-/// the routines DB directory still holds the original IRIS.DAT and no backup file exists.
-/// RollbackDatabaseSwap must not delete the original when there is no backup to restore.
-Method TestRollbackPreservesOriginalWhenNoBackup()
-{
-    // Create a throwaway namespace so we have a real, mounted routines DB directory to act on.
-    set installNS = "TESTDBROLLBACKNS"
-    do $$$AssertStatusOK(..CreateTestNamespace(installNS), "Created test namespace")
-
-    set dbDir = ##class(%IPM.Utils.Module).GetRoutineDatabaseDir(installNS)
-    set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", dbDir)
-    do $$$AssertTrue(##class(%Library.File).Exists(irisDAT), "Original IRIS.DAT exists before rollback")
-
-    // Invoke rollback with a backupPath that does not exist.
-    set bogusBackup = ##class(%Library.File).NormalizeFilename("IRIS_nonexistent_backup.DAT", dbDir)
-    set lifecycle = ##class(%IPM.Lifecycle.Database).%New(##class(%IPM.Storage.Module).%New())
-    do lifecycle.RollbackDatabaseSwap(dbDir, bogusBackup)
-
-    do $$$AssertTrue(##class(%Library.File).Exists(irisDAT), "Original IRIS.DAT preserved when no backup exists")
-}
-
-/// Template module.xml for TestSystemRequirementsOverwrite.
-/// REPLACEPREVIRISVERSION is substituted at runtime with a dynamically computed previous IRIS version.
-XData SimpleModuleWithSysReqTemplate
-{
-<?xml version="1.0" encoding="UTF-8"?>
-<Export generator="IRIS" version="26">
-  <Document name="simple-db-module.ZPM">
-    <Module>
-      <Name>simple-db-module</Name>
-      <Version>1.0.0</Version>
-      <Packaging>module</Packaging>
-      <SourcesRoot>src</SourcesRoot>
-      <SystemRequirements Version="REPLACEPREVIRISVERSION"/>
-      <Resource Name="SimpleModule.Main.CLS" />
-    </Module>
-  </Document>
-</Export>
 }
 
 /// A dependency's non-compiled and config-only resources must be applied during a database

@@ -157,11 +157,18 @@ Method GetRelativeSource() As %String [ Private ]
 /// module root on the installing system, so nothing is staged for it.
 Method OnStageForDatabasePackage(
 	targetDir As %String,
-	ByRef params)
+	ByRef params) As %Status
 {
-    set relativeSource = ..GetRelativeSource()
-    quit:relativeSource=""
-    do ##class(%IPM.Utils.File).StageResourceFile(..ResourceReference.Name, ..GetSource(), ##class(%File).Construct(targetDir, relativeSource))
+    set sc = $$$OK
+    try {
+        set relativeSource = ..GetRelativeSource()
+        if relativeSource '= "" {
+            do ##class(%IPM.Utils.File).StageResourceFile(..ResourceReference.Name, ..GetSource(), ##class(%File).Construct(targetDir, relativeSource))
+        }
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    quit sc
 }
 
 Method DoCopy(
