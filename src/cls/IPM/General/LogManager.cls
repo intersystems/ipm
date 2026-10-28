@@ -382,12 +382,12 @@ buf(string) [line,nl] public {
 
 /// Remove the chained capture tee installed by <method>BeginChainedCaptureToLog</method>,
 /// flushing any trailing partial line, and restore the predecessor redirect handler.
-ClassMethod EndChainedCaptureToLog() As %Status [ ProcedureBlock = 0 ]
+ClassMethod EndChainedCaptureToLog() [ ProcedureBlock = 0 ]
 {
     new priorIOHandler,line
 
     if '$data($$$IPMLogCapture("active")) {
-        quit $$$OK
+        quit
     }
 
     set line = $get($$$IPMLogCapture("line"))
@@ -402,7 +402,7 @@ ClassMethod EndChainedCaptureToLog() As %Status [ ProcedureBlock = 0 ]
     // entry points fall through to that handler once our state is gone.
     if ##class(%Device).ReDirectIO(), ($zutil(96,12) '= $zname) {
         kill $$$IPMLogCapture
-        quit $$$OK
+        quit
     }
 
     if (priorIOHandler '= "") {
@@ -413,7 +413,7 @@ ClassMethod EndChainedCaptureToLog() As %Status [ ProcedureBlock = 0 ]
     }
 
     kill $$$IPMLogCapture
-    quit $$$OK
+    quit
 }
 
 /// Write one captured logical line to the log. Interception is turned off for the duration so the

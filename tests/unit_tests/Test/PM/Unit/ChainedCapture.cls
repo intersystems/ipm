@@ -7,7 +7,7 @@ Class Test.PM.Unit.ChainedCapture Extends %UnitTest.TestCase
 Method OnAfterOneTest(testname As %String) As %Status
 {
     // Clear any capture that leaked from the test body.
-    $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
     return $$$OK
 }
 
@@ -67,7 +67,7 @@ Method TestNonReentrant()
     } catch ex {
         do $$$AssertSuccess("Second chained capture WAS rejected while one is active")
     }
-    $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
 }
 
 /// Ending the tee while a Module capture sits on top of it must not drop that capture, and once

@@ -19,7 +19,7 @@ Property LoadedClasses [Multidimensional];
 Method OnBeforeOneTest(testname As %String) As %Status
 {
     // Reset any log state leaked from an earlier suite before this test initializes its own.
-    $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
     do ##class(%IPM.General.LogManager).%Get().Finalize()
     return $$$OK
 }
@@ -27,7 +27,7 @@ Method OnBeforeOneTest(testname As %String) As %Status
 Method OnAfterOneTest(testname As %String) As %Status
 {
     // Guard against a leaked capture or open log carrying into later tests.
-    $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
     do ##class(%IPM.General.LogManager).%Get().Finalize()
     set name = ""
     for {
