@@ -215,6 +215,7 @@ This command is an alias for `module-action module-name publish`
 <modifier name="dev" dataAlias="DeveloperMode" dataValue="1" description="Sets the DeveloperMode flag for the module's lifecycle. Key consequences of this are that ^Sources will be configured for resources in the module, and installer methods will be called with the dev mode flag set." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon update, creates/updates the module's lock file." />
 <modifier name="skip-sync" dataAlias="SkipSync" dataValue="1" description="In developer mode, skips recording the file hashes that sync uses to detect changes. The next sync of the module records them instead." />
+<modifier name="swap-db" dataAlias="SwapDB" dataValue="1" description="For database-packaged modules: swap the namespace routines database with the packaged IRIS.DAT. Required to proceed without confirmation." />
 </command>
 
 <command name="makedeployed">
@@ -344,6 +345,7 @@ load C:\module\root\path -env C:\path\to\env1.json;C:\path\to\env2.json
 <modifier name="force" aliases="f" value="false" description="Allows the user to load a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon load, creates/updates the module's lock file." />
 <modifier name="skip-sync" dataAlias="SkipSync" dataValue="1" description="In developer mode, skips recording the file hashes that sync uses to detect changes. The next sync of the module records them instead." />
+<modifier name="swap-db" dataAlias="SwapDB" dataValue="1" description="For database-packaged modules: swap the namespace routines database with the packaged IRIS.DAT. Required to proceed without confirmation." />
 
 <!-- Parameters -->
 <parameter name="path" required="true" description="Directory on the local filesystem, containing a file named module.xml" />
@@ -472,6 +474,7 @@ install -env /path/to/env1.json;/path/to/env2.json example-package
 <modifier name="force" aliases="f" value="false" description="Allows the user to install a newer version of an existing module without running update steps." />
 <modifier name="create-lockfile" aliases="lock" dataAlias="CreateLockFile" dataValue="1" description="Upon install, creates/updates the module's lock file." />
 <modifier name="skip-sync" dataAlias="SkipSync" dataValue="1" description="In developer mode, skips recording the file hashes that sync uses to detect changes. The next sync of the module records them instead." />
+<modifier name="swap-db" dataAlias="SwapDB" dataValue="1" description="For database-packaged modules: swap the namespace routines database with the packaged IRIS.DAT. Required to proceed without confirmation." />
 
 </command>
 
