@@ -151,6 +151,7 @@ ClassMethod InitLog(
     kill cmd
     set cmd = "install"
     set cmd("data","Verbose") = 0
+    set cmd("parameters","module") = "test"
     $$$ThrowOnError(log.InitializeLog("install test", .cmd))
 }
 

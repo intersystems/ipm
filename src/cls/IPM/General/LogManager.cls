@@ -290,15 +290,15 @@ Method AddMessage(
 /// Each logical line (one per newline) is sent to <method>WriteLogLine</method>.
 /// Pair with <method>EndChainedCaptureToLog</method>. The predecessor handler is recorded so this
 /// coexists with an already-active <class>%IPM.Utils.Module</class> capture or the test harness.
-/// @Argument writeToTerminal   Forwarded to <method>WriteLogLine</method> for each captured line.
-///                             When 0, forwarding up the redirect chain is blocked, so output
-///                             reaches the log only and not the terminal or any outer capture.
-ClassMethod BeginChainedCaptureToLog(writeToTerminal As %Boolean = 0) As %Status [ ProcedureBlock = 0 ]
+/// @Argument writeToTerminal   Controls live forwarding up the redirect chain. When 0, forwarding
+///                             is blocked, so output reaches the log only and not the terminal or
+///                             any outer capture.
+ClassMethod BeginChainedCaptureToLog(writeToTerminal As %Boolean = 0) [ ProcedureBlock = 0 ]
 {
     new priorIOHandler
 
     if $data($$$IPMLogCapture("active")) {
-        $$$ThrowOnError($$$ERROR($$$GeneralError, "Chained log capture already active"))
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Chained log capture already active"))
     }
 
     // Record the previous redirect handler so that it can be restored once EndChainedCaptureToLog is called.
@@ -320,7 +320,7 @@ ClassMethod BeginChainedCaptureToLog(writeToTerminal As %Boolean = 0) As %Status
     // Install this routine's labels as the device mnemonic routine and switch interception on.
     use $io::("^"_$zname)
     do ##class(%Device).ReDirectIO(1)
-    quit $$$OK
+    quit
 
     // --- Device redirection entry points (called by the kernel while interception is on) ---
 rstr(size,timeout) [result,readExpr,isRedirectOn] public {
@@ -371,7 +371,7 @@ buf(string) [line,nl] public {
     set nl = $find(string,$char(10))
     while nl {
         set line = line_$extract(string,1,nl-2)
-        do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line, $get($$$IPMLogCapture("writeToTerminal")))
+        do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line)
         set line = ""
         set string = $extract(string,nl,*)
         set nl = $find(string,$char(10))
@@ -382,7 +382,6 @@ buf(string) [line,nl] public {
 
 /// Remove the chained capture tee installed by <method>BeginChainedCaptureToLog</method>,
 /// flushing any trailing partial line, and restore the predecessor redirect handler.
-/// @Argument writeToTerminal   Forwarded to <method>WriteLogLine</method> for the trailing line.
 ClassMethod EndChainedCaptureToLog() As %Status [ ProcedureBlock = 0 ]
 {
     new priorIOHandler,line
@@ -393,7 +392,7 @@ ClassMethod EndChainedCaptureToLog() As %Status [ ProcedureBlock = 0 ]
 
     set line = $get($$$IPMLogCapture("line"))
     if (line '= "") {
-        do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line, $get($$$IPMLogCapture("writeToTerminal"), 0))
+        do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line)
     }
 
     set priorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
@@ -419,18 +418,16 @@ ClassMethod EndChainedCaptureToLog() As %Status [ ProcedureBlock = 0 ]
 
 /// Write one captured logical line to the log. Interception is turned off for the duration so the
 /// log write cannot re-enter the tee, and <property>Verbose</property> is forced off so the command's
-/// verbosity does not re-echo the line the tee already forwarded live; <var>writeToTerminal</var>
-/// gives the caller explicit control over terminal echo.
-ClassMethod FlushCapturedBuffer(
-	pLine As %String,
-	writeToTerminal As %Boolean = 0)
+/// verbosity does not re-echo the line. Terminal echo is handled live by <var>fwd</var> in
+/// <method>BeginChainedCaptureToLog</method>, so the log write itself never echoes to the terminal.
+ClassMethod FlushCapturedBuffer(pLine As %String)
 {
     set st = ##class(%Device).ReDirectIO(0)
     set currentLogMgr = ..%Get(.sc)
     if $isobject(currentLogMgr) {
         set verbose = currentLogMgr.Verbose
         set currentLogMgr.Verbose = 0
-        do currentLogMgr.WriteLogLine(pLine,, writeToTerminal)
+        do currentLogMgr.WriteLogLine(pLine)
         set currentLogMgr.Verbose = verbose
     }
     do ##class(%Device).ReDirectIO(st)

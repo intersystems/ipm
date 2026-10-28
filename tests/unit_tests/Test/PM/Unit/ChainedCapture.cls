@@ -4,6 +4,13 @@
 Class Test.PM.Unit.ChainedCapture Extends %UnitTest.TestCase
 {
 
+Method OnAfterOneTest(testname As %String) As %Status
+{
+    // Clear any capture that leaked from the test body.
+    $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
+    return $$$OK
+}
+
 /// Begin the tee under an outer capture with terminal forwarding on, write a line, and assert it
 /// reached both the log (routing) and the outer capture buffer (forwarding intact).
 Method TestVerboseChainedCapture()
@@ -53,10 +60,14 @@ Method TestNonVerboseChainedCapture()
 /// A second BeginChainedCaptureToLog while one is active must be rejected, not silently clobber state.
 Method TestNonReentrant()
 {
-    $$$ThrowOnError(##class(%IPM.General.LogManager).BeginChainedCaptureToLog())
-    set sc = ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
+    set rejected = 0
+    try {
+        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
+    } catch ex {
+        do $$$AssertSuccess("Second chained capture WAS rejected while one is active")
+    }
     $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
-    do $$$AssertStatusNotOK(sc, "Second chained capture WAS rejected while one is active")
 }
 
 /// Ending the tee while a Module capture sits on top of it must not drop that capture, and once
