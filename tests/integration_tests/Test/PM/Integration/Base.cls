@@ -160,6 +160,21 @@ ClassMethod ModuleAvailableInRepositories(moduleName As %String) As %Boolean
 	return results.Count() > 0
 }
 
+/// Returns whether <var>string</var> appears on any line of the file at <var>filePath</var>.
+ClassMethod FileContains(
+	filePath As %String,
+	string As %String) As %Boolean
+{
+	set stream = ##class(%Stream.FileCharacter).%New()
+	set stream.Filename = filePath
+	while 'stream.AtEnd {
+		if (stream.ReadLine() [ string) {
+			return 1
+		}
+	}
+	return 0
+}
+
 ClassMethod HttpGet(pPath As %String = "/") As %Status
 {
 	new $namespace
