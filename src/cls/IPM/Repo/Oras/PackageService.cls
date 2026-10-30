@@ -412,6 +412,10 @@ Method AddModulesFromTags(
 
         // get metadata from annotations
         set metadata = ..GetPackageMetadata(..Location, name, tag, "", client)
+        if (metadata = "") {
+            // Tag exists in the tag list but manifest is unreachable — skip silently
+            continue
+        }
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()
         $$$ThrowOnError(artifactMetadata.%JSONImport(metadata))
 
@@ -455,6 +459,14 @@ Method AddModulesFromTags(
                     continue
                 }
             }
+        }
+
+        // Determine packaging type from annotation; absent means source for backwards compatibility
+        set modPackaging = $case(artifactMetadata.IPMPackaging, "database":"database", :"source")
+
+        // Apply packaging filter if specified
+        if (searchCriteria.Packaging '= "") && (modPackaging '= searchCriteria.Packaging) {
+            continue
         }
 
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
@@ -823,13 +835,11 @@ ClassMethod Pull(
         #; Convert into stream
         set tFileBinStream = ##class(%Stream.FileBinary).%New()
         set tSC = tFileBinStream.LinkToFile(tempFile)
-        if $$$ISOK(tSC) {
-            set stream = tFileBinStream
-        }
+        $$$ThrowOnError(tSC)
+        set stream = tFileBinStream
 
-        #; Check hash and size against the manifest
-        set hash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
-        set hash = ##class(%xsd.hexBinary).LogicalToXSD(hash)
+        // Check hash and size against the manifest
+        set hash = ##class(%IPM.Utils.File).ComputeSHA256Hex(tempFile)
 
         set verified = ..VerifyModuleHashAndSize(registry, package _ ":" _ tag, namespace, username, password, token, tokenAuthMethod, hash, ##class(%Library.File).GetFileSize(tempFile))
         if 'verified {

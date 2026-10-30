@@ -1,0 +1,4 @@
+Class DepWithMapping.Main
+{
+
+}

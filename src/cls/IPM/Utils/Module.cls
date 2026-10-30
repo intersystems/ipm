@@ -1186,6 +1186,11 @@ ClassMethod LoadNewModule(
         if moduleCurrent '= "" {
             set fromVersion = moduleCurrent.Version
             set fromVersionString = moduleCurrent.VersionString
+            if foundNewModuleObj && (newModuleObj.Packaging = "database") {
+                // Captured before the load below overwrites this module's manifest, so the database
+                // install can tell a dependency this package dropped from a module the user installed.
+                set params("PreviousDependencies") = moduleCurrent.GetDependencyNames()
+            }
         }
         if (fromVersion '= "") && (toVersion '= "") {
             if fromVersion.Follows(toVersion) {
@@ -1294,7 +1299,12 @@ ClassMethod LoadNewModule(
         if $get(params("CreateLockFile"), 0) && '$data(params("LockFileModule")){
             set params("LockFileModule") = tModule.Name
         }
-        do ..LoadDependencies(tModule,, .params)
+        // For database packages, all dependencies are compiled into IRIS.DAT — skip LoadDependencies.
+        // Fetching deps from a registry would fail (code isn't installed yet before the DB swap).
+        // %Reload registers their metadata from the deps/ directory once the swap completes.
+        if tModule.Packaging '= "database" {
+            do ..LoadDependencies(tModule,, .params)
+        }
 
         set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
         $$$ThrowOnError(tSC)
@@ -1312,8 +1322,10 @@ ClassMethod LoadNewModule(
         }
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
+        // A database install commits this transaction once its swap lands.
+        set params("InstallTLevel") = tInitTLevel
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
-        if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
+        if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions && ($tlevel > tInitTLevel) {
             tcommit
         }
         $$$ThrowOnError(tSC)
@@ -1388,6 +1400,46 @@ ClassMethod LoadDependencies(
     }
 }
 
+/// Builds a dependency graph of module's installed transitive dependencies from local records only,
+/// in the layout of <method>%IPM.Storage.Module.BuildDependencyGraph</method>. Every dependency is
+/// included regardless of Scope. Declared dependencies with no installed record and module itself
+/// are left out.
+ClassMethod BuildInstalledDependencyGraph(
+	module As %IPM.Storage.Module,
+	Output dependencyGraph)
+{
+    kill dependencyGraph
+    set modules(module.Name) = module
+    // Walk from module's in-memory dependencies, which can differ from its stored record.
+    for i = 1:1:module.Dependencies.Count() {
+        set names = ##class(%IPM.Storage.Module).GetKnownDependencies(module.Dependencies.GetAt(i).Name)
+        set ptr = 0
+        while $listnext(names, ptr, name) {
+            if $data(modules(name)) || '##class(%IPM.Storage.Module).NameExists(name) {
+                continue
+            }
+            set depModule = ##class(%IPM.Storage.Module).NameOpen(name, , .sc)
+            $$$ThrowOnError(sc)
+            set modules(name) = depModule
+            set dependencyGraph(name) = $listbuild(1, "", depModule.VersionString, depModule.DisplayName, "", depModule.Deployed, depModule.PlatformVersion)
+        }
+    }
+
+    // Edges only between nodes: the sort never resolves an edge to a missing node.
+    set parentName = ""
+    for {
+        set parentName = $order(modules(parentName), 1, parent)
+        quit:parentName=""
+        set parentInfo = parent.Name _ " " _ parent.VersionString
+        for i = 1:1:parent.Dependencies.Count() {
+            set dep = parent.Dependencies.GetAt(i)
+            if $data(dependencyGraph(dep.Name)) {
+                set dependencyGraph(dep.Name, parentInfo) = dep.VersionString
+            }
+        }
+    }
+}
+
 /// Construct an inverted dependency graph from the dependency graph of a module. <br />
 /// @Argument	pDependencyGraph			Dependency graph constructed. <br />
 /// @Argument	pInvertedDependencyGraph	Inverted dependency graph constructed. <br />
@@ -1425,14 +1477,27 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
     #dim moduleReference As %IPM.Storage.QualifiedModuleInfo
     set orderedDependencyList = ##class(%Library.ListOfObjects).%New()
     set moduleName = ""
+    set removedThisPass = 0
     while 1 {
-        // Note that all nodes have to be killed eventually because no cyclic dependencies
-        // are allowed to exist
         if '$data(pInvertedDependencyGraph) {
             quit
         }
         set moduleName = $order(pInvertedDependencyGraph(moduleName))
         if (moduleName = "") {
+            // A pass that removed nothing means a cycle, which only installed records can hold.
+            // Drop the remaining edges so the next pass emits the rest in name order. Valueless
+            // nodes (dependents outside the graph) go with them.
+            if 'removedThisPass {
+                for {
+                    set moduleName = $order(pInvertedDependencyGraph(moduleName), 1, data)
+                    quit:moduleName=""
+                    set hasValue = $data(pInvertedDependencyGraph(moduleName)) # 2
+                    kill pInvertedDependencyGraph(moduleName)
+                    set:hasValue pInvertedDependencyGraph(moduleName) = data
+                }
+                continue
+            }
+            set removedThisPass = 0
             set moduleName = $order(pInvertedDependencyGraph(moduleName))
         }
 
@@ -1447,6 +1512,7 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
             set moduleReference.Deployed = deployed
             set moduleReference.PlatformVersion = platformVersion
             $$$ThrowOnError(orderedDependencyList.Insert(moduleReference))
+            set removedThisPass = 1
             // Remove node from graph
             kill pInvertedDependencyGraph(moduleName)
             // Remove from all entries in graph
@@ -1797,39 +1863,42 @@ ClassMethod CreateAllNamespace() As %Status
     return tSC
 }
 
+/// Returns the Config.Databases key for a namespace's routines database.
 ClassMethod GetRoutineDatabase(pNamespace As %String) As %String
 {
     new $namespace
     set $namespace="%SYS"
-    quit ##class(Config.Namespaces).Open(pNamespace).Routines
+    $$$ThrowOnError(##class(Config.Namespaces).Get(pNamespace, .nsProps))
+    quit $get(nsProps("Routines"))
 }
 
+/// Returns the Config.Databases key for a namespace's globals database.
 ClassMethod GetGlobalDatabase(pNamespace As %String) As %String
 {
     new $namespace
     set $namespace="%SYS"
-    quit ##class(Config.Namespaces).Open(pNamespace).Globals
+    $$$ThrowOnError(##class(Config.Namespaces).Get(pNamespace, .nsProps))
+    quit $get(nsProps("Globals"))
 }
 
 ClassMethod GetRoutineDatabaseDir(pNamespace As %String) As %String
 {
-    new $namespace
-    set $namespace="%SYS"
     quit ..GetDatabaseDirectory(..GetRoutineDatabase(pNamespace))
 }
 
 ClassMethod GetGlobalDatabaseDir(pNamespace As %String) As %String
 {
-    new $namespace
-    set $namespace="%SYS"
     quit ..GetDatabaseDirectory(..GetGlobalDatabase(pNamespace))
 }
 
+/// Returns the normalized directory path of a registered database. Callers that need the
+/// conventional path of a database that may not be registered must build it themselves.
 ClassMethod GetDatabaseDirectory(pDatabase As %String) As %String
 {
     new $namespace
     set $namespace="%SYS"
-    quit ##class(Config.Databases).Open(pDatabase).Directory
+    $$$ThrowOnError(##class(Config.Databases).Get(pDatabase, .dbProps))
+    quit ##class(%Library.File).NormalizeDirectory($get(dbProps("Directory")))
 }
 
 ClassMethod ActivateMappings(pNamespace = {$namespace}) As %Status [ Internal ]

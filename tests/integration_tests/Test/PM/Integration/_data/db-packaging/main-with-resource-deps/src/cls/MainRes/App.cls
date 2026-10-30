@@ -1,0 +1,4 @@
+Class MainRes.App
+{
+
+}

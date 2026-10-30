@@ -1,0 +1,4 @@
+Class ModuleWithMappings.Main
+{
+
+}

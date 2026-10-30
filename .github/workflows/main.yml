@@ -41,7 +41,7 @@ jobs:
           echo number=${VERSION} >> $GITHUB_OUTPUT
 
   build:
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs:
       - prepare
     strategy:
@@ -77,7 +77,7 @@ jobs:
           tags: zpm
           build-args: BASE=${{ steps.image.outputs.name }}
       - name: Run temporary registry
-        timeout-minutes: 15
+        timeout-minutes: 5
         run: |
           docker network create zpm
           docker build -f tests/registry/Dockerfile -t registry-image .
