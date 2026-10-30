@@ -1,4 +1,4 @@
-Include %IPM.Common
+Include (%IPM.Common, %IPM.Formatting)
 
 Class %IPM.Repo.Manager Extends %IPM.General.Singleton
 {
@@ -89,6 +89,11 @@ Method SearchRepositoriesForModule(
                 continue
             }
 
+            // A repo whose credentials were rejected stays skipped for the rest of the command
+            if $data($$$RepoLookupState(tServer.Name, "skip")) {
+                continue
+            }
+
             set tClient = ..CheckServiceCache(tServer.Name,.tAvailable)
             if 'tAvailable {
                 continue
@@ -106,7 +111,25 @@ Method SearchRepositoriesForModule(
             }
             set tClientCriteria.IncludePrerelease = tPrereleases
             set tClientCriteria.IncludeSnapshots = tSnapshots
-            set tServerResults = tClient.ListModules(tClientCriteria)
+            try {
+                set tServerResults = tClient.ListModules(tClientCriteria)
+            } catch e {
+                // System errors, such as Ctrl+C, stop the search
+                if e.%IsA("%Exception.SystemException") {
+                    throw e
+                }
+                if '$data($$$RepoLookupState(tServer.Name, "warned")) {
+                    write !, $$$FormattedLine($$$Yellow, "WARNING: " _ ##class(%IPM.Main).ErrorText(e.AsStatus()))
+                }
+                // Install and update search again for each dependency, so a shell command warns once per repo
+                if $data($$$RepoLookupState) {
+                    set $$$RepoLookupState(tServer.Name, "warned") = ""
+                    if e.%IsA("%IPM.Repo.Oras.HttpException") && e.CredentialsRejected {
+                        set $$$RepoLookupState(tServer.Name, "skip") = ""
+                    }
+                }
+                continue
+            }
             for i=1:1:tServerResults.Count() {
                 set item = tServerResults.GetAt(i)
                 if 'item.IsCompatibleWithPlatform(currentPlatform) {

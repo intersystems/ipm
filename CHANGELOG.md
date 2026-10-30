@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
+- #1115: Improve ORAS registry error reporting and authentication:
+    - ORAS registry errors now name the repo and show the HTTP status and the registry's message
+    - ORAS registries using Basic authentication work
+    - Lookups warn about a repo whose credentials are rejected and continue with the other repos
+    - Shell errors are shown in full, including every error in a combined status, instead of being cut off at a trailing bracket
+    - `unpublish` now fails when the module or version is not found or the registry refuses the request, instead of printing the error and reporting success
+    - Credential checks no longer follow redirects from a registry's token endpoint, so credentials are not sent to another host
 
 ## [0.10.10] - 2026-10-14
 

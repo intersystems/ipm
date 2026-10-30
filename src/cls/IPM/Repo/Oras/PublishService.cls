@@ -50,7 +50,7 @@ Method PublishModule(pModule As %IPM.Repo.Remote.ModuleInfo) As %Status
         #; Push file
         $$$ThrowOnError(..Push(..Location, repo, tag, ..Namespace, tempDirectory, metaDataString, ..Username, ..Password, ..Token, ..TokenAuthMethod))
     } catch ex {
-        set status = ex.AsStatus()
+        set status = ..ClassifyException(ex, pModule.Name).AsStatus()
     }
     // Clean up temp directory whether successful or not
     if ($data(tempDirectory) # 2) && ##class(%File).DirectoryExists(tempDirectory) {
@@ -73,10 +73,19 @@ Method Unpublish(
 	packageName As %String,
 	packageVersion As %String) As %Status
 {
-    if (packageVersion = "all") {
-        do ..DeleteModule(..Location, packageName, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
-    } else {
-        do ..DeleteTags(..Location, packageName, $$$Semver2Tag(packageVersion), ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+    try {
+        if (packageVersion = "all") {
+            do ..DeleteModule(..Location, packageName, ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+        } else {
+            do ..DeleteTags(..Location, packageName, $$$Semver2Tag(packageVersion), ..Namespace, ..Username, ..Password, ..Token, ..TokenAuthMethod)
+        }
+    } catch e {
+        set failure = ##class(%IPM.Repo.Oras.HttpException).FromException(e)
+        if $isobject(failure) && (failure.StatusCode = 404) {
+            set version = $select(packageVersion = "all": "", 1: " " _ packageVersion)
+            return $$$ERROR($$$GeneralError, "'" _ packageName _ "'" _ version _ " not found in repo '" _ ..RepoName _ "'.")
+        }
+        return ..ClassifyException(e, packageName).AsStatus()
     }
     return $$$OK
 }
@@ -118,6 +127,8 @@ ClassMethod Push(
             set eStatus = e.AsStatus()
             set usrStatus = $$$ERROR($$$GeneralError,$$$OrasRequiresFlexiblePython)
             $$$ThrowStatus($$$EMBEDSC(usrStatus,eStatus))
+        } elseif ##class(%IPM.Repo.Oras.HttpException).IsRegistryFailure(e) {
+            throw e
         } else {
             $$$ThrowStatus($$$ERROR($$$GeneralError,"Unable to push: " _ e.DisplayString()))
         }
@@ -139,7 +150,7 @@ ClassMethod PushOras(
 	tokenAuthMethod As %String) [ Language = python ]
 {
     import iris
-    import os, sys
+    import os
     import json
     import re
     import contextlib
@@ -160,13 +171,8 @@ ClassMethod PushOras(
 
         # Suppress console output using a context manager
         with open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
-            try:
-                target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
-                res = client.push(files=file_paths, target=target, disable_path_validation=True, manifest_annotations=manifest_annotations)
-            except Exception as e:
-                # stderr is unaffected by redirect_stdout
-                print("Error: ", repr(e), file=sys.stderr)
-                raise e
+            target = iris.cls("%IPM.Repo.Oras.PackageService").GetAPITarget(registry, package, namespace) + ":" + tag
+            res = client.call("push", files=file_paths, target=target, disable_path_validation=True, manifest_annotations=manifest_annotations)
 }
 
 /// Deletes the specified tags from the module
@@ -189,7 +195,7 @@ ClassMethod DeleteTags(
     if isinstance(tags, str):
         tags = tags.replace(" ","").split(",")
     for tag in tags:
-        client.delete_tag(target,tag)
+        client.call("delete_tag", target, tag)
 }
 
 /// Deletes the module by deleting all tags
@@ -205,9 +211,12 @@ ClassMethod DeleteModule(
     set target = ##class(%IPM.Repo.Oras.PackageService).GetAPITarget(registry, package, namespace)
     set client = ##class(%IPM.Repo.Oras.PackageService).GetClient(registry, username, password, token, tokenAuthMethod)
     try {
-        set tags = client."get_tags"(target)
+        set tags = client.call("get_tags", target)
         do ..DeleteTags(registry, package, tags, namespace, username, password, token, tokenAuthMethod)
     } catch sc {
+        if ##class(%IPM.Repo.Oras.HttpException).IsRegistryFailure(sc) {
+            throw sc
+        }
         $$$ThrowStatus($$$ERROR($$$GeneralError,"Failed to delete: " _ sc.DisplayString()))
     }
 }

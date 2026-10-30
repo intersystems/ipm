@@ -222,11 +222,9 @@ Method TestInterchangeableNames()
     set sc = ##class(%IPM.Main).Shell("repo -o -name zot -url http://oras:5000")
     do $$$AssertStatusOK(sc,"Zot repo configured succesfully")
 
-    // Make sure modules are not already published
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
-    do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
-    do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
+    // Make sure modules are not already published. Either may never have been, so the status is ignored.
+    do ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
+    do ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
 
     // Load module
     set moduleDir = ..GetModuleDir(..#Folder)
@@ -251,8 +249,6 @@ Method TestInterchangeableNames()
     // Cleanup by unpublishing and uninstalling
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
-    do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
     set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#ExternalName)
     do $$$AssertStatusOK(sc, "Successfully uninstalled module")
     // Verify cannot install now
@@ -279,8 +275,6 @@ Method TestInterchangeableNames()
     do $$$AssertStatusOK(sc, "Successfully installed module with default name")
 
     // Cleanup by unpublishing and uninstalling
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
-    do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
     set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
@@ -311,8 +305,6 @@ Method TestInterchangeableNames()
     // Cleanup by unpublishing and uninstalling
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
-    do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
     set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
     do $$$AssertStatusOK(sc, "Successfully uninstalled module")
     // Verify cannot install now
@@ -341,8 +333,6 @@ Method TestInterchangeableNames()
     // Cleanup by unpublishing and uninstalling
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
-    do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
     set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
     do $$$AssertStatusOK(sc, "Successfully uninstalled module")
     // Verify cannot install now
@@ -374,8 +364,6 @@ Method TestInterchangeableNames()
     do $$$AssertStatusOK(sc, "Successfully installed module with default name from namespaced repo")
 
     // Cleanup by unpublishing and uninstalling
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
-    do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
     set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
@@ -407,8 +395,6 @@ Method TestInterchangeableNames()
     // Cleanup by unpublishing and uninstalling
     set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
     do $$$AssertStatusOK(sc,"Unpublished default name succesfully")
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
-    do $$$AssertStatusOK(sc,"Unpublished external name succesfully")
     set sc = ##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName)
     do $$$AssertStatusOK(sc, "Successfully uninstalled module")
     // Verify cannot install now
