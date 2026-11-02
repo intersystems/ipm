@@ -57,7 +57,9 @@ Index Children On Children(KEYS);
 /// Tells us if this resource belongs to a module currently being processed as part of the update command
 /// If set to false, incoming resources with the same name will throw an error
 /// If set to true, incoming resources with the same name will overwrite this entry
-Property MarkedForUpdate As %Boolean [ InitialExpression = 0 ];
+/// Never exported, since IPM before 0.10.7 rejects the tag. Still accepted on import because manifests
+/// published by IPM 0.10.7-0.10.10 contain it; switch to XMLPROJECTION = "NONE" by 1.0.
+Property MarkedForUpdate As %Boolean(XMLIO = "IN") [ InitialExpression = 0 ];
 
 Method ProcessorGet() As %IPM.ResourceProcessor.Abstract
 {
