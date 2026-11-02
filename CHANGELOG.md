@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
+- #435: Copying or removing a directory on Windows now fails when ROBOCOPY cannot be run, instead of reporting success with no files copied
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
 - #1115: Improve ORAS registry error reporting and authentication:
     - ORAS registry errors now name the repo and show the HTTP status and the registry's message

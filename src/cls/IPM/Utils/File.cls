@@ -40,11 +40,7 @@ ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
                 }
                 set pRoot = ##class(%Library.File).NormalizeDirectory(pRoot)
                 set stdout=""
-                set tCmd = $listbuild("ROBOCOPY",tEmptyDir,pRoot,"/MIR")
-                set tSC = ##class(%IPM.Utils.Module).RunCommand(, tCmd,.stdout,,.retCode)
-                if $$$ISERR(tSC) && ($get(retCode)<8) {
-                    set tSC=$$$OK
-                }
+                do ..RunRobocopy($listbuild("ROBOCOPY",tEmptyDir,pRoot,"/MIR"), .stdout)
             } catch e {
                 set tSC = e.AsStatus()
             }
@@ -107,14 +103,10 @@ ClassMethod CopyDir(
             }
             set pSource = ##class(%Library.File).NormalizeDirectory(pSource)
             set pDest = ##class(%Library.File).NormalizeDirectory(pDest)
-            set tCmd = $listbuild("ROBOCOPY", pSource,pDest,"/E")
             if ('pVerbose) {
                 set stdout = ""
             }
-            set tSC = ##class(%IPM.Utils.Module).RunCommand(, tCmd,.stdout,,.retCode)
-            if $$$ISERR(tSC) && ($get(retCode)<8) {
-                set tSC=$$$OK
-            }
+            do ..RunRobocopy($listbuild("ROBOCOPY", pSource,pDest,"/E"), .stdout)
             if (pVerbose) {
                 for i=1:1:$get(tLog) {
                     write tLog(i),!
@@ -125,6 +117,19 @@ ClassMethod CopyDir(
         set tSC = $$$EMBEDSC(tBadSC,e.AsStatus())
     }
     quit tSC
+}
+
+/// Runs <var>command</var>, a ROBOCOPY command $list, and throws if it fails. ROBOCOPY exits with
+/// 0-7 on success and 8 or higher on failure. A command that never ran has no return code and fails.
+ClassMethod RunRobocopy(
+	command As %List,
+	ByRef stdout)
+{
+    set sc = ##class(%IPM.Utils.Module).RunCommand(, command, .stdout, , .returnCode)
+    if $$$ISERR(sc) && ($get(returnCode) '= "") && (returnCode < 8) {
+        set sc = $$$OK
+    }
+    $$$ThrowOnError(sc)
 }
 
 ClassMethod MakeDirectoryWriteable(
