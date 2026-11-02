@@ -1141,7 +1141,10 @@ ClassMethod LoadNewModule(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
-        do ..GetModuleDefaultsFromXML(pDirectory, .defaults)
+        set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
+        if foundNewModuleObj {
+            do newModuleObj.GetDefaultParameters(.defaults)
+        }
         merge params = defaults
         merge params = pParams
 
@@ -1172,7 +1175,6 @@ ClassMethod LoadNewModule(
             tstart
         }
 
-        set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
         set toVersion = ""
         set toVersionString = ""
         set fromVersion = ""

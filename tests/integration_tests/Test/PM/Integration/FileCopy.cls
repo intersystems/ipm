@@ -4,8 +4,15 @@ Class Test.PM.Integration.FileCopy Extends Test.PM.Integration.Base
 Method OnBeforeAllTests() As %Status
 {
     // Setup repo for FileCopy tests
-    set status = ##class(%IPM.Main).Shell("repo -n integration-tests -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/")
+    set status = ##class(%IPM.Main).Shell("repo -n integration-tests -fs -path " _ ..GetModuleDir("file-copy-test"))
     do $$$AssertStatusOK(status,"Created integration-tests repo successfully.")
+    return status
+}
+
+Method OnAfterAllTests() As %Status
+{
+    set status = ##class(%IPM.Main).Shell("repo -delete -name integration-tests")
+    do $$$AssertStatusOK(status,"Deleted integration-tests repo successfully.")
     return status
 }
 
