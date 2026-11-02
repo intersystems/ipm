@@ -132,14 +132,13 @@ jobs:
         timeout-minutes: 15
         run: |
           docker rm -f registry || true
-          docker run --rm -d \
+          REGISTRY=$(docker run --rm -d \
             --network zpm \
             --name registry \
             -p 52773:52773 \
             --network-alias registry \
             registry-image \
-            -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'"
-          REGISTRY=`docker ps -lq`
+            -a "iris session iris -U%SYS '##class(Security.Users).UnExpireUserPasswords(\"*\")'")
           sleep 5; docker exec $REGISTRY /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker exec -i $REGISTRY iris session iris -UUSER << EOF
             zpm "install zpm-registry"
@@ -251,17 +250,12 @@ jobs:
         timeout-minutes: 15
         run: |
           wget http://localhost:52773/registry/packages/zpm/latest/installer -O zpm-${{ needs.prepare.outputs.version }}.xml
-      - name: Stop ORAS registry
+      - name: Stop containers
         if: always()
         run: |
-          docker stop oras
-      - name: Stop temporary registry
-        if: always()
-        run: |
-          CONTAINER=`docker ps -lq`
-          docker stop $CONTAINER
-          docker stop registry
-          docker network rm zpm
+          # Stops the registries and any test container a failed or timed-out step left running.
+          docker ps -q --filter network=zpm | xargs -r docker stop || true
+          docker network rm zpm || true
       - uses: actions/upload-artifact@v4
         if: matrix.image == needs.prepare.outputs.main
         with:
