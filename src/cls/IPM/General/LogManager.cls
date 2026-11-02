@@ -145,8 +145,7 @@ Method WriteLogLine(
         }
 
         if '$listfind($listfromstring(..#LogLevels), level) {
-            set errMsg = "Attempted to write to log with invalid log level '"_level_"'. Please ensure log level is one of: "_..#LogLevels_$$$NL_"Attempted message to log was: "_message
-            do ..WriteLogLine(errMsg, "ERROR")
+            set errMsg = "Attempted to write to IPM command logs ("_..JSONFilePath_" and "_ ..TxtFilePath_") with invalid log level '"_level_"'. Please ensure log level is one of: "_..#LogLevels_$$$NL_"Attempted message to log was: "_message
             $$$ThrowOnError($$$ERROR($$$GeneralError, errMsg))
         }
 
@@ -157,7 +156,7 @@ Method WriteLogLine(
             set entry = ##class(%DynamicObject).%New()
             set entry.level = level
             // Terminal echo above keeps ANSI color; the log files get a stripped copy.
-            set entry.message = ..StripControlSequences(message)
+            set entry.message = message
             set entry.timestamp = timestamp
 
             // Append one NDJSON record; no full-file read/parse required.
@@ -179,18 +178,27 @@ Method WriteLogLine(
     }
     catch ex
     {
+        set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
         return ex.AsStatus()
     }
 }
 
 /// Write a standard final "Logging Complete" message to both the JSON and TXT log files and mark log as no longer initialized
-Method Finalize()
+Method Finalize() As %Status
 {
-    if (..Initialized) {
-        $$$ThrowOnError(..WriteLogLine("Logging COMPLETE", "INFO"))
-        set ..JSONFilePath = ""
-        set ..TxtFilePath = ""
+    set sc = $$$OK
+    try {
+        if (..Initialized) {
+            $$$ThrowOnError(..WriteLogLine("Logging COMPLETE", "INFO"))
+            set ..JSONFilePath = ""
+            set ..TxtFilePath = ""
+        }
     }
+    catch ex {
+        set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
+        return ex.AsStatus()
+    }
+    return sc
 }
 
 Method Flush(pThreshold As %Integer = {..Threshold})
@@ -343,8 +351,7 @@ wtab(col) [pad] public {
     set pad = $justify("", $select(col>$x:col-$x, 1:0))
     do fwd(pad) do buf(pad)
 }
-    // Forward raw bytes (ANSI intact) to the predecessor sink so the terminal still sees output
-    // live, but only when the caller opted into terminal output.
+    // Forward raw bytes to the prior redirect handler but only when the caller opted into verbose terminal output
 fwd(string) [priorIOHandler,isRedirectOn] public {
     new priorIOHandler,isRedirectOn
     if '$get($$$IPMLogCapture("writeToTerminal")) { quit }
@@ -416,43 +423,17 @@ ClassMethod EndChainedCaptureToLog() [ ProcedureBlock = 0 ]
     quit
 }
 
-/// Write one captured logical line to the log. Interception is turned off for the duration so the
-/// log write cannot re-enter the tee, and <property>Verbose</property> is forced off so the command's
-/// verbosity does not re-echo the line. Terminal echo is handled live by <var>fwd</var> in
-/// <method>BeginChainedCaptureToLog</method>, so the log write itself never echoes to the terminal.
-ClassMethod FlushCapturedBuffer(pLine As %String)
+/// Writes one buffered log line to the log files, temporarily setting verbosity
+/// to 0 so the log write does not write the line twice.
+/// @Argument line      %String to write to the active logs
+ClassMethod FlushCapturedBuffer(line As %String)
 {
-    set st = ##class(%Device).ReDirectIO(0)
     set currentLogMgr = ..%Get(.sc)
     if $isobject(currentLogMgr) {
         set verbose = currentLogMgr.Verbose
         set currentLogMgr.Verbose = 0
-        do currentLogMgr.WriteLogLine(pLine)
+        do currentLogMgr.WriteLogLine(line)
         set currentLogMgr.Verbose = verbose
     }
-    do ##class(%Device).ReDirectIO(st)
 }
-
-/// Strip ANSI SGR control sequences (<code>ESC[...m</code>) so color codes written for the
-/// terminal do not reach the log files.
-ClassMethod StripControlSequences(pText As %String) As %String
-{
-    set esc = $char(27)_"["
-    set out = ""
-    set p = $find(pText, esc)
-    while p {
-        set out = out_$extract(pText, 1, p-$length(esc)-1)
-        set pText = $extract(pText, p, *)
-        set m = $find(pText, "m")
-        if m {
-            set pText = $extract(pText, m, *)
-        } else {
-            set pText = ""
-        }
-        set p = $find(pText, esc)
-    }
-    quit out_pText
 }
-
-}
-
