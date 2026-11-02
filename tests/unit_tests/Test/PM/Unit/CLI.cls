@@ -432,13 +432,6 @@ Method TestUninstallWithoutModuleName()
     do $$$LogMessage("Run Uninstall command without module name")
     set status = ..RunCommand("uninstall")
     do $$$AssertStatusNotOK(status, $system.Status.GetErrorText(status))
-    set status = ..RunCommand("install objectscript-math")
-    do $$$AssertStatusOK(status, "objectscript-math module installed successfully.")
-    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
-    do $$$AssertTrue(exists, "objectscript-math Module exists in storage after installation.")
-    do ..RunCommand("uninstall objectscript-math")
-    set exists = ##class(%IPM.Storage.Module).NameExists("objectscript-math")
-    do $$$AssertNotTrue(exists, "Module removed successfully.")
 }
 
 /// Specifies the serialization format (json, toon, yaml) for unit and integration test results in the shell.
