@@ -51,6 +51,56 @@ Method TestGetModuleDefaultsFromXML()
   do $$$AssertEquals(count, 3)
 }
 
+/// A module.xml must decode per its encoding attribute, not the process's default file translation table.
+/// Multibyte tests force a UTF8 default so that a character-stream read mangles the fixture's UTF-8 bytes.
+Parameter MULTIBYTEDIR = "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/multibyte-description/";
+
+Method TestGetModuleObjectFromPathMultibyte()
+{
+  set originalFileTable = ..SetFileTranslateTable("UTF8")
+  try {
+    set module = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(..#MULTIBYTEDIR, .found)
+    do ..AssertMultibyteModule(module, found)
+  } catch e {
+    do $$$AssertStatusOK(e.AsStatus())
+  }
+  do ..SetFileTranslateTable(originalFileTable)
+}
+
+Method TestFilesystemRepoGetModuleStreamFromFileMultibyte()
+{
+  set originalFileTable = ..SetFileTranslateTable("UTF8")
+  try {
+    set repo = ##class(%IPM.Repo.Filesystem.Definition).%New()
+    set sc = repo.GetModuleStreamFromFile(..#MULTIBYTEDIR_"module.xml", .stream, .name, .version)
+    do $$$AssertStatusOK(sc)
+    do $$$AssertEquals(name, "multibyte-description")
+    do $$$AssertEquals(version, "1.0.0")
+    set module = ##class(%IPM.Utils.Module).GetModuleObjectFromStream(stream, .found)
+    do ..AssertMultibyteModule(module, found)
+  } catch e {
+    do $$$AssertStatusOK(e.AsStatus())
+  }
+  do ..SetFileTranslateTable(originalFileTable)
+}
+
+/// Sets the process's default file translation table and returns the previous one.
+Method SetFileTranslateTable(table As %String) As %String
+{
+  set nlsTable = ##class(%SYS.NLS.Table).%New("Process")
+  set previous = nlsTable.GetIOTable(3)
+  do nlsTable.SetIOTable(3, table)
+  return previous
+}
+
+Method AssertMultibyteModule(
+	module As %IPM.Storage.Module,
+	found As %Boolean)
+{
+  do $$$AssertTrue(found)
+  do $$$AssertEquals(module.Description, $char(26085, 26412, 35486, 12398, 35500, 26126))
+}
+
 Method TestFixUndefinedCLIGenCommand()
 {
 	set webAppList = "/test/test"

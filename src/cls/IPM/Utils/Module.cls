@@ -321,7 +321,8 @@ ClassMethod GetModuleObjectFromPath(
     if '##class(%Library.File).Exists(modulePath) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"File not found to obtain module object: "_modulePath))
     }
-    set stream = ##class(%Stream.FileCharacter).%New()
+    // Binary so the XML parser decodes per the encoding declaration, not the process's default file translation table
+    set stream = ##class(%Stream.FileBinary).%New()
     $$$ThrowOnError(stream.LinkToFile(modulePath))
     return ..GetModuleObjectFromStream(stream,.pFound)
 }

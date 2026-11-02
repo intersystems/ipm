@@ -251,7 +251,8 @@ Method GetModuleStreamFromFile(
     set pVersion = ""
     try {
         // The source stream should contain a Studio document export of a module manifest.
-        set tSourceStream = ##class(%Stream.FileCharacter).%New()
+        // Binary so the XSLT parser decodes per the encoding declaration, not the process's default file translation table
+        set tSourceStream = ##class(%Stream.FileBinary).%New()
         set tSC = tSourceStream.LinkToFile(pFilename)
         $$$ThrowOnError(tSC)
 
