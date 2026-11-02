@@ -22,9 +22,6 @@ Method TestInstallTimeConfig()
 
     Set tSC = ##class(%IPM.Main).Shell("repo -delete-all")
     Do $$$AssertStatusOK(tSC, "Deleted all repos successfully")
-
-    Set tSC = ##class(%IPM.Main).Shell("repo -reset-defaults")
-    Do $$$AssertStatusOK(tSC, "Reset repo to default successfully")
 }
 
 Method TestPhaseConfig()

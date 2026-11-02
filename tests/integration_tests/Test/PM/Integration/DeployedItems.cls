@@ -43,7 +43,7 @@ Method DeployedItemsHelper(noDevMode As %Boolean = 0)
 
     do ..RunDeployedCode()
     do ..UninstallModule()
-    do ..RestoreDefaultRegistry()
+    do ..DeleteRepos()
 }
 
 Method SetupModule(noDevMode As %Boolean = 0)
@@ -84,13 +84,10 @@ Method SetupOrasRegistry()
     do $$$AssertStatusOK(sc, "Successfully setup oras registry")
 }
 
-Method RestoreDefaultRegistry()
+Method DeleteRepos()
 {
     set sc = ##class(%IPM.Main).Shell("repo -delete-all")
-    do $$$AssertStatusOK(sc, "Successfully deleted modules")
-
-    set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
-    do $$$AssertStatusOK(sc, "Successfully reset repo to defaults")
+    do $$$AssertStatusOK(sc, "Successfully deleted repos")
 }
 
 Method TestDeployedItems()
@@ -127,7 +124,7 @@ Method TestDeployedDependencies()
 
     // Uninstall module and reset registry
     do ..UninstallModule()
-    do ..RestoreDefaultRegistry()
+    do ..DeleteRepos()
 }
 
 }

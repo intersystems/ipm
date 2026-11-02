@@ -31,9 +31,6 @@ Method TestExternalName()
 
     set sc = ##class(%IPM.Main).Shell("repo -delete-all")
     do $$$AssertStatusOK(sc, "Deleted all repos")
-
-    set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
-    do $$$AssertStatusOK(sc, "Reset repos to default")
 }
 
 }

@@ -136,8 +136,6 @@ Method TestZeroByteFilePreservedAfterExtract()
     do $$$AssertStatusOK(sc,"Uninstalled zero-byte-file after reinstall.")
     set sc = ##class(%IPM.Main).Shell("repo -delete-all")
     do $$$AssertStatusOK(sc,"Deleted repos successfully.")
-    set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
-    do $$$AssertStatusOK(sc,"Reset repos to default successfully.")
   } catch e {
     do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
   }

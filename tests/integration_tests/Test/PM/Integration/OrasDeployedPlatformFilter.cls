@@ -43,7 +43,6 @@ Method OnBeforeAllTests() As %Status
 Method OnAfterAllTests() As %Status
 {
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"), "Cleared repos")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -reset-defaults"), "Reset repos to defaults")
     return $$$OK
 }
 

@@ -21,7 +21,6 @@ Method OnAfterAllTests() As %Status
 {
     do ##class(%IPM.Main).Shell("unpublish oras/" _ ..#ModuleName _ " " _ ..#ModuleVersion _ " -force")
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"), "Deleted repos.")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -reset-defaults"), "Reset repos to defaults.")
     return $$$OK
 }
 
