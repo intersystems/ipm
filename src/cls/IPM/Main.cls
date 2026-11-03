@@ -1132,6 +1132,9 @@ ClassMethod ShellInternal(
                 do ##class(%IPM.General.LogManager).%Get().Finalize()
                 return
             }
+            // A failing IRIS system call may have thrown with the chained capture tee still
+            // installed; tear it down before displaying so the error line is not re-captured.
+            $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
             do ..DisplayError(pException.AsStatus())
         }
         do ##class(%IPM.General.LogManager).%Get().Finalize()
