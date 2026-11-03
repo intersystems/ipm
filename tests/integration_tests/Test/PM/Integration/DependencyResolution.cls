@@ -13,6 +13,21 @@ Method TestEverything()
 
     do ..PublishModules()
 
+    set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+    set searchCriteria.Registry = ..#REGISTRYNAME
+    set searchCriteria.Name = "HS.JSON"
+    set $PROPERTY(searchCriteria, "AllVersions") = 0
+    set sc = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(searchCriteria, .remoteResults)
+    do $$$AssertStatusOK(sc, "Searched remote repository for HS.JSON.")
+    do $$$AssertEquals(remoteResults.Count(), 11, "Remote search returns all published HS.JSON versions despite the deprecated flag.")
+    if (remoteResults.Count() = 11) {
+      set firstResult = remoteResults.GetAt(1)
+      do $$$AssertEquals(firstResult.VersionString, "2.0.0", "Highest remote version is first.")
+      do $$$AssertTrue(firstResult.AllVersions [ "1.1.4", "Remote candidates retain the version summary.")
+      set lastResult = remoteResults.GetAt(11)
+      do $$$AssertEquals(lastResult.VersionString, "0.0.1+snapshot", "Lowest remote version is last.")
+    }
+
 		#; // Get annotations for local module XDATA blocks; put into array by module (XDATA) name.
 		#; If '$$$AssertStatusOK(##class(%IPM.PackageManager.Developer.Annotation.Utils).ExtractAnnotations($classname(),.tAnnotationList)) {
 		#; 	Quit

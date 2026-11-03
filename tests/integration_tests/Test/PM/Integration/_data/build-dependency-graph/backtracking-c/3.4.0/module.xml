@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="backtracking-c.ZPM">
+        <Module>
+            <Name>backtracking-c</Name>
+            <Version>3.4.0</Version>
+            <Dependencies>
+                <ModuleReference>
+                    <Name>backtracking-d</Name>
+                    <Version>^3.3.0</Version>
+                </ModuleReference>
+            </Dependencies>
+        </Module>
+    </Document>
+</Export>

@@ -24,55 +24,46 @@ Method OnAfterAllTests() As %Status
     quit sc
 }
 
-/// SearchRepositoriesForModule should return a module reference
-/// will AllVersions set to all three versions of the module when no version specified in search criteria
+/// SearchRepositoriesForModule returns each matching module version and preserves the version summary.
 Method TestSearchModuleNoVersionSpecified()
 {
     // Set searchCriteria
     set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
 	set searchCriteria.Name = ..#REPONAME
-	set searchCriteria.AllVersions = 1
 
     // Search repos
     set sc = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(searchCriteria, .resultList)
 	do $$$AssertStatusOK(sc, "SearchRepositoriesForModule call was successful.")
-    do $$$AssertTrue((resultList.Count() = 1), "Found module.")
+    do $$$AssertEquals(resultList.Count(), 3, "Search returns one reference per matching version.")
 
-    // Get the first module reference
+    // Get the newest module reference
     set moduleReference = resultList.GetAt(1)
 
-    // Make sure AllVersions is set and contains all three versions of the module
-    set versionsString = moduleReference.AllVersions
-    do $$$AssertTrue((versionsString = "3.0.0, 2.0.0, 1.0.0"), "AllVersions contains all versions of the module.")
-
-    // Make sure VersionString is set to the latest version of the module
-    do $$$AssertTrue((moduleReference.VersionString = "3.0.0"), "VersionString is set to the latest version of the module.")
+    do $$$AssertEquals(moduleReference.VersionString, "3.0.0", "Newest version is first.")
+    do $$$AssertEquals(moduleReference.AllVersions, "3.0.0, 2.0.0, 1.0.0", "Each result preserves the full version summary.")
+    do $$$AssertEquals(resultList.GetAt(2).VersionString, "2.0.0", "Second version is returned.")
+    do $$$AssertEquals(resultList.GetAt(3).VersionString, "1.0.0", "Third version is returned.")
 }
 
-/// SearchRepositoriesForModule should return a module reference
-/// will AllVersions set to all versions of the module that match the version expression in search criteria
+/// SearchRepositoriesForModule returns every version matching the expression, with that filtered summary.
 Method TestSearchModuleVersionSpecified()
 {
     // Set searchCriteria
     set searchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
 	set searchCriteria.Name = ..#REPONAME
-	set searchCriteria.AllVersions = 1
     set searchCriteria.VersionExpression = "<3.0.0"
 
     // Search repos
     set sc = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(searchCriteria, .resultList)
 	do $$$AssertStatusOK(sc, "SearchRepositoriesForModule call was successful.")
-    do $$$AssertTrue((resultList.Count() = 1), "Found module.")
+    do $$$AssertEquals(resultList.Count(), 2, "Search returns both matching versions.")
 
     // Get the first module reference
     set moduleReference = resultList.GetAt(1)
 
-    // Make sure AllVersions is set and contains all three versions of the module
-    set versionsString = moduleReference.AllVersions
-    do $$$AssertTrue((versionsString = "2.0.0, 1.0.0"), "AllVersions contains all matching versions of the module.")
-
-    // Make sure VersionString is set to specified version of the module
-    do $$$AssertTrue((moduleReference.VersionString = "2.0.0"), "VersionString is set to the specified version of the module.")
+    do $$$AssertEquals(moduleReference.VersionString, "2.0.0", "Highest matching version is first.")
+    do $$$AssertEquals(moduleReference.AllVersions, "2.0.0, 1.0.0", "Summary contains only matching versions.")
+    do $$$AssertEquals(resultList.GetAt(2).VersionString, "1.0.0", "The other matching version is returned.")
 }
 
 }

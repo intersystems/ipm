@@ -331,10 +331,7 @@ ClassMethod AggregatePlatformVersions(
     return ##class(%IPM.Utils.EmbeddedPython).FromPythonList(sortedTags)
 }
 
-/// Reorders versionsList so that versions with an artifact for currentPlatform come first, each
-/// group keeping the newest-first order it arrived in. A caller that reports only the first version
-/// therefore reports the newest installable one, falling back to the newest version overall when
-/// the module has no artifact for this platform at all.
+/// Reorders versionsList so platform-compatible versions come first, preserving newest-first order.
 ClassMethod PreferCompatibleVersions(
 	versionsList As %List,
 	ByRef aggregatedPlatformVersion,
@@ -384,11 +381,7 @@ Method AddModulesFromTags(
 {
     set allTagsString = ..GetAllTags(..Location, name, "", client)
     set allVersionsList = ..AggregatePlatformVersions($listfromstring(allTagsString, ", "), .aggregatedPlatformVersion)
-    // The tri-states of AllVersions that report a single version should report one this platform
-    // can actually install. The empty state reports every version, so its order doesn't matter.
-    if (searchCriteria.AllVersions '= "") {
-        set allVersionsList = ..PreferCompatibleVersions(allVersionsList, .aggregatedPlatformVersion, $$$CurrentPlatformVersion)
-    }
+    set allVersionsList = ..PreferCompatibleVersions(allVersionsList, .aggregatedPlatformVersion, $$$CurrentPlatformVersion)
     set pointer = 0
     while $listnext(allVersionsList,pointer,moduleVersion) {
         // filter by version
@@ -466,28 +459,16 @@ Method AddModulesFromTags(
         set tModRef.Repository = artifactMetadata.ImageSource
         set tModRef.Description = artifactMetadata.ImageDescription
         set tModRef.Deployed = artifactMetadata.IPMDeployed
-        // Skipped for AllVersions, which reports a single entry standing in for every version;
-        // these platforms belong to just one of them.
-        if (artifactMetadata.IPMDeployed '= "") && 'searchCriteria.AllVersions {
+        if (artifactMetadata.IPMDeployed '= "") {
             set pvPtr = 0
             while $listnext(platformVersions, pvPtr, pv) {
                 $$$ThrowOnError(tModRef.PlatformVersions.Insert(pv))
             }
         }
-        if searchCriteria.AllVersions {
-            // TODO: Convert these to semvers. This is just for display so OK not to for now.
-            set tModRef.AllVersions = allTagsString
-        }
+        // TODO: Convert these to semvers. This is just for display so OK not to for now.
+        set tModRef.AllVersions = allTagsString
         set tModRef.Origin = artifactMetadata.IPMOrigin
         do moduleList.Insert(tModRef)
-
-        if (searchCriteria.AllVersions '= "") {
-            // This is a tri-state.
-            // 0: don't show them.
-            // 1: do show them
-            // empty: we're resolving dependencies so DON'T QUIT.
-            quit
-        }
     }
 }
 

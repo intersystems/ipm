@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes
 
 ### Fixed
+- #1299: Repository searches now return every matching version so dependency resolution can backtrack from incompatible candidates while module listings retain their latest-only default
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
 - #1115: Improve ORAS registry error reporting and authentication:

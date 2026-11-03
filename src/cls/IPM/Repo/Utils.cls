@@ -153,11 +153,9 @@ ClassMethod moduleSqlToList(
             set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
             set tModRef.Name = tRes.%Get("Name")
             set tModRef.VersionString = tRes.%Get("VersionString")
-            if pSearchCriteria.AllVersions {
-                set tModRef.AllVersions = VersionString
-            }
+            set tModRef.AllVersions = VersionString
             do tArray.SetAt(tModRef, Name)
-        } elseif pSearchCriteria.AllVersions {
+        } else {
             set tModRef.AllVersions = tModRef.AllVersions_", "_VersionString
         }
     }

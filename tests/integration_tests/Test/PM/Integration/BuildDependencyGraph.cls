@@ -411,6 +411,108 @@ Method TestFuzzyVersionSelectsHighestCompatibleMatch()
     do $$$AssertEquals(version, "1.0.1", "loop-b resolved at highest compatible version 1.0.1.")
 }
 
+/// When the highest matching candidate conflicts with an already-selected dependency, the next candidate is used.
+/// Test data: backtracking-root requires backtracking-b ~3.29.0 and backtracking-c ~3.4.0; backtracking-c requires backtracking-d ^3.3.0.
+Method TestHighestCandidateBacktracksOnTransitiveConflict()
+{
+    set mod = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(..GetModuleDir(..#REPONAME, "backtracking-root", "1.0.0"), .found)
+    do $$$AssertTrue(found, "Loaded backtracking-root 1.0.0 module object.")
+
+    set sc = mod.BuildDependencyGraph(.graph)
+    if ('$$$AssertStatusOK(sc, "BuildDependencyGraph() backtracks when the highest candidate conflicts.")) {
+        return
+    }
+
+    set $listbuild(, , version) = graph("backtracking-b")
+    do $$$AssertEquals(version, "3.29.0", "Root's backtracking-b requirement resolves to 3.29.0.")
+    set $listbuild(, , version) = graph("backtracking-d")
+    do $$$AssertEquals(version, "3.7.0", "backtracking-d resolves to 3.7.0 because 3.8.0 requires incompatible backtracking-b.")
+}
+
+/// Filesystem searches return each matching version regardless of the deprecated search flag.
+Method TestFilesystemSearchAlwaysReturnsMatchingVersions()
+{
+    set repo = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(..#REPONAME, , .sc)
+    if ('$$$AssertStatusOK(sc, "Opened the filesystem test repository.")) {
+        return
+    }
+    set service = repo.GetPackageService()
+    set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
+    set criteria.Name = "backtracking-d"
+    set criteria.VersionExpression = "^3.3.0"
+
+    set modes = $listbuild("", 0, 1)
+    for modeIndex=1:1:$listlength(modes) {
+        set $PROPERTY(criteria, "AllVersions") = $listget(modes, modeIndex)
+        set results = service.ListModules(criteria)
+        set resultCount = results.Count()
+        do $$$AssertEquals(resultCount, 2, "Every AllVersions mode returns both matching filesystem versions.")
+        if (resultCount = 2) {
+            do $$$AssertEquals(results.GetAt(1).VersionString, "3.8.0", "Highest candidate is first.")
+            do $$$AssertEquals(results.GetAt(2).VersionString, "3.7.0", "Lower candidate remains available for backtracking.")
+            do $$$AssertEquals(results.GetAt(1).AllVersions, "3.8.0, 3.7.0", "Each candidate retains the version summary.")
+        }
+    }
+}
+
+/// Cross-repository search keeps every matching version in global semantic order.
+Method TestRepositorySearchReturnsCandidatesAcrossRepositories()
+{
+    set secondaryRepo = "backtracking-secondary"
+    set secondaryRoot = ..GetModuleDir(secondaryRepo)
+    set sc = ##class(%IPM.Main).Shell("repo -n " _ secondaryRepo _ " -fs -path " _ secondaryRoot)
+    do $$$AssertStatusOK(sc, "Created the secondary filesystem repository.")
+
+    set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
+    set criteria.Name = "backtracking-d"
+    set $PROPERTY(criteria, "AllVersions") = 0
+    set sc = ##class(%IPM.Repo.Utils).SearchRepositoriesForModule(criteria, .results)
+    do $$$AssertStatusOK(sc, "Cross-repository search succeeded.")
+    do $$$AssertEquals(results.Count(), 4, "Search returns every version from both repositories.")
+    if (results.Count() = 4) {
+        set candidate = results.GetAt(1)
+        do $$$AssertEquals(candidate.VersionString, "3.9.0", "Highest version from the secondary repo is first.")
+        do $$$AssertEquals(candidate.ServerName, secondaryRepo, "Highest version retains its source repository.")
+
+        set candidate = results.GetAt(2)
+        do $$$AssertEquals(candidate.VersionString, "3.8.0", "Next-highest version from the primary repo is second.")
+        do $$$AssertEquals(candidate.ServerName, ..#REPONAME, "Next-highest version retains its source repository.")
+
+        set candidate = results.GetAt(3)
+        do $$$AssertEquals(candidate.VersionString, "3.8.0", "Equal versions from the second repository follow the primary repository.")
+        do $$$AssertEquals(candidate.ServerName, secondaryRepo, "Equal-version repository precedence is retained.")
+
+        set candidate = results.GetAt(4)
+        do $$$AssertEquals(candidate.VersionString, "3.7.0", "Lowest matching version remains available.")
+        do $$$AssertEquals(candidate.ServerName, ..#REPONAME, "Lowest version retains its source repository.")
+    }
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete -name " _ secondaryRepo), "Deleted the secondary filesystem repository.")
+}
+
+/// The module-list projection shows only the latest version by default and every version on request.
+Method TestModuleListPreservesLatestAndAllVersionViews()
+{
+    set result = ##class(%SQL.Statement).%ExecDirect(,
+        "select Name, Version, AllVersions from %IPM_Utils.Module_GetModuleList(?,?) where Name = ?",
+        ..#REPONAME, 0, "backtracking-d")
+    do $$$AssertTrue(result.%SQLCODE = 0, "Default module-list query succeeded.")
+    do $$$AssertTrue(result.%Next(.sc), "Default module list includes backtracking-d.")
+    do $$$AssertEquals(result.%Get("Version"), "3.8.0", "Default module list selects the latest version.")
+    do $$$AssertTrue('result.%Next(.sc), "Default module list emits only one version per module.")
+
+    set result = ##class(%SQL.Statement).%ExecDirect(,
+        "select Name, Version, AllVersions from %IPM_Utils.Module_GetModuleList(?,?) where Name = ?",
+        ..#REPONAME, 1, "backtracking-d")
+    do $$$AssertTrue(result.%SQLCODE = 0, "All-version module-list query succeeded.")
+    do $$$AssertTrue(result.%Next(.sc), "All-version module list includes the highest version.")
+    do $$$AssertEquals(result.%Get("Version"), "3.8.0", "Highest version is listed first.")
+    do $$$AssertEquals(result.%Get("AllVersions"), "3.8.0, 3.7.0", "Version summary remains available.")
+    do $$$AssertTrue(result.%Next(.sc), "All-version module list includes the lower version.")
+    do $$$AssertEquals(result.%Get("Version"), "3.7.0", "Lower matching version is listed.")
+    do $$$AssertTrue('result.%Next(.sc), "All-version module list emits only matching versions.")
+}
+
 /// When a dependency is pinned to an exact version string (e.g., "1.0.0" not "^1.0.0"),
 /// that exact version is recorded in the graph regardless of other available versions.
 /// Test data: build-dependency-graph/loop-root; loop-root pins loop-c at exactly 1.0.0.
