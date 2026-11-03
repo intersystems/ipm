@@ -1,8 +1,6 @@
 Class Test.PM.Integration.Data.RedirectionToLog.LoadClasses
 {
 
-Parameter TargetClass = "Test.PM.Integration.Data.RedirectionToLog.Target";
-
 /// Loads a file with the chained capture tee active, so its compile output is routed to the log.
 /// Pass <var>writeToTerminal</var> = 1 to also echo the output down the redirect chain.
 ClassMethod LoadWithCapture(
