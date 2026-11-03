@@ -17,8 +17,6 @@ Parameter ExportPackageWithPythonDepsLocation = "export-package-with-python-deps
 
 Parameter PublishWithPythonDepsLocation = "publish-with-python-deps";
 
-Parameter ExportedPackagesDir = "/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/python-deps-tests/export-package-with-python-deps/";
-
 Method OnAfterOneTest() As %Status
 {
     // Make test environment clean by uninstalling all modules at the end of each test
@@ -26,6 +24,17 @@ Method OnAfterOneTest() As %Status
     do $$$AssertStatusOK(sc, "Successfully uninstalled all modules after test")
     set sc = ##class(%IPM.Main).Shell("repo -delete-all")
     do $$$AssertStatusOK(sc, "Successfully deleted all repositories after test")
+    do ..DeletePath(..ExportedPackagesDir())
+    // -export-python-deps downloads requirements.txt wheels into <module root>/wheels
+    do ..DeletePath(..GetModuleDir("python-deps-tests", ..#PackageWithPythonDepsLocation, "wheels"))
+    do ..DeletePath(..GetModuleDir("python-deps-tests", ..#PublishWithPythonDepsLocation, "just-reqs", "wheels"))
+    do ..DeletePath(..GetModuleDir("python-deps-tests", ..#PublishWithPythonDepsLocation, "wheels-and-reqs", "wheels"))
+    // GenerateWheel builds inside the fixture's package source and copies the wheel next to its module.xml
+    set packageDir = ..GetModuleDir("python-deps-tests", ..#PackageLocation, "modules", "python", "ipm_dummy_package")
+    for buildDir = "build", "dist", "ipm_dummy_package.egg-info" {
+        do ..DeletePath(##class(%File).NormalizeDirectory(buildDir, packageDir))
+    }
+    do ..DeletePath(##class(%File).NormalizeFilename("ipm_dummy_package-0.1-py3-none-any.whl", ..GetModuleDir("python-deps-tests", ..#PackageLocation)))
     return sc
 }
 
@@ -182,7 +191,8 @@ Method TestNoWheelAndReqsPresentOffline()
 Method TestPackageWithPythonDeps() As %Status
 {
     do ..PurgePythonPackage("lune")
-    do ..PurgePythonPackage("ansible")
+    do ..PurgePythonPackage("jinja2")
+    do ..PurgePythonPackage("markupsafe")
     set dir = ..GetModuleDir("python-deps-tests", ..#PackageWithPythonDepsLocation)
 
     // Use a local filesystem repo to install the test module into the namespace
@@ -203,8 +213,7 @@ Method TestPackageWithPythonDeps() As %Status
     do $$$AssertStatusOK(sc, "Uninstalled module")
 
 
-    set wheels = { "wheels": ["ansible", "cffi", "cryptography", "jinja2", "lune", "markupsafe",
-                              "packaging", "pycparser", "pyyaml", "resolvelib"] }
+    set wheels = { "wheels": ["jinja2", "lune", "markupsafe"] }
     do ..AssertWheelFilesExistInPackagedModule(exportTarball, wheels)
 
     set sc = ##class(%IPM.Main).Shell("load -bypass-py-deps "_exportTarball)
@@ -241,8 +250,7 @@ Method TestPackageWithoutPythonDeps() As %Status
     do $$$AssertStatusOK(sc, "Uninstalled module")
 
 
-    set wheels = { "wheels": ["ansible", "cffi", "cryptography", "jinja2", "lune", "markupsafe",
-                              "packaging", "pycparser", "pyyaml", "resolvelib"] }
+    set wheels = { "wheels": ["jinja2", "lune", "markupsafe"] }
     do ..AssertWheelFilesExistInPackagedModule(exportTarball, wheels, 0)
 
     set sc = ##class(%IPM.Main).Shell("repo -delete -n localrepo")
@@ -255,14 +263,14 @@ Method TestPublishWithPythonDeps() As %Status
 
     // 1. Test the case of python dependencies defined via requirements.txt
     set moduleNameReq = "publish-with-python-just-reqs"
-    set wheelsReq = ["docx2md", "lxml", "pillow"]
+    set wheelsReq = ["markdown_it_py", "mdurl"]
                      set wheels = {}
     do wheels.%Set(moduleNameReq, wheelsReq)
     do ..PublishTestHandler(moduleNameReq, wheels)
 
     // 2. Test the case of python dependencies defined via wheel resources in module.xml
     set moduleNameWhl = "publish-with-python-just-wheels"
-    set wheelsWhl = ["numpy"]
+    set wheelsWhl = ["tomli"]
     set wheels = {}
     do wheels.%Set(moduleNameWhl, wheelsWhl)
     do ..PublishTestHandler(moduleNameWhl, wheels)
@@ -334,7 +342,13 @@ Method PublishTestHandler(
 Method GetRandomExportPath()
 {
     set randomDir = $translate($system.Encryption.Base64Encode($system.Encryption.GenCryptRand(6)),"+/=")
-    return ..#ExportedPackagesDir_randomDir_"/package"
+    return ##class(%File).Construct(..ExportedPackagesDir(), randomDir, "package")
+}
+
+/// Packages are written to the native filesystem because the repo bind mount is slow for large files
+ClassMethod ExportedPackagesDir() As %String
+{
+    return ##class(%File).NormalizeDirectory(..#ExportPackageWithPythonDepsLocation, $system.Util.ManagerDirectory())
 }
 
 /// Checks to see if the physical files exist in a packaged module

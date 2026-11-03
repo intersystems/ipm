@@ -29,7 +29,6 @@ Method OnAfterOneTest(testName As %String) As %Status
 Method OnAfterAllTests() As %Status
 {
     do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete-all"), "Deleted repos successfully")
-    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -reset-defaults"), "Reset repos to default successfully")
     return $$$OK
 }
 

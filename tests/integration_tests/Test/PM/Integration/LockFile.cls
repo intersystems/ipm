@@ -50,8 +50,14 @@ Parameter ModuleK As String = "lock-mod-k-common-transient";
 ///     - F -> E & B
 Parameter ModuleL As String = "lock-mod-l-complex-deps";
 
+/// Contents of the lock files committed in the module directories, by path.
+/// The tests overwrite them with install -create-lockfile, so OnAfterAllTests puts them back.
+Property SavedLockFiles As %String [ MultiDimensional ];
+
 Method OnBeforeAllTests() As %Status
 {
+    do ..SaveLockFiles()
+
     // Setup repos for LockFile tests
     set sc = ##class(%IPM.Main).Shell("repo -delete-all")
     do $$$AssertStatusOK(sc,"Deleted all leftover repos from other tests successfully.")
@@ -69,7 +75,57 @@ Method OnAfterAllTests() As %Status
     do $$$AssertStatusOK(sc,"Removed lock-file-base repo successfully.")
     set sc = ##class(%IPM.Main).Shell("repo -delete -name lock-file-edge")
     do $$$AssertStatusOK(sc,"Removed lock-file-edge repo successfully.")
+
+    do ..RestoreLockFiles()
     return sc
+}
+
+/// Lists the lock file path for each module directory in the test repos, whether or not the file exists
+Method LockFilePaths(Output paths)
+{
+    for repoDir = "mods-base-cases", "mods-edge-cases" {
+        set root = ..GetModuleDir("lock-test", repoDir)
+        set entry = $zsearch(root_"*")
+        while entry '= "" {
+            if ##class(%File).DirectoryExists(entry) && '$listfind($listbuild(".", ".."), ##class(%File).GetFilename(entry)) {
+                set paths(##class(%File).NormalizeFilename(..#LockFileName, entry)) = ""
+            }
+            set entry = $zsearch("")
+        }
+    }
+}
+
+Method SaveLockFiles()
+{
+    do ..LockFilePaths(.paths)
+    set path = ""
+    for {
+        set path = $order(paths(path))
+        quit:path=""
+        continue:'##class(%File).Exists(path)
+        set stream = ##class(%Stream.FileBinary).%New()
+        $$$ThrowOnError(stream.LinkToFile(path))
+        set ..SavedLockFiles(path) = stream.Read(stream.Size)
+    }
+}
+
+/// Writes back each saved lock file and deletes the ones the tests created
+Method RestoreLockFiles()
+{
+    do ..LockFilePaths(.paths)
+    set path = ""
+    for {
+        set path = $order(paths(path))
+        quit:path=""
+        if $data(..SavedLockFiles(path)) {
+            set stream = ##class(%Stream.FileBinary).%New()
+            $$$ThrowOnError(stream.LinkToFile(path))
+            $$$ThrowOnError(stream.Write(..SavedLockFiles(path)))
+            $$$ThrowOnError(stream.%Save())
+        } elseif ##class(%File).Exists(path) {
+            do $$$AssertTrue(##class(%File).Delete(path), "Deleted lock file created by the tests: "_path)
+        }
+    }
 }
 
 Method OnAfterOneTest() As %Status

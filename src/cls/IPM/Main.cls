@@ -1017,7 +1017,10 @@ ClassMethod ShellInternal(
     if (tCommand '= "") {
         set tOneCommand = 1
     }
-    set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
+    // The intro is only shown in the interactive shell. Building it lists modules in every namespace.
+    if 'tOneCommand {
+        set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
+    }
     set tInShell = 0
     for {
         kill $$$DeprecationWarned

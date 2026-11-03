@@ -65,7 +65,17 @@ Method TestResourceTypesOnIRISForHealth()
 	}
 
 	set $namespace = oldNamespace
+	do ..DeleteLocalizationExport($get(tModuleDirectory))
 	do ..TearDown()
+}
+
+/// Activate exports the module's .LOC messages into its root, which is the fixture directory
+ClassMethod DeleteLocalizationExport(moduleDirectory As %String)
+{
+	if moduleDirectory = "" {
+		return
+	}
+	do ##class(%File).Delete(##class(%File).NormalizeFilename("localize/HTTPStatuses.xml", moduleDirectory))
 }
 
 Method TestResourceTypesOnIRIS()
@@ -117,6 +127,7 @@ Method TestResourceTypesOnIRIS()
 	}
 
 	set $namespace = oldNamespace
+	do ..DeleteLocalizationExport($get(tModuleDirectory))
 	do ..TearDown()
 }
 

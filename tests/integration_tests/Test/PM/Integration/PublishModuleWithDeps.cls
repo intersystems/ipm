@@ -3,7 +3,7 @@ Class Test.PM.Integration.PublishModuleWithDeps Extends Test.PM.Integration.Base
 
 Method TestPublishWithDeps() As %Status
 {
-    Set moduleDir = ..GetModuleDir()
+    Set moduleDir = ..GetModuleDir("publish-with-deps")
 
     Set sc = ##class(%IPM.Main).Shell("repo -fs -name localrepo -path " _ moduleDir)
     Do $$$AssertStatusOK(sc, "Successfully configured local filesystem repo")
