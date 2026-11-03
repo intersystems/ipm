@@ -270,6 +270,30 @@ ClassMethod LoadModuleFromArchive(
     quit tSC
 }
 
+/// Returns the status of a <code>$system.OBJ.ImportDir</code> call without errors for files IRIS
+/// cannot import (such as .DS_Store), so they do not fail the load. ImportDir still loads every other
+/// file, but its returned status holds only the first error, so a real error is rebuilt from the log.
+ClassMethod RemoveUnsupportedFileErrors(
+	importSC As %Status,
+	ByRef errorLog) As %Status
+{
+    if $$$ISOK(importSC) || '$get(errorLog) {
+        return importSC
+    }
+    set sc = $$$OK
+    for i=1:1:errorLog {
+        if errorLog(i, "code") = $$$ImportUnknownType {
+            continue
+        }
+        set entrySC = $system.Status.Error(errorLog(i, "code"), $get(errorLog(i, "param", 1)), $get(errorLog(i, "param", 2)), $get(errorLog(i, "param", 3)))
+        if $data(errorLog(i, "embeddedstatus"), embeddedSC) {
+            set entrySC = $$$EMBEDSC(entrySC, embeddedSC)
+        }
+        set sc = $$$ADDSC(sc, entrySC)
+    }
+    return sc
+}
+
 ClassMethod LoadModuleFromDirectory(
 	pDirectory As %String,
 	ByRef pParams,

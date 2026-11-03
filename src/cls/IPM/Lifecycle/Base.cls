@@ -598,7 +598,8 @@ Method %Initialize(ByRef pParams) As %Status
         set preloadRoot = $get(pParams("RootDirectory"))_"preload"
         set verbose = $get(pParams("Verbose"))
         if ##class(%File).DirectoryExists(preloadRoot) {
-            set tSC = $system.OBJ.ImportDir(preloadRoot, "*", $select(verbose:"d",1:"-d")_$select($tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+            set tSC = $system.OBJ.ImportDir(preloadRoot, "*", $select(verbose:"d",1:"-d")_$select($tlevel:"/multicompile=0", 1: ""), .errorLog, 1, .tImported)
+            set tSC = ##class(%IPM.Utils.Module).RemoveUnsupportedFileErrors(tSC, .errorLog)
             if $$$ISERR(tSC) { quit }
             set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
             if $$$ISERR(tSC) { quit }
