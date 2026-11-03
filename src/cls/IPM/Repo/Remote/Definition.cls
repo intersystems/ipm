@@ -66,9 +66,6 @@ ClassMethod OnConfigure(
     set tSC = $$$OK
     try {
         set tUrl = $get(pModifiers("url"), pInstance.URL)
-        if (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new remote server with non-unique URL."))
-        }
         if (pInteractive && (tUrl = "")) {
             set tPrompt = ..#URLPromptString
             set tResponse = ##class(%Library.Prompt).GetString(tPrompt, .tUrl)
@@ -76,6 +73,7 @@ ClassMethod OnConfigure(
                 $$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
             }
         }
+        do ..CheckRepoKeyUnique(pInstance, ..ComputeRepoKey(tUrl))
 
         if ( $$$lcase(tUrl) '= $$$lcase(pInstance.URL) ) {
             // when repo URL changing - clear all existing credentials

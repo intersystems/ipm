@@ -496,4 +496,139 @@ Method TestSearchRejectedCredentials()
     do $$$AssertEquals(..CountOccurrences(.lines, "rejected the credentials"), 1)
 }
 
+// ===== Repo uniqueness =====
+
+/// Asserts that command fails because it configures the repository that repo existing already addresses.
+Method AssertConfigureClashes(
+	command As %String,
+	existing As %String)
+{
+    do ..AssertErrorContains(##class(%IPM.Main).Shell(command), "'" _ existing _ "'")
+}
+
+Method TestSameRegistryDifferentNamespaces()
+{
+    set sc = ##class(%IPM.Main).Shell("repo -o -name other -url " _ ..#OrasURL _ " -namespace other")
+    do $$$AssertStatusOK(sc, "Configured a second repo on the registry with a namespace")
+
+    // The namespace a repo moves away from is free for another repo
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -n other -namespace moved"), "Moved the repo to another namespace")
+    set sc = ##class(%IPM.Main).Shell("repo -o -name third -url " _ ..#OrasURL _ " -namespace other")
+    do $$$AssertStatusOK(sc, "Configured a repo with the namespace another repo moved away from")
+}
+
+/// Only one repo publishes by default, so configuring another with -publish takes it over.
+Method TestPublishMovesBetweenNamespaces()
+{
+    set sc = ##class(%IPM.Main).Shell("repo -o -name other -url " _ ..#OrasURL _ " -namespace other -publish 1")
+    do $$$AssertStatusOK(sc, "Configured a second publishing repo on the registry")
+    set repo = ##class(%IPM.Repo.Oras.Definition).DeploymentServerOpen(1)
+    if $$$AssertTrue($isobject(repo), "A repo publishes by default") {
+        do $$$AssertEquals(repo.Name, "other")
+    }
+}
+
+Method TestEquivalentOrasUrlRejected()
+{
+    do ..AssertConfigureClashes("repo -o -name dup -url http://oras:5000/", "oras")
+    do ..AssertConfigureClashes("repo -o -name dup -url http://ORAS:5000", "oras")
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -o -name ns -url " _ ..#OrasURL _ " -namespace other"))
+    do ..AssertConfigureClashes("repo -o -name dup -url " _ ..#OrasURL _ " -namespace /Other/", "ns")
+
+    // https is assumed when the scheme is omitted
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -o -name bare -url oras:5000"))
+    do ..AssertConfigureClashes("repo -o -name dup -url https://oras:5000", "bare")
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -o -name port -url http://oras:80"))
+    do ..AssertConfigureClashes("repo -o -name dup -url http://oras", "port")
+}
+
+/// The RepoKey index is empty for existing repos until the migration builds it.
+Method TestMigrationBuildsRepoKeyIndex()
+{
+    kill ^IPM.Repo.DefinitionI("RepoKey")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -o -name dup -url http://oras:5000/"), "Accepted a duplicate while the index is empty")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -delete -name dup"))
+
+    do ##class(%IPM.Utils.Migration).BuildRepoKeyIndex()
+    do ..AssertConfigureClashes("repo -o -name dup -url http://oras:5000/", "oras")
+}
+
+/// A repo saved with a path in its URL, as IPM used to allow, warns on lookups without stopping them.
+Method TestUrlPathRepoWarnsAndContinues()
+{
+    set repo = ##class(%IPM.Repo.Oras.Definition).%New()
+    set repo.Name = "pathrepo"
+    set repo.URL = ..#OrasURL _ "/myorg"
+    do $$$AssertStatusOK(repo.%Save(), "Saved a repo with a path")
+
+    set sc = ..InstallWithFailingRepo("pathrepo", .lines)
+    do $$$AssertStatusOK(sc, "Installed from the filesystem repo")
+    do $$$AssertEquals(..CountOccurrences(.lines, "repo -n pathrepo -url " _ ..#OrasURL _ " -namespace myorg"), 1)
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -n pathrepo -disable"), "Disabled the repo without changing its URL")
+}
+
+Method TestEquivalentRemoteUrlRejected()
+{
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -r -name remote -url " _ ..#OrasURL _ "/registry"))
+    do ..AssertConfigureClashes("repo -r -name dup -url http://ORAS:5000/registry/", "remote")
+}
+
+// ===== Dependencies published under another name =====
+
+/// Loads consumer, a module in the oras-dep-name fixture that depends on oras-dep-name
+/// published to the oras repo under publishedName, and asserts the dependency installs.
+Method AssertDependencyInstalls(
+	consumer As %String,
+	publishedName As %String,
+	publishFlags As %String = "")
+{
+    set fixture = ..GetModuleDir("oras-dep-name")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ ##class(%File).NormalizeDirectory("dep", fixture)), "Loaded the dependency")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish oras-dep-name -r oras -only " _ publishFlags), "Published the dependency as " _ publishedName)
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall oras-dep-name"), "Uninstalled the dependency")
+
+    set sc = ##class(%IPM.Main).Shell("load " _ ##class(%File).NormalizeDirectory(consumer, fixture))
+    do $$$AssertStatusOK(sc, "Loaded " _ consumer _ " with its dependency from the oras repo")
+    do ..AssertVersion("oras-dep-name", "1.0.0")
+
+    do ##class(%IPM.Main).Shell("uninstall oras-dep-" _ consumer)
+    do ##class(%IPM.Main).Shell("uninstall oras-dep-name")
+    do ##class(%IPM.Main).Shell("unpublish oras/" _ publishedName _ " all -force")
+}
+
+/// The dependency is declared by its external name and published under its name.
+Method TestDependencyByExternalName()
+{
+    do ..AssertDependencyInstalls("consumer-external", "oras-dep-name")
+}
+
+/// The dependency is declared by its name and published under its external name.
+Method TestDependencyByNamePublishedAsExternalName()
+{
+    do ..AssertDependencyInstalls("consumer-name", "oras-dep-external", "-use-external-name")
+}
+
+/// Searching a namespace also finds modules nested below it.
+Method TestDependencyNestedBelowNamespace()
+{
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -n oras -ns dep-nested/sub"))
+    set fixture = ..GetModuleDir("oras-dep-name")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ ##class(%File).NormalizeDirectory("dep", fixture)), "Loaded the dependency")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("publish oras-dep-name -r oras -only"), "Published the dependency below the namespace")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall oras-dep-name"), "Uninstalled the dependency")
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("repo -n oras -ns dep-nested"))
+    set sc = ##class(%IPM.Main).Shell("load " _ ##class(%File).NormalizeDirectory("consumer-name", fixture))
+    do $$$AssertStatusOK(sc, "Loaded consumer-name with its dependency from below the namespace")
+    do ..AssertVersion("oras-dep-name", "1.0.0")
+
+    do ##class(%IPM.Main).Shell("uninstall oras-dep-consumer-name")
+    do ##class(%IPM.Main).Shell("uninstall oras-dep-name")
+    do ##class(%IPM.Main).Shell("repo -n oras -ns dep-nested/sub")
+    do ##class(%IPM.Main).Shell("unpublish oras/oras-dep-name all -force")
+}
+
 }

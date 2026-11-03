@@ -7,6 +7,9 @@ Parameter MONIKER As STRING = "oras";
 
 Property Namespace As %IPM.DataType.OrasNamespace;
 
+/// Covers the namespace as well as the URL, so repos on one registry can use different namespaces.
+Property RepoKey As %String(MAXLEN = 40) [ Calculated, SqlComputeCode = {set {*} = ##class(%IPM.Repo.Http.Definition).ComputeRepoKey({URL}, ##class(%IPM.DataType.OrasNamespace).Normalize({Namespace}))}, SqlComputed, SqlComputeOnChange = (URL, Namespace) ];
+
 Method NamespaceGet() As %IPM.DataType.OrasNamespace
 {
     return ##class(%IPM.DataType.OrasNamespace).Normalize(i%Namespace)
@@ -30,11 +33,7 @@ Note, this is not the IRIS namespace, but a namespace in the sense of a (sub)dir
 Method GetPackageService() As %IPM.Repo.IPackageService
 {
     set tClient = ##class(%IPM.Repo.Oras.PackageService).%New()
-    // We want to preprend the prefix to the "GET"/"POST"/etc. requests
-    // Otherwise, it will be overwritten
-    do ##class(%IPM.Repo.Oras.PackageService).SplitLocation(..URL, .location, .pathPrefix)
-    set tClient.Location = location
-    set tClient.PathPrefix = pathPrefix
+    set tClient.Location = ##class(%IPM.Repo.Oras.PackageService).NormalizeLocation(..URL)
     set tClient.RepoName = ..Name
     set tClient.Namespace = ..Namespace
     set tClient.Username = ..Username
@@ -48,7 +47,7 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 Method GetPublishService() As %IPM.Repo.IPublishService
 {
     set tClient = ##class(%IPM.Repo.Oras.PublishService).%New()
-    set tClient.Location = ..URL
+    set tClient.Location = ##class(%IPM.Repo.Oras.PackageService).NormalizeLocation(..URL)
     set tClient.RepoName = ..Name
     set tClient.Namespace = ..Namespace
     set tClient.Username = ..Username
@@ -68,7 +67,12 @@ Method Display()
     }
     if (..Username '= "") || (..Password '= "") || (..Token '= "") {
         set packageService = ..GetPackageService()
-        set authenticated = (packageService.IsAvailable() && packageService.IsAuthenticated())
+        try {
+            set authenticated = (packageService.IsAvailable() && packageService.IsAuthenticated())
+        } catch e {
+            // The base class shows the error under Available?
+            set authenticated = 0
+        }
         write !,$char(9),"Authenticated?",..Padding(1),$$$YesNo(authenticated)
     }
 }
@@ -83,9 +87,6 @@ ClassMethod OnConfigure(
     set tSC = $$$OK
     try {
         set tUrl = $get(pModifiers("url"), pInstance.URL)
-        if (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new ORAS server with non-unique URL."))
-        }
         if (pInteractive && (tUrl = "")) {
             set tPrompt = ..#URLPromptString
             set tResponse = ##class(%Library.Prompt).GetString(tPrompt, .tUrl)
@@ -93,6 +94,12 @@ ClassMethod OnConfigure(
                 $$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
             }
         }
+        set namespace = ##class(%IPM.DataType.OrasNamespace).Normalize($get(pModifiers("namespace"), pInstance.Namespace))
+        // A repo saved with a path stays configurable, e.g. with -disable, until its URL is changed
+        if $data(pModifiers("url")) || (pInstance.%Id() = "") {
+            do ##class(%IPM.Repo.Oras.PackageService).CheckNoPath(tUrl, namespace)
+        }
+        do ..CheckRepoKeyUnique(pInstance, ..ComputeRepoKey(tUrl, namespace), "URL and namespace")
         if $data(pModifiers("username"), tUsername) {
             set pInstance.Username = tUsername
         }
@@ -113,7 +120,7 @@ ClassMethod OnConfigure(
         }
         if (pInstance.DeploymentEnabled = 1) {
             set tServer = ##class(%IPM.Repo.Oras.Definition).DeploymentServerOpen(1)
-            if $isobject(tServer),tServer.URL'=pInstance.URL {
+            if $isobject(tServer),tServer.%Id()'=pInstance.%Id() {
                 set tServer.DeploymentEnabled = 0
                 $$$ThrowOnError(tServer.%Save())
             }

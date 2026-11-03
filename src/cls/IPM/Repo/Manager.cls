@@ -94,11 +94,6 @@ Method SearchRepositoriesForModule(
                 continue
             }
 
-            set tClient = ..CheckServiceCache(tServer.Name,.tAvailable)
-            if 'tAvailable {
-                continue
-            }
-
             #dim tClientCriteria As %IPM.Repo.SearchCriteria
             set tClientCriteria = pSearchCriteria.%ConstructClone(1)
             set tPrereleases = pSearchCriteria.IncludePrerelease
@@ -112,7 +107,11 @@ Method SearchRepositoriesForModule(
             set tClientCriteria.IncludePrerelease = tPrereleases
             set tClientCriteria.IncludeSnapshots = tSnapshots
             try {
-                set tServerResults = tClient.ListModules(tClientCriteria)
+                // A repo can also fail its availability check, e.g. one with a configuration error
+                set tClient = ..CheckServiceCache(tServer.Name,.tAvailable)
+                if tAvailable {
+                    set tServerResults = tClient.ListModules(tClientCriteria)
+                }
             } catch e {
                 // System errors, such as Ctrl+C, stop the search
                 if e.%IsA("%Exception.SystemException") {
@@ -128,6 +127,9 @@ Method SearchRepositoriesForModule(
                         set $$$RepoLookupState(tServer.Name, "skip") = ""
                     }
                 }
+                continue
+            }
+            if 'tAvailable {
                 continue
             }
             for i=1:1:tServerResults.Count() {

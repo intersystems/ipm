@@ -5,35 +5,21 @@ Class Test.PM.Unit.Oras Extends %UnitTest.TestCase
 
 // ===== Package service construction =====
 
-/// Bare hostname (no scheme) should produce a Location with https:// scheme
-/// and no path leaking into Location or PathPrefix.
+/// Bare hostname (no scheme) should produce a Location with https:// scheme.
 Method TestGetPackageServiceUrlNormalizationBareHostname()
 {
     set def = ##class(%IPM.Repo.Oras.Definition).%New()
     set def.URL = "ghcr.io"
-    set svc = def.GetPackageService()
-    do $$$AssertEquals(svc.Location, "https://ghcr.io", "Bare hostname gets https:// prepended")
-    do $$$AssertEquals(svc.PathPrefix, "", "No path prefix for bare hostname")
+    do $$$AssertEquals(def.GetPackageService().Location, "https://ghcr.io", "Bare hostname gets https:// prepended")
+    do $$$AssertEquals(def.GetPublishService().Location, "https://ghcr.io", "Publish service gets the same Location")
 }
 
 /// Explicit https:// scheme should produce the same result as a bare hostname.
 Method TestGetPackageServiceUrlNormalizationWithScheme()
 {
     set def = ##class(%IPM.Repo.Oras.Definition).%New()
-    set def.URL = "https://ghcr.io"
-    set svc = def.GetPackageService()
-    do $$$AssertEquals(svc.Location, "https://ghcr.io", "Explicit https:// scheme preserved")
-    do $$$AssertEquals(svc.PathPrefix, "", "No path prefix when URL has no path")
-}
-
-/// URL with a path component should set PathPrefix and strip the path from Location.
-Method TestGetPackageServiceWithPathPrefix()
-{
-    set def = ##class(%IPM.Repo.Oras.Definition).%New()
-    set def.URL = "ghcr.io/myorg"
-    set svc = def.GetPackageService()
-    do $$$AssertEquals(svc.Location, "https://ghcr.io", "Path stripped from Location")
-    do $$$AssertEquals(svc.PathPrefix, "myorg/", "Path component becomes PathPrefix")
+    set def.URL = "https://ghcr.io/"
+    do $$$AssertEquals(def.GetPackageService().Location, "https://ghcr.io", "Explicit https:// scheme preserved, trailing slash dropped")
 }
 
 /// Bare hostname with port should preserve port in Location.
@@ -41,9 +27,25 @@ Method TestGetPackageServiceUrlNormalizationWithPort()
 {
     set def = ##class(%IPM.Repo.Oras.Definition).%New()
     set def.URL = "registry.example.com:5000"
-    set svc = def.GetPackageService()
-    do $$$AssertEquals(svc.Location, "https://registry.example.com:5000", "Port preserved in Location")
-    do $$$AssertEquals(svc.PathPrefix, "", "No path prefix when no path in URL")
+    do $$$AssertEquals(def.GetPackageService().Location, "https://registry.example.com:5000", "Port preserved in Location")
+}
+
+/// A repo saved with a path in its URL fails its availability check with how to reconfigure it.
+Method TestUrlPathFailsAvailability()
+{
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set def.Name = "myrepo"
+    set def.URL = "ghcr.io/myorg"
+    set expected = "repo -n myrepo -url https://ghcr.io -namespace myorg"
+    for service = def.GetPackageService(), def.GetPublishService() {
+        try {
+            do service.IsAvailable()
+            do $$$AssertFailure($classname(service) _ " did not throw")
+        } catch e {
+            set text = $system.Status.GetErrorText(e.AsStatus())
+            do $$$AssertTrue(text [ expected, $classname(service) _ ": " _ text)
+        }
+    }
 }
 
 /// The namespace is lowercased and leading and trailing slashes are stripped.
@@ -57,6 +59,45 @@ Method TestNamespaceNormalization()
     do $$$AssertEquals(def.Namespace, "packages/ipm", "Namespace lowercased")
     set def.Namespace = "/"
     do $$$AssertEquals(def.Namespace, "", "Lone slash is no namespace")
+}
+
+// ===== Repo configuration =====
+
+/// Runs OnConfigure for a new ORAS repo with the given url and, if not empty, namespace.
+Method Configure(
+	url As %String,
+	namespace As %String = "") As %Status
+{
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set modifiers("url") = url
+    if namespace '= "" {
+        set modifiers("namespace") = namespace
+    }
+    return ##class(%IPM.Repo.Oras.Definition).OnConfigure(def, 0, .modifiers)
+}
+
+/// OCI clients read a path after the host as the start of the repository name, so it belongs in -namespace.
+Method TestConfigureRejectsUrlPath()
+{
+    set sc = ..Configure("https://ghcr.io/myorg")
+    do $$$AssertStatusNotOK(sc)
+    set text = $system.Status.GetErrorText(sc)
+    do $$$AssertTrue(text [ "-url https://ghcr.io -namespace myorg", "Suggests the namespace: " _ text)
+}
+
+/// The suggestion keeps the URL as given, and puts the path in front of any namespace.
+Method TestConfigureRejectsUrlPathWithNamespace()
+{
+    set sc = ..Configure("ghcr.io/myorg", "team")
+    do $$$AssertStatusNotOK(sc)
+    set text = $system.Status.GetErrorText(sc)
+    do $$$AssertTrue(text [ "-url ghcr.io -namespace myorg/team", "Suggests the combined namespace: " _ text)
+}
+
+Method TestConfigureAcceptsTrailingSlash()
+{
+    do $$$AssertStatusOK(..Configure("https://ghcr.io/"))
+    do $$$AssertStatusOK(..Configure("registry.example.com:5000/"))
 }
 
 /// Module names are registry repository paths without the configured namespace.
@@ -149,19 +190,6 @@ Method TestOtherClientError()
     set line1 = "Repo 'myrepo' (https://registry.example.com) returned 400 Bad Request for /v2/auth-test/demo/tags/list."
     set line2 = "The registry rejected the request. Check the repo URL and namespace, and that the registry supports the OCI distribution API."
     do ..AssertClassified(failure, 1, "", line1, line2, 0)
-}
-
-/// The message names the repo URL with its path, from both the package and the publish service.
-Method TestRegistryFailureShowsPath()
-{
-    set def = ##class(%IPM.Repo.Oras.Definition).%New()
-    set def.Name = "myrepo"
-    set def.URL = "registry.example.com/artifactory/api/oci/x"
-    set expected = "Repo 'myrepo' (https://registry.example.com/artifactory/api/oci/x) returned 404 Not Found"
-    set failure = def.GetPackageService().RegistryFailure(..NewFailure(404, "Not Found", ""), "demo")
-    do $$$AssertTrue(failure.Text [ expected, "Package service: " _ failure.Text)
-    set failure = def.GetPublishService().RegistryFailure(..NewFailure(404, "Not Found", ""), "demo")
-    do $$$AssertTrue(failure.Text [ expected, "Publish service: " _ failure.Text)
 }
 
 Method TestFromPythonException()

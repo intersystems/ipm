@@ -12,7 +12,10 @@ Parameter MANAGEDEXTENT = 0;
 
 Property URL As %IPM.DataType.RepoLocation [ Required ];
 
-Index URL On URL [ Unique ];
+/// Identifies what the repo addresses, so URLs that differ only in form count as one repo. See ComputeRepoKey.
+Property RepoKey As %String(MAXLEN = 40) [ Calculated, SqlComputeCode = {set {*} = ##class(%IPM.Repo.Http.Definition).ComputeRepoKey({URL})}, SqlComputed, SqlComputeOnChange = URL ];
+
+Index RepoKey On RepoKey [ Unique ];
 
 Parameter URLPromptString = {$$$Text("Registry URL:","ZPM")};
 
@@ -49,6 +52,49 @@ XData Commands [ XMLNamespace = "http://www.intersystems.com/PackageManager/CLI"
 </group>
 </command>
 </commands>
+}
+
+/// Returns url with the scheme and host lowercased, https assumed when the scheme is omitted,
+/// the scheme's default port dropped, and slashes trimmed from the path.
+/// e.g. "GHCR.io:443/" gives "https://ghcr.io"
+ClassMethod NormalizeURL(url As %String) As %String
+{
+    do ##class(%IPM.Repo.Http.PackageService).ParseLocation(url, .components)
+    set scheme = $zconvert(components("scheme"), "L")
+    set normalized = scheme _ "://" _ $zconvert(components("host"), "L")
+    set port = $get(components("port"))
+    if (port '= "") && (port '= $case(scheme, "http": 80, "https": 443, : "")) {
+        set normalized = normalized _ ":" _ port
+    }
+    set path = $zstrip(components("path"), "<>", "/")
+    if (path '= "") {
+        set normalized = normalized _ "/" _ path
+    }
+    return normalized
+}
+
+/// Returns the value of RepoKey for a repo at url with the given normalized namespace.
+/// It is a hash because the URL and namespace can together exceed the global subscript length limit.
+ClassMethod ComputeRepoKey(
+	url As %String,
+	namespace As %String = "") As %String
+{
+    return ##class(%xsd.hexBinary).LogicalToXSD($system.Encryption.SHA1Hash($listbuild(..NormalizeURL(url), namespace)))
+}
+
+/// Throws if a repo other than instance has the given RepoKey, naming that repo.
+/// keyParts names what the key is computed from, for the error.
+ClassMethod CheckRepoKeyUnique(
+	instance As %IPM.Repo.Http.Definition,
+	key As %String,
+	keyParts As %String = "URL")
+{
+    // Through this class, since a subclass only finds its own repos
+    if ##class(%IPM.Repo.Http.Definition).RepoKeyExists(key, .id) && (id '= instance.%Id()) {
+        set existing = ##class(%IPM.Repo.Definition).%OpenId(id, , .sc)
+        $$$ThrowOnError(sc)
+        $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Repo '%1' already uses this %2.", existing.Name, keyParts)))
+    }
 }
 
 /// This callback method is invoked by the <METHOD>%Save</METHOD> method to

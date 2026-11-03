@@ -1402,10 +1402,10 @@ ClassMethod ConstructInvertedDependencyGraph(
         if (moduleName = "") {
             quit
         }
-        // pInvertedDependencyGraph(<module>) holds repository, version, deployed flag and
-        // platform version (see BuildDependencyGraph for the full node layout).
+        // pInvertedDependencyGraph(<module>) holds repository, version, deployed flag, platform
+        // version and name in the repository (see BuildDependencyGraph for the full node layout).
         // pInvertedDependencyGraph(<module>, <depends on>) = "" marks a remaining dependency edge.
-        set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3) _ $list(data, 6, 7)
+        set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3) _ $list(data, 6, 7) _ $listbuild($listget(data, 8))
         set dependentKey = ""
         for {
             set dependentKey = $order(pDependencyGraph(moduleName, dependentKey))
@@ -1439,10 +1439,16 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
 
         // If it has no remaining dependencies
         if $data(pInvertedDependencyGraph(moduleName)) < 10 {
-            set $listbuild(repositoryName, versionString, deployed, platformVersion) = $get(pInvertedDependencyGraph(moduleName))
+            set node = $get(pInvertedDependencyGraph(moduleName))
+            set repositoryName = $listget(node, 1)
+            set versionString = $listget(node, 2)
+            set deployed = $listget(node, 3)
+            set platformVersion = $listget(node, 4)
+            // Installed by the name the repository has it under, as a top-level install is
+            set nameInRepository = $listget(node, 5)
             // Create qualified module reference to add to list
             set moduleReference = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
-            set moduleReference.Name = moduleName
+            set moduleReference.Name = $select(nameInRepository '= "": nameInRepository, 1: moduleName)
             set moduleReference.VersionString = versionString
             set moduleReference.ServerName = repositoryName
             set moduleReference.Deployed = deployed

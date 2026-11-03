@@ -883,6 +883,8 @@ ClassMethod HasScope(
 /// <li>Scope of the module, or empty string if the dependency is not scoped</li>
 /// <li>Whether the module is deployed</li>
 /// <li>Platform version the deployed module was built for, or empty string if not deployed</li>
+/// <li>Name of the module in the repository, which can differ from the dependency's name, e.g. an ORAS
+/// repository matches a module's ExternalName too. Empty if already installed.</li>
 /// </ul>
 /// <p>
 /// <b>Parameters:</b><br>
@@ -1206,7 +1208,7 @@ Method ProcessSingleDependencyIterative(
 
             set pDependencyGraph(pDep.Name) = $listbuild(
                 pDepth, qualifiedReference.ServerName, moduleObj.VersionString, pDep.DisplayName, pDep.Scope,
-                qualifiedReference.Deployed, qualifiedReference.PlatformVersion
+                qualifiedReference.Deployed, qualifiedReference.PlatformVersion, qualifiedReference.Name
             )
             set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
@@ -1240,7 +1242,7 @@ Method ProcessSingleDependencyIterative(
                 set depth = $select(previousDepth=0:pDepth,previousDepth>pDepth:previousDepth,1:pDepth)
                 set dependencyGraph(pDep.Name) = $listbuild(
                     depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName,pDep.Scope,
-                    qualifiedReference.Deployed,qualifiedReference.PlatformVersion
+                    qualifiedReference.Deployed,qualifiedReference.PlatformVersion,qualifiedReference.Name
                 )
                 set dependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
