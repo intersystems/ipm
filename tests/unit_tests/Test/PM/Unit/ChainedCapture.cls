@@ -61,7 +61,6 @@ Method TestNonVerboseChainedCapture()
 Method TestNonReentrant()
 {
     do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
-    set rejected = 0
     try {
         do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
     } catch ex {
