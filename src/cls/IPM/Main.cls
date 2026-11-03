@@ -2450,58 +2450,62 @@ ClassMethod LoadInternal(
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = ##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory())
         set tTempExtractionRoot = tTargetDirectory
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Extracting archive to ",tTargetDirectory
-        }
-        $$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
-        // Try to locate the top-level module.xml file
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Trying to locate module.xml file in ", tTargetDirectory
-        }
-        set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
-        if (tCount = 0) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
-        }
-
-        // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
-        set tModuleFilePath = $listget(tList(tCount), *)
-        set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Found "_tCount_" results. They are: "
-            set idx = ""
-            for {
-                set idx = $order(tList(idx))
-                quit:(idx="")
-                write !, $char(9), $list(tList(idx), *)
+        try {
+            if $get(pCommandInfo("data", "Verbose")) {
+                write !,"Extracting archive to ",tTargetDirectory
             }
-            write !, "Using module.xml file at ", tModuleFilePath
+            $$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
+            // Try to locate the top-level module.xml file
+            if $get(pCommandInfo("data", "Verbose")) {
+                write !,"Trying to locate module.xml file in ", tTargetDirectory
+            }
+            set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
+            if (tCount = 0) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
+            }
+
+            // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+            set tModuleFilePath = $listget(tList(tCount), *)
+            set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+            if $get(pCommandInfo("data", "Verbose")) {
+                write !,"Found "_tCount_" results. They are: "
+                set idx = ""
+                for {
+                    set idx = $order(tList(idx))
+                    quit:(idx="")
+                    write !, $char(9), $list(tList(idx), *)
+                }
+                write !, "Using module.xml file at ", tModuleFilePath
+            }
+
+            // For tarballs, copy the extracted content to <ModuleRoot>/<name>/<version>/
+            // and clean up the temp extraction directory. Directory loads are left in-place so that
+            // live-edit workflows (mounted volumes, bootstrap) continue to work without re-loading.
+            set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
+            if 'tFound {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"No Module element found in module.xml at "_tTargetDirectory))
+            }
+            set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
+                ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
+            if ##class(%File).DirectoryExists(tFinalDirectory) {
+                $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
+            }
+            $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
+            // Destination was just created empty above, so pDeleteFirst=0 is intentional.
+            // If CopyDir fails partway through, tFinalDirectory may be left in a partial state.
+            $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
+            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
+            set tTargetDirectory = tFinalDirectory
+        } catch e {
+            // Ignore the cleanup status so the original error is the one reported.
+            do ##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot)
+            throw e
         }
     }
 
     // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
     // It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
-
-    // For tarball and URL sources, copy the extracted content to <ModuleRoot>/<name>/<version>/
-    // and clean up the temp extraction directory. Directory loads are left in-place so that
-    // live-edit workflows (mounted volumes, bootstrap) continue to work without re-loading.
-    if $get(tTempExtractionRoot) '= "" {
-        set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
-        if 'tFound {
-            $$$ThrowStatus($$$ERROR($$$GeneralError,"No Module element found in module.xml at "_tTargetDirectory))
-        }
-        set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
-            ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
-        if ##class(%File).DirectoryExists(tFinalDirectory) {
-            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
-        }
-        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
-        // Destination was just created empty above, so pDeleteFirst=0 is intentional.
-        // If CopyDir fails partway through, tFinalDirectory may be left in a partial state.
-        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
-        $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
-        set tTargetDirectory = tFinalDirectory
-    }
 
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)

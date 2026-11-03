@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Shell errors are shown in full, including every error in a combined status, instead of being cut off at a trailing bracket
     - `unpublish` now fails when the module or version is not found or the registry refuses the request, instead of printing the error and reporting success
     - Credential checks no longer follow redirects from a registry's token endpoint, so credentials are not sent to another host
+- #1183: `load` of a tarball handles pax headers (written by macOS and Windows tar) and cleans up its temp directory on failure
 - #1236: `install` from filesystem repos and `load` read a module.xml in the encoding its XML declaration names, so multi-byte characters (such as Japanese text) no longer cause a SAX parser error when the system's default file encoding differs
 
 ## [0.10.10] - 2026-10-14

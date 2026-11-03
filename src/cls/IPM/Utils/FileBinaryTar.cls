@@ -225,13 +225,18 @@ ClassMethod ExtractStream(
             }
             set fileSize=tFile.size
             set typeFlag=tFile.typeflag
-            if (typeFlag="L") || (typeFlag="K") {
+            // GNU long name (L) and long link (K) headers, or a pax extended header (x), describe the next entry
+            if (typeFlag="L") || (typeFlag="K") || (typeFlag="x") {
                 set readBlocks=fileSize \ blockSize
                 set:fileSize#blockSize>0 readBlocks=readBlocks + 1
                 set longLink=aFileStream.Read(readBlocks * blockSize)
-                set longLink=$zstrip(longLink,"<>",$char(0,32))
-                set:(typeFlag="L") longLink4Name=longLink
-                set:(typeFlag="K") longLink4Link=longLink
+                if (typeFlag="x") {
+                    do ..ParsePaxRecords($extract(longLink, 1, fileSize), .longLink4Name, .longLink4Link)
+                } else {
+                    set longLink=$zstrip(longLink,"<>",$char(0,32))
+                    set:(typeFlag="L") longLink4Name=longLink
+                    set:(typeFlag="K") longLink4Link=longLink
+                }
                 set repeat=1
                 continue
             }
@@ -265,6 +270,34 @@ ClassMethod ExtractStream(
         }
     }
     return result
+}
+
+/// Reads the <code>path</code> and <code>linkpath</code> values from the data of a pax extended header.
+/// Each record is <code>"&lt;length&gt; &lt;key&gt;=&lt;value&gt;\n"</code>, where length counts the whole record in bytes.
+/// For example, <code>"30 path=src/very/long/name.cls\n"</code>.
+ClassMethod ParsePaxRecords(
+	records As %String,
+	ByRef path As %String,
+	ByRef linkpath As %String) [ Internal, Private ]
+{
+    set position = 1
+    while position < $length(records) {
+        set recordLength = +$piece($extract(records, position, position + 19), " ")
+        quit:recordLength<=0
+        set record = $extract(records, position, position + recordLength - 1)
+        set position = position + recordLength
+        set keyValue = $extract($piece(record, " ", 2, *), 1, *-1)
+        set key = $piece(keyValue, "=")
+        set value = $zconvert($piece(keyValue, "=", 2, *), "I", "UTF8")
+        if ($extract(value, 1, 2) = "./") {
+            set value = $extract(value, 3, *)
+        }
+        if (key = "path") {
+            set path = value
+        } elseif (key = "linkpath") {
+            set linkpath = value
+        }
+    }
 }
 
 ClassMethod AddToArray(
