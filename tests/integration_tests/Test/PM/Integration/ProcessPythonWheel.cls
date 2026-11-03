@@ -29,6 +29,12 @@ Method OnAfterOneTest() As %Status
     do ..DeletePath(..GetModuleDir("python-deps-tests", ..#PackageWithPythonDepsLocation, "wheels"))
     do ..DeletePath(..GetModuleDir("python-deps-tests", ..#PublishWithPythonDepsLocation, "just-reqs", "wheels"))
     do ..DeletePath(..GetModuleDir("python-deps-tests", ..#PublishWithPythonDepsLocation, "wheels-and-reqs", "wheels"))
+    // GenerateWheel builds inside the fixture's package source and copies the wheel next to its module.xml
+    set packageDir = ..GetModuleDir("python-deps-tests", ..#PackageLocation, "modules", "python", "ipm_dummy_package")
+    for buildDir = "build", "dist", "ipm_dummy_package.egg-info" {
+        do ..DeletePath(##class(%File).NormalizeDirectory(buildDir, packageDir))
+    }
+    do ..DeletePath(##class(%File).NormalizeFilename("ipm_dummy_package-0.1-py3-none-any.whl", ..GetModuleDir("python-deps-tests", ..#PackageLocation)))
     return sc
 }
 
