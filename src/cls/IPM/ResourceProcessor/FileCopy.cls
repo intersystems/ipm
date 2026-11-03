@@ -5,7 +5,7 @@ Class %IPM.ResourceProcessor.FileCopy Extends %IPM.ResourceProcessor.Abstract
 Parameter DESCRIPTION As STRING = "Copies the specified directory or file  (the resource name) to a specific target location (InstallDirectory) during the Activate phase.";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay,CSPApplication,Defer";
+Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay,CSPApplication,Defer,KeepOnUninstall";
 
 Property Name As %String(MAXLEN = "") [ Aliases = {SourceDirectory} ];
 
@@ -26,6 +26,12 @@ Property CSPApplication As %String(MAXLEN = "");
 /// The default is to copy the files at the beginning of the Activate phase.
 /// Use this for build artifacts.
 Property Defer As %Boolean [ InitialExpression = 0 ];
+
+/// If true, the copied file or directory is left in place when the module is uninstalled or cleaned.
+/// Use this for files that other modules may also expect at the target, since IPM does not track
+/// which module a shared file belongs to. Files this module alone uses can go in a separate resource
+/// without this flag, so they are still removed.
+Property KeepOnUninstall As %Boolean [ InitialExpression = 0 ];
 
 Method OnBeforePhase(
 	pPhase As %String,
@@ -209,6 +215,10 @@ Method OnPhase(
         set tSource = ..ResourceReference.Module.Root _ ..Name
         set tTarget = ..InstallDirectory
         do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
+        if ..KeepOnUninstall {
+            write:tVerbose !,"Keeping ",tTarget
+            return $$$OK
+        }
         write:tVerbose !,"Deleting ",tTarget
         if copyAsFile {
             do ##class(%File).Delete(tTarget)

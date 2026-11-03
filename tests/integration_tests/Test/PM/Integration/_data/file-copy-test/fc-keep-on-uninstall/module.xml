@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="fc-keep-on-uninstall.ZPM">
+    <Module>
+      <Name>fc-keep-on-uninstall</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <FileCopy Name="shared/" Target="${mgrDir}/../fc-keep-on-uninstall/" Overlay="1" KeepOnUninstall="1"/>
+      <FileCopy Name="shared-file.txt" Target="${mgrDir}/../fc-keep-on-uninstall/shared-file.txt" KeepOnUninstall="1"/>
+      <FileCopy Name="mine.txt" Target="${mgrDir}/../fc-keep-on-uninstall/mine.txt"/>
+    </Module>
+  </Document>
+</Export>

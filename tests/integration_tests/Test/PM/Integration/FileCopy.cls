@@ -89,6 +89,24 @@ Method TestDependencySameResourceName()
     }
 }
 
+Method TestKeepOnUninstall()
+{
+    set targetDir = ##class(%File).NormalizeDirectory("../fc-keep-on-uninstall/", $system.Util.ManagerDirectory())
+    try {
+        set status = ##class(%IPM.Main).Shell("install fc-keep-on-uninstall")
+        do $$$AssertStatusOK(status,"Installed fc-keep-on-uninstall module successfully.")
+        set status = ##class(%IPM.Main).Shell("uninstall fc-keep-on-uninstall")
+        do $$$AssertStatusOK(status,"Uninstalled fc-keep-on-uninstall module successfully.")
+
+        do $$$AssertTrue(##class(%File).Exists(targetDir_"shared.txt"), "Kept directory resource's shared.txt")
+        do $$$AssertTrue(##class(%File).Exists(targetDir_"shared-file.txt"), "Kept file resource shared-file.txt")
+        do $$$AssertNotTrue(##class(%File).Exists(targetDir_"mine.txt"), "Deleted file resource mine.txt")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestKeepOnUninstall.")
+    }
+    do ##class(%File).RemoveDirectoryTree(targetDir)
+}
+
 Method TestMakeDeployed()
 {
     set status = $$$OK

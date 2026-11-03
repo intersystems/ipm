@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes
+- #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
 
 ### Fixed
 - #1248: Published module manifests no longer include `MarkedForUpdate`, so IPM versions before 0.10.7 can resolve them as dependencies
