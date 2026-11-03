@@ -26,21 +26,13 @@ ClassMethod RunAll(verbose As %Boolean = 1) As %Status
             set $namespace = $zstrip(ns,"<>WC")
             do ..MigrateReposFromIPM09(verbose) // Do this first; MigrateZPMToIPM will fail with <FRAMESTACK> otherwise.
             do ..MigrateZPMToIPM(verbose)
-            do ..BuildRepoKeyIndex()
+            // Nodes of the removed URL index, which repo changes no longer maintain
+            kill ^IPM.Repo.DefinitionI("URL")
         } catch e {
             set sc = $$$ADDSC(sc, e.AsStatus())
         }
     }
     quit sc
-}
-
-/// Builds the RepoKey index of HTTP repo definitions, which a new or changed RepoKey computation leaves out of date for existing repos.
-/// Existing repos that share a key are both indexed, so they keep working.
-ClassMethod BuildRepoKeyIndex()
-{
-    // Replaced by the RepoKey index, and no longer removed with its rows
-    kill ^IPM.Repo.DefinitionI("URL")
-    $$$ThrowOnError(##class(%IPM.Repo.Http.Definition).%BuildIndices($listbuild("RepoKey"), 1, 1))
 }
 
 ClassMethod HasLegacyZPMPackage()

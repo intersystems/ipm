@@ -30,6 +30,14 @@ Method TestGetPackageServiceUrlNormalizationWithPort()
     do $$$AssertEquals(def.GetPackageService().Location, "https://registry.example.com:5000", "Port preserved in Location")
 }
 
+/// A host containing "http" is still a bare hostname.
+Method TestGetPackageServiceUrlNormalizationHostContainingHttp()
+{
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set def.URL = "myhttp.example.com:5000"
+    do $$$AssertEquals(def.GetPackageService().Location, "https://myhttp.example.com:5000")
+}
+
 /// A repo saved with a path in its URL fails its availability check with how to reconfigure it.
 Method TestUrlPathFailsAvailability()
 {
@@ -85,19 +93,36 @@ Method TestConfigureRejectsUrlPath()
     do $$$AssertTrue(text [ "-url https://ghcr.io -namespace myorg", "Suggests the namespace: " _ text)
 }
 
-/// The suggestion keeps the URL as given, and puts the path in front of any namespace.
+/// The suggestion puts the path in front of any namespace.
 Method TestConfigureRejectsUrlPathWithNamespace()
 {
     set sc = ..Configure("ghcr.io/myorg", "team")
     do $$$AssertStatusNotOK(sc)
     set text = $system.Status.GetErrorText(sc)
-    do $$$AssertTrue(text [ "-url ghcr.io -namespace myorg/team", "Suggests the combined namespace: " _ text)
+    do $$$AssertTrue(text [ "-url https://ghcr.io -namespace myorg/team", "Suggests the combined namespace: " _ text)
 }
 
-Method TestConfigureAcceptsTrailingSlash()
+/// A trailing slash is not a path.
+Method TestTrailingSlashIsNotAPath()
 {
-    do $$$AssertStatusOK(..Configure("https://ghcr.io/"))
-    do $$$AssertStatusOK(..Configure("registry.example.com:5000/"))
+    for url = "https://ghcr.io/", "ghcr.io:5000/" {
+        try {
+            do ##class(%IPM.Repo.Oras.PackageService).CheckNoPath(url)
+            do $$$AssertSuccess(url)
+        } catch e {
+            do $$$AssertFailure(url _ ": " _ $system.Status.GetErrorText(e.AsStatus()))
+        }
+    }
+}
+
+/// URLs that differ only in form canonicalize alike, so they count as one repo.
+Method TestCanonicalize()
+{
+    for url = "ghcr.io", "https://ghcr.io/", "HTTPS://GHCR.io", "ghcr.io:443" {
+        do $$$AssertEquals(##class(%IPM.DataType.RepoLocation).Canonicalize(url), "https://ghcr.io", url)
+    }
+    do $$$AssertEquals(##class(%IPM.DataType.RepoLocation).Canonicalize("http://oras:80/registry/"), "http://oras/registry")
+    do $$$AssertEquals(##class(%IPM.DataType.RepoLocation).Canonicalize("http://oras:5000"), "http://oras:5000")
 }
 
 /// Module names are registry repository paths without the configured namespace.

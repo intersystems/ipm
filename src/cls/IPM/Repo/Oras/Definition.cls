@@ -8,7 +8,10 @@ Parameter MONIKER As STRING = "oras";
 Property Namespace As %IPM.DataType.OrasNamespace;
 
 /// Covers the namespace as well as the URL, so repos on one registry can use different namespaces.
-Property RepoKey As %String(MAXLEN = 40) [ Calculated, SqlComputeCode = {set {*} = ##class(%IPM.Repo.Http.Definition).ComputeRepoKey({URL}, ##class(%IPM.DataType.OrasNamespace).Normalize({Namespace}))}, SqlComputed, SqlComputeOnChange = (URL, Namespace) ];
+Method RepoKey() As %List
+{
+    return ..ComputeRepoKey(..URL, ..Namespace)
+}
 
 Method NamespaceGet() As %IPM.DataType.OrasNamespace
 {
@@ -33,7 +36,7 @@ Note, this is not the IRIS namespace, but a namespace in the sense of a (sub)dir
 Method GetPackageService() As %IPM.Repo.IPackageService
 {
     set tClient = ##class(%IPM.Repo.Oras.PackageService).%New()
-    set tClient.Location = ##class(%IPM.Repo.Oras.PackageService).NormalizeLocation(..URL)
+    set tClient.Location = ##class(%IPM.DataType.RepoLocation).Canonicalize(..URL)
     set tClient.RepoName = ..Name
     set tClient.Namespace = ..Namespace
     set tClient.Username = ..Username
@@ -47,7 +50,7 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 Method GetPublishService() As %IPM.Repo.IPublishService
 {
     set tClient = ##class(%IPM.Repo.Oras.PublishService).%New()
-    set tClient.Location = ##class(%IPM.Repo.Oras.PackageService).NormalizeLocation(..URL)
+    set tClient.Location = ##class(%IPM.DataType.RepoLocation).Canonicalize(..URL)
     set tClient.RepoName = ..Name
     set tClient.Namespace = ..Namespace
     set tClient.Username = ..Username
@@ -70,6 +73,9 @@ Method Display()
         try {
             set authenticated = (packageService.IsAvailable() && packageService.IsAuthenticated())
         } catch e {
+            if e.%IsA("%Exception.SystemException") {
+                throw e
+            }
             // The base class shows the error under Available?
             set authenticated = 0
         }
@@ -95,11 +101,11 @@ ClassMethod OnConfigure(
             }
         }
         set namespace = ##class(%IPM.DataType.OrasNamespace).Normalize($get(pModifiers("namespace"), pInstance.Namespace))
-        // A repo saved with a path stays configurable, e.g. with -disable, until its URL is changed
-        if $data(pModifiers("url")) || (pInstance.%Id() = "") {
+        // A repo saved with a path or a duplicate URL stays configurable, e.g. with -disable, until its URL or namespace changes
+        if $data(pModifiers("url")) || $data(pModifiers("namespace")) || (pInstance.%Id() = "") {
             do ##class(%IPM.Repo.Oras.PackageService).CheckNoPath(tUrl, namespace)
+            do ..CheckRepoKeyUnique(pInstance, ..ComputeRepoKey(tUrl, namespace), "URL and namespace")
         }
-        do ..CheckRepoKeyUnique(pInstance, ..ComputeRepoKey(tUrl, namespace), "URL and namespace")
         if $data(pModifiers("username"), tUsername) {
             set pInstance.Username = tUsername
         }

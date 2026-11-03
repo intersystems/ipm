@@ -30,32 +30,21 @@ Property CredentialsProbe As %String [ Private ];
 
 Parameter ALLOWPREFIXINLOCATION = 0;
 
-/// Returns url with https:// added when it has no scheme and without trailing slashes.
-/// e.g. "ghcr.io/" gives "https://ghcr.io"
-ClassMethod NormalizeLocation(url As %String) As %String
-{
-    if (url '= "") && (url '[ "://") {
-        set url = "https://" _ url
-    }
-    return $zstrip(url, ">", "/")
-}
-
 /// Throws if url has a path after the host. OCI clients read a path there as the start of the
 /// repository name and send API calls to /v2/ on the host, so the path belongs in the namespace.
-/// The error suggests the equivalent configuration, e.g. "-url ghcr.io -namespace myorg" for "ghcr.io/myorg".
+/// The error suggests the equivalent configuration, e.g. "-url https://ghcr.io -namespace myorg" for "ghcr.io/myorg".
 /// With repoName, the error is about that existing repo rather than a URL being configured.
 ClassMethod CheckNoPath(
 	url As %String,
 	namespace As %String = "",
 	repoName As %String = "")
 {
-    do ..ParseLocation(url, .components)
-    set path = $zstrip(components("path"), "<>", "/")
+    set canonical = ##class(%IPM.DataType.RepoLocation).Canonicalize(url)
+    set path = $piece(canonical, "/", 4, *)
     if (path = "") {
         return
     }
-    set host = $zstrip($extract($zstrip(url, ">", "/"), 1, *-$length(path)), ">", "/")
-    set suggestion = "-url " _ host _ " -namespace " _ ##class(%IPM.DataType.OrasNamespace).Normalize(path _ "/" _ namespace)
+    set suggestion = "-url " _ $piece(canonical, "/", 1, 3) _ " -namespace " _ ##class(%IPM.DataType.OrasNamespace).Normalize(path _ "/" _ namespace)
     if (repoName = "") {
         set msg = $$$FormatText("ORAS repo URL '%1' has a path. Put the path in the namespace instead: %2", url, suggestion)
     } else {
@@ -199,7 +188,7 @@ Method ProbeTokenEndpoint(wwwAuth As %String) As %String [ Private ]
         set service = serviceMatcher.Group(1)
     }
     // Build a request to the token endpoint (which may be on a different host than the registry)
-    do ..ParseLocation(realm, .comp)
+    do ##class(%IPM.DataType.RepoLocation).Parse(realm, .comp)
     set tokenRequest = ##class(%Net.HttpRequest).%New()
     set tokenRequest.Timeout = 5
     // A redirect could send the credentials elsewhere, including over plain http

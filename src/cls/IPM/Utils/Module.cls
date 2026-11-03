@@ -90,7 +90,8 @@ ClassMethod LoadModuleReference(
             quit
         }
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-        set tModRef.Name = pModuleName
+        // Pulled by the name the repository has it under, which can differ from a dependency's name
+        set tModRef.Name = $listget($get(pDependencyGraph(pModuleName)), 8, pModuleName)
         set tModRef.VersionString = pVersion
         set tModRef.Deployed = pDeployed
         set tModRef.PlatformVersion = pPlatformVersion
@@ -899,26 +900,26 @@ ClassMethod GetModuleListExecute(
         }
 
         set tClient = tServer.GetPackageService()
-        if tClient.IsAvailable() {
-            set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-            set tSearchCriteria.IncludePrerelease = tServer.Prereleases
-            set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
-            set tSearchCriteria.AllVersions = pShowAllVersions
-            set tList = ""
-            try {
+        set tList = ""
+        try {
+            if tClient.IsAvailable() {
+                set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+                set tSearchCriteria.IncludePrerelease = tServer.Prereleases
+                set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
+                set tSearchCriteria.AllVersions = pShowAllVersions
                 set tList = tClient.ListModules(tSearchCriteria)
-            } catch e {
-                write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
             }
-            if $isobject(tList) {
-                set platformVersion = $$$CurrentPlatformVersion
-                for i=1:1:tList.Count() {
-                    set tMod = tList.GetAt(i)
-                    if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
-                        continue
-                    }
-                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
+        } catch e {
+            write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
+        }
+        if $isobject(tList) {
+            set platformVersion = $$$CurrentPlatformVersion
+            for i=1:1:tList.Count() {
+                set tMod = tList.GetAt(i)
+                if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
+                    continue
                 }
+                set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
             }
         }
 
@@ -1402,10 +1403,10 @@ ClassMethod ConstructInvertedDependencyGraph(
         if (moduleName = "") {
             quit
         }
-        // pInvertedDependencyGraph(<module>) holds repository, version, deployed flag, platform
-        // version and name in the repository (see BuildDependencyGraph for the full node layout).
+        // pInvertedDependencyGraph(<module>) holds repository, version, deployed flag and
+        // platform version (see BuildDependencyGraph for the full node layout).
         // pInvertedDependencyGraph(<module>, <depends on>) = "" marks a remaining dependency edge.
-        set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3) _ $list(data, 6, 7) _ $listbuild($listget(data, 8))
+        set pInvertedDependencyGraph(moduleName) = $list(data, 2, 3) _ $list(data, 6, 7)
         set dependentKey = ""
         for {
             set dependentKey = $order(pDependencyGraph(moduleName, dependentKey))
@@ -1439,16 +1440,10 @@ ClassMethod GetFlatDependencyListFromInvertedDependencyGraph(ByRef pInvertedDepe
 
         // If it has no remaining dependencies
         if $data(pInvertedDependencyGraph(moduleName)) < 10 {
-            set node = $get(pInvertedDependencyGraph(moduleName))
-            set repositoryName = $listget(node, 1)
-            set versionString = $listget(node, 2)
-            set deployed = $listget(node, 3)
-            set platformVersion = $listget(node, 4)
-            // Installed by the name the repository has it under, as a top-level install is
-            set nameInRepository = $listget(node, 5)
+            set $listbuild(repositoryName, versionString, deployed, platformVersion) = $get(pInvertedDependencyGraph(moduleName))
             // Create qualified module reference to add to list
             set moduleReference = ##class(%IPM.Storage.QualifiedModuleInfo).%New()
-            set moduleReference.Name = $select(nameInRepository '= "": nameInRepository, 1: moduleName)
+            set moduleReference.Name = moduleName
             set moduleReference.VersionString = versionString
             set moduleReference.ServerName = repositoryName
             set moduleReference.Deployed = deployed

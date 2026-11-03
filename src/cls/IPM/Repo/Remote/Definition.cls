@@ -73,9 +73,12 @@ ClassMethod OnConfigure(
                 $$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
             }
         }
-        do ..CheckRepoKeyUnique(pInstance, ..ComputeRepoKey(tUrl))
+        // A repo saved with a duplicate URL stays configurable, e.g. with -disable, until its URL changes
+        if $data(pModifiers("url")) || (pInstance.%Id() = "") {
+            do ..CheckRepoKeyUnique(pInstance, ..ComputeRepoKey(tUrl))
+        }
 
-        if ( $$$lcase(tUrl) '= $$$lcase(pInstance.URL) ) {
+        if ##class(%IPM.DataType.RepoLocation).Canonicalize(tUrl) '= ##class(%IPM.DataType.RepoLocation).Canonicalize(pInstance.URL) {
             // when repo URL changing - clear all existing credentials
             set pInstance.Username = ""
             set pInstance.Password = ""
@@ -100,7 +103,7 @@ ClassMethod OnConfigure(
         }
         if (pInstance.DeploymentEnabled = 1) {
             set tServer = ##class(%IPM.Repo.Remote.Definition).DeploymentServerOpen(1)
-            if $isobject(tServer),tServer.URL'=pInstance.URL {
+            if $isobject(tServer),tServer.%Id()'=pInstance.%Id() {
                 set tServer.DeploymentEnabled = 0
                 $$$ThrowOnError(tServer.%Save())
             }

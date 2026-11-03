@@ -117,6 +117,9 @@ Method Display()
     try {
         set available = $$$YesNo(..GetPackageService().IsAvailable())
     } catch e {
+        if e.%IsA("%Exception.SystemException") {
+            throw e
+        }
         // Shown rather than thrown, so a misconfigured repo can still be listed and reconfigured
         set available = "No. " _ ##class(%IPM.Main).ErrorText(e.AsStatus())
     }
