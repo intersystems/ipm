@@ -80,18 +80,18 @@ Method TestEndWithHandlerOnTop()
     set txtPath = log.TxtFilePath
 
     do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
-    write "Tee line",!
+    write "This should be logged in the log file",!
     // Module capture layers on top of the active tee.
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     // Tee ends while the Module capture is still the top handler.
     do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-    write "After tee end",!
-    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .inner)
+    write "This should only appear in the terminal array",!
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .terminal)
     do log.Finalize()
 
-    do $$$AssertTrue(..ArrayContains(.inner, "After tee end"), "Module capture survived the tee teardown")
-    do $$$AssertTrue(..FileContains(txtPath, "Tee line"), "Line written before teardown WAS logged")
-    do $$$AssertNotTrue(..FileContains(txtPath, "After tee end"), "Stray line was NOT logged after the tee ended")
+    do $$$AssertTrue(..ArrayContains(.terminal, "This should only appear in the terminal array"), "Module capture survived the tee teardown")
+    do $$$AssertTrue(..FileContains(txtPath, "This should be logged in the log file"), "Line written before teardown WAS logged")
+    do $$$AssertNotTrue(..FileContains(txtPath, "This should only appear in the terminal array"), "Stray line was NOT logged after the tee ended")
 }
 
 /// Initialize the LogManager log files for a synthetic supported command.
