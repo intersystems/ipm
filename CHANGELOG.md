@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - #1248: Published module manifests no longer include `MarkedForUpdate`, so IPM versions before 0.10.7 can resolve them as dependencies
 - #1197: IPM installs on IRIS 2023.1 and earlier, which failed to compile `%IPM.Storage.ModuleTemplate`
+- #1083: IPM installs on IRIS 2022.1, which failed to compile the repository definition classes with a SAX parser error and `%IPM.General.LockFile` with `<NOLINE>`
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
 - #435: Copying or removing a directory on Windows now fails when ROBOCOPY cannot be run, instead of reporting success with no files copied
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
