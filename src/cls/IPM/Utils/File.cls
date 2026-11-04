@@ -15,6 +15,48 @@ ClassMethod CreateDirectoryChain(pName As %String) As %Status
     quit tSC
 }
 
+/// Returns 1 if deleting dir would delete a directory IRIS or IPM needs to run, because dir is
+/// one of those directories or an ancestor of one. Subdirectories, such as an application's own
+/// directory under csp/, are not protected.
+ClassMethod IsProtectedDirectory(dir As %String) As %Boolean
+{
+    set installDir = $system.Util.InstallDirectory()
+    set mgrDir = ##class(%Library.File).ManagerDirectory()
+    set cspDir = ##class(%Library.File).Construct(installDir, "csp")
+    set libDir = ##class(%Library.File).Construct(installDir, "lib")
+    set protectedDirs = $listbuild(
+        installDir,
+        $system.Util.DataDirectory(),
+        mgrDir,
+        $system.Util.BinaryDirectory(),
+        libDir,
+        cspDir,
+        // The Management Portal and Interoperability UI
+        ##class(%Library.File).Construct(cspDir, "sys"),
+        ##class(%Library.File).Construct(cspDir, "broker"),
+        ##class(%Library.File).Construct(cspDir, "enslib"),
+        // Installed Python packages and the IRIS iris module
+        ##class(%Library.File).Construct(mgrDir, "python"),
+        ##class(%Library.File).Construct(libDir, "python"),
+        // Holds IPM's own files
+        ##class(%IPM.Repo.UniversalSettings).GetModuleRoot())
+    set dir = ..NormalizeForComparison(dir)
+    set pointer = 0
+    while $listnext(protectedDirs, pointer, protectedDir) {
+        if $extract(..NormalizeForComparison(protectedDir), 1, $length(dir)) = dir {
+            return 1
+        }
+    }
+    return 0
+}
+
+/// Lowercases on every platform because Windows and macOS file systems are case-insensitive by default.
+/// On a case-sensitive file system this can only protect too much, which keeps files rather than deleting them.
+ClassMethod NormalizeForComparison(dir As %String) As %String [ Private ]
+{
+    return $zconvert(##class(%Library.File).NormalizeDirectory(dir), "L")
+}
+
 ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
 {
     new %objlasterror
