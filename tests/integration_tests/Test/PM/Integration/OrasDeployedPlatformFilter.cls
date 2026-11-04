@@ -115,6 +115,41 @@ Method TestPlatformFilterPicksLowerCompatibleVersion()
     do $$$AssertEquals($classmethod("PlatformFilterTest.Public", "Version"), "1.0.0", "1.0.0 sources were installed")
 }
 
+/// ORAS searches return every matching version and preserve each deployed version's platform metadata.
+Method TestSearchReturnsEveryVersionForDeprecatedModes()
+{
+    do ..PublishBothVersions()
+
+    set repo = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen("oras", , .sc)
+    do $$$AssertStatusOK(sc, "Opened the ORAS test repository.")
+    set service = repo.GetPackageService()
+    set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
+    set criteria.Name = ..#ModuleName
+    set modes = $listbuild("", 0, 1)
+
+    for modeIndex=1:1:$listlength(modes) {
+        set $PROPERTY(criteria, "AllVersions") = $listget(modes, modeIndex)
+        set results = service.ListModules(criteria)
+        set resultCount = results.Count()
+        do $$$AssertEquals(resultCount, 2, "Every deprecated flag value returns both ORAS versions.")
+        if (resultCount = 2) {
+            set foundV1 = 0
+            set foundV2 = 0
+            for i=1:1:resultCount {
+                set candidate = results.GetAt(i)
+                do $$$AssertEquals(candidate.PlatformVersions.Count(), 1, "Candidate retains its own platform metadata.")
+                do $$$AssertTrue(candidate.AllVersions '= "", "Candidate retains the all-version summary.")
+                if (candidate.VersionString = "1.0.0") {
+                    set foundV1 = 1
+                } elseif (candidate.VersionString = "2.0.0") {
+                    set foundV2 = 1
+                }
+            }
+            do $$$AssertTrue(foundV1 && foundV2, "Both ORAS versions are present.")
+        }
+    }
+}
+
 /// A dependent whose range (">=1.0.0") is satisfied by both published versions must get the
 /// one that is compatible with this platform. Exercises the dependency resolution path in
 /// %IPM.Storage.Module rather than the install path in %IPM.Main.

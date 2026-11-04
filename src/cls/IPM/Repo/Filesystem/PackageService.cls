@@ -11,10 +11,22 @@ Method %OnNew(pRoot As %String) As %Status [ Private, ServerOnly = 1 ]
 
 Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.ModuleInfo")
 {
-    set tList = ##class(%Library.ListOfObjects).%New()
     set tQuery = "select Name,VersionString from %IPM_Repo_Filesystem.Cache_OrderedMatches(?,?,?,?) m"
     set tArgs($increment(tArgs)) = ..Root
-    quit ##class(%IPM.Repo.Utils).moduleSqlToList(tQuery,.pSearchCriteria,.tArgs)
+    set tModules = ##class(%IPM.Repo.Utils).moduleSqlToList(tQuery,.pSearchCriteria,.tArgs)
+
+    set tCandidates = ##class(%Library.ListOfObjects).%New()
+    for i=1:1:tModules.Count() {
+        set tModule = tModules.GetAt(i)
+        set tVersionList = $listfromstring(tModule.AllVersions,", ")
+        set tPointer = 0
+        while ($listnext(tVersionList,tPointer,tVersion)) {
+            set tCandidate = tModule.%ConstructClone(1)
+            set tCandidate.VersionString = tVersion
+            do tCandidates.Insert(tCandidate)
+        }
+    }
+    return tCandidates
 }
 
 Method HasModule(pModuleReference As %IPM.Storage.ModuleInfo) As %Boolean

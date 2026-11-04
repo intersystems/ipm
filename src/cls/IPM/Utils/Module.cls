@@ -903,7 +903,6 @@ ClassMethod GetModuleListExecute(
             set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
             set tSearchCriteria.IncludePrerelease = tServer.Prereleases
             set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
-            set tSearchCriteria.AllVersions = pShowAllVersions
             set tList = ""
             try {
                 set tList = tClient.ListModules(tSearchCriteria)
@@ -912,12 +911,27 @@ ClassMethod GetModuleListExecute(
             }
             if $isobject(tList) {
                 set platformVersion = $$$CurrentPlatformVersion
+                set latestModules = ##class(%Library.ArrayOfObjects).%New()
                 for i=1:1:tList.Count() {
                     set tMod = tList.GetAt(i)
-                    if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
-                        continue
+                    if pShowAllVersions {
+                        set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
+                    } elseif tMod.IsCompatibleWithPlatform(platformVersion) {
+                        set existingModule = latestModules.GetAt(tMod.Name)
+                        if ('$isobject(existingModule)) || tMod.Version.Follows(existingModule.Version) {
+                            do latestModules.SetAt(tMod,tMod.Name)
+                        }
                     }
-                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
+                }
+                if 'pShowAllVersions {
+                    set moduleName = ""
+                    for {
+                        set tMod = latestModules.GetNext(.moduleName)
+                        if (moduleName = "") {
+                            quit
+                        }
+                        set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
+                    }
                 }
             }
         }

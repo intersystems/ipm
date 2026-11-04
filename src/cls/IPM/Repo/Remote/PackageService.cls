@@ -41,7 +41,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
     if (name '= "") {
         set tURL = tRequest.Location_"packages/" _ name
     }
-    do tRequest.SetParam("allVersions", pSearchCriteria.AllVersions)
+    do tRequest.SetParam("allVersions", 1)
     do tRequest.SetParam("includePrerelease", pSearchCriteria.IncludePrerelease)
     do tRequest.SetParam("includeSnapshots", pSearchCriteria.IncludeSnapshots)
 
@@ -59,6 +59,13 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
             set allVersionsString = ""
             if (item.allVersions) {
                 set tIterVer = item.allVersions.%GetIterator()
+                while tIterVer.%GetNext(.key, .version) {
+                    set allVersionsString = allVersionsString_$listbuild(version)
+                }
+            }
+            if (allVersionsString = "") {
+                // Some registries omit the aggregate field while returning every version.
+                set tIterVer = item.versions.%GetIterator()
                 while tIterVer.%GetNext(.key, .version) {
                     set allVersionsString = allVersionsString_$listbuild(version)
                 }
