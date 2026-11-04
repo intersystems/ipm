@@ -1,0 +1,4 @@
+Class Test.Unsupported.MyClass
+{
+
+}

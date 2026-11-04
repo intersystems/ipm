@@ -328,8 +328,8 @@ Method OnLoad(
             $select($tlevel||..ResourceReference.Deploy:"/multicompile=0",1:"")
 
         if ..LoadAsDirectory {
-            set tSC = $system.OBJ.ImportDir(pFullResourcePath, "*"_..FilenameExtension, tFlags, , 1, .pLoadedList)
-            $$$ThrowOnError(tSC)
+            set importSC = $system.OBJ.ImportDir(pFullResourcePath, "*"_..FilenameExtension, tFlags, .errorLog, 1, .pLoadedList)
+            $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveUnsupportedFileErrors(importSC, .errorLog))
             set pLoadedList = "" // ImportDir returns as an array and clears the top node
             set tResourceKey = ""
             for {
