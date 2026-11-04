@@ -1,0 +1,4 @@
+Class NSWebApp.Main
+{
+
+}

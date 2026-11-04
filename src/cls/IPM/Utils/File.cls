@@ -82,6 +82,35 @@ ClassMethod CopyFile(
     quit tSC
 }
 
+/// Copies a resource's file, or a whole directory tree, to destPath, creating parent directories as
+/// needed. A <FileCopy> resource names either and the processor resolves both at install time, so
+/// both must be staged.
+/// Throws on failure. Warns if sourcePath doesn't exist: a missing file would ship silently and
+/// only surface at install time on the user's system.
+ClassMethod StageResourceFile(
+	resourceName As %String,
+	sourcePath As %String,
+	destPath As %String)
+{
+    // %Library.File.Exists is true for directories too, so test for a directory first.
+    if ##class(%Library.File).DirectoryExists(sourcePath) {
+        set destDir = ##class(%Library.File).NormalizeDirectory(destPath)
+        $$$ThrowOnError(..CreateDirectoryChain(destDir))
+        $$$ThrowOnError(..CopyDir(sourcePath, destDir))
+        quit
+    }
+    if '##class(%Library.File).Exists(sourcePath) {
+        do ##class(%IPM.General.LogManager).Warning("Resource '" _ resourceName _ "' will be missing from this package: " _ sourcePath _ " not found")
+        quit
+    }
+    // Callers build destPath with Construct, which joins with the platform delimiter but leaves any
+    // separators already inside a segment alone. Normalize before splitting off the directory.
+    set destPath = ##class(%Library.File).NormalizeFilename(destPath)
+    set destDir = ##class(%Library.File).GetDirectory(destPath)
+    $$$ThrowOnError(..CreateDirectoryChain(destDir))
+    $$$ThrowOnError(..CopyFile(sourcePath, destPath, 1))
+}
+
 ClassMethod CopyDir(
 	pSource As %String,
 	pDest As %String,
@@ -251,6 +280,19 @@ ClassMethod CreateTempDirectory(baseDirectory As %String = "") As %String
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create temporary directory: " _ $zutil(209,-dir)))
     }
     return ##class(%File).NormalizeDirectory(dir)
+}
+
+/// Computes the SHA-256 hash of a file and returns it as a lowercase hex string (64 chars).
+ClassMethod ComputeSHA256Hex(filePath As %String) As %String
+{
+    set stream = ##class(%Stream.FileBinary).%New()
+    $$$ThrowOnError(stream.LinkToFile(filePath))
+
+    set binHash = ##class(%SYSTEM.Encryption).SHAHashStream(256, stream, .sc)
+    $$$ThrowOnError(sc)
+
+    // %xsd.hexBinary.LogicalToXSD returns uppercase hex; lowercase to match the on-disk convention.
+    quit $zconvert(##class(%xsd.hexBinary).LogicalToXSD(binHash), "L")
 }
 
 }

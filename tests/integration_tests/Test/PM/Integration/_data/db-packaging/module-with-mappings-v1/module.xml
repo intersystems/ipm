@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="module-with-mappings.ZPM">
+    <Module>
+      <Name>module-with-mappings</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Mapping Name="DbPkgRootMap.GBL" Source="IRISTEMP" />
+      <Dependencies>
+        <ModuleReference>
+          <Name>dep-with-mapping</Name>
+          <Version>1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+      <Resource Name="ModuleWithMappings.Main.CLS" />
+    </Module>
+  </Document>
+</Export>

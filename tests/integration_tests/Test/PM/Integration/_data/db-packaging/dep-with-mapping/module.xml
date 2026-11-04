@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="dep-with-mapping.ZPM">
+    <Module>
+      <Name>dep-with-mapping</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Mapping Name="DbPkgDepMap.GBL" Source="IRISTEMP" />
+      <CPF Name="dep-with-mapping.cpf" />
+      <Resource Name="DepWithMapping.Main.CLS" />
+    </Module>
+  </Document>
+</Export>

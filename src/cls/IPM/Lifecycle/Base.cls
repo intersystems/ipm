@@ -611,6 +611,34 @@ Method %Initialize(ByRef pParams) As %Status
     quit status
 }
 
+/// Adds each of module's <Mapping> elements to the current namespace.
+ClassMethod ApplyModuleMappings(
+	module As %IPM.Storage.Module,
+	verbose As %Boolean = 0)
+{
+    set key = ""
+    for {
+        #dim mapping As %IPM.Storage.MappingReference
+        set mapping = module.Mappings.GetNext(.key)
+        quit:key=""
+
+        set name = $piece(mapping.Name,".",1,*-1)
+        set extension = $piece(mapping.Name,".",*)
+        set source = mapping.SourceResolved
+
+        set sc = $case(extension,
+            "GBL":##class(%IPM.Utils.Module).AddGlobalMapping($namespace,name,source),
+            "INC":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,name,,source),
+            "MAC":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,name,"MAC",source),
+            "PKG":##class(%IPM.Utils.Module).AddPackageMapping($namespace,name,source),
+            "":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,name,"ALL",source))
+        $$$ThrowOnError(sc)
+        if verbose {
+            write !, "Added "_extension_" mapping "_name_" from database "_source
+        }
+    }
+}
+
 Method %Reload(ByRef pParams) As %Status
 {
     set tSC = $$$OK
@@ -657,33 +685,7 @@ Method %Reload(ByRef pParams) As %Status
         set ..Module = ##class(%IPM.Storage.Module).NameOpen(tModuleName,,.tSC)
         $$$ThrowOnError(tSC)
 
-        // Set up mappings
-        set tKey = ""
-        for {
-            #dim tMapping As %IPM.Storage.MappingReference
-            set tMapping = ..Module.Mappings.GetNext(.tKey)
-            quit:tKey=""
-
-            set tName = $piece(tMapping.Name,".",1,*-1)
-            set tExtension = $piece(tMapping.Name,".",*)
-            set tSource = tMapping.SourceResolved
-
-            set tSC = $case(tExtension,
-                "GBL":##class(%IPM.Utils.Module).AddGlobalMapping($namespace,tName,tSource),
-                "INC":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,,tSource),
-                "MAC":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,"MAC",tSource),
-                "PKG":##class(%IPM.Utils.Module).AddPackageMapping($namespace,tName,tSource),
-                "":##class(%IPM.Utils.Module).AddRoutineMapping($namespace,tName,"ALL",tSource))
-            if $$$ISERR(tSC) {
-                quit
-            }
-            if (tVerbose) {
-                write !, "Added "_tExtension_" mapping "_tName_" from database "_tSource
-            }
-        }
-        if $$$ISERR(tSC) {
-            quit
-        }
+        do ..ApplyModuleMappings(..Module, tVerbose)
 
         $$$ThrowOnError(..InstallOrDownloadPythonRequirements(tRoot, .pParams))
 
@@ -1423,9 +1425,11 @@ Method ExportPythonDependencies(
     $$$ThrowOnError(..InstallOrDownloadPythonRequirements(root, .pParams, 1))
     set wheelsDir = ##class(%File).NormalizeDirectory("wheels", module.Root)
     if '##class(%File).DirectoryExists(wheelsDir) {
-        // ExportPythonDependencies called on base module + dependencies so don't want to error if one of
-        // the modules doesn't have a wheels directory since that might actually be the case for the module
-        write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        // A module without Python requirements legitimately has no wheels directory, so this is only worth warning about
+        // when requirements.txt exists but the download produced nothing.
+        if ##class(%File).Exists(##class(%File).NormalizeFilename("requirements.txt", root)) {
+            write !, "WARNING: No wheels directory for this module: "_wheelsDir_" not found"
+        }
         quit
     }
     set stmt = ##class(%SQL.Statement).%New()
@@ -1639,7 +1643,12 @@ Method %Publish(ByRef pParams) As %Status
             quit
         }
         set tModule.VersionString = ..Module.VersionString
-        if (..Module.Deployed) {
+        // Publish type comes from the running lifecycle, not the module's Packaging property.
+        // ..Module.Packaging records how the module was loaded (may be stale); the PACKAGING
+        // parameter is fixed per lifecycle class and reflects how it's being published now.
+        if ($parameter($this, "PACKAGING") = "database") {
+            set tModule.IPMPackaging = "database"
+        } elseif (..Module.Deployed) {
             set tModule.Deployed = 1
             if $isobject(..Module.SystemRequirements) {
                 set tModule.PlatformVersion = ..Module.SystemRequirements.VersionString
@@ -2145,6 +2154,18 @@ Method ExportSingleModule(
     }
 }
 
+/// Returns this module followed by its installed transitive dependencies.
+/// The root comes first because every caller needs its resources considered before its dependencies'.
+Method GetSelfAndDependencyModules() As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.Module") [ Private ]
+{
+    set modules = ..Module.GetDependencyModules()
+    do modules.InsertAt(..Module, 1)
+    quit modules
+}
+
+/// Returns the lifecycle class whose Final PACKAGING parameter equals pPackaging.
+/// pBaseClass is "" when no class claims that value. This is a valid outcome, since packaging values are
+/// not constrained to those with a dedicated lifecycle class. Callers decide the fallback.
 ClassMethod GetBaseClassForPackaging(
 	pPackaging As %String,
 	Output pBaseClass As %Dictionary.Classname) As %Status [ Final ]
@@ -2163,8 +2184,6 @@ ClassMethod GetBaseClassForPackaging(
             set pBaseClass = tRes.%Get("BaseClass")
         }
         $$$ThrowOnError(tSC)
-
-        // TODO: Error if no results?
     } catch e {
         set pBaseClass = ""
         set tSC = e.AsStatus()

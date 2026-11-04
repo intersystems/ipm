@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes
+- #986: Database packaging: new `package-database` and `publish-database` commands create a package from a copy of the namespace's routines database, which installs via swapping of the routines database rather than compilation of source files. The module and its dependencies must be loaded into the namespace before packaging. Pass `-include-tests` to include test resources (`Scope="test"` or `Scope="verify"`), which are excluded by default.
 
 ### Fixed
 - #1248: Published module manifests no longer include `MarkedForUpdate`, so IPM versions before 0.10.7 can resolve them as dependencies

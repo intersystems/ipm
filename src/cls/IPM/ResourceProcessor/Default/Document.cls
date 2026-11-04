@@ -100,11 +100,6 @@ Method OnPhase(
             while $listnext(tListNames, ptrn, tName) {
                 set tSourcesPrefix = $char($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
 
-                if ..ResourceReference.Generated {
-                    set pResourceHandled = 1
-                    quit
-                }
-
                 if '..ResourceReference.Generated {
                     set tSubDirectory = $select(..ResourceReference.Preload:"preload/",1:"")
                     set tResourceDirectory = ##class(%File).NormalizeDirectory(tRoot_"/"_tSubDirectory)
