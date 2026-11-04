@@ -4,13 +4,13 @@ Class %IPM.Storage.ModuleSetting.Parameter Extends %IPM.Storage.ModuleSetting
 Parameter DEFAULTGLOBAL = "^IPM.Storage.ModSet.Param";
 
 /// Name of the parameter (may contain "." to indicate a subscript in the array passed to lifecycle phases)
-Property Name As %String(XMLPROJECTION = "ATTRIBUTE");
+Property Name As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE");
 
 /// Value of the parameter (may be empty)
-Property Value As %String(XMLPROJECTION = "CONTENT");
+Property Value As %String(MAXLEN = "", XMLPROJECTION = "CONTENT");
 
 /// Optional; if specified, parameter default only applies when the lifecycle class is the one in question.
-Property LifecycleClass As %String(XMLPROJECTION = "ATTRIBUTE");
+Property LifecycleClass As %String(MAXLEN = 255, XMLPROJECTION = "ATTRIBUTE");
 
 Storage Default
 {

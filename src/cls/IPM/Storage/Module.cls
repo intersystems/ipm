@@ -27,7 +27,7 @@ Property Keywords As %String(MAXLEN = "");
 Property Author As %IPM.Storage.ModuleAuthorInfo;
 
 /// Typically "module" or "application", but intentionally not enforced with VALUELIST.
-Property Packaging As %String [ Required ];
+Property Packaging As %String(MAXLEN = 255) [ Required ];
 
 Property Dependencies As list Of %IPM.Storage.ModuleReference(STORAGEDEFAULT = "array");
 
@@ -63,7 +63,7 @@ Property InstallerClass As %Dictionary.Classname;
 
 Property Lifecycle As %IPM.Lifecycle.Base(XMLPROJECTION = "NONE") [ Transient ];
 
-Property Hash As %Binary(ForceCodeGenerate = 0, XMLPROJECTION = "NONE");
+Property Hash As %Binary(ForceCodeGenerate = 0, MAXLEN = 20, XMLPROJECTION = "NONE");
 
 Property LastModifiedTimestamp As %TimeStamp(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ InitialExpression = {$zdatetime($horolog,3)} ];
 

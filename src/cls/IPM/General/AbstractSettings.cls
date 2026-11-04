@@ -6,7 +6,7 @@
 Class %IPM.General.AbstractSettings Extends (%Persistent, %IPM.General.Singleton, %IPM.General.IConfigurable) [ Abstract, NoExtent ]
 {
 
-Property Key As %String [ InitialExpression = "Settings", ReadOnly ];
+Property Key As %String(MAXLEN = 255) [ InitialExpression = "Settings", ReadOnly ];
 
 Index Key On Key [ IdKey, Unique ];
 
