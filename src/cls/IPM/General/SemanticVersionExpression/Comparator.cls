@@ -3,7 +3,7 @@ Class %IPM.General.SemanticVersionExpression.Comparator Extends (%IPM.General.Se
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVer.Comp";
 
-Property Expression As %String [ ReadOnly ];
+Property Expression As %String(MAXLEN = "") [ ReadOnly ];
 
 Property Operator As %String(VALUELIST = ",=,<,<=,>,>=") [ InitialExpression = "=", Required ];
 

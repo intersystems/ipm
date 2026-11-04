@@ -5,7 +5,7 @@ Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleTemplate";
 
 Property TemplateResources [ MultiDimensional ];
 
-Property ModuleFolder As %String(XMLPROJECTION = "NONE");
+Property ModuleFolder As %String(MAXLEN = "", XMLPROJECTION = "NONE");
 
 /// Export Resources
 /// Example: ExportList="00000,apptools.,apptools.M^00000,apptools.,apptools.M"

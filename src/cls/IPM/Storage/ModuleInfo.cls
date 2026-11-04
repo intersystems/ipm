@@ -5,7 +5,7 @@ Class %IPM.Storage.ModuleInfo Extends (%SerialObject, %IPM.General.ModuleInfo) [
 
 Parameter DEFAULTGLOBAL = "^IPM.Storage.ModuleInfo";
 
-Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions");
+Property PlatformVersions As list Of %String(%JSONFIELDNAME = "platform_versions", MAXLEN = 10);
 
 /// Returns true if this module is installable on the given platform. Non-deployed modules are not
 /// platform-specific and always match. A deployed module is built and tagged per platform, so it is

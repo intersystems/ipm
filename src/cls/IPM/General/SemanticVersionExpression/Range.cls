@@ -3,7 +3,7 @@ Class %IPM.General.SemanticVersionExpression.Range Extends %IPM.General.Semantic
 
 Parameter DEFAULTGLOBAL = "^IPM.General.SemVer.Range";
 
-Property Expression As %String [ ReadOnly ];
+Property Expression As %String(MAXLEN = "") [ ReadOnly ];
 
 Property Comparators As list Of %IPM.General.SemanticVersionExpression.Comparator;
 

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1197: IPM installs on IRIS 2023.1 and earlier, which failed to compile `%IPM.Storage.ModuleTemplate`
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
+- #634: Module parameter values, template folders, and other stored strings longer than 50 characters no longer fail to save with `ERROR #7201`
 - #1115: Improve ORAS registry error reporting and authentication:
     - ORAS registry errors now name the repo and show the HTTP status and the registry's message
     - ORAS registries using Basic authentication work

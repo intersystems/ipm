@@ -11,7 +11,7 @@ Parameter MANAGEDEXTENT As INTEGER [ Constraint = "0,1", Flags = ENUM ] = 0;
 
 /// An inherited IDKey index on this property means that the default value is
 /// used as a subscript under <DataLocation> in the storage definition.
-Property Key As %String [ InitialExpression = {$classname()}, ReadOnly ];
+Property Key As %String(MAXLEN = 255) [ InitialExpression = {$classname()}, ReadOnly ];
 
 /// If enabled, source control behavior (including menu item enable/disable) follows mapped resources.
 /// That is, if a class is mapped from the default routine database of another namespace that has source control enabled,

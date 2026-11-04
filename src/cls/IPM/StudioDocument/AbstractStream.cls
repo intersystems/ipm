@@ -7,7 +7,7 @@ Property Name As %String(MAXLEN = 100);
 
 Property Contents As %Stream.GlobalCharacter;
 
-Property Hash As %Binary;
+Property Hash As %Binary(MAXLEN = 20);
 
 Property LastModifiedTimestamp As %TimeStamp;
 
