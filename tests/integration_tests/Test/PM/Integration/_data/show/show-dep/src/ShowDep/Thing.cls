@@ -1,0 +1,4 @@
+Class ShowDep.Thing
+{
+
+}

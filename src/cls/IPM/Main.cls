@@ -600,6 +600,20 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 
 </command>
 
+<command name="show">
+<description>
+    Shows an installed module's details, what it contains, and the modules it depends on or is required by. Use list-dependents for modules that depend on it transitively.
+</description>
+
+<!-- Examples -->
+<example description="Shows the details, resources, and dependencies of the installed module MyModule.">
+    show MyModule
+</example>
+
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of an installed module" />
+</command>
+
 <command name="default-modifiers" dataPrefix="D">
 <description>
     Manages default modifiers to use for all package manager commands in the current namespace.
@@ -1083,6 +1097,8 @@ ClassMethod ShellInternal(
                 do ..ListInstalled(.tCommandInfo)
             } elseif (tCommandInfo = "list-dependents") {
                 do ..ListDependents(.tCommandInfo)
+            } elseif (tCommandInfo = "show") {
+                do ##class(%IPM.General.ModuleSummary).Show(tCommandInfo("parameters","module"))
             } elseif (tCommandInfo = "orphans") {
                 do ..ListOrphans(.tCommandInfo)
             } elseif (tCommandInfo = "default-modifiers") {

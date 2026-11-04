@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="show-main.ZPM">
+    <Module>
+      <Name>show-main</Name>
+      <ExternalName>ShowMain</ExternalName>
+      <Version>1.2.3</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="ShowMain.PKG"/>
+      <Dependencies>
+        <ModuleReference>
+          <Name>show-dep</Name>
+          <Version>^1.0.0</Version>
+        </ModuleReference>
+        <ModuleReference Scope="test">
+          <Name>show-missing</Name>
+          <Version>1.0.0</Version>
+        </ModuleReference>
+      </Dependencies>
+    </Module>
+  </Document>
+</Export>
