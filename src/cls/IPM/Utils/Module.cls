@@ -90,7 +90,8 @@ ClassMethod LoadModuleReference(
             quit
         }
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-        set tModRef.Name = pModuleName
+        // Pulled by the name the repository has it under, which can differ from a dependency's name
+        set tModRef.Name = $listget($get(pDependencyGraph(pModuleName)), 8, pModuleName)
         set tModRef.VersionString = pVersion
         set tModRef.Deployed = pDeployed
         set tModRef.PlatformVersion = pPlatformVersion
@@ -899,26 +900,26 @@ ClassMethod GetModuleListExecute(
         }
 
         set tClient = tServer.GetPackageService()
-        if tClient.IsAvailable() {
-            set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-            set tSearchCriteria.IncludePrerelease = tServer.Prereleases
-            set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
-            set tSearchCriteria.AllVersions = pShowAllVersions
-            set tList = ""
-            try {
+        set tList = ""
+        try {
+            if tClient.IsAvailable() {
+                set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+                set tSearchCriteria.IncludePrerelease = tServer.Prereleases
+                set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
+                set tSearchCriteria.AllVersions = pShowAllVersions
                 set tList = tClient.ListModules(tSearchCriteria)
-            } catch e {
-                write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
             }
-            if $isobject(tList) {
-                set platformVersion = $$$CurrentPlatformVersion
-                for i=1:1:tList.Count() {
-                    set tMod = tList.GetAt(i)
-                    if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
-                        continue
-                    }
-                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
+        } catch e {
+            write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
+        }
+        if $isobject(tList) {
+            set platformVersion = $$$CurrentPlatformVersion
+            for i=1:1:tList.Count() {
+                set tMod = tList.GetAt(i)
+                if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
+                    continue
                 }
+                set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
             }
         }
 

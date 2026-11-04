@@ -26,6 +26,8 @@ ClassMethod RunAll(verbose As %Boolean = 1) As %Status
             set $namespace = $zstrip(ns,"<>WC")
             do ..MigrateReposFromIPM09(verbose) // Do this first; MigrateZPMToIPM will fail with <FRAMESTACK> otherwise.
             do ..MigrateZPMToIPM(verbose)
+            // Nodes of the removed URL index, which repo changes no longer maintain
+            kill ^IPM.Repo.DefinitionI("URL")
         } catch e {
             set sc = $$$ADDSC(sc, e.AsStatus())
         }

@@ -114,7 +114,16 @@ Method Display()
     write !,..Name
     write !,$char(9),"Source: ",..Padding(1),..Details
     write !,$char(9),"Enabled?",..Padding(1),$$$YesNo(..Enabled)
-    write !,$char(9),"Available?",..Padding(1),$$$YesNo(..GetPackageService().IsAvailable())
+    try {
+        set available = $$$YesNo(..GetPackageService().IsAvailable())
+    } catch e {
+        if e.%IsA("%Exception.SystemException") {
+            throw e
+        }
+        // Shown rather than thrown, so a misconfigured repo can still be listed and reconfigured
+        set available = "No. " _ ##class(%IPM.Main).ErrorText(e.AsStatus())
+    }
+    write !,$char(9),"Available?",..Padding(1),available
     write !,$char(9),"Use for Snapshots?",..Padding(2),$$$YesNo(..Snapshots)
     write !,$char(9),"Use for Prereleases?",..Padding(2),$$$YesNo(..Prereleases)
     write !,$char(9),"Is Read-Only?",..Padding(1),$$$YesNo(..ReadOnly)

@@ -22,9 +22,6 @@ Method ModuleNameFromRepository(repository As %String) As %String
     return repository
 }
 
-/// Prefix for ORAS API calls
-Property PathPrefix As %String(MAXLEN = "");
-
 /// Name of the repo definition this service was built from, for messages.
 Property RepoName As %String(MAXLEN = "");
 
@@ -33,30 +30,27 @@ Property CredentialsProbe As %String [ Private ];
 
 Parameter ALLOWPREFIXINLOCATION = 0;
 
-/// Splits url into a location with a scheme and no path, and a path prefix with no leading slash and a trailing slash.
-/// e.g. "ghcr.io/myorg" gives "https://ghcr.io" and "myorg/"
-ClassMethod SplitLocation(
+/// Throws if url has a path after the host. OCI clients read a path there as the start of the
+/// repository name and send API calls to /v2/ on the host, so the path belongs in the namespace.
+/// The error suggests the equivalent configuration, e.g. "-url https://ghcr.io -namespace myorg" for "ghcr.io/myorg".
+/// With repoName, the error is about that existing repo rather than a URL being configured.
+ClassMethod CheckNoPath(
 	url As %String,
-	Output location As %String,
-	Output pathPrefix As %String)
+	namespace As %String = "",
+	repoName As %String = "")
 {
-    do ..ParseLocation(url, .components)
-    set pathPrefix = components("path")
-    if (pathPrefix '= "") && ($extract(pathPrefix, *) '= "/") {
-        set pathPrefix = pathPrefix _ "/"
+    set canonical = ##class(%IPM.DataType.RepoLocation).Canonicalize(url)
+    set path = $piece(canonical, "/", 4, *)
+    if (path = "") {
+        return
     }
-    kill components("path")
-    set location = ##class(%Net.URLParser).Compose(.components)
-}
-
-/// Splits the repo URL as SplitLocation does. The package service keeps the path in PathPrefix,
-/// while the publish service's Location is the whole repo URL.
-Method SplitRepoLocation(
-	Output location As %String,
-	Output pathPrefix As %String) [ Private ]
-{
-    do ..SplitLocation(..Location, .location, .pathPrefix)
-    set pathPrefix = ..PathPrefix _ pathPrefix
+    set suggestion = "-url " _ $piece(canonical, "/", 1, 3) _ " -namespace " _ ##class(%IPM.DataType.OrasNamespace).Normalize(path _ "/" _ namespace)
+    if (repoName = "") {
+        set msg = $$$FormatText("ORAS repo URL '%1' has a path. Put the path in the namespace instead: %2", url, suggestion)
+    } else {
+        set msg = $$$FormatText("ORAS repo '%1' has URL '%2' with a path. Put the path in the namespace instead: repo -n %1 %3", repoName, url, suggestion)
+    }
+    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
 }
 
 /// Classifies failure, which came from an operation on module moduleName, and returns it.
@@ -72,9 +66,7 @@ Method RegistryFailure(
         }
         set probe = ..CredentialsProbe
     }
-    do ..SplitRepoLocation(.location, .pathPrefix)
-    set repoURL = $zstrip(location _ "/" _ pathPrefix, ">", "/")
-    do failure.Classify(..RepoName, repoURL, moduleName, ..HasCredentials(), probe)
+    do failure.Classify(..RepoName, ..Location, moduleName, ..HasCredentials(), probe)
     return failure
 }
 
@@ -97,11 +89,13 @@ Method ClassifyException(
 /// Per the OCI Distribution Spec, GET /v2/ returning 401 means the registry is up but requires
 /// authentication — this is not a failure. We check for WWW-Authenticate (required by RFC 7235 on
 /// any proper 401) rather than Docker-Distribution-Api-Version, since many registries omit the latter.
+/// Throws for a URL with a path, saying how to reconfigure the repo.
 Method IsAvailable() As %Boolean
 {
+    do ..CheckNoPath(..Location, ..Namespace, ..RepoName)
     set request = ..GetHttpRequest(..Location)
     set request.Timeout = 5
-    if $$$ISERR(request.Get(..PathPrefix _ "v2/")) {
+    if $$$ISERR(request.Get("v2/")) {
         return 0
     }
     set statusCode = request.HttpResponse.StatusCode
@@ -134,10 +128,9 @@ Method ProbeCredentials() As %String
     }
     // Probe GET /v2/ with credentials attached by GetHttpRequest().
     // Some registries accept credentials directly here and return 2xx.
-    do ..SplitRepoLocation(.location, .pathPrefix)
-    set request = ..GetHttpRequest(location)
+    set request = ..GetHttpRequest(..Location)
     set request.Timeout = 5
-    if $$$ISERR(request.Get(pathPrefix _ "v2/")) {
+    if $$$ISERR(request.Get("v2/")) {
         return $$$OrasCredentialsUnknown
     }
     set statusCode = request.HttpResponse.StatusCode
@@ -195,7 +188,7 @@ Method ProbeTokenEndpoint(wwwAuth As %String) As %String [ Private ]
         set service = serviceMatcher.Group(1)
     }
     // Build a request to the token endpoint (which may be on a different host than the registry)
-    do ..ParseLocation(realm, .comp)
+    do ##class(%IPM.DataType.RepoLocation).Parse(realm, .comp)
     set tokenRequest = ##class(%Net.HttpRequest).%New()
     set tokenRequest.Timeout = 5
     // A redirect could send the credentials elsewhere, including over plain http
@@ -511,7 +504,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
     set request = ..GetHttpRequest()
     // Make GET request
     // response is a JSON structure like {"repositories":["package1", "package2", ...]}
-    set tSC=request.Get(..PathPrefix _ "/v2/_catalog")
+    set tSC=request.Get("/v2/_catalog")
     $$$ThrowOnError(tSC)
     set response=request.HttpResponse
     if (response.StatusCode=200) {
@@ -553,8 +546,7 @@ Method ListModules(pSearchCriteria As %IPM.Repo.SearchCriteria) As %ListOfObject
                 set failure = ##class(%IPM.Repo.Oras.HttpException).%New("RegistryHttpError", response.StatusCode)
                 set failure.StatusCode = response.StatusCode
                 set failure.Reason = response.ReasonPhrase
-                do ..SplitRepoLocation(.location, .pathPrefix)
-                set failure.URL = location _ "/" _ pathPrefix _ "v2/_catalog"
+                set failure.URL = ..Location _ "/v2/_catalog"
                 if ..RegistryFailure(failure, "_catalog").CredentialsRejected {
                     throw failure
                 }
