@@ -135,6 +135,13 @@ Method OnPhase(
                 if $data(pParams("UnitTest","Case"), tTestCase)#2 {
                     $$$ThrowOnError($system.OBJ.Compile(tTestCase, tCompileFlags))
                 } else {
+                    // A test package with no classes is not an error in itself, so warn and skip it.
+                    set nextClass = $order(^oddDEF(..Package _ "."))
+                    if $extract(nextClass, 1, $length(..Package) + 1) '= (..Package _ ".") {
+                        set suppressor = ""
+                        write !, "WARNING: no test classes found for package ", ..Package, " in ", tUnitTestDir, ". Skipping."
+                        quit
+                    }
                     $$$ThrowOnError($system.OBJ.CompilePackage(..Package, tCompileFlags))
                 }
 
