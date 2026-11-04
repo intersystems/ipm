@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Shell errors are shown in full, including every error in a combined status, instead of being cut off at a trailing bracket
     - `unpublish` now fails when the module or version is not found or the registry refuses the request, instead of printing the error and reporting success
     - Credential checks no longer follow redirects from a registry's token endpoint, so credentials are not sent to another host
+- #1183: `load` of a tarball handles pax headers (written by macOS and Windows tar) and cleans up its temp directory on failure
 - #1236: `install` from filesystem repos and `load` read a module.xml in the encoding its XML declaration names, so multi-byte characters (such as Japanese text) no longer cause a SAX parser error when the system's default file encoding differs
 - #1283: `repo -o` rejects a URL with a path, such as `https://ghcr.io/myorg`, and suggests the equivalent `-url https://ghcr.io -namespace myorg`. An existing repo with a path shows that suggestion on `repo -list` and in a warning on lookups, which continue with the other repos.
 - #1281: Repos on one ORAS registry can use different namespaces, and repo URLs that differ only in form (scheme omitted, case of the host, default port, trailing slash) are rejected as duplicates, naming the existing repo. The generated `URLExists` and `URLOpen` methods of `%IPM.Repo.Http.Definition` are removed along with the `URL` index.
