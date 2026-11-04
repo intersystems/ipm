@@ -35,6 +35,43 @@ Method TestAncestorIsProtected()
     do $$$AssertTrue(##class(%IPM.Utils.File).IsProtectedDirectory(root), root_" is protected")
 }
 
+/// Checks the list directly because every configured database directory also holds an IRIS.DAT,
+/// which IsProtectedDirectory checks first.
+Method TestDatabaseDirectoriesIncludesConfigured()
+{
+    set dir = $piece(##class(%SYS.Namespace).GetGlobalDest($namespace), "^", 2)
+    set target = $zconvert(##class(%File).NormalizeDirectory(dir), "L")
+    set databaseDirs = ##class(%IPM.Utils.File).DatabaseDirectories()
+    set found = 0
+    set pointer = 0
+    while 'found && $listnext(databaseDirs, pointer, databaseDir) {
+        set found = ($zconvert(##class(%File).NormalizeDirectory(databaseDir), "L") = target)
+    }
+    do $$$AssertTrue(found, dir_" is a configured database directory")
+}
+
+/// Covers a database IRIS does not know about, such as one dismounted and removed from the configuration.
+Method TestDirectoryWithIrisDatIsProtected()
+{
+    set dir = ##class(%IPM.Utils.File).CreateTempDirectory()
+    try {
+        // IRIS refuses to write a file named IRIS.DAT, so write another name and rename it.
+        set file = ##class(%Stream.FileBinary).%New()
+        $$$ThrowOnError(file.LinkToFile(##class(%File).TempFilename("dat", dir)))
+        $$$ThrowOnError(file.Write("not a real database"))
+        $$$ThrowOnError(file.%Save())
+        set tempName = file.Filename
+        kill file
+        if '##class(%File).Rename(tempName, ##class(%File).Construct(dir, "IRIS.DAT")) {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "Could not rename "_tempName_" to IRIS.DAT"))
+        }
+        do $$$AssertTrue(##class(%IPM.Utils.File).IsProtectedDirectory(dir), dir_" is protected")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "An exception occurred in TestDirectoryWithIrisDatIsProtected.")
+    }
+    do ##class(%File).RemoveDirectoryTree(dir)
+}
+
 Method TestSubdirectoryIsNotProtected()
 {
     set installDir = $system.Util.InstallDirectory()
