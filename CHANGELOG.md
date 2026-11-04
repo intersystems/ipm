@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - #1248: Published module manifests no longer include `MarkedForUpdate`, so IPM versions before 0.10.7 can resolve them as dependencies
+- #1005: `test` and `verify` warn and skip a `UnitTest` resource whose directory holds no test classes, instead of failing with "Nothing to compile"
 - #1197: IPM installs on IRIS 2023.1 and earlier, which failed to compile `%IPM.Storage.ModuleTemplate`
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
