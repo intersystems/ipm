@@ -1,3 +1,5 @@
+Include %IPM.Formatting
+
 Class %IPM.ResourceProcessor.FileCopy Extends %IPM.ResourceProcessor.Abstract
 {
 
@@ -182,7 +184,12 @@ Method DoCopy(
             }
         } else {
             write:tVerbose " as directory "
-            set tSC = ##class(%IPM.Utils.File).CopyDir(tSource,tTarget,'..Overlay)
+            set deleteFirst = '..Overlay
+            if deleteFirst && ##class(%IPM.Utils.File).IsProtectedDirectory(tTarget) {
+                write !, $$$FormattedLine($$$Yellow, "WARNING: "_tTarget_" is a protected IRIS or IPM directory. Copying into it without clearing it first.")
+                set deleteFirst = 0
+            }
+            set tSC = ##class(%IPM.Utils.File).CopyDir(tSource,tTarget,deleteFirst)
         }
     } catch e {
         set tSC = e.AsStatus()
@@ -217,6 +224,10 @@ Method OnPhase(
         do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
         if ..KeepOnUninstall {
             write:tVerbose !,"Keeping ",tTarget
+            return $$$OK
+        }
+        if 'copyAsFile && ##class(%IPM.Utils.File).IsProtectedDirectory(tTarget) {
+            write !, $$$FormattedLine($$$Yellow, "WARNING: "_tTarget_" is a protected IRIS or IPM directory. Leaving it in place.")
             return $$$OK
         }
         write:tVerbose !,"Deleting ",tTarget

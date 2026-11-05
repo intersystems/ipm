@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #435: Copying or removing a directory on Windows now fails when ROBOCOPY cannot be run, instead of reporting success with no files copied
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
 - #634: Module parameter values, template folders, and other stored strings longer than 50 characters no longer fail to save with `ERROR #7201`
+- #300: `FileCopy` and `CSPApplication` resources no longer delete IRIS or IPM system directories such as `${cspdir}` or `${mgrdir}python/`, or any directory containing one, on install or uninstall. IPM copies into them without clearing them first, leaves them in place on uninstall, and warns
 - #1115: Improve ORAS registry error reporting and authentication:
     - ORAS registry errors now name the repo and show the HTTP status and the registry's message
     - ORAS registries using Basic authentication work

@@ -187,7 +187,12 @@ Method OnPhaseInternal(
             }
 
             // Actually copy the directory
-            $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tResourceDir,..Directory,, tVerbose))
+            set deleteFirst = 1
+            if ##class(%IPM.Utils.File).IsProtectedDirectory(..Directory) {
+                write !, $$$FormattedLine($$$Yellow, "WARNING: "_..Directory_" is a protected IRIS or IPM directory. Copying into it without clearing it first.")
+                set deleteFirst = 0
+            }
+            $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tResourceDir,..Directory,deleteFirst, tVerbose))
 
             // And also make directory writeable afterward (because read-only files were copied in)
             $$$ThrowOnError(##class(%IPM.Utils.File).MakeDirectoryWriteable(..Directory,.tCmd,.tOutputLog,.tErrLog))
@@ -402,8 +407,12 @@ Method DeleteCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
     set tSC = $$$OK
     try {
         // Only try to purge files if the directory exists.
-        set tDirExists = (..Directory '= "") && ##class(%File).DirectoryExists(..Directory)
-        set tSC = ##class(%Library.EnsembleMgr).deletePortal(..Url,tDirExists,pVerbose)
+        set purgeFiles = (..Directory '= "") && ##class(%File).DirectoryExists(..Directory)
+        if purgeFiles && ##class(%IPM.Utils.File).IsProtectedDirectory(..Directory) {
+            write !, $$$FormattedLine($$$Yellow, "WARNING: "_..Directory_" is a protected IRIS or IPM directory. Leaving it in place.")
+            set purgeFiles = 0
+        }
+        set tSC = ##class(%Library.EnsembleMgr).deletePortal(..Url,purgeFiles,pVerbose)
         if ($system.Status.GetErrorCodes(tSC) [ $$$ApplicationDoesNotExist) {
             // Not actually a problem - allow Clean/Uninstall to continue if it fails while trying to remove something that doesn't exist.
             set tSC = $$$OK

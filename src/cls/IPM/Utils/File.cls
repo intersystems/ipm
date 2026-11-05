@@ -15,6 +15,70 @@ ClassMethod CreateDirectoryChain(pName As %String) As %Status
     quit tSC
 }
 
+/// Returns 1 if deleting dir would delete a directory IRIS or IPM needs to run, because dir is
+/// one of those directories or an ancestor of one. Subdirectories, such as an application's own
+/// directory under csp/, are not protected. Database directories are protected too, both configured
+/// ones and any directory holding an IRIS.DAT.
+ClassMethod IsProtectedDirectory(dir As %String) As %Boolean
+{
+    if ##class(%Library.File).Exists(##class(%Library.File).Construct(dir, "IRIS.DAT")) {
+        return 1
+    }
+    set installDir = $system.Util.InstallDirectory()
+    set mgrDir = ##class(%Library.File).ManagerDirectory()
+    set cspDir = ##class(%Library.File).Construct(installDir, "csp")
+    set libDir = ##class(%Library.File).Construct(installDir, "lib")
+    set protectedDirs = $listbuild(
+        installDir,
+        $system.Util.DataDirectory(),
+        mgrDir,
+        $system.Util.BinaryDirectory(),
+        libDir,
+        cspDir,
+        // The Management Portal and Interoperability UI
+        ##class(%Library.File).Construct(cspDir, "sys"),
+        ##class(%Library.File).Construct(cspDir, "broker"),
+        ##class(%Library.File).Construct(cspDir, "enslib"),
+        // Installed Python packages and the IRIS iris module
+        ##class(%Library.File).Construct(mgrDir, "python"),
+        ##class(%Library.File).Construct(libDir, "python"),
+        // Holds IPM's own files
+        ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()) _ ..DatabaseDirectories()
+    set dir = ..NormalizeForComparison(dir)
+    set pointer = 0
+    while $listnext(protectedDirs, pointer, protectedDir) {
+        if $extract(..NormalizeForComparison(protectedDir), 1, $length(dir)) = dir {
+            return 1
+        }
+    }
+    return 0
+}
+
+/// Returns the directory of every database in the instance configuration, including those outside mgr/.
+ClassMethod DatabaseDirectories() As %List [ Internal ]
+{
+    new $namespace
+    set $namespace = "%SYS"
+    set statement = ##class(%SQL.Statement).%New()
+    $$$ThrowOnError(statement.%PrepareClassQuery("Config.Databases", "List"))
+    set rs = statement.%Execute("*")
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    set dirs = ""
+    while rs.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set dirs = dirs _ $listbuild(rs.%Get("Directory"))
+    }
+    $$$ThrowOnError(sc)
+    return dirs
+}
+
+/// Lowercases on every platform because Windows and macOS file systems are case-insensitive by default.
+/// On a case-sensitive file system this can only protect too much, which keeps files rather than deleting them.
+ClassMethod NormalizeForComparison(dir As %String) As %String [ Private ]
+{
+    return $zconvert(##class(%Library.File).NormalizeDirectory(dir), "L")
+}
+
 ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
 {
     new %objlasterror
