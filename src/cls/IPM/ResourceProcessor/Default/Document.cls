@@ -398,7 +398,7 @@ Method OnLoad(
             // Checked here because the catch blocks above swallow errors
             $$$ThrowOnError(tSC)
             if 'savedUnderResourceName && (..ResourceReference.Name '[ "*") {
-                do ..AssertLoadedResourceName(pFullResourcePath, pLoadedList)
+                do ..AssertResourceLoaded(pFullResourcePath, pLoadedList)
             }
         }
         $$$ThrowOnError(..OnLoadDeployed(.pParams, .pLoadedList))
@@ -423,20 +423,19 @@ Method OnLoad(
     quit tSC
 }
 
-/// Throws unless <var>loadedList</var>, the comma-separated names <method>$system.OBJ.Load</method> reported,
-/// contains the resource name. Load imports the name inside the file but export writes the resource name,
-/// so a mismatch would package an empty or missing item.
-Method AssertLoadedResourceName(
+/// Throws unless the resource exists after loading fullResourcePath. Load imports the name inside the
+/// file but export writes the resource name, so a mismatch would package an empty or missing item.
+/// loadedList is the comma-separated names $system.OBJ.Load reported.
+Method AssertResourceLoaded(
 	fullResourcePath As %String,
 	loadedList As %String)
 {
-    // Match whole entries without splitting, since document names such as DFI may contain commas
-    set loaded = "," _ $zconvert(loadedList, "U") _ ","
-    set name = $zconvert(..ResourceReference.Name, "U")
-    // Documents such as BPL and DTL are stored as the class with the same name. A class name
-    // without a package, such as Test, loads as User.Test.
-    set className = $zconvert($$$NormalizeClassname($piece(..ResourceReference.Name, ".", 1, *-1)) _ ".CLS", "U")
-    if (loaded [ ("," _ name _ ",")) || (loaded [ ("," _ className _ ",")) {
+    // Exists applies IRIS naming rules, so X.BPL finds class X and Test.CLS finds User.Test
+    if ##class(%RoutineMgr).Exists(..ResourceReference.Name) {
+        return
+    }
+    // A document type may not implement Exists. Match whole entries, since names may contain commas.
+    if ("," _ $zconvert(loadedList, "U") _ ",") [ ("," _ $zconvert(..ResourceReference.Name, "U") _ ",") {
         return
     }
     set contents = $select(loadedList = "": "nothing", 1: loadedList)

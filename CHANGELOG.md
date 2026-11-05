@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - Unreleased
+
+### Changed
+- #1104: Loading a module from source now fails when a resource's file holds a different name, such as `MyFile.HL7` containing `<Document name="My-File.HL7">`. Document types such as LUT, HL7 and DFI used to load under the other name and package an empty file.
+
 ## [0.10.11] - Unreleased
 
 ### Added
@@ -36,7 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A repo URL with no scheme whose host contains "http", such as `myhttp.example.com`, is no longer misread as having a scheme.
 - #1279: Loading a package installs its deployed code when the module sets `SourcesRoot` and every code resource is `Deploy="true"`
 - #1125: Loading a package installs `Deploy="true"` resources that packaging exports as source, such as include files, instead of skipping them
-- #1104: Loading a resource now fails when its file holds a different name, such as `MyFile.HL7` containing `<Document name="My-File.HL7">`, instead of loading the other name and packaging an empty file
 
 ## [0.10.10] - 2026-10-14
 
