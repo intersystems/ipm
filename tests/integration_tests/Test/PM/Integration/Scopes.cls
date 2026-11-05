@@ -61,7 +61,7 @@ Method TestScopedResourceInstall()
         do $$$AssertStatusOK(status, "Module ScopeClass successfully installed.")
 
         // Normal install: Scoped class should not exist
-        do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("HS.ScopedClass"), "Scoped class should NOT exist after normal install")
+        do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("ScopeFixture.ScopedClass"), "Scoped class should NOT exist after normal install")
 
         set moduleDir = ..GetModuleDir("scope-test/scope-package")
         set status = ##class(%IPM.Main).Shell("load -verbose "_moduleDir)
@@ -93,11 +93,11 @@ Method AssertScopedClassLoadsOnTest(loadFlags As %String)
         set moduleDir = ..GetModuleDir("scope-test/scope-class")
         set sc = ##class(%IPM.Main).Shell("load "_moduleDir_loadFlags)
         do $$$AssertStatusOK(sc, "Loaded ScopeClass")
-        do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("HS.ScopedClass"), "Scoped class should NOT exist after install")
+        do $$$AssertNotTrue(##class(%Dictionary.ClassDefinition).%ExistsId("ScopeFixture.ScopedClass"), "Scoped class should NOT exist after install")
 
         set sc = ##class(%IPM.Main).Shell("HealthShare.ScopeClass test")
         do $$$AssertStatusOK(sc, "test should load and compile the test-scoped class")
-        do $$$AssertTrue(##class(%Dictionary.CompiledClass).%ExistsId("HS.ScopedClass"), "Scoped class should be compiled after test")
+        do $$$AssertTrue(##class(%Dictionary.CompiledClass).%ExistsId("ScopeFixture.ScopedClass"), "Scoped class should be compiled after test")
     } catch ex {
         do $$$AssertStatusOK(ex.AsStatus(), "Unexpected failure in AssertScopedClassLoadsOnTest")
     }

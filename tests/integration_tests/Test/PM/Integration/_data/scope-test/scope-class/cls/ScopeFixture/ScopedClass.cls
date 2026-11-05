@@ -1,0 +1,4 @@
+Class ScopeFixture.ScopedClass
+{
+
+}
