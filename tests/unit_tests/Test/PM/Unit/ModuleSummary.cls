@@ -73,12 +73,24 @@ Method TestDefaults()
 Method TestDependencies()
 {
     set module = ..NewModule()
-    do ..AddDependency(module, "fslog", "^1.0.0")
     do ..AddDependency(module, "testify", "1.0.2")
+    do ..AddDependency(module, "fslog", "^1.0.0")
+    do ..AddDependency(module, "alpha", "^2.0.0")
+    do ..AddDependency(module, "pinned", "1.0.2")
+    do ..AddDependency(module, "exact", "1.0.2")
     do ..AddDependency(module, "scoped", "1.0.0", "test")
-    set lines = ##class(%IPM.General.ModuleSummary).GetLines(module, {"fslog":"1.0.3"}, [{"name":"other-app","version":"2.0.0"}])
-    do ..AssertInOrder(lines, "Depends on", "fslog ^1.0.0 installed 1.0.3", "testify 1.0.2 not installed", "Required by (directly)", "other-app 2.0.0")
+    set installed = {"fslog":"1.0.3","alpha":"1.5.0","pinned":"1.0.3","exact":"1.0.2"}
+    set lines = ##class(%IPM.General.ModuleSummary).GetLines(module, installed, [{"name":"other-app","version":"2.0.0"}])
+    do ..AssertInOrder(lines, "Depends on (5)",
+        "alpha ^2.0.0 installed 1.5.0, unsatisfied",
+        "exact 1.0.2 installed 1.0.2",
+        "fslog ^1.0.0 installed 1.0.3",
+        "pinned 1.0.2 installed 1.0.3, unsatisfied",
+        "testify 1.0.2 not installed",
+        "Required by directly (1)", "other-app 2.0.0")
     do $$$AssertNotTrue(..AnyLineContains(lines, "scoped"))
+    set requiredBy = ..LineIndex(lines, "Required by directly (1)")
+    do $$$AssertEquals(lines.%Get(requiredBy - 2), "", "Blank line separates the two lists")
 }
 
 Method TestSystemRequirements()

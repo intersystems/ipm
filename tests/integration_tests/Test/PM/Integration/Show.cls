@@ -32,7 +32,7 @@ Method TestShowsInstalledModule()
         set sc = ##class(%IPM.Main).Shell("show show-dep")
         do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .depOutput)
         do $$$AssertStatusOK(sc, "show show-dep")
-        do $$$AssertTrue(..FindStringInMultiDimArray("Required by (directly)", .depOutput), "Required by heading")
+        do $$$AssertTrue(..FindStringInMultiDimArray("Required by directly (1)", .depOutput), "Required by heading")
         do $$$AssertTrue(..FindStringInMultiDimArray("show-main 1.2.3", .depOutput), "Direct dependent")
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(), "No exception")

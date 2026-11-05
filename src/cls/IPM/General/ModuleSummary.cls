@@ -135,25 +135,55 @@ ClassMethod GetLines(
     do ..AddTable(footprint, "Other resources", sections.other)
     do ..AddBlock(lines, footprint)
 
-    set needs = []
-    set dependsOn = []
     for i = 1:1:module.Dependencies.Count() {
         set dependency = module.Dependencies.GetAt(i)
         // Scoped dependencies are development only and usually not installed.
         continue:dependency.Scope'=""
-        set installed = installedVersions.%Get($zconvert(dependency.Name, "L"))
-        do dependsOn.%Push([(dependency.Name _ " " _ dependency.VersionString), ($select(installed = "": "not installed", 1: "installed " _ installed))])
+        set sorted($zconvert(dependency.Name, "L"), i) = dependency
     }
-    do ..AddTable(needs, "Depends on", dependsOn)
+    set dependsOn = []
+    set name = ""
+    for {
+        set name = $order(sorted(name))
+        quit:name=""
+        set i = ""
+        for {
+            set i = $order(sorted(name, i), 1, dependency)
+            quit:i=""
+            do dependsOn.%Push([(dependency.Name _ " " _ dependency.VersionString), (..GetInstalledStatus(dependency, installedVersions.%Get(name)))])
+        }
+    }
+    set block = []
+    do ..AddTable(block, "Depends on (" _ dependsOn.%Size() _ ")", dependsOn)
+    do ..AddBlock(lines, block)
+
     set dependents = []
     set iterator = requiredBy.%GetIterator()
     while iterator.%GetNext(, .dependent) {
         do dependents.%Push(dependent.name _ " " _ dependent.version)
     }
-    do ..AddList(needs, "Required by (directly)", dependents)
-    do ..AddList(needs, "System requirements", ..GetSystemRequirements(module.SystemRequirements))
-    do ..AddBlock(lines, needs)
+    set block = []
+    do ..AddList(block, "Required by directly (" _ dependents.%Size() _ ")", dependents)
+    do ..AddBlock(lines, block)
+
+    set block = []
+    do ..AddList(block, "System requirements", ..GetSystemRequirements(module.SystemRequirements))
+    do ..AddBlock(lines, block)
     return lines
+}
+
+/// Returns how installedVersion relates to dependency, e.g. "installed 1.0.3", "installed 0.9.0, unsatisfied", or "not installed".
+ClassMethod GetInstalledStatus(
+	dependency As %IPM.Storage.ModuleReference,
+	installedVersion As %String) As %String [ Private ]
+{
+    if (installedVersion = "") {
+        return "not installed"
+    }
+    if '##class(%IPM.General.SemanticVersion).FromString(installedVersion).Satisfies(dependency.Version) {
+        return "installed " _ installedVersion _ ", unsatisfied"
+    }
+    return "installed " _ installedVersion
 }
 
 /// Returns the requirement lines of stream, skipping blank lines and # comments.
