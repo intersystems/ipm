@@ -192,7 +192,11 @@ Method OnPhase(
                 quit
             }
         } elseif (pPhase = "Compile") {
-            if tInScope {
+            if tInScope && (..ResourceReference.Scope '= "") && '..ResourceReference.Generated && '..ResourceReference.Preload {
+                // A scoped resource may not be loaded yet. Its own phase installs its scoped dependencies, then loads and compiles it.
+                // Generated and preloaded resources are never loaded there, so they compile here as usual.
+                set pResourceHandled = 1
+            } elseif tInScope {
                 // If Compile is false, indicate that the resource's compilation phase has already been handled and nothing special should happen.
                 set pResourceHandled = '..Compile
             } else {
