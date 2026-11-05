@@ -1,0 +1,4 @@
+ROUTINE DeployedSourcesRoot.Routine
+Hello() public {
+    quit "routine"
+}
