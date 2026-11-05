@@ -433,8 +433,9 @@ Method AssertLoadedResourceName(
     // Match whole entries without splitting, since document names such as DFI may contain commas
     set loaded = "," _ $zconvert(loadedList, "U") _ ","
     set name = $zconvert(..ResourceReference.Name, "U")
-    // Documents such as BPL and DTL are stored as the class with the same name
-    set className = $piece(name, ".", 1, *-1) _ ".CLS"
+    // Documents such as BPL and DTL are stored as the class with the same name. A class name
+    // without a package, such as Test, loads as User.Test.
+    set className = $zconvert($$$NormalizeClassname($piece(..ResourceReference.Name, ".", 1, *-1)) _ ".CLS", "U")
     if (loaded [ ("," _ name _ ",")) || (loaded [ ("," _ className _ ",")) {
         return
     }
