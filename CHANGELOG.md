@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes
+- #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
 
 ### Fixed
 - #1043: Loading a package resource or a `preload` directory skips files IRIS cannot import, such as macOS `.DS_Store` files, instead of failing or leaving preloaded classes uncompiled
