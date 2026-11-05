@@ -1,7 +1,7 @@
 /// Unit tests for the chained redirected output capture methods in <class>%IPM.General.LogManager</class>:
 /// it must route each captured line into the log while forwarding it live down the redirect
 /// chain, and it must coexist with an already-active <class>%IPM.Utils.Module</class> capture.
-Class Test.PM.Unit.ChainedCapture Extends %UnitTest.TestCase
+Class Test.PM.Unit.ChainedCapture Extends (%UnitTest.TestCase, Test.PM.Utils)
 {
 
 Method OnAfterOneTest(testname As %String) As %Status
@@ -27,7 +27,7 @@ Method TestVerboseChainedCapture()
     do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .outer)
 
-    do $$$AssertTrue(..ArrayContains(.outer, "Hello from within the tee"), "Line WAS forwarded to the predecessor sink")
+    do $$$AssertTrue(..FindStringInMultiDimArray("Hello from within the tee", .outer), "Line WAS forwarded to the predecessor sink")
 
     do log.Finalize()
     do $$$AssertTrue(..FileContains(txtPath, "Hello from within the tee"), "Line WAS routed to the .txt log")
@@ -51,7 +51,7 @@ Method TestNonVerboseChainedCapture()
     do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
     do log.Finalize()
 
-    do $$$AssertTrue(..ArrayContains(.inner, "Inner only line"), "Inner capture received only its own line")
+    do $$$AssertTrue(..FindStringInMultiDimArray("Inner only line", .inner), "Inner capture received only its own line")
     do $$$AssertTrue(..FileContains(txtPath, "Outer tee line one"), "Line written before the inner scope WAS routed to the log")
     do $$$AssertTrue(..FileContains(txtPath, "Outer tee line two"), "Line written after the inner scope WAS routed to the log")
     do $$$AssertNotTrue(..FileContains(txtPath, "Inner only line"), "Inner-captured line was NOT double-routed into the log")
@@ -88,7 +88,7 @@ Method TestEndWithHandlerOnTop()
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .inner)
     do log.Finalize()
 
-    do $$$AssertTrue(..ArrayContains(.inner, "After tee end"), "Module capture survived the tee teardown")
+    do $$$AssertTrue(..FindStringInMultiDimArray("After tee end", .inner), "Module capture survived the tee teardown")
     do $$$AssertTrue(..FileContains(txtPath, "Tee line"), "Line written before teardown WAS logged")
     do $$$AssertNotTrue(..FileContains(txtPath, "After tee end"), "Stray line was NOT logged after the tee ended")
 }
@@ -100,35 +100,6 @@ ClassMethod InitLog(log As %IPM.General.LogManager) [ Private ]
     set cmd = "install"
     set cmd("data","Verbose") = 0
     $$$ThrowOnError(log.InitializeLog("install test", .cmd))
-}
-
-ClassMethod ArrayContains(
-	ByRef array,
-	needle As %String) As %Boolean [ Private ]
-{
-    set key = ""
-    for {
-        set key = $order(array(key), 1, line)
-        quit:key=""
-        if ($get(line) [ needle) {
-            return 1
-        }
-    }
-    return 0
-}
-
-ClassMethod FileContains(
-	path As %String,
-	needle As %String) As %Boolean [ Private ]
-{
-    set stream = ##class(%Stream.FileCharacter).%New()
-    set stream.Filename = path
-    while 'stream.AtEnd {
-        if (stream.ReadLine() [ needle) {
-            return 1
-        }
-    }
-    return 0
 }
 
 }

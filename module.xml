@@ -18,6 +18,7 @@
             <Resource Name="%IPM.Common.INC" />
             <Resource Name="%IPM.Formatting.INC" />
             <Resource Name="IPM.Installer.CLS" Preload="true" />
+            <Resource Name="Test.PM.Utils.CLS" />
             <UnitTest Name="/tests/unit_tests/" Package="Test.PM.Unit" Phase="test" />
             <UnitTest Name="/tests/integration_tests/" Package="Test.PM.Integration" Phase="verify" />
             <Invoke Class="IPM.Installer" Method="Map" Phase="Reload" When="Before" />
