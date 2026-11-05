@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1197: IPM installs on IRIS 2023.1 and earlier, which failed to compile `%IPM.Storage.ModuleTemplate`
 - #1083: IPM installs on IRIS 2022.1, which failed to compile the repository definition classes with a SAX parser error and `%IPM.General.LockFile` with `<NOLINE>`
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
+- #934: `FileCopy` and other directory copies fail without deleting anything when the source and target are the same directory (for example through a symlink or a Docker bind mount) or one contains the other, instead of deleting source files
 - #435: Copying or removing a directory on Windows now fails when ROBOCOPY cannot be run, instead of reporting success with no files copied
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
 - #634: Module parameter values, template folders, and other stored strings longer than 50 characters no longer fail to save with `ERROR #7201`

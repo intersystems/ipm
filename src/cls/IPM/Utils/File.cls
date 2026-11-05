@@ -152,6 +152,10 @@ ClassMethod CopyDir(
     set tSC = $$$OK
     set tBadSC = $$$ERROR($$$GeneralError,$$$FormatText("Error copying directory %1 to %2",pSource,pDest))
     try {
+        if ..DirectoriesOverlap(pSource, pDest) {
+            set message = $$$FormatText("Source %1 and target %2 are the same directory or one contains the other", pSource, pDest)
+            $$$ThrowStatus($$$ERROR($$$GeneralError, message))
+        }
         if $$$isUNIX {
             kill %objlasterror
             if '##class(%Library.File).CopyDir(pSource,pDest,1,.tCreated,pDeleteFirst) {
@@ -181,6 +185,51 @@ ClassMethod CopyDir(
         set tSC = $$$EMBEDSC(tBadSC,e.AsStatus())
     }
     quit tSC
+}
+
+/// Returns 1 if first and second are the same directory or one is inside the other. Embedded Python
+/// compares device and inode, so a symlink or bind mount that aliases the two is caught too. Without
+/// Python, or on a filesystem that reports inode 0, only the normalized paths are compared.
+ClassMethod DirectoriesOverlap(
+	first As %String,
+	second As %String) As %Boolean
+{
+    try {
+        return ..DirectoriesOverlapPython(first, second)
+    } catch {
+        set first = ##class(%File).NormalizeDirectory(first)
+        set second = ##class(%File).NormalizeDirectory(second)
+        return ($extract(first, 1, $length(second)) = second) || ($extract(second, 1, $length(first)) = first)
+    }
+}
+
+ClassMethod DirectoriesOverlapPython(
+	first As %String,
+	second As %String) As %Boolean [ Language = python ]
+{
+    import os
+
+    def same(a, b):
+        statA = os.stat(a)
+        statB = os.stat(b)
+        # An inode of 0 means the filesystem has no file IDs, so every file would compare equal.
+        if statA.st_ino == 0 or statB.st_ino == 0:
+            raise OSError("Filesystem does not report file IDs")
+        return (statA.st_dev, statA.st_ino) == (statB.st_dev, statB.st_ino)
+
+    def contains(outer, inner):
+        if not os.path.isdir(outer):
+            return False
+        path = os.path.abspath(inner)
+        while True:
+            if os.path.exists(path) and same(outer, path):
+                return True
+            parent = os.path.dirname(path)
+            if parent == path:
+                return False
+            path = parent
+
+    return contains(first, second) or contains(second, first)
 }
 
 /// Runs <var>command</var>, a ROBOCOPY command $list, and throws if it fails. ROBOCOPY exits with
