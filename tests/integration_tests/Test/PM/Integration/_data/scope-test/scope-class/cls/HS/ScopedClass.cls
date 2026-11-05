@@ -1,4 +1,0 @@
-Class HS.ScopedClass
-{
-
-}

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
 
 ### Fixed
+- #1023: `test` on a module with a `Scope="test"` class no longer fails in Compile with "Class does not exist". The class loads and compiles in the Test phase, as with `test -only`.
 - #1043: Loading a package resource or a `preload` directory skips files IRIS cannot import, such as macOS `.DS_Store` files, instead of failing or leaving preloaded classes uncompiled
 - #1248: Published module manifests no longer include `MarkedForUpdate`, so IPM versions before 0.10.7 can resolve them as dependencies
 - #1005: `test` and `verify` warn and skip a `UnitTest` resource whose directory holds no test classes, instead of failing with "Nothing to compile"
