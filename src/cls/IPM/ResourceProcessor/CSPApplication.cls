@@ -167,6 +167,8 @@ Method OnPhaseInternal(
 
         // If Directory was specified, move resources from module root to that directory
         if (tCopyFiles) {
+            do ##class(%IPM.Utils.File).WarnIfInInstallDirectory(..Directory, ..ResourceReference)
+
             // Make directory writeable first (so read-only files can be overwritten)
             if ##class(%File).DirectoryExists(..Directory) {
                 $$$ThrowOnError(##class(%IPM.Utils.File).MakeDirectoryWriteable(..Directory,.tCmd,.tOutputLog,.tErrLog))

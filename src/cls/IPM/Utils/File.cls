@@ -1,3 +1,5 @@
+Include %IPM.Formatting
+
 /// Wraps a set of more robust file operations
 Class %IPM.Utils.File
 {
@@ -256,6 +258,48 @@ ClassMethod CreateTempDirectory(baseDirectory As %String = "") As %String
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create temporary directory: " _ $zutil(209,-dir)))
     }
     return ##class(%File).NormalizeDirectory(dir)
+}
+
+/// Returns 1 if path is under installDir but not under dataDir. Copies there can fail, because the
+/// install directory can be read-only, for example in containers with durable %SYS.
+/// Returns 0 when the two directories are the same, because the install directory then holds the instance's
+/// data and is writable.
+/// <example>
+/// // Returns 1
+/// write ##class(%IPM.Utils.File).IsInInstallDirectoryOnly("/usr/irissys/csp/myapp/", "/usr/irissys/", "/durable/iris/")
+/// // Returns 0
+/// write ##class(%IPM.Utils.File).IsInInstallDirectoryOnly("/usr/irissys/csp/myapp/", "/usr/irissys/", "/usr/irissys/")
+/// </example>
+ClassMethod IsInInstallDirectoryOnly(
+	path As %String,
+	installDir As %String = {$system.Util.InstallDirectory()},
+	dataDir As %String = {$system.Util.DataDirectory()}) As %Boolean
+{
+    set path = ..NormalizeForComparison(path)
+    set dataDir = ..NormalizeForComparison(dataDir)
+    set installDir = ..NormalizeForComparison(installDir)
+    return ($extract(path, 1, $length(installDir)) = installDir) && ($extract(path, 1, $length(dataDir)) '= dataDir)
+}
+
+/// Writes a warning if target, a file or directory that resource is about to copy into, passes
+/// IsInInstallDirectoryOnly.
+ClassMethod WarnIfInInstallDirectory(
+	target As %String,
+	resource As %IPM.Storage.ResourceReference)
+{
+    if '..IsInInstallDirectoryOnly(target) {
+        return
+    }
+    set message = "WARNING: "_resource.Module.Name_" resource "_resource.Name_" copies to "_target_", which is in the install directory and can be read-only."
+    write !, $$$FormattedLine($$$Yellow, message)
+}
+
+/// Normalizes path as a directory so that a prefix match only matches whole path segments.
+/// Windows paths are case-insensitive, so they are lowercased.
+ClassMethod NormalizeForComparison(path As %String) As %String [ Private ]
+{
+    set path = ##class(%File).NormalizeDirectory(path)
+    return $select($$$isWINDOWS: $zconvert(path, "L"), 1: path)
 }
 
 }

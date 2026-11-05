@@ -49,6 +49,7 @@ Method OnBeforePhase(
         if (pPhase = "Activate") && (..InstallDirectory '= "") && ('..Defer) {
             set tSource = ..GetSource()
             set tTarget = ..InstallDirectory
+            do ##class(%IPM.Utils.File).WarnIfInInstallDirectory(tTarget, ..ResourceReference)
             set tSC = ..DoCopy(tSource, tTarget, .pParams)
             if $$$ISERR(tSC) {
                 quit
@@ -75,6 +76,7 @@ Method OnAfterPhase(
         if (pPhase = "Activate") && (..InstallDirectory '= "") && (..Defer) {
             set tSource = ..GetSource()
             set tTarget = ..InstallDirectory
+            do ##class(%IPM.Utils.File).WarnIfInInstallDirectory(tTarget, ..ResourceReference)
             set tSC = ..DoCopy(tSource, tTarget, .pParams)
             if $$$ISERR(tSC) {
                 quit
