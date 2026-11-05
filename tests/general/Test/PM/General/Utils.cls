@@ -1,5 +1,5 @@
 /// Utility class for all integration and unit test classes
-Class Test.PM.Utils
+Class Test.PM.General.Utils
 {
 
 ClassMethod ReadXDataToModule(

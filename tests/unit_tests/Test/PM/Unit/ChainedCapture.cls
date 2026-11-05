@@ -1,7 +1,7 @@
 /// Unit tests for the chained redirected output capture methods in <class>%IPM.General.LogManager</class>:
 /// it must route each captured line into the log while forwarding it live down the redirect
 /// chain, and it must coexist with an already-active <class>%IPM.Utils.Module</class> capture.
-Class Test.PM.Unit.ChainedCapture Extends (%UnitTest.TestCase, Test.PM.Utils)
+Class Test.PM.Unit.ChainedCapture Extends (%UnitTest.TestCase, Test.PM.General.Utils)
 {
 
 Method OnAfterOneTest(testname As %String) As %Status

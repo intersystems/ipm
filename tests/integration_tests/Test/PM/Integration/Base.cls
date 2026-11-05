@@ -1,6 +1,6 @@
 Include %IPM.Common
 
-Class Test.PM.Integration.Base Extends (%UnitTest.TestCase, Test.PM.Utils)
+Class Test.PM.Integration.Base Extends (%UnitTest.TestCase, Test.PM.General.Utils)
 {
 
 Parameter REGISTRYNAME = "test_registry";
