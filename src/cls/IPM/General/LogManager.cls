@@ -189,6 +189,7 @@ Method Finalize() As %Status
     set sc = $$$OK
     try {
         if (..Initialized) {
+            set ..Verbose = 0 // Make sure the final line of the log is not written to the terminal
             $$$ThrowOnError(..WriteLogLine("Logging COMPLETE", "INFO"))
             set ..JSONFilePath = ""
             set ..TxtFilePath = ""
