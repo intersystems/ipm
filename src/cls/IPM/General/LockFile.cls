@@ -69,12 +69,12 @@ ClassMethod CreateLockFileForModule(
         $$$ThrowOnError(lockFile.Dependencies.SetAt(dependencyVal, mod.Name))
 
         // Add the dependency's repository to the lock file
-        do AddRepositoryToLockFile(.lockFile, mod.Repository, verbose)
+        do ..AddRepositoryToLockFile(.lockFile, mod.Repository, verbose)
     }
     // Add repository for base module if not already added by a dependency
     // Skip undefined repositories as that means the module was installed via the zpm "load" command
     if (module.Repository '= "") {
-        do AddRepositoryToLockFile(.lockFile, module.Repository, verbose)
+        do ..AddRepositoryToLockFile(.lockFile, module.Repository, verbose)
     }
 
     $$$ThrowOnError(lockFile.%JSONExportToStream(.lockFileJSON, "LockFileMapping"))

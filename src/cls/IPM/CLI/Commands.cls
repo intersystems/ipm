@@ -222,6 +222,13 @@ ClassMethod %GetOneCommandStructure(Output pCommandStructure) [ CodeMode = objec
 
             #; Parse the XML data in the specfied stream
             set tSC = ##Class(%XML.SAX.Parser).ParseStream(tStream,tHandler,tResolver,,,"Schema")
+            // The compiler shares these streams with later generators. %JSONGenerate on older versions of IRIS read them without rewinding.
+            for xDataName = "Commands","Schema" {
+                set xDataIndex = tCompiledClass.XDatas.FindObjectId(tClassName_"||"_xDataName)
+                if (xDataIndex '= "") {
+                    do tCompiledClass.XDatas.GetAt(xDataIndex).Data.Rewind()
+                }
+            }
             if $$$ISERR(tSC) {
                 quit
             }
