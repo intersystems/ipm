@@ -361,6 +361,7 @@ Method OnLoad(
             set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$select(pVerbose:"d",1:"-d"))
         } else {
             set tProcessed = 0
+            set savedUnderResourceName = 0
             set fileExt = $$$UPPER($piece(pFullResourcePath, ".", *))
             if '$listfind($listbuild("CLS", "MAC"), fileExt), ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
                 try {
@@ -384,6 +385,7 @@ Method OnLoad(
                             $$$ThrowOnError(routineMgr.%Save())
                             write:tVerbose !,"Imported document: ", ..ResourceReference.Name, !, "Load finished successfully.", !
                             set tProcessed = 1
+                            set savedUnderResourceName = 1
                         } catch ex { }
                     }
                 } catch ex {
@@ -392,7 +394,11 @@ Method OnLoad(
             }
             if 'tProcessed {
                 set tSC = $system.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
-                $$$ThrowOnError(tSC)
+            }
+            // Checked here because the catch blocks above swallow errors
+            $$$ThrowOnError(tSC)
+            if 'savedUnderResourceName && (..ResourceReference.Name '[ "*") {
+                do ..AssertLoadedResourceName(pFullResourcePath, pLoadedList)
             }
         }
         $$$ThrowOnError(..OnLoadDeployed(.pParams, .pLoadedList))
@@ -415,6 +421,26 @@ Method OnLoad(
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Throws unless <var>loadedList</var>, the comma-separated names <method>$system.OBJ.Load</method> reported,
+/// contains the resource name. Load imports the name inside the file but export writes the resource name,
+/// so a mismatch would package an empty or missing item.
+Method AssertLoadedResourceName(
+	fullResourcePath As %String,
+	loadedList As %String)
+{
+    // Match whole entries without splitting, since document names such as DFI may contain commas
+    set loaded = "," _ $zconvert(loadedList, "U") _ ","
+    set name = $zconvert(..ResourceReference.Name, "U")
+    // Documents such as BPL and DTL are stored as the class with the same name
+    set className = $piece(name, ".", 1, *-1) _ ".CLS"
+    if (loaded [ ("," _ name _ ",")) || (loaded [ ("," _ className _ ",")) {
+        return
+    }
+    set contents = $select(loadedList = "": "nothing", 1: loadedList)
+    set msg = "Resource " _ ..ResourceReference.Name _ " was loaded from " _ fullResourcePath _ ", which contains " _ contents _ ". Rename the file or the item inside it so the names match."
+    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
 }
 
 Method OnLoadDeployed(

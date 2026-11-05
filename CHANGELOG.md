@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A repo URL with no scheme whose host contains "http", such as `myhttp.example.com`, is no longer misread as having a scheme.
 - #1279: Loading a package installs its deployed code when the module sets `SourcesRoot` and every code resource is `Deploy="true"`
 - #1125: Loading a package installs `Deploy="true"` resources that packaging exports as source, such as include files, instead of skipping them
+- #1104: Loading a resource now fails when its file holds a different name, such as `MyFile.HL7` containing `<Document name="My-File.HL7">`, instead of loading the other name and packaging an empty file
 
 ## [0.10.10] - 2026-10-14
 
