@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1281: Repos on one ORAS registry can use different namespaces, and repo URLs that differ only in form (scheme omitted, case of the host, default port, trailing slash) are rejected as duplicates, naming the existing repo. The generated `URLExists` and `URLOpen` methods of `%IPM.Repo.Http.Definition` are removed along with the `URL` index.
 - #1269: A dependency found in an ORAS repo under its other name (`Name` or `ExternalName`), or nested below the repo's namespace, installs instead of failing to pull.
 - A repo URL with no scheme whose host contains "http", such as `myhttp.example.com`, is no longer misread as having a scheme.
+- #1279: Loading a package installs its deployed code when the module sets `SourcesRoot` and every code resource is `Deploy="true"`
+- #1125: Loading a package installs `Deploy="true"` resources that packaging exports as source, such as include files, instead of skipping them
 
 ## [0.10.10] - 2026-10-14
 

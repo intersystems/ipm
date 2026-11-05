@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="deployed-include.ZPM">
+    <Module>
+      <Name>deployed-include</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <Resource Name="DeployedInclude.Macros.INC" Deploy="true"/>
+      <Resource Name="DeployedInclude.Main.CLS" Deploy="true"/>
+      <Resource Name="DeployedInclude.Consumer.CLS"/>
+    </Module>
+  </Document>
+</Export>

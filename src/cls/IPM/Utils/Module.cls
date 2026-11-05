@@ -2814,6 +2814,17 @@ ClassMethod GetDeployedProjectPath(root As %String) As %String
     quit deployedDirectory_$$$DeployedXMLName
 }
 
+/// Returns whether documents of this type install from the deployed project. Other types are packaged
+/// and installed as source, even when their resource sets Deploy="true".
+/// <example>
+/// write ##class(%IPM.Utils.Module).IsDeployableType("cls") // 1
+/// write ##class(%IPM.Utils.Module).IsDeployableType("INC") // 0
+/// </example>
+ClassMethod IsDeployableType(type As %String) As %Boolean [ CodeMode = expression ]
+{
+''$listfind($listbuild("CLS", "MAC", "INT"), $zconvert(type, "U"))
+}
+
 ClassMethod GetDeployedProjectName(moduleName As %String) As %String [ CodeMode = expression ]
 {
 moduleName_$$$DeployedProjectSuffix

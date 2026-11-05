@@ -96,6 +96,9 @@ Method OnPhase(
             if '$get(pParams("NoMapping"),0) {
                 $$$ThrowOnError(..OnConfigureMappings(.pParams))
             }
+            if ..LoadFromDeployedProject(tVerbose) {
+                return $$$OK
+            }
             set ptrn = 0
             while $listnext(tListNames, ptrn, tName) {
                 set tSourcesPrefix = $char($parameter("%IPM.ExtensionBase.SourceControl.Interface","NOPREFIXCHARCODE"))
@@ -170,32 +173,9 @@ Method OnPhase(
                                     }
                                 }
                             }
-                            set tDeployedProjectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
-                            // If resource path exists and the resource is not deployed with a deployed.xml existing
-                            if ##class(%IPM.Utils.File).Exists(.tResourcePath) && '(##class(%IPM.Utils.File).Exists(tDeployedProjectPath) && ..ResourceReference.Deploy) {
+                            if ##class(%IPM.Utils.File).Exists(.tResourcePath) {
                                 set tSC = $$$OK
                                 quit
-                            }
-                            if ..ResourceReference.Deploy {
-                                if tVerbose {
-                                    write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
-                                }
-                                set ..CompileFromProject = 1
-                                // Mark deployed so Compile skips source compilation of Deploy=true
-                                // resources. Persisted because the module is reopened from the
-                                // database between here and Compile.
-                                if '..ResourceReference.Module.Deployed {
-                                    set ..ResourceReference.Module.Deployed = 1
-                                    $$$ThrowOnError(..ResourceReference.Module.%Save())
-                                }
-                                if '$data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
-                                    set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
-                                    if $$$ISERR(sc) {
-                                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Resource path '" _ tDeployedProjectPath _ "' not found"))
-                                    }
-                                    set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
-                                }
-                                return $$$OK
                             }
                             set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
                         }
@@ -224,6 +204,42 @@ Method OnPhase(
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Installs the module's deployed project if this resource loads from it, and returns whether it does.
+/// Types that packaging exports as source load from source even when Deploy is set.
+/// A path-style name has no type to check, so it keeps loading from the deployed project.
+Method LoadFromDeployedProject(verbose As %Boolean) As %Boolean [ Private ]
+{
+    // Extension is the type of the documents a resource holds, so it is "cls" for a PKG
+    set deployable = ($extract(..ResourceReference.Name) = "/") || ##class(%IPM.Utils.Module).IsDeployableType(..Extension)
+    if '..ResourceReference.Deploy || 'deployable || ..ResourceReference.Generated || ..ResourceReference.Preload {
+        return 0
+    }
+    set projectPath = ##class(%IPM.Utils.Module).GetDeployedProjectPath(..ResourceReference.Module.Root)
+    if '##class(%IPM.Utils.File).Exists(projectPath) {
+        return 0
+    }
+    if verbose {
+        write !, "Loading deployed resource from Studio project: "_..ResourceReference.Name
+    }
+    set ..CompileFromProject = 1
+    // Mark deployed so Compile skips source compilation of Deploy=true
+    // resources. Persisted because the module is reopened from the
+    // database between here and Compile.
+    if '..ResourceReference.Module.Deployed {
+        set ..ResourceReference.Module.Deployed = 1
+        $$$ThrowOnError(..ResourceReference.Module.%Save())
+    }
+    if '$data($$$DeployedProjectInstalled(projectPath)) {
+        set sc = ##class(%Studio.Project).InstallFromFile(projectPath, "<none>")
+        if $$$ISERR(sc) {
+            set message = $$$FormatText("Failed to install deployed code from '%1'", projectPath)
+            $$$ThrowStatus($$$EMBEDSC($$$ERROR($$$GeneralError, message), sc))
+        }
+        set $$$DeployedProjectInstalled(projectPath) = ""
+    }
+    return 1
 }
 
 Method OnExportItem(
@@ -288,8 +304,7 @@ Method OnExportDeployedItem(
             // Only export deployed items if they are marked for deploy, we are in a non-developer-mode context
             quit
         }
-        set fileExt = $$$ucase($piece(pItemName, ".", *))
-        quit:'($listfind($listbuild("CLS","MAC","INT"), fileExt))
+        quit:'##class(%IPM.Utils.Module).IsDeployableType($piece(pItemName, ".", *))
         if $data(pParams($$$DeployedProjectIndex), deployedProject) {
             if tVerbose {
                 write !, $$$FormatText("Adding deployed item '%1' to project '%2'", pItemName, deployedProject.Name)
