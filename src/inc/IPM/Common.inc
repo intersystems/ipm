@@ -49,6 +49,9 @@ ROUTINE %IPM.Common [Type=INC]
 #; Log file tools
 #def1arg LogLine(%args) if ('##class(%IPM.General.LogManager).%Get().WriteLogLine(%args)) { do ##class(%IPM.General.LogManager).%Get().WriteLogLine("Error in writing to log manager", $$$Error) }
 
+#; Process-private state for the chained output-capture tee (see %IPM.General.LogManager)
+#define IPMLogCapture ^||%IPM.LogCapture
+
 #; System method/special variable wrappers
 #define InProgrammerMode ##class(%SYSTEM.Process).IsProgrammerMode()
 
