@@ -145,4 +145,34 @@ Method TestLoadSkipsUnsupportedFiles()
     kill ^IPMTest("UnsupportedFiles")
 }
 
+/// Export writes the item under the resource name, so a file holding a different class would package empty.
+Method TestLoadFailsOnMismatchedClassName()
+{
+    set moduleDir = ..GetModuleDir("mismatched-names", "class")
+    set sc = ##class(%IPM.Main).Shell("load " _ moduleDir)
+    do $$$AssertStatusNotOK(sc, "Load failed")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "MismatchTest.Bar", "Error names the class in the file: " _ $system.Status.GetErrorText(sc))
+    do ##class(%IPM.Storage.Module).Uninstall("mismatched-class", 1, 1)
+    do $system.OBJ.Delete("MismatchTest.Bar.cls", "-d")
+}
+
+/// The document name inside an XML export, not its file name, decides what gets imported.
+Method TestLoadFailsOnMismatchedDocumentName()
+{
+    set moduleDir = ..GetModuleDir("mismatched-names", "document")
+    set sc = ##class(%IPM.Main).Shell("load " _ moduleDir)
+    do $$$AssertStatusNotOK(sc, "Load failed")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "MismatchTest.Other.LOC", "Error names the document in the file: " _ $system.Status.GetErrorText(sc))
+    do ##class(%IPM.Storage.Module).Uninstall("mismatched-document", 1, 1)
+    do ##class(%RoutineMgr).Delete("MismatchTest.Other.LOC")
+}
+
+/// Load reports the names it imported as one comma-separated string, so a name containing a comma must still match.
+Method TestLoadAcceptsCommaInDocumentName()
+{
+    set moduleDir = ..GetModuleDir("comma-document-name")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("load " _ moduleDir), "Loaded module")
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("uninstall comma-document-name"), "Uninstalled module")
+}
+
 }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Document name="comma-document-name.ZPM"><Module>
+  <Name>comma-document-name</Name>
+  <Version>0.0.1</Version>
+  <Resources>
+    <Resource Name="CommaTest-Sales, Q1.dashboard.DFI"/>
+  </Resources>
+</Module>
+</Document></Export>
