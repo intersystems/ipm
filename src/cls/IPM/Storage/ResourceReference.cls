@@ -67,19 +67,27 @@ Method ProcessorGet() As %IPM.ResourceProcessor.Abstract
     if $isobject(r%Processor) {
         quit r%Processor
     }
-    set tProcessorClass = ..ProcessorClass
-    if (tProcessorClass '= "") && '$$$comClassDefined(tProcessorClass) && $$$comClassDefined($$$DefaultProcessorPackageDot_tProcessorClass) {
-        set tProcessorClass = $$$DefaultProcessorPackageDot_tProcessorClass
-    }
-    if (tProcessorClass = "") {
-        // Default class for resource extension
-        set tProcessorClass = ..Module.Lifecycle.GetDefaultResourceProcessor(..Name)
-    }
+    set tProcessorClass = ..ResolvedProcessorClass()
     if (tProcessorClass = "") || '$$$comClassDefined(tProcessorClass) {
         quit $$$NULLOREF
     }
     set r%Processor = $classmethod(tProcessorClass,"%New",$this)
     quit r%Processor
+}
+
+/// Returns the processor class the lifecycle uses for this resource, whether or not that class is defined.
+/// Returns "" when no processor applies, e.g. for a resource starting with / and no ProcessorClass.
+Method ResolvedProcessorClass() As %Dictionary.Classname
+{
+    set processorClass = ..ProcessorClass
+    if (processorClass '= "") && '$$$comClassDefined(processorClass) && $$$comClassDefined($$$DefaultProcessorPackageDot_processorClass) {
+        set processorClass = $$$DefaultProcessorPackageDot_processorClass
+    }
+    if (processorClass = "") {
+        // Default class for resource extension
+        set processorClass = ..Module.Lifecycle.GetDefaultResourceProcessor(..Name)
+    }
+    return processorClass
 }
 
 Method ProcessorClassGet() As %String
