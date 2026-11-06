@@ -1482,7 +1482,9 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
         set tPathSrc=##class(%File).NormalizeDirectory(tPath_"\"_tSrc)
         do ##class(%IPM.Storage.ModuleTemplate).ExportResources(tPathSrc,tExp)
     }
-    do tTemplate.ReadResources(tSrc)
+    set tests = "tests"
+    do ##class(%Library.Prompt).GetString("Enter module tests folder:", .tests)
+    do tTemplate.ReadResources(tSrc, tests)
 
     // web applications
     do ##class(%IPM.Storage.ModuleTemplate).GetCSPApplications(.apps)
@@ -1534,7 +1536,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
         do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps)
         for i=1:1:$listlength(tCSPapps) {
             set tCSPPath = ""
-            do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$listget(tCSPapps,i)_": ", .tCSPPath)
+            do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$listget(tCSPapps,i)_", relative to the module folder: ", .tCSPPath)
             if (tCSPPath'="") {
                 do tTemplate.SetSourcePathForCSPApp($listget(tCSPapps,i),tCSPPath)
             }

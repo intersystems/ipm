@@ -177,7 +177,8 @@ ClassMethod GetCSPApplications(
     return $$$OK
 }
 
-/// adds a web application to the temporary array of module resources
+/// Adds the named web applications (comma-separated, or * for all of them in the namespace) as WebApplication resources.
+/// <var>cspapps</var> returns the ones that serve files from a Path instead of having a dispatch class.
 Method AddWebApps(
 	pApps As %String,
 	Output cspapps As %List,
@@ -191,115 +192,60 @@ Method AddWebApps(
         set tAppList = $listfromstring(pApps,",")
     }
     set cspapps = ""
+    set cspDir = ##class(%File).NormalizeDirectory("csp", $system.Util.InstallDirectory())
 
     new $namespace
+    set $namespace = curns
+    set dbRole = ##class(%IPM.Utils.Module).GetDatabaseRole()
     set $namespace = "%SYS"
-    set (matchRoles,dispatchClass,autheEnabled,path)=""
-    for i=1:1:$listlength(tAppList) {
-        set app = ##class(Security.Applications).Get($listget(tAppList,i), .props)
-        if $$$ISOK(app) {
-            set tAppName = props("Name")
-            set matchRoles = props("MatchRoles")
-            set autheEnabled = props("AutheEnabled")
-            set dispatchClass = props("DispatchClass")
-            set path = props("Path")
-        } else {
-            set tAppName = $listget(tAppList,i)
-            set autheEnabled = $$$AutheCache
-        }
-        set ..TemplateResources(tAppName) = tAppName
-        set ..TemplateResources(tAppName, "Url") = tAppName
-        if matchRoles["%DB_"_curns {
-            set props("MatchRoles") = $replace(matchRoles,"%DB_"_curns,"{$dbrole}")
-        }
-        if (dispatchClass'="") {
-            set ..TemplateResources(tAppName,"DispatchClass") = dispatchClass
-        } else {
-            set tCSPDir = ##class(%File).NormalizeDirectory(##class(%File).ParentDirectoryName(##class(%File).ManagerDirectory())_"/csp")
-            set ..TemplateResources(tAppName,"Directory") = $replace(path,tCSPDir,"${cspdir}")
-            set cspapps = cspapps_$listbuild(tAppName)
-        }
-        if ( autheEnabled = $$$AutheCache ) {
-            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 0
-            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
-        } elseif ( autheEnabled = $$$AutheUnauthenticated ) {
-            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 1
-            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 0
-        } elseif ( autheEnabled = ($$$AutheCache + $$$AutheUnauthenticated) ) {
-            set ..TemplateResources(tAppName,"UnauthenticatedEnabled") = 1
-            set ..TemplateResources(tAppName,"PasswordAuthEnabled") = 1
-        } else {
-            set ..TemplateResources(tAppName,"AuthenticationMethods") = autheEnabled
-        }
 
-        // Map subscript of application properties to %Installer.CSPApplication properties
-        set tMap("AutoCompile") = "AutoCompile"
-        set tMap("AutoCompile","default") = 1
-        set tMap("Enabled") = "Enabled"
-        set tMap("Enabled","default") = 1
-        set tMap("ChangePasswordPage") = "ChangePasswordPage"
-        set tMap("ErrorPage") = "CustomErrorPage"
-        set tMap("SuperClass") = "DefaultSuperclass"
-        set tMap("Timeout") = "DefaultTimeout"
-        set tMap("Description") = "Description"
-        set tMap("EventClass") = "EventClass"
-        set tMap("MatchRoles") = "MatchRoles"
-        set tMap("GroupById") = "GroupById"
-        set tMap("InbndWebServicesEnabled") = "InboundWebServicesEnabled"
-        set tMap("InbndWebServicesEnabled","default") = 1
-        set tMap("IsNamespaceDefault") = "IsNamespaceDefault"
-        set tMap("IsNamespaceDefault","default") = 0
-        set tMap("LockCSPName") = "LockCSPName"
-        set tMap("LockCSPName","default") = 1
-        set tMap("LoginPage") = "LoginClass"
-        set tMap("Package") = "PackageName"
-        set tMap("CookiePath") = "CookiePath"
-        set tMap("UseCookies") = "UseSessionCookie"
-        set tMap("PermittedClasses") = "PermittedClasses"
-        set tMap("Recurse") = "Recurse"
-        set tMap("Recurse","default") = 0
-        set tMap("Resource") = "Resource"
-        set tMap("ServeFiles") = "ServeFiles"
-        set tMap("ServeFilesTimeout") = "ServeFilesTimeout"
-        set tMap("TwoFactorEnabled") = "TwoFactorEnabled"
-        set tMap("TwoFactorEnabled","default") = 0
-
-        set tAttr = ""
+    // WebApplication creates the app with Security.Applications defaults, so only values that differ need writing
+    set defaults = ##class(Security.Applications).%New()
+    // Name and NameSpace come from the install, Path is written only for CSP apps,
+    // and IsNameSpaceDefault would make the app its install namespace's default
+    set skipped = $listbuild("IsNameSpaceDefault", "Name", "NameSpace", "Path")
+    set appPointer = 0
+    while $listnext(tAppList, appPointer, appName) {
+        kill props
+        if $$$ISERR(##class(Security.Applications).Get(appName, .props)) {
+            kill props
+            set props("AutheEnabled") = $$$AutheCache
+        }
+        set ..TemplateResources(appName) = appName
+        set ..TemplateResources(appName, "ProcessorClass") = "WebApplication"
+        // Always written, even at its default, so readers of module.xml can see how the app authenticates
+        set ..TemplateResources(appName, "AutheEnabled") = $get(props("AutheEnabled"), defaults.AutheEnabled)
+        if $get(props("MatchRoles")) '= "" {
+            set props("MatchRoles") = $replace(props("MatchRoles"), dbRole, "{$globalsDbRole}")
+        }
+        if ($get(props("DispatchClass")) = "") && ($get(props("Path")) '= "") {
+            set ..TemplateResources(appName, "Path") = $replace(props("Path"), cspDir, "{$cspdir}")
+            set cspapps = cspapps_$listbuild(appName)
+        }
+        set property = ""
         for {
-            set tAttr = $order(tMap(tAttr))
-            quit:(tAttr="")
-            continue:('$data(props(tAttr)))
-            if (props(tAttr)'=$get(tMap(tAttr,"default"))) {
-                set ..TemplateResources(tAppName,$get(tMap(tAttr)))=props(tAttr)
+            set property = $order(props(property), 1, value)
+            quit:property=""
+            // Values already set, such as AutheEnabled and those from the CORS and JWT prompts, take precedence
+            continue:$listfind(skipped, property)||$data(..TemplateResources(appName, property))
+            if (value '= $property(defaults, property)) {
+                set ..TemplateResources(appName, property) = value
             }
         }
     }
     return $$$OK
 }
 
+/// Adds a FileCopy resource that deploys <var>pPath</var>, relative to the module root, to the Path of CSP application <var>pCSPApp</var>
 Method SetSourcePathForCSPApp(
 	pCSPApp,
 	pPath) As %Status
 {
-    set ..TemplateResources(pCSPApp,"Path") = pPath
-}
-
-Method DefineReminWebAppProps(ByRef props)
-{
-    //add cors origin details
-    set props("CorsAllowlist") = ""
-    set props("CorsCredentialsAllowed") = 0
-    // add cors headers
-    set props("CorsHeadersList") = ""
-    set props("DeepSeeEnabled") = 0
-    set props("JWTAuthEnabled") = 0
-    set props("JWTRefreshTokenTimeout") = 900
-    set props("JWTAccessTokenTimeout") = 60
-    set props("WSGIAppLocation") = ""
-    set props("WSGIAppName") = ""
-    set props("WSGICallable") = ""
-    set props("WSGIDebug") = ""
-    set props("WSGIType") = ""
+    set key = "files:"_pCSPApp
+    set ..TemplateResources(key) = ..RelativeFolder(pPath)_"/"
+    set ..TemplateResources(key, "ProcessorClass") = "FileCopy"
+    set ..TemplateResources(key, "Target") = $get(..TemplateResources(pCSPApp, "Path"))
+    return $$$OK
 }
 
 ClassMethod GetGlobalsList(Output globals As %List) As %Status
@@ -403,7 +349,7 @@ Method SetJWTProps(
     set ptr = 0
     while $listnext(appList, ptr, webpApp) {
         set ..TemplateResources(webpApp,"JWTAccessTokenTimeout") = jwt("JWTAccessTokenTO")
-        set ..TemplateResources(webpApp,"JWTAuthEnabled") = jwt("allowedHeaders")
+        set ..TemplateResources(webpApp,"JWTAuthEnabled") = jwt("enableJWT")
         set ..TemplateResources(webpApp,"JWTRefreshTokenTimeout") = jwt("JWTRefreshTokenTO")
     }
 }
@@ -439,21 +385,87 @@ ClassMethod NewTemplate(
     return tTemplate
 }
 
-Method ReadResources(pFolder) As %Status
+/// Adds the source files under <var>pFolder</var>, relative to the module folder, as resources, with one .PKG per directory
+/// and top-level package. Classes under <var>testsFolder</var>, if it exists, become UnitTest resources instead, e.g.
+/// <example language="xml"><UnitTest Name="/tests/unit_tests/" Package="MyApp.Test" Phase="test"/></example>
+Method ReadResources(
+	pFolder,
+	testsFolder As %String = "")
 {
-    set exts = $listbuild("cls","mac","inc","int")
-    if (($extract(pFolder,1)="/") || ($extract(pFolder,1)="\")) {
-        set pFolder = $extract(pFolder,2,*)
-    }
+    set pFolder = ..RelativeFolder(pFolder)
     set ..SourcesRoot = pFolder
-    set tSC = ..ReadFolder(..ModuleFolder_pFolder, .files)
-    return:$$$ISERR(tSC) tSC
+    set testsFolder = ..RelativeFolder(testsFolder)
+    set testsDir = $select(testsFolder="":"", 1:##class(%File).NormalizeDirectory(testsFolder, ..ModuleFolder))
+    do ..ReadItems(pFolder, .items, testsDir)
+    do ..GroupClasses(.items, .packages)
+    merge ..TemplateResources = items
+    do ..AddPackages(.packages)
+
+    if (testsDir '= "") && ##class(%File).DirectoryExists(testsDir) {
+        do ..ReadItems(testsFolder, .testItems)
+        do ..GroupClasses(.testItems, .testPackages)
+        do ..AddPackages(.testPackages, testsFolder)
+    }
+}
+
+/// Adds a resource for each package in <var>packages</var>, as grouped by <method>GroupClasses</method>.
+/// Each is a .PKG, or a UnitTest if the classes came from <var>testsFolder</var>.
+Method AddPackages(
+	ByRef packages,
+	testsFolder As %String = "")
+{
+    set directoryKey = ""
+    for {
+        set directoryKey = $order(packages(directoryKey))
+        quit:directoryKey=""
+        set directory = $extract(directoryKey, 2, *)
+        set topLevel = ""
+        for {
+            set topLevel = $order(packages(directoryKey, topLevel), 1, package)
+            quit:topLevel=""
+            if (testsFolder = "") {
+                set key = "pkg:"_directoryKey_":"_package
+                set ..TemplateResources(key) = package_".PKG"
+                if (directory '= "") {
+                    set ..TemplateResources(key, "Directory") = directory
+                }
+            } else {
+                set key = "test:"_directoryKey_":"_package
+                set ..TemplateResources(key) = "/"_..RelativeFolder(testsFolder_directoryKey)_"/"
+                set ..TemplateResources(key, "ProcessorClass") = "UnitTest"
+                set ..TemplateResources(key, "Package") = package
+                set ..TemplateResources(key, "Phase") = "test"
+            }
+        }
+    }
+}
+
+/// Returns <var>folder</var> with forward slashes and without leading or trailing ones, e.g. "\tests\" -> "tests"
+ClassMethod RelativeFolder(folder As %String) As %String
+{
+    return $zstrip($translate(folder, "\", "/"), "<>", "/")
+}
+
+/// Lists the ObjectScript source files under <var>folder</var>, relative to the module folder, skipping any under <var>excludeDir</var>.
+/// <var>items</var>(file) is the item the file holds, e.g. "MyApp.Util.Helper.cls", and <var>items</var>(file, "Directory") is
+/// the directory, relative to <var>folder</var>, that the item's package path starts in, e.g. "cls" for cls/MyApp/Util/Helper.cls.
+Method ReadItems(
+	folder As %String,
+	Output items,
+	excludeDir As %String = "")
+{
+    kill items
+    set exts = $listbuild("cls","mac","inc","int")
+    $$$ThrowOnError(..ReadFolder(..ModuleFolder_folder, .files))
     set tFile = ""
     for {
         set tFile = $order(files(tFile))
         quit:(tFile="")
         set tFileExt = $zconvert($piece( tFile, ".", * ),"l")
         if ('$listfind(exts,tFileExt)) {
+            continue
+        }
+        if (excludeDir '= "") && ($extract(tFile, 1, $length(excludeDir)) = excludeDir) {
             continue
         }
         set tSC = $system.OBJ.Load(tFile,"-d",,.tLoadedList,1)
@@ -463,43 +475,56 @@ Method ReadResources(pFolder) As %Status
         }
 
         set pDir = ""
-        for i=##class(%File).GetDirectoryLength(..ModuleFolder_pFolder)+1:1:##class(%File).GetDirectoryLength(##class(%File).GetDirectory(tFile))-$length(tLoadedList,".")+2 {
+        for i=##class(%File).GetDirectoryLength(..ModuleFolder_folder)+1:1:##class(%File).GetDirectoryLength(##class(%File).GetDirectory(tFile))-$length(tLoadedList,".")+2 {
             set pDir = pDir_"/"_##class(%File).GetDirectoryPiece(##class(%File).GetDirectory(tFile),i)
         }
         if (($extract(pDir,1)="/") || ($extract(pDir,1)="\")) {
             set pDir = $extract(pDir,2,*)
         }
-        set ..TemplateResources(tFile) = tLoadedList
+        set items(tFile) = tLoadedList
         if (pDir'="") {
-            set ..TemplateResources(tFile,"Directory") = pDir
+            set items(tFile,"Directory") = pDir
         }
     }
+}
 
-    // instead of classes individually use packages (.PKG)
-    set key = ""
-    kill resource
+/// Moves the classes out of <var>items</var>, as listed by <method>ReadItems</method>, into <var>packages</var>, which holds
+/// the deepest package that a directory's classes under one top-level package share:
+/// <var>packages</var>("/"_directory, topLevelPackage) = package. Classes without a package stay in <var>items</var>.
+ClassMethod GroupClasses(
+	ByRef items,
+	Output packages)
+{
+    kill packages
+    set file = ""
     for {
-        set key = $order(..TemplateResources(key))
-        quit:(key="")
-        if ( "cls" = $zconvert($piece( ..TemplateResources(key), ".", * ),"l") ) {
-            set pPath = ##class(%File).NormalizeDirectory(..ModuleFolder_pFolder)
-            set pPKGName = $piece( ..TemplateResources(key), ".", 1 )
-            if ( $data(resource(pPath_pPKGName)) && $get(resource(pPath_pPKGName, "Directory"))=$get(..TemplateResources(key,"Directory")) ) {
-                merge resource(key) = ..TemplateResources(key)
-            } else {
-                set resource(pPath_pPKGName) = pPKGName_".PKG"
-                if ($data(..TemplateResources(key,"Directory"))) {
-                    set resource(pPath_pPKGName, "Directory") = ..TemplateResources(key,"Directory")
-                }
-            }
-        } else {
-            merge resource(key) = ..TemplateResources(key)
+        set file = $order(items(file), 1, item)
+        quit:file=""
+        continue:$zconvert($piece(item, ".", *), "l")'="cls"
+        set package = $piece(item, ".", 1, *-2)
+        continue:package=""
+        // Prefix the directory so a class root at the folder itself ("") is still a valid subscript
+        set directoryKey = "/"_$get(items(file, "Directory"))
+        set topLevel = $piece(package, ".")
+        if $data(packages(directoryKey, topLevel), shared) {
+            set package = ..SharedPackage(shared, package)
         }
-
+        set packages(directoryKey, topLevel) = package
+        kill items(file)
     }
-    kill ..TemplateResources
-    merge ..TemplateResources = resource
-    return $$$OK
+}
+
+/// Returns the longest package that contains both <var>first</var> and <var>second</var>, e.g. "A.B.C" and "A.B.D" -> "A.B"
+ClassMethod SharedPackage(
+	first As %String,
+	second As %String) As %String
+{
+    set shared = ""
+    for i=1:1:$length(first, ".") {
+        quit:$piece(first, ".", i)'=$piece(second, ".", i)
+        set shared = $piece(first, ".", 1, i)
+    }
+    return shared
 }
 
 Method ProcessResources()
@@ -511,10 +536,12 @@ Method ProcessResources()
         quit:(key="")
         set resource = ##class(%IPM.Storage.ResourceReference).%New()
         set resource.Name = $get(resources(key),"resourceName")
+        set resource.ProcessorClass = $get(resources(key,"ProcessorClass"))
         set att = ""
         for {
             set att = $order(resources(key,att))
             quit:(att="")
+            continue:att="ProcessorClass"
             do resource.Attributes.SetAt($get(resources(key,att),"value"),att)
         }
         set resource.Module = $this
@@ -582,17 +609,17 @@ Method SetTemplateProps() As %Status
     set ..TemplateResources("gbl","Directory") = "gbl"
 
     set ..TemplateResources("test") = "/tests/unit_tests/"
+    set ..TemplateResources("test","ProcessorClass") = "UnitTest"
     set ..TemplateResources("test","Package") = "Test.Unit"
     set ..TemplateResources("test","Phase") = "test"
 
     // REST APP
     set ..TemplateResources("rest") = "/crud"
-    set ..TemplateResources("rest","Url") = "/crud"
+    set ..TemplateResources("rest","ProcessorClass") = "WebApplication"
     set ..TemplateResources("rest","CookiePath") = "/crud"
     set ..TemplateResources("rest","UseCookies") = 2
     set ..TemplateResources("rest","DispatchClass") = "Sample.REST"
-    set ..TemplateResources("rest","PasswordAuthEnabled") = 1
-    set ..TemplateResources("rest","UnauthenticatedEnabled") = 0
+    set ..TemplateResources("rest","AutheEnabled") = $$$AutheCache
     set ..TemplateResources("rest","Recurse") = 1
 
     //CORS
@@ -602,15 +629,18 @@ Method SetTemplateProps() As %Status
 
     // WEB APP
     set ..TemplateResources("web") = "/web"
-    set ..TemplateResources("web","Url") = "/web"
+    set ..TemplateResources("web","ProcessorClass") = "WebApplication"
     set ..TemplateResources("web","CookiePath") = "/web"
     set ..TemplateResources("web","UseCookies") = 2
-    set ..TemplateResources("web","PasswordAuthEnabled") = 1
-    set ..TemplateResources("web","UnauthenticatedEnabled") = 0
+    set ..TemplateResources("web","AutheEnabled") = $$$AutheCache
     set ..TemplateResources("web","Recurse") = 1
     set ..TemplateResources("web","ServeFiles") = 1
-    set ..TemplateResources("web","Directory") = "{$cspdir}myapp"
-    set ..TemplateResources("web","Path") = "/web"
+    set ..TemplateResources("web","Path") = "{$cspdir}myapp/"
+
+    // Static files for the WEB APP
+    set ..TemplateResources("webfiles") = "web/"
+    set ..TemplateResources("webfiles","ProcessorClass") = "FileCopy"
+    set ..TemplateResources("webfiles","Target") = "{$cspdir}myapp/"
 
     do ..ProcessResources()
 
@@ -674,11 +704,6 @@ XData XSLT
         </Document>
     </Export>
   </xsl:template>
-  <xsl:template match="Resource[@Url]">
-    <WebApplication>
-        <xsl:apply-templates select="@*[local-name() != 'Name']" />
-    </WebApplication>
-  </xsl:template>
   <xsl:template match="node()">
     <xsl:copy>
       <xsl:apply-templates select="@*|node()" />
@@ -686,9 +711,8 @@ XData XSLT
   </xsl:template>
   <xsl:template match="@*">
     <xsl:choose>
-        <xsl:when test="(name()='Directory') and (.!='') and ../@Url"><xsl:attribute name="DeployPath"><xsl:value-of select="." /></xsl:attribute></xsl:when>
+        <xsl:when test="name()='ProcessorClass'"></xsl:when>
         <xsl:when test="(name()='Directory') and (.='')"></xsl:when>
-         <xsl:when test="name()='Path'"><xsl:attribute name="SourcePath"><xsl:value-of select="." /></xsl:attribute></xsl:when>
         <xsl:otherwise><xsl:copy></xsl:copy></xsl:otherwise>
     </xsl:choose>
   </xsl:template>

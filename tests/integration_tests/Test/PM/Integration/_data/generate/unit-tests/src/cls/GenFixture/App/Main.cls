@@ -1,0 +1,4 @@
+Class GenFixture.App.Main
+{
+
+}
