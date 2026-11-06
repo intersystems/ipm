@@ -54,6 +54,7 @@ Method OnAfterPhase(
                         write !, $$$FormattedLine($$$Yellow, "WARNING: "_..InstallDirectory_" has contents which will be overwritten by this action.")
                     }
                 }
+                do ##class(%IPM.Utils.File).WarnIfInInstallDirectory(..InstallDirectory, ..ResourceReference)
                 // Copy contents over with pDeleteBeforeCopy = 1
                 if '##class(%File).CopyDir(downloadDirectory, ..InstallDirectory, 1, , 1) {
                     $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to copy to directory: "_..InstallDirectory))

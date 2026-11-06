@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes
 - #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
+- #1232: `FileCopy`, `CSPApplication`, and `ArtifactoryTarball` resources warn when they copy into the instance's install directory, which can be read-only, for example via `{$cspDir}` or `{$libDir}`. Instances whose install directory is also their data directory do not warn.
 
 ### Fixed
 - #1023: `test` on a module with a `Scope="test"` class no longer fails in Compile with "Class does not exist". The class loads and compiles in the Test phase, as with `test -only`.
