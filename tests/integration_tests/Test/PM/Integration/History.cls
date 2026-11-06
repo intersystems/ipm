@@ -247,10 +247,7 @@ Method TestInvalidHistoryCommands()
     do $$$AssertStatusNotOK(sc,"Invalid command: "_command)
 }
 
-/// Tests history logging behavior in dev mode vs non-dev mode.
-/// Verifies that:
-/// - Failed operations without -dev flag create uncommitted history entries (Committed=0)
-/// - Failed operations with -dev flag create committed history entries (Committed=1)
+/// Tests that a malformed module, which fails before anything is written, is never logged as committed, with or without -dev.
 Method TestDevMode()
 {
     set moduleDir = ..GetModuleDir("malformed-module")
@@ -281,7 +278,6 @@ Method TestDevMode()
     set sc = ##class(%IPM.Main).Shell("load -verbose -dev " _ moduleDir)
     do $$$AssertStatusNotOK(sc,"Malformed module not loaded")
 
-    // dev mode means it should be committed
     set rs = ##class(%IPM.General.History).GetHistory(.filter,,1)
     set count = 0
     while rs.%Next() {
@@ -295,12 +291,53 @@ Method TestDevMode()
         do $$$AssertTrue(rs.%Get("TimeStart") '= "")
         do $$$AssertTrue(rs.%Get("TimeEnd") '= "")
         do $$$AssertNotEquals(rs.%Get("Success"),1)
-        do $$$AssertEquals(rs.%Get("Committed"),1)
+        do $$$AssertEquals(rs.%Get("Committed"),0)
         do $$$AssertEquals(rs.%Get("CommandString"),"load -verbose -dev " _ moduleDir)
         do $$$AssertEquals(rs.%Get("SourceDetails"),"")
         do $$$AssertEquals(rs.%Get("SourceMoniker"),"")
         do $$$AssertEquals(rs.%Get("SourceName"),"")
     }
+}
+
+/// Tests that a -dev load rolled back before its first commit is logged as uncommitted.
+/// The downgrade check fails inside the transaction, before the module manifest is committed.
+Method TestDevModeRollbackNotCommitted()
+{
+    set sc = ##class(%IPM.Main).Shell("load " _ ..GetModuleDir(..#SimpleModuleName _ "/2.0.0"))
+    do $$$AssertStatusOK(sc, "Loaded 2.0.0")
+
+    set sc = ##class(%IPM.Main).Shell("load -dev " _ ..GetModuleDir(..#SimpleModuleName _ "/1.0.0"))
+    do $$$AssertStatusNotOK(sc, "Downgrade to 1.0.0 rejected")
+    do $$$AssertTrue($system.Status.GetErrorText(sc) [ "Cannot downgrade", "Rejected by the downgrade check")
+
+    do ..AssertLastFailureCommitted(0)
+}
+
+/// Tests that a -dev load failing after the module manifest is committed is logged as committed.
+Method TestDevModeFailureAfterCommit()
+{
+    set sc = ##class(%IPM.Main).Shell("load -dev " _ ..GetModuleDir("invoke/failure/NonStatusReturnCheckStatus"))
+    do $$$AssertStatusNotOK(sc, "Activate fails")
+
+    do ..AssertLastFailureCommitted(1)
+}
+
+/// Tests that a failed load without a transaction, whose partial changes are kept, is logged as committed.
+Method TestNoTransactionFailure()
+{
+    set sc = ##class(%IPM.Main).Shell("load " _ ..GetModuleDir("invoke/failure/NonStatusReturnCheckStatus") _ " -DNoTransaction=1")
+    do $$$AssertStatusNotOK(sc, "Activate fails")
+
+    do ..AssertLastFailureCommitted(1)
+}
+
+/// Asserts that the most recent history entry is a failure with the given Committed value.
+Method AssertLastFailureCommitted(expected As %Boolean)
+{
+    set rs = ##class(%IPM.General.History).GetHistory(,,1)
+    do $$$AssertTrue(rs.%Next(), "History entry found")
+    do $$$AssertNotEquals(rs.%Get("Success"), 1)
+    do $$$AssertEquals(rs.%Get("Committed"), expected)
 }
 
 /// Tests multi-namespace history tracking and management.

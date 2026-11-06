@@ -632,7 +632,7 @@ ClassMethod ExecutePhases(
                     if isSelfUninstall && $isobject(pLog) {
                         // Log the Clean phase completion and finalize now
                         do pLog.FinalizePhase(tOnePhase, $$$OK)
-                        set tSC = pLog.Finalize($$$OK, 0)
+                        set tSC = pLog.Finalize($$$OK)
                         $$$ThrowOnError(tSC)
                         // Explicitly persist to twin while History classes still exist
                         $$$ThrowOnError(pLog.PersistToTwin())
@@ -746,11 +746,10 @@ ClassMethod Uninstall(
     } catch e {
         set tSC = e.AsStatus()
     }
-	set devMode = $get(pParams("DeveloperMode", 0))
 	// Only finalize if log wasn't already finalized and deleted (e.g., during self-uninstall)
 	if $isobject(log) {
 		try {
-			set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+			set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
 		} catch {
 			// Skip if log was already deleted during self-uninstall
 		}
