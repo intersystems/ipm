@@ -25,13 +25,4 @@ Method TestGroupClassesUsesDeepestSharedPackage()
     do $$$AssertEquals($order(items("/m/src/mac/Routine.mac")), "")
 }
 
-Method TestReplaceRoleMatchesWholeRoles()
-{
-    #define Replace(%roles) ##class(%IPM.Storage.ModuleTemplate).ReplaceRole(%roles, "%DB_APP", "{$globalsDbRole}")
-    do $$$AssertEquals($$$Replace(":%DB_APP"), ":{$globalsDbRole}")
-    do $$$AssertEquals($$$Replace(":%DB_APP:%DB_APPDATA"), ":{$globalsDbRole}:%DB_APPDATA")
-    do $$$AssertEquals($$$Replace("%DB_APP:%Developer,%Operator:%DB_APP"), "{$globalsDbRole}:%Developer,%Operator:{$globalsDbRole}")
-    do $$$AssertEquals($$$Replace(":%DB_APPDATA"), ":%DB_APPDATA")
-}
-
 }

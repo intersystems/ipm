@@ -216,7 +216,7 @@ Method AddWebApps(
         // Always written, even at its default, so readers of module.xml can see how the app authenticates
         set ..TemplateResources(appName, "AutheEnabled") = $get(props("AutheEnabled"), defaults.AutheEnabled)
         if $get(props("MatchRoles")) '= "" {
-            set props("MatchRoles") = ..ReplaceRole(props("MatchRoles"), dbRole, "{$globalsDbRole}")
+            set props("MatchRoles") = $replace(props("MatchRoles"), dbRole, "{$globalsDbRole}")
         }
         if ($get(props("DispatchClass")) = "") && ($get(props("Path")) '= "") {
             set ..TemplateResources(appName, "Path") = $replace(props("Path"), cspDir, "{$cspdir}")
@@ -228,36 +228,12 @@ Method AddWebApps(
             quit:property=""
             // Values already set, such as AutheEnabled and those from the CORS and JWT prompts, take precedence
             continue:$listfind(skipped, property)||$data(..TemplateResources(appName, property))
-            set default = $property(defaults, property)
-            // List properties such as MatchRoles default to an empty collection
-            if $isobject(default) {
-                set default = ""
-            }
-            if (value '= default) {
+            if (value '= $property(defaults, property)) {
                 set ..TemplateResources(appName, property) = value
             }
         }
     }
     return $$$OK
-}
-
-/// Replaces each whole <var>role</var> in <var>matchRoles</var>, a Security.Applications MatchRoles value, e.g.
-/// <example>ReplaceRole(":%DB_APP:%DB_APPDATA", "%DB_APP", "{$globalsDbRole}") -> ":{$globalsDbRole}:%DB_APPDATA"</example>
-ClassMethod ReplaceRole(
-	matchRoles As %String,
-	role As %String,
-	replacement As %String) As %String
-{
-    for i=1:1:$length(matchRoles, ",") {
-        set entry = $piece(matchRoles, ",", i)
-        for j=1:1:$length(entry, ":") {
-            if ($piece(entry, ":", j) = role) {
-                set $piece(entry, ":", j) = replacement
-            }
-        }
-        set $piece(matchRoles, ",", i) = entry
-    }
-    return matchRoles
 }
 
 /// Adds a FileCopy resource that deploys <var>pPath</var>, relative to the module root, to the Path of CSP application <var>pCSPApp</var>
@@ -270,24 +246,6 @@ Method SetSourcePathForCSPApp(
     set ..TemplateResources(key, "ProcessorClass") = "FileCopy"
     set ..TemplateResources(key, "Target") = $get(..TemplateResources(pCSPApp, "Path"))
     return $$$OK
-}
-
-Method DefineReminWebAppProps(ByRef props)
-{
-    //add cors origin details
-    set props("CorsAllowlist") = ""
-    set props("CorsCredentialsAllowed") = 0
-    // add cors headers
-    set props("CorsHeadersList") = ""
-    set props("DeepSeeEnabled") = 0
-    set props("JWTAuthEnabled") = 0
-    set props("JWTRefreshTokenTimeout") = 900
-    set props("JWTAccessTokenTimeout") = 60
-    set props("WSGIAppLocation") = ""
-    set props("WSGIAppName") = ""
-    set props("WSGICallable") = ""
-    set props("WSGIDebug") = ""
-    set props("WSGIType") = ""
 }
 
 ClassMethod GetGlobalsList(Output globals As %List) As %Status
