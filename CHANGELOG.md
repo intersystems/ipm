@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes
 - #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
 - #1232: `FileCopy`, `CSPApplication`, and `ArtifactoryTarball` resources warn when they copy into the instance's install directory, which can be read-only, for example via `{$cspDir}` or `{$libDir}`. Instances whose install directory is also their data directory do not warn.
+- #150: `generate` asks for a tests folder (default `tests`) and adds a `UnitTest` resource for the test classes in it
 
 ### Fixed
 - #1023: `test` on a module with a `Scope="test"` class no longer fails in Compile with "Class does not exist". The class loads and compiles in the Test phase, as with `test -only`.
@@ -42,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1279: Loading a package installs its deployed code when the module sets `SourcesRoot` and every code resource is `Deploy="true"`
 - #1125: Loading a package installs `Deploy="true"` resources that packaging exports as source, such as include files, instead of skipping them
 - #1237: The `Committed` column of `history` now shows whether a failed `load`, `install` or `update` kept any changes. A `-dev` action rolled back before its first commit reads uncommitted, and one run with `-DNoTransaction=1` or `-DNoJournal=1` reads committed.
+- #806: Web applications in a module.xml from `generate` now load instead of failing with "The following invalid attributes were found". A CSP application's source files are deployed with a `FileCopy` resource, and enabling JWT no longer fails with `<UNDEFINED>`.
+- #503: `generate` names each package resource after the deepest package its classes share, such as `MyApp.Local.PKG` instead of `MyApp.PKG`
+- `generate` stops with an error when the source folder does not exist, instead of writing a module.xml with no code resources
 
 ## [0.10.10] - 2026-10-14
 
