@@ -2074,6 +2074,9 @@ ClassMethod EndCaptureOutput(
                 use $io::("")
             }
             kill $$$IPMLogCapture
+        } else {
+            // The chained log capture is still active, so hand output back to it
+            use $io::("^"_pCookie)
         }
     } elseif pCookie'="" {
         // Use the original redirected routine
