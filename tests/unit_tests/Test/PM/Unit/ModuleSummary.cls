@@ -177,7 +177,7 @@ Method TestUnresolvableProcessorIsOther()
 
 Method TestParseRequirements()
 {
-    set stream = ##class(%Stream.TmpCharacter).%New()
+    set stream = ##class(%Stream.FileCharacter).%New()
     do stream.Write("requests" _ $char(13, 10) _ $char(10) _ "# comment" _ $char(10) _ "  numpy>=1.26  " _ $char(13, 10) _ "--index-url https://example.com/simple" _ $char(10))
     set requirements = ##class(%IPM.General.ModuleSummary).ParseRequirements(stream)
     do $$$AssertEquals(requirements.%ToJSON(), ["requests","numpy>=1.26","--index-url https://example.com/simple"].%ToJSON())

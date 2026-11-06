@@ -8,14 +8,13 @@ Class %IPM.General.ModuleSummary
 /// moduleName may be the module's Name or ExternalName, in any case.
 ClassMethod Show(moduleName As %String)
 {
-    if ##class(%IPM.Storage.Module).NameExists(moduleName) {
-        set module = ##class(%IPM.Storage.Module).NameOpen(moduleName, , .sc)
-    } elseif ##class(%IPM.Storage.Module).ExternalNameExists(moduleName) {
-        set module = ##class(%IPM.Storage.Module).ExternalNameOpen(moduleName, , .sc)
-    } else {
+    set module = ##class(%IPM.Storage.Module).NameOpen(moduleName)
+    if '$isobject(module) {
+        set module = ##class(%IPM.Storage.Module).ExternalNameOpen(moduleName)
+    }
+    if '$isobject(module) {
         $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Module '%1' is not installed in namespace %2.", moduleName, $namespace)))
     }
-    $$$ThrowOnError(sc)
     set installedVersions = {}
     for i = 1:1:module.Dependencies.Count() {
         set dependency = module.Dependencies.GetAt(i)
@@ -186,18 +185,15 @@ ClassMethod GetInstalledStatus(
     return "installed " _ installedVersion
 }
 
-/// Returns the requirement lines of stream, skipping blank lines and # comments.
-ClassMethod ParseRequirements(stream As %Stream.Object) As %DynamicArray
+/// Returns the trimmed requirement lines of stream, skipping blank lines and # comments.
+/// %Stream.FileCharacter reads LF and CRLF files alike on any OS.
+ClassMethod ParseRequirements(stream As %Stream.FileCharacter) As %DynamicArray
 {
     set requirements = []
     do stream.Rewind()
-    set content = ""
     while 'stream.AtEnd {
-        set content = content _ stream.Read(32000)
-    }
-    set iterator = ..SplitLines(content).%GetIterator()
-    while iterator.%GetNext(, .line) {
-        if ($extract(line) '= "#") {
+        set line = $zstrip(stream.ReadLine(), "<>W")
+        if (line '= "") && ($extract(line) '= "#") {
             do requirements.%Push(line)
         }
     }
