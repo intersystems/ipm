@@ -6,6 +6,7 @@ Class Test.PM.Integration.RedirectToLog Extends Test.PM.Integration.Base
 
 Parameter NEEDSREGISTRY As BOOLEAN = 0;
 
+/// Class which uses $System methods to load another class
 Parameter LoadingClass = "Test.PM.Integration.Data.RedirectionToLog.LoadClasses";
 
 /// Fully-qualified name of the class the runner loads; its compile output names it on the device.
@@ -39,6 +40,7 @@ Method OnAfterOneTest(testname As %String) As %Status
     return $$$OK
 }
 
+/// Tests that an IRIS system call's output reaches the log only when it is wrapped in the chained capture.
 Method TestLoadLoggedOnlyWhenWrapped()
 {
     set dataDir = ..GetModuleDir("redirection-to-log")

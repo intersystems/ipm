@@ -315,7 +315,7 @@ ClassMethod BeginChainedCaptureToLog(writeToTerminal As %Boolean = 0) [ Procedur
     new priorIOHandler
 
     if $data($$$IPMLogCapture("active")) {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Chained log capture already active"))
+        Quit
     }
 
     // Record the previous redirect handler so that it can be restored once EndChainedCaptureToLog is called.
