@@ -2,78 +2,87 @@
 Class Test.PM.General.Utils
 {
 
+/// Imports the module manifest in the named XData block of this class and opens the resulting module.
+/// @Argument namespace	    Namespace containing the XData block.
+/// @Argument xDataName	    Name of the XData block holding the module manifest.
+/// @Argument module	    The imported module.
 ClassMethod ReadXDataToModule(
-	pNamespace As %String = {$namespace},
-	pXDataName As %String,
-	ByRef pModule As %IPM.Storage.Module) As %Status
+	namespace As %String = {$namespace},
+	xDataName As %String,
+	ByRef module As %IPM.Storage.Module) As %Status
 {
 	new $namespace
-	set tInitNS = $namespace
-	set tStatus = $$$OK
+	set initialNamespace = $namespace
+	set status = $$$OK
 	try {
-		set $namespace = pNamespace
-		set tXData = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||"_pXDataName,,.tStatus)
-		if $$$ISERR(tStatus) {
+		set $namespace = namespace
+		set xData = ##class(%Dictionary.XDataDefinition).%OpenId($classname()_"||"_xDataName,,.status)
+		if $$$ISERR(status) {
 			quit
 		}
 
 		// Find the module name by inspecting the XML prior to importing it as a document.
-		set tReader = ##class(%XML.Reader).%New()
-		set tSC = tReader.OpenStream(tXData.Data)
-		if $$$ISERR(tSC) {
+		set reader = ##class(%XML.Reader).%New()
+		set sc = reader.OpenStream(xData.Data)
+		if $$$ISERR(sc) {
 			quit
 		}
 
-		do tReader.Correlate("Module","%IPM.Storage.Module")
-		do tReader.Next(.tModule,.tSC)
-		set tName = tModule.Name_".ZPM"
-		do tXData.Data.Rewind()
+		do reader.Correlate("Module","%IPM.Storage.Module")
+		do reader.Next(.parsedModule,.sc)
+		set documentName = parsedModule.Name_".ZPM"
+		do xData.Data.Rewind()
 
-		set $namespace = tInitNS
+		set $namespace = initialNamespace
 
-		set tStatus = ##class(%IPM.StudioDocument.Module).ImportStream(.tName,tXData.Data)
-		if $$$ISERR(tStatus) {
+		set status = ##class(%IPM.StudioDocument.Module).ImportStream(.documentName,xData.Data)
+		if $$$ISERR(status) {
 			quit
 		}
 
-		set pModule = ##class(%IPM.Storage.Module).NameOpen($piece(tName,".",1,*-1),,.tStatus)
-		if $$$ISERR(tStatus) {
+		set module = ##class(%IPM.Storage.Module).NameOpen($piece(documentName,".",1,*-1),,.status)
+		if $$$ISERR(status) {
 			quit
 		}
-	} catch e {
-		set tStatus = e.AsStatus()
+	} catch ex {
+		set status = ex.AsStatus()
 	}
-	quit tStatus
+	quit status
 }
 
+/// Returns the normalized path to a test data directory under `_data`.
+/// @Argument subfolders	Subdirectory names to append under `_data`.
 ClassMethod GetModuleDir(subfolders... As %String) As %String
 {
-  set tTestRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
-  set tTestRoot = ##class(%File).GetDirectory(tTestRoot)
-  set tModuleDir = ##class(%File).Construct(tTestRoot, "_data", subfolders...)
-  set tModuleDir = ##class(%File).NormalizeDirectory(tModuleDir)
-  quit tModuleDir
+  set testRoot = ##class(%File).NormalizeDirectory($get(^UnitTestRoot))
+  set testRoot = ##class(%File).GetDirectory(testRoot)
+  set moduleDir = ##class(%File).Construct(testRoot, "_data", subfolders...)
+  set moduleDir = ##class(%File).NormalizeDirectory(moduleDir)
+  quit moduleDir
 }
 
-/// Returns whether a substring is found in any element of a multi-dimensional array
+/// Returns whether a substring is found in any element of a multi-dimensional array.
+/// @Argument string	Substring to search for.
+/// @Argument array	    Multidimensional array whose top-level elements are searched.
 ClassMethod FindStringInMultiDimArray(
-	pString As %String,
-	ByRef pArray) As %Boolean
+	string As %String,
+	ByRef array) As %Boolean
 {
-	set sub = ""
+	set subscript = ""
 	for {
-		set sub = $order(pArray(sub), 1, element)
-		if sub = "" {
+		set subscript = $order(array(subscript), 1, element)
+		if subscript = "" {
 			quit
 		}
-		if element [ pString {
+		if element [ string {
 			return 1
 		}
 	}
 	return 0
 }
 
-/// Returns true if any configured repository offers the named module
+/// Returns whether any configured repository has the named module.
+/// @Argument moduleName	Name of the module to look up.
 ClassMethod ModuleAvailableInRepositories(moduleName As %String) As %Boolean
 {
 	set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
@@ -86,6 +95,8 @@ ClassMethod ModuleAvailableInRepositories(moduleName As %String) As %Boolean
 }
 
 /// Returns whether <var>string</var> appears on any line of the file at <var>filePath</var>.
+/// @Argument filePath	Path of the file to read.
+/// @Argument string	Substring to search for.
 ClassMethod FileContains(
 	filePath As %String,
 	string As %String) As %Boolean
@@ -100,23 +111,25 @@ ClassMethod FileContains(
 	return 0
 }
 
-ClassMethod HttpGet(pPath As %String = "/") As %Status
+/// Sends a GET request to the local web server and returns an error unless the response is HTTP 200.
+/// @Argument path	GET endpoint path (relative to the web server URL prefix).
+ClassMethod HttpGet(path As %String = "/") As %Status
 {
 	new $namespace
 	set $namespace = "%SYS"
 
-	set tSC = ##class(Config.Startup).Get(.props)
-	if $$$ISERR(tSC) {
-		quit tSC
+	set sc = ##class(Config.Startup).Get(.props)
+	if $$$ISERR(sc) {
+		quit sc
 	}
 
 	set request = ##class(%Net.HttpRequest).%New()
 	set request.Server = "127.0.0.1"
 	set request.Port = props("WebServerPort")
-	set path = props("WebServerURLPrefix") _ "/" _ pPath
-	set tSC = request.Get(path)
-	if $$$ISERR(tSC) {
-		quit tSC
+	set fullPath = props("WebServerURLPrefix") _ "/" _ path
+	set sc = request.Get(fullPath)
+	if $$$ISERR(sc) {
+		quit sc
 	}
 	if (request.HttpResponse.StatusCode '= 200) {
 		quit $$$ERROR($$$GeneralError, "HTTP Status: "_request.HttpResponse.StatusCode_$char(13,10)_request.HttpResponse.Data.Read())
