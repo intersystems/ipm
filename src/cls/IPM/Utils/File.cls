@@ -74,11 +74,13 @@ ClassMethod DatabaseDirectories() As %List [ Internal ]
     return dirs
 }
 
+/// Normalizes path as a directory so that a prefix match only matches whole path segments.
 /// Lowercases on every platform because Windows and macOS file systems are case-insensitive by default.
-/// On a case-sensitive file system this can only protect too much, which keeps files rather than deleting them.
-ClassMethod NormalizeForComparison(dir As %String) As %String [ Private ]
+/// On a case-sensitive file system a prefix match can then only match too much, which keeps files
+/// rather than deleting them or writes an extra warning.
+ClassMethod NormalizeForComparison(path As %String) As %String [ Private ]
 {
-    return $zconvert(##class(%Library.File).NormalizeDirectory(dir), "L")
+    return $zconvert(##class(%Library.File).NormalizeDirectory(path), "L")
 }
 
 ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
@@ -405,14 +407,6 @@ ClassMethod WarnIfInInstallDirectory(
     }
     set message = "WARNING: "_resource.Module.Name_" resource "_resource.Name_" copies to "_target_", which is in the install directory and can be read-only."
     write !, $$$FormattedLine($$$Yellow, message)
-}
-
-/// Normalizes path as a directory so that a prefix match only matches whole path segments.
-/// Windows paths are case-insensitive, so they are lowercased.
-ClassMethod NormalizeForComparison(path As %String) As %String [ Private ]
-{
-    set path = ##class(%File).NormalizeDirectory(path)
-    return $select($$$isWINDOWS: $zconvert(path, "L"), 1: path)
 }
 
 }
