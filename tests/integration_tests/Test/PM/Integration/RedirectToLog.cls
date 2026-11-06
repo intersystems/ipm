@@ -140,7 +140,7 @@ Method TestCommandErrorRestoresRedirection()
     do $$$AssertEquals(finalRedirect, originalRedirect, "Redirection state WAS restored after the failed command")
     set finalHandler = $select(finalRedirect : $zutil(96, 12), 1 : "")
     do $$$AssertEquals(finalHandler, originalHandler, "Original I/O handler WAS restored after the failed command")
-    do $$$AssertNotTrue($data($$$IPMLogCapture), "Chained capture state WAS cleared after the failed command")
+    do $$$AssertNotTrue($data($$$IPMLogCapture("active")), "Chained capture state WAS cleared after the failed command")
 
     // Clean up
     do ##class(%IPM.Main).Shell("uninstall redirect-error-module -r")

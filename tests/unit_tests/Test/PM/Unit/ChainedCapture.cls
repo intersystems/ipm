@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 /// Unit tests for the chained redirected output capture methods in <class>%IPM.General.LogManager</class>:
 /// it must route each captured line into the log while forwarding it live down the redirect
 /// chain, and it must coexist with an already-active <class>%IPM.Utils.Module</class> capture.
@@ -57,26 +59,30 @@ Method TestNonVerboseChainedCapture()
     do $$$AssertNotTrue(..FileContains(txtPath, "Inner only line"), "Inner-captured line was NOT double-routed into the log")
 }
 
-/// A second BeginChainedCaptureToLog while one is active must be rejected, not silently clobber state.
+/// A second, nested BeginChainedCaptureToLog should not have any effect on redirection.
 Method TestNonReentrant()
 {
-    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
-    try {
-        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
-    } catch ex {
-        do $$$AssertSuccess("Second chained capture WAS rejected while one is active")
-    }
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(0)
+    set writeToTerminal = $get($$$IPMLogCapture("writeToTerminal"))
     do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+    do $$$AssertEquals(writeToTerminal, 1, "Nested chained capture did NOT overwrite writeToTerminal")
 }
 
-/// Ending the tee while a Module capture sits on top of it must not drop that capture, and once
-/// the tee's state is gone its reinstalled labels must not log stray lines.
+/// Ending the chained log capture while a non-chained capture sits on top of it must not drop that capture, and once
+/// the chained log capture's state is gone its reinstalled labels must not log any more lines.
 Method TestEndWithHandlerOnTop()
 {
     set log = ##class(%IPM.General.LogManager).%Get(.sc)
     $$$ThrowOnError(sc)
     do ..InitLog(log)
     set txtPath = log.TxtFilePath
+
+    if ##class(%Device).ReDirectIO() {
+        set originalIOHandler = $zutil(96,12)
+    } else {
+        set originalIOHandler = ""
+    }
 
     do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog()
     write "Tee line",!
@@ -87,6 +93,14 @@ Method TestEndWithHandlerOnTop()
     write "After tee end",!
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .inner)
     do log.Finalize()
+
+    if ##class(%Device).ReDirectIO() {
+        set finalIOHandler = $zutil(96,12)
+    } else {
+        set finalIOHandler = ""
+    }
+
+    do $$$AssertEquals(finalIOHandler, originalIOHandler, "Original I/O handler WAS restored after the tee ended")
 
     do $$$AssertTrue(..FindStringInMultiDimArray("After tee end", .inner), "Module capture survived the tee teardown")
     do $$$AssertTrue(..FileContains(txtPath, "Tee line"), "Line written before teardown WAS logged")
