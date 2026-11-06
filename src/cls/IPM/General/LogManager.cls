@@ -178,8 +178,12 @@ Method WriteLogLine(
     }
     catch ex
     {
+        set fullSc = ex.AsStatus()
         set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
-        return ex.AsStatus()
+        If $$$ISERR(sc) {
+            set fullSc = $System.Status.AppendStatus(fullSc,sc)
+        }
+        return fullSc
     }
 }
 
@@ -196,8 +200,12 @@ Method Finalize() As %Status
         }
     }
     catch ex {
+        set fullSc = ex.AsStatus()
         set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
-        return ex.AsStatus()
+        If $$$ISERR(sc) {
+            set fullSc = $System.Status.AppendStatus(fullSc,sc)
+        }
+        return fullSc
     }
     return sc
 }
