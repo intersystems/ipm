@@ -814,7 +814,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<parameter name="argument" required="false" description="Argument for `details` command" />
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
 	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
-	<example description="Show history of all packages in the current namespace where the command has been committed `to disk`. Note that committed != successful, as all actions in dev mode will be committed regardless of success.">history find -DCommitted=1</example>
+	<example description="Show history of all packages in the current namespace where the command has been committed `to disk`. Committed is not the same as successful, because a failed action can keep changes, for example in dev mode or without a transaction.">history find -DCommitted=1</example>
 	<example description="Show history of all packages in the current namespace where the command has errored">history find -DSucess="0*"</example>
 	<example description="Show history of all packages in the current namespace where start time is later than 2000-01-01 00:00:00">history find -DTimeStart=">2000-01-01 00:00:00"</example>
 	<example description="Show 5 history records in the current namespace in ascending order">history find -sort asc -limit 5</example>
@@ -2398,7 +2398,6 @@ ClassMethod Load(
 	ByRef pCommandInfo,
 	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
 {
-	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
     if pLog = "" {
 	    set log = ##class(%IPM.General.HistoryTemp).LoadInit("")
     } else {
@@ -2407,10 +2406,10 @@ ClassMethod Load(
 	try {
 		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
-		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
+		$$$ThrowOnError(log.Finalize(Ex.AsStatus()))
 		throw Ex
 	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+	$$$ThrowOnError(log.Finalize($$$OK))
 }
 
 ClassMethod ExecuteCOS(ByRef commandInfo)
@@ -2647,10 +2646,10 @@ ClassMethod Install(
             }
         }
     } catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+		$$$ThrowOnError(log.Finalize(ex.AsStatus()))
 		throw ex
 	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+	$$$ThrowOnError(log.Finalize($$$OK))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]

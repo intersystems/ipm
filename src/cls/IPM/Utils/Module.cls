@@ -205,12 +205,7 @@ ClassMethod LoadModuleReference(
         }
     }
     if $isobject($get(log)) && (prelogged=0) {
-		if $data(tDeveloperMode) # 2 {
-			set devMode = $get(tDeveloperMode, 0)
-		} else {
-			set devMode = $get(pParams("DeveloperMode"), 0)
-		}
-		set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+		set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
 	}
     quit tSC
 }
@@ -1227,6 +1222,11 @@ ClassMethod LoadNewModule(
             }
         }
 
+        // Without a transaction, everything written from here on is kept even if the load fails.
+        if 'tUseTransactions && $isobject(pLog) {
+            do pLog.SetCommitted()
+        }
+
         // Mark relevant resources for update
         if (commandLineModuleName '= "") && ($get(params("cmd")) = "update") {
             set tSC = moduleCurrent.GetResolvedReferences(.resourceArray, 1)
@@ -1309,6 +1309,9 @@ ClassMethod LoadNewModule(
         if (tDeveloperMode && tUseTransactions) {
             // In developer mode, save the module manifest so we can fix it even if errors occur afterward.
             tcommit
+            if $isobject(pLog) {
+                do pLog.SetCommitted()
+            }
 
             // Nested transactions in underlying calls to LoadNewModule during the dependency resolution process may be rolled back at the end of this method.
             // To debug a dependency, that module itself should be loaded in "developer mode"
@@ -1343,6 +1346,9 @@ ClassMethod LoadNewModule(
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions {
             tcommit
+            if $isobject(pLog) {
+                do pLog.SetCommitted()
+            }
         }
         $$$ThrowOnError(tSC)
         do tModule.WriteAfterInstallMessage()
