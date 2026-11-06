@@ -201,7 +201,9 @@ Method AddWebApps(
 
     // WebApplication creates the app with Security.Applications defaults, so only values that differ need writing
     set defaults = ##class(Security.Applications).%New()
-    set properties = $listbuild("AutoCompile", "ChangePasswordPage", "CookiePath", "Description", "DispatchClass", "Enabled", "ErrorPage", "EventClass", "GroupById", "InbndWebServicesEnabled", "LockCSPName", "LoginPage", "MatchRoles", "Package", "PermittedClasses", "Recurse", "Resource", "ServeFiles", "ServeFilesTimeout", "SuperClass", "Timeout", "TwoFactorEnabled", "UseCookies")
+    // Name and NameSpace come from the install, Path is written only for CSP apps,
+    // and IsNameSpaceDefault would make the app its install namespace's default
+    set skipped = $listbuild("IsNameSpaceDefault", "Name", "NameSpace", "Path")
     set appPointer = 0
     while $listnext(tAppList, appPointer, appName) {
         kill props
@@ -220,9 +222,18 @@ Method AddWebApps(
             set ..TemplateResources(appName, "Path") = $replace(props("Path"), cspDir, "{$cspdir}")
             set cspapps = cspapps_$listbuild(appName)
         }
-        set propertyPointer = 0
-        while $listnext(properties, propertyPointer, property) {
-            if $data(props(property), value) && (value '= $property(defaults, property)) {
+        set property = ""
+        for {
+            set property = $order(props(property), 1, value)
+            quit:property=""
+            // Values already set, such as AutheEnabled and those from the CORS and JWT prompts, take precedence
+            continue:$listfind(skipped, property)||$data(..TemplateResources(appName, property))
+            set default = $property(defaults, property)
+            // List properties such as MatchRoles default to an empty collection
+            if $isobject(default) {
+                set default = ""
+            }
+            if (value '= default) {
                 set ..TemplateResources(appName, property) = value
             }
         }

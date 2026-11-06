@@ -86,6 +86,7 @@ Method TestWebApplicationsLoad()
     set csp("Path") = ..CSPAppDirectory()
     set csp("AutheEnabled") = $$$AutheUnauthenticated
     set csp("MatchRoles") = matchRoles
+    set csp("DeepSeeEnabled") = 1
     do ..CreateWebApp(..#RestApp, .rest)
     do ..CreateWebApp(..#CSPApp, .csp)
 
@@ -119,6 +120,7 @@ Method TestWebApplicationsLoad()
     do $$$AssertEquals($get(cspProps("Path")), ..CSPAppDirectory())
     do $$$AssertEquals($get(cspProps("AutheEnabled")), $$$AutheUnauthenticated)
     do $$$AssertEquals($get(cspProps("MatchRoles")), matchRoles)
+    do $$$AssertEquals($get(cspProps("DeepSeeEnabled")), 1)
     set $namespace = namespace
     do $$$AssertTrue(##class(%File).Exists(##class(%File).NormalizeFilename("index.html", ..CSPAppDirectory())), "CSP source files were copied to the app's path")
 }
