@@ -120,6 +120,8 @@ Method TestErrorLoggedAndEchoed()
     do log.Finalize()
     do $$$AssertTrue(..FileContains(txtPath, "ERROR"), "Redirected compilation error WAS logged")
     do $$$AssertTrue(..FindStringInMultiDimArray("ERROR", .terminal), "Redirected compilation error WAS echoed to the terminal")
+    do $$$AssertTrue(..FileContains(txtPath, ..#ErrorTargetClass), "Class with compilation errors WAS logged")
+    do $$$AssertTrue(..FindStringInMultiDimArray(..#ErrorTargetClass, .terminal), "Class with compilation errors WAS echoed to the terminal")
 }
 
 /// When an IPM command throws from an erroring IRIS system call wrapped in the chained capture tee,
