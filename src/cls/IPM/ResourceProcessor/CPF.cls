@@ -75,8 +75,7 @@ Method OnResolveChildren(
     if (key = "") {
         quit $$$ERROR($$$GeneralError, "Empty resource array for CPF resource processor: " _ ..Name)
     }
-    set sourcesRoot = ..ResourceReference.Module.SourcesRoot
-    set pResourceArray(key, "RelativePath") = ##class(%File).Construct(sourcesRoot, ..Directory, ..Name)
+    set pResourceArray(key, "RelativePath") = ..GetRelativePath()
     quit $$$OK
 }
 
@@ -121,6 +120,27 @@ Method GetSourceFile() As %String [ Private ]
         $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("CPF file '%1' not found in directory '%2'", ..Name, dir)))
     }
     return filename
+}
+
+/// Returns the CPF file's path relative to the module root.
+Method GetRelativePath() As %String [ Private ]
+{
+    return ##class(%File).Construct(..ResourceReference.Module.SourcesRoot, ..Directory, ..Name)
+}
+
+Method OnStageForDatabasePackage(
+	targetDir As %String,
+	ByRef params) As %Status
+{
+    set sc = $$$OK
+    try {
+        set relativePath = ..GetRelativePath()
+        set sourcePath = ##class(%File).NormalizeFilename(##class(%File).Construct(..ResourceReference.Module.Root, relativePath))
+        do ##class(%IPM.Utils.File).StageResourceFile(..ResourceReference.Name, sourcePath, ##class(%File).Construct(targetDir, relativePath))
+    } catch ex {
+        set sc = ex.AsStatus()
+    }
+    quit sc
 }
 
 Method DoMerge(ByRef pParams) As %Status

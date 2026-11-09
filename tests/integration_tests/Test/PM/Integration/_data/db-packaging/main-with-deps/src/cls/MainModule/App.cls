@@ -1,0 +1,4 @@
+Class MainModule.App
+{
+
+}

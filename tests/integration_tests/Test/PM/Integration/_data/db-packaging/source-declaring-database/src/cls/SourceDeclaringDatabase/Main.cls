@@ -1,0 +1,4 @@
+Class SourceDeclaringDatabase.Main
+{
+
+}

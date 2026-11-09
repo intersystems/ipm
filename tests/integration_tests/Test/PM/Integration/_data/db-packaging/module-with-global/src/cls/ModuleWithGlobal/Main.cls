@@ -1,0 +1,4 @@
+Class ModuleWithGlobal.Main
+{
+
+}

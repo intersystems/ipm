@@ -13,7 +13,7 @@ Method TestBatchActivationUnmapSingleNamespace()
     set ns = "TEST_UNMAP_NS"
 
     // Create test namespace using utility
-    set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns)
+    set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns, 0)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
     // Add a test package mapping
@@ -60,7 +60,7 @@ Method TestBatchActivationUnmapMultipleNamespaces()
 
     for i=1:1:$listlength(namespaces) {
         set ns = $listget(namespaces, i)
-        set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns)
+        set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns, 0)
         do $$$AssertStatusOK(sc, "Created namespace: " _ ns)
 
         // Add test mappings to each namespace
@@ -107,7 +107,7 @@ Method TestBatchActivationSkipsWhenNoChanges()
     do $$$AssertStatusOK(sc, "Loaded cpf-merge module successfully")
 
     set ns = "TEST_NO_CHANGE_NS"
-    set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns)
+    set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns, 0)
     do $$$AssertStatusOK(sc, "Created test namespace")
 
     // First, add a test mapping so we have something to unmap
@@ -139,7 +139,7 @@ Method TestEnableMapSingleNamespace()
     set targetNs = "TEST_ENABLE_MAP_NS1"
 
     // Ensure target namespace exists
-    set sc = ##class(%IPM.Test.Utils).CreateNamespace(targetNs)
+    set sc = ##class(%IPM.Test.Utils).CreateNamespace(targetNs, 0)
     do $$$AssertStatusOK(sc, "Created target namespace")
 
     // Map IPM from current namespace into target namespace (quiet mode)
@@ -169,9 +169,9 @@ Method TestEnableMapMultipleNamespacesWithRepos()
     set ns2 = "TEST_ENABLE_MAP_NS3"
 
     // Create target namespaces
-    set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns1)
+    set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns1, 0)
     do $$$AssertStatusOK(sc, "Created namespace " _ ns1)
-    set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns2)
+    set sc = ##class(%IPM.Test.Utils).CreateNamespace(ns2, 0)
     do $$$AssertStatusOK(sc, "Created namespace " _ ns2)
 
     // Map IPM and repos from current namespace into both targets

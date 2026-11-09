@@ -554,6 +554,7 @@ ClassMethod ExecutePhases(
                 set tOnePhase = tNormalizedPhaseName
             }
             set tStart = $zhorolog
+            // Refresh checkpoint, not a real phase (see %IPM.DataType.PhaseName).
             if tOnePhase="*" {
                 kill tModule,tLifecycle
                 set tModule = ..NameOpen(pModuleName,,.tSC)
@@ -1168,6 +1169,9 @@ Method ProcessSingleDependencyIterative(
         set searchCriteria.Name = pDep.Name
         set searchExprStr = searchExpr.ToResolvedString()
         set searchCriteria.VersionExpression = searchExprStr
+        // Dependencies are always resolved as source packages regardless of top-level -swap-db.
+        // A database-packaged module already includes its dependencies in the tgz.
+        set searchCriteria.Packaging = "source"
         if searchExprStr = "" {
             set searchExprStr = "*"
         }
@@ -1297,6 +1301,10 @@ Method ProcessSingleDependencyIterative(
 }
 
 /// Retrieves all known dependencies for a module, including transitive dependencies.
+/// Takes a name and queries stored dependency rows, so it works without opening the module and the
+/// returned list includes pModuleName itself. Callers use it only as a membership test.
+/// Use <method>GetDependencyNames</method> instead when you need the dependencies of a module you
+/// already have open, without the module itself, in dependency order.
 ClassMethod GetKnownDependencies(pModuleName As %String) As %List
 {
     set tStatement = ##class(%SQL.Statement).%New()
@@ -1338,6 +1346,37 @@ ClassMethod GetKnownDependencies(pModuleName As %String) As %List
         set tSearchList = tNewSearchList
     }
     quit tKnownDependencyList
+}
+
+/// Returns installed transitive dependencies as %IPM.Storage.Module objects, dependencies before
+/// dependents, excluding this module. Uninstalled dependencies are omitted rather than reported: a
+/// module with no local record has nothing to inspect.
+Method GetDependencyModules() As %ListOfObjects(ELEMENTTYPE="%IPM.Storage.Module")
+{
+    set names = ..GetDependencyNames()
+    set deps = ##class(%ListOfObjects).%New()
+    set ptr = 0
+    while $listnext(names, ptr, name) {
+        set depModule = ..NameOpen(name, , .sc)
+        $$$ThrowOnError(sc)
+        do deps.Insert(depModule)
+    }
+    quit deps
+}
+
+/// Returns the installed transitive dependency names, dependencies before dependents, excluding
+/// this module. Resolves from local records only.
+/// See <method>GetKnownDependencies</method> for the name-only, self-inclusive variant.
+Method GetDependencyNames() As %List
+{
+    do ##class(%IPM.Utils.Module).BuildInstalledDependencyGraph($this, .dependencyGraph)
+    do ##class(%IPM.Utils.Module).ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
+    set flatDepList = ##class(%IPM.Utils.Module).GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
+    set names = ""
+    for i = 1:1:flatDepList.Count() {
+        set names = names _ $listbuild(flatDepList.GetAt(i).Name)
+    }
+    quit names
 }
 
 /// Builds a module's immediate dependency graph and array of resources.<br />
@@ -1524,11 +1563,24 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
             if (..Packaging = "") {
                 set ..Packaging = tPackaging
             } elseif (..Packaging '= tPackaging) {
-                set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
-                quit
+                // A declared lifecycle class wins. Only the default is derived from Packaging.
+                set tDerived = ""
+                if (..LifecycleClass = ($$$DefaultLifecyclePackageDot _ "Module")) {
+                    set tSC = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(..Packaging, .tDerived)
+                    quit:$$$ISERR(tSC)
+                }
+                if (tDerived = "") {
+                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
+                    quit
+                }
+                set ..LifecycleClass = tDerived
             }
         } elseif (..LifecycleClass = "") && (..Packaging '= "") {
-              set ..LifecycleClass = $case(..Packaging,"application": "Application", : "Module")
+            // Derive lifecycle from packaging; fall back to the generic Module lifecycle
+            // for "module" and any packaging with no dedicated lifecycle class.
+            set tSC = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(..Packaging, .tDerived)
+            quit:$$$ISERR(tSC)
+            set ..LifecycleClass = $select(tDerived '= "": tDerived, 1: $$$DefaultLifecyclePackageDot _ "Module")
         } elseif (..Packaging = "") {
             // Default to "module"
             set ..Packaging = "module"

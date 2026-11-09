@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
 - #1232: `FileCopy`, `CSPApplication`, and `ArtifactoryTarball` resources warn when they copy into the instance's install directory, which can be read-only, for example via `{$cspDir}` or `{$libDir}`. Instances whose install directory is also their data directory do not warn.
 - #150: `generate` asks for a tests folder (default `tests`) and adds a `UnitTest` resource for the test classes in it
+- #986: Database packaging: new `package-database` and `publish-database` commands create a package from a copy of the namespace's routines database, which installs via swapping of the routines database rather than compilation of source files. The module and its dependencies must be loaded into the namespace before packaging. Pass `-include-tests` to include test resources (`Scope="test"` or `Scope="verify"`), which are excluded by default.
 
 ### Fixed
 - #1023: `test` on a module with a `Scope="test"` class no longer fails in Compile with "Class does not exist". The class loads and compiles in the Test phase, as with `test -only`.
