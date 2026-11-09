@@ -361,7 +361,7 @@ ClassMethod GetModuleObjectFromString(
 
 /// Returns a semantic version expression capturing all version requirements for a given module name in the current namespace.
 /// A list of modules to exclude may be provided (for example, if these modules would be updated at the same time).
-/// 
+///
 /// If provided a dependency graph, will use versions defined there instead of what the SQL call returns.
 /// This is especially important for the update command, where we want to check requirements with post-update versions as opposed to what's currently installed.
 ClassMethod GetRequiredVersionExpression(
@@ -1019,7 +1019,7 @@ ClassMethod GetModuleNameFromXML(
 ///     <Parameter Name="NoLock">1</Parameter>
 /// </Defaults>
 /// ```
-/// 
+///
 /// Returns results as multidimensional array
 ClassMethod GetModuleDefaultsFromXML(
 	pDirectory As %String,
@@ -2083,13 +2083,29 @@ ClassMethod EndCaptureOutput(
 {
     #dim tLast,tKey,tValue As %String
 
-    if pCookie'="" {
-        #; Use the original redirected routine
+    // If this routine was nested within another chained capture, the correct I/O handler is restored. In the case that the chained capture is no longer active, the chained capture routine's prior I/O handler needs to be reinstated
+    if ($data($$$IPMLogCapture("chainedCaptureIOHandler")) && (pCookie = $get($$$IPMLogCapture("chainedCaptureIOHandler")))) {
+        if '$get($$$IPMLogCapture("active")) {
+            // The chained log capture ended while this capture was on top, so restore the handler it replaced
+            set tPriorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
+            if tPriorIOHandler'="" {
+                use $io::("^"_tPriorIOHandler)
+            } else {
+                do ##class(%Device).ReDirectIO(0)
+                use $io::("")
+            }
+            kill $$$IPMLogCapture
+        } else {
+            // The chained log capture is still active, so hand output back to it
+            use $io::("^"_pCookie)
+        }
+    } elseif pCookie'="" {
+        // Use the original redirected routine
         use $io::("^"_pCookie)
     } else {
-        #; Otherwise switch redirection off
+        // Otherwise switch redirection off
         do $zutil(82,12,0)
-        #; Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
+        // Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
         use $io::("")
     }
 
