@@ -177,7 +177,14 @@ ClassMethod LoadModuleReference(
                 } elseif $data(qstruct("/compile")) {
                     kill qstruct("/compile")
                 }
-                set tSC = $system.OBJ.Load(tTmpStream.Filename,.qstruct, , .tLoaded)
+                do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
+                try {
+                    set tSC = $system.OBJ.Load(tTmpStream.Filename,.qstruct, , .tLoaded)
+                } catch ex {
+                    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                    throw ex
+                }
+                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
                 set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoaded, .qstruct))
             }
             set errorMsg = "", success = 0
@@ -1215,7 +1222,14 @@ ClassMethod LoadNewModule(
         }
 
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
-        set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
+        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
+        try {
+            set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
+        } catch ex {
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+            throw ex
+        }
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
         $$$ThrowOnError(tSC)
 
         set tFirstLoaded = $order(tLoadedList(""))
@@ -1289,7 +1303,14 @@ ClassMethod LoadNewModule(
         }
         do ..LoadDependencies(tModule,, .params)
 
-        set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
+        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
+        try {
+            set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
+        } catch ex {
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+            throw ex
+        }
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
         $$$ThrowOnError(tSC)
         set tSC = tModule.%Reload()
         $$$ThrowOnError(tSC)

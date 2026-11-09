@@ -14,6 +14,9 @@ Parameter TargetClass = "Test.PM.Integration.Data.RedirectionToLog.Target";
 /// Fully-qualified name of a class whose compile fails; its error output names it on the device.
 Parameter ErrorTargetClass = "Test.PM.Integration.Data.RedirectionToLog.ErrorTarget";
 
+/// Part of the path of the non-existent xml file redirect-error-module tries to import; fails
+Parameter ErrorFileFragment = "redirect-error-target";
+
 Property LoadedClasses [Multidimensional];
 
 Method OnBeforeOneTest(testname As %String) As %Status
@@ -143,6 +146,42 @@ Method TestCommandErrorRestoresRedirection()
     // Clean up
     do ##class(%IPM.Main).Shell("uninstall redirect-error-module -r")
     do $system.OBJ.Delete("RedirectErrorModule.Trigger", "-d")
+}
+
+/// A failing $system call surfaces its error in both the log (at [ERROR]) and the terminal, and the
+/// shell still closes the redirection the command left open.
+Method TestCommandErrorLogsStatusAndRestoresRedirection()
+{
+    set moduleDir = ..GetModuleDir("redirect-error-module")
+    set logDir = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory()))
+
+    // Record the redirection baseline so we can prove the shell handed control back after the failure.
+    set originalRedirect = ##class(%Device).ReDirectIO()
+    set originalHandler = $select(originalRedirect : $zutil(96, 12), 1 : "")
+
+    // Capture the terminal so we can prove the $system error was echoed, not only logged.
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("load -v -log-dir " _ logDir _ " " _ moduleDir)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .terminal)
+    do $$$AssertStatusNotOK(sc, "Loading a module that throws from a wrapped $system call WAS reported as an error")
+
+    // Check that error would be surfaced in the terminal and in the logs.
+    do $$$AssertTrue(..FindStringInMultiDimArray(..#ErrorFileFragment, .terminal), "The $system error WAS echoed to the terminal")
+    set txtPath = $zsearch(logDir _ "*.txt")
+    do $$$AssertNotEquals(txtPath, "", "A .txt log file WAS created for the failed command")
+    do $$$AssertTrue(..FileContains(txtPath, ..#ErrorFileFragment), "The $system error WAS logged")
+
+    // The failed command must leave redirection exactly as it found it.
+    set finalRedirect = ##class(%Device).ReDirectIO()
+    do $$$AssertEquals(finalRedirect, originalRedirect, "Redirection state WAS restored after the failed command")
+    set finalHandler = $select(finalRedirect : $zutil(96, 12), 1 : "")
+    do $$$AssertEquals(finalHandler, originalHandler, "Original I/O handler WAS restored after the failed command")
+    do $$$AssertNotTrue($data($$$IPMLogCapture), "Chained capture state WAS cleared after the failed command")
+
+    // Clean up
+    do ##class(%IPM.Main).Shell("uninstall redirect-error-module -r")
+    do $system.OBJ.Delete("RedirectErrorModule.Trigger", "-d")
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(logDir)
 }
 
 ClassMethod InitLog(

@@ -84,6 +84,17 @@ Method TestLoad()
     do ..GenericLoggingTest(commands, ..DefaultLogFileDir)
 }
 
+/// Tests that compiler output from a verbose 'load' is written to the .txt log file
+Method TestLoadCapturesCompileOutput()
+{
+    set moduleDir = ..GetModuleDir("logging", "v1", "base-mod")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ moduleDir))
+
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    set txtLogFile = $listget(files.%Get("txt"), 1)
+    do $$$AssertTrue(..FileContains(txtLogFile, "BaseMod.Class1"), "Compiled class name is present in the txt log file")
+}
+
 /// Tests creation of a log file on the 'update' command
 Method TestUpdate()
 {

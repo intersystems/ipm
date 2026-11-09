@@ -596,7 +596,14 @@ Method %Initialize(ByRef pParams) As %Status
         set preloadRoot = $get(pParams("RootDirectory"))_"preload"
         set verbose = $get(pParams("Verbose"))
         if ##class(%File).DirectoryExists(preloadRoot) {
-            set tSC = $system.OBJ.ImportDir(preloadRoot, "*", $select(verbose:"d",1:"-d")_$select($tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+            do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(verbose)
+            try {
+                set tSC = $system.OBJ.ImportDir(preloadRoot, "*", $select(verbose:"d",1:"-d")_$select($tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+            } catch ex {
+                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                throw ex
+            }
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
             if $$$ISERR(tSC) { quit }
             set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
             if $$$ISERR(tSC) { quit }
@@ -631,7 +638,15 @@ Method %Reload(ByRef pParams) As %Status
         quit:tRoot=""
 
         set tRoot = ##class(%File).NormalizeDirectory("",tRoot)
-        set tSC = $system.OBJ.Load(tRoot_"module.xml","/nodisplay",.error,.tLoadedList) quit:$$$ISERR(tSC)
+        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(0)
+        try {
+            set tSC = $system.OBJ.Load(tRoot_"module.xml","/nodisplay",.error,.tLoadedList)
+        } catch ex {
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+            throw ex
+        }
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        quit:$$$ISERR(tSC)
 
         // Validate loaded module
         set first = $$$lcase($order(tLoadedList("")))
