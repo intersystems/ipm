@@ -145,8 +145,7 @@ Method WriteLogLine(
         }
 
         if '$listfind($listfromstring(..#LogLevels), level) {
-            set errMsg = "Attempted to write to log with invalid log level '"_level_"'. Please ensure log level is one of: "_..#LogLevels_$$$NL_"Attempted message to log was: "_message
-            do ..WriteLogLine(errMsg, "ERROR")
+            set errMsg = "Attempted to write to IPM command logs ("_..JSONFilePath_" and "_ ..TxtFilePath_") with invalid log level '"_level_"'. Please ensure log level is one of: "_..#LogLevels_$$$NL_"Attempted message to log was: "_message
             $$$ThrowOnError($$$ERROR($$$GeneralError, errMsg))
         }
 
@@ -173,23 +172,39 @@ Method WriteLogLine(
         $$$ThrowOnError(txtStream.MoveToEnd())
         do txtStream.WriteLine(timestamp _ " [" _ level _ "] " _ message)
         $$$ThrowOnError(txtStream.%Save())
-
-        return $$$OK
     }
     catch ex
     {
-        return ex.AsStatus()
+        set sc = ex.AsStatus()
+        set consoleSc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
+        if $$$ISERR(consoleSc) {
+            set sc = $system.Status.AppendStatus(sc,consoleSc)
+        }
     }
+    return sc
 }
 
 /// Write a standard final "Logging Complete" message to both the JSON and TXT log files and mark log as no longer initialized
-Method Finalize()
+Method Finalize() As %Status
 {
-    if (..Initialized) {
-        $$$ThrowOnError(..WriteLogLine("Logging COMPLETE", "INFO"))
-        set ..JSONFilePath = ""
-        set ..TxtFilePath = ""
+    set sc = $$$OK
+    try {
+        if (..Initialized) {
+            set ..Verbose = 0 // Make sure the final line of the log is not written to the terminal
+            $$$ThrowOnError(..WriteLogLine("Logging COMPLETE", "INFO"))
+            set ..JSONFilePath = ""
+            set ..TxtFilePath = ""
+        }
     }
+    catch ex {
+        set fullSc = ex.AsStatus()
+        set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
+        if $$$ISERR(sc) {
+            set fullSc = $system.Status.AppendStatus(fullSc,sc)
+        }
+        return fullSc
+    }
+    return sc
 }
 
 Method Flush(pThreshold As %Integer = {..Threshold})
@@ -284,4 +299,168 @@ Method AddMessage(
     }
 }
 
+/// Install a chained output-capture tee that routes IRIS-native output into the log in real
+/// time while still forwarding it live down the redirect chain (terminal or an outer capture).
+/// Each logical line (one per newline) is sent to <method>WriteLogLine</method>.
+/// Pair with <method>EndChainedCaptureToLog</method>. The predecessor handler is recorded so this
+/// coexists with an already-active <class>%IPM.Utils.Module</class> capture or the test harness.
+/// @Argument writeToTerminal   Controls live forwarding up the redirect chain. When 0, forwarding
+///                             is blocked, so output reaches the log only and not the terminal or
+///                             any outer capture.
+ClassMethod BeginChainedCaptureToLog(writeToTerminal As %Boolean = 0) [ ProcedureBlock = 0 ]
+{
+    new priorIOHandler
+
+    if $data($$$IPMLogCapture("active")) {
+        quit
+    }
+
+    // Start with a clean slate in case metadata from a previous capture is still present
+    kill $$$IPMLogCapture
+
+    // Record the previous redirect handler so that it can be restored once EndChainedCaptureToLog is called.
+    if ##class(%Device).ReDirectIO() {
+        set priorIOHandler = $zutil(96,12)
+    } else {
+        set priorIOHandler = ""
+    }
+    // This is safeguard for the case that redirection from this method is still on but the $$$IPMLogCapture metadata somehow got wiped,
+    // since priorIOHandler = $zname would cause out() to re-enter wstr() in an infinite loop
+    if (priorIOHandler = $zname) {
+        set priorIOHandler = ""
+    }
+    set $$$IPMLogCapture("chainedCaptureIOHandler") = $zname
+    set $$$IPMLogCapture("priorIOHandler") = priorIOHandler
+    set $$$IPMLogCapture("line") = ""
+    set $$$IPMLogCapture("writeToTerminal") = writeToTerminal
+    set $$$IPMLogCapture("active") = 1
+
+    // Install this routine's labels as the device mnemonic routine and switch interception on.
+    use $io::("^"_$zname)
+    do ##class(%Device).ReDirectIO(1)
+    quit
+
+    // --- Device redirection entry points (called by the kernel while interception is on) ---
+rstr(size,timeout) [result,readExpr,isRedirectOn] public {
+    new result,readExpr,isRedirectOn
+    set readExpr = "result"
+    set isRedirectOn = ##class(%Device).ReDirectIO(0)
+    set:$data(size) readExpr = readExpr_"#"_size
+    set:$data(timeout) readExpr = readExpr_":"_timeout
+    read @readExpr
+    do:$data(timeout) $system.Process.IODollarTest($test)
+    do ##class(%Device).ReDirectIO(isRedirectOn)
+    quit result
+}
+wchr(char) public { do fwd($char(char)) do buf($char(char)) }
+wff() public { do fwd($char(12)) do buf($char(12)) }
+wnl() public { do fwd($char(13,10)) do buf($char(10)) }
+wstr(string) public { do fwd(string) do buf(string) }
+wtab(col) [pad] public {
+    new pad
+    set pad = $justify("", $select(col>$x:col-$x, 1:0))
+    do fwd(pad) do buf(pad)
+}
+
+    // Forward to the prior handler unless the active capture has verbose terminal output turned off
+fwd(string) [priorIOHandler,isRedirectOn] public {
+    new priorIOHandler,isRedirectOn
+
+    if ($get($$$IPMLogCapture("active")) && '$get($$$IPMLogCapture("writeToTerminal"))) {
+        quit
+    }
+    set priorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
+    set isRedirectOn = 1 // Default value that will be true in most cases
+
+    try {
+        set isRedirectOn = ##class(%Device).ReDirectIO(0)
+
+        // Forward the string to write to the prior I/O handler if it exists, and if not, write directly to current device
+        if (priorIOHandler '= "") {
+            use $io::("^"_priorIOHandler)
+            do ##class(%Device).ReDirectIO(1)
+            write string
+            do ##class(%Device).ReDirectIO(0)
+        } else {
+            write string
+        }
+    } catch ex {
+        do ##class(%SYS.System).WriteToConsoleLog("Exception occurred when forwarding string '"_string_"' to the prior I/O handler or current device: "_ex.DisplayString())
+        do ##class(%SYS.System).WriteToConsoleLog("Restoring "_$zname_" as I/O handler and set I/O redirection switch to 'on'.")
+    }
+
+    use $io::("^"_$zname)
+    do ##class(%Device).ReDirectIO(isRedirectOn)
+}
+    // Assemble logical lines; on each newline flush the completed line to the log.
+buf(string) [line,nl] public {
+    new line,nl
+    // After teardown an outer capture may reinstall this routine; without this guard the
+    // nodes below would resurrect a half-populated tee and log stray lines.
+    if '$data($$$IPMLogCapture("active")) { quit }
+    set line = $get($$$IPMLogCapture("line"))
+    set nl = $find(string,$char(10))
+    while nl {
+        set line = line_$extract(string,1,nl-2)
+        set line = $zstrip(line, ">", "C") // Strip control characters
+        do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line)
+        set line = ""
+        set string = $extract(string,nl,*)
+        set nl = $find(string,$char(10))
+    }
+    set $$$IPMLogCapture("line") = line_string
+}
+}
+
+/// Remove the chained capture tee installed by <method>BeginChainedCaptureToLog</method>,
+/// flushing any trailing partial line, and restore the predecessor redirect handler.
+ClassMethod EndChainedCaptureToLog() [ ProcedureBlock = 0 ]
+{
+    new priorIOHandler,line, chainedCaptureIOHandler
+
+    if '$data($$$IPMLogCapture("active")) {
+        quit
+    }
+
+    set line = $get($$$IPMLogCapture("line"))
+    if (line '= "") {
+        do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line)
+    }
+
+    set priorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
+    set chainedCaptureIOHandler = $get($$$IPMLogCapture("chainedCaptureIOHandler"))
+
+    // If I/O redirection is on, and the current redirection handler is NOT this routine,
+    // then make sure to hold onto the prior I/O handler so that fwd() can pass output through to it
+    if (##class(%Device).ReDirectIO() && ($zutil(96,12) '= $zname)) {
+        kill $$$IPMLogCapture
+        set $$$IPMLogCapture("priorIOHandler") = priorIOHandler
+        set $$$IPMLogCapture("chainedCaptureIOHandler") = chainedCaptureIOHandler
+        quit
+    }
+
+    if (priorIOHandler '= "") {
+        use $io::("^"_priorIOHandler)
+    } else {
+        do ##class(%Device).ReDirectIO(0)
+        use $io::("")
+    }
+
+    kill $$$IPMLogCapture
+    quit
+}
+
+/// Writes one buffered log line to the log files, temporarily setting verbosity
+/// to 0 so the log write does not write the line twice.
+/// @Argument line      %String to write to the active logs
+ClassMethod FlushCapturedBuffer(line As %String)
+{
+    set currentLogMgr = ..%Get(.sc)
+    if $isobject(currentLogMgr) {
+        set verbose = currentLogMgr.Verbose
+        set currentLogMgr.Verbose = 0
+        do currentLogMgr.WriteLogLine(line)
+        set currentLogMgr.Verbose = verbose
+    }
+}
 }
