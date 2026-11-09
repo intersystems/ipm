@@ -203,13 +203,13 @@ Method TestLineWithNewLineLoggedCleanly()
 {
     set log = ##class(%IPM.General.LogManager).%Get(.sc)
     $$$ThrowOnError(sc)
-    do ..InitLog(log)
+    $$$ThrowOnError(..InitLog(log))
     set txtPath = log.TxtFilePath
 
-    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(0)
+    $$$ThrowOnError(##class(%IPM.General.LogManager).BeginChainedCaptureToLog(0))
     write "First line"_$char(13,10)_"Second line"
-    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-    do log.Finalize()
+    $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
+    $$$ThrowOnError(log.Finalize())
 
     set firstLine = ..GetLineInFile(txtPath, "First line")
     set secondLine = ..GetLineInFile(txtPath, "Second line")
