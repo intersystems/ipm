@@ -195,6 +195,28 @@ Method TestNonVerboseChainedCapture()
     do $$$AssertNotTrue(..FileContains(txtPath, "Inner only line"), "Inner-captured line was NOT double-routed into the log")
 }
 
+/// A string with an embedded CRLF character (carriage return and newline) captured by the
+/// redirection handler is correctly logged as two separate lines with control characters stripped
+Method TestLineWithNewLineLoggedCleanly()
+{
+    set log = ##class(%IPM.General.LogManager).%Get(.sc)
+    $$$ThrowOnError(sc)
+    do ..InitLog(log)
+    set txtPath = log.TxtFilePath
+
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(0)
+    write "First line"_$char(13,10)_"Second line"
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+    do log.Finalize()
+
+    set firstLine = ..GetLineInFile(txtPath, "First line")
+    set secondLine = ..GetLineInFile(txtPath, "Second line")
+    do $$$AssertEquals(firstLine, "First line", "First line ends cleanly at the CRLF")
+    do $$$AssertEquals(secondLine, "Second line", "Second line ends cleanly at capture end")
+    do $$$AssertNotTrue(firstLine [ $char(13), "First logged line does NOT contain a carriage return")
+    do $$$AssertNotTrue(secondLine [ $char(13), "Second logged line does NOT contain a carriage return")
+}
+
 /// A second, nested BeginChainedCaptureToLog should not have any effect on redirection.
 Method TestNonReentrant()
 {

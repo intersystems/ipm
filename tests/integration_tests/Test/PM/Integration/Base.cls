@@ -186,6 +186,24 @@ ClassMethod FileContains(
 	return 0
 }
 
+/// Returns the first line of the file at <var>filePath</var> containing <var>string</var>, or "" if none does.
+/// @Argument filePath	Path of the file to read.
+/// @Argument string	Substring used to find the line.
+ClassMethod GetLineInFile(
+	filePath As %String,
+	string As %String) As %String
+{
+	set stream = ##class(%Stream.FileCharacter).%New()
+	set stream.Filename = filePath
+	while 'stream.AtEnd {
+		set line = stream.ReadLine()
+		if (line [ string) {
+			return line
+		}
+	}
+	return ""
+}
+
 /// Sends a GET request to the local web server and returns an error unless the response is HTTP 200.
 /// @Argument path	GET endpoint path (relative to the web server URL prefix).
 ClassMethod HttpGet(path As %String = "/") As %Status

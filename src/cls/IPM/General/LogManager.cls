@@ -408,6 +408,7 @@ buf(string) [line,nl] public {
     set nl = $find(string,$char(10))
     while nl {
         set line = line_$extract(string,1,nl-2)
+        set line = $zstrip(line, ">", "C") // Strip control characters
         do ##class(%IPM.General.LogManager).FlushCapturedBuffer(line)
         set line = ""
         set string = $extract(string,nl,*)
