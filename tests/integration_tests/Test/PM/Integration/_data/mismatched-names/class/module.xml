@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Document name="mismatched-class.ZPM"><Module>
+  <Name>mismatched-class</Name>
+  <Version>0.0.1</Version>
+  <Resources>
+    <Resource Name="MismatchTest.Foo.CLS"/>
+  </Resources>
+</Module>
+</Document></Export>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Document name="mismatched-document.ZPM"><Module>
+  <Name>mismatched-document</Name>
+  <Version>0.0.1</Version>
+  <Resources>
+    <Resource Name="MismatchTest.Messages.LOC"/>
+  </Resources>
+</Module>
+</Document></Export>
