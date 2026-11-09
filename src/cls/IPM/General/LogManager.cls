@@ -179,8 +179,8 @@ Method WriteLogLine(
     {
         set fullSc = ex.AsStatus()
         set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
-        If $$$ISERR(sc) {
-            set fullSc = $System.Status.AppendStatus(fullSc,sc)
+        if $$$ISERR(sc) {
+            set fullSc = $system.Status.AppendStatus(fullSc,sc)
         }
         return fullSc
     }
@@ -201,8 +201,8 @@ Method Finalize() As %Status
     catch ex {
         set fullSc = ex.AsStatus()
         set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
-        If $$$ISERR(sc) {
-            set fullSc = $System.Status.AppendStatus(fullSc,sc)
+        if $$$ISERR(sc) {
+            set fullSc = $system.Status.AppendStatus(fullSc,sc)
         }
         return fullSc
     }
@@ -314,7 +314,7 @@ ClassMethod BeginChainedCaptureToLog(writeToTerminal As %Boolean = 0) [ Procedur
     new priorIOHandler
 
     if $data($$$IPMLogCapture("active")) {
-        Quit
+        quit
     }
 
     // Start with a clean slate in case metadata from a previous capture is still present
@@ -363,25 +363,38 @@ wtab(col) [pad] public {
     set pad = $justify("", $select(col>$x:col-$x, 1:0))
     do fwd(pad) do buf(pad)
 }
+
     // Forward to the prior handler unless the active capture has verbose terminal output turned off
 fwd(string) [priorIOHandler,isRedirectOn] public {
     new priorIOHandler,isRedirectOn
 
     if ('$get($$$IPMLogCapture("writeToTerminal")) && $get($$$IPMLogCapture("active"))) {
-        Quit
+        quit
     }
     set priorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
-    set isRedirectOn = ##class(%Device).ReDirectIO(0)
+    set isRedirectOn = 1 // Default value that will be true in most cases
 
-    // If priorIOHandler is "", there is no prior handler to forward to, so write directly to current device
-    if (priorIOHandler '= "") {
-        use $io::("^"_priorIOHandler)
-        do ##class(%Device).ReDirectIO(1)
-        write string
-        do ##class(%Device).ReDirectIO(0)
-    } else {
-        write string
+    try {
+        set isRedirectOn = ##class(%Device).ReDirectIO(0)
+
+        // Forward the string to write to the prior I/O handler if it exists, and if not, write directly to current device
+        if (priorIOHandler '= "") {
+            use $io::("^"_priorIOHandler)
+            do ##class(%Device).ReDirectIO(1)
+            write string
+            do ##class(%Device).ReDirectIO(0)
+        } else {
+            write string
+        }
+    } catch ex {
+        do ##class(%SYS.System).WriteToConsoleLog("Exception occurred when forwarding string '"_string_"' to the prior I/O handler or current device: "_ex.DisplayString())
+
+        use $io::("^"_$zname)
+        do ##class(%Device).ReDirectIO(isRedirectOn)
+
+        do ##class(%SYS.System).WriteToConsoleLog("Restored "_$zname_" as I/O handler and set I/O redirection switch to 'on'.")
     }
+
     use $io::("^"_$zname)
     do ##class(%Device).ReDirectIO(isRedirectOn)
 }
