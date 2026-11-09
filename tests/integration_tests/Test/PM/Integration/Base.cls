@@ -188,7 +188,7 @@ ClassMethod FileContains(
 
 /// Returns the first line of the file at <var>filePath</var> containing <var>string</var>, or "" if none does.
 /// @Argument filePath	Path of the file to read.
-/// @Argument string	Substring used to find the line.
+/// @Argument string	Substring contained in line to find.
 ClassMethod GetLineInFile(
 	filePath As %String,
 	string As %String) As %String

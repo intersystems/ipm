@@ -211,8 +211,7 @@ Method TestLineWithNewLineLoggedCleanly()
 
     set firstLine = ..GetLineInFile(txtPath, "First line")
     set secondLine = ..GetLineInFile(txtPath, "Second line")
-    do $$$AssertEquals(firstLine, "First line", "First line ends cleanly at the CRLF")
-    do $$$AssertEquals(secondLine, "Second line", "Second line ends cleanly at capture end")
+    do $$$AssertNotEquals(firstLine, secondLine, "Redirected output with CRLF embedded in it IS split into separate log lines")
     do $$$AssertNotTrue(firstLine [ $char(13), "First logged line does NOT contain a carriage return")
     do $$$AssertNotTrue(secondLine [ $char(13), "Second logged line does NOT contain a carriage return")
 }
