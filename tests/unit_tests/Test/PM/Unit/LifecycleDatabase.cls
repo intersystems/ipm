@@ -32,6 +32,11 @@ Method TestPackagingDerivesLifecycleClass()
     set module.LifecycleClass = ""
     do $$$AssertStatusOK(module.%ValidateObject(), "Module with empty LifecycleClass and Packaging=database validates")
     do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.Database", "Empty LifecycleClass derived from database packaging")
+
+    // A declared lifecycle class is kept, so a Packaging it does not implement is an error.
+    set module.LifecycleClass = "%IPM.Lifecycle.StudioProject"
+    do $$$AssertStatusNotOK(module.%ValidateObject(), "Declared lifecycle class with mismatched Packaging fails validation")
+    do $$$AssertEquals(module.LifecycleClass, "%IPM.Lifecycle.StudioProject", "Declared lifecycle class not replaced")
 }
 
 /// Guards the ComputeSHA256Hex output contract (64-char lowercase hex): the hash is produced

@@ -1563,17 +1563,17 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
             if (..Packaging = "") {
                 set ..Packaging = tPackaging
             } elseif (..Packaging '= tPackaging) {
-                // The lifecycle class is still the default but Packaging has been changed.
-                // Derive the correct class from the Packaging value via the canonical mapping.
-                set tSC = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(..Packaging, .tDerived)
-                quit:$$$ISERR(tSC)
-                if tDerived '= "" {
-                    set ..LifecycleClass = tDerived
-                } else {
-                    // No lifecycle class claims this packaging value, so there is nothing to switch to.
-                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', which no lifecycle class implements. Lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
+                // A declared lifecycle class wins. Only the default is derived from Packaging.
+                set tDerived = ""
+                if (..LifecycleClass = ($$$DefaultLifecyclePackageDot _ "Module")) {
+                    set tSC = ##class(%IPM.Lifecycle.Base).GetBaseClassForPackaging(..Packaging, .tDerived)
+                    quit:$$$ISERR(tSC)
+                }
+                if (tDerived = "") {
+                    set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Module's packaging is set to '%1', but lifecycle class '%2' has packaging '%3'.",..Packaging,..LifecycleClass,tPackaging))
                     quit
                 }
+                set ..LifecycleClass = tDerived
             }
         } elseif (..LifecycleClass = "") && (..Packaging '= "") {
             // Derive lifecycle from packaging; fall back to the generic Module lifecycle

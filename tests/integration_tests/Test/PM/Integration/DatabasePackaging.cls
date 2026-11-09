@@ -214,7 +214,7 @@ Method OnAfterAllTests() As %Status
 Method CreateTestNamespace(pNamespace As %String) As %Status
 {
     // Create the standard namespace (initially Globals=pNamespace, Routines=pNamespace)
-    set sc = ##class(%IPM.Test.Utils).CreateNamespace(pNamespace)
+    set sc = ##class(%IPM.Test.Utils).CreateNamespace(pNamespace, 0)
     if $$$ISERR(sc) {
         return sc
     }
@@ -1375,7 +1375,7 @@ Method TestWarnsWhenRoutinesDatabaseIsGlobalsDatabase()
     // %IPM.Test.Utils.CreateNamespace leaves Routines = Globals = <NS>. CreateTestNamespace is the
     // helper that then gives the namespace a separate globals DB.
     set sameNS = "TESTDBSAMEDB"
-    do $$$AssertStatusOK(##class(%IPM.Test.Utils).CreateNamespace(sameNS), "Created namespace with one database")
+    do $$$AssertStatusOK(##class(%IPM.Test.Utils).CreateNamespace(sameNS, 0), "Created namespace with one database")
     set ..CreatedNamespaces = ..CreatedNamespaces _ $listbuild(sameNS)
     set splitNS = "TESTDBSPLITDB"
     do $$$AssertStatusOK(..CreateTestNamespace(splitNS), "Created namespace with a separate globals DB")

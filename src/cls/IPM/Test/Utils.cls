@@ -3,10 +3,10 @@ Include %sySecurity
 Class %IPM.Test.Utils
 {
 
-/// Only ensemble-enable the namespace when required.
+/// Pass pEnableEnsemble = 0 to skip interoperability, which is slow to enable, when the namespace does not need it.
 ClassMethod CreateNamespace(
 	pNSName As %String,
-	pEnableEnsemble As %Boolean = 0) As %Status
+	pEnableEnsemble As %Boolean = 1) As %Status
 {
     new $namespace
     set tSC = $$$OK
