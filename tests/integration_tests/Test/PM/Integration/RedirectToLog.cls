@@ -216,6 +216,8 @@ Method TestLineWithNewLineLoggedCleanly()
     do $$$AssertNotEquals(firstLine, secondLine, "Redirected output with CRLF embedded in it IS split into separate log lines")
     do $$$AssertNotTrue(firstLine [ $char(13), "First logged line does NOT contain a carriage return")
     do $$$AssertNotTrue(secondLine [ $char(13), "Second logged line does NOT contain a carriage return")
+    do $$$AssertNotTrue(firstLine [ $char(10), "First logged line does NOT contain a newline")
+    do $$$AssertNotTrue(secondLine [ $char(10), "Second logged line does NOT contain a newline")
 }
 
 /// A second, nested BeginChainedCaptureToLog should not have any effect on redirection.

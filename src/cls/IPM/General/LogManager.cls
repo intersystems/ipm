@@ -172,18 +172,16 @@ Method WriteLogLine(
         $$$ThrowOnError(txtStream.MoveToEnd())
         do txtStream.WriteLine(timestamp _ " [" _ level _ "] " _ message)
         $$$ThrowOnError(txtStream.%Save())
-
-        return $$$OK
     }
     catch ex
     {
-        set fullSc = ex.AsStatus()
-        set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
-        if $$$ISERR(sc) {
-            set fullSc = $system.Status.AppendStatus(fullSc,sc)
+        set sc = ex.AsStatus()
+        set consoleSc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
+        if $$$ISERR(consoleSc) {
+            set sc = $system.Status.AppendStatus(sc,consoleSc)
         }
-        return fullSc
     }
+    return sc
 }
 
 /// Write a standard final "Logging Complete" message to both the JSON and TXT log files and mark log as no longer initialized
@@ -368,7 +366,7 @@ wtab(col) [pad] public {
 fwd(string) [priorIOHandler,isRedirectOn] public {
     new priorIOHandler,isRedirectOn
 
-    if ('$get($$$IPMLogCapture("writeToTerminal")) && $get($$$IPMLogCapture("active"))) {
+    if ($get($$$IPMLogCapture("active")) && '$get($$$IPMLogCapture("writeToTerminal"))) {
         quit
     }
     set priorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
@@ -388,11 +386,7 @@ fwd(string) [priorIOHandler,isRedirectOn] public {
         }
     } catch ex {
         do ##class(%SYS.System).WriteToConsoleLog("Exception occurred when forwarding string '"_string_"' to the prior I/O handler or current device: "_ex.DisplayString())
-
-        use $io::("^"_$zname)
-        do ##class(%Device).ReDirectIO(isRedirectOn)
-
-        do ##class(%SYS.System).WriteToConsoleLog("Restored "_$zname_" as I/O handler and set I/O redirection switch to 'on'.")
+        do ##class(%SYS.System).WriteToConsoleLog("Restoring "_$zname_" as I/O handler and set I/O redirection switch to 'on'.")
     }
 
     use $io::("^"_$zname)

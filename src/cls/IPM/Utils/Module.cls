@@ -2063,7 +2063,7 @@ ClassMethod EndCaptureOutput(
     #dim tLast,tKey,tValue As %String
 
     // If this routine was nested within another chained capture, the correct I/O handler is restored. In the case that the chained capture is no longer active, the chained capture routine's prior I/O handler needs to be reinstated
-    if ($data($$$IPMLogCapture("chainedCaptureIOHandler")) && (pCookie = $get($$$IPMLogCapture("chainedCaptureIOHandler")))) {
+    if pCookie = $get($$$IPMLogCapture("chainedCaptureIOHandler"), -1) {
         if '$get($$$IPMLogCapture("active")) {
             // The chained log capture ended while this capture was on top, so restore the handler it replaced
             set tPriorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
